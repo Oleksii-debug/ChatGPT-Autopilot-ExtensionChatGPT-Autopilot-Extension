@@ -3,9 +3,32 @@ import { normalizeSpecialistSelectionV1 } from './specialist-registry.js';
 
 export const SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION = 1;
 
-const INPUT_KEYS = new Set(['projectId', 'selection']);
-const DEPENDENCY_KEYS = new Set(['resolveCurrentOutcomeContract']);
+const PREPARE_INPUT_KEYS = new Set(['projectId', 'selection']);
+const PREPARE_DEPENDENCY_KEYS = new Set(['resolveCurrentOutcomeContract']);
+const VERIFY_INPUT_KEYS = new Set(['admission', 'selection']);
+const VERIFY_DEPENDENCY_KEYS = new Set(['resolveCanonicalOutcomeContract']);
+const ADMISSION_KEYS = new Set([
+  'schemaVersion',
+  'projectId',
+  'registryId',
+  'registryRevision',
+  'registryBindingKey',
+  'specialistId',
+  'providerId',
+  'definitionRevision',
+  'executionPlane',
+  'requestedCapabilityIds',
+  'grantedToolIds',
+  'resultContractId',
+  'resultContractRevision',
+  'outcomeContractBindingKey',
+  'bindingKey',
+  'executionAuthorized',
+  'verificationAuthorized',
+  'completionAuthorized',
+]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^sha256:[0-9a-f]{64}$/u;
 const MAX_CANONICAL_BINDING_CHARS = 12_000_000;
 
 function snapshot(value, allowed, label) {
@@ -39,6 +62,20 @@ function requireOwn(record, key, label) {
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(label + ' must use exact canonical identity representation');
+  }
+  return value;
+}
+
+function exactPositiveInteger(value, label) {
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+    throw new Error(label + ' must be a positive exact integer');
+  }
+  return value;
+}
+
+function exactSha256(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
+    throw new Error(label + ' must be an exact SHA-256 binding');
   }
   return value;
 }
@@ -79,6 +116,75 @@ function selectionProjection(selection) {
   ];
 }
 
+function admissionSelection(admission) {
+  return normalizeSpecialistSelectionV1({
+    schemaVersion: 1,
+    registryId: admission.registryId,
+    registryRevision: admission.registryRevision,
+    registryBindingKey: admission.registryBindingKey,
+    specialistId: admission.specialistId,
+    providerId: admission.providerId,
+    definitionRevision: admission.definitionRevision,
+    executionPlane: admission.executionPlane,
+    requestedCapabilityIds: admission.requestedCapabilityIds,
+    grantedToolIds: admission.grantedToolIds,
+    resultContractId: admission.resultContractId,
+  });
+}
+
+function sameProjection(left, right) {
+  return JSON.stringify(selectionProjection(left)) === JSON.stringify(selectionProjection(right));
+}
+
+async function admissionBindingKey(projectId, selection, contractId, contractRevision, outcomeContractBindingKey) {
+  return sha256Binding([
+    SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION,
+    projectId,
+    selectionProjection(selection),
+    contractId,
+    contractRevision,
+    outcomeContractBindingKey,
+  ], 'Specialist OutcomeContract admission');
+}
+
+export function normalizeSpecialistOutcomeContractAdmissionV1(input) {
+  const raw = snapshot(input, ADMISSION_KEYS, 'Specialist OutcomeContract admission');
+  for (const key of ADMISSION_KEYS) requireOwn(raw, key, 'Specialist OutcomeContract admission');
+  if (raw.schemaVersion !== SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION) {
+    throw new Error('Specialist OutcomeContract admission schemaVersion must be numeric 1');
+  }
+  const projectId = exactId(raw.projectId, 'projectId');
+  const selection = admissionSelection(raw);
+  const resultContractRevision = exactPositiveInteger(raw.resultContractRevision, 'resultContractRevision');
+  const outcomeContractBindingKey = exactSha256(raw.outcomeContractBindingKey, 'outcomeContractBindingKey');
+  const bindingKey = exactSha256(raw.bindingKey, 'bindingKey');
+  if (raw.executionAuthorized !== false
+      || raw.verificationAuthorized !== false
+      || raw.completionAuthorized !== false) {
+    throw new Error('Specialist OutcomeContract admission cannot grant authority');
+  }
+  return freeze({
+    schemaVersion: SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION,
+    projectId,
+    registryId: selection.registryId,
+    registryRevision: selection.registryRevision,
+    registryBindingKey: selection.registryBindingKey,
+    specialistId: selection.specialistId,
+    providerId: selection.providerId,
+    definitionRevision: selection.definitionRevision,
+    executionPlane: selection.executionPlane,
+    requestedCapabilityIds: selection.requestedCapabilityIds,
+    grantedToolIds: selection.grantedToolIds,
+    resultContractId: selection.resultContractId,
+    resultContractRevision,
+    outcomeContractBindingKey,
+    bindingKey,
+    executionAuthorized: false,
+    verificationAuthorized: false,
+    completionAuthorized: false,
+  });
+}
+
 /**
  * Freezes the mutable Specialist resultContractId reference to one exact
  * canonical OutcomeContract revision at admission time.
@@ -89,8 +195,12 @@ function selectionProjection(selection) {
  * authority.
  */
 export async function prepareSpecialistOutcomeContractAdmissionV1(input = {}, dependencies = {}) {
-  const raw = snapshot(input, INPUT_KEYS, 'Specialist OutcomeContract admission request');
-  const deps = snapshot(dependencies, DEPENDENCY_KEYS, 'Specialist OutcomeContract admission dependencies');
+  const raw = snapshot(input, PREPARE_INPUT_KEYS, 'Specialist OutcomeContract admission request');
+  const deps = snapshot(
+    dependencies,
+    PREPARE_DEPENDENCY_KEYS,
+    'Specialist OutcomeContract admission dependencies',
+  );
   const projectId = exactId(
     requireOwn(raw, 'projectId', 'Specialist OutcomeContract admission request'),
     'projectId',
@@ -121,26 +231,17 @@ export async function prepareSpecialistOutcomeContractAdmissionV1(input = {}, de
   if (contract.contractId !== selection.resultContractId) {
     throw new Error('Resolved OutcomeContract identity does not match Specialist resultContractId');
   }
-  if (!Number.isSafeInteger(contract.revision)
-      || Object.is(contract.revision, -0)
-      || contract.revision < 1) {
-    throw new Error('Resolved OutcomeContract revision is not a positive exact integer');
-  }
-
-  const outcomeContractBindingKey = await sha256Binding(
-    contract,
-    'Resolved OutcomeContract',
-  );
-  const bindingKey = await sha256Binding([
-    SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION,
+  const resultContractRevision = exactPositiveInteger(contract.revision, 'Resolved OutcomeContract revision');
+  const outcomeContractBindingKey = await sha256Binding(contract, 'Resolved OutcomeContract');
+  const bindingKey = await admissionBindingKey(
     projectId,
-    selectionProjection(selection),
+    selection,
     contract.contractId,
-    contract.revision,
+    resultContractRevision,
     outcomeContractBindingKey,
-  ], 'Specialist OutcomeContract admission');
+  );
 
-  return freeze({
+  return normalizeSpecialistOutcomeContractAdmissionV1({
     schemaVersion: SPECIALIST_OUTCOME_CONTRACT_ADMISSION_VERSION,
     projectId,
     registryId: selection.registryId,
@@ -153,11 +254,71 @@ export async function prepareSpecialistOutcomeContractAdmissionV1(input = {}, de
     requestedCapabilityIds: selection.requestedCapabilityIds,
     grantedToolIds: selection.grantedToolIds,
     resultContractId: contract.contractId,
-    resultContractRevision: contract.revision,
+    resultContractRevision,
     outcomeContractBindingKey,
     bindingKey,
     executionAuthorized: false,
     verificationAuthorized: false,
     completionAuthorized: false,
   });
+}
+
+/**
+ * Revalidates persisted admission provenance after restart/recovery using the
+ * canonical immutable historical OutcomeContract resolver. This does not
+ * decide verification or completion; it only proves the persisted admission
+ * still names the exact selection and contract semantics admitted earlier.
+ */
+export async function verifySpecialistOutcomeContractAdmissionV1(input = {}, dependencies = {}) {
+  const raw = snapshot(input, VERIFY_INPUT_KEYS, 'Specialist OutcomeContract verification request');
+  const deps = snapshot(
+    dependencies,
+    VERIFY_DEPENDENCY_KEYS,
+    'Specialist OutcomeContract verification dependencies',
+  );
+  const admission = normalizeSpecialistOutcomeContractAdmissionV1(
+    requireOwn(raw, 'admission', 'Specialist OutcomeContract verification request'),
+  );
+  const selection = normalizeSpecialistSelectionV1(
+    requireOwn(raw, 'selection', 'Specialist OutcomeContract verification request'),
+  );
+  const admittedSelection = admissionSelection(admission);
+  if (!sameProjection(selection, admittedSelection)) {
+    throw new Error('Specialist selection drifted from persisted OutcomeContract admission');
+  }
+  const resolver = requireOwn(
+    deps,
+    'resolveCanonicalOutcomeContract',
+    'Specialist OutcomeContract verification dependencies',
+  );
+  if (typeof resolver !== 'function') {
+    throw new Error('resolveCanonicalOutcomeContract must be a trusted resolver function');
+  }
+
+  const lookup = freeze({
+    contractId: admission.resultContractId,
+    contractRevision: admission.resultContractRevision,
+  });
+  const resolved = await resolver(lookup);
+  const contract = normalizeOutcomeContractV1(resolved);
+  if (contract.projectId !== admission.projectId
+      || contract.contractId !== admission.resultContractId
+      || contract.revision !== admission.resultContractRevision) {
+    throw new Error('Canonical OutcomeContract drifted from persisted Specialist admission identity');
+  }
+  const outcomeContractBindingKey = await sha256Binding(contract, 'Canonical OutcomeContract');
+  if (outcomeContractBindingKey !== admission.outcomeContractBindingKey) {
+    throw new Error('Canonical OutcomeContract semantics drifted from persisted Specialist admission');
+  }
+  const bindingKey = await admissionBindingKey(
+    admission.projectId,
+    selection,
+    admission.resultContractId,
+    admission.resultContractRevision,
+    outcomeContractBindingKey,
+  );
+  if (bindingKey !== admission.bindingKey) {
+    throw new Error('Persisted Specialist OutcomeContract admission binding is invalid');
+  }
+  return admission;
 }
