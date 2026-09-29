@@ -341,7 +341,10 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     ownerPlane: ownership.ownerPlane,
     registryId: selection.registryId,
     registryRevision: selection.registryRevision,
-    registryBindingKey: selection.registryBindingKey,
+    registryBindingKey: await canonicalBindingKey(
+      selection.registryBindingKey,
+      'registryBindingKey',
+    ),
     specialistId: selection.specialistId,
     providerId: providerExecution.providerId,
     providerConfigRevision: providerExecution.providerConfig.revision,
