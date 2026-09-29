@@ -1658,6 +1658,7 @@ export class BrowserAgentManager {
 
     let prepared = null;
     let providerRequest = null;
+    let resumedPrepared = false;
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
@@ -1712,10 +1713,43 @@ export class BrowserAgentManager {
       const existing = executions.find(item => item?.agentId === request.agentId);
       if (existing) {
         const canonical = normalizeSpecialistProviderExecutionV1(existing);
-        if (canonical.leaseId === assignment.leaseId) {
+        if (canonical.leaseId !== assignment.leaseId) {
+          throw new Error('Specialist provider execution already exists for this assignment identity');
+        }
+        const exactPreparedIdentity = canonical.status === 'PREPARED'
+          && canonical.planId === plan.planId
+          && canonical.nodeId === node.nodeId
+          && canonical.handoffId === handoff.handoffId
+          && canonical.providerId === providerId
+          && canonical.conversationId === request.conversationId
+          && canonical.leaseUntil === assignment.leaseExpiresAt;
+        if (!exactPreparedIdentity) {
           throw new Error('Existing Specialist provider execution requires reconciliation before redispatch');
         }
-        throw new Error('Specialist provider execution already exists for this assignment identity');
+        if (JSON.stringify(canonical.providerConfig) !== JSON.stringify(normalizedProviderConfig)) {
+          throw new Error('Existing Specialist provider execution provider config drifted before restart attach');
+        }
+        prepared = canonical;
+        resumedPrepared = true;
+        providerRequest = {
+          client: providerClient,
+          input: {
+            handoff,
+            grantedCapabilityIds: selection.requestedCapabilityIds,
+            config: canonical.providerConfig.config,
+            conversationId: canonical.conversationId,
+          },
+        };
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-provider-execution-resumed',
+          agentId: assignment.agentId,
+          providerId,
+          conversationId: canonical.conversationId,
+          leaseId: assignment.leaseId,
+          message: 'Exact durable PREPARED Specialist execution resumed through provider attach semantics.',
+        });
+        return store;
       }
 
       prepared = createSpecialistProviderExecutionV1({
@@ -1771,25 +1805,48 @@ export class BrowserAgentManager {
           providerStatus: '',
           providerSucceeded: false,
           manualReviewRequired: false,
-          reconciliationRequired: false,
-          safeToRetry: true,
+          reconciliationRequired: resumedPrepared,
+          safeToRetry: !resumedPrepared,
           effectEvidence: '',
-          errorCode: 'OWNER_CONTROL_CHANGED_BEFORE_PROVIDER_DISPATCH',
+          errorCode: resumedPrepared
+            ? 'OWNER_CONTROL_CHANGED_DURING_PREPARED_RECOVERY'
+            : 'OWNER_CONTROL_CHANGED_BEFORE_PROVIDER_DISPATCH',
           at: cancelledAt,
         });
         job.runtime.specialistProviderExecutions = executions.map((item, itemIndex) =>
           itemIndex === index ? cancelled : item);
+        if (resumedPrepared) {
+          const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+          const ownershipIndex = ownerships.findIndex(item =>
+            item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+          if (ownershipIndex < 0) {
+            throw new Error('Recovered PREPARED Specialist execution lacks exact execution ownership');
+          }
+          ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
+            leaseId: prepared.leaseId,
+            reason: 'Owner control changed while recovering a durable PREPARED provider execution with ambiguous prior effect.',
+            at: cancelledAt,
+          });
+          job.runtime.specialistExecutionOwnerships = ownerships;
+        }
         job.runtime.updatedAt = this.now();
         appendHistory(job.runtime, {
           at: this.now(),
-          type: 'specialist-provider-dispatch-cancelled',
+          type: resumedPrepared
+            ? 'specialist-provider-recovery-reconcile'
+            : 'specialist-provider-dispatch-cancelled',
           agentId: prepared.agentId,
           providerId: prepared.providerId,
-          message: 'Owner control changed after durable preparation; no provider effect was dispatched.',
+          message: resumedPrepared
+            ? 'Owner control changed during PREPARED recovery; prior provider effect is ambiguous and requires reconciliation.'
+            : 'Owner control changed after durable preparation; no provider effect was dispatched.',
         });
         return store;
       });
-      return { kind: 'SPECIALIST_PROVIDER_NOT_DISPATCHED', execution: clone(cancelled) };
+      return {
+        kind: resumedPrepared ? 'SPECIALIST_PROVIDER_RECONCILE' : 'SPECIALIST_PROVIDER_NOT_DISPATCHED',
+        execution: clone(cancelled),
+      };
     }
 
     let rawOutcome = null;
