@@ -2260,8 +2260,6 @@ async function createBrowserAgentFromDefinition() {
     if (!id) throw new Error('Core не повернув id створеного Agent job.');
 
     ui.selectedBrowserAgentId = id;
-    ui.agentDraftActive = false;
-    ui.agentPolicyDirty = false;
     await loadBrowserAgentJobs({ selectId: id });
 
     const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
