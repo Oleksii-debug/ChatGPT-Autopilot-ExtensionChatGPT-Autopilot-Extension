@@ -605,3 +605,106 @@ test('canonical repository update cannot delete or substitute existing artifact 
   assert.equal(restored.revision, 1);
   assert.equal(restored.projectsById['project-a'].provenanceByArtifactId.build.sourceBindings.length, 1);
 });
+
+
+test('workspace validation rejects persisted chronology inversion', () => {
+  const workspace = createProjectWorkspace(10);
+  workspace.updatedAt = 9;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /updatedAt cannot precede createdAt/,
+  );
+
+  const valid = createProjectWorkspace(1);
+  addProjectSnapshot(valid, snapshot(), { nowMs: 2 });
+  valid.projectsById['project-a'].updatedAt = 1;
+  assert.throws(
+    () => validateProjectWorkspace(valid),
+    /project updatedAt cannot precede createdAt/,
+  );
+});
+
+test('repository update rejects durable-time rollback before invoking caller mutator', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  let mutatorCalls = 0;
+  await assert.rejects(
+    repository.update(workspace => {
+      mutatorCalls += 1;
+      workspace.projectsById['project-a'].snapshot = snapshot('project-r2', 'r2');
+      return workspace;
+    }, { nowMs: 1 }),
+    /nowMs cannot precede durable updatedAt/,
+  );
+
+  assert.equal(mutatorCalls, 0);
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.updatedAt, 2);
+  assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+});
+
+test('generic repository mutation cannot rewrite durable creation time or move project time backward', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.createdAt = 2;
+      return workspace;
+    }, { nowMs: 4 }),
+    /workspace createdAt is immutable/,
+  );
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].createdAt = 1;
+      return workspace;
+    }, { nowMs: 4 }),
+    /project createdAt is immutable/,
+  );
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].updatedAt = 2;
+      return workspace;
+    }, { nowMs: 4 }),
+    /project updatedAt cannot move backward/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.createdAt, 0);
+  assert.equal(restored.updatedAt, 3);
+  assert.equal(restored.projectsById['project-a'].createdAt, 2);
+  assert.equal(restored.projectsById['project-a'].updatedAt, 3);
+});
+
+test('monotonic repository update remains valid after chronology hardening', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+  await repository.update(workspace => {
+    replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 5 });
+    return workspace;
+  }, { nowMs: 5 });
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 2);
+  assert.equal(restored.updatedAt, 5);
+  assert.equal(restored.projectsById['project-a'].updatedAt, 5);
+  assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r2');
+});
