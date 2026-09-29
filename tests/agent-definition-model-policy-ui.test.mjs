@@ -184,6 +184,7 @@ test('Agent definition model policy rejects relationships that canonical Agent b
   assert.throws(
     () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
       modelRouteAllowRouteIdsText: 'route.fast',
+      modelRouteOrderedRouteIdsText: 'route.fast',
       modelRouteDenyRouteIdsText: 'route.strong',
     })),
     /Denied model route ID поза allow scope: route\.strong/u,
@@ -191,6 +192,7 @@ test('Agent definition model policy rejects relationships that canonical Agent b
   assert.throws(
     () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
       modelRouteAllowRouteIdsText: 'route.fast',
+      modelRouteOrderedRouteIdsText: 'route.fast',
       modelRoutePinnedRouteId: 'route.strong',
     })),
     /Pinned model route ID поза allow scope: route\.strong/u,
