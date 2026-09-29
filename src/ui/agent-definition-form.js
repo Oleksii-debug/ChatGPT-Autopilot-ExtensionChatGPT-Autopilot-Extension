@@ -146,51 +146,61 @@ export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Форма Specialist delegation недоступна.');
   }
-  const configured = input.specialistDelegationConfigured === true;
+  const configuredField = optionalOwnModelPolicyFormValue(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
+  const configured = configuredField.present
+    ? exactModelPolicyBoolean(configuredField.value, 'Specialist delegation configured')
+    : false;
   if (!configured) {
     return persistedProfile === undefined ? undefined : null;
   }
   const profile = normalizeAgentSpecialistDelegationProfileV1({
     schemaVersion: 1,
     registryId: parseCanonicalAgentIdentity(
-      input.specialistRegistryId,
+      modelPolicyFormValue(input, 'specialistRegistryId', 'Specialist registry ID', undefined),
       'Specialist registry ID',
     ),
     requiredCapabilityIds: listFromLines(
-      input.specialistCapabilityIdsText ?? '',
+      modelPolicyFormValue(input, 'specialistCapabilityIdsText', 'Specialist capability IDs', ''),
       'Specialist capability ID',
       { maxItems: 64, itemMax: 180, identity: true },
     ),
     requiredToolIds: listFromLines(
-      input.specialistToolIdsText ?? '',
+      modelPolicyFormValue(input, 'specialistToolIdsText', 'Specialist tool IDs', ''),
       'Specialist tool ID',
       { maxItems: 128, itemMax: 180, identity: true },
     ),
     policyEnvelopeId: parseCanonicalAgentIdentity(
-      input.specialistPolicyEnvelopeId,
+      modelPolicyFormValue(input, 'specialistPolicyEnvelopeId', 'Policy envelope ID', undefined),
       'Policy envelope ID',
     ),
     deadlineSeconds: exactIntegerText(
-      input.specialistDeadlineSeconds,
+      modelPolicyFormValue(input, 'specialistDeadlineSeconds', 'Specialist deadline', undefined),
       'Specialist deadline',
       { min: 1, max: 31_536_000 },
     ),
     maxConcurrentHandoffs: exactIntegerText(
-      input.specialistMaxConcurrentHandoffs,
+      modelPolicyFormValue(input, 'specialistMaxConcurrentHandoffs', 'Specialist concurrency', undefined),
       'Specialist concurrency',
       { min: 0, max: 256 },
     ),
     leaseSeconds: exactIntegerText(
-      input.specialistLeaseSeconds,
+      modelPolicyFormValue(input, 'specialistLeaseSeconds', 'Specialist lease', undefined),
       'Specialist lease',
       { min: 1, max: 86_400 },
     ),
     priority: exactIntegerText(
-      input.specialistPriority,
+      modelPolicyFormValue(input, 'specialistPriority', 'Specialist priority', undefined),
       'Specialist priority',
       { min: 0, max: 1_000_000 },
     ),
-    enabled: input.specialistDelegationEnabled === true,
+    enabled: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'specialistDelegationEnabled', 'Specialist delegation enabled', false),
+      'Specialist delegation enabled',
+    ),
   });
   return profile;
 }
@@ -454,6 +464,23 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
     persistedPolicy: modelRoutePolicy,
   });
+  const agentDefinitionId = modelPolicyFormValue(input, 'agentDefinitionId', 'Agent definition ID', undefined);
+  const label = modelPolicyFormValue(input, 'label', 'Назва', undefined);
+  const description = modelPolicyFormValue(input, 'description', 'Опис', '');
+  const instructions = modelPolicyFormValue(input, 'instructions', 'Інструкції', undefined);
+  const capabilityIdsText = modelPolicyFormValue(input, 'capabilityIdsText', 'Capability IDs', '');
+  const toolIdsText = modelPolicyFormValue(input, 'toolIdsText', 'Tool IDs', '');
+  const tagsText = modelPolicyFormValue(input, 'tagsText', 'Tags', '');
+  const acceptanceCriteriaText = modelPolicyFormValue(input, 'acceptanceCriteriaText', 'Критерії завершення', '');
+  const enabled = exactModelPolicyBoolean(
+    modelPolicyFormValue(input, 'enabled', 'Agent definition enabled', false),
+    'Agent definition enabled',
+  );
+  const specialistConfiguredField = optionalOwnModelPolicyFormValue(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
   const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
   if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
     const policyPinnedRouteId = effectiveModelRoutePolicy.pinnedRouteId || '';
@@ -475,18 +502,18 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   }
   return {
     schemaVersion: 1,
-    agentDefinitionId: parseCanonicalAgentIdentity(input.agentDefinitionId, 'Agent definition ID'),
-    label: exactText(input.label, 'Назва', 160),
-    description: exactText(input.description ?? '', 'Опис', 4000, { optional: true }),
-    instructions: exactText(input.instructions, 'Інструкції', 12000),
-    capabilityIds: listFromLines(input.capabilityIdsText ?? '', 'Capability ID', { maxItems:64, itemMax:180, identity:true }),
-    toolIds: listFromLines(input.toolIdsText ?? '', 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
-    tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
-    acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
+    agentDefinitionId: parseCanonicalAgentIdentity(agentDefinitionId, 'Agent definition ID'),
+    label: exactText(label, 'Назва', 160),
+    description: exactText(description, 'Опис', 4000, { optional: true }),
+    instructions: exactText(instructions, 'Інструкції', 12000),
+    capabilityIds: listFromLines(capabilityIdsText, 'Capability ID', { maxItems:64, itemMax:180, identity:true }),
+    toolIds: listFromLines(toolIdsText, 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
+    tags: listFromLines(tagsText, 'Тег', { maxItems:32, itemMax:180, identity:true }),
+    acceptanceCriteria: listFromLines(acceptanceCriteriaText, 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: effectiveConfigDefaults,
     modelRoutePolicy: effectiveModelRoutePolicy,
     ...(() => {
-      const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
+      const effectiveProfile = specialistConfiguredField.present
         ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
           persistedProfile: specialistDelegationProfile,
         })
@@ -497,7 +524,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
         ? {}
         : { specialistDelegationProfile: effectiveProfile };
     })(),
-    enabled: input.enabled === true,
+    enabled,
     definitionRevision,
   };
 }
