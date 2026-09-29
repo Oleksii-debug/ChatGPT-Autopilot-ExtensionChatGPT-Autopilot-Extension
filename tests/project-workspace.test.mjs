@@ -1469,3 +1469,28 @@ test('project workspace mutation helpers reject noncanonical timestamps before m
     /Invalid project workspace project createdAt/,
   );
 });
+
+
+test('direct project mutation helpers reject chronology rollback before mutation', () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 20 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, provenance(), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+});
