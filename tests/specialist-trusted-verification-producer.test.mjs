@@ -728,6 +728,50 @@ test('same-ID provider execution and ownership semantic changes produce distinct
   assert.equal(lookups[1].providerId, PROVIDER_ID);
 });
 
+test('untrusted provider and handoff narrative is bound by digest but never disclosed to verifier', async () => {
+  const baselineLookups = [];
+  const changedLookups = [];
+  await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request(),
+    {
+      resolveTrustedSpecialistExecutionVerification: async lookup => {
+        baselineLookups.push(lookup);
+        return proof();
+      },
+    },
+  );
+
+  const providerSentinel = 'UNTRUSTED_PROVIDER_SENTINEL_DO_NOT_EXECUTE';
+  const handoffSentinel = 'UNTRUSTED_HANDOFF_SENTINEL_DO_NOT_EXECUTE';
+  await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request({
+      providerExecution: providerExecution({ effectEvidence: providerSentinel }),
+      handoff: handoff({ goal: handoffSentinel }),
+    }),
+    {
+      resolveTrustedSpecialistExecutionVerification: async lookup => {
+        changedLookups.push(lookup);
+        return proof();
+      },
+    },
+  );
+
+  assert.equal(baselineLookups.length, 1);
+  assert.equal(changedLookups.length, 1);
+  assert.notEqual(
+    baselineLookups[0].providerExecutionBindingKey,
+    changedLookups[0].providerExecutionBindingKey,
+  );
+  assert.notEqual(
+    baselineLookups[0].handoffBindingKey,
+    changedLookups[0].handoffBindingKey,
+  );
+  const exposed = JSON.stringify(changedLookups[0]);
+  assert.equal(exposed.includes(providerSentinel), false);
+  assert.equal(exposed.includes(handoffSentinel), false);
+  assert.equal(Object.hasOwn(changedLookups[0], 'providerEffectEvidence'), false);
+});
+
 test('hostile accessors and unknown fields are rejected without executing getters', async () => {
   let hits = 0;
   const hostileProof = {
