@@ -59,6 +59,7 @@ import {
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
+  bindSpecialistHandoffToRegistryV1,
   createSpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
@@ -423,6 +424,63 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   const millis = Date.parse(candidate);
   if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
   return new Date(millis).toISOString();
+}
+function trustedSpecialistReadinessDependencies(dependencies) {
+  if (dependencies == null) return null;
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    new Set(['specialistProviderReadinessResolver']),
+    'Browser Agent Specialist readiness dependencies',
+  );
+  const resolver = raw.specialistProviderReadinessResolver;
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')
+      || typeof resolver.resolve !== 'function' || typeof resolver.assertCurrent !== 'function') {
+    throw new Error('Browser Agent Specialist readiness dependencies require a trusted resolver');
+  }
+  return resolver;
+}
+function assertTrustedSpecialistReadiness(readiness, selectionInput, nowMs) {
+  const selection = normalizeSpecialistSelectionV1(selectionInput);
+  if (!readiness || typeof readiness !== 'object' || Array.isArray(readiness)) {
+    throw new Error('Specialist provider readiness must be a trusted resolver result');
+  }
+  if (readiness.trustedResolverInvoked !== true || readiness.callerReadinessAccepted !== false
+      || readiness.executable !== true) {
+    throw new Error('Specialist provider is not executable according to trusted readiness');
+  }
+  for (const key of ['registryId','registryRevision','registryBindingKey','specialistId','providerId','definitionRevision','executionPlane']) {
+    if (readiness[key] !== selection[key]) {
+      throw new Error('Specialist provider readiness drifted from durable selection provenance');
+    }
+  }
+  const resolvedAt = Date.parse(readiness.resolvedAt || '');
+  const observedAt = Date.parse(readiness.observedAt || '');
+  if (!Number.isFinite(resolvedAt) || !Number.isFinite(observedAt)
+      || observedAt > resolvedAt || resolvedAt > nowMs) {
+    throw new Error('Specialist provider readiness chronology is invalid');
+  }
+  return readiness;
+}
+function assertSelectionProvenanceRegistryCurrent(store, job, provenance) {
+  if (!provenance) throw new Error('Specialist execution lacks durable selection provenance');
+  const selection = normalizeSpecialistSelectionV1(provenance.selection);
+  const handoff = normalizeSpecialistHandoffV1(provenance.handoff);
+  const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+  if (Object.hasOwn(quarantine, selection.registryId)) {
+    throw new Error('Specialist registry is quarantined before claim or provider execution');
+  }
+  const registry = store.specialistRegistriesById?.[selection.registryId];
+  if (!registry) throw new Error('Specialist registry disappeared before claim or provider execution');
+  if (!job.definitionScope) throw new Error('Owner-bound Specialist execution lacks durable parent scope');
+  bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryBindingKey: selection.registryBindingKey,
+    selection,
+    handoff,
+    parentCapabilityIds: job.definitionScope.capabilityIds,
+    parentToolIds: job.definitionScope.toolIds,
+  });
+  return { selection, handoff };
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function freshStore() {
@@ -1608,9 +1666,11 @@ export class BrowserAgentManager {
     return result;
   }
 
-  executeClaimedSpecialistProvider(id, payload = {}) {
+  executeClaimedSpecialistProvider(id, payload = {}, dependencies = null) {
     let request;
+    let trustedReadiness;
     try {
+      trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
       request = snapshotExactOwnDataRequest(
         payload,
         SPECIALIST_PROVIDER_EXECUTE_KEYS,
@@ -1655,13 +1715,13 @@ export class BrowserAgentManager {
       request.expectedControlEpoch,
     ]);
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
-    const operation = this.#executeClaimedSpecialistProvider(id, request)
+    const operation = this.#executeClaimedSpecialistProvider(id, request, trustedReadiness)
       .finally(() => this.inFlight.delete(inFlightKey));
     this.inFlight.set(inFlightKey, operation);
     return operation;
   }
 
-  async #executeClaimedSpecialistProvider(id, request) {
+  async #executeClaimedSpecialistProvider(id, request, trustedReadiness = null) {
     // External-effect authority is evaluated and recorded against the live
     // manager clock. Caller-supplied timestamps are audit input only and may
     // neither extend a lease nor place PREPARED chronology in the future.
@@ -1670,7 +1730,19 @@ export class BrowserAgentManager {
     let prepared = null;
     let providerRequest = null;
     let resumedPrepared = false;
-    await this.update(store => {
+    let executionReadiness = null;
+    if (trustedReadiness) {
+      const initial = await this.get(id);
+      const initialProvenance = (initial.job?.runtime?.specialistSelectionProvenance || [])
+        .find(item => item?.agentId === request.agentId);
+      if (!initialProvenance) throw new Error('Specialist provider execution lacks durable selection provenance');
+      executionReadiness = assertTrustedSpecialistReadiness(
+        await trustedReadiness.resolve(initialProvenance.selection),
+        initialProvenance.selection,
+        this.now(),
+      );
+    }
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
       if (job.runtime.specialistProviderExecutionIntegrityFault === true) {
@@ -1696,9 +1768,11 @@ export class BrowserAgentManager {
       }
       const provenance = (job.runtime.specialistSelectionProvenance || [])
         .find(item => item?.agentId === request.agentId);
-      if (!provenance) throw new Error('Specialist provider execution lacks durable selection provenance');
-      const selection = normalizeSpecialistSelectionV1(provenance.selection);
-      const handoff = normalizeSpecialistHandoffV1(provenance.handoff);
+      const { selection, handoff } = assertSelectionProvenanceRegistryCurrent(store, job, provenance);
+      if (trustedReadiness) {
+        assertTrustedSpecialistReadiness(executionReadiness, selection, this.now());
+        await trustedReadiness.assertCurrent(executionReadiness);
+      }
       if (selection.specialistId !== assignment.specialistId
           || handoff.specialistId !== assignment.specialistId) {
         throw new Error('Specialist provider execution provenance drifted from leased assignment');
