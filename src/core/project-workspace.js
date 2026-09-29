@@ -15,6 +15,16 @@ export const MAX_SNAPSHOT_REVISIONS_PER_PROJECT = 512;
 export const PROJECT_WORKSPACE_CONTEXT_RESOLUTION_VERSION = 1;
 
 const CONTEXT_RESOLUTION_REQUEST_KEYS = new Set(['projectId', 'expectedProjectRevisionId', 'capsuleId']);
+const WORKSPACE_KEYS = new Set(['schemaVersion', 'revision', 'createdAt', 'updatedAt', 'projectsById']);
+const PROJECT_RECORD_KEYS = new Set([
+  'projectId',
+  'snapshot',
+  'createdAt',
+  'updatedAt',
+  'snapshotRevisionIds',
+  'capsulesById',
+  'provenanceByArtifactId',
+]);
 const PROJECT_WORKSPACE_SAVE_QUEUES = new WeakMap();
 const WORKSPACE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
@@ -42,6 +52,23 @@ function strictDataRecord(value, allowedKeys, label) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function dataRecordEntries(value, label) {
+  record(value, label);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const entries = [];
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
+    const descriptor = descriptors[key];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} entries must be enumerable own data properties`);
+    }
+    entries.push([key, descriptor.value]);
+  }
+  return entries;
 }
 
 function workspaceId(value, label) {
@@ -246,22 +273,20 @@ function snapshotContextResolutionRequest(input) {
 }
 
 function validateProjectRecord(project) {
-  record(project, 'project workspace project');
-  const snapshot = normalizeProjectSnapshotV1(project.snapshot);
-  if (project.projectId !== snapshot.projectId) throw new Error('Project workspace projectId mismatch');
+  const raw = strictDataRecord(project, PROJECT_RECORD_KEYS, 'project workspace project');
+  const snapshot = normalizeProjectSnapshotV1(raw.snapshot);
+  if (raw.projectId !== snapshot.projectId) throw new Error('Project workspace projectId mismatch');
   snapshotRevisionHistory(project, snapshot);
-  const createdAt = timestamp(project.createdAt, 'project workspace project createdAt');
-  const updatedAt = timestamp(project.updatedAt, 'project workspace project updatedAt');
+  const createdAt = timestamp(raw.createdAt, 'project workspace project createdAt');
+  const updatedAt = timestamp(raw.updatedAt, 'project workspace project updatedAt');
   if (updatedAt < createdAt) throw new Error('Project workspace project updatedAt cannot precede createdAt');
-  record(project.capsulesById, 'project workspace capsulesById');
-  record(project.provenanceByArtifactId, 'project workspace provenanceByArtifactId');
-  const capsules = Object.entries(project.capsulesById);
+  const capsules = dataRecordEntries(raw.capsulesById, 'project workspace capsulesById');
+  const provenance = dataRecordEntries(raw.provenanceByArtifactId, 'project workspace provenanceByArtifactId');
   if (capsules.length > MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
   for (const [capsuleId, capsule] of capsules) {
     const normalized = normalizeContextCapsuleV1(capsule);
     if (normalized.capsuleId !== capsuleId || normalized.projectId !== snapshot.projectId) throw new Error('Project workspace capsule binding mismatch');
   }
-  const provenance = Object.entries(project.provenanceByArtifactId);
   if (provenance.length > MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
   for (const [artifactId, item] of provenance) {
     const normalized = normalizeArtifactProvenanceV1(item);
@@ -275,14 +300,15 @@ export function createProjectWorkspace(nowMs = Date.now()) {
 }
 
 export function validateProjectWorkspace(workspace) {
-  record(workspace, 'project workspace');
-  if (workspace.schemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION) throw new Error('Unsupported project workspace schema');
-  if (!Number.isInteger(workspace.revision) || workspace.revision < 0) throw new Error('Invalid project workspace revision');
-  const createdAt = timestamp(workspace.createdAt, 'project workspace createdAt');
-  const updatedAt = timestamp(workspace.updatedAt, 'project workspace updatedAt');
+  const raw = strictDataRecord(workspace, WORKSPACE_KEYS, 'project workspace');
+  if (raw.schemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION) throw new Error('Unsupported project workspace schema');
+  if (!Number.isInteger(raw.revision) || Object.is(raw.revision, -0) || raw.revision < 0) {
+    throw new Error('Invalid project workspace revision');
+  }
+  const createdAt = timestamp(raw.createdAt, 'project workspace createdAt');
+  const updatedAt = timestamp(raw.updatedAt, 'project workspace updatedAt');
   if (updatedAt < createdAt) throw new Error('Project workspace updatedAt cannot precede createdAt');
-  record(workspace.projectsById, 'project workspace projectsById');
-  const entries = Object.entries(workspace.projectsById);
+  const entries = dataRecordEntries(raw.projectsById, 'project workspace projectsById');
   if (entries.length > MAX_PROJECTS) throw new Error('Project workspace project limit exceeded');
   for (const [projectId, project] of entries) {
     validateProjectRecord(project);
@@ -503,7 +529,9 @@ export class ProjectWorkspaceRepository {
     const candidate = structuredClone(workspace);
     validateProjectWorkspace(candidate);
     if (expectedPreviousRevision !== null
-        && (!Number.isInteger(expectedPreviousRevision) || expectedPreviousRevision < 0)) {
+        && (!Number.isInteger(expectedPreviousRevision)
+          || Object.is(expectedPreviousRevision, -0)
+          || expectedPreviousRevision < 0)) {
       throw new Error('Invalid expected project workspace revision');
     }
     const expectedRevision = expectedPreviousRevision;
