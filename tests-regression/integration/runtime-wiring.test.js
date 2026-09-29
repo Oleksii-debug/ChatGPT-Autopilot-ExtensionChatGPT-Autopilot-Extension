@@ -18,7 +18,7 @@ test('manifest wires the options UI and ChatGPT content scripts with bounded per
   assert.equal(manifest.oauth2, undefined, 'repository must not ship a fake OAuth client identity');
   assert.deepEqual(manifest.content_scripts, [{
     matches: ['https://chatgpt.com/*'],
-    js: ['src/interaction/chatgpt-adapter.js', 'src/interaction/content-script.js'],
+    js: ['src/interaction/chatgpt-adapter.js', 'src/interaction/chatgpt-live-send-recovery.js', 'src/interaction/content-script.js'],
     run_at: 'document_idle',
   }]);
   assert.deepEqual(manifest.commands, {
