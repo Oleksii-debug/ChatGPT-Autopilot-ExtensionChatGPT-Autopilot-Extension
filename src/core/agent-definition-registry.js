@@ -44,7 +44,7 @@ const CONFIG_DEFAULT_KEYS = new Set([
   'allowCrossOriginNavigation', 'closeOwnedTabsOnStop', 'visionOnDemand',
   'maxModelCalls', 'maxInputTokens', 'maxOutputTokens', 'maxTotalTokens',
   'maxOutputTokensPerCall', 'maxRuntimeMinutes',
-  'aiRoutingMode', 'aiPrimaryProvider', 'aiPrimaryModel',
+  'aiRoutingMode', 'aiPinnedRouteId', 'aiPrimaryProvider', 'aiPrimaryModel',
   'aiStrongProvider', 'aiStrongModel',
 ]);
 const DEFINITION_CEILING_KEYS = Object.freeze([
