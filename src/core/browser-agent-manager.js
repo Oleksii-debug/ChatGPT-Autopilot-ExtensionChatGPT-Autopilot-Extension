@@ -2284,8 +2284,10 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
+  async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    const readinessByAssignment = new Map();
     const limit = request.maxConcurrentHandoffs;
     if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
       throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
@@ -2297,8 +2299,30 @@ export class BrowserAgentManager {
       if (key !== 'maxConcurrentHandoffs') claimRequest[key] = value;
     }
     claimRequest.at = at;
+
+    if (trustedReadiness) {
+      const initial = await this.load();
+      for (const jobId of initial.order || []) {
+        const job = initial.byId?.[jobId];
+        if (!job?.runtime?.plan || !job.specialistDelegationBinding?.profile?.enabled) continue;
+        for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          const provenance = (job.runtime.specialistSelectionProvenance || [])
+            .find(item => item?.agentId === assignment.agentId);
+          if (!provenance) throw new Error('Owner-bound Specialist cross-job claim lacks durable selection provenance');
+          readinessByAssignment.set(
+            JSON.stringify([jobId, assignment.agentId]),
+            assertTrustedSpecialistReadiness(
+              await trustedReadiness.resolve(provenance.selection),
+              provenance.selection,
+              this.now(),
+            ),
+          );
+        }
+      }
+    }
+
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
       const specialistOwnerships = store.order
@@ -2315,22 +2339,41 @@ export class BrowserAgentManager {
       let remaining = Math.max(0, limit - capacityOwnerships.length);
       const claimed = [];
       const reconciliationRequired = [];
+
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
-        assertOwnerBoundSpecialistAdmissionProvenance(job);
         const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+
+        if (job.specialistDelegationBinding?.profile?.enabled) {
+          for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+            const provenance = (job.runtime.specialistSelectionProvenance || [])
+              .find(item => item?.agentId === assignment.agentId);
+            const { selection } = assertSelectionProvenanceRegistryCurrent(store, job, provenance);
+            if (trustedReadiness) {
+              const readiness = readinessByAssignment.get(JSON.stringify([jobId, assignment.agentId]));
+              if (!readiness) throw new Error('Owner-bound Specialist cross-job claim lacks trusted provider readiness');
+              assertTrustedSpecialistReadiness(readiness, selection, this.now());
+              await trustedReadiness.assertCurrent(readiness);
+            }
+          }
+        }
+
         const boundedClaimRequest = boundSpecialistClaimRequestForJob(
           job,
-          { ...claimRequest, availableSlots: remaining, at },
+          { ...claimRequest, availableSlots: remaining },
           jobCapacityObligations,
         );
-        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...boundedClaimRequest,
-          executionOwnerships: currentJobOwnerships,
-          at,
-        });
+        const outcome = claimAgentPlanSpecialistHandoffsV1(
+          job.runtime.plan,
+          job.runtime.specialistHandoffs || [],
+          {
+            ...boundedClaimRequest,
+            executionOwnerships: currentJobOwnerships,
+            at,
+          },
+        );
         job.runtime.plan = outcome.plan;
         job.runtime.specialistHandoffs = outcome.assignments;
         job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
@@ -2338,11 +2381,21 @@ export class BrowserAgentManager {
         remaining -= outcome.claimed.length;
         for (const agentId of outcome.claimed) {
           claimed.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
+          appendHistory(job.runtime, {
+            at: this.now(),
+            type: 'specialist-handoff-claimed',
+            agentId,
+            message: 'Specialist lease admitted within product-wide and owner-bound capacity/readiness fences.',
+          });
         }
         for (const agentId of outcome.reconciliationRequired) {
           reconciliationRequired.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+          appendHistory(job.runtime, {
+            at: this.now(),
+            type: 'specialist-handoff-reconcile',
+            agentId,
+            message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.',
+          });
         }
       }
       result = {
