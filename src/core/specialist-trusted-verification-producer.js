@@ -133,12 +133,18 @@ function assertSameIds(left, right, label) {
   }
 }
 
-function canonicalBindingKey(value, label) {
-  const key = JSON.stringify(value);
-  if (!key || key.length > 200_000) {
+async function canonicalBindingKey(value, label) {
+  const canonical = JSON.stringify(value);
+  if (!canonical || canonical.length > 200_000) {
     throw new Error(label + ' exceeds canonical binding bound');
   }
-  return key;
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || typeof subtle.digest !== 'function') {
+    throw new Error(label + ' requires WebCrypto SHA-256 support');
+  }
+  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  return 'sha256:' + hex;
 }
 
 function assertChronology(
@@ -310,16 +316,16 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     throw new Error('Specialist handoff cannot postdate provider execution preparation');
   }
 
-  const providerExecutionBindingKey = canonicalBindingKey(
+  const providerExecutionBindingKey = await canonicalBindingKey(
     providerExecution,
     'providerExecutionBindingKey',
   );
-  const executionOwnershipBindingKey = canonicalBindingKey(
+  const executionOwnershipBindingKey = await canonicalBindingKey(
     ownership,
     'executionOwnershipBindingKey',
   );
-  const selectionBindingKey = canonicalBindingKey(selection, 'selectionBindingKey');
-  const handoffBindingKey = canonicalBindingKey(handoff, 'handoffBindingKey');
+  const selectionBindingKey = await canonicalBindingKey(selection, 'selectionBindingKey');
+  const handoffBindingKey = await canonicalBindingKey(handoff, 'handoffBindingKey');
 
   const lookup = freeze({
     schemaVersion: SPECIALIST_TRUSTED_VERIFICATION_PRODUCER_VERSION,
