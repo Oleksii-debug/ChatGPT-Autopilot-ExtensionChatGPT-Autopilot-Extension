@@ -236,6 +236,27 @@ test('fresh execution creates once and requires two terminal observations before
 });
 
 
+test('terminal double-read requires the same provider revision, not status alone', async () => {
+  let reads = 0;
+  const revisedAt = '2026-09-25T08:00:00.500Z';
+  const client = clientFor(async url => {
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`)) {
+      reads += 1;
+      return json(info('finished', {
+        updated_at: reads === 1 ? CREATED_AT : revisedAt,
+      }));
+    }
+    throw new Error('POST must not occur for an existing conversation');
+  });
+
+  const result = await client.execute(input());
+  assert.equal(result.created, false);
+  assert.equal(result.providerStatus, 'finished');
+  assert.equal(result.providerUpdatedAt, revisedAt);
+  assert.equal(reads, 3);
+});
+
 test('provider mutation response is not counted as fresh terminal readback evidence', async () => {
   const calls = [];
   let readbacksAfterPost = 0;
