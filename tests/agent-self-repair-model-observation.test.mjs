@@ -429,6 +429,17 @@ test('observation admits exactly one bounded provider call and canonical token c
   }
 });
 
+test('durable provider reservation totalTokens must exactly match its canonical producer formula', () => {
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      providerReservation: providerReservation({
+        totalTokens: 577,
+      }),
+    })),
+    /totalTokens must exactly equal inputTokens plus outputTokens/u,
+  );
+});
+
 test('observation timestamp spelling must already be canonical UTC', () => {
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
