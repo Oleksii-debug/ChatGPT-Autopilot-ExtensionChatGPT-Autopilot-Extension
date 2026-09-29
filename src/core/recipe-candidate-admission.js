@@ -10,7 +10,7 @@ import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 export const RECIPE_CANDIDATE_ADMISSION_VERSION = 1;
 
 export const RecipeCandidateAdmissionStatus = Object.freeze({
-  CANDIDATE_ADMITTED: 'CANDIDATE_ADMITTED',
+  READY_FOR_REGISTRY_CAS: 'READY_FOR_REGISTRY_CAS',
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -309,17 +309,17 @@ function secretScanLookup(request, compiled, subjectSha256) {
 }
 
 /**
- * Admits one structurally sanitized RecipeCompilerV1 candidate into the
- * canonical append-only RecipeRegistryV1 snapshot after independently resolving
+ * Prepares one structurally sanitized RecipeCompilerV1 candidate for an exact
+ * compare-and-swap append to RecipeRegistryV1 after independently resolving
  * the exact run trace, every verification-evidence ArtifactRefV1 and a
  * subject-digest-bound clean secret scan.
  *
- * This function is persistence-free. registryAdmissionAuthorized means only
- * that the returned nextRegistry is a valid exact +1 candidate extension of
- * the supplied trusted registry snapshot. It grants no replay, promotion,
- * execution, policy, permission, provider or effect authority.
+ * This function is persistence-free. The returned nextRegistry is only a
+ * proposed exact +1 snapshot. Canonical persistence must compare-and-swap the
+ * expected registry revision again; this function grants no registry write,
+ * replay, promotion, execution, policy, permission, provider or effect authority.
  */
-export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
+export async function prepareTrustedRecipeCandidateAdmissionV1(input, trustedOptions) {
   const request = normalizeRequest(input);
   const options = normalizeOptions(trustedOptions);
   const registry = options.recipeRegistry;
@@ -422,7 +422,7 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
 
   return freezeDeep({
     schemaVersion: RECIPE_CANDIDATE_ADMISSION_VERSION,
-    status: RecipeCandidateAdmissionStatus.CANDIDATE_ADMITTED,
+    status: RecipeCandidateAdmissionStatus.READY_FOR_REGISTRY_CAS,
     admissionId: request.admissionId,
     registryId: registry.registryId,
     previousRegistryRevision: registry.revision,
@@ -441,13 +441,16 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
     sourceTrust: 'TRUSTED_RESOLVER',
     evidenceTrust: 'TRUSTED_ARTIFACT_REFS',
     secretScanTrust: 'TRUSTED_RESOLVER',
-    registryAdmissionAuthorized: true,
+    registryAdmissionReady: true,
+    registryAdmissionAuthorized: false,
+    registryPersistenceAuthorized: false,
     replayAuthorized: false,
     promotionAuthorized: false,
     executionAuthorized: false,
     permissionGranted: false,
     policyDecisionGranted: false,
     exactEffectAuthorized: false,
+    requiresCanonicalRegistryCompareAndSwap: true,
     requiresTrustedReplayEvaluation: true,
     requiresCanonicalPolicyDecision: true,
     requiresCanonicalExactEffect: true,
