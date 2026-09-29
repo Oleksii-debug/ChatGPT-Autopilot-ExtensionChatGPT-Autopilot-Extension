@@ -855,15 +855,15 @@ export class CoreCommandDispatcher {
           throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
         const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
-        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
-        if (maxModelCallsDescriptor
-            && (maxModelCallsDescriptor.enumerable !== true
-              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
-              || typeof maxModelCallsForRequest !== 'number'
-              || !Number.isSafeInteger(maxModelCallsForRequest)
-              || Object.is(maxModelCallsForRequest, -0)
-              || maxModelCallsForRequest < 0)) {
-          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
+        const maxModelCallsForRequest = maxModelCallsDescriptor?.value;
+        if (!maxModelCallsDescriptor
+            || maxModelCallsDescriptor.enumerable !== true
+            || !Object.hasOwn(maxModelCallsDescriptor, 'value')
+            || typeof maxModelCallsForRequest !== 'number'
+            || !Number.isSafeInteger(maxModelCallsForRequest)
+            || Object.is(maxModelCallsForRequest, -0)
+            || maxModelCallsForRequest < 1) {
+          throw new Error('Agent model invocation requires canonical bounded maxModelCallsForRequest');
         }
         internalPrompt = promptDescriptor.value;
         internalSystemPrompt = systemPromptDescriptor?.value ?? '';
