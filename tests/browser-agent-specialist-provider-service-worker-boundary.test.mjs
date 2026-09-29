@@ -67,3 +67,19 @@ test('Specialist mutation commands strip caller time authority before BrowserAge
     /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'[\s\S]*?const claim = structuredClone[\s\S]*?delete claim\.at[\s\S]*?claimSpecialistHandoffs/,
   );
 });
+
+
+test('claim command injects durable-config-backed trusted readiness and strips caller time', () => {
+  assert.match(source, /SpecialistProviderReadinessResolverV1/);
+  assert.match(source, /createOpenHandsSpecialistReadinessBindingV1/);
+  assert.match(source, /specialistReadinessConfigProvenance/);
+  assert.match(source, /specialistProviderReadinessResolver/);
+  const branch = source.match(
+    /} else if \(message\.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,
+  );
+  assert.ok(branch, 'Specialist claim command must remain structurally identifiable');
+  assert.match(branch[1], /delete claim\.at/);
+  assert.match(branch[1], /browserAgent\.claimSpecialistHandoffs/);
+  assert.match(branch[1], /specialistProviderReadinessResolver/);
+  assert.match(source, /Specialist provider config changed after readiness probe/);
+});
