@@ -361,7 +361,6 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     expectedOutcome,
     providerStatus: providerExecution.providerStatus,
     providerSucceeded: providerExecution.providerSucceeded,
-    providerEffectEvidence: providerExecution.effectEvidence,
     providerUpdatedAt: providerExecution.providerUpdatedAt,
     providerObservedAt: providerExecution.providerObservedAt,
     providerExecutionUpdatedAt: providerExecution.updatedAt,
