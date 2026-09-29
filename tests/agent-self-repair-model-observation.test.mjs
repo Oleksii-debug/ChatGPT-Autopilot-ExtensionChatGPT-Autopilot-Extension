@@ -221,16 +221,23 @@ function modelResult(overrides = {}) {
       failoverChain: [],
     },
     runtime: {},
+    providerReservation: providerReservation(),
     ...overrides,
   };
 }
 
 function request(overrides = {}) {
+  const sidecarProviderReservation = Object.hasOwn(overrides, 'providerReservation')
+    ? overrides.providerReservation
+    : providerReservation();
+  const result = Object.hasOwn(overrides, 'modelResult')
+    ? overrides.modelResult
+    : modelResult({ providerReservation: sidecarProviderReservation });
   return {
     invocationRequest: invocationRequest(),
-    providerReservation: providerReservation(),
+    providerReservation: sidecarProviderReservation,
     observationId: 'observation.observe.1',
-    modelResult: modelResult(),
+    modelResult: result,
     observedAt: '1970-01-01T00:00:01.900Z',
     ...overrides,
   };
@@ -564,6 +571,15 @@ test('AiOrchestrator embedded reservation receipt removes the runtime sidecar re
     callNumber: 1,
     createdAt: 1_850,
   });
+});
+
+test('sidecar-only reservation cannot replace embedded lifecycle receipt provenance', () => {
+  const sidecarOnly = request();
+  delete sidecarOnly.modelResult.providerReservation;
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(sidecarOnly),
+    /requires embedded durable provider reservation receipt/u,
+  );
 });
 
 test('embedded and sidecar provider receipts must be exactly identical when both are present', () => {
