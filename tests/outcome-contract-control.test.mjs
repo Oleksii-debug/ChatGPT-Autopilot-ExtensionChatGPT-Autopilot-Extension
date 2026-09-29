@@ -221,6 +221,47 @@ test('durable OutcomeContract registry creates, resolves, lists, updates and del
   );
 });
 
+
+test('contractId remains globally non-reusable across projects and tombstones for historical verifier identity', () => {
+  const state = createEmptyState(1);
+  createStoredOutcomeContractV1(state, contractV1({
+    contractId: 'global-contract-id',
+    projectId: 'project-1',
+  }));
+
+  assert.throws(
+    () => createStoredOutcomeContractV1(state, contractV1({
+      contractId: 'global-contract-id',
+      projectId: 'project-2',
+    })),
+    /already exists/,
+    'historical resolver identity has no projectId and therefore contractId must remain globally unique',
+  );
+
+  deleteStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'global-contract-id',
+    expectedRevision: 1,
+  });
+
+  assert.throws(
+    () => createStoredOutcomeContractV1(state, contractV1({
+      contractId: 'global-contract-id',
+      projectId: 'project-2',
+    })),
+    /already exists/,
+    'tombstoning must not make a historical contractId reusable',
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'global-contract-id',
+      contractRevision: 1,
+    }).projectId,
+    'project-1',
+  );
+});
+
+
 test('internal current resolver selects an exact project-bound revision for downstream admission without weakening public exact reads', () => {
   const state = createEmptyState(1);
   const first = createStoredOutcomeContractV1(state, contractV1());
