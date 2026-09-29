@@ -50,7 +50,12 @@ import {
   verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
-import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import {
+  ExecutionOwnershipState,
+  normalizeExecutionOwnershipV1,
+  requireExecutionReconciliationV1,
+  recoverExpiredExecutionOwnershipV1,
+} from './execution-plane-ownership.js';
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
@@ -1737,6 +1742,29 @@ export class BrowserAgentManager {
       }
       job.runtime.specialistProviderExecutions = executions.map((item, itemIndex) =>
         itemIndex === index ? outcome : item);
+      if (outcome.reconciliationRequired) {
+        const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+        const ownershipIndex = ownerships.findIndex(item =>
+          item.ownerId === prepared.agentId
+          && item.leaseId === prepared.leaseId
+          && item.nodeId === prepared.nodeId);
+        if (ownershipIndex < 0) {
+          throw new Error('Ambiguous Specialist provider outcome lacks matching canonical execution ownership');
+        }
+        const ownership = ownerships[ownershipIndex];
+        const reason = `Specialist provider outcome requires reconciliation: ${outcome.errorCode || 'PROVIDER_AMBIGUITY'}`;
+        ownerships[ownershipIndex] = Date.parse(observedAt) <= Date.parse(ownership.leaseUntil)
+          ? requireExecutionReconciliationV1(ownership, {
+            leaseId: prepared.leaseId,
+            reason,
+            at: observedAt,
+          })
+          : recoverExpiredExecutionOwnershipV1(ownership, {
+            reason,
+            at: observedAt,
+          });
+        job.runtime.specialistExecutionOwnerships = ownerships;
+      }
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
