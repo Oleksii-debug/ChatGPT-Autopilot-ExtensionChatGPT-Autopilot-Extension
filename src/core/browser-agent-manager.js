@@ -55,6 +55,7 @@ import { TrustedExecutionVerificationLedgerRepository } from './trusted-executio
 import {
   SPECIALIST_REGISTRY_VERSION,
   createSpecialistRegistryV1,
+  normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
@@ -1015,6 +1016,9 @@ export class BrowserAgentManager {
       throw new Error('Browser Agent Specialist registry mutation request requires expectedRegistryBindingKey');
     }
     const registryId = canonicalSpecialistRegistryId(request.registryId);
+    if (Object.hasOwn(request, 'definition')) {
+      request.definition = normalizeSpecialistDefinitionV1(request.definition);
+    }
     let committed = null;
     await this.update(store => {
       const registries = store.specialistRegistriesById || Object.create(null);
