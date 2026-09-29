@@ -58,6 +58,7 @@ import {
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
+  bindSpecialistHandoffToRegistryV1,
   createSpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
@@ -742,6 +743,29 @@ function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
   }
   return readiness;
 }
+
+function assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission) {
+  if (!job?.specialistDelegationBinding?.profile?.enabled) return;
+  if (!admission) throw new Error('Owner-bound Specialist execution lacks durable admission provenance');
+  if (!job.definitionScope) throw new Error('Owner-bound Specialist execution lacks durable definition scope');
+  const selection = normalizeSpecialistSelectionV1(admission.selection);
+  const registryRaw = store.specialistRegistriesById?.[selection.registryId];
+  if (!registryRaw) throw new Error('Owner-bound Specialist registry is no longer available');
+  const registry = normalizeSpecialistRegistryV1(registryRaw);
+  if (registry.revision !== selection.registryRevision
+      || registry.bindingKey !== selection.registryBindingKey) {
+    throw new Error('Owner-bound Specialist registry drifted after durable admission');
+  }
+  bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryBindingKey: selection.registryBindingKey,
+    selection,
+    handoff: admission.handoff,
+    parentCapabilityIds: job.definitionScope.capabilityIds,
+    parentToolIds: job.definitionScope.toolIds,
+  });
+}
+
 
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
   const profile = job?.specialistDelegationBinding?.profile;
@@ -1840,6 +1864,7 @@ export class BrowserAgentManager {
       const admission = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions)
         .find(item => item.agentId === request.agentId);
       if (!admission) throw new Error('Specialist provider execution lacks durable admission provenance');
+      assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission);
       if (trustedReadiness) {
         assertTrustedSpecialistReadiness(executionReadiness, admission.selection, this.now());
         await trustedReadiness.assertCurrent(executionReadiness);
@@ -2089,8 +2114,19 @@ export class BrowserAgentManager {
           if (!admission || !readiness) {
             throw new Error('Owner-bound Specialist claim lacks trusted provider readiness');
           }
+          assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission);
           assertTrustedSpecialistReadiness(readiness, admission.selection, this.now());
           await trustedReadiness.assertCurrent(readiness);
+        }
+      }
+      if (job.specialistDelegationBinding?.profile?.enabled) {
+        const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+        for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          assertOwnerBoundSpecialistAdmissionRegistryCurrent(
+            store,
+            job,
+            admissions.find(item => item.agentId === assignment.agentId),
+          );
         }
       }
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
@@ -2154,6 +2190,16 @@ export class BrowserAgentManager {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
         assertOwnerBoundSpecialistAdmissionProvenance(job);
+        if (job.specialistDelegationBinding?.profile?.enabled) {
+          const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+          for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+            assertOwnerBoundSpecialistAdmissionRegistryCurrent(
+              store,
+              job,
+              admissions.find(item => item.agentId === assignment.agentId),
+            );
+          }
+        }
         const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
         const boundedClaimRequest = boundSpecialistClaimRequestForJob(
