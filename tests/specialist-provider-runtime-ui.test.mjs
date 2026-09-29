@@ -50,6 +50,7 @@ test('runtime run control is disabled without a canonical epoch or with terminal
   assert.match(body, /selected\.state !== 'LEASED'/u);
   assert.match(body, /Number\.isSafeInteger\(controlEpoch\)/u);
   assert.match(body, /PROVIDER_SUCCEEDED/u);
+  assert.match(body, /RECONCILE/u);
   assert.match(body, /MANUAL_REVIEW/u);
 });
 
