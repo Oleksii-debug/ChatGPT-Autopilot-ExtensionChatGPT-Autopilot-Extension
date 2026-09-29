@@ -201,6 +201,7 @@ test('internal Agent dispatcher preserves the selected durable provider receipt 
     { ...response.result.providerReservation },
     durableReservation(),
   );
+  assert.equal(Object.isFrozen(response.result.providerReservation), true);
   assert.equal(response.result.routing.selectedRouteId, 'route.receipt');
   assert.equal(response.result.usage.modelCalls, 1);
   assert.deepEqual(lifecycleEvents, [
