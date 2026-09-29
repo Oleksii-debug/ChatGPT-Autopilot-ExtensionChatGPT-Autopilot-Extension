@@ -258,3 +258,12 @@ test('disabled Specialist delegation does not inspect inactive subordinate field
   assert.equal(cleared.specialistDelegationProfile, null);
   assert.equal(reads, 0);
 });
+
+
+test('persisted Specialist delegation tombstone survives unrelated legacy edits', () => {
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    specialistDelegationProfile: null,
+  });
+  assert.equal(Object.hasOwn(definition, 'specialistDelegationProfile'), true);
+  assert.equal(definition.specialistDelegationProfile, null);
+});
