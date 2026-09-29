@@ -275,3 +275,23 @@ test('persistent automatic Specialist admission failure reaches the existing ter
   assert.equal(current.job.runtime.nextWakeAt, 0);
   assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
 });
+
+
+test('existing owner-bound handoff with missing admission provenance enters bounded planning retry', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const id = await seed(manager);
+  const first = await manager.cycleOne(id);
+  assert.equal(first.kind, 'SPECIALIST_PENDING');
+
+  delete storage.data.autopilotBrowserAgentV1.byId[id].runtime.specialistDelegationAdmissions;
+  const restarted = managerFor(storage.chrome);
+  const result = await restarted.cycleOne(id);
+  assert.equal(result.kind, 'PLANNING_RETRY');
+  assert.match(result.error, /lacks durable admission provenance/);
+
+  const persisted = await restarted.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs.length, 1);
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
