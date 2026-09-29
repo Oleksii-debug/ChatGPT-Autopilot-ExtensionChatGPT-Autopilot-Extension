@@ -16,25 +16,41 @@ const AGENT_PLAN_BUDGET_KEYS = new Set([
   'maxRuntimeSeconds',
   'maxCostUsdMicros',
 ]);
+const NARROW_REQUEST_KEYS = new Set(['ownerBudget', 'agentPlanBudget']);
+const ADMISSION_REQUEST_KEYS = new Set([
+  'ownerBudget',
+  'agentPlanBudget',
+  'currentUsage',
+  'request',
+]);
 
 function object(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be own data properties`);
     }
+    snapshot[key] = descriptor.value;
   }
-  return value;
+  return snapshot;
 }
 
 function exact(raw, allowed, label) {
   for (const key of Object.getOwnPropertyNames(raw)) {
     if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
   }
+}
+
+function record(value, allowed, label) {
+  const raw = object(value, label);
+  exact(raw, allowed, label);
+  return raw;
 }
 
 function own(raw, key) {
@@ -44,7 +60,11 @@ function own(raw, key) {
 
 function integer(value, label, max, fallback = 0) {
   const number = value == null ? fallback : value;
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 0 || number > max) {
+  if (typeof number !== 'number'
+      || !Number.isSafeInteger(number)
+      || Object.is(number, -0)
+      || number < 0
+      || number > max) {
     throw new Error(`${label} is invalid`);
   }
   return number;
@@ -57,8 +77,7 @@ function frozen(value) {
 }
 
 export function normalizeAgentPlanBudgetCeilingV1(input = {}) {
-  const raw = object(input, 'AgentPlan budget ceiling');
-  exact(raw, AGENT_PLAN_BUDGET_KEYS, 'AgentPlan budget ceiling');
+  const raw = record(input, AGENT_PLAN_BUDGET_KEYS, 'AgentPlan budget ceiling');
   return frozen({
     maxModelCalls: integer(own(raw, 'maxModelCalls'), 'AgentPlan budget maxModelCalls', 1_000_000),
     maxRuntimeSeconds: integer(own(raw, 'maxRuntimeSeconds'), 'AgentPlan budget maxRuntimeSeconds', 31_536_000),
@@ -71,9 +90,10 @@ export function normalizeAgentPlanBudgetCeilingV1(input = {}) {
  * remains authoritative for every other dimension. Shared dimensions are
  * narrowed to the stricter value; this function can never expand authority.
  */
-export function narrowResourceBudgetWithAgentPlanV1({ ownerBudget, agentPlanBudget } = {}) {
-  const owner = normalizeResourceBudgetV1(ownerBudget);
-  const plan = normalizeAgentPlanBudgetCeilingV1(agentPlanBudget);
+export function narrowResourceBudgetWithAgentPlanV1(input = {}) {
+  const raw = record(input, NARROW_REQUEST_KEYS, 'Agent resource budget narrowing request');
+  const owner = normalizeResourceBudgetV1(own(raw, 'ownerBudget'));
+  const plan = normalizeAgentPlanBudgetCeilingV1(own(raw, 'agentPlanBudget'));
   return frozen({
     ...owner,
     maxModelCalls: Math.min(owner.maxModelCalls, plan.maxModelCalls),
@@ -87,12 +107,16 @@ export function narrowResourceBudgetWithAgentPlanV1({ ownerBudget, agentPlanBudg
  * cost meter may supply modelCalls/modelInputTokens/modelOutputTokens/
  * costUsdMicros while the governor fills unrelated dimensions with zero.
  */
-export function evaluateAgentResourceAdmissionV1({
-  ownerBudget,
-  agentPlanBudget,
-  currentUsage = {},
-  request = {},
-} = {}) {
+export function evaluateAgentResourceAdmissionV1(input = {}) {
+  const raw = record(input, ADMISSION_REQUEST_KEYS, 'Agent resource admission request');
+  const ownerBudget = own(raw, 'ownerBudget');
+  const agentPlanBudget = own(raw, 'agentPlanBudget');
+  const currentUsage = own(raw, 'currentUsage');
+  const request = own(raw, 'request');
   const budget = narrowResourceBudgetWithAgentPlanV1({ ownerBudget, agentPlanBudget });
-  return evaluateResourceBudgetV1({ budget, usage: currentUsage, request });
+  return evaluateResourceBudgetV1({
+    budget,
+    usage: currentUsage === undefined ? {} : currentUsage,
+    request: request === undefined ? {} : request,
+  });
 }
