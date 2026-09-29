@@ -549,7 +549,6 @@ test('4xx and 5xx server detail never enters public coding-specialist diagnostic
   }
 });
 
-
 test('PREPARED recovery is attach-only and never POSTs when the durable conversation is absent', async () => {
   const calls = [];
   const client = clientFor(async (url, init) => {
@@ -608,3 +607,4 @@ test('external lease deadline caps OpenHands before a later request can dispatch
   );
   assert.equal(calls.filter(call => call.method === 'POST').length, 0);
 });
+
