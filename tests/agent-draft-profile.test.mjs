@@ -28,3 +28,121 @@ test('Agent draft rejects unknown and secret fields instead of importing them', 
   assert.throws(() => parseAgentDraftProfile({ ...draft, version: 2 }), /формат/);
   assert.throws(() => parseAgentDraftProfile({ ...draft, goal: '' }), /Завдання/);
 });
+
+
+test('Agent draft rejects accessor-backed top-level and policy fields without executing getters', () => {
+  let reads = 0;
+  const top = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    policy: {},
+  };
+  Object.defineProperty(top, 'goal', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 'Не виконувати getter';
+    },
+  });
+  assert.throws(() => parseAgentDraftProfile(top), /без getter\/setter/);
+  assert.equal(reads, 0);
+
+  const policy = {};
+  Object.defineProperty(policy, 'maxSteps', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 50;
+    },
+  });
+  assert.throws(
+    () => parseAgentDraftProfile({
+      format: 'chatgpt-autopilot-agent-draft',
+      version: 1,
+      goal: 'Безпечне завдання',
+      policy,
+    }),
+    /без getter\/setter/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('Agent draft rejects symbol, inherited, sparse and decorated JSON shapes', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити структуру',
+    policy: {},
+  };
+
+  const symbolDraft = { ...base };
+  symbolDraft[Symbol('runtime')] = true;
+  assert.throws(() => parseAgentDraftProfile(symbolDraft), /невідоме поле/);
+
+  const inheritedPolicy = Object.create({ apiKey: 'secret' });
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: inheritedPolicy }),
+    /звичайним JSON-об’єктом/,
+  );
+
+  const acceptanceCriteria = new Array(2);
+  acceptanceCriteria[0] = 'Перший критерій';
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: { acceptanceCriteria },
+    }),
+    /щільним масивом/,
+  );
+
+  const decorated = ['Критерій'];
+  decorated.extra = 'runtime';
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: { acceptanceCriteria: decorated },
+    }),
+    /невідоме поле/,
+  );
+});
+
+test('Agent draft rejects non-JSON and non-canonical numeric values before Browser Agent normalization', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити числа',
+  };
+  for (const value of [NaN, Infinity, -Infinity, -0]) {
+    assert.throws(
+      () => parseAgentDraftProfile({ ...base, policy: { maxSteps: value } }),
+      /неканонічне число/,
+    );
+  }
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { maxSteps: undefined } }),
+    /лише JSON-значення/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { maxSteps: () => 10 } }),
+    /лише JSON-значення/,
+  );
+});
+
+test('Agent draft snapshots nested JSON data and canonicalizes goal whitespace', () => {
+  const draft = parseAgentDraftProfile({
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: '  Перевірити сторінку  ',
+    policy: {
+      acceptanceCriteria: ['Готово'],
+      siteRules: [{
+        pattern: 'example.com',
+        defaultDecision: 'ASK',
+        actionDecisions: {},
+      }],
+    },
+  });
+  assert.equal(draft.goal, 'Перевірити сторінку');
+  assert.deepEqual(draft.policy.acceptanceCriteria, ['Готово']);
+  assert.equal(draft.policy.siteRules[0].pattern, 'example.com');
+});
