@@ -638,6 +638,9 @@ export class ProjectWorkspaceRepository {
       }
       const draft = structuredClone(current);
       const next = await mutator(draft) || draft;
+      // Validate the caller-returned object before writing repository-owned
+      // revision/timestamp fields so hostile setters cannot execute first.
+      validateProjectWorkspace(next);
       next.revision = current.revision + 1;
       next.updatedAt = nowMs;
       validateProjectWorkspace(next);
