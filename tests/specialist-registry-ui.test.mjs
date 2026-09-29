@@ -57,6 +57,7 @@ test('Specialist save binds exact registry and definition CAS and never executes
   const save = functionBody('saveSpecialistDefinition');
   assert.match(save, /buildSpecialistDefinitionFromFormV1/u);
   assert.match(save, /expectedRegistryRevision: registry\.revision/u);
+  assert.match(save, /expectedRegistryBindingKey: registry\.bindingKey/u);
   assert.match(save, /expectedDefinitionRevision: current\.definitionRevision/u);
   assert.match(save, /MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY/u);
   assert.doesNotMatch(save, /PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF|CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS|COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF|START_BROWSER_AGENT_JOB|RUN_BROWSER_AGENT|RUN_AI_/u);
@@ -66,6 +67,7 @@ test('Specialist toggle and delete retain exact revision guards and existing mut
   for (const name of ['toggleSpecialistEnabled', 'deleteSpecialistDefinition']) {
     const body = functionBody(name);
     assert.match(body, /expectedRegistryRevision: registry\.revision/u);
+    assert.match(body, /expectedRegistryBindingKey: registry\.bindingKey/u);
     assert.match(body, /expectedDefinitionRevision: current\.definitionRevision/u);
     assert.match(body, /MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY/u);
     assert.doesNotMatch(body, /PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF|CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS|START_BROWSER_AGENT_JOB|RUN_BROWSER_AGENT/u);
@@ -74,7 +76,8 @@ test('Specialist toggle and delete retain exact revision guards and existing mut
 
 test('Specialist revision drift reloads durable live state instead of retrying stale authority', () => {
   const body = functionBody('reloadAfterSpecialistDrift');
-  assert.match(body, /revision drifted/iu);
+  assert.match(body, /bindingKey/u);
+  assert.match(body, /drifted/iu);
   assert.match(body, /loadSpecialistRegistries/u);
   assert.match(body, /selectRegistryId: registryId/u);
   assert.match(body, /selectSpecialistId: specialistId/u);
