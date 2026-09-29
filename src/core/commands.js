@@ -16,7 +16,9 @@ import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
 import { normalizeAiRoutePolicy, selectAiRouteCandidates } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
-import { normalizeBoundAgentModelOrchestratorEnvelopeV1 } from './agent-model-orchestrator-envelope.js';
+import {
+  normalizeBoundAgentModelOrchestratorEnvelopeV1,
+} from './agent-model-orchestrator-envelope.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -40,41 +42,6 @@ function minimumNullable(left, right) {
   if (left == null) return right;
   if (right == null) return left;
   return Math.min(left, right);
-}
-function normalizeInternalAgentProviderBudgetContext(value, expectedJobId) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Agent model invocation requires canonical provider budget context');
-  }
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) {
-    throw new Error('Agent model invocation provider budget context must be a plain object');
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
-  const out = Object.create(null);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error('Agent model invocation provider budget context contains unsupported field');
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error('Agent model invocation provider budget context must contain data-only fields');
-    }
-    out[key] = descriptor.value;
-  }
-  if (out.kind !== 'browser-agent') {
-    throw new Error('Agent model invocation requires an existing durable provider budget lifecycle');
-  }
-  if (typeof out.jobId !== 'string' || out.jobId !== expectedJobId) {
-    throw new Error('Agent model invocation budget owner does not match envelope job identity');
-  }
-  if (typeof out.controlEpoch !== 'number'
-      || !Number.isSafeInteger(out.controlEpoch)
-      || Object.is(out.controlEpoch, -0)
-      || out.controlEpoch < 1) {
-    throw new Error('Agent model invocation budget controlEpoch is invalid');
-  }
-  return Object.freeze({ kind: out.kind, jobId: out.jobId, controlEpoch: out.controlEpoch });
 }
 function snapshotAiRoutePolicyOverride(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || Array.isArray(rawPolicy)) {
@@ -131,6 +98,45 @@ function snapshotAiRoutePolicyOverride(rawPolicy) {
     out[key] = value;
   }
   return out;
+}
+function normalizeInternalAgentProviderBudgetContext(value, expectedJobId) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Agent model invocation requires canonical provider budget context');
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Agent model invocation provider budget context must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error('Agent model invocation provider budget context contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent model invocation provider budget context must contain data-only fields');
+    }
+    out[key] = descriptor.value;
+  }
+  if (out.kind !== 'browser-agent') {
+    throw new Error('Agent model invocation requires an existing durable provider budget lifecycle');
+  }
+  if (typeof out.jobId !== 'string' || out.jobId !== expectedJobId) {
+    throw new Error('Agent model invocation budget owner does not match envelope job identity');
+  }
+  if (typeof out.controlEpoch !== 'number'
+      || !Number.isSafeInteger(out.controlEpoch)
+      || Object.is(out.controlEpoch, -0)
+      || out.controlEpoch < 1) {
+    throw new Error('Agent model invocation budget controlEpoch is invalid');
+  }
+  return Object.freeze({
+    kind: out.kind,
+    jobId: out.jobId,
+    controlEpoch: out.controlEpoch,
+  });
 }
 function narrowAiRoutePolicy(baseSettings, rawRequested) {
   if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
@@ -841,9 +847,23 @@ export class CoreCommandDispatcher {
       if (Object.hasOwn(payload, 'agentModelOrchestratorEnvelope')) {
         throw new Error('Agent model orchestrator envelope is internal-only');
       }
-      const internalEnvelope = internal?.agentModelOrchestratorEnvelope === undefined
+      const internalEnvelopeDescriptor = internal == null
+        ? undefined
+        : Object.getOwnPropertyDescriptor(Object(internal), 'agentModelOrchestratorEnvelope');
+      if (internalEnvelopeDescriptor
+          && (internalEnvelopeDescriptor.enumerable !== true
+            || !Object.hasOwn(internalEnvelopeDescriptor, 'value'))) {
+        throw new Error('Agent model orchestrator envelope must be an enumerable own data property');
+      }
+      const internalEnvelopeValue = internalEnvelopeDescriptor?.value;
+      const internalEnvelope = internalEnvelopeValue === undefined
         ? null
-        : normalizeBoundAgentModelOrchestratorEnvelopeV1(internal.agentModelOrchestratorEnvelope);
+        : normalizeBoundAgentModelOrchestratorEnvelopeV1(internalEnvelopeValue);
+      let internalImageDataUrl = '';
+      let internalPrompt = '';
+      let internalSystemPrompt = '';
+      let internalMaxOutputTokens = 0;
+      let internalMaxModelCallsForRequest = 0;
       if (internalEnvelope) {
         for (const alias of [
           'settings','routerOverride','routerRuntime','isolatedRuntime',
@@ -853,21 +873,85 @@ export class CoreCommandDispatcher {
             throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
           }
         }
-        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
-        if (!Number.isSafeInteger(boundedOutputTokens)
+        const promptDescriptor = Object.getOwnPropertyDescriptor(payload, 'prompt');
+        if (!promptDescriptor
+            || promptDescriptor.enumerable !== true
+            || !Object.hasOwn(promptDescriptor, 'value')
+            || typeof promptDescriptor.value !== 'string') {
+          throw new Error('Agent model invocation prompt must be an enumerable own text data property');
+        }
+        const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
+        if (systemPromptDescriptor
+            && (systemPromptDescriptor.enumerable !== true
+              || !Object.hasOwn(systemPromptDescriptor, 'value')
+              || typeof systemPromptDescriptor.value !== 'string')) {
+          throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
+        }
+        const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
+        const boundedOutputTokens = maxOutputTokensDescriptor?.value;
+        if (!maxOutputTokensDescriptor
+            || maxOutputTokensDescriptor.enumerable !== true
+            || !Object.hasOwn(maxOutputTokensDescriptor, 'value')
+            || typeof boundedOutputTokens !== 'number'
+            || !Number.isSafeInteger(boundedOutputTokens)
             || Object.is(boundedOutputTokens, -0)
             || boundedOutputTokens < 1) {
-          throw new Error('Agent model invocation requires bounded maxOutputTokens');
+          throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
+        const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
+        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
+        if (maxModelCallsDescriptor
+            && (maxModelCallsDescriptor.enumerable !== true
+              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
+              || typeof maxModelCallsForRequest !== 'number'
+              || !Number.isSafeInteger(maxModelCallsForRequest)
+              || Object.is(maxModelCallsForRequest, -0)
+              || maxModelCallsForRequest < 0)) {
+          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
+        }
+        internalPrompt = promptDescriptor.value;
+        internalSystemPrompt = systemPromptDescriptor?.value ?? '';
+        internalMaxOutputTokens = boundedOutputTokens;
+        internalMaxModelCallsForRequest = maxModelCallsForRequest;
+        const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
+        if (imageDescriptor
+            && (imageDescriptor.enumerable !== true
+              || !Object.hasOwn(imageDescriptor, 'value'))) {
+          throw new Error('Agent model invocation imageDataUrl must be an enumerable own data property');
+        }
+        const imageDataUrl = imageDescriptor?.value ?? '';
+        if (typeof imageDataUrl !== 'string' || imageDataUrl !== imageDataUrl.trim()) {
+          throw new Error('Agent model invocation imageDataUrl must already be canonical text');
+        }
+        if ((imageDataUrl.length > 0) !== internalEnvelope.requiresVision) {
+          throw new Error('Agent model image input does not match durable requiresVision intent');
+        }
+        internalImageDataUrl = imageDataUrl;
+      }
+      let internalProviderBudgetContext = null;
+      if (internalEnvelope) {
+        const budgetDescriptor = internal == null
+          ? undefined
+          : Object.getOwnPropertyDescriptor(Object(internal), 'providerCallBudgetContext');
+        if (!budgetDescriptor
+            || budgetDescriptor.enumerable !== true
+            || !Object.hasOwn(budgetDescriptor, 'value')) {
+          throw new Error('Agent model provider budget context must be an enumerable own data property');
+        }
+        internalProviderBudgetContext = budgetDescriptor.value;
       }
       const providerCallBudgetContext = internalEnvelope
-        ? normalizeInternalAgentProviderBudgetContext(internal?.providerCallBudgetContext, internalEnvelope.jobId)
+        ? normalizeInternalAgentProviderBudgetContext(
+          internalProviderBudgetContext,
+          internalEnvelope.jobId,
+        )
         : internal?.providerCallBudgetContext || null;
-      const routerOverride = !internalEnvelope
-        && Object.hasOwn(payload, 'routerOverride')
-        && payload.routerOverride != null
-        ? snapshotAiRouterOverride(payload.routerOverride)
-        : null;
+
+      const routerOverride = internalEnvelope
+        ? null
+        : Object.hasOwn(payload, 'routerOverride') && payload.routerOverride != null
+          ? snapshotAiRouterOverride(payload.routerOverride)
+          : null;
       const state = await this.repo.load();
       if (internalEnvelope) {
         const invocationNow = this.now();
@@ -877,11 +961,15 @@ export class CoreCommandDispatcher {
             || invocationNow < internalEnvelope.revalidatedAt) {
           throw new Error('Agent model invocation time is stale or invalid');
         }
-        const currentSettings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+        const currentSettings = normalizeAiRouterSettings(
+          state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
         if (currentSettings.enabled !== true) {
           throw new Error('Current canonical AI Router is disabled before Agent model invocation');
         }
-        const currentRoute = currentSettings.routes.find(route => route.routeId === internalEnvelope.routeId);
+        const currentRoute = currentSettings.routes.find(
+          route => route.routeId === internalEnvelope.routeId,
+        );
         const envelopeRoute = internalEnvelope.settings.routes[0];
         if (currentSettings.gatewayUrl !== internalEnvelope.settings.gatewayUrl) {
           throw new Error('Agent model Gateway identity drifted before provider invocation');
@@ -892,7 +980,9 @@ export class CoreCommandDispatcher {
             || currentRoute.endpointId !== envelopeRoute.endpointId) {
           throw new Error('Agent model route identity drifted before provider invocation');
         }
-        const currentRuntime = normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
+        const currentRuntime = normalizeAiRouterRuntime(
+          state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
+        );
         const currentCandidates = selectAiRouteCandidates({
           routes: currentSettings.routes,
           policy: currentSettings.routePolicy,
@@ -902,13 +992,17 @@ export class CoreCommandDispatcher {
           requiresVision: internalEnvelope.requiresVision,
           now: invocationNow,
         });
-        if (!currentCandidates.candidates.some(route => route.routeId === internalEnvelope.routeId)) {
+        if (!currentCandidates.candidates.some(
+          route => route.routeId === internalEnvelope.routeId,
+        )) {
           throw new Error('Agent model route is no longer authorized by current canonical Router');
         }
       }
       const baseSettings = internalEnvelope
         ? internalEnvelope.settings
-        : normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+        : normalizeAiRouterSettings(
+          payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
       const settings = internalEnvelope
         ? baseSettings
         : routerOverride
@@ -922,12 +1016,18 @@ export class CoreCommandDispatcher {
           : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
-        result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
-          systemPrompt: payload.systemPrompt || '',
+        result = await this.aiOrchestrator.run(
+          settings,
+          runtime,
+          internalEnvelope ? internalPrompt : payload.prompt,
+          {
+          systemPrompt: internalEnvelope ? internalSystemPrompt : payload.systemPrompt || '',
           forceStrong: internalEnvelope ? false : payload.forceStrong === true,
-          maxOutputTokens: Number(payload.maxOutputTokens || 0),
-          maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
-          imageDataUrl: payload.imageDataUrl || '',
+          maxOutputTokens: internalEnvelope ? internalMaxOutputTokens : Number(payload.maxOutputTokens || 0),
+          maxModelCallsForRequest: internalEnvelope
+            ? internalMaxModelCallsForRequest
+            : Number(payload.maxModelCallsForRequest || 0),
+          imageDataUrl: internalEnvelope ? internalImageDataUrl : payload.imageDataUrl || '',
           taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
           strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
           capabilityIds: internalEnvelope

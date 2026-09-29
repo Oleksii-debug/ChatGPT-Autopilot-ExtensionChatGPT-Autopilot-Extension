@@ -194,16 +194,6 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   };
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
-    mode: 'primary',
-    primary: { provider: route.provider, model: route.model },
-    strong: { provider: route.provider, model: route.model },
-    strongEveryNRequests: 0,
-    strongEveryMinutes: 0,
-    strongMinGapMinutes: 0,
-    strongMaxPerHour: 0,
-    carryStrongResultToPrimary: false,
-    fallbackToStrongOnPrimaryError: false,
-    keepPrimaryIfStrongFails: true,
     routes: [route],
     workerPolicy: scopedWorkerPolicy,
     routePolicy: {
@@ -253,31 +243,68 @@ const FINAL_ENVELOPE_KEYS = new Set([
   'role','capabilityIds','requiresVision','preparedAt','revalidatedAt',
   'routeId','settings','runtime','authority',
 ]);
-const FINAL_AUTHORITY_KEYS = new Set(Object.keys(AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY));
+const FINAL_AUTHORITY_KEYS = new Set(
+  Object.keys(AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY),
+);
 
+/**
+ * Re-validate a previously prepared envelope at an internal invocation
+ * boundary. This validates structure and least-authority invariants only; it
+ * does not grant permission to invoke the orchestrator.
+ */
 export function normalizeBoundAgentModelOrchestratorEnvelopeV1(value) {
-  const raw = strictRecord(value, FINAL_ENVELOPE_KEYS, 'Bound Agent model orchestrator envelope');
+  const raw = strictRecord(
+    value,
+    FINAL_ENVELOPE_KEYS,
+    'Bound Agent model orchestrator envelope',
+  );
   if (raw.schemaVersion !== AGENT_MODEL_ORCHESTRATOR_ENVELOPE_VERSION) {
     throw new Error('Unsupported bound Agent model orchestrator envelope schemaVersion');
   }
-  const authority = strictRecord(raw.authority, FINAL_AUTHORITY_KEYS, 'Bound Agent model orchestrator envelope authority');
+  const authority = strictRecord(
+    raw.authority,
+    FINAL_AUTHORITY_KEYS,
+    'Bound Agent model orchestrator envelope authority',
+  );
   for (const [key, expected] of Object.entries(AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY)) {
-    if (authority[key] !== expected) throw new Error('Bound Agent model orchestrator envelope authority is invalid');
+    if (authority[key] !== expected) {
+      throw new Error('Bound Agent model orchestrator envelope authority is invalid');
+    }
   }
+
   const jobId = exactString(raw.jobId, 'orchestrator envelope jobId');
   const projectId = exactString(raw.projectId, 'orchestrator envelope projectId');
-  const definitionModelPolicyBindingKey = exactString(raw.definitionModelPolicyBindingKey, 'orchestrator envelope definitionModelPolicyBindingKey');
-  const modelPolicyBindingKey = exactString(raw.modelPolicyBindingKey, 'orchestrator envelope modelPolicyBindingKey');
+  const definitionModelPolicyBindingKey = exactString(
+    raw.definitionModelPolicyBindingKey,
+    'orchestrator envelope definitionModelPolicyBindingKey',
+  );
+  const modelPolicyBindingKey = exactString(
+    raw.modelPolicyBindingKey,
+    'orchestrator envelope modelPolicyBindingKey',
+  );
   const parentModelPolicyBindingKey = raw.parentModelPolicyBindingKey === undefined
     ? null
-    : exactString(raw.parentModelPolicyBindingKey, 'orchestrator envelope parentModelPolicyBindingKey');
-  const routePoolRevision = exactInteger(raw.routePoolRevision, 'orchestrator envelope routePoolRevision');
+    : exactString(
+      raw.parentModelPolicyBindingKey,
+      'orchestrator envelope parentModelPolicyBindingKey',
+    );
+  const routePoolRevision = exactInteger(
+    raw.routePoolRevision,
+    'orchestrator envelope routePoolRevision',
+  );
   const role = exactString(raw.role, 'orchestrator envelope role');
   const capabilityIds = exactCapabilityIds(raw.capabilityIds);
-  if (typeof raw.requiresVision !== 'boolean') throw new Error('orchestrator envelope requiresVision is invalid');
+  if (typeof raw.requiresVision !== 'boolean') {
+    throw new Error('orchestrator envelope requiresVision is invalid');
+  }
   const preparedAt = exactTimestamp(raw.preparedAt, 'orchestrator envelope preparedAt');
-  const revalidatedAt = exactTimestamp(raw.revalidatedAt, 'orchestrator envelope revalidatedAt');
-  if (revalidatedAt < preparedAt) throw new Error('orchestrator envelope revalidatedAt precedes preparedAt');
+  const revalidatedAt = exactTimestamp(
+    raw.revalidatedAt,
+    'orchestrator envelope revalidatedAt',
+  );
+  if (revalidatedAt < preparedAt) {
+    throw new Error('orchestrator envelope revalidatedAt precedes preparedAt');
+  }
   const routeId = exactString(raw.routeId, 'orchestrator envelope routeId');
   const settings = normalizeAiRouterSettings(raw.settings);
   const runtime = normalizeAiRouterRuntime(raw.runtime);
@@ -294,8 +321,11 @@ export function normalizeBoundAgentModelOrchestratorEnvelopeV1(value) {
     throw new Error('orchestrator envelope route scope is invalid');
   }
   for (const runtimeRouteId of Object.keys(runtime.routeStates || {})) {
-    if (runtimeRouteId !== routeId) throw new Error('orchestrator envelope runtime leaks another route');
+    if (runtimeRouteId !== routeId) {
+      throw new Error('orchestrator envelope runtime leaks another route');
+    }
   }
+
   return freezeDeep({
     schemaVersion: AGENT_MODEL_ORCHESTRATOR_ENVELOPE_VERSION,
     jobId,
