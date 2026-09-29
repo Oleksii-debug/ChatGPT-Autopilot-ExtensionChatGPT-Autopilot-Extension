@@ -93,7 +93,9 @@ function setOwn(value, key, entry) {
 }
 
 function timestamp(value, label) {
-  if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid ${label}`);
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0) {
+    throw new Error(`Invalid ${label}`);
+  }
   return value;
 }
 
