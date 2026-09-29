@@ -169,6 +169,7 @@ test('internal Agent dispatcher preserves the selected durable provider receipt 
           ok,
           result.usage.totalTokens,
         ]);
+        return { settled: true };
       },
     },
   });
