@@ -170,6 +170,7 @@ function taskEnvelope(overrides = {}) {
       sourceId: 'source.allowed',
       location: 'private://parent/source.allowed',
       revisionId: 'r1',
+      contentSha256: 'a'.repeat(64),
     }],
     inputArtifactRefs: [artifact('artifact.allowed')],
     outcome: {

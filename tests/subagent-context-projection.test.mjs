@@ -444,6 +444,7 @@ function taskEnvelope(overrides = {}) {
       sourceId: 'source.allowed',
       location: 'private://parent/source.allowed',
       revisionId: 'r1',
+      contentSha256: 'a'.repeat(64),
     }],
     inputArtifactRefs: [artifact('artifact.allowed')],
     outcome: {
@@ -809,4 +810,16 @@ test('canonical ProjectWorkspaceRepository resolves durable child context across
     requestValue => restarted.resolveContext(requestValue),
   );
   assert.deepEqual(afterRestart, first);
+});
+
+
+test('task-bound child context rejects same logical source revision with substituted bytes', () => {
+  const changedSnapshot = snapshot();
+  changedSnapshot.sourceRefs[0] = source('source.allowed', { sha: 'f'.repeat(64) });
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      parentProjectSnapshot: changedSnapshot,
+    })),
+    /source identity is stale or mismatched: source\.allowed/,
+  );
 });

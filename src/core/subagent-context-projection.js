@@ -408,7 +408,8 @@ export function projectSubagentTaskContextV1(input = {}) {
     const current = sourceById.get(taskSource.sourceId);
     if (!current
         || current.revisionId !== taskSource.revisionId
-        || current.uri !== taskSource.location) {
+        || current.uri !== taskSource.location
+        || current.contentSha256 !== taskSource.contentSha256) {
       throw new Error(`Subagent task source identity is stale or mismatched: ${taskSource.sourceId}`);
     }
   }

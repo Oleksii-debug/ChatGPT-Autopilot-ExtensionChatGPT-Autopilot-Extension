@@ -176,6 +176,7 @@ function outcome(overrides = {}) {
       sourceId: overrides.sourceId || 'source.repo',
       location: 'project://source.repo',
       revisionId: 'rev-1',
+      contentSha256: overrides.contentSha256 || '4'.repeat(64),
       purpose: 'Canonical child source.',
     }],
     allowedAuthority: [],

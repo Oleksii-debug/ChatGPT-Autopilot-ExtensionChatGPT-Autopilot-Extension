@@ -9,6 +9,7 @@ import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_REFS = 256;
 const INPUT_KEYS = new Set([
   'envelopeId',
@@ -49,7 +50,7 @@ const ENVELOPE_KEYS = new Set([
   'completionAuthority',
 ]);
 const BUDGET_KEYS = new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']);
-const SOURCE_REF_KEYS = new Set(['sourceId', 'location', 'revisionId']);
+const SOURCE_REF_KEYS = new Set(['sourceId', 'location', 'revisionId', 'contentSha256']);
 const OUTCOME_KEYS = new Set([
   'contractId',
   'contractRevision',
@@ -97,6 +98,13 @@ function own(value, key, label) {
 function id(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function sha256(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
+    throw new Error(label + ' must be an exact lowercase SHA-256 digest');
   }
   return value;
 }
@@ -175,6 +183,10 @@ function normalizeSourceRef(value) {
     sourceId: id(own(raw, 'sourceId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.sourceId'),
     location: text(own(raw, 'location', 'SubagentTaskSourceRefV1'), 'inputSourceRef.location', 8_000),
     revisionId: id(own(raw, 'revisionId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.revisionId'),
+    contentSha256: sha256(
+      own(raw, 'contentSha256', 'SubagentTaskSourceRefV1'),
+      'inputSourceRef.contentSha256',
+    ),
   };
 }
 
@@ -281,10 +293,16 @@ function sourceRefsForIds(inputSourceIds, outcome) {
     if (!source) {
       throw new Error('Subagent task input source is not bound to OutcomeContract sourceTruth: ' + sourceId);
     }
+    if (typeof source.contentSha256 !== 'string' || !SHA256.test(source.contentSha256)) {
+      throw new Error(
+        'Subagent task input source must carry contentSha256 immutable identity: ' + sourceId,
+      );
+    }
     return {
       sourceId: source.sourceId,
       location: source.location,
       revisionId: source.revisionId,
+      contentSha256: source.contentSha256,
     };
   });
 }
