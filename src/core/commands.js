@@ -32,10 +32,69 @@ const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
 ]);
+const AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS = new Set([
+  'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
+]);
 function minimumNullable(left, right) {
   if (left == null) return right;
   if (right == null) return left;
   return Math.min(left, right);
+}
+function snapshotAiRoutePolicyOverride(rawPolicy) {
+  if (!rawPolicy || typeof rawPolicy !== 'object' || Array.isArray(rawPolicy)) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const proto = Object.getPrototypeOf(rawPolicy);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawPolicy);
+  const out = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('Selected Agent AI route policy contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Selected Agent AI route policy must contain data-only fields');
+    }
+    const value = descriptor.value;
+    if (AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS.has(key)) {
+      if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+        throw new Error('Selected Agent AI route policy.' + key + ' must be a canonical array');
+      }
+      const arrayDescriptors = Object.getOwnPropertyDescriptors(value);
+      const length = arrayDescriptors.length?.value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > 32) {
+        throw new Error('Selected Agent AI route policy.' + key + ' has invalid length');
+      }
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      for (const arrayKey of Reflect.ownKeys(arrayDescriptors)) {
+        if (typeof arrayKey !== 'string' || !expected.has(arrayKey)) {
+          throw new Error('Selected Agent AI route policy.' + key + ' contains non-canonical fields');
+        }
+      }
+      const copy = new Array(length);
+      for (let index = 0; index < length; index += 1) {
+        const itemDescriptor = arrayDescriptors[String(index)];
+        if (!itemDescriptor || !Object.hasOwn(itemDescriptor, 'value') || itemDescriptor.enumerable !== true) {
+          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be an enumerable data property');
+        }
+        const item = itemDescriptor.value;
+        if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be scalar data');
+        }
+        copy[index] = item;
+      }
+      out[key] = copy;
+      continue;
+    }
+    if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
+      throw new Error('Selected Agent AI route policy.' + key + ' must be scalar data');
+    }
+    out[key] = value;
+  }
+  return out;
 }
 function narrowAiRoutePolicy(baseSettings, rawRequested) {
   if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
@@ -136,6 +195,9 @@ function snapshotAiRouterOverride(rawOverride) {
       throw new Error('Selected Agent AI router override must contain data-only fields');
     }
     out[key] = descriptor.value;
+  }
+  if (Object.hasOwn(out, 'routePolicy')) {
+    out.routePolicy = snapshotAiRoutePolicyOverride(out.routePolicy);
   }
   for (const slotName of ['primary', 'strong']) {
     if (!Object.hasOwn(out, slotName) || out[slotName] == null) continue;
@@ -740,10 +802,13 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
+      const routerOverride = Object.hasOwn(payload, 'routerOverride') && payload.routerOverride != null
+        ? snapshotAiRouterOverride(payload.routerOverride)
+        : null;
       const state = await this.repo.load();
       const baseSettings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-      const settings = payload.routerOverride
-        ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
+      const settings = routerOverride
+        ? mergeAiRouterSettingsOverride(baseSettings, routerOverride)
         : baseSettings;
       const isolatedRuntime = payload.isolatedRuntime === true;
       const runtime = isolatedRuntime
