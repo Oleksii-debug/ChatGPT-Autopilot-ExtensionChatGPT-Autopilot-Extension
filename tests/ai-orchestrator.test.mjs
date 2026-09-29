@@ -407,7 +407,15 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
   const lifecycle = {
     async beforeProviderCall({ context, route, maxOutputTokens, callNumber }) {
       events.push(['before', context.jobId, route.model, maxOutputTokens, callNumber]);
-      return { reservationId:'reservation-1' };
+      return {
+        reservationId:`${context.jobId}:model-budget:${callNumber}`,
+        controlEpoch: context.controlEpoch,
+        callNumber,
+        routeId: route.routeId,
+        provider: route.provider,
+        model: route.model,
+        modelCalls: 1,
+      };
     },
     async afterProviderCall({ context, reservation, route, ok, result }) {
       events.push(['after', context.jobId, reservation.reservationId, route.model, ok, result.usage.totalTokens]);
@@ -427,7 +435,7 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
   assert.deepEqual(events, [
     ['before','job-1','qwen:8b',128,1],
     ['gateway','qwen:8b'],
-    ['after','job-1','reservation-1','qwen:8b',true,8],
+    ['after','job-1','job-1:model-budget:1','qwen:8b',true,8],
   ]);
 });
 
@@ -440,9 +448,17 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
     },
   };
   const lifecycle = {
-    async beforeProviderCall({ route }) {
+    async beforeProviderCall({ context, route, callNumber }) {
       events.push(['before', route.model]);
-      return { reservationId:`reservation-${route.model}` };
+      return {
+        reservationId:`${context.jobId}:model-budget:${callNumber}`,
+        controlEpoch: context.controlEpoch,
+        callNumber,
+        routeId: route.routeId,
+        provider: route.provider,
+        model: route.model,
+        modelCalls: 1,
+      };
     },
     async afterProviderCall({ reservation, route, ok, error }) {
       events.push(['after', reservation.reservationId, route.model, ok, error.message]);
@@ -464,10 +480,10 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   assert.deepEqual(events, [
     ['before','qwen:8b'],
     ['gateway','qwen:8b'],
-    ['after','reservation-qwen:8b','qwen:8b',false,'provider failed'],
+    ['after','job-2:model-budget:1','qwen:8b',false,'provider failed'],
     ['before','gpt-strong'],
     ['gateway','gpt-strong'],
-    ['after','reservation-gpt-strong','gpt-strong',false,'provider failed'],
+    ['after','job-2:model-budget:2','gpt-strong',false,'provider failed'],
   ]);
 });
 

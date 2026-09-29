@@ -1345,7 +1345,7 @@ test('internal Agent invocation requires the existing durable browser-agent budg
       { prompt: 'agent', maxOutputTokens: 128 },
       { agentModelOrchestratorEnvelope: envelope },
     ),
-    /requires canonical provider budget context/u,
+    /provider budget context must be an enumerable own data property/u,
   );
   await assert.rejects(
     dispatcher.execute(
@@ -1390,7 +1390,7 @@ test('internal Agent invocation requires a bounded output-token reservation', as
         providerCallBudgetContext: internalAgentBudgetContext(),
       },
     ),
-    /requires bounded maxOutputTokens/u,
+    /requires canonical bounded maxOutputTokens/u,
   );
   assert.equal(calls, 0);
 });

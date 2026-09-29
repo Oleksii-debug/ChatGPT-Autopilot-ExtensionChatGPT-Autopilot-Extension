@@ -158,7 +158,12 @@ test('Agent model-policy UI is native, labeled and removes inactive controls fro
     'agent-definition-model-route-circuit-failures',
     'agent-definition-model-route-circuit-seconds',
   ];
-  for (const id of ids) assert.match(html, new RegExp('id=["\\']' + id + '["\\']', 'u'));
+  for (const id of ids) {
+    assert.ok(
+      html.includes(`id="${id}"`) || html.includes(`id='${id}'`),
+      `missing Agent model-policy control ${id}`,
+    );
+  }
   assert.match(html, /Збереження policy не вибирає модель, не запускає provider і не запускає Agent/u);
   assert.match(source, /function syncAgentDefinitionModelRoutePolicyControls\(\)[\s\S]*?\$\(id\)\.disabled = !configured/u);
   assert.match(source, /agent-definition-model-route-policy-configured'\)\.addEventListener\('change', syncAgentDefinitionModelRoutePolicyControls\)/u);
