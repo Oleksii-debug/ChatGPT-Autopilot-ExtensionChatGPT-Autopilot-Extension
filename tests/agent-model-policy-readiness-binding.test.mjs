@@ -455,7 +455,7 @@ test('bound readiness supports verifier-only work without requiring planner elig
   assert.equal(result.readiness.requiresPlanner, false);
   assert.equal(result.readiness.requiresVerifier, true);
   assert.deepEqual(result.readiness.planner.availableRouteIds, []);
-  assert.deepEqual(result.readiness.verifier.availableRouteIds, ['route.a', 'route.b']);
+  assert.deepEqual(result.readiness.verifier.availableRouteIds, ['route.b', 'route.a']);
 });
 
 test('routes outside durable effectiveRouteIds cannot make an otherwise unavailable Agent ready', () => {
