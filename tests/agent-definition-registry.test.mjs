@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AgentDefinitionRegistryMutationKind,
+  createAgentDefinitionRegistryV1,
   discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
@@ -28,7 +29,6 @@ function definition(overrides = {}) {
       maxModelCalls: 20,
       maxRuntimeMinutes: 30,
       aiRoutingMode: 'primary',
-      aiPinnedRouteId: 'mistral-agent',
       aiPrimaryProvider: 'openai-compatible',
       aiPrimaryModel: 'mistral-small-latest',
       visionOnDemand: false,
@@ -40,7 +40,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return {
+  return createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
@@ -49,7 +49,7 @@ function registry(overrides = {}) {
       definition(),
     ],
     ...overrides,
-  };
+  });
 }
 
 function materialization(overrides = {}) {
@@ -91,6 +91,99 @@ test('registry canonicalizes reusable Agent definitions deterministically', () =
   assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
+});
+
+test('same-revision Agent registry content substitution is rejected by canonical bindingKey', () => {
+  const current = registry();
+  const forged = {
+    ...current,
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ instructions: 'Changed instructions without a revision bump.' }),
+    ],
+  };
+  assert.throws(
+    () => normalizeAgentDefinitionRegistryV1(forged),
+    /bindingKey is inconsistent with canonical registry content/,
+  );
+
+  const selected = selectAgentDefinitionV1({ registry: current, agentDefinitionId: 'agent.research' });
+  assert.equal(selected.registryBindingKey, current.bindingKey);
+});
+
+test('legacy Agent definitions remain shape-compatible when no specialist delegation profile exists', () => {
+  const normalized = normalizeAgentDefinitionV1(definition());
+  assert.equal(Object.hasOwn(normalized, 'specialistDelegationProfile'), false);
+});
+
+test('Agent definition persists an optional owner-bound specialist delegation profile', () => {
+  const normalized = normalizeAgentDefinitionV1(definition({
+    specialistDelegationProfile: {
+      schemaVersion: 1,
+      registryId: 'specialists:project-1',
+      requiredCapabilityIds: ['research.read', 'project.context'],
+      requiredToolIds: ['files.read', 'browser.read'],
+      policyEnvelopeId: 'policy:agent.research',
+      deadlineSeconds: 900,
+      maxConcurrentHandoffs: 2,
+      leaseSeconds: 600,
+      priority: 5,
+      enabled: true,
+    },
+  }));
+
+  assert.deepEqual(normalized.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(normalized.specialistDelegationProfile.requiredToolIds, [
+    'browser.read',
+    'files.read',
+  ]);
+  assert.equal(normalized.specialistDelegationProfile.registryId, 'specialists:project-1');
+  assert.equal(normalized.specialistDelegationProfile.policyEnvelopeId, 'policy:agent.research');
+  assert.equal(Object.isFrozen(normalized.specialistDelegationProfile), true);
+
+  const cleared = normalizeAgentDefinitionV1(definition({ specialistDelegationProfile: null }));
+  assert.equal(cleared.specialistDelegationProfile, null);
+});
+
+test('Agent definition specialist profile cannot exceed reusable definition scope', () => {
+  assert.throws(
+    () => normalizeAgentDefinitionV1(definition({
+      specialistDelegationProfile: {
+        schemaVersion: 1,
+        registryId: 'specialists:project-1',
+        requiredCapabilityIds: ['research.write'],
+        requiredToolIds: ['browser.read'],
+        policyEnvelopeId: 'policy:agent.research',
+        deadlineSeconds: 900,
+        maxConcurrentHandoffs: 2,
+        leaseSeconds: 600,
+        priority: 5,
+        enabled: true,
+      },
+    })),
+    /Agent specialist delegation capabilities exceeds allowed authority: research\.write/u,
+  );
+
+  assert.throws(
+    () => normalizeAgentDefinitionV1(definition({
+      specialistDelegationProfile: {
+        schemaVersion: 1,
+        registryId: 'specialists:project-1',
+        requiredCapabilityIds: ['research.read'],
+        requiredToolIds: ['shell.run'],
+        policyEnvelopeId: 'policy:agent.research',
+        deadlineSeconds: 900,
+        maxConcurrentHandoffs: 2,
+        leaseSeconds: 600,
+        priority: 5,
+        enabled: true,
+      },
+    })),
+    /Agent specialist delegation tools exceeds allowed authority: shell\.run/u,
+  );
 });
 
 test('read-only discovery filters enabled definitions deterministically without granting permission', () => {
@@ -145,11 +238,16 @@ test('selection carries a full immutable definition snapshot so same-revision by
       definition({ instructions: 'Changed instructions without a revision bump.' }),
     ],
   });
+  assert.notEqual(
+    drifted.bindingKey,
+    reg.bindingKey,
+    'same-revision definition bytes must change the canonical registry binding',
+  );
   assert.throws(() => materializeAgentDefinitionV1({
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -163,13 +261,163 @@ test('materialization reuses Browser Agent config and binds model defaults under
   assert.equal(result.config.maxModelCalls, 20);
   assert.equal(result.config.maxRuntimeMinutes, 30);
   assert.equal(result.config.aiRoutingMode, 'primary');
-  assert.equal(result.config.aiPinnedRouteId, 'mistral-agent');
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
   assert.equal(result.config.maxCostUsd, 5);
   assert.equal(result.config.inputPricePerMillionUsd, 3);
   assert.equal(result.config.outputPricePerMillionUsd, 6);
   assert.deepEqual(result.config.acceptanceCriteria, definition().acceptanceCriteria);
+});
+
+test('materialization binds enabled specialist profile to the exact job and instantiated scope', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read', 'project.context'],
+          requiredToolIds: ['browser.read', 'github.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: true,
+        },
+      }),
+    ],
+  });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+  });
+
+  assert.equal(result.specialistDelegationBinding.schemaVersion, 1);
+  assert.equal(result.specialistDelegationBinding.jobId, 'job-research-001');
+  assert.equal(result.specialistDelegationBinding.projectId, 'project-1');
+  assert.equal(result.specialistDelegationBinding.registryId, 'agents:project-1');
+  assert.equal(result.specialistDelegationBinding.registryRevision, 3);
+  assert.equal(result.specialistDelegationBinding.agentDefinitionId, 'agent.research');
+  assert.equal(result.specialistDelegationBinding.definitionRevision, 7);
+  assert.equal(result.specialistDelegationBinding.profile.registryId, 'specialists:project-1');
+  assert.deepEqual(result.specialistDelegationBinding.profile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(result.specialistDelegationBinding.profile.requiredToolIds, [
+    'browser.read',
+    'github.read',
+  ]);
+  assert.deepEqual(result.specialistDelegationBinding.authority, {
+    proposalOnly: true,
+    executionAuthorized: false,
+    policyAuthorized: false,
+    schedulingAuthorized: false,
+    recoveryAuthorized: false,
+    credentialAuthorized: false,
+    completionAuthorized: false,
+    verificationAuthorized: false,
+    capacityReserved: false,
+  });
+  assert.equal(Object.isFrozen(result.specialistDelegationBinding), true);
+  assert.equal(Object.isFrozen(result.specialistDelegationBinding.profile), true);
+});
+
+test('enabled specialist profile cannot exceed the concrete materialized job scope', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read', 'project.context'],
+          requiredToolIds: ['browser.read', 'files.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: true,
+        },
+      }),
+    ],
+  });
+  const selection = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+
+  assert.throws(
+    () => materializeAgentDefinitionV1({
+      ...materialization(),
+      registry: reg,
+      selection,
+      requestedCapabilityIds: ['research.read'],
+    }),
+    /specialist delegation capabilities for materialized job exceeds allowed authority: project\.context/u,
+  );
+
+  assert.throws(
+    () => materializeAgentDefinitionV1({
+      ...materialization(),
+      registry: reg,
+      selection,
+      requestedToolIds: ['browser.read'],
+    }),
+    /specialist delegation tools for materialized job exceeds allowed authority: files\.read/u,
+  );
+});
+
+test('disabled specialist profile stays job-bound but cannot grant runtime authority', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read'],
+          requiredToolIds: ['files.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: false,
+        },
+      }),
+    ],
+  });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+    requestedCapabilityIds: ['research.read'],
+    requestedToolIds: ['browser.read'],
+  });
+
+  assert.equal(result.specialistDelegationBinding.profile.enabled, false);
+  assert.equal(result.specialistDelegationBinding.authority.executionAuthorized, false);
+  assert.equal(result.specialistDelegationBinding.authority.capacityReserved, false);
+});
+
+test('materialization omits specialist binding for legacy or explicitly cleared profiles', () => {
+  const legacy = materializeAgentDefinitionV1(materialization());
+  assert.equal(Object.hasOwn(legacy, 'specialistDelegationBinding'), false);
+
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ specialistDelegationProfile: null }),
+    ],
+  });
+  const cleared = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationBinding'), false);
 });
 
 test('definition ceilings can only narrow owner budgets and zero/unbounded aliases cannot widen them', () => {
@@ -307,7 +555,7 @@ test('requested capability and tool scope is the explicit intersection of owner 
   })), /exceeds allowed authority/);
 });
 
-test('disabled, removed and registry-revision drift require fresh selection', () => {
+test('disabled, removed and registry-revision drift invalidate the exact registry binding', () => {
   const reg = registry();
   const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
   const base = materialization({ selection: selected });
@@ -320,17 +568,17 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ revision: 4 }),
-  }), /registry identity or revision drifted/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('selection envelope cannot substitute a different definition identity or revision', () => {
@@ -381,11 +629,16 @@ test('config defaults reject every legacy-normalizer alias instead of silently c
     configDefaults: {
       ...definition().configDefaults,
       startUrl: 'https://example.com/',
-      aiPinnedRouteId: 'mistral-agent',
     },
   }));
   assert.equal(canonical.configDefaults.startUrl, 'https://example.com/');
-  assert.equal(canonical.configDefaults.aiPinnedRouteId, 'mistral-agent');
+
+  assert.throws(
+    () => normalizeAgentDefinitionV1(definition({
+      configDefaults: { ...definition().configDefaults, aiPinnedRouteId: 'mistral-agent' },
+    })),
+    /unknown field: aiPinnedRouteId/,
+  );
 });
 
 test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {

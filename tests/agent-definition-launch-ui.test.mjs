@@ -56,7 +56,7 @@ test('definition launch uses the canonical create command and never auto-starts 
   assert.doesNotMatch(body, /RUN_BROWSER_AGENT_NOW/u);
   assert.doesNotMatch(body, /assertBrowserAgentRouteReadyForLaunch/u);
   assert.match(body, /runState !== 'STOPPED'/u);
-  assert.match(body, /loadBrowserAgentJobs\(\{ selectId: id \}\)/u);
+  assert.match(body, /loadBrowserAgentJobs\(\{ selectId: createdId \}\)/u);
 });
 
 test('definition launch reads owner budget from the visible canonical Agent budget controls only', () => {
@@ -92,4 +92,43 @@ test('selected definition controls launch admission and prefilled least-authorit
   assert.match(body, /definition\?\.enabled === true/u);
   assert.match(body, /agentDefinitionLaunchScopeTextV1\(definition\)/u);
   assert.match(body, /button\.disabled = !launchable/u);
+});
+
+
+test('launch scope prefill cache is bound to exact registry and definition provenance', () => {
+  const start = options.indexOf('function fillAgentDefinitionLaunchForm');
+  const end = options.indexOf('\nfunction browserAgentOwnerBudgetPolicyFromForm', start);
+  assert.ok(start >= 0 && end > start);
+  const body = options.slice(start, end);
+
+  assert.match(
+    body,
+    /selectedAgentDefinitionRegistry\.registryId.*selectedAgentDefinitionRegistry\.revision.*agentDefinitionId.*definitionRevision/su,
+    'prefill cache key must change when registry identity or revision changes even if definition ID/revision are reused',
+  );
+});
+
+
+test('post-create verification failure preserves the durable job identity and forbids blind retry messaging', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /let createdId = ''/u);
+  assert.match(body, /let createAcknowledged = false/u);
+  assert.match(body, /createAcknowledged = true/u);
+  assert.match(body, /createdId = created\?\.job\?\.id \|\| created\?\.selectedId \|\| ''/u);
+  assert.match(body, /if \(createAcknowledged\)/u);
+  assert.match(body, /уже підтверджено Core/u);
+  assert.match(body, /Не створюйте повторно/u);
+  assert.match(body, /оновіть список Agent jobs/u);
+});
+
+
+test('acknowledged definition create without returned identity is treated as ambiguous, not absent', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /Core підтвердив create, але не повернув id/u);
+  assert.match(body, /Create-виклик/u);
+  assert.match(body, /знайдіть нове завдання перед будь-якою повторною спробою/u);
+  assert.doesNotMatch(
+    body.slice(body.indexOf('if (createAcknowledged)'), body.indexOf('} else if (/revision drifted')),
+    /Завдання з definition не створено/u,
+  );
 });

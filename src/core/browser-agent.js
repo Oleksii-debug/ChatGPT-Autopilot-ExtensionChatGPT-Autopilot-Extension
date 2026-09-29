@@ -282,7 +282,7 @@ export function normalizeBrowserAgentAcceptanceCriteria(raw = []) {
   return raw.map((value, index) => {
     const criterion = clean(value, 1000);
     if (!criterion) throw new Error(`Browser Agent acceptance criterion ${index + 1} is required`);
-    const key = criterion.toLowerCase();
+    const key = criterion.toLocaleLowerCase();
     if (seen.has(key)) throw new Error(`Duplicate Browser Agent acceptance criterion: ${criterion}`);
     seen.add(key);
     return criterion;
@@ -351,7 +351,7 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
   const aiPrimaryModel = clean(raw.aiPrimaryModel, 300);
   const aiStrongModel = clean(raw.aiStrongModel, 300);
   const aiPinnedRouteId = clean(raw.aiPinnedRouteId, 180);
-  if (aiPinnedRouteId && !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(aiPinnedRouteId)) {
+  if (aiPinnedRouteId && !BROWSER_AGENT_ID.test(aiPinnedRouteId)) {
     throw new Error('Browser Agent route ID is invalid');
   }
   if (aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT && !aiPrimaryModel) {

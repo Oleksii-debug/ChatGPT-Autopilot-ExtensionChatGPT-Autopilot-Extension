@@ -16,10 +16,10 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     ? [String(fields.url || '').trim()]
     : String(fields.urls || '').split(/\r?\n/u).map(url => url.trim()).filter(Boolean);
   const prompts = promptMode === 'shared'
-    ? [String(fields.prompt ?? '')]
-    : String(fields.prompts ?? '').split(/^[ \t]*---[ \t]*$/mu).filter(prompt => prompt.trim());
+    ? [String(fields.prompt || '').trim()]
+    : String(fields.prompts || '').split(/^\s*---\s*$/mu).map(prompt => prompt.trim()).filter(Boolean);
   if (!urls.length || urls.some(url => !url)) throw new Error('Укажіть посилання ChatGPT.');
-  if (!prompts.length || prompts.some(prompt => !prompt.trim())) throw new Error('Укажіть промпт.');
+  if (!prompts.length || prompts.some(prompt => !prompt)) throw new Error('Укажіть промпт.');
   if (urlMode === 'unique' && promptMode === 'unique' && urls.length !== prompts.length) {
     throw new Error('Кількість посилань і промптів повинна збігатися.');
   }
@@ -31,14 +31,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
   const interval = exactInteger(fields.interval, 1, intervalUnit === 'seconds' ? 86400 : 1440, 'Інтервал');
   const preSendDelaySeconds = exactInteger(fields.delay, 1, 30, 'Пауза перед Send');
   const busyCheckDelaySeconds = exactInteger(fields.busy, 1, 30, 'Перевірка зайнятого чату');
-  const retryUnit = fields.retryUnit === 'minutes' ? 'minutes' : 'seconds';
-  const retryValue = exactInteger(
-    fields.retry,
-    retryUnit === 'minutes' ? 1 : 5,
-    retryUnit === 'minutes' ? 60 : 3600,
-    'Повторна спроба',
-  );
-  const retryBackoffSeconds = retryValue * (retryUnit === 'minutes' ? 60 : 1);
+  const retryBackoffSeconds = exactInteger(fields.retry, 5, 3600, 'Технічний повтор');
   const tasks = Array.from({ length: compact ? 1 : physicalCount }, (_, index) => ({
     id: previous?.tasks?.[index]?.id || createId(), enabled: true,
     label: `Крок ${index + 1}`,
@@ -57,7 +50,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     minimumSendIntervalValue: interval, minimumSendIntervalUnit: intervalUnit,
     preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
     retryPolicy: fields.retryPolicy === 'manual' ? 'manual' : 'safe',
-    busyChatBehavior: fields.busyBehavior === 'skip-next' ? 'skip-next' : 'skip-next',
+    busyChatBehavior: 'skip-next',
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',
   };
 }

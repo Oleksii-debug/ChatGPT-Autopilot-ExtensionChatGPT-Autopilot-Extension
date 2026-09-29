@@ -32,10 +32,69 @@ const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
 ]);
+const AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS = new Set([
+  'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
+]);
 function minimumNullable(left, right) {
   if (left == null) return right;
   if (right == null) return left;
   return Math.min(left, right);
+}
+function snapshotAiRoutePolicyOverride(rawPolicy) {
+  if (!rawPolicy || typeof rawPolicy !== 'object' || Array.isArray(rawPolicy)) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const proto = Object.getPrototypeOf(rawPolicy);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawPolicy);
+  const out = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('Selected Agent AI route policy contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Selected Agent AI route policy must contain data-only fields');
+    }
+    const value = descriptor.value;
+    if (AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS.has(key)) {
+      if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+        throw new Error('Selected Agent AI route policy.' + key + ' must be a canonical array');
+      }
+      const arrayDescriptors = Object.getOwnPropertyDescriptors(value);
+      const length = arrayDescriptors.length?.value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > 32) {
+        throw new Error('Selected Agent AI route policy.' + key + ' has invalid length');
+      }
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      for (const arrayKey of Reflect.ownKeys(arrayDescriptors)) {
+        if (typeof arrayKey !== 'string' || !expected.has(arrayKey)) {
+          throw new Error('Selected Agent AI route policy.' + key + ' contains non-canonical fields');
+        }
+      }
+      const copy = new Array(length);
+      for (let index = 0; index < length; index += 1) {
+        const itemDescriptor = arrayDescriptors[String(index)];
+        if (!itemDescriptor || !Object.hasOwn(itemDescriptor, 'value') || itemDescriptor.enumerable !== true) {
+          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be an enumerable data property');
+        }
+        const item = itemDescriptor.value;
+        if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be scalar data');
+        }
+        copy[index] = item;
+      }
+      out[key] = copy;
+      continue;
+    }
+    if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
+      throw new Error('Selected Agent AI route policy.' + key + ' must be scalar data');
+    }
+    out[key] = value;
+  }
+  return out;
 }
 function narrowAiRoutePolicy(baseSettings, rawRequested) {
   if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
@@ -136,6 +195,9 @@ function snapshotAiRouterOverride(rawOverride) {
       throw new Error('Selected Agent AI router override must contain data-only fields');
     }
     out[key] = descriptor.value;
+  }
+  if (Object.hasOwn(out, 'routePolicy')) {
+    out.routePolicy = snapshotAiRoutePolicyOverride(out.routePolicy);
   }
   for (const slotName of ['primary', 'strong']) {
     if (!Object.hasOwn(out, slotName) || out[slotName] == null) continue;
@@ -666,39 +728,21 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
       const ms = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
-      const concurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
-      return {
-        rateLimitCooldownMinutes: Math.round(ms / 60000),
-        maxConcurrentSessionOperations: Number.isInteger(concurrency) ? Math.max(1, Math.min(32, concurrency)) : 10,
-      };
+      return { rateLimitCooldownMinutes: Math.round(ms / 60000) };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
-      const hasCooldown = payload.rateLimitCooldownMinutes !== undefined;
-      const hasConcurrency = payload.maxConcurrentSessionOperations !== undefined;
-      const minutes = hasCooldown ? Number(payload.rateLimitCooldownMinutes) : null;
-      const ms = hasCooldown ? minutes * 60000 : null;
-      const concurrency = hasConcurrency ? Number(payload.maxConcurrentSessionOperations) : null;
-      if (hasCooldown && (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS)) {
+      const minutes = Number(payload.rateLimitCooldownMinutes);
+      const ms = minutes * 60000;
+      if (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS) {
         throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
-      if (hasConcurrency && (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32)) {
-        throw new Error('Maximum concurrent Session operations must be a whole number from 1 to 32');
-      }
-      const state = await this.repo.update(draft => {
-        if (hasCooldown) {
-          draft.profile.rateLimitCooldownMs = ms;
-          draft.profile.rateLimitReservePolicyVersion = 1;
-          if (ms === 0) draft.profile.rateLimitUntil = 0;
-        }
-        if (hasConcurrency) draft.profile.maxConcurrentSessionOperations = concurrency;
+      await this.repo.update(draft => {
+        draft.profile.rateLimitCooldownMs = ms;
+        draft.profile.rateLimitReservePolicyVersion = 1;
+        if (ms === 0) draft.profile.rateLimitUntil = 0;
         return draft;
       });
-      const storedMs = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
-      const storedConcurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
-      return {
-        rateLimitCooldownMinutes: Math.round(storedMs / 60000),
-        maxConcurrentSessionOperations: Number.isInteger(storedConcurrency) ? Math.max(1, Math.min(32, storedConcurrency)) : 10,
-      };
+      return { rateLimitCooldownMinutes: minutes };
     }
     if (command === CoreCommand.GET_LOCAL_AI_SETTINGS) {
       const state = await this.repo.load();
@@ -758,10 +802,13 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
+      const routerOverride = Object.hasOwn(payload, 'routerOverride') && payload.routerOverride != null
+        ? snapshotAiRouterOverride(payload.routerOverride)
+        : null;
       const state = await this.repo.load();
       const baseSettings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-      const settings = payload.routerOverride
-        ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
+      const settings = routerOverride
+        ? mergeAiRouterSettingsOverride(baseSettings, routerOverride)
         : baseSettings;
       const isolatedRuntime = payload.isolatedRuntime === true;
       const runtime = isolatedRuntime

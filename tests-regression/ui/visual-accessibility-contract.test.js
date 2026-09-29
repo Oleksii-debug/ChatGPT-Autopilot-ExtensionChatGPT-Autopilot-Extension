@@ -16,12 +16,13 @@ function contrast(a, b) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-test('visual shell exposes clear brand and global action grouping without tutorial notices', () => {
+test('visual shell exposes clear brand, global action grouping and orchestration safety notices', () => {
   assert.match(html, /class="brand-row"/);
   assert.match(html, /class="app-icon"/);
   assert.match(html, /class="header-actions" aria-label="Глобальні дії"/);
   assert.match(html, /class="orchestra-actions" aria-label="Дії з вибраним оркестром"/);
-  assert.doesNotMatch(html, /class="notice"/);
+  assert.match(html, /Безпечна локальна пауза/);
+  assert.match(html, /Аварійна дія лише для вибраного оркестру/);
 });
 
 test('visual accessibility includes responsive, forced-colors, reduced-motion and explicit focus support', () => {

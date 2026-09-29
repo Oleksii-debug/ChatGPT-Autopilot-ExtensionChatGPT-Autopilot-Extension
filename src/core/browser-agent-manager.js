@@ -51,9 +51,9 @@ import {
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
-import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
+  createAgentDefinitionRegistryV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
@@ -61,49 +61,24 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
-import {
-  SPECIALIST_REGISTRY_VERSION,
-  normalizeSpecialistDefinitionV1,
-  normalizeSpecialistRegistryV1,
-  proposeSpecialistRegistryMutationV1,
-} from './specialist-registry.js';
-import {
-  BrowserAgentOrchestrationBindingStatus,
-  createBrowserAgentOrchestrationNodeBindingV1,
-  inspectBrowserAgentOrchestrationNodeBindingV1,
-  normalizeBrowserAgentOrchestrationBindingRequestV1,
-  normalizeBrowserAgentOrchestrationNodeBindingV1,
-} from './browser-agent-orchestration-binding.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
-const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
-const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
-const MAX_SPECIALIST_REGISTRIES = 128;
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
-const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
-const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
-  'definition', 'specialistId', 'expectedDefinitionRevision',
-]);
-const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
-  'resolveProjectHierarchyAuthority',
-  'withProjectHierarchyAuthority',
-]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -151,76 +126,15 @@ function snapshotExactOwnDataRequest(value, allowed, label) {
   }
   return snapshot;
 }
-function trustedOrchestrationAuthorityResolver(dependencies) {
-  const raw = snapshotExactOwnDataRequest(
-    dependencies,
-    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
-    'Browser Agent orchestration binding dependencies',
-  );
-  if (typeof raw.resolveProjectHierarchyAuthority !== 'function') {
-    throw new Error('Canonical orchestration Project authority resolver is required');
-  }
-  return raw.resolveProjectHierarchyAuthority;
-}
-
-function trustedOrchestrationAuthorityFence(dependencies) {
-  const raw = snapshotExactOwnDataRequest(
-    dependencies,
-    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
-    'Browser Agent orchestration binding dependencies',
-  );
-  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
-    throw new Error('Canonical orchestration Project authority fence is required');
-  }
-  return raw.withProjectHierarchyAuthority;
-}
-
-const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
-  'PROJECT_UNOWNED',
-  'PROJECT_NON_UNIQUE',
-  'HIERARCHY_UNAVAILABLE',
-  'HIERARCHY_INCONSISTENT',
-]);
-
-function ownDataPropertyValue(value, key) {
-  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
-}
-
-function inspectUnavailableOrchestrationAuthority(binding, error) {
-  const code = ownDataPropertyValue(error, 'code');
-  if (typeof code !== 'string' || !ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES.has(code)) return null;
-  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(binding);
-  const projectDrift = code === 'PROJECT_UNOWNED' || code === 'PROJECT_NON_UNIQUE';
-  return Object.freeze({
-    binding: canonicalBinding,
-    status: projectDrift
-      ? BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED
-      : BrowserAgentOrchestrationBindingStatus.GRAPH_DRIFTED,
-    current: false,
-    currentAuthority: null,
-    authorityErrorCode: code,
-  });
-}
-
 function canonicalAgentDefinitionRegistryId(value) {
-  return normalizeAgentDefinitionRegistryV1({
+  return createAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
     definitions: [],
   }).registryId;
 }
-function canonicalSpecialistRegistryId(value) {
-  return normalizeSpecialistRegistryV1({
-    schemaVersion: SPECIALIST_REGISTRY_VERSION,
-    registryId: value,
-    revision: 1,
-    definitions: [],
-  }).registryId;
-}
-function storedDefinitionMapDescriptors(raw) {
+function storedAgentDefinitionMapDescriptors(raw) {
   if (raw === undefined) return [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
   const prototype = Object.getPrototypeOf(raw);
@@ -289,7 +203,6 @@ function snapshotAgentDefinitionLaunchNestedInputs(request) {
   }
   return request;
 }
-
 function normalizePersistedAgentDefinitionScope(raw, selection) {
   if (selection == null) {
     if (raw == null) return null;
@@ -334,11 +247,10 @@ function normalizePersistedAgentDefinitionScope(raw, selection) {
     toolIds: normalizeIds(record.toolIds, 'Browser Agent definition scope toolIds', 128, selection.definition.toolIds),
   };
 }
-
-function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
+function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   const registries = Object.create(null);
   const quarantine = Object.create(null);
-  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+  for (const [key, value] of storedAgentDefinitionMapDescriptors(rawQuarantine)) {
     try {
       quarantine[key] = clone(value);
     } catch {
@@ -346,33 +258,14 @@ function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine)
       // in-memory exotic values without invoking caller behavior.
     }
   }
-  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+  for (const [key, value] of storedAgentDefinitionMapDescriptors(rawRegistries)) {
     try {
-      const registry = normalizeSpecialistRegistryV1(value);
-      if (registry.registryId !== key) throw new Error('Stored Specialist registry identity drift');
-      registries[key] = registry;
-      delete quarantine[key];
-    } catch {
-      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
-    }
-  }
-  return { registries, quarantine };
-}
-
-function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
-  const registries = Object.create(null);
-  const quarantine = Object.create(null);
-  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine)) {
-    try {
-      quarantine[key] = clone(value);
-    } catch {
-      // Chrome storage values are structured-cloneable. Ignore an impossible
-      // in-memory exotic value rather than executing caller behavior.
-    }
-  }
-  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries)) {
-    try {
-      const registry = normalizeAgentDefinitionRegistryV1(value);
+      const descriptors = value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.getOwnPropertyDescriptors(value)
+        : null;
+      const registry = descriptors && !Object.hasOwn(descriptors, 'bindingKey')
+        ? createAgentDefinitionRegistryV1(value)
+        : normalizeAgentDefinitionRegistryV1(value);
       if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
       registries[key] = registry;
       delete quarantine[key];
@@ -443,41 +336,14 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function normalizeBrowserAgentExecutionPolicy(raw = {}) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent execution policy must be a plain object');
-  const prototype = Object.getPrototypeOf(raw);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error('Browser Agent execution policy must be a plain object');
-  const descriptors = Object.getOwnPropertyDescriptors(raw);
-  const keys = Reflect.ownKeys(descriptors);
-  if (keys.some(key => typeof key !== 'string' || !['maxConcurrentAgents'].includes(key))) {
-    throw new Error('Browser Agent execution policy contains an unknown field');
-  }
-  for (const key of keys) {
-    const descriptor = descriptors[key];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error('Browser Agent execution policy fields must be enumerable data properties');
-    }
-  }
-  const value = Object.hasOwn(descriptors, 'maxConcurrentAgents')
-    ? descriptors.maxConcurrentAgents.value
-    : DEFAULT_BROWSER_AGENT_MAX_CONCURRENT;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
-      || value < 1 || value > MAX_BROWSER_AGENT_CONCURRENT) {
-    throw new Error(`Browser Agent maxConcurrentAgents must be an integer from 1 to ${MAX_BROWSER_AGENT_CONCURRENT}`);
-  }
-  return Object.freeze({ maxConcurrentAgents: value });
-}
 function freshStore() {
   return {
     schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
     selectedId: '',
     order: [],
     byId: {},
-    executionPolicy: normalizeBrowserAgentExecutionPolicy(),
     definitionRegistriesById: Object.create(null),
     definitionRegistryQuarantineById: Object.create(null),
-    specialistRegistriesById: Object.create(null),
-    specialistRegistryQuarantineById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -487,6 +353,23 @@ function originPattern(value) {
   return `${url.origin}/*`;
 }
 
+function definitionConfigBindingKey(config) {
+  return JSON.stringify(config);
+}
+function normalizePersistedDefinitionConfigBindingKey(raw, selection, config) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition config binding requires persisted selection provenance');
+  }
+  if (typeof raw !== 'string' || raw !== raw.trim() || !raw || raw.length > 200_000) {
+    throw new Error('Browser Agent definition config binding key is invalid');
+  }
+  const expected = definitionConfigBindingKey(config);
+  if (raw !== expected) {
+    throw new Error('Browser Agent definition config drifted from persisted launch binding');
+  }
+  return raw;
+}
 function normalizePersistedDefinitionRouterOverride(raw, selection) {
   if (raw == null) {
     if (selection?.definition?.modelRoutePolicy) {
@@ -704,16 +587,11 @@ function normalizeStore(raw, now) {
         raw.byId[id].definitionRouterOverride,
         definitionSelection,
       );
-      const orchestrationNodeBinding = raw.byId[id].orchestrationNodeBinding == null
-        ? null
-        : normalizeBrowserAgentOrchestrationNodeBindingV1(raw.byId[id].orchestrationNodeBinding);
-      if (orchestrationNodeBinding && orchestrationNodeBinding.jobId !== id) {
-        throw new Error('Browser Agent orchestration binding jobId mismatch');
-      }
-      if (orchestrationNodeBinding && orchestrationNodeBinding.projectId !== config.projectId) {
-        // Preserve a stale Project binding as drift evidence only when the job
-        // itself is otherwise canonical. It can never be consumed as CURRENT.
-      }
+      const definitionConfigBindingKeyValue = normalizePersistedDefinitionConfigBindingKey(
+        raw.byId[id].definitionConfigBindingKey,
+        definitionSelection,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -721,7 +599,7 @@ function normalizeStore(raw, now) {
         definitionSelection,
         definitionScope,
         definitionRouterOverride,
-        orchestrationNodeBinding,
+        definitionConfigBindingKey: definitionConfigBindingKeyValue,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -731,23 +609,12 @@ function normalizeStore(raw, now) {
     }
   }
   out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
-  try {
-    out.executionPolicy = normalizeBrowserAgentExecutionPolicy(raw.executionPolicy || {});
-  } catch {
-    out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
-  }
   const definitionState = normalizePersistedAgentDefinitionState(
     raw.definitionRegistriesById,
     raw.definitionRegistryQuarantineById,
   );
   out.definitionRegistriesById = definitionState.registries;
   out.definitionRegistryQuarantineById = definitionState.quarantine;
-  const specialistState = normalizePersistedSpecialistRegistryState(
-    raw.specialistRegistriesById,
-    raw.specialistRegistryQuarantineById,
-  );
-  out.specialistRegistriesById = specialistState.registries;
-  out.specialistRegistryQuarantineById = specialistState.quarantine;
   return out;
 }
 
@@ -769,12 +636,6 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
-    this.runBurstInFlight = new Map();
-    this.cycleAllInFlight = null;
-    this.executionSlotActive = new Set();
-    this.executionSlotQueue = [];
-    this.executionSlotPump = null;
-    this.executionSlotPumpRequested = false;
   }
 
   async load() {
@@ -827,28 +688,6 @@ export class BrowserAgentManager {
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
       if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
-      const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
-      const afterFailure = await this.get(id);
-      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
-        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
-      if (failedCalls && !lifecycleAccounted) {
-        await this.update(store => {
-          const live = store.byId[id];
-          if (!live || live.runtime.controlEpoch !== epoch) return store;
-          live.runtime.modelCalls += failedCalls;
-          if (error?.routerRuntime) live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
-          live.runtime.updatedAt = this.now();
-          return store;
-        });
-      } else if (error?.routerRuntime) {
-        await this.update(store => {
-          const live = store.byId[id];
-          if (!live || live.runtime.controlEpoch !== epoch) return store;
-          live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
-          live.runtime.updatedAt = this.now();
-          return store;
-        });
-      }
       return { ok: false, error };
     }
     const verifier = verifierReply?.result || verifierReply;
@@ -882,22 +721,18 @@ export class BrowserAgentManager {
     return { ok: true, verification };
   }
 
-  async getExecutionPolicy() {
+  async list() {
     const store = await this.load();
-    return normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+    return {
+      selectedId: store.selectedId,
+      jobs: store.order.map(id => ({ ...clone(store.byId[id]), selected: id === store.selectedId })),
+    };
   }
 
-  async updateExecutionPolicy(input = {}) {
-    const policy = normalizeBrowserAgentExecutionPolicy(input);
-    await this.update(store => {
-      store.executionPolicy = policy;
-      return store;
-    });
-    // Concurrency policy changes neither due times nor alarm ownership. Waking
-    // the in-memory admission queue is sufficient and avoids reporting a
-    // failed save after the durable policy already committed.
-    this.#requestExecutionSlotPump();
-    return policy;
+  async get(id = '') {
+    const store = await this.load();
+    const target = id || store.selectedId;
+    return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
   }
 
   async listAgentDefinitionRegistries() {
@@ -943,7 +778,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
-      created = normalizeAgentDefinitionRegistryV1({
+      created = createAgentDefinitionRegistryV1({
         schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
         registryId,
         revision: 1,
@@ -964,6 +799,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent definition registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent definition registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let committed = null;
     await this.update(store => {
@@ -978,6 +816,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
@@ -988,208 +827,6 @@ export class BrowserAgentManager {
       return store;
     });
     return clone(committed);
-  }
-
-  async listSpecialistRegistries() {
-    const store = await this.load();
-    const registries = Object.keys(store.specialistRegistriesById || {})
-      .sort()
-      .map(registryId => clone(store.specialistRegistriesById[registryId]));
-    const quarantinedRegistryIds = Object.keys(store.specialistRegistryQuarantineById || {}).sort();
-    return { registries, quarantinedRegistryIds };
-  }
-
-  async getSpecialistRegistry(registryId) {
-    const canonicalId = canonicalSpecialistRegistryId(registryId);
-    const store = await this.load();
-    const registries = store.specialistRegistriesById || Object.create(null);
-    const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
-    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
-    return {
-      registry: registry ? clone(registry) : null,
-      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
-    };
-  }
-
-  async createSpecialistRegistry(input = {}) {
-    const request = snapshotExactOwnDataRequest(
-      input,
-      SPECIALIST_REGISTRY_CREATE_KEYS,
-      'Browser Agent Specialist registry create request',
-    );
-    if (!Object.hasOwn(request, 'registryId')) {
-      throw new Error('Browser Agent Specialist registry create request requires registryId');
-    }
-    const registryId = canonicalSpecialistRegistryId(request.registryId);
-    let created = null;
-    await this.update(store => {
-      const registries = store.specialistRegistriesById
-        || (store.specialistRegistriesById = Object.create(null));
-      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
-      if (Object.hasOwn(registries, registryId)) throw new Error('Specialist registry already exists');
-      if (Object.hasOwn(quarantine, registryId)) {
-        throw new Error('Specialist registry is quarantined as corrupt and cannot be overwritten');
-      }
-      if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
-        throw new Error('Specialist registry capacity is exhausted');
-      }
-      created = normalizeSpecialistRegistryV1({
-        schemaVersion: SPECIALIST_REGISTRY_VERSION,
-        registryId,
-        revision: 1,
-        definitions: [],
-      });
-      registries[registryId] = created;
-      return store;
-    });
-    return { registry: clone(created) };
-  }
-
-  async mutateSpecialistRegistry(input = {}) {
-    const request = snapshotExactOwnDataRequest(
-      input,
-      SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS,
-      'Browser Agent Specialist registry mutation request',
-    );
-    if (!Object.hasOwn(request, 'registryId')) {
-      throw new Error('Browser Agent Specialist registry mutation request requires registryId');
-    }
-    const registryId = canonicalSpecialistRegistryId(request.registryId);
-    if (Object.hasOwn(request, 'definition')) {
-      request.definition = normalizeSpecialistDefinitionV1(request.definition);
-    }
-    let committed = null;
-    await this.update(store => {
-      const registries = store.specialistRegistriesById || Object.create(null);
-      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
-      if (Object.hasOwn(quarantine, registryId)) {
-        throw new Error('Specialist registry is quarantined as corrupt and cannot be mutated');
-      }
-      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
-      if (!current) throw new Error('Specialist registry not found');
-      const proposalInput = {
-        registry: current,
-        registryId,
-        expectedRegistryRevision: request.expectedRegistryRevision,
-        kind: request.kind,
-      };
-      for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
-        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
-      }
-      committed = proposeSpecialistRegistryMutationV1(proposalInput);
-      store.specialistRegistriesById[registryId] = committed.nextRegistry;
-      return store;
-    });
-    return clone(committed);
-  }
-
-  #rejectExecutionSlotQueue(error) {
-    const pending = this.executionSlotQueue.splice(0);
-    for (const next of pending) next.reject(error);
-  }
-
-  #hasExecutionTargetConflict(store, id) {
-    const requestedTabId = store.byId[id]?.runtime?.tabId;
-    if (!Number.isInteger(requestedTabId)) return false;
-    for (const activeId of this.executionSlotActive) {
-      if (activeId === id) continue;
-      if (store.byId[activeId]?.runtime?.tabId === requestedTabId) return true;
-    }
-    return false;
-  }
-
-  #requestExecutionSlotPump() {
-    if (this.executionSlotPump) {
-      this.executionSlotPumpRequested = true;
-      return;
-    }
-    void this.#pumpExecutionSlots();
-  }
-
-  async #pumpExecutionSlots() {
-    if (this.executionSlotPump) return this.executionSlotPump;
-    this.executionSlotPumpRequested = false;
-    const operation = (async () => {
-      try {
-        while (this.executionSlotQueue.length) {
-          const store = await this.load();
-          const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
-          if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
-
-          let eligibleIndex = -1;
-          for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
-            const candidate = this.executionSlotQueue[index];
-            if (!this.executionSlotActive.has(candidate.id) && !this.#hasExecutionTargetConflict(store, candidate.id)) {
-              eligibleIndex = index;
-              break;
-            }
-          }
-          if (eligibleIndex < 0) return;
-
-          const [next] = this.executionSlotQueue.splice(eligibleIndex, 1);
-          if (!next) return;
-          if (this.executionSlotActive.has(next.id)) {
-            next.resolve();
-            continue;
-          }
-          this.executionSlotActive.add(next.id);
-          next.resolve();
-        }
-      } catch (error) {
-        this.#rejectExecutionSlotQueue(error);
-      }
-    })();
-    this.executionSlotPump = operation;
-    try {
-      await operation;
-    } finally {
-      if (this.executionSlotPump === operation) this.executionSlotPump = null;
-      if (this.executionSlotPumpRequested) {
-        this.executionSlotPumpRequested = false;
-        this.#requestExecutionSlotPump();
-      }
-    }
-  }
-
-  async #acquireExecutionSlot(id) {
-    const store = await this.load();
-    const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
-    const admission = evaluateResourceBudgetV1({
-      budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
-      usage: { concurrentAgents: this.executionSlotActive.size },
-      request: { concurrentAgents: 1 },
-    });
-    if (admission.decision === ResourceBudgetDecisionKind.ALLOW
-        && this.executionSlotQueue.length === 0
-        && !this.executionSlotActive.has(id)
-        && !this.#hasExecutionTargetConflict(store, id)) {
-      this.executionSlotActive.add(id);
-      return true;
-    }
-    await new Promise((resolve, reject) => {
-      this.executionSlotQueue.push({ id, resolve, reject });
-      this.#requestExecutionSlotPump();
-    });
-    return true;
-  }
-
-  #releaseExecutionSlot(id) {
-    if (!this.executionSlotActive.delete(id)) return;
-    this.#requestExecutionSlotPump();
-  }
-
-  async list() {
-    const store = await this.load();
-    return {
-      selectedId: store.selectedId,
-      jobs: store.order.map(id => ({ ...clone(store.byId[id]), selected: id === store.selectedId })),
-    };
-  }
-
-  async get(id = '') {
-    const store = await this.load();
-    const target = id || store.selectedId;
-    return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
   }
 
   /**
@@ -1218,92 +855,6 @@ export class BrowserAgentManager {
       projectId,
       planId,
     });
-  }
-
-  /**
-   * Persist one exact Browser Agent -> canonical OrchestrationHierarchy node
-   * binding through the existing Browser Agent serialized storage authority.
-   * Canonical OrchestrationV2 authority remains fenced until this manager's
-   * durable Browser Agent update has committed; no caller snapshot can mint
-   * structural authority outside that shared serialization boundary.
-   */
-  async bindOrchestrationNode(id, rawRequest = {}, dependencies = {}) {
-    const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
-    const withProjectHierarchyAuthority = trustedOrchestrationAuthorityFence(dependencies);
-
-    const initial = await this.get(id);
-    if (!initial.job) throw new Error('Browser Agent job not found');
-    const projectId = initial.job.config?.projectId || '';
-    if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
-
-    return withProjectHierarchyAuthority(projectId, async authority => {
-      let binding = null;
-      await this.update(store => {
-        const job = store.byId[id];
-        if (!job) throw new Error('Browser Agent job not found');
-        const liveProjectId = job.config?.projectId || '';
-        if (liveProjectId !== projectId) {
-          throw new Error('Browser Agent Project changed during orchestration binding');
-        }
-
-        const currentBinding = job.orchestrationNodeBinding;
-        binding = createBrowserAgentOrchestrationNodeBindingV1({
-          jobId: job.id,
-          projectId,
-          request,
-          authority,
-          currentBinding,
-          boundAt: this.now(),
-        });
-        if (currentBinding) return store;
-
-        job.orchestrationNodeBinding = clone(binding);
-        job.updatedAt = this.now();
-        return store;
-      });
-      return Object.freeze({ binding });
-    });
-  }
-
-  /**
-   * Read the durable node binding and compare it with current canonical
-   * OrchestrationV2 authority. Drift is surfaced; it is never silently healed.
-   */
-  async inspectOrchestrationNodeBinding(id = '', dependencies = {}) {
-    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
-    const current = await this.get(id);
-    if (!current.job) throw new Error('Browser Agent job not found');
-    if (!current.job.orchestrationNodeBinding) {
-      return Object.freeze({
-        binding: null,
-        status: 'UNBOUND',
-        current: false,
-        currentAuthority: null,
-      });
-    }
-    const projectId = current.job.config?.projectId || '';
-    if (!projectId) {
-      return Object.freeze({
-        binding: current.job.orchestrationNodeBinding,
-        status: BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED,
-        current: false,
-        currentAuthority: null,
-      });
-    }
-    try {
-      const authority = await resolveProjectHierarchyAuthority(projectId);
-      return inspectBrowserAgentOrchestrationNodeBindingV1({
-        binding: current.job.orchestrationNodeBinding,
-        authority,
-      });
-    } catch (error) {
-      const unavailable = inspectUnavailableOrchestrationAuthority(
-        current.job.orchestrationNodeBinding,
-        error,
-      );
-      if (unavailable) return unavailable;
-      throw error;
-    }
   }
 
   async listSpecialistHandoffs(id = '') {
@@ -1528,7 +1079,7 @@ export class BrowserAgentManager {
       'Browser Agent definition launch request',
     );
     for (const key of [
-      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
       'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
       'requestedCapabilityIds', 'requestedToolIds',
     ]) {
@@ -1558,6 +1109,9 @@ export class BrowserAgentManager {
       if (!registry) throw new Error('Agent definition registry not found');
       if (registry.revision !== request.expectedRegistryRevision) {
         throw new Error('Agent definition registry revision drifted before launch');
+      }
+      if (registry.bindingKey !== request.expectedRegistryBindingKey) {
+        throw new Error('Agent definition registry bindingKey drifted before launch');
       }
 
       const selection = selectAgentDefinitionV1({
@@ -1591,7 +1145,7 @@ export class BrowserAgentManager {
         definitionSelection: clone(selection),
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
-        orchestrationNodeBinding: null,
+        definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
         createdAt: now,
         updatedAt: now,
       };
@@ -1653,7 +1207,7 @@ export class BrowserAgentManager {
         definitionSelection: null,
         definitionScope: null,
         definitionRouterOverride: null,
-        orchestrationNodeBinding: null,
+        definitionConfigBindingKey: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1679,6 +1233,9 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+      if (job.definitionSelection != null) {
+        throw new Error('Reusable Agent definition-bound jobs are immutable; create a new job from the current definition');
+      }
 
       let nextProjectId = job.config.projectId || '';
       if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
@@ -1960,10 +1517,9 @@ export class BrowserAgentManager {
     return { kind: 'BUDGET_PAUSED', reason };
   }
 
-  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, retryAt = 0, maxConsecutive = 5 } = {}) {
+  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, maxConsecutive = 5 } = {}) {
     const now = this.now();
     const message = clean(error?.message || error || 'Unknown Browser Agent failure', 1200);
-    const absoluteRetryAt = typeof retryAt === 'number' && Number.isSafeInteger(retryAt) && retryAt > now ? retryAt : 0;
     let terminal = false;
     let consecutive = 0;
     await this.update(store => {
@@ -1984,10 +1540,6 @@ export class BrowserAgentManager {
         job.runtime.runState = BrowserAgentRunState.ERROR;
         job.runtime.nextWakeAt = 0;
         appendHistory(job.runtime, { at: now, type: 'error', message: `Agent stopped after ${consecutive} consecutive ${type || 'runtime'} failures: ${message}` });
-      } else if (absoluteRetryAt) {
-        // Canonical router backoff/circuit state is already durable. Do not wake
-        // the Agent early and convert one provider cooldown into repeated model errors.
-        job.runtime.nextWakeAt = Math.max(now + MIN_WAKE_MS, absoluteRetryAt);
       } else {
         // Bounded exponential backoff: transient browser/provider failures recover,
         // but a broken loop does not spin at full CPU/network speed.
@@ -2264,29 +1816,18 @@ export class BrowserAgentManager {
     }
     const context = await this.resolveStartContext(job);
     if (context.tab?.id != null && context.adopt) {
-      let adopted = false;
       await this.update(store => {
         const live = store.byId[job.id];
         if (!live) return store;
-        const claimedByOtherAgent = store.order.some(otherId =>
-          otherId !== job.id && store.byId[otherId]?.runtime?.tabId === context.tab.id);
-        if (claimedByOtherAgent) return store;
         live.runtime.tabId = context.tab.id;
         if (!live.runtime.knownTabIds.includes(context.tab.id)) live.runtime.knownTabIds.push(context.tab.id);
         // Adopted owner tabs are intentionally NOT placed in ownedTabIds.
         live.runtime.currentUrl = context.tab.url || context.url;
         live.runtime.updatedAt = this.now();
         appendHistory(live.runtime, { at: this.now(), type: 'tab', message: 'Adopted existing browser tab without taking ownership' });
-        adopted = true;
         return store;
       });
-      if (adopted) {
-        this.#requestExecutionSlotPump();
-        return context.tab;
-      }
-      // Another durable Browser Agent already binds this owner tab. Do not
-      // create a competing target-ownership authority; isolate this job onto a
-      // fresh owned tab at the same URL instead.
+      return context.tab;
     }
     const tab = await this.chrome.tabs.create({ url: context.url || DEFAULT_AGENT_START_URL, active: false });
     if (!Number.isInteger(tab?.id)) throw new Error('Browser Agent could not create a browser tab');
@@ -2300,7 +1841,6 @@ export class BrowserAgentManager {
       live.runtime.updatedAt = this.now();
       return store;
     });
-    this.#requestExecutionSlotPump();
     return tab;
   }
 
@@ -2688,7 +2228,6 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = this.now();
       return store;
     });
-    this.#requestExecutionSlotPump();
     return child;
   }
 
@@ -2766,12 +2305,7 @@ export class BrowserAgentManager {
       await this.reconcileAlarm();
       return this.get(id);
     };
-    const ownsSlot = await this.#acquireExecutionSlot(id);
-    try {
-      // Acquire before re-proving the approved target. If this approval waited
-      // behind another Agent on the same tab, all stale-target checks must run
-      // only after exclusive Browser-Agent execution admission is obtained.
-      const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
     const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
@@ -2889,10 +2423,7 @@ export class BrowserAgentManager {
         return store;
       });
     }
-      await this.reconcileAlarm();
-    } finally {
-      if (ownsSlot) this.#releaseExecutionSlot(id);
-    }
+    await this.reconcileAlarm();
     if (runInitial) await this.runBurst(id, { maxCycles: 25, maxWallMs: 25_000 });
     await this.reconcileAlarm();
     return this.get(id);
@@ -3096,7 +2627,6 @@ export class BrowserAgentManager {
         live.runtime.updatedAt = this.now();
         return store;
       });
-      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: created.url || action.url };
     }
     if (action.type === BrowserAgentActionType.SWITCH_TAB) {
@@ -3123,19 +2653,11 @@ export class BrowserAgentManager {
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
-        const activeTargetOwner = [...this.executionSlotActive].find(activeId =>
-          activeId !== job.id && store.byId[activeId]?.runtime?.tabId === action.tabId);
-        if (activeTargetOwner) {
-          const error = new Error('Browser Agent target tab is already in use by another active Agent');
-          error.code = 'AGENT_TAB_TARGET_IN_USE';
-          throw error;
-        }
         current.runtime.tabId = action.tabId;
         current.runtime.currentUrl = targetUrl;
         current.runtime.updatedAt = this.now();
         return store;
       });
-      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: targetUrl };
     }
     if (action.type === BrowserAgentActionType.CLOSE_TAB) {
@@ -3166,7 +2688,6 @@ export class BrowserAgentManager {
           if (candidate && isHttpUrl(candidate.pendingUrl || candidate.url)) { fallback = candidate; break; }
         } catch { /* skip stale tab */ }
       }
-      let appliedFallback = fallback;
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -3174,18 +2695,13 @@ export class BrowserAgentManager {
         current.runtime.retirePendingTabIds = current.runtime.retirePendingTabIds.filter(id => id !== action.tabId);
         current.runtime.knownTabIds = current.runtime.knownTabIds.filter(id => id !== action.tabId);
         if (current.runtime.tabId === action.tabId) {
-          const fallbackClaimedByActiveAgent = Number.isInteger(fallback?.id)
-            && [...this.executionSlotActive].some(activeId =>
-              activeId !== job.id && store.byId[activeId]?.runtime?.tabId === fallback.id);
-          if (fallbackClaimedByActiveAgent) appliedFallback = null;
-          current.runtime.tabId = appliedFallback?.id ?? null;
-          current.runtime.currentUrl = appliedFallback?.pendingUrl || appliedFallback?.url || '';
+          current.runtime.tabId = fallback?.id ?? null;
+          current.runtime.currentUrl = fallback?.pendingUrl || fallback?.url || '';
         }
         current.runtime.updatedAt = this.now();
         return store;
       });
-      this.#requestExecutionSlotPump();
-      return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
+      return { kind: 'ACTION', action, currentUrl: fallback?.pendingUrl || fallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
       if (!(await this.hasChromePermission('downloads'))) {
@@ -3676,13 +3192,7 @@ export class BrowserAgentManager {
           return store;
         });
       }
-      return this.recordRecoverableFailure(id, epoch, {
-        type: 'model',
-        error,
-        retryMs: 1500,
-        retryAt: error?.retryAt,
-        maxConsecutive: 5,
-      });
+      return this.recordRecoverableFailure(id, epoch, { type: 'model', error, retryMs: 1500, maxConsecutive: 5 });
     }
     const planner = routed?.result || routed;
     const reportedUsage = planner?.usage || routed?.usage || {};
@@ -3805,15 +3315,7 @@ export class BrowserAgentManager {
       const nodeConfig = { ...current.job.config, acceptanceCriteria: node.acceptanceCriteria };
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, nodeConfig, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
-        type: 'verification',
-        error: outcome.error,
-        action,
-        countStep: false,
-        retryMs: 500,
-        retryAt: outcome.error?.retryAt,
-        maxConsecutive: 4,
-      });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
       let nextPlan;
       try {
         const running = node.state === AgentPlanNodeState.READY
@@ -3865,15 +3367,7 @@ export class BrowserAgentManager {
       }
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, current.job.config, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
-        type: 'verification',
-        error: outcome.error,
-        action,
-        countStep: false,
-        retryMs: 500,
-        retryAt: outcome.error?.retryAt,
-        maxConsecutive: 4,
-      });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
       const verification = outcome.verification;
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
       await this.update(store => {
@@ -4012,29 +3506,20 @@ export class BrowserAgentManager {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before manual Step');
-    let pauseAfter = false;
-    if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) {
-      if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
-      const now = this.now();
-      await this.update(store => {
-        const job = store.byId[id];
-        if (!job) return store;
-        job.runtime.controlEpoch += 1;
-        job.runtime.runState = BrowserAgentRunState.RUNNING;
-        job.runtime.lastError = '';
-        job.runtime.nextWakeAt = now;
-        job.runtime.updatedAt = now;
-        return store;
-      });
-      pauseAfter = true;
-    }
-
-    const ownsSlot = await this.#acquireExecutionSlot(id);
-    try {
-      return await this.cycleOne(id, { pauseAfter });
-    } finally {
-      if (ownsSlot) this.#releaseExecutionSlot(id);
-    }
+    if (current.job.runtime.runState === BrowserAgentRunState.RUNNING) return this.cycleOne(id);
+    if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
+    const now = this.now();
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) return store;
+      job.runtime.controlEpoch += 1;
+      job.runtime.runState = BrowserAgentRunState.RUNNING;
+      job.runtime.lastError = '';
+      job.runtime.nextWakeAt = now;
+      job.runtime.updatedAt = now;
+      return store;
+    });
+    return this.cycleOne(id, { pauseAfter: true });
   }
 
   async addInstruction(id, text) {
@@ -4075,58 +3560,40 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  runBurst(id, options = {}) {
-    if (this.runBurstInFlight.has(id)) return this.runBurstInFlight.get(id);
-    const operation = this.#runBurst(id, options).finally(() => {
-      if (this.runBurstInFlight.get(id) === operation) this.runBurstInFlight.delete(id);
-    });
-    this.runBurstInFlight.set(id, operation);
-    return operation;
-  }
-
-  async #runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
-    const ownsSlot = await this.#acquireExecutionSlot(id);
-    try {
-      const startedWall = Date.now();
-      const results = [];
-      for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
-        if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
-        const before = await this.get(id);
-        if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
-        const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
-        if (waitMs > 0) {
-          if (waitMs > maxInlineWaitMs) break;
-          await sleep(waitMs);
-        }
-        const result = await this.cycleOne(id);
-        results.push(result);
-        if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
-        if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
-          const live = await this.get(id);
-          const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
-          if (delay > maxInlineWaitMs) break;
-        }
+  async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
+    const startedWall = Date.now();
+    const results = [];
+    for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
+      if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
+      const before = await this.get(id);
+      if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
+      const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
+      if (waitMs > 0) {
+        if (waitMs > maxInlineWaitMs) break;
+        await sleep(waitMs);
       }
-      await this.reconcileAlarm();
-      return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
-    } finally {
-      if (ownsSlot) this.#releaseExecutionSlot(id);
+      const result = await this.cycleOne(id);
+      results.push(result);
+      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+      if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
+        const live = await this.get(id);
+        const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
+        if (delay > maxInlineWaitMs) break;
+      }
     }
+    await this.reconcileAlarm();
+    return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
   }
 
   cycleAll() {
-    if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
       const store = await this.load();
       const now = this.now();
-      const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
-      const preflightResults = [];
-      const due = [];
-
+      const results = [];
       for (const id of store.order) {
         let job = store.byId[id];
         if ((job?.runtime?.retirePendingTabIds || []).length) {
-          preflightResults.push({ id, result: await this.retryPendingRetirement(id) });
+          results.push({ id, result: await this.retryPendingRetirement(id) });
           const live = await this.get(id);
           job = live.job;
           if (!job) continue;
@@ -4134,44 +3601,17 @@ export class BrowserAgentManager {
         if (job?.runtime?.runState === BrowserAgentRunState.WAITING_SCHEDULE) {
           if (Number(job.runtime.nextWakeAt || 0) > now) continue;
           const activation = await this.activateScheduledJob(id);
-          preflightResults.push({ id, result: activation });
+          results.push({ id, result: activation });
           const live = await this.get(id);
           job = live.job;
         }
         if (job?.runtime?.runState !== BrowserAgentRunState.RUNNING) continue;
         if (Number(job.runtime.nextWakeAt || 0) > now) continue;
-        due.push(id);
+        results.push({ id, result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }) });
       }
-
-      const runResults = new Array(due.length);
-      let cursor = 0;
-      const workerCount = Math.min(policy.maxConcurrentAgents, due.length);
-      const workers = Array.from({ length: workerCount }, async () => {
-        while (true) {
-          const index = cursor;
-          cursor += 1;
-          if (index >= due.length) return;
-          const id = due[index];
-          runResults[index] = {
-            id,
-            result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }),
-          };
-        }
-      });
-      await Promise.all(workers);
-
       await this.reconcileAlarm();
-      const results = [...preflightResults, ...runResults.filter(Boolean)];
-      return {
-        kind: results.length ? 'CYCLED' : 'IDLE',
-        results,
-        maxConcurrentAgents: policy.maxConcurrentAgents,
-      };
+      return { kind: results.length ? 'CYCLED' : 'IDLE', results };
     })();
-    this.cycleAllInFlight = operation;
-    operation.finally(() => {
-      if (this.cycleAllInFlight === operation) this.cycleAllInFlight = null;
-    }).catch(() => undefined);
     return operation;
   }
 
