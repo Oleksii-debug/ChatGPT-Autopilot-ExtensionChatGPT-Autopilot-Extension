@@ -328,6 +328,18 @@ export class TrustedExecutionVerificationLedgerRepository {
 
   async save(ledgerInput) {
     const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
+    const current = await this.load();
+    if (ledger.revision < current.revision) {
+      throw new Error('Trusted execution verification ledger persistence cannot roll back revision');
+    }
+    for (let index = 0; index < current.records.length; index += 1) {
+      if (!sameCanonicalRecord(current.records[index], ledger.records[index])) {
+        throw new Error(
+          'Trusted execution verification ledger persistence cannot rewrite append-only history',
+        );
+      }
+    }
+    if (ledger.revision === current.revision) return current;
     await this.chrome.storage.local.set({
       [this.storageKey]: structuredClone(ledger),
     });
