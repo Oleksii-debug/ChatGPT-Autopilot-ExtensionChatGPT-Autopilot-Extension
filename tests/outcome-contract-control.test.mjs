@@ -12,6 +12,7 @@ import {
   updateStoredOutcomeContractV1,
 } from '../src/core/outcome-contract-control.js';
 import { createOutcomeContractV1, normalizeOutcomeContractV1 } from '../src/core/outcome-contract.js';
+import { adjudicateOutcomeVerificationV1 } from '../src/core/outcome-verification-bridge.js';
 import { createEmptyState, validateState, STORAGE_KEY } from '../src/core/schema.js';
 import { StorageRepository } from '../src/core/storage.js';
 import { CoreCommand } from '../src/shared/protocol.js';
@@ -199,6 +200,77 @@ test('canonical verifier resolver matches the existing contractId/contractRevisi
     }),
     /revision binding mismatch/,
   );
+});
+
+test('existing independent Outcome verifier consumes the durable canonical resolver without authority widening', async () => {
+  const state = createEmptyState(1);
+  const stored = createStoredOutcomeContractV1(state, contractV1());
+  const criterion = stored.completionCriteria[0];
+  const evidenceArtifact = {
+    schemaVersion: 1,
+    artifactId: 'evidence-1',
+    kind: 'test-report',
+    uri: 'artifact://outcome/evidence-1',
+    mediaType: 'application/json',
+    sha256: 'a'.repeat(64),
+    sizeBytes: 128,
+    createdAt: '2026-09-29T04:04:00.000Z',
+    producerInvocationId: 'actor-tool-invocation',
+    sensitive: false,
+  };
+  const trustedRecord = {
+    schemaVersion: 1,
+    recordId: 'trusted-record-1',
+    contractId: stored.contractId,
+    contractRevision: stored.revision,
+    verifierPlanId: stored.verifierPlan.planId,
+    criterion: {
+      criterionId: criterion.criterionId,
+      description: criterion.description,
+      observable: criterion.observable,
+      requiredEvidenceKinds: [...criterion.requiredEvidenceKinds],
+    },
+    verifierId: stored.verifierPlan.verifierId,
+    verificationAuthorityId: 'verification-authority-1',
+    verification: {
+      schemaVersion: 1,
+      verificationId: 'verification-1',
+      invocationId: 'effect-1',
+      observationId: 'observation-1',
+      status: 'VERIFIED',
+      reasonCode: 'PASS',
+      summary: '',
+      evidenceArtifactIds: ['evidence-1'],
+      verifiedAt: '2026-09-29T04:05:00.000Z',
+      verifierId: stored.verifierPlan.verifierId,
+      verificationAuthorityId: 'verification-authority-1',
+    },
+    evidenceArtifacts: [evidenceArtifact],
+    recordedAt: '2026-09-29T04:06:00.000Z',
+    validThrough: '2026-09-29T05:00:00.000Z',
+  };
+
+  const result = await adjudicateOutcomeVerificationV1({
+    contract: stored,
+    criterionVerifications: [{
+      criterionId: criterion.criterionId,
+      verificationId: 'verification-1',
+    }],
+    evaluatedAt: '2026-09-29T04:10:00.000Z',
+  }, {
+    resolveTrustedOutcomeContract: async lookup => resolveCanonicalStoredOutcomeContractV1(state, lookup),
+    resolveTrustedVerificationRecord: async lookup => (
+      lookup.verificationId === 'verification-1' ? trustedRecord : null
+    ),
+  });
+
+  assert.equal(result.verdict, 'VERIFIED');
+  assert.equal(result.contractId, 'outcome-1');
+  assert.equal(result.contractRevision, 1);
+  assert.equal(result.completionEvidenceReady, true);
+  assert.equal(result.completionAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.verificationAuthorityMinted, false);
 });
 
 test('contract identity, creation time and revision progression are immutable under update', () => {
