@@ -74,7 +74,7 @@ const MAX_PROVIDER_RESERVATION_RECEIPT_TEXT = 10_000;
 
 function snapshotProviderReservationReceipt(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('AI provider-call lifecycle reservation must be a plain data object');
+    throw new Error('AI provider-call lifecycle did not admit a durable budget reservation');
   }
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
@@ -109,7 +109,7 @@ function snapshotProviderReservationReceipt(value) {
   if (typeof snapshot.reservationId !== 'string'
       || !snapshot.reservationId.trim()
       || snapshot.reservationId !== snapshot.reservationId.trim()) {
-    throw new Error('AI provider-call lifecycle did not admit a canonical durable budget reservation');
+    throw new Error('AI provider-call lifecycle did not admit a durable budget reservation with canonical reservationId');
   }
   return Object.freeze(snapshot);
 }
