@@ -364,9 +364,12 @@ function normalizePersistedDefinitionRouterOverride(raw, selection) {
   }
   return Object.freeze({ routePolicy });
 }
-function browserAgentRouterOverride(config = {}) {
-  const out = {};
+function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
+  const out = definitionRouterOverride?.routePolicy
+    ? { routePolicy: definitionRouterOverride.routePolicy }
+    : {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
+  if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
   if (config.aiPrimaryProvider && config.aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT) primary.provider = config.aiPrimaryProvider;
   if (clean(config.aiPrimaryModel, 300)) primary.model = clean(config.aiPrimaryModel, 300);
@@ -1036,7 +1039,85 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async createFromAgentDefinition(input = {}
+  async createFromAgentDefinition(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_LAUNCH_KEYS,
+      'Browser Agent definition launch request',
+    );
+    for (const key of [
+      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
+      'requestedCapabilityIds', 'requestedToolIds',
+    ]) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent definition launch request requires ${key}`);
+      }
+    }
+    snapshotAgentDefinitionLaunchNestedInputs(request);
+    for (const key of ['expectedRegistryRevision', 'expectedDefinitionRevision']) {
+      const value = request[key];
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+        throw new Error(`Browser Agent definition launch request ${key} must be a positive safe integer`);
+      }
+    }
+
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    const jobId = Object.hasOwn(request, 'jobId') ? request.jobId : this.createId();
+    if (typeof jobId !== 'string' || jobId.length < 1 || jobId.length > 128) {
+      throw new Error('Browser Agent definition launch jobId must be exact bounded text');
+    }
+
+    await this.update(store => {
+      const now = this.now();
+      if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const registry = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!registry) throw new Error('Agent definition registry not found');
+      if (registry.revision !== request.expectedRegistryRevision) {
+        throw new Error('Agent definition registry revision drifted before launch');
+      }
+
+      const selection = selectAgentDefinitionV1({
+        registry,
+        agentDefinitionId: request.agentDefinitionId,
+      });
+      if (selection.definitionRevision !== request.expectedDefinitionRevision) {
+        throw new Error('Agent definition revision drifted before launch');
+      }
+
+      const materialized = materializeAgentDefinitionV1({
+        registry,
+        selection,
+        jobId,
+        goal: request.goal,
+        projectId: Object.hasOwn(request, 'projectId') ? request.projectId : '',
+        ownerBudget: request.ownerBudget,
+        ownerCapabilityIds: request.ownerCapabilityIds,
+        ownerToolIds: request.ownerToolIds,
+        requestedCapabilityIds: request.requestedCapabilityIds,
+        requestedToolIds: request.requestedToolIds,
+      });
+      if (materialized.config.id !== jobId) {
+        throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
+      }
+
+      store.byId[jobId] = {
+        id: jobId,
+        config: clone(materialized.config),
+        runtime: createBrowserAgentRuntime(now),
+        definitionSelection: clone(selection),
+        definitionScope: clone(materialized.scope),
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.order.push(jobId);
+      store.selectedId = jobId;
+      return store;
+    });
+    return this.get(jobId);
+  }
 
   async create(raw = {}) {
     const id = clean(raw.id, 128) || this.createId();
