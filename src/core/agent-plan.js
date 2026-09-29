@@ -192,14 +192,14 @@ export function normalizeAgentPlanV1(raw) {
   const createdAt = timestamp(source.createdAt, 'AgentPlan createdAt');
   const updatedAt = timestamp(source.updatedAt, 'AgentPlan updatedAt');
   if (Date.parse(updatedAt) < Date.parse(createdAt)) {
-    throw new Error('AgentPlan updatedAt cannot precede createdAt');
+    throw new Error('AgentPlan updatedAt cannot predate plan createdAt');
   }
   for (const node of nodes) {
     if (Date.parse(node.updatedAt) < Date.parse(createdAt)) {
-      throw new Error(`AgentPlan node ${node.nodeId} updatedAt cannot precede plan createdAt`);
+      throw new Error(`AgentPlan node updatedAt is outside the plan causal window: ${node.nodeId}; outside plan chronology (before plan createdAt)`);
     }
     if (Date.parse(node.updatedAt) > Date.parse(updatedAt)) {
-      throw new Error(`AgentPlan node ${node.nodeId} updatedAt cannot exceed plan updatedAt`);
+      throw new Error(`AgentPlan node updatedAt is outside the plan causal window: ${node.nodeId}; outside plan chronology (after plan updatedAt)`);
     }
   }
   return frozen({

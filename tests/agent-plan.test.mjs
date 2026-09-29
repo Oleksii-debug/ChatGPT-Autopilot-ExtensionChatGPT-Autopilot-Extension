@@ -492,7 +492,7 @@ test('AgentPlan durable chronology is monotonic and nodes stay inside the plan t
   reversedPlan.updatedAt = earlier;
   assert.throws(
     () => normalizeAgentPlanV1(reversedPlan),
-    /updatedAt cannot precede createdAt/,
+    /updatedAt cannot predate plan createdAt/,
   );
 
   const nodeBeforeCreation = plan([node('discover')]);
@@ -500,14 +500,14 @@ test('AgentPlan durable chronology is monotonic and nodes stay inside the plan t
   nodeBeforeCreation.nodes[0].updatedAt = earlier;
   assert.throws(
     () => normalizeAgentPlanV1(nodeBeforeCreation),
-    /node discover updatedAt cannot precede plan createdAt/,
+    /node updatedAt is outside the plan causal window: discover/,
   );
 
   const nodeAfterPlan = plan([node('discover')]);
   nodeAfterPlan.nodes[0].updatedAt = later;
   assert.throws(
     () => normalizeAgentPlanV1(nodeAfterPlan),
-    /node discover updatedAt cannot exceed plan updatedAt/,
+    /node updatedAt is outside the plan causal window: discover/,
   );
 
   const monotonic = plan([node('discover')]);
