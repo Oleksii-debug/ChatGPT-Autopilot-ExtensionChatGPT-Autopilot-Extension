@@ -1898,6 +1898,10 @@ export class BrowserAgentManager {
         assertTrustedSpecialistReadiness(executionReadiness, selection, this.now());
         await trustedReadiness.assertCurrent(executionReadiness);
       }
+      const durablePreparedAt = new Date(this.now()).toISOString();
+      if (assignment.leaseExpiresAt <= durablePreparedAt) {
+        throw new Error('Specialist provider execution lease expired before provider preparation');
+      }
       if (selection.specialistId !== assignment.specialistId
           || handoff.specialistId !== assignment.specialistId) {
         throw new Error('Specialist provider execution provenance drifted from leased assignment');
@@ -1977,7 +1981,7 @@ export class BrowserAgentManager {
         leaseUntil: assignment.leaseExpiresAt,
         conversationId: request.conversationId,
         providerConfig: normalizedProviderConfig,
-        at: preparedAt,
+        at: durablePreparedAt,
       });
       job.runtime.specialistProviderExecutions = [...executions, prepared];
       job.runtime.updatedAt = this.now();
