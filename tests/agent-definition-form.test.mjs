@@ -249,3 +249,139 @@ test('form-produced model defaults are already canonical at the durable AgentDef
   assert.deepEqual(canonical.configDefaults, raw.configDefaults);
   assert.equal(canonical.definitionRevision, 9);
 });
+
+
+test('Agent definition form builds configured Specialist delegation profile with explicit enabled state', () => {
+  const enabled = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read\nproject.context',
+    specialistToolIdsText: 'files.read\nbrowser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  }));
+  assert.equal(enabled.specialistDelegationProfile.enabled, true);
+  assert.equal(enabled.specialistDelegationProfile.registryId, 'specialists:project-1');
+  assert.deepEqual(enabled.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(enabled.specialistDelegationProfile.requiredToolIds, [
+    'browser.read',
+    'files.read',
+  ]);
+  assert.equal(enabled.specialistDelegationProfile.maxConcurrentHandoffs, 2);
+
+  const disabled = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: false,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '30',
+    specialistMaxConcurrentHandoffs: '0',
+    specialistLeaseSeconds: '10',
+    specialistPriority: '0',
+  }));
+  assert.equal(disabled.specialistDelegationProfile.enabled, false);
+});
+
+test('Specialist delegation clear semantics distinguish new absence from persisted-profile removal', () => {
+  const newDefinition = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: false,
+  }));
+  assert.equal(Object.hasOwn(newDefinition, 'specialistDelegationProfile'), false);
+
+  const persistedProfile = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: false,
+  };
+  const cleared = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: false,
+  }), {
+    specialistDelegationProfile: persistedProfile,
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationProfile'), true);
+  assert.equal(cleared.specialistDelegationProfile, null);
+});
+
+test('Specialist delegation form rejects non-canonical numeric aliases and out-of-scope grants', () => {
+  const base = {
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  };
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistDeadlineSeconds: '0900',
+    })),
+    /канонічному форматі/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistMaxConcurrentHandoffs: '257',
+    })),
+    /діапазоном/u,
+  );
+  assert.throws(
+    () => normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistCapabilityIdsText: 'research.write',
+    }))),
+    /exceeds allowed authority/u,
+  );
+});
+
+test('persisted Specialist delegation profile is canonicalized and detached on unrelated edits', () => {
+  const persisted = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read', 'project.context'],
+    requiredToolIds: ['files.read', 'browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    specialistDelegationProfile: persisted,
+  });
+  assert.deepEqual(definition.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(definition.specialistDelegationProfile.requiredToolIds, [
+    'browser.read',
+    'files.read',
+  ]);
+  assert.notEqual(definition.specialistDelegationProfile, persisted);
+  persisted.requiredCapabilityIds[0] = 'mutated';
+  assert.deepEqual(definition.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+});
