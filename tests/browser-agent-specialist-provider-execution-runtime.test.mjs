@@ -688,3 +688,49 @@ test('trusted readiness drift before PREPARED blocks provider execution without 
   assert.equal(durable.handoffs[0].state, 'LEASED');
   assert.equal(durable.executionOwnerships[0].state, 'OWNED');
 });
+
+
+test('registry drift after lease blocks provider PREPARED and external dispatch', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const registryState = await manager.getSpecialistRegistry('specialists:project-1');
+  const currentDefinition = registryState.registry.definitions.find(
+    item => item.specialistId === OPENHANDS_CODING_SPECIALIST_ID,
+  );
+  await manager.mutateSpecialistRegistry({
+    registryId: registryState.registry.registryId,
+    expectedRegistryRevision: registryState.registry.revision,
+    expectedRegistryBindingKey: registryState.registry.bindingKey,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: currentDefinition.specialistId,
+    expectedDefinitionRevision: currentDefinition.definitionRevision,
+    definition: {
+      ...currentDefinition,
+      enabled: false,
+      definitionRevision: currentDefinition.definitionRevision + 1,
+    },
+  });
+  clock.value = Date.parse(T1);
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '99999999-9999-4999-8999-999999999999',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /registry drifted after durable admission|selection registry identity, revision or bindingKey drifted/,
+  );
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
