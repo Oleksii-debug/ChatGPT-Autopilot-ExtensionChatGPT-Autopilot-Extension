@@ -337,20 +337,24 @@ test('ambiguous provider transport failure is durably fenced for reconciliation'
   assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
 });
 
-test('durable PREPARED record is never blindly redispatched after restart-shaped re-entry', async () => {
+
+test('durable PREPARED recovery attaches to the exact persisted conversation and never trusts a new caller identity', async () => {
   const { chrome } = chromeStorage();
   const clock = { value: Date.parse(T0) };
   let calls = 0;
+  const durableConversationId = '55555555-5555-4555-8555-555555555555';
   const client = {
-    async execute() {
+    async execute(input, options) {
       calls += 1;
+      assert.equal(input.conversationId, durableConversationId);
+      assert.equal(options.allowCreate, false);
       return {
         providerStatus: 'finished',
         providerSucceeded: true,
         manualReviewRequired: false,
         reconciliationRequired: false,
         safeToRetry: false,
-        effectEvidence: 'terminal',
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
         providerUpdatedAt: T1,
         providerObservedAt: T1,
       };
@@ -365,18 +369,18 @@ test('durable PREPARED record is never blindly redispatched after restart-shaped
   const agentId = await seed(manager);
   const current = await manager.get('job.coder');
   const assignment = current.job.runtime.specialistHandoffs[0];
-  const provenance = current.job.runtime.specialistDelegationAdmissions[0];
+  const admission = current.job.runtime.specialistDelegationAdmissions[0];
   await manager.update(store => {
     store.byId['job.coder'].runtime.specialistProviderExecutions = [{
       schemaVersion: 1,
       planId: 'plan:job.coder',
       nodeId: 'local:code',
       agentId,
-      handoffId: provenance.handoff.handoffId,
+      handoffId: admission.handoff.handoffId,
       providerId: OPENHANDS_CODING_PROVIDER_ID,
       leaseId: assignment.leaseId,
       leaseUntil: assignment.leaseExpiresAt,
-      conversationId: '55555555-5555-4555-8555-555555555555',
+      conversationId: durableConversationId,
       providerConfig: providerConfig(),
       status: 'PREPARED',
       providerStatus: '',
@@ -395,18 +399,19 @@ test('durable PREPARED record is never blindly redispatched after restart-shaped
   });
   clock.value = Date.parse(T1);
 
-  await assert.rejects(
-    () => manager.executeClaimedSpecialistProvider('job.coder', {
-      agentId,
-      conversationId: '55555555-5555-4555-8555-555555555555',
-      expectedControlEpoch: 0,
-      at: T1,
-    }),
-    /requires reconciliation before redispatch/,
-  );
-  assert.equal(calls, 0);
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '56565656-5656-4565-8565-565656565656',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.equal(calls, 1);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 1);
+  assert.equal(durable.providerExecutions[0].conversationId, durableConversationId);
+  assert.equal(durable.providerExecutions[0].status, 'PROVIDER_SUCCEEDED');
 });
-
 
 test('concurrent exact provider execution calls coalesce onto one external effect', async () => {
   const { chrome } = chromeStorage();
@@ -955,33 +960,19 @@ test('historical terminal provider execution from a prior lease does not block a
 });
 
 
-test('bounded provider execution history retains the newest PREPARED record before the 129th effect', async () => {
+
+test('bounded provider execution history fails closed before a 129th effect and preserves anti-replay evidence', async () => {
   const { chrome } = chromeStorage();
   const clock = { value: Date.parse(T0) };
   let calls = 0;
-  let manager;
   const currentConversationId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
   const client = {
     async execute() {
       calls += 1;
-      const duringEffect = await manager.listSpecialistHandoffs('job.coder');
-      assert.equal(duringEffect.providerExecutions.length, 128);
-      assert.ok(duringEffect.providerExecutions.some(item =>
-        item.conversationId === currentConversationId && item.status === 'PREPARED'));
-      assert.ok(!duringEffect.providerExecutions.some(item => item.leaseId === 'lease:historical-0'));
-      return {
-        providerStatus: 'finished',
-        providerSucceeded: true,
-        manualReviewRequired: false,
-        reconciliationRequired: false,
-        safeToRetry: false,
-        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
-        providerUpdatedAt: T1,
-        providerObservedAt: T1,
-      };
+      throw new Error('history capacity must prevent external effect');
     },
   };
-  manager = new BrowserAgentManager({
+  const manager = new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
     now: () => clock.value,
@@ -1021,19 +1012,22 @@ test('bounded provider execution history retains the newest PREPARED record befo
     return store;
   });
   clock.value = Date.parse(T1);
-  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
-    agentId,
-    conversationId: currentConversationId,
-    expectedControlEpoch: 0,
-    at: T1,
-  });
-  assert.equal(calls, 1);
-  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: currentConversationId,
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /history capacity exhausted/,
+  );
+  assert.equal(calls, 0);
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 128);
-  assert.ok(durable.providerExecutions.some(item => item.conversationId === currentConversationId));
+  assert.ok(durable.providerExecutions.some(item => item.leaseId === 'lease:historical-0'));
+  assert.ok(!durable.providerExecutions.some(item => item.conversationId === currentConversationId));
 });
-
 
 test('readiness await cannot carry provider PREPARED past lease expiry', async () => {
   const { chrome } = chromeStorage();
