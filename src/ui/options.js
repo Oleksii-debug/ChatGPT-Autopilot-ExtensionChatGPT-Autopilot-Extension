@@ -2244,7 +2244,7 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}#${ui.selectedAgentDefinitionRegistry.bindingKey}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
   if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
@@ -2296,6 +2296,8 @@ async function createBrowserAgentFromDefinition() {
     return;
   }
 
+  let createdId = '';
+  let createAcknowledged = false;
   try {
     const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
       registry,
@@ -2306,22 +2308,28 @@ async function createBrowserAgentFromDefinition() {
     status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
 
     const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
-    const id = created?.job?.id || created?.selectedId;
-    if (!id) throw new Error('Core не повернув id створеного Agent job.');
+    createAcknowledged = true;
+    createdId = created?.job?.id || created?.selectedId || '';
+    if (!createdId) throw new Error('Core підтвердив create, але не повернув id створеного Agent job.');
 
-    ui.selectedBrowserAgentId = id;
-    await loadBrowserAgentJobs({ selectId: id });
+    ui.selectedBrowserAgentId = createdId;
+    await loadBrowserAgentJobs({ selectId: createdId });
 
     const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
     if (runState !== 'STOPPED') {
       throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
     }
 
-    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    status.textContent = `Завдання ${createdId} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
     announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
     $('agent-job-list').focus();
   } catch (error) {
-    if (/revision drifted/i.test(String(error?.message || ''))) {
+    if (createAcknowledged) {
+      const identity = createdId ? `Завдання ${createdId}` : 'Create-виклик';
+      const reconcile = createdId ? `перевірте цей ID ${createdId}` : 'оновіть список Agent jobs і знайдіть нове завдання перед будь-якою повторною спробою';
+      status.textContent = `${identity} уже підтверджено Core, але UI не зміг підтвердити durable результат: ${error.message}. Не створюйте повторно; ${reconcile}.`;
+      announce('Reusable Agent create уже підтверджено Core. Потрібна reconciliation-перевірка, а не повторне створення.');
+    } else if (/revision drifted/i.test(String(error?.message || ''))) {
       await loadAgentDefinitionRegistries({
         selectRegistryId: registry.registryId,
         selectDefinitionId: definition.agentDefinitionId,
@@ -2471,7 +2479,7 @@ function agentDefinitionFormValue() {
 }
 
 async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
-  if (!/(?:revision|bindingKey) drifted/i.test(String(error?.message || ''))) return false;
+  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
   const registryId = ui.selectedAgentDefinitionRegistryId;
   await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
   $('agent-definition-status').textContent = 'Реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
@@ -4638,6 +4646,7 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadAgentDefinitionRegistries();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
