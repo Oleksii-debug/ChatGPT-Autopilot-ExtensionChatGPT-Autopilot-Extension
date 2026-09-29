@@ -272,7 +272,7 @@ test('binding owner rejects forged activation, cross-project task and caller aut
 
   await assert.rejects(
     ()=>manager.registerSubagentTaskActivationBinding({...base,taskEnvelope:taskEnvelope('other-project')},'orch-1'),
-    /dispatch identity does not match task envelope|project does not match orchestra owner project/u,
+    /authority envelope does not match task identity|dispatch identity does not match task envelope|project does not match orchestra owner project/u,
   );
   const substituted=structuredClone(taskEnvelope());
   substituted.objective += ' Caller semantic substitution.';
