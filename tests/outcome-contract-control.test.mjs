@@ -662,6 +662,72 @@ test('Core commands persist canonical OutcomeContracts across restart and return
 });
 
 
+
+test('Core OutcomeContract command wrappers reject accessors and unknown fields before authority reads', async () => {
+  const chrome = fakeChrome();
+  const dispatcher = new CoreCommandDispatcher(new StorageRepository(chrome), () => 1000);
+  const initial = contractV1();
+  let getterCalls = 0;
+
+  const accessorPayload = {};
+  Object.defineProperty(accessorPayload, 'projectId', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'project-1';
+    },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(CoreCommand.LIST_OUTCOME_CONTRACTS, accessorPayload),
+    /fields must be enumerable own data properties/,
+  );
+  assert.equal(getterCalls, 0, 'command wrapper must not execute payload getters');
+
+  await assert.rejects(
+    dispatcher.execute(CoreCommand.CREATE_OUTCOME_CONTRACT, {
+      contract: initial,
+      ignoredAuthorityHint: true,
+    }),
+    /contains unknown field: ignoredAuthorityHint/,
+  );
+
+  await dispatcher.execute(CoreCommand.CREATE_OUTCOME_CONTRACT, { contract: initial });
+
+  await assert.rejects(
+    dispatcher.execute(CoreCommand.GET_OUTCOME_CONTRACT, {
+      projectId: 'project-1',
+      contractId: 'outcome-1',
+      expectedRevision: 1,
+      extra: 'ignored-before-hardening',
+    }),
+    /contains unknown field: extra/,
+  );
+
+  const updatePayload = Object.create(null);
+  updatePayload.projectId = 'project-1';
+  updatePayload.contractId = 'outcome-1';
+  updatePayload.expectedRevision = 1;
+  updatePayload.contract = nextContract(initial, { desiredResult: 'Data-only wrapper update.' });
+  const updated = await dispatcher.execute(CoreCommand.UPDATE_OUTCOME_CONTRACT, updatePayload);
+  assert.equal(updated.contract.revision, 2, 'null-prototype data payload remains supported');
+
+  const deletePayload = {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 2,
+  };
+  Object.defineProperty(deletePayload, 'unexpected', {
+    enumerable: false,
+    value: true,
+  });
+  await assert.rejects(
+    dispatcher.execute(CoreCommand.DELETE_OUTCOME_CONTRACT, deletePayload),
+    /contains unknown field: unexpected/,
+  );
+});
+
+
 test('concurrent Core revision CAS serializes writers so exactly one stale peer fails', async () => {
   const chrome = fakeChrome();
   const repository = new StorageRepository(chrome);
