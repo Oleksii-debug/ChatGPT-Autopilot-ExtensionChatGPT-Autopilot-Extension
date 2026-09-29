@@ -98,7 +98,7 @@ test('Agent definition model policy supports explicit inherit/null and preserves
   assert.equal(cleared.modelRoutePolicy, null);
 });
 
-test('legacy partial Agent policy upgrades to the existing Router failover defaults without changing eligibility intent', () => {
+test('legacy partial Agent policy preserves omitted failover fields for parent-policy inheritance', () => {
   const legacy = normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1(baseForm(), {
     modelRoutePolicy: {
       autoSwitch: false,
@@ -112,9 +112,9 @@ test('legacy partial Agent policy upgrades to the existing Router failover defau
   }));
   assert.equal(legacy.modelRoutePolicy.autoSwitch, false);
   assert.deepEqual(legacy.modelRoutePolicy.allowRouteIds, ['route.saved']);
-  assert.equal(legacy.modelRoutePolicy.retryBackoffSeconds, 60);
-  assert.equal(legacy.modelRoutePolicy.circuitBreakerFailures, 2);
-  assert.equal(legacy.modelRoutePolicy.circuitBreakerSeconds, 300);
+  assert.equal(Object.hasOwn(legacy.modelRoutePolicy, 'retryBackoffSeconds'), false);
+  assert.equal(Object.hasOwn(legacy.modelRoutePolicy, 'circuitBreakerFailures'), false);
+  assert.equal(Object.hasOwn(legacy.modelRoutePolicy, 'circuitBreakerSeconds'), false);
 });
 
 test('explicit global-inherit model policy does not read disabled subordinate fields', () => {
