@@ -1011,6 +1011,41 @@ test('internal Agent dispatcher snapshots prompt and request budgets before asyn
   }]);
 });
 
+test('internal Agent invocation rejects input larger than the durable Browser Agent reservation estimator', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'x'.repeat(100_001), maxOutputTokens:128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /prompt exceeds the durable Browser Agent input-budget bound/u,
+  );
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', systemPrompt:'x'.repeat(50_001), maxOutputTokens:128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /systemPrompt exceeds the durable Browser Agent input-budget bound/u,
+  );
+  assert.equal(calls, 0);
+});
+
 test('internal Agent dispatcher rejects accessor-backed prompt and request-budget fields without getter execution', async () => {
   let calls = 0;
   let reads = 0;
