@@ -48,7 +48,6 @@ const SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS = new Set([
 ]);
 const SUBAGENT_CONTEXT_RESOLUTION_KEYS = new Set([
   'bindingId',
-  'taskEnvelope',
   'expectedProjectRevisionId',
   'capsuleId',
 ]);
@@ -163,7 +162,7 @@ function snapshotSubagentContextResolution(value) {
       throw new Error('Subagent durable-context resolution contains unknown field: ' + key);
     }
   }
-  for (const key of ['bindingId', 'taskEnvelope', 'expectedProjectRevisionId']) {
+  for (const key of ['bindingId', 'expectedProjectRevisionId']) {
     if (!Object.hasOwn(snapshot, key)) {
       throw new Error('Subagent durable-context resolution is missing field: ' + key);
     }
@@ -712,6 +711,7 @@ export class OrchestrationV2Manager {
         registry,
         {
           binding: derived,
+          taskEnvelope,
           authorityEnvelope: request.authorityEnvelope,
           registeredAt: ownerBoundAt,
         },
@@ -762,19 +762,13 @@ export class OrchestrationV2Manager {
 
 
   /**
-   * Resolve one child-visible Project context only after proving that the caller's
-   * task envelope is the exact task already bound into durable orchestration
-   * activation evidence. Project bytes then come from the existing canonical
+   * Resolve one child-visible Project context from self-contained durable
+   * task+authority activation evidence. Project bytes then come from the existing canonical
    * ProjectWorkspaceRepository; neither caller state nor this adapter can mint
    * execution, retrieval, scheduling, completion, credential, or policy authority.
    */
   async resolveDurableSubagentTaskContext(input = {}, id = '') {
     const request = snapshotSubagentContextResolution(input);
-    const task = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
-    if (!task.authorityEnvelopeIdentity) {
-      throw new Error('Durable subagent context requires task-bound authority envelope identity');
-    }
-    const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
     const bindingLookup = plainSubagentBindingLookup({
       bindingId: request.bindingId,
     }, 'Subagent durable-context binding lookup');
@@ -795,9 +789,17 @@ export class OrchestrationV2Manager {
     );
     const binding = evidence?.binding ?? null;
     if (!binding) throw new Error('Durable subagent activation binding not found');
+    if (!evidence.taskEnvelope) {
+      throw new Error('Durable subagent activation binding lacks task provenance');
+    }
     if (!evidence.authorityEnvelope) {
       throw new Error('Durable subagent activation binding lacks authority provenance');
     }
+    const task = normalizeSubagentTaskEnvelopeV1(evidence.taskEnvelope);
+    if (!task.authorityEnvelopeIdentity) {
+      throw new Error('Durable subagent context requires task-bound authority envelope identity');
+    }
+    const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
     const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
       evidence.authorityEnvelope,
     );

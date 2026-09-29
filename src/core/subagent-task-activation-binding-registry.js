@@ -1,6 +1,13 @@
 import { OrchestrationActivationPurpose } from './orchestration-hierarchy.js';
 import { normalizeTrustedSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
-import { normalizeAllowedSubagentAuthorityEnvelopeV1 } from './subagent-authority-envelope.js';
+import {
+  deriveSubagentAuthorityEnvelopeIdentityV1,
+  normalizeAllowedSubagentAuthorityEnvelopeV1,
+} from './subagent-authority-envelope.js';
+import {
+  deriveSubagentTaskDispatchIdentityV1,
+  normalizeSubagentTaskEnvelopeV1,
+} from './subagent-task-envelope.js';
 
 export const SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_VERSION = 1;
 export const MAX_SUBAGENT_TASK_ACTIVATION_BINDINGS = 1024;
@@ -20,9 +27,9 @@ export const SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_AUTHORITY = Object.freeze
 });
 
 const REGISTRY_KEYS = new Set(['schemaVersion', 'revision', 'records']);
-const RECORD_KEYS = new Set(['binding', 'authorityEnvelope', 'registeredAt']);
+const RECORD_KEYS = new Set(['binding', 'taskEnvelope', 'authorityEnvelope', 'registeredAt']);
 const REQUIRED_RECORD_KEYS = new Set(['binding', 'registeredAt']);
-const PUT_KEYS = new Set(['binding', 'authorityEnvelope', 'registeredAt']);
+const PUT_KEYS = new Set(['binding', 'taskEnvelope', 'authorityEnvelope', 'registeredAt']);
 const REQUIRED_PUT_KEYS = new Set(['binding', 'registeredAt']);
 const READ_KEYS = new Set(['bindingId']);
 const ACTIVATION_READ_KEYS = new Set([
@@ -164,6 +171,47 @@ function authorityEnvelopeSignature(authorityEnvelope) {
   return authorityEnvelope ? JSON.stringify(authorityEnvelope) : '';
 }
 
+function taskEnvelopeSignature(taskEnvelope) {
+  return taskEnvelope ? JSON.stringify(taskEnvelope) : '';
+}
+
+function assertTaskEnvelopeMatchesBinding(taskEnvelope, binding, label) {
+  if (!taskEnvelope) return;
+  const dispatchIdentity = deriveSubagentTaskDispatchIdentityV1(taskEnvelope);
+  const pairs = [
+    ['projectId', binding.projectId, taskEnvelope.projectId],
+    ['parentAgentId', binding.parentAgentId, taskEnvelope.parentAgentId],
+    ['childAgentId', binding.childAgentId, taskEnvelope.childAgentId],
+    ['taskId', binding.taskId, taskEnvelope.taskId],
+    ['taskEnvelopeId', binding.taskEnvelopeId, taskEnvelope.envelopeId],
+    ['taskDispatchIdentity', binding.taskDispatchIdentity, dispatchIdentity],
+    ['planId', binding.planId, taskEnvelope.planId],
+    ['planRevision', binding.planRevision, taskEnvelope.planRevision],
+    ['outcomeContractId', binding.outcomeContractId, taskEnvelope.outcome.contractId],
+    ['outcomeContractRevision', binding.outcomeContractRevision, taskEnvelope.outcome.contractRevision],
+  ];
+  for (const [key, expected, actual] of pairs) {
+    if (actual !== expected) {
+      throw new Error(label + ' taskEnvelope does not match binding.' + key);
+    }
+  }
+}
+
+function assertTaskEnvelopeMatchesAuthority(taskEnvelope, authorityEnvelope, label) {
+  if (!taskEnvelope) return;
+  if (taskEnvelope.authorityEnvelopeIdentity && !authorityEnvelope) {
+    throw new Error(label + ' taskEnvelope authority identity requires authorityEnvelope provenance');
+  }
+  if (!authorityEnvelope) return;
+  if (!taskEnvelope.authorityEnvelopeIdentity) {
+    throw new Error(label + ' taskEnvelope is missing authorityEnvelopeIdentity');
+  }
+  const actual = deriveSubagentAuthorityEnvelopeIdentityV1(authorityEnvelope);
+  if (taskEnvelope.authorityEnvelopeIdentity !== actual) {
+    throw new Error(label + ' taskEnvelope authority identity does not match authorityEnvelope provenance');
+  }
+}
+
 function assertAuthorityEnvelopeMatchesBinding(authorityEnvelope, binding, label) {
   if (!authorityEnvelope) return;
   const pairs = [
@@ -187,16 +235,22 @@ function normalizeStoredRecord(input, index) {
   const label = 'SubagentTaskActivationBindingRegistryRecordV1[' + index + ']';
   const raw = strictRecord(input, RECORD_KEYS, label, REQUIRED_RECORD_KEYS);
   const binding = normalizeTrustedSubagentTaskActivationBindingV1(raw.binding);
+  const taskEnvelope = Object.hasOwn(raw, 'taskEnvelope')
+    ? normalizeSubagentTaskEnvelopeV1(raw.taskEnvelope)
+    : null;
   const authorityEnvelope = Object.hasOwn(raw, 'authorityEnvelope')
     ? normalizeAllowedSubagentAuthorityEnvelopeV1(raw.authorityEnvelope)
     : null;
+  assertTaskEnvelopeMatchesBinding(taskEnvelope, binding, label);
   assertAuthorityEnvelopeMatchesBinding(authorityEnvelope, binding, label);
+  assertTaskEnvelopeMatchesAuthority(taskEnvelope, authorityEnvelope, label);
   const registeredAt = exactTimestamp(raw.registeredAt, label + '.registeredAt');
   if (Date.parse(registeredAt) < Date.parse(binding.boundAt)) {
     throw new Error(label + ' registeredAt cannot predate binding.boundAt');
   }
   return deepFreeze({
     binding,
+    ...(taskEnvelope ? { taskEnvelope } : {}),
     ...(authorityEnvelope ? { authorityEnvelope } : {}),
     registeredAt,
   });
@@ -298,12 +352,25 @@ export function putSubagentTaskActivationBindingV1(registryInput, input) {
     REQUIRED_PUT_KEYS,
   );
   const binding = normalizeTrustedSubagentTaskActivationBindingV1(raw.binding);
+  const taskEnvelope = Object.hasOwn(raw, 'taskEnvelope')
+    ? normalizeSubagentTaskEnvelopeV1(raw.taskEnvelope)
+    : null;
   const authorityEnvelope = Object.hasOwn(raw, 'authorityEnvelope')
     ? normalizeAllowedSubagentAuthorityEnvelopeV1(raw.authorityEnvelope)
     : null;
+  assertTaskEnvelopeMatchesBinding(
+    taskEnvelope,
+    binding,
+    'PutSubagentTaskActivationBindingV1 request',
+  );
   assertAuthorityEnvelopeMatchesBinding(
     authorityEnvelope,
     binding,
+    'PutSubagentTaskActivationBindingV1 request',
+  );
+  assertTaskEnvelopeMatchesAuthority(
+    taskEnvelope,
+    authorityEnvelope,
     'PutSubagentTaskActivationBindingV1 request',
   );
   const registeredAt = exactTimestamp(raw.registeredAt, 'PutSubagentTaskActivationBindingV1 registeredAt');
@@ -314,6 +381,8 @@ export function putSubagentTaskActivationBindingV1(registryInput, input) {
   const existingById = registry.records.find(record => record.binding.bindingId === binding.bindingId);
   if (existingById) {
     if (exactBindingSignature(existingById.binding) !== exactBindingSignature(binding)
+        || taskEnvelopeSignature(existingById.taskEnvelope ?? null)
+          !== taskEnvelopeSignature(taskEnvelope)
         || authorityEnvelopeSignature(existingById.authorityEnvelope ?? null)
           !== authorityEnvelopeSignature(authorityEnvelope)) {
       throw new Error(
@@ -372,6 +441,7 @@ export function putSubagentTaskActivationBindingV1(registryInput, input) {
     revision: registry.revision + 1,
     records: [...registry.records, deepFreeze({
       binding,
+      ...(taskEnvelope ? { taskEnvelope } : {}),
       ...(authorityEnvelope ? { authorityEnvelope } : {}),
       registeredAt,
     })],
@@ -393,6 +463,7 @@ export function resolveSubagentTaskActivationEvidenceV1(registryInput, input) {
   if (!record) return null;
   return deepFreeze({
     binding: record.binding,
+    taskEnvelope: record.taskEnvelope ?? null,
     authorityEnvelope: record.authorityEnvelope ?? null,
     registeredAt: record.registeredAt,
   });
