@@ -138,6 +138,10 @@ function assertChronology(
   const resultLowerBound = Date.parse(providerExecution.preparedAt);
   const resultIds = new Set(resultArtifactIds);
   const atMs = Date.parse(at);
+  if (ownership.state === ExecutionOwnershipState.OWNED
+      && atMs > Date.parse(ownership.leaseUntil)) {
+    throw new Error('Trusted Specialist verification cannot outlive the current execution lease');
+  }
   if (Date.parse(providerExecution.updatedAt) > atMs || Date.parse(ownership.updatedAt) > atMs) {
     throw new Error('Trusted Specialist verification request predates durable execution state');
   }
