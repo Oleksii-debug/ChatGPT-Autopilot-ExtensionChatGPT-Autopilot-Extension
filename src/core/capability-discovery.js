@@ -92,6 +92,24 @@ function optionalInteger(value, label, max) {
   return value;
 }
 
+function positiveInteger(value, label) {
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  return value;
+}
+
+function canonicalTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  return value;
+}
+
 function boundedArray(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
@@ -143,6 +161,10 @@ const PROVIDER_STATE_KEYS = new Set([
   'schemaVersion',
   'providerId',
   'toolId',
+  'sourceId',
+  'sourceRevision',
+  'observedAt',
+  'validThrough',
   'health',
   'installationRequired',
   'installed',
@@ -158,10 +180,19 @@ export function normalizeProviderReadinessV1(input) {
   exact(raw, PROVIDER_STATE_KEYS, 'ProviderReadinessV1');
   if (raw.schemaVersion !== 1) throw new Error('ProviderReadinessV1 schemaVersion is invalid');
   const health = exactEnum(raw.health, HEALTH, 'health');
+  const observedAt = canonicalTimestamp(raw.observedAt, 'observedAt');
+  const validThrough = canonicalTimestamp(raw.validThrough, 'validThrough');
+  if (Date.parse(validThrough) < Date.parse(observedAt)) {
+    throw new Error('ProviderReadinessV1 validThrough cannot predate observedAt');
+  }
   return frozen({
     schemaVersion: 1,
     providerId: exactId(raw.providerId, 'providerId'),
     toolId: raw.toolId == null || raw.toolId === '' ? '' : exactId(raw.toolId, 'toolId'),
+    sourceId: exactId(raw.sourceId, 'sourceId'),
+    sourceRevision: positiveInteger(raw.sourceRevision, 'sourceRevision'),
+    observedAt,
+    validThrough,
     health,
     installationRequired: bool(raw.installationRequired, 'installationRequired'),
     installed: bool(raw.installed, 'installed'),
@@ -173,14 +204,23 @@ export function normalizeProviderReadinessV1(input) {
   });
 }
 
-function readinessFor(state) {
-  if (!state) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+function readinessFor(state, asOf) {
+  if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+  if (Date.parse(state.observedAt) > Date.parse(asOf)) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+  if (Date.parse(state.validThrough) < Date.parse(asOf)) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
   if (state.health === ProviderHealthStatus.UNAVAILABLE) return CapabilityPathReadiness.UNAVAILABLE;
   if (state.installationRequired && !state.installed) return CapabilityPathReadiness.NEEDS_INSTALL;
   if (state.authenticationRequired && !state.authenticated) return CapabilityPathReadiness.NEEDS_AUTH;
   if (state.health === ProviderHealthStatus.UNKNOWN) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
   if (state.health === ProviderHealthStatus.DEGRADED) return CapabilityPathReadiness.DEGRADED;
   return CapabilityPathReadiness.READY;
+}
+
+function readinessReasonCode(state, asOf) {
+  if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return 'PROVIDER_STATE_MISSING';
+  if (Date.parse(state.observedAt) > Date.parse(asOf)) return 'PROVIDER_STATE_FUTURE';
+  if (Date.parse(state.validThrough) < Date.parse(asOf)) return 'PROVIDER_STATE_STALE';
+  return state.reasonCode;
 }
 
 function normalizeCapabilityIdentityExact(input) {
@@ -305,6 +345,10 @@ function providerFacts(providerId, toolId, statesByProviderTool) {
     installed: false,
     authenticationRequired: false,
     authenticated: false,
+    sourceId: '',
+    sourceRevision: 0,
+    observedAt: '',
+    validThrough: '',
     pathKind: CapabilityPathKind.OCR,
     latencyMs: 0,
     reasonCode: 'PROVIDER_STATE_MISSING',
@@ -334,6 +378,10 @@ function buildPlan(candidates, knownRequestedIds) {
       capabilityIds,
       readiness: selected.candidate.readiness,
       pathKind: selected.candidate.pathKind,
+      readinessSourceId: selected.candidate.readinessSourceId,
+      readinessSourceRevision: selected.candidate.readinessSourceRevision,
+      readinessObservedAt: selected.candidate.readinessObservedAt,
+      readinessValidThrough: selected.candidate.readinessValidThrough,
       requiresPolicyDecision: true,
       permissionGranted: false,
     }));
@@ -342,6 +390,7 @@ function buildPlan(candidates, knownRequestedIds) {
 }
 
 const DISCOVERY_REQUEST_KEYS = new Set([
+  'asOf',
   'capabilities',
   'tools',
   'providerStates',
@@ -351,6 +400,7 @@ const DISCOVERY_REQUEST_KEYS = new Set([
 export function discoverCapabilityPathsV1(input = {}) {
   const request = plain(input, 'CapabilityDiscoveryRequestV1');
   exact(request, DISCOVERY_REQUEST_KEYS, 'CapabilityDiscoveryRequestV1');
+  const asOf = canonicalTimestamp(request.asOf, 'asOf');
   const capabilities = request.capabilities ?? [];
   const tools = request.tools ?? [];
   const providerStates = request.providerStates ?? [];
@@ -369,12 +419,16 @@ export function discoverCapabilityPathsV1(input = {}) {
         providerId: tool.providerId,
         toolId: tool.toolId,
         matchingCapabilityIds,
-        readiness: readinessFor(state),
+        readiness: readinessFor(state, asOf),
         health: state.health,
         pathKind: state.pathKind,
         readOnly: tool.readOnly,
         latencyMs: state.latencyMs,
-        reasonCode: state.reasonCode,
+        reasonCode: readinessReasonCode(state, asOf),
+        readinessSourceId: state.sourceId,
+        readinessSourceRevision: state.sourceRevision,
+        readinessObservedAt: state.observedAt,
+        readinessValidThrough: state.validThrough,
         requiresPolicyDecision: true,
         permissionGranted: false,
       });
@@ -388,6 +442,7 @@ export function discoverCapabilityPathsV1(input = {}) {
 
   return frozen({
     schemaVersion: 1,
+    asOf,
     requestedCapabilityIds: [...requested],
     candidates,
     plan: steps,
