@@ -409,6 +409,32 @@ test('Specialist delegation form admission is descriptor-safe and requires expli
   assert.equal(reads, 0);
 });
 
+test('disabled Specialist delegation does not inspect inactive subordinate fields', () => {
+  let reads = 0;
+  const input = form({ specialistDelegationConfigured: false });
+  Object.defineProperty(input, 'specialistRegistryId', {
+    enumerable: true,
+    get() { reads += 1; return 'specialists:should-not-run'; },
+  });
+  const persistedProfile = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const cleared = buildAgentDefinitionFromFormV1(input, {
+    specialistDelegationProfile: persistedProfile,
+  });
+  assert.equal(cleared.specialistDelegationProfile, null);
+  assert.equal(reads, 0);
+});
+
 test('persisted Specialist delegation profile is canonicalized and detached on unrelated edits', () => {
   const persisted = {
     schemaVersion: 1,
