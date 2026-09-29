@@ -34,6 +34,7 @@ const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compat
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS = new Set([
   'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
@@ -158,7 +159,8 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
   }
   const requested = normalizeAiRoutePolicy(rawRequested);
   for (const key of ['autoSwitch', 'freeOnly', 'pinnedRouteId', 'locality',
-    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
+    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
     if (Object.hasOwn(rawRequested, key)
         && (Object.is(rawRequested[key], -0) || !Object.is(rawRequested[key], requested[key]))) {
       throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
@@ -205,6 +207,15 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
     locality: base.locality === 'any' ? requested.locality : base.locality,
     maxInputPricePerMillionUsd: minimumNullable(base.maxInputPricePerMillionUsd, requested.maxInputPricePerMillionUsd),
     maxOutputPricePerMillionUsd: minimumNullable(base.maxOutputPricePerMillionUsd, requested.maxOutputPricePerMillionUsd),
+    retryBackoffSeconds: Object.hasOwn(rawRequested, 'retryBackoffSeconds')
+      ? Math.max(base.retryBackoffSeconds, requested.retryBackoffSeconds)
+      : base.retryBackoffSeconds,
+    circuitBreakerFailures: Object.hasOwn(rawRequested, 'circuitBreakerFailures')
+      ? Math.min(base.circuitBreakerFailures, requested.circuitBreakerFailures)
+      : base.circuitBreakerFailures,
+    circuitBreakerSeconds: Object.hasOwn(rawRequested, 'circuitBreakerSeconds')
+      ? Math.max(base.circuitBreakerSeconds, requested.circuitBreakerSeconds)
+      : base.circuitBreakerSeconds,
   };
   if (policy.pinnedRouteId) {
     if (policy.allowRouteIds.length && !policy.allowRouteIds.includes(policy.pinnedRouteId)) {
@@ -814,34 +825,17 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       return {
         settings: normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS),
-        routePoolRevision: Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-          && state.profile.aiRoutePoolRevision > 0
-          ? state.profile.aiRoutePoolRevision
-          : 1,
         runtime: normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
       };
     }
     if (command === CoreCommand.UPDATE_AI_ROUTER_SETTINGS) {
       const settings = validateAiRouterReadiness(payload.settings || {});
-      let routePoolRevision = 1;
       await this.repo.update(draft => {
-        const previousSettings = normalizeAiRouterSettings(
-          draft.profile.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
-        );
-        const previousRoutePoolRevision = Number.isSafeInteger(draft.profile.aiRoutePoolRevision)
-          && draft.profile.aiRoutePoolRevision > 0
-          ? draft.profile.aiRoutePoolRevision
-          : 1;
-        const routePoolChanged = JSON.stringify(previousSettings.routes) !== JSON.stringify(settings.routes);
-        routePoolRevision = routePoolChanged
-          ? previousRoutePoolRevision + 1
-          : previousRoutePoolRevision;
         draft.profile.aiRouter = structuredClone(settings);
-        draft.profile.aiRoutePoolRevision = routePoolRevision;
         draft.profile.aiRouterRuntime = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
         return draft;
       });
-      return { settings, routePoolRevision };
+      return { settings };
     }
     if (command === CoreCommand.TEST_AI_GATEWAY) {
       if (!this.aiGatewayClient) throw new Error('AI Gateway runtime is unavailable');
@@ -897,12 +891,18 @@ export class CoreCommandDispatcher {
             || typeof promptDescriptor.value !== 'string') {
           throw new Error('Agent model invocation prompt must be an enumerable own text data property');
         }
+        if (promptDescriptor.value.length > 100_000) {
+          throw new Error('Agent model invocation prompt exceeds the durable Browser Agent input-budget bound');
+        }
         const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
         if (systemPromptDescriptor
             && (systemPromptDescriptor.enumerable !== true
               || !Object.hasOwn(systemPromptDescriptor, 'value')
               || typeof systemPromptDescriptor.value !== 'string')) {
           throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
+        }
+        if ((systemPromptDescriptor?.value ?? '').length > 50_000) {
+          throw new Error('Agent model invocation systemPrompt exceeds the durable Browser Agent input-budget bound');
         }
         const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
         const boundedOutputTokens = maxOutputTokensDescriptor?.value;
