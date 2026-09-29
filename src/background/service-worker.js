@@ -682,11 +682,6 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
-  } else if (message.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER') {
-    result = await browserAgent.executeClaimedSpecialistProvider(
-      message.payload?.id || '',
-      message.payload?.execution || {},
-    );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
