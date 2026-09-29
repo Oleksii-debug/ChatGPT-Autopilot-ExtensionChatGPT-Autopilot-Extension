@@ -495,6 +495,28 @@ test('candidate must append exactly one version to the current immutable Recipe 
   );
 });
 
+test('nested compiler input accessors are rejected by the canonical compiler without eager admission reads', async () => {
+  let reads = 0;
+  const nested = compilerInput();
+  Object.defineProperty(nested.trace.steps[0], 'toolId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'repo.delete';
+    },
+  });
+
+  await assert.rejects(
+    () => admitTrustedRecipeCandidateV1(
+      request({ compilerInput: nested }),
+      options(),
+    ),
+    /enumerable own data properties/u,
+  );
+  assert.equal(reads, 0);
+});
+
 test('request and trusted result boundaries reject authority aliases/accessors without getter execution', async () => {
   let reads = 0;
   const hostile = request();
