@@ -548,3 +548,63 @@ test('4xx and 5xx server detail never enters public coding-specialist diagnostic
     assert.equal(publicProjection.includes(instruction), false);
   }
 });
+
+test('PREPARED recovery is attach-only and never POSTs when the durable conversation is absent', async () => {
+  const calls = [];
+  const client = clientFor(async (url, init) => {
+    calls.push({ url, method: init.method });
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`)) return json({}, 404);
+    if (url.endsWith('/api/conversations') && init.method === 'POST') {
+      throw new Error('attach-only recovery must never create');
+    }
+    throw new Error(`unexpected request: ${url}`);
+  });
+
+  await assert.rejects(
+    () => client.execute(input(), { allowCreate: false }),
+    error => {
+      assert.ok(error instanceof OpenHandsCodingSpecialistError);
+      assert.equal(error.code, 'OPENHANDS_PREPARED_RECOVERY_ABSENT');
+      assert.equal(error.reconciliationRequired, true);
+      assert.equal(error.safeToRetry, false);
+      return true;
+    },
+  );
+  assert.equal(calls.filter(call => call.method === 'POST').length, 0);
+});
+
+test('external lease deadline caps OpenHands before a later request can dispatch an effect', async () => {
+  const calls = [];
+  let now = 0;
+  const client = new OpenHandsCodingSpecialistClient({
+    fetchFn: async (url, init) => {
+      calls.push({ url, method: init.method });
+      if (url.endsWith('/openapi.json')) {
+        now = 60;
+        return openapi();
+      }
+      if (url.endsWith('/api/conversations') && init.method === 'POST') {
+        throw new Error('lease deadline must prevent create');
+      }
+      return json({}, 404);
+    },
+    nowFn: () => now,
+    sleepFn: async ms => { now += ms; },
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+
+  await assert.rejects(
+    () => client.execute(input(), { deadlineMs: 50 }),
+    error => {
+      assert.ok(error instanceof OpenHandsCodingSpecialistError);
+      assert.equal(error.code, 'OPENHANDS_EXECUTION_WINDOW_EXPIRED');
+      assert.equal(error.reconciliationRequired, false);
+      assert.equal(error.safeToRetry, true);
+      return true;
+    },
+  );
+  assert.equal(calls.filter(call => call.method === 'POST').length, 0);
+});
+
