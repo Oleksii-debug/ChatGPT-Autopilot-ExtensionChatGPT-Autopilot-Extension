@@ -176,7 +176,7 @@ test('execution loop automatically prepares a durable definition-bound Specialis
   assert.equal(result.reused, false);
   assert.equal(result.node.nodeId, 'local:research');
   assert.equal(result.handoff.specialistId, 'specialist.research.local');
-  assert.equal(result.executionOwnership.state, 'UNOWNED');
+  assert.equal(result.executionOwnership.state, 'AVAILABLE');
 
   const persisted = await manager.listSpecialistHandoffs(id);
   assert.equal(persisted.handoffs.length, 1);
@@ -332,7 +332,7 @@ test('durable reusable-Agent zero Specialist capacity prevents per-job claim wid
   });
   assert.deepEqual(claimed.claimed, []);
   assert.equal(claimed.assignments[0].state, 'READY');
-  assert.equal(claimed.executionOwnerships[0].state, 'UNOWNED');
+  assert.equal(claimed.executionOwnerships[0].state, 'AVAILABLE');
 });
 
 test('cross-job claim cannot widen durable Agent zero capacity', async () => {
@@ -354,7 +354,7 @@ test('cross-job claim cannot widen durable Agent zero capacity', async () => {
 
   const persisted = await manager.listSpecialistHandoffs(id);
   assert.equal(persisted.handoffs[0].state, 'READY');
-  assert.equal(persisted.executionOwnerships[0].state, 'UNOWNED');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
 });
 
 test('cross-job claim caps lease duration by each durable Agent profile', async () => {
