@@ -58,7 +58,34 @@ test('provider identities are exact text and never trimmed or coerced', () => {
 
 test('provider launch URL is bound to its declared site adapter', () => {
   assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, ''), 'https://chatgpt.com/');
+  assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, undefined), 'https://chatgpt.com/');
+  assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, null), 'https://chatgpt.com/');
   assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://chatgpt.com/c/example'), 'https://chatgpt.com/c/example');
   assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://example.com/'), /does not accept URL/);
   assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://www.chatgpt.com/'), /does not accept URL/);
+});
+
+test('provider launch URL never coerces or trims an explicit URL value', () => {
+  let coercions = 0;
+  const coercive = {
+    toString() {
+      coercions += 1;
+      return 'https://chatgpt.com/';
+    },
+  };
+
+  for (const value of [coercive, false, 0, new URL('https://chatgpt.com/')]) {
+    assert.throws(
+      () => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, value),
+      /exact text representation/,
+    );
+  }
+  assert.equal(coercions, 0);
+
+  for (const value of [' https://chatgpt.com/', 'https://chatgpt.com/ ']) {
+    assert.throws(
+      () => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, value),
+      /exact text representation/,
+    );
+  }
 });

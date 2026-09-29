@@ -96,3 +96,29 @@ test('site adapter URL contract fails closed outside declared HTTPS hosts', () =
   assert.throws(() => requireSiteAdapterUrl(SiteAdapterId.CHATGPT_WEB, 'https://example.com/'), /does not accept URL/);
   assert.throws(() => getSiteAdapter('future-site'), /Unsupported site adapter/);
 });
+
+test('site adapter URL values are exact strings and never coerced or trimmed', () => {
+  let coercions = 0;
+  const coercive = {
+    toString() {
+      coercions += 1;
+      return 'https://chatgpt.com/';
+    },
+  };
+
+  for (const value of [
+    coercive,
+    false,
+    0,
+    new URL('https://chatgpt.com/'),
+    ' https://chatgpt.com/',
+    'https://chatgpt.com/ ',
+  ]) {
+    assert.equal(siteAdapterAcceptsUrl(SiteAdapterId.CHATGPT_WEB, value), false);
+    assert.throws(
+      () => requireSiteAdapterUrl(SiteAdapterId.CHATGPT_WEB, value),
+      /does not accept URL value/,
+    );
+  }
+  assert.equal(coercions, 0);
+});
