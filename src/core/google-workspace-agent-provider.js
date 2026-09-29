@@ -7,6 +7,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
   DRIVE_FILE_GET: 'remote/google-workspace/drive.file.get',
   DRIVE_FILE_READ_TEXT: 'remote/google-workspace/drive.file.readText',
   DRIVE_FILE_UPDATE: 'remote/google-workspace/drive.file.update',
+  SHEETS_VALUES_GET: 'remote/google-workspace/sheets.values.get',
   GMAIL_SEARCH: 'remote/google-workspace/gmail.search',
   GMAIL_MESSAGE_GET: 'remote/google-workspace/gmail.message.get',
   GMAIL_MESSAGE_MODIFY: 'remote/google-workspace/gmail.message.modify',
@@ -20,6 +21,7 @@ export const GoogleWorkspaceCapabilityId = Object.freeze({
   DRIVE_SEARCH: 'google.drive.search',
   DRIVE_FILE_READ: 'google.drive.file.read',
   DRIVE_FILE_UPDATE: 'google.drive.file.update',
+  SHEETS_VALUES_READ: 'google.sheets.values.read',
   GMAIL_SEARCH: 'google.gmail.search',
   GMAIL_MESSAGE_READ: 'google.gmail.message.read',
   GMAIL_MESSAGE_MODIFY: 'google.gmail.message.modify',
@@ -72,6 +74,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'google-workspace-schema/drive.file.update/input',
     outputSchemaRef: 'google-workspace-schema/drive.file.update/output',
     readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GoogleWorkspaceToolId.SHEETS_VALUES_GET,
+    providerId: GOOGLE_WORKSPACE_PROVIDER_ID,
+    label: 'Read owner-authorized Google Sheets values',
+    description: 'Reads one bounded A1 range only after the spreadsheet is revalidated inside owner-authorized Drive scope.',
+    capabilityIds: [GoogleWorkspaceCapabilityId.SHEETS_VALUES_READ],
+    inputSchemaRef: 'google-workspace-schema/sheets.values.get/input',
+    outputSchemaRef: 'google-workspace-schema/sheets.values.get/output',
+    readOnly: true,
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -320,6 +333,7 @@ function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_GET) return 'getDriveFile';
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_READ_TEXT) return 'readDriveText';
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_UPDATE) return 'updateDriveFile';
+  if (toolId === GoogleWorkspaceToolId.SHEETS_VALUES_GET) return 'readSheetsValues';
   if (toolId === GoogleWorkspaceToolId.GMAIL_SEARCH) return 'searchGmail';
   if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_GET) return 'getGmailMessage';
   if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY) return 'modifyGmailMessage';
