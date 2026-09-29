@@ -99,9 +99,31 @@ function denseRecords(value) {
         || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('Trusted execution verification ledger records must be dense data entries');
     }
-    records[index] = normalizeTrustedExecutionVerificationRecordV1(descriptor.value);
+    records[index] = assertIntrinsicRecordChronology(
+      normalizeTrustedExecutionVerificationRecordV1(descriptor.value),
+    );
   }
   return records;
+}
+
+function assertIntrinsicRecordChronology(record) {
+  const verifiedAt = Date.parse(record.verification.verifiedAt);
+  const recordedAt = Date.parse(record.recordedAt);
+  const validThrough = Date.parse(record.validThrough);
+  if (recordedAt < verifiedAt) {
+    throw new Error('Trusted execution verification record predates its verification');
+  }
+  if (validThrough < recordedAt) {
+    throw new Error('Trusted execution verification record validity interval is invalid');
+  }
+  for (const artifact of record.evidenceArtifacts) {
+    if (Date.parse(artifact.createdAt) > verifiedAt) {
+      throw new Error(
+        `Trusted execution verification evidence postdates verification: ${artifact.artifactId}`,
+      );
+    }
+  }
+  return record;
 }
 
 function canonicalJson(value) {
@@ -228,7 +250,9 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
 export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordInput) {
   const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
   const canonicalInputLedger = Object.isFrozen(ledgerInput) ? ledgerInput : null;
-  const record = normalizeTrustedExecutionVerificationRecordV1(recordInput);
+  const record = assertIntrinsicRecordChronology(
+    normalizeTrustedExecutionVerificationRecordV1(recordInput),
+  );
 
   const byRecordId = ledger.records.find(item => item.recordId === record.recordId);
   if (byRecordId) {

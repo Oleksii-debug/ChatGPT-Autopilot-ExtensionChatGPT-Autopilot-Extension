@@ -235,6 +235,41 @@ test('ledger normalization rejects duplicate canonical identities and hostile ac
   assert.equal(getterCalls, 0);
 });
 
+
+test('ledger rejects records whose own chronology cannot represent trusted verification', () => {
+  const empty = createTrustedExecutionVerificationLedgerV1();
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        overrides: { recordedAt: T2 },
+      }),
+    ),
+    /record predates its verification/u,
+  );
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        overrides: { validThrough: T3 },
+      }),
+    ),
+    /validity interval is invalid/u,
+  );
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        artifacts: [evidenceArtifact({ createdAt: T4 })],
+      }),
+    ),
+    /evidence postdates verification/u,
+  );
+});
+
 test('lookup admission rejects extra fields and accessors without executing getters', () => {
   const ledger = appendTrustedExecutionVerificationRecordV1(
     createTrustedExecutionVerificationLedgerV1(),
