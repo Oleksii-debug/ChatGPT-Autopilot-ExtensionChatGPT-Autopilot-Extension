@@ -75,3 +75,16 @@ test('Specialist provider config commands preserve one BrowserAgent control plan
     /message\.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]*?browserAgent\.putSpecialistProviderConfig\(message\.payload \|\| \{\}\)/,
   );
 });
+
+
+test('Specialist provider execution command remains mutation-only and delegates exact execution payload', () => {
+  const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
+  const end = source.indexOf(']);', start);
+  const block = source.slice(start, end);
+
+  assert.doesNotMatch(block, /'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'/);
+  assert.match(
+    source,
+    /message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\s\S]*?browserAgent\.executeClaimedSpecialistProvider\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.execution \|\| \{\}[\s\S]*?\)/,
+  );
+});
