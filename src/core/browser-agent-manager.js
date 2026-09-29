@@ -417,15 +417,22 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
 }
 
 function specialistProviderConfigHasLiveExecution(store, providerId, at) {
-  const atMs = Date.parse(at);
+  if (!Number.isFinite(Date.parse(at))) return true;
   for (const jobId of store.order || []) {
     const executions = store.byId?.[jobId]?.runtime?.specialistProviderExecutions || [];
     for (const item of executions) {
       let execution;
       try { execution = normalizeSpecialistProviderExecutionV1(item); } catch { return true; }
       if (execution.providerId !== providerId) continue;
-      if (![SpecialistProviderExecutionStatus.PREPARED, SpecialistProviderExecutionStatus.RECONCILE, SpecialistProviderExecutionStatus.MANUAL_REVIEW].includes(execution.status)) continue;
-      if (!Number.isFinite(atMs) || Date.parse(execution.leaseUntil) > atMs) return true;
+      if ([
+        SpecialistProviderExecutionStatus.PREPARED,
+        SpecialistProviderExecutionStatus.RECONCILE,
+        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+      ].includes(execution.status)) {
+        // Lease expiry does not resolve an external effect. These states remain
+        // provider-config authority until canonical reconciliation/terminalization.
+        return true;
+      }
     }
   }
   return false;
