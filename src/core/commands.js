@@ -808,6 +808,7 @@ export class CoreCommandDispatcher {
         : normalizeBoundAgentModelOrchestratorEnvelopeV1(
           internal.agentModelOrchestratorEnvelope,
         );
+      let internalImageDataUrl = '';
       if (internalEnvelope) {
         for (const alias of [
           'settings','routerOverride','routerRuntime','isolatedRuntime',
@@ -836,6 +837,7 @@ export class CoreCommandDispatcher {
         if ((imageDataUrl.length > 0) !== internalEnvelope.requiresVision) {
           throw new Error('Agent model image input does not match durable requiresVision intent');
         }
+        internalImageDataUrl = imageDataUrl;
       }
       const providerCallBudgetContext = internalEnvelope
         ? normalizeInternalAgentProviderBudgetContext(
@@ -913,9 +915,7 @@ export class CoreCommandDispatcher {
           forceStrong: internalEnvelope ? false : payload.forceStrong === true,
           maxOutputTokens: Number(payload.maxOutputTokens || 0),
           maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
-          imageDataUrl: internalEnvelope
-            ? (Object.getOwnPropertyDescriptor(payload, 'imageDataUrl')?.value ?? '')
-            : payload.imageDataUrl || '',
+          imageDataUrl: internalEnvelope ? internalImageDataUrl : payload.imageDataUrl || '',
           taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
           strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
           capabilityIds: internalEnvelope
