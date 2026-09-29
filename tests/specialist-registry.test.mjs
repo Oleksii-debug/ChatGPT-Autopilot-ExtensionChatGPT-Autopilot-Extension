@@ -148,7 +148,8 @@ test('handoff and mutation require the exact current registry bindingKey', () =>
 });
 
 test('discovery grants only requested parent capabilities and explicitly requested tools', () => {
-  const result = discoverSpecialistsV1(discovery());
+  const request = discovery();
+  const result = discoverSpecialistsV1(request);
   assert.equal(result.registryBindingKey, request.registry.bindingKey);
   assert.equal(result.specialists.length, 1);
   const selected = result.specialists[0];
