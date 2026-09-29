@@ -39,6 +39,7 @@ const RECONCILE_OUTCOMES = new Set(Object.values(ReconciliationOutcome));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_PROCESSED_EVENTS = 1024;
 const MAX_ATTEMPTS = 64;
+const MAX_CLOCK_SKEW_MS = 60 * 1000;
 
 function clone(value) {
   return structuredClone(value);
@@ -206,7 +207,7 @@ function normalizedState(input) {
   if (observation) {
     assertObservationBinding(observation, { invocation });
     if (Date.parse(observation.observedAt) < Date.parse(createdAt)
-        || Date.parse(observation.observedAt) > Date.parse(updatedAt)) {
+        || Date.parse(observation.observedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS) {
       throw new Error('Exact-effect observation chronology is invalid');
     }
   }
@@ -221,7 +222,7 @@ function normalizedState(input) {
       attempt,
     });
     if (Date.parse(verification.verifiedAt) < Date.parse(observation.observedAt)
-        || Date.parse(verification.verifiedAt) > Date.parse(updatedAt)) {
+        || Date.parse(verification.verifiedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS) {
       throw new Error('Exact-effect verification chronology is invalid');
     }
   }
