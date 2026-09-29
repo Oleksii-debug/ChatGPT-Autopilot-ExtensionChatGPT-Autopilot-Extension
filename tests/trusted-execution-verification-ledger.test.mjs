@@ -236,6 +236,36 @@ test('ledger normalization rejects duplicate canonical identities and hostile ac
 });
 
 
+test('ledger revision is exactly bound to append-only record count across restart normalization', () => {
+  const record = trustedRecord();
+
+  assert.throws(
+    () => normalizeTrustedExecutionVerificationLedgerV1({
+      schemaVersion: 1,
+      revision: 0,
+      records: [record],
+    }),
+    /revision must equal append-only record count/u,
+  );
+
+  assert.throws(
+    () => normalizeTrustedExecutionVerificationLedgerV1({
+      schemaVersion: 1,
+      revision: 2,
+      records: [record],
+    }),
+    /revision must equal append-only record count/u,
+  );
+
+  const once = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    record,
+  );
+  const restarted = normalizeTrustedExecutionVerificationLedgerV1(structuredClone(once));
+  assert.equal(restarted.revision, restarted.records.length);
+  assert.equal(restarted.revision, 1);
+});
+
 test('ledger rejects records whose own chronology cannot represent trusted verification', () => {
   const empty = createTrustedExecutionVerificationLedgerV1();
 

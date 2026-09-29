@@ -240,9 +240,15 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
     }
     executionVerificationKeys.add(bindingKey);
   }
+  const revision = exactRevision(raw.revision);
+  if (revision !== records.length) {
+    throw new Error(
+      'Trusted execution verification ledger revision must equal append-only record count',
+    );
+  }
   return deepFreeze({
     schemaVersion: TRUSTED_EXECUTION_VERIFICATION_LEDGER_VERSION,
-    revision: exactRevision(raw.revision),
+    revision,
     records,
   });
 }
