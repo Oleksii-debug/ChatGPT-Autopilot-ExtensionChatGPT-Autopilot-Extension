@@ -99,9 +99,31 @@ function denseRecords(value) {
         || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('Trusted execution verification ledger records must be dense data entries');
     }
-    records[index] = normalizeTrustedExecutionVerificationRecordV1(descriptor.value);
+    records[index] = assertIntrinsicRecordChronology(
+      normalizeTrustedExecutionVerificationRecordV1(descriptor.value),
+    );
   }
   return records;
+}
+
+function assertIntrinsicRecordChronology(record) {
+  const verifiedAt = Date.parse(record.verification.verifiedAt);
+  const recordedAt = Date.parse(record.recordedAt);
+  const validThrough = Date.parse(record.validThrough);
+  if (recordedAt < verifiedAt) {
+    throw new Error('Trusted execution verification record predates its verification');
+  }
+  if (validThrough < recordedAt) {
+    throw new Error('Trusted execution verification record validity interval is invalid');
+  }
+  for (const artifact of record.evidenceArtifacts) {
+    if (Date.parse(artifact.createdAt) > verifiedAt) {
+      throw new Error(
+        `Trusted execution verification evidence postdates verification: ${artifact.artifactId}`,
+      );
+    }
+  }
+  return record;
 }
 
 function canonicalJson(value) {
@@ -218,24 +240,31 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
     }
     executionVerificationKeys.add(bindingKey);
   }
+  const revision = exactRevision(raw.revision);
+  if (revision !== records.length) {
+    throw new Error(
+      'Trusted execution verification ledger revision must equal append-only record count',
+    );
+  }
   return deepFreeze({
     schemaVersion: TRUSTED_EXECUTION_VERIFICATION_LEDGER_VERSION,
-    revision: exactRevision(raw.revision),
+    revision,
     records,
   });
 }
 
 export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordInput) {
   const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
-  const canonicalInputLedger = Object.isFrozen(ledgerInput) ? ledgerInput : null;
-  const record = normalizeTrustedExecutionVerificationRecordV1(recordInput);
+  const record = assertIntrinsicRecordChronology(
+    normalizeTrustedExecutionVerificationRecordV1(recordInput),
+  );
 
   const byRecordId = ledger.records.find(item => item.recordId === record.recordId);
   if (byRecordId) {
     if (!sameCanonicalRecord(byRecordId, record)) {
       throw new Error('Trusted execution verification recordId is append-only and cannot be rewritten');
     }
-    return canonicalInputLedger || ledger;
+    return ledger;
   }
 
   const verificationId = record.verification.verificationId;
@@ -248,7 +277,7 @@ export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordIn
         'Trusted execution verification verificationId is append-only and cannot be rebound',
       );
     }
-    return canonicalInputLedger || ledger;
+    return ledger;
   }
 
   if (ledger.records.length >= MAX_TRUSTED_EXECUTION_VERIFICATION_RECORDS) {
@@ -299,6 +328,18 @@ export class TrustedExecutionVerificationLedgerRepository {
 
   async save(ledgerInput) {
     const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
+    const current = await this.load();
+    if (ledger.revision < current.revision) {
+      throw new Error('Trusted execution verification ledger persistence cannot roll back revision');
+    }
+    for (let index = 0; index < current.records.length; index += 1) {
+      if (!sameCanonicalRecord(current.records[index], ledger.records[index])) {
+        throw new Error(
+          'Trusted execution verification ledger persistence cannot rewrite append-only history',
+        );
+      }
+    }
+    if (ledger.revision === current.revision) return current;
     await this.chrome.storage.local.set({
       [this.storageKey]: structuredClone(ledger),
     });

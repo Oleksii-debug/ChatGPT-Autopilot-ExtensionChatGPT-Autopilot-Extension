@@ -176,7 +176,10 @@ test('exact duplicate append is idempotent but recordId and verificationId canno
     trustedRecord(),
   );
   const duplicate = appendTrustedExecutionVerificationRecordV1(once, trustedRecord());
-  assert.equal(duplicate, once);
+  assert.deepEqual(duplicate, once);
+  assert.equal(Object.isFrozen(duplicate), true);
+  assert.equal(Object.isFrozen(duplicate.records), true);
+  assert.equal(Object.isFrozen(duplicate.records[0]), true);
 
   assert.throws(
     () => appendTrustedExecutionVerificationRecordV1(
@@ -233,6 +236,101 @@ test('ledger normalization rejects duplicate canonical identities and hostile ac
     /enumerable own data property/u,
   );
   assert.equal(getterCalls, 0);
+});
+
+
+test('ledger revision is exactly bound to append-only record count across restart normalization', () => {
+  const record = trustedRecord();
+
+  assert.throws(
+    () => normalizeTrustedExecutionVerificationLedgerV1({
+      schemaVersion: 1,
+      revision: 0,
+      records: [record],
+    }),
+    /revision must equal append-only record count/u,
+  );
+
+  assert.throws(
+    () => normalizeTrustedExecutionVerificationLedgerV1({
+      schemaVersion: 1,
+      revision: 2,
+      records: [record],
+    }),
+    /revision must equal append-only record count/u,
+  );
+
+  const once = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    record,
+  );
+  const restarted = normalizeTrustedExecutionVerificationLedgerV1(structuredClone(once));
+  assert.equal(restarted.revision, restarted.records.length);
+  assert.equal(restarted.revision, 1);
+});
+
+test('idempotent append never returns a shallow-frozen caller ledger with mutable nested state', () => {
+  const record = trustedRecord();
+  const canonical = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    record,
+  );
+  const callerRecords = structuredClone(canonical.records);
+  const shallowFrozen = Object.freeze({
+    schemaVersion: canonical.schemaVersion,
+    revision: canonical.revision,
+    records: callerRecords,
+  });
+
+  assert.equal(Object.isFrozen(shallowFrozen), true);
+  assert.equal(Object.isFrozen(shallowFrozen.records), false);
+  assert.equal(Object.isFrozen(shallowFrozen.records[0]), false);
+
+  const idempotent = appendTrustedExecutionVerificationRecordV1(shallowFrozen, record);
+
+  assert.notEqual(idempotent, shallowFrozen);
+  assert.equal(Object.isFrozen(idempotent), true);
+  assert.equal(Object.isFrozen(idempotent.records), true);
+  assert.equal(Object.isFrozen(idempotent.records[0]), true);
+  assert.equal(Object.isFrozen(idempotent.records[0].verification), true);
+  assert.equal(Object.isFrozen(idempotent.records[0].evidenceArtifacts), true);
+
+  callerRecords[0].recordId = 'caller-mutated-record';
+  assert.equal(idempotent.records[0].recordId, record.recordId);
+});
+
+test('ledger rejects records whose own chronology cannot represent trusted verification', () => {
+  const empty = createTrustedExecutionVerificationLedgerV1();
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        overrides: { recordedAt: T2 },
+      }),
+    ),
+    /record predates its verification/u,
+  );
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        overrides: { validThrough: T3 },
+      }),
+    ),
+    /validity interval is invalid/u,
+  );
+
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      empty,
+      trustedRecord({
+        artifacts: [evidenceArtifact({ createdAt: T4 })],
+      }),
+    ),
+    /evidence postdates verification/u,
+  );
 });
 
 test('lookup admission rejects extra fields and accessors without executing getters', () => {
@@ -294,6 +392,56 @@ test('durable repository serializes concurrent appends and supplies the canonica
     verificationId: 'verification.specialist.2',
   }));
   assert.equal(noEffectResolved.recordId, 'record.specialist.2');
+});
+
+test('durable repository save is monotonic and cannot rewrite or roll back observed history', async () => {
+  const repository = new TrustedExecutionVerificationLedgerRepository(storageChrome());
+  await repository.append(trustedRecord());
+
+  const current = await repository.load();
+  const rewrittenRecord = trustedRecord({
+    overrides: { validThrough: '2026-09-29T00:06:00.000Z' },
+  });
+  const rewritten = normalizeTrustedExecutionVerificationLedgerV1({
+    schemaVersion: 1,
+    revision: 1,
+    records: [rewrittenRecord],
+  });
+
+  await assert.rejects(
+    () => repository.save(rewritten),
+    /cannot rewrite append-only history/u,
+  );
+  await assert.rejects(
+    () => repository.save(createTrustedExecutionVerificationLedgerV1()),
+    /cannot roll back revision/u,
+  );
+
+  const secondRecord = trustedRecord({
+    outcome: TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
+    recordId: 'record.specialist.2',
+    verificationId: 'verification.specialist.2',
+  });
+  const extended = appendTrustedExecutionVerificationRecordV1(current, secondRecord);
+  const saved = await repository.save(extended);
+  assert.equal(saved.revision, 2);
+  assert.deepEqual(saved.records.map(item => item.recordId), [
+    'record.specialist.1',
+    'record.specialist.2',
+  ]);
+
+  const stale = extended;
+  await repository.append(trustedRecord({
+    recordId: 'record.specialist.3',
+    verificationId: 'verification.specialist.3',
+  }));
+  await assert.rejects(
+    () => repository.save(stale),
+    /cannot roll back revision/u,
+  );
+  const durable = await repository.load();
+  assert.equal(durable.revision, 3);
+  assert.equal(durable.records.at(-1).recordId, 'record.specialist.3');
 });
 
 test('existing execution ownership completion consumes only the ledger resolver', async () => {
