@@ -32,7 +32,7 @@ function snapshotTransportExecutor(transport, providerId) {
 
   let cursor = transport;
   const visited = new Set();
-  while (cursor !== null) {
+  while (cursor !== null && cursor !== Object.prototype && cursor !== Function.prototype) {
     if (visited.has(cursor)) {
       throw new Error(`Interaction transport prototype chain is invalid for ${providerId}`);
     }
