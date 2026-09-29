@@ -588,3 +588,99 @@ test('automation-policy claim returns the exact claim-time control epoch for pro
   assert.equal(current.job.runtime.controlEpoch, 1);
   assert.notEqual(result.claimed[0].controlEpoch, current.job.runtime.controlEpoch);
 });
+
+test('manual Specialist claim is never promoted into automatic provider dispatch provenance', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+
+  const manual = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 1,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(manual.claimed.length, 1);
+
+  const projected = await manager.listSpecialistAutomationDispatchCandidates();
+  assert.deepEqual(projected.candidates, []);
+});
+
+test('policy-admitted fresh Specialist dispatch provenance survives manager restart exactly', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  const expected = claimed.claimed[0];
+  assert.equal(expected.jobId, id);
+  assert.equal(expected.controlEpoch, 0);
+
+  const restarted = managerFor(storage.chrome);
+  const projected = await restarted.listSpecialistAutomationDispatchCandidates();
+  assert.deepEqual(projected.candidates, [{
+    jobId: id,
+    agentId: expected.agentId,
+    expectedControlEpoch: 0,
+    recoverPrepared: false,
+  }]);
+});
+
+test('owner control epoch drift revokes unprepared automatic Specialist dispatch provenance', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal((await manager.listSpecialistAutomationDispatchCandidates()).candidates.length, 1);
+
+  await manager.addInstruction(id, 'Owner changed the plan before provider preparation.');
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.controlEpoch, 1);
+  assert.deepEqual((await manager.listSpecialistAutomationDispatchCandidates()).candidates, []);
+});
+
+test('automation policy revision drift revokes unprepared automatic Specialist dispatch provenance', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse('2026-09-29T03:05:00.000Z') };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+  });
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  assert.equal((await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy()).claimed.length, 1);
+  assert.equal((await manager.listSpecialistAutomationDispatchCandidates()).candidates.length, 1);
+
+  clock.value += 1000;
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 1,
+    enabled: true,
+    maxConcurrentHandoffs: 0,
+  });
+  assert.deepEqual((await manager.listSpecialistAutomationDispatchCandidates()).candidates, []);
+});
