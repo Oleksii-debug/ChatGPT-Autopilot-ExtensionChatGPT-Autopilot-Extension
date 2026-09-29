@@ -1107,7 +1107,7 @@ test('internal Agent envelope preserves exact canonical vision input into AiOrch
   const imageDataUrl = 'data:image/png;base64,AAAA';
   const result = await dispatcher.execute(
     'RUN_AI_ROUTED_PROMPT',
-    { prompt:'agent', maxOutputTokens:128, imageDataUrl },
+    { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1, imageDataUrl },
     {
       agentModelOrchestratorEnvelope: vision,
       providerCallBudgetContext: internalAgentBudgetContext(),
