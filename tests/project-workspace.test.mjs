@@ -1195,3 +1195,32 @@ test('generic repository mutation cannot bypass immutable artifactId continuity'
   assert.equal(durable.projectsById['project-a'].snapshot.revisionId, 'project-r1');
   assert.equal(durable.projectsById['project-a'].snapshot.artifactRefs[0].uri, 'drive://build');
 });
+
+
+test('repository update rejects accessor-backed mutator results before owner field writes', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  let setterCalls = 0;
+
+  await assert.rejects(
+    repository.update(() => {
+      const hostile = createProjectWorkspace(1);
+      Object.defineProperty(hostile, 'revision', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          return 0;
+        },
+        set() {
+          setterCalls += 1;
+        },
+      });
+      return hostile;
+    }, { nowMs: 2 }),
+    /fields must be enumerable own data properties/,
+  );
+
+  assert.equal(setterCalls, 0);
+  const durable = await repository.load({ emptyNowMs: 2 });
+  assert.equal(durable.revision, 0);
+});
