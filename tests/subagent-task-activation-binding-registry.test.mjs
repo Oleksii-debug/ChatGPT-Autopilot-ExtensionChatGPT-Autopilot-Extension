@@ -27,6 +27,7 @@ function binding(overrides = {}) {
     childAgentId: 'child-1',
     taskId: 'task-1',
     taskEnvelopeId: 'envelope-1',
+    taskDispatchIdentity: 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     planId: 'plan-1',
     planRevision: 3,
     outcomeContractId: 'outcome-1',
@@ -46,6 +47,7 @@ function binding(overrides = {}) {
     value.childAgentId,
     value.taskId,
     value.taskEnvelopeId,
+    value.taskDispatchIdentity,
     value.planId,
     String(value.planRevision),
     value.outcomeContractId,
@@ -184,6 +186,85 @@ test('same task may accumulate bounded retry generations with unique activation 
       '2026-09-27T18:40:30.000Z',
     ),
     /history limit exceeded/u,
+  );
+});
+
+test('task dispatch identity is durable binding identity', () => {
+  const first = binding();
+  const changed = binding({ taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' });
+  assert.notEqual(changed.bindingId, first.bindingId);
+  assert.throws(
+    () => normalizeSubagentTaskActivationBindingRegistryV1({
+      schemaVersion: 1,
+      revision: 1,
+      records: [{
+        binding: {
+          ...first,
+          taskDispatchIdentity: changed.taskDispatchIdentity,
+        },
+        registeredAt: REGISTERED,
+      }],
+    }),
+    /bindingId is not canonical/u,
+  );
+});
+
+test('non-WORK continuation requires an earlier durable WORK binding for the exact task dispatch identity', () => {
+  const work = binding();
+  const reconcile = binding({
+    activationId: 'activation-reconcile',
+    generation: 2,
+    invocationId: 'invocation-reconcile',
+    activationPurpose: OrchestrationActivationPurpose.RECONCILE,
+    boundAt: '2026-09-27T18:01:00.000Z',
+  });
+  assert.throws(
+    () => append(
+      createSubagentTaskActivationBindingRegistryV1(),
+      reconcile,
+      '2026-09-27T18:01:01.000Z',
+    ),
+    /requires prior durable WORK task dispatch identity/u,
+  );
+
+  let registry = append(createSubagentTaskActivationBindingRegistryV1(), work, REGISTERED);
+  registry = append(registry, reconcile, '2026-09-27T18:01:01.000Z');
+  assert.equal(registry.revision, 2);
+  assert.equal(registry.records[1].binding.activationPurpose, OrchestrationActivationPurpose.RECONCILE);
+
+  const driftedRecovery = binding({
+    taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    activationId: 'activation-recovery',
+    generation: 3,
+    invocationId: 'invocation-recovery',
+    activationPurpose: OrchestrationActivationPurpose.RECOVERY,
+    boundAt: '2026-09-27T18:02:00.000Z',
+  });
+  assert.throws(
+    () => append(registry, driftedRecovery, '2026-09-27T18:02:01.000Z'),
+    /requires prior durable WORK task dispatch identity/u,
+  );
+});
+
+test('restart normalization rejects non-WORK history that precedes its trusted WORK anchor', () => {
+  const work = binding();
+  const reconcile = binding({
+    activationId: 'activation-reconcile',
+    generation: 2,
+    invocationId: 'invocation-reconcile',
+    activationPurpose: OrchestrationActivationPurpose.RECONCILE,
+    boundAt: '2026-09-27T18:00:00.500Z',
+  });
+  assert.throws(
+    () => normalizeSubagentTaskActivationBindingRegistryV1({
+      schemaVersion: 1,
+      revision: 2,
+      records: [
+        { binding: reconcile, registeredAt: '2026-09-27T18:00:01.000Z' },
+        { binding: work, registeredAt: '2026-09-27T18:00:02.000Z' },
+      ],
+    }),
+    /requires prior durable WORK task dispatch identity/u,
   );
 });
 

@@ -347,6 +347,7 @@ function canonicalBindingId({
   childAgentId = 'child-1',
   taskId = 'task-1',
   taskEnvelopeId = 'envelope-1',
+  taskDispatchIdentity = 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   planId = 'plan-1',
   planRevision = 3,
   outcomeContractId = 'outcome-1',
@@ -364,6 +365,7 @@ function canonicalBindingId({
     childAgentId,
     taskId,
     taskEnvelopeId,
+    taskDispatchIdentity,
     planId,
     String(planRevision),
     outcomeContractId,
@@ -385,6 +387,7 @@ function binding(overrides = {}) {
     childAgentId: 'child-1',
     taskId: 'task-1',
     taskEnvelopeId: 'envelope-1',
+    taskDispatchIdentity: 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     planId: 'plan-1',
     planRevision: 3,
     outcomeContractId: 'outcome-1',
@@ -1096,6 +1099,7 @@ test('task activation binding identity changes with exact task, plan and outcome
     { childAgentId: 'child-other' },
     { taskId: 'task-other' },
     { taskEnvelopeId: 'envelope-other' },
+    { taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
     { planId: 'plan-other' },
     { planRevision: 4 },
     { outcomeContractId: 'outcome-other' },
@@ -1110,6 +1114,13 @@ test('task activation binding identity changes with exact task, plan and outcome
     () => normalizeTrustedSubagentTaskActivationBindingV1({
       ...binding(),
       planRevision: 4,
+    }),
+    /bindingId is not canonical/u,
+  );
+  assert.throws(
+    () => normalizeTrustedSubagentTaskActivationBindingV1({
+      ...binding(),
+      taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     }),
     /bindingId is not canonical/u,
   );

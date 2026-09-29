@@ -1,3 +1,4 @@
+import { OrchestrationActivationPurpose } from './orchestration-hierarchy.js';
 import { normalizeTrustedSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
 
 export const SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_VERSION = 1;
@@ -145,6 +146,17 @@ function taskKey(binding) {
   return [binding.projectId, binding.parentAgentId, binding.childAgentId, binding.taskId].join('\u0000');
 }
 
+function taskDispatchKey(binding) {
+  return [
+    binding.projectId,
+    binding.parentAgentId,
+    binding.childAgentId,
+    binding.taskId,
+    binding.taskEnvelopeId,
+    binding.taskDispatchIdentity,
+  ].join('\u0000');
+}
+
 function normalizeStoredRecord(input, index) {
   const label = 'SubagentTaskActivationBindingRegistryRecordV1[' + index + ']';
   const raw = strictRecord(input, RECORD_KEYS, label);
@@ -183,6 +195,7 @@ export function normalizeSubagentTaskActivationBindingRegistryV1(input) {
   const activations = new Map();
   const invocations = new Map();
   const taskCounts = new Map();
+  const trustedWorkDispatches = new Set();
   let previousRegisteredAt = -1;
 
   for (const record of records) {
@@ -211,6 +224,15 @@ export function normalizeSubagentTaskActivationBindingRegistryV1(input) {
       );
     }
     invocations.set(invocation, binding.bindingId);
+
+    const dispatch = taskDispatchKey(binding);
+    if (binding.activationPurpose === OrchestrationActivationPurpose.WORK) {
+      trustedWorkDispatches.add(dispatch);
+    } else if (!trustedWorkDispatches.has(dispatch)) {
+      throw new Error(
+        'Subagent non-WORK activation binding requires prior durable WORK task dispatch identity',
+      );
+    }
 
     const task = taskKey(binding);
     const nextTaskCount = (taskCounts.get(task) || 0) + 1;
@@ -267,6 +289,17 @@ export function putSubagentTaskActivationBindingV1(registryInput, input) {
         + ' to '
         + binding.bindingId,
     );
+  }
+  if (binding.activationPurpose !== OrchestrationActivationPurpose.WORK) {
+    const hasTrustedWork = registry.records.some(record => (
+      record.binding.activationPurpose === OrchestrationActivationPurpose.WORK
+      && taskDispatchKey(record.binding) === taskDispatchKey(binding)
+    ));
+    if (!hasTrustedWork) {
+      throw new Error(
+        'Subagent non-WORK activation binding requires prior durable WORK task dispatch identity',
+      );
+    }
   }
 
   if (registry.records.length >= MAX_SUBAGENT_TASK_ACTIVATION_BINDINGS) {
