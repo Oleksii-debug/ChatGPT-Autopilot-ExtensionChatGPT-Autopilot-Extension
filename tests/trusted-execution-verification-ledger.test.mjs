@@ -266,6 +266,36 @@ test('ledger revision is exactly bound to append-only record count across restar
   assert.equal(restarted.revision, 1);
 });
 
+test('idempotent append never returns a shallow-frozen caller ledger with mutable nested state', () => {
+  const record = trustedRecord();
+  const canonical = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    record,
+  );
+  const callerRecords = structuredClone(canonical.records);
+  const shallowFrozen = Object.freeze({
+    schemaVersion: canonical.schemaVersion,
+    revision: canonical.revision,
+    records: callerRecords,
+  });
+
+  assert.equal(Object.isFrozen(shallowFrozen), true);
+  assert.equal(Object.isFrozen(shallowFrozen.records), false);
+  assert.equal(Object.isFrozen(shallowFrozen.records[0]), false);
+
+  const idempotent = appendTrustedExecutionVerificationRecordV1(shallowFrozen, record);
+
+  assert.notEqual(idempotent, shallowFrozen);
+  assert.equal(Object.isFrozen(idempotent), true);
+  assert.equal(Object.isFrozen(idempotent.records), true);
+  assert.equal(Object.isFrozen(idempotent.records[0]), true);
+  assert.equal(Object.isFrozen(idempotent.records[0].verification), true);
+  assert.equal(Object.isFrozen(idempotent.records[0].evidenceArtifacts), true);
+
+  callerRecords[0].recordId = 'caller-mutated-record';
+  assert.equal(idempotent.records[0].recordId, record.recordId);
+});
+
 test('ledger rejects records whose own chronology cannot represent trusted verification', () => {
   const empty = createTrustedExecutionVerificationLedgerV1();
 
