@@ -79,6 +79,16 @@ import {
   canonicalSpecialistProviderIdV1,
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
+import {
+  createSpecialistProviderExecutionV1,
+  normalizeSpecialistProviderExecutionV1,
+  recordSpecialistProviderExecutionOutcomeV1,
+} from './specialist-provider-execution.js';
+import {
+  OPENHANDS_CODING_PROVIDER_ID,
+  OpenHandsCodingSpecialistClient,
+  OpenHandsCodingSpecialistError,
+} from './coding-specialist-provider.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -109,6 +119,7 @@ const AGENT_DEFINITION_SPECIALIST_INTENT_KEYS = new Set([
   'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId', 'at',
   'childBudget', 'parentInvocationId',
 ]);
+const SPECIALIST_PROVIDER_EXECUTE_KEYS = new Set(['agentId', 'conversationId', 'expectedControlEpoch', 'at']);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -625,12 +636,29 @@ function normalizeRuntime(raw, now) {
       }
     })
     : [];
+  const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
+    ? raw.specialistProviderExecutions.slice(0, 128).flatMap(item => {
+      try {
+        const execution = normalizeSpecialistProviderExecutionV1(item);
+        const assignment = specialistHandoffs.find(candidate => candidate?.agentId === execution.agentId);
+        const provenance = specialistSelectionProvenance.find(candidate => candidate?.agentId === execution.agentId);
+        if (!assignment || !provenance
+            || execution.planId !== plan.planId
+            || execution.providerId !== provenance.selection.providerId
+            || execution.handoffId !== provenance.handoff.handoffId) return [];
+        return [execution];
+      } catch {
+        return [];
+      }
+    })
+    : [];
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
     specialistSelectionProvenance,
+    specialistProviderExecutions,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -800,7 +828,14 @@ function normalizeStore(raw, now) {
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
+  constructor({
+    chromeApi,
+    routePrompt,
+    now = () => Date.now(),
+    createId = createIdFallback,
+    nativeCompanionClient = undefined,
+    specialistProviderClients = undefined,
+  } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -816,6 +851,18 @@ export class BrowserAgentManager {
       ? (chromeApi?.runtime?.sendNativeMessage ? new NativeCompanionClient({ chromeApi }) : null)
       : nativeCompanionClient;
     this.trustedExecutionVerificationLedger = new TrustedExecutionVerificationLedgerRepository(chromeApi);
+    const defaultProviderClients = new Map([
+      [OPENHANDS_CODING_PROVIDER_ID, new OpenHandsCodingSpecialistClient({
+        fetchFn: (...args) => fetch(...args),
+        nowFn: this.now,
+      })],
+    ]);
+    if (specialistProviderClients !== undefined && !(specialistProviderClients instanceof Map)) {
+      throw new Error('Browser Agent specialistProviderClients must be a Map');
+    }
+    this.specialistProviderClients = specialistProviderClients === undefined
+      ? defaultProviderClients
+      : new Map(specialistProviderClients);
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
   }
@@ -1428,6 +1475,7 @@ export class BrowserAgentManager {
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
       selectionProvenance: clone(current.job.runtime.specialistSelectionProvenance || []),
+      providerExecutions: clone(current.job.runtime.specialistProviderExecutions || []),
     };
   }
 
