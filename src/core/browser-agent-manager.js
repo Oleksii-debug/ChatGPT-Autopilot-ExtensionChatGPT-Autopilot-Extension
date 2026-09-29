@@ -529,6 +529,54 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+function normalizeSpecialistDelegationAdmissions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw.slice(0, 128)) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const agentId = clean(item.agentId, 240);
+    const admissionKey = typeof item.admissionKey === 'string'
+      && item.admissionKey === item.admissionKey.trim()
+      && item.admissionKey.length > 0
+      && item.admissionKey.length <= 100_000
+      ? item.admissionKey
+      : '';
+    if (!agentId || !admissionKey || out.some(entry => entry.agentId === agentId)) continue;
+    out.push({ agentId, admissionKey });
+  }
+  return out;
+}
+
+function specialistDelegationAdmissionKey(proposal) {
+  const key = JSON.stringify([
+    proposal.schemaVersion, proposal.planId, proposal.jobId, proposal.nodeId,
+    proposal.planRevision, proposal.registryId, proposal.registryRevision,
+    proposal.selection, proposal.childBudget, proposal.binding, proposal.runtimePrepareRequest,
+  ]);
+  if (!key || key.length > 100_000) throw new Error('Specialist delegation admission key exceeds durable bound');
+  return key;
+}
+
+function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
+  const profile = job?.specialistDelegationBinding?.profile;
+  if (!profile?.enabled) return request;
+  const out = { ...request };
+  const obligations = Number.isSafeInteger(capacityObligations) && capacityObligations >= 0 ? capacityObligations : 0;
+  const profileSlots = Math.max(0, profile.maxConcurrentHandoffs - obligations);
+  if (out.availableSlots !== undefined && Number.isSafeInteger(out.availableSlots) && out.availableSlots >= 0) {
+    out.availableSlots = Math.min(out.availableSlots, profileSlots);
+  } else if (out.availableSlots === undefined) {
+    out.availableSlots = 0;
+  }
+  const leaseSeconds = out.leaseSeconds === undefined ? 900 : out.leaseSeconds;
+  if (Number.isSafeInteger(leaseSeconds) && leaseSeconds >= 1) out.leaseSeconds = Math.min(leaseSeconds, profile.leaseSeconds);
+  const maxChildren = out.maxChildrenPerAgent === undefined ? 4 : out.maxChildrenPerAgent;
+  if (Number.isSafeInteger(maxChildren) && maxChildren >= 1) {
+    out.maxChildrenPerAgent = Math.min(maxChildren, Math.max(1, profile.maxConcurrentHandoffs));
+  }
+  return out;
+}
+
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const reservationId = clean(raw.reservationId, 240);
@@ -575,6 +623,7 @@ function normalizeRuntime(raw, now) {
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistDelegationAdmissions: normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions),
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1241,21 +1290,25 @@ export class BrowserAgentManager {
       });
       const assignment = proposal.preview.assignment;
       const executionOwnership = proposal.preview.executionOwnership;
+      const admissionKey = specialistDelegationAdmissionKey(proposal);
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
-        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
-        if (JSON.stringify(existing) !== JSON.stringify(assignment)
-            || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
-          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
-        }
+        const existingAdmission = admissions.find(item => item.agentId === assignment.agentId);
+        if (!existingOwnership || !existingAdmission) throw new Error('Existing specialist handoff lacks canonical durable admission provenance');
+        if (existingAdmission.admissionKey !== admissionKey) throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
         return store;
       }
+      if (admissions.some(item => item.agentId === assignment.agentId)) {
+        throw new Error('Specialist delegation admission provenance exists without its canonical handoff');
+      }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.specialistDelegationAdmissions = [...admissions, { agentId: assignment.agentId, admissionKey }];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
@@ -1327,7 +1380,14 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+      const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+      const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+        ...boundedRequest,
+        executionOwnerships: currentOwnerships,
+        at,
+      });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
@@ -1380,10 +1440,16 @@ export class BrowserAgentManager {
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
+        const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+        const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+        const boundedClaimRequest = boundSpecialistClaimRequestForJob(
+          job,
+          { ...claimRequest, availableSlots: remaining, at },
+          jobCapacityObligations,
+        );
         const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...claimRequest,
-          availableSlots: remaining,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          ...boundedClaimRequest,
+          executionOwnerships: currentJobOwnerships,
           at,
         });
         job.runtime.plan = outcome.plan;
