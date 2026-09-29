@@ -1,7 +1,9 @@
 import {
-  AgentSelfRepairWorkKind,
   normalizeAgentSelfRepairModelIntentV1,
 } from './agent-self-repair-model-binding.js';
+import {
+  AgentSelfRepairWorkKind,
+} from './agent-self-repair-bridge.js';
 import {
   rankBoundAgentModelRouteCandidatesV1,
 } from './agent-model-route-candidate-binding.js';
