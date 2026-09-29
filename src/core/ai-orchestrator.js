@@ -128,6 +128,41 @@ function assertProviderReservationSettlement(value) {
   }
 }
 
+function assertProviderReservationReceiptBinding(receipt, { context, route, callNumber }) {
+  if (!context || context.kind !== 'browser-agent') return receipt;
+  const expectedEpoch = Number(context.controlEpoch);
+  if (!Number.isSafeInteger(expectedEpoch) || Object.is(expectedEpoch, -0) || expectedEpoch < 0) {
+    throw new Error('AI provider-call budget context controlEpoch is invalid');
+  }
+  const expectedCallNumber = Number(callNumber);
+  if (!Number.isSafeInteger(expectedCallNumber) || expectedCallNumber < 1) {
+    throw new Error('AI provider-call reservation callNumber binding is invalid');
+  }
+  const expectedJobId = clean(context.jobId);
+  if (!expectedJobId) {
+    throw new Error('AI provider-call budget context jobId is required');
+  }
+  const expectedPrefix = `${expectedJobId}:model-budget:`;
+  if (!receipt.reservationId.startsWith(expectedPrefix)) {
+    throw new Error('AI provider-call reservation does not match the admitted Browser Agent job');
+  }
+  if (receipt.controlEpoch !== expectedEpoch) {
+    throw new Error('AI provider-call reservation controlEpoch does not match admission');
+  }
+  if (receipt.callNumber !== expectedCallNumber) {
+    throw new Error('AI provider-call reservation callNumber does not match admission');
+  }
+  for (const key of ['routeId', 'provider', 'model']) {
+    if (receipt[key] !== route[key]) {
+      throw new Error(`AI provider-call reservation ${key} does not match admitted route`);
+    }
+  }
+  if (receipt.modelCalls !== 1) {
+    throw new Error('AI provider-call reservation must admit exactly one model call');
+  }
+  return receipt;
+}
+
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
   const model = clean(raw?.model);
@@ -338,7 +373,14 @@ export class AiOrchestrator {
           throw attachNonProviderFailureRuntime(error);
         }
         try {
-          reservation = snapshotProviderReservationReceipt(admittedReservation);
+          reservation = assertProviderReservationReceiptBinding(
+            snapshotProviderReservationReceipt(admittedReservation),
+            {
+              context: providerCallBudgetContext,
+              route: routeIdentity,
+              callNumber: callsUsed + 1,
+            },
+          );
         } catch (error) {
           error.code = error.code || 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
           throw attachNonProviderFailureRuntime(error);
