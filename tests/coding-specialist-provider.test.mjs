@@ -577,6 +577,28 @@ test('execution deadline covers probe and does not dispatch a conversation after
 });
 
 
+test('raw transport error text never enters public coding-specialist diagnostics', async () => {
+  const sentinel = 'PRIVATE_TRANSPORT_SENTINEL_7e21';
+  const client = clientFor(async url => {
+    if (url.endsWith('/openapi.json')) {
+      throw new TypeError(`socket failure ${sentinel} C:\\Users\\Owner\\secret.txt`);
+    }
+    throw new Error('unexpected request');
+  });
+
+  let caught = null;
+  try {
+    await client.execute(input());
+  } catch (error) {
+    caught = error;
+  }
+  assert.ok(caught instanceof OpenHandsCodingSpecialistError);
+  assert.equal(caught.code, 'OPENHANDS_TRANSPORT_FAILURE');
+  assert.equal(caught.message, 'Could not reach OpenHands Agent Server');
+  assert.equal(caught.message.includes(sentinel), false);
+  assert.equal(caught.message.includes('Owner'), false);
+});
+
 test('4xx and 5xx server detail never enters public coding-specialist diagnostics', async () => {
   const sentinel = 'TOP_SECRET_SENTINEL_9f2c';
   const ownerPath = 'C:\\Users\\Owner\\Private Project\\secret.txt';
