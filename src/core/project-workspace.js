@@ -607,7 +607,7 @@ export class ProjectWorkspaceRepository {
               && (durable.revision < 1 || expectedRevision !== durable.revision - 1)) {
             throw new Error('Project workspace exact replay expected revision mismatch');
           }
-          return durable;
+          return structuredClone(durable);
         }
         if (expectedRevision !== null && durable.revision !== expectedRevision) {
           throw new Error('Project workspace durable revision changed before save');
@@ -618,7 +618,9 @@ export class ProjectWorkspaceRepository {
         assertSnapshotRevisionContinuity(durable, candidate);
       }
 
-      await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: candidate });
+      await this.chrome.storage.local.set({
+        [PROJECT_WORKSPACE_STORAGE_KEY]: structuredClone(candidate),
+      });
       return candidate;
     });
     PROJECT_WORKSPACE_SAVE_QUEUES.set(queueKey, task.catch(() => undefined));
