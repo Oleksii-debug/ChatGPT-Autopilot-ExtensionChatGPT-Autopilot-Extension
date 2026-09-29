@@ -321,6 +321,12 @@ test('ambiguous provider transport failure is durably fenced for reconciliation'
   assert.equal(result.execution.reconciliationRequired, true);
   assert.equal(result.execution.safeToRetry, false);
   assert.equal(result.execution.errorCode, 'OPENHANDS_REQUEST_TIMEOUT');
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships.length, 1);
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, durable.handoffs[0].leaseId);
+  assert.match(durable.executionOwnerships[0].ambiguityReason, /OPENHANDS_REQUEST_TIMEOUT/);
 });
 
 test('durable PREPARED record is never blindly redispatched after restart-shaped re-entry', async () => {
@@ -391,4 +397,42 @@ test('durable PREPARED record is never blindly redispatched after restart-shaped
     /requires reconciliation before redispatch/,
   );
   assert.equal(calls, 0);
+});
+
+test('ambiguous provider outcome after lease expiry still enters canonical reconciliation without retry', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const client = {
+    async execute() {
+      clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+      throw new OpenHandsCodingSpecialistError('late ambiguous timeout', {
+        code: 'OPENHANDS_REQUEST_TIMEOUT',
+        conversationId: '66666666-6666-4666-8666-666666666666',
+        effectMayHaveOccurred: true,
+        reconciliationRequired: true,
+        safeToRetry: false,
+      });
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '66666666-6666-4666-8666-666666666666',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, durable.handoffs[0].leaseId);
+  assert.equal(durable.providerExecutions[0].safeToRetry, false);
 });
