@@ -341,6 +341,23 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
   return new Date(millis).toISOString();
 }
+function sameSpecialistAssignmentAuthority(existing, expected) {
+  const fields = [
+    'schemaVersion', 'agentId', 'parentAgentId', 'jobId', 'purpose',
+    'specialistId', 'ownershipKey', 'depth', 'priority', 'deadlineAt',
+  ];
+  return fields.every(key => existing?.[key] === expected?.[key])
+    && JSON.stringify(existing?.requestedCapabilityIds || [])
+      === JSON.stringify(expected?.requestedCapabilityIds || []);
+}
+
+function sameSpecialistExecutionAuthority(existing, expected) {
+  const fields = [
+    'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId',
+  ];
+  return fields.every(key => existing?.[key] === expected?.[key]);
+}
+
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
   const profile = job?.specialistDelegationBinding?.profile;
   if (!profile?.enabled) return request;
@@ -1095,8 +1112,8 @@ export class BrowserAgentManager {
       if (existing) {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
         if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
-        if (JSON.stringify(existing) !== JSON.stringify(assignment)
-            || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
+        if (!sameSpecialistAssignmentAuthority(existing, assignment)
+            || !sameSpecialistExecutionAuthority(existingOwnership, executionOwnership)) {
           throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
         }
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
