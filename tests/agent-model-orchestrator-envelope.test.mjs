@@ -317,3 +317,24 @@ test('single-route envelope projects manual worker policy without leaking other 
   assert.equal(result.settings.workerPolicy.allocationMode,'manual');
   assert.deepEqual(result.settings.workerPolicy.manualRouteWorkers,{'route.b':1});
 });
+
+
+test('bounded envelope collapses hybrid Router mode to one selected-route call', () => {
+  const current=settings();
+  current.mode='hybrid-rules';
+  current.strongEveryNRequests=1;
+  current.strongEveryMinutes=1;
+  current.strongMinGapMinutes=0;
+  current.strongMaxPerHour=10;
+  current.carryStrongResultToPrimary=true;
+  current.fallbackToStrongOnPrimaryError=true;
+  const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
+    currentRouterSettings:current,
+  }));
+  assert.equal(result.settings.mode,'primary');
+  assert.deepEqual(result.settings.routes.map(route=>route.routeId),['route.b']);
+  assert.equal(result.settings.strongEveryNRequests,0);
+  assert.equal(result.settings.strongEveryMinutes,0);
+  assert.equal(result.settings.fallbackToStrongOnPrimaryError,false);
+  assert.equal(result.settings.carryStrongResultToPrimary,false);
+});
