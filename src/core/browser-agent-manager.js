@@ -672,6 +672,56 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+function normalizeSpecialistDelegationAdmissions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw.slice(0, 128)) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const agentId = clean(item.agentId, 240);
+    const admissionKey = typeof item.admissionKey === 'string'
+      && item.admissionKey === item.admissionKey.trim()
+      && item.admissionKey.length > 0
+      && item.admissionKey.length <= 100_000
+      ? item.admissionKey
+      : '';
+    let selection = null;
+    let handoff = null;
+    try {
+      selection = normalizeSpecialistSelectionV1(item.selection);
+      handoff = normalizeSpecialistHandoffV1(item.handoff);
+    } catch {
+      continue;
+    }
+    if (!agentId || !admissionKey || handoff.specialistId !== selection.specialistId
+        || out.some(entry => entry.agentId === agentId)) continue;
+    out.push({ agentId, admissionKey, selection, handoff });
+  }
+  return out;
+}
+
+function specialistDelegationAdmissionKey(proposal) {
+  const key = JSON.stringify([
+    proposal.schemaVersion, proposal.planId, proposal.jobId, proposal.nodeId,
+    proposal.planRevision, proposal.registryId, proposal.registryRevision,
+    proposal.selection, proposal.childBudget, proposal.binding, proposal.runtimePrepareRequest,
+  ]);
+  if (!key || key.length > 100_000) throw new Error('Specialist delegation admission key exceeds durable bound');
+  return key;
+}
+
+function assertOwnerBoundSpecialistAdmissionProvenance(job) {
+  if (!job?.specialistDelegationBinding?.profile?.enabled) return;
+  const assignments = Array.isArray(job.runtime?.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+  if (!assignments.length) return;
+  const admissions = normalizeSpecialistDelegationAdmissions(job.runtime?.specialistDelegationAdmissions);
+  const admittedIds = new Set(admissions.map(item => item.agentId));
+  for (const assignment of assignments) {
+    if (!assignment?.agentId || !admittedIds.has(assignment.agentId)) {
+      throw new Error('Owner-bound specialist handoff lacks durable admission provenance');
+    }
+  }
+}
+
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const reservationId = clean(raw.reservationId, 240);
@@ -713,6 +763,7 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistDelegationAdmissions = normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions);
   const specialistSelectionProvenance = plan && Array.isArray(raw.specialistSelectionProvenance)
     ? raw.specialistSelectionProvenance.slice(0, 128).flatMap(item => {
       try {
@@ -755,6 +806,7 @@ function normalizeRuntime(raw, now) {
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistDelegationAdmissions,
     specialistSelectionProvenance,
     specialistProviderExecutions,
     specialistProviderExecutionIntegrityFault,
@@ -1571,8 +1623,10 @@ export class BrowserAgentManager {
       });
       const assignment = proposal.preview.assignment;
       const executionOwnership = proposal.preview.executionOwnership;
+      const admissionKey = specialistDelegationAdmissionKey(proposal);
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
       const provenance = Array.isArray(job.runtime.specialistSelectionProvenance) ? job.runtime.specialistSelectionProvenance : [];
       const selectionProvenance = Object.freeze({
         agentId: assignment.agentId,
@@ -1582,10 +1636,18 @@ export class BrowserAgentManager {
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
-        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
+        const existingAdmission = admissions.find(item => item.agentId === assignment.agentId);
+        if (!existingOwnership || !existingAdmission) {
+          throw new Error('Existing specialist handoff lacks canonical durable admission provenance');
+        }
+        if (existingAdmission.admissionKey !== admissionKey
+            || JSON.stringify(existingAdmission.selection) !== JSON.stringify(proposal.selection)
+            || JSON.stringify(existingAdmission.handoff) !== JSON.stringify(proposal.binding.handoff)) {
+          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+        }
         if (JSON.stringify(existing) !== JSON.stringify(assignment)
             || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
-          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+          throw new Error('Existing specialist handoff runtime state drifted from its canonical READY proposal');
         }
         const existingProvenance = provenance.find(item => item?.agentId === assignment.agentId);
         if (existingProvenance
@@ -1598,8 +1660,17 @@ export class BrowserAgentManager {
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
         return store;
       }
+      if (admissions.some(item => item.agentId === assignment.agentId)) {
+        throw new Error('Specialist delegation admission provenance exists without its canonical handoff');
+      }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.specialistDelegationAdmissions = [...admissions, {
+        agentId: assignment.agentId,
+        admissionKey,
+        selection: clone(proposal.selection),
+        handoff: clone(proposal.binding.handoff),
+      }];
       job.runtime.specialistSelectionProvenance = [...provenance, selectionProvenance];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
