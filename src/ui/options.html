@@ -114,6 +114,77 @@
       <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
       <p class="field-help">Опишіть результат звичайною мовою. AI сам планує роботу та керує браузерними інструментами Autopilot. Налаштування нижче є лише політикою й лімітами; для звичайного запуску їх заповнювати не потрібно.</p>
 
+      <details id="agent-specialist-automation-details">
+        <summary>Автоматичні Specialist workers</summary>
+        <p id="agent-specialist-automation-help" class="field-help">Ця owner policy лише вмикає або вимикає автоматичний Specialist claim і provider dispatch. Product-wide числовий ліміт задається окремо через ResourceBudgetV1 нижче. Уже PREPARED execution може лише відновити attach/reconciliation без повторного створення зовнішньої роботи.</p>
+        <fieldset class="settings-group" aria-describedby="agent-specialist-automation-help agent-specialist-automation-status">
+          <legend>Product-wide Specialist automation</legend>
+          <label><input id="agent-specialist-automation-enabled" type="checkbox">Дозволити автоматичний Specialist claim і provider dispatch</label>
+          <div class="agent-actions" aria-label="Керування автоматичними Specialist workers">
+            <button id="agent-specialist-automation-save-button" type="button">Зберегти policy</button>
+            <button id="agent-specialist-automation-clear-button" type="button">Очистити policy</button>
+          </div>
+          <p id="agent-specialist-automation-status" role="status">Specialist automation policy ще не завантажено.</p>
+        </fieldset>
+      </details>
+
+      <details id="agent-specialist-provider-details">
+        <summary>OpenHands Specialist provider</summary>
+        <p id="agent-specialist-provider-help" class="field-help">Provider v1 працює лише з локальним OpenHands Agent Server 1.49.5 через http://localhost або http://127.0.0.1 з явним портом. Паролі, API keys і CredentialRef тут не використовуються.</p>
+        <fieldset class="settings-group" aria-describedby="agent-specialist-provider-help agent-specialist-provider-status">
+          <legend>OpenHands Agent Server</legend>
+          <p id="agent-specialist-provider-identity" tabindex="0">Provider ID: openhands-agent-server. Auth: LOCAL_UNAUTHENTICATED.</p>
+
+          <label for="agent-specialist-provider-server-url">Local server URL</label>
+          <input id="agent-specialist-provider-server-url" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:3000">
+
+          <label for="agent-specialist-provider-profile-id">Agent profile UUID</label>
+          <input id="agent-specialist-provider-profile-id" type="text" autocomplete="off" spellcheck="false" placeholder="00000000-0000-4000-8000-000000000000">
+
+          <label for="agent-specialist-provider-profile-revision">Agent profile revision</label>
+          <input id="agent-specialist-provider-profile-revision" type="number" min="1" step="1" inputmode="numeric" value="1">
+
+          <label for="agent-specialist-provider-workspace">Absolute isolated workspace path</label>
+          <input id="agent-specialist-provider-workspace" type="text" maxlength="4096" autocomplete="off" spellcheck="false" aria-describedby="agent-specialist-provider-workspace-help">
+          <p id="agent-specialist-provider-workspace-help" class="field-help">Дозволено абсолютний Windows або POSIX path. Network shares та . або .. segments заборонені.</p>
+
+          <label for="agent-specialist-provider-capabilities">Qualified capability IDs — по одному в рядку</label>
+          <textarea id="agent-specialist-provider-capabilities" rows="4" spellcheck="false" aria-describedby="agent-specialist-provider-capabilities-help"></textarea>
+          <p id="agent-specialist-provider-capabilities-help" class="field-help">Список має точно збігатися з capability scope Specialist handoff.</p>
+
+          <label for="agent-specialist-provider-request-timeout">Request timeout, секунд</label>
+          <input id="agent-specialist-provider-request-timeout" type="number" min="1" max="120" step="1" inputmode="numeric" value="30">
+
+          <label for="agent-specialist-provider-max-execution">Maximum execution, секунд</label>
+          <input id="agent-specialist-provider-max-execution" type="number" min="1" max="21600" step="1" inputmode="numeric" value="1800">
+
+          <label for="agent-specialist-provider-poll-interval">Poll interval, мс</label>
+          <input id="agent-specialist-provider-poll-interval" type="number" min="100" max="30000" step="1" inputmode="numeric" value="1000">
+
+          <label for="agent-specialist-provider-max-iterations">Maximum iterations</label>
+          <input id="agent-specialist-provider-max-iterations" type="number" min="1" max="500" step="1" inputmode="numeric" value="100">
+
+          <label for="agent-specialist-provider-max-response-bytes">Maximum response bytes</label>
+          <input id="agent-specialist-provider-max-response-bytes" type="number" min="1024" max="2000000" step="1" inputmode="numeric" value="200000">
+
+          <div class="agent-actions" aria-label="Керування OpenHands Specialist provider">
+            <button id="agent-specialist-provider-save-button" type="button">Зберегти provider config</button>
+            <button id="agent-specialist-provider-probe-button" type="button">Перевірити збережений provider</button>
+            <button id="agent-specialist-provider-clear-button" type="button">Очистити provider config</button>
+          </div>
+          <p id="agent-specialist-provider-status" role="status">OpenHands provider config ще не завантажено.</p>
+        </fieldset>
+      </details>
+
+      <fieldset class="settings-group" id="agent-owner-resource-budget-group">
+        <legend>Глобальна capacity Specialist</legend>
+        <p id="agent-owner-max-concurrent-help" class="field-help">Це owner-authoritative maxConcurrentAgents із ResourceBudgetV1 для product-wide Specialist admission. 0 означає: не видавати нові Specialist leases. Інші виміри ResourceBudgetV1 під час цього збереження не змінюються.</p>
+        <label for="agent-owner-max-concurrent">Максимум одночасних Specialist leases</label>
+        <input id="agent-owner-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric" value="0" aria-describedby="agent-owner-max-concurrent-help">
+        <button id="agent-owner-resource-budget-save-button" type="button">Зберегти глобальну capacity</button>
+        <p id="agent-owner-resource-budget-status" role="status" tabindex="0">Глобальний ResourceBudgetV1 ще не завантажено.</p>
+      </fieldset>
+
       <details id="agent-definition-details">
         <summary>Збережені reusable Agent definitions</summary>
         <p class="field-help">Definitions зберігають постійні інструкції, capabilities, tools і per-agent model routing. Вони не запускають Agent самі по собі.</p>
@@ -220,7 +291,7 @@
         </fieldset>
       </details>
 
-<details id="specialist-registry-details">
+      <details id="specialist-registry-details">
         <summary>Specialists</summary>
         <p>Тут налаштовуються reusable Specialist definitions. Ця форма не запускає Specialist і не створює handoff.</p>
 
@@ -322,7 +393,7 @@
         </fieldset>
       </details>
 
-            <label for="agent-prompt">Що потрібно зробити?</label>
+      <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true" placeholder="Наприклад: перевір предмети зимового семестру, підбери розклад без конфліктів і виконай задачу відповідно до вибраної нижче політики автономності."></textarea>
       <div class="agent-actions" aria-label="Основні дії агента">
         <button id="agent-run-prompt-button" type="button">Запустити агента</button>

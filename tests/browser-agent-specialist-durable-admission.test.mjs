@@ -358,6 +358,7 @@ test('owner-bound claim requires trusted executable readiness on the product dep
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -365,6 +366,7 @@ test('owner-bound claim requires trusted executable readiness on the product dep
         executable,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(Date.now()).toISOString(),
         resolvedAt: new Date(Date.now()).toISOString(),
         maxAgeMs: 60_000,
       };
@@ -410,6 +412,7 @@ test('owner-bound claim fails closed when trusted readiness becomes stale before
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -417,6 +420,7 @@ test('owner-bound claim fails closed when trusted readiness becomes stale before
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(Date.now()).toISOString(),
         resolvedAt: new Date(Date.now()).toISOString(),
         maxAgeMs: 60_000,
       };
@@ -494,6 +498,7 @@ test('product-wide claim path cannot bypass trusted readiness for owner-bound ad
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -501,6 +506,7 @@ test('product-wide claim path cannot bypass trusted readiness for owner-bound ad
         executable: false,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(Date.now()).toISOString(),
         resolvedAt: new Date(Date.now()).toISOString(),
         maxAgeMs: 60_000,
       };
@@ -518,6 +524,108 @@ test('product-wide claim path cannot bypass trusted readiness for owner-bound ad
       at: '2026-09-29T03:06:00.000Z',
     }, { specialistProviderReadinessResolver: resolver }),
     /not currently executable/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+
+test('owner-bound claim binds readiness to exact registry binding key without executing accessors', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  let getterCalls = 0;
+  const resolver = {
+    async resolve(selection) {
+      const readiness = {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        observedAt: new Date(Date.now()).toISOString(),
+        resolvedAt: new Date(Date.now()).toISOString(),
+        maxAgeMs: 60_000,
+      };
+      Object.defineProperty(readiness, 'registryBindingKey', {
+        enumerable: true,
+        get() { getterCalls += 1; return selection.registryBindingKey; },
+      });
+      return readiness;
+    },
+    async assertCurrent() { return true; },
+  };
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: resolver }),
+    /provenance does not match durable admission/,
+  );
+  assert.equal(getterCalls, 0);
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('owner-bound claim expires readiness from provider observation time, not resolver completion time', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  const resolver = {
+    async resolve(selection) {
+      const resolvedAtMs = Date.now();
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        observedAt: new Date(resolvedAtMs - 61_000).toISOString(),
+        resolvedAt: new Date(resolvedAtMs).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() { return true; },
+  };
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: resolver }),
+    /readiness expired before claim/,
   );
   const persisted = await manager.listSpecialistHandoffs('job.research');
   assert.equal(persisted.handoffs[0].state, 'READY');

@@ -10,6 +10,11 @@ import {
   agentDefinitionLaunchScopeTextV1,
   buildAgentDefinitionLaunchRequestV1,
 } from './agent-definition-launch-form.js';
+import {
+  OPENHANDS_AGENT_SERVER_VERSION,
+  OPENHANDS_CODING_PROVIDER_ID,
+} from '../core/coding-specialist-provider.js';
+import { SpecialistProviderConfigKind } from '../core/specialist-provider-config.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -63,6 +68,13 @@ const ui = {
   selectedSpecialistHandoffAgentId: '',
   specialistProviderConfigLoadGeneration: 0,
   specialistProviderRuntimeLoadGeneration: 0,
+  ownerResourceBudgetState: null,
+  specialistAutomationPolicy: null,
+  specialistAutomationPolicyRevision: 0,
+  specialistAutomationPolicyQuarantined: false,
+  specialistProviderConfig: null,
+  specialistProviderConfigRevision: 0,
+  specialistProviderConfigQuarantined: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -3203,6 +3215,347 @@ function renderBrowserAgentList() {
   }
 }
 
+function specialistProviderInteger(id, min, max, label) {
+  const value = Number($(id).value);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    const error = new Error(`${label}: введіть ціле число від ${min} до ${max}.`);
+    error.focusId = id;
+    throw error;
+  }
+  return value;
+}
+
+function specialistProviderCapabilitiesFromForm() {
+  const values = $('agent-specialist-provider-capabilities').value
+    .split(/\r?\n/u)
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (!values.length) {
+    const error = new Error('Додайте принаймні один qualified capability ID.');
+    error.focusId = 'agent-specialist-provider-capabilities';
+    throw error;
+  }
+  if (values.length > 64 || new Set(values).size !== values.length) {
+    const error = new Error('Qualified capability IDs мають бути унікальні; максимум 64.');
+    error.focusId = 'agent-specialist-provider-capabilities';
+    throw error;
+  }
+  return values;
+}
+
+function specialistProviderConfigFromForm() {
+  return {
+    schemaVersion: 1,
+    serverUrl: $('agent-specialist-provider-server-url').value.trim(),
+    agentServerVersion: OPENHANDS_AGENT_SERVER_VERSION,
+    agentProfileId: $('agent-specialist-provider-profile-id').value.trim(),
+    agentProfileRevision: specialistProviderInteger(
+      'agent-specialist-provider-profile-revision',
+      1,
+      Number.MAX_SAFE_INTEGER,
+      'Agent profile revision',
+    ),
+    workspacePath: $('agent-specialist-provider-workspace').value.trim(),
+    qualifiedCapabilityIds: specialistProviderCapabilitiesFromForm(),
+    requestTimeoutSeconds: specialistProviderInteger(
+      'agent-specialist-provider-request-timeout', 1, 120, 'Request timeout',
+    ),
+    maxExecutionSeconds: specialistProviderInteger(
+      'agent-specialist-provider-max-execution', 1, 21600, 'Maximum execution',
+    ),
+    pollIntervalMs: specialistProviderInteger(
+      'agent-specialist-provider-poll-interval', 100, 30000, 'Poll interval',
+    ),
+    maxIterations: specialistProviderInteger(
+      'agent-specialist-provider-max-iterations', 1, 500, 'Maximum iterations',
+    ),
+    maxResponseBytes: specialistProviderInteger(
+      'agent-specialist-provider-max-response-bytes', 1024, 2000000, 'Maximum response bytes',
+    ),
+    authMode: 'LOCAL_UNAUTHENTICATED',
+  };
+}
+
+function renderSpecialistProviderConfig() {
+  const record = ui.specialistProviderConfig;
+  const config = record?.config || null;
+  const quarantined = ui.specialistProviderConfigQuarantined === true;
+  const fields = [
+    'agent-specialist-provider-server-url',
+    'agent-specialist-provider-profile-id',
+    'agent-specialist-provider-profile-revision',
+    'agent-specialist-provider-workspace',
+    'agent-specialist-provider-capabilities',
+    'agent-specialist-provider-request-timeout',
+    'agent-specialist-provider-max-execution',
+    'agent-specialist-provider-poll-interval',
+    'agent-specialist-provider-max-iterations',
+    'agent-specialist-provider-max-response-bytes',
+  ];
+  if (config) {
+    $('agent-specialist-provider-server-url').value = config.serverUrl;
+    $('agent-specialist-provider-profile-id').value = config.agentProfileId;
+    $('agent-specialist-provider-profile-revision').value = String(config.agentProfileRevision);
+    $('agent-specialist-provider-workspace').value = config.workspacePath;
+    $('agent-specialist-provider-capabilities').value = config.qualifiedCapabilityIds.join('\n');
+    $('agent-specialist-provider-request-timeout').value = String(config.requestTimeoutSeconds);
+    $('agent-specialist-provider-max-execution').value = String(config.maxExecutionSeconds);
+    $('agent-specialist-provider-poll-interval').value = String(config.pollIntervalMs);
+    $('agent-specialist-provider-max-iterations').value = String(config.maxIterations);
+    $('agent-specialist-provider-max-response-bytes').value = String(config.maxResponseBytes);
+  }
+  for (const id of fields) $(id).disabled = quarantined;
+  $('agent-specialist-provider-save-button').disabled = quarantined;
+  $('agent-specialist-provider-probe-button').disabled = quarantined || !record;
+  $('agent-specialist-provider-clear-button').disabled = quarantined || !record;
+
+  const status = $('agent-specialist-provider-status');
+  if (quarantined) {
+    status.textContent = `OpenHands provider config revision ${ui.specialistProviderConfigRevision} пошкоджена й заблокована fail-closed. Automatic provider execution недоступний до explicit storage recovery.`;
+  } else if (!record) {
+    status.textContent = `OpenHands provider не налаштовано. Durable revision: ${ui.specialistProviderConfigRevision}. Automatic provider execution не запускається.`;
+  } else {
+    status.textContent = `OpenHands provider config revision ${record.revision} збережена для ${config.serverUrl}. Probe перевіряє тільки цю durable revision, не незбережені поля форми.`;
+  }
+}
+
+async function loadSpecialistProviderConfig() {
+  try {
+    const state = await core('GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+    });
+    ui.specialistProviderConfig = state?.config || null;
+    ui.specialistProviderConfigRevision = Number(state?.revision || 0);
+    ui.specialistProviderConfigQuarantined = state?.quarantined === true;
+    renderSpecialistProviderConfig();
+  } catch (error) {
+    $('agent-specialist-provider-status').textContent = `OpenHands provider config не завантажено: ${error.message}`;
+  }
+}
+
+async function saveSpecialistProviderConfig() {
+  const button = $('agent-specialist-provider-save-button');
+  try {
+    const config = specialistProviderConfigFromForm();
+    button.disabled = true;
+    const result = await core('SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: ui.specialistProviderConfigRevision,
+      kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+      config,
+    });
+    ui.specialistProviderConfig = result?.config || null;
+    ui.specialistProviderConfigRevision = Number(result?.config?.revision || ui.specialistProviderConfigRevision);
+    ui.specialistProviderConfigQuarantined = false;
+    renderSpecialistProviderConfig();
+    announce('OpenHands Specialist provider config збережено.');
+  } catch (error) {
+    if (error?.focusId) $(error.focusId)?.focus();
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistProviderConfig();
+      $('agent-specialist-provider-status').textContent = 'Provider config змінилася в іншій операції. Актуальну durable revision перезавантажено; перевірте її перед повторним збереженням.';
+      announce('OpenHands provider config змінилася. Актуальний стан перезавантажено.');
+    } else {
+      $('agent-specialist-provider-status').textContent = `Provider config не збережено: ${error.message}`;
+    }
+  } finally {
+    if (!ui.specialistProviderConfigQuarantined) button.disabled = false;
+  }
+}
+
+async function probeSpecialistProviderConfig() {
+  const button = $('agent-specialist-provider-probe-button');
+  try {
+    button.disabled = true;
+    $('agent-specialist-provider-status').textContent = 'Перевіряю саме збережену OpenHands provider revision…';
+    const result = await core('PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+    });
+    $('agent-specialist-provider-status').textContent = `OpenHands provider готовий. Config revision ${result.configRevision}; provider state ${result.providerState}; observed ${formatTime(result.observedAt)}.`;
+    announce('Збережений OpenHands Specialist provider успішно перевірено.');
+  } catch (error) {
+    $('agent-specialist-provider-status').textContent = `OpenHands provider probe не пройдено: ${error.message}`;
+  } finally {
+    button.disabled = ui.specialistProviderConfigQuarantined || !ui.specialistProviderConfig;
+  }
+}
+
+async function clearSpecialistProviderConfig() {
+  const button = $('agent-specialist-provider-clear-button');
+  try {
+    button.disabled = true;
+    await core('CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: ui.specialistProviderConfigRevision,
+    });
+    await loadSpecialistProviderConfig();
+    announce('OpenHands Specialist provider config очищено.');
+    $('agent-specialist-provider-server-url').focus();
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistProviderConfig();
+      $('agent-specialist-provider-status').textContent = 'Provider config змінилася в іншій операції. Актуальний стан перезавантажено.';
+    } else {
+      $('agent-specialist-provider-status').textContent = `Provider config не очищено: ${error.message}`;
+    }
+  } finally {
+    renderSpecialistProviderConfig();
+  }
+}
+
+function renderSpecialistAutomationPolicy() {
+  const policy = ui.specialistAutomationPolicy;
+  const quarantined = ui.specialistAutomationPolicyQuarantined === true;
+  const enabled = $('agent-specialist-automation-enabled');
+  const save = $('agent-specialist-automation-save-button');
+  const clear = $('agent-specialist-automation-clear-button');
+  const status = $('agent-specialist-automation-status');
+
+  enabled.checked = policy?.enabled === true;
+  enabled.disabled = quarantined;
+  save.disabled = quarantined;
+  clear.disabled = quarantined || !policy;
+
+  if (quarantined) {
+    status.textContent = 'Specialist automation policy у карантині як пошкоджена; automatic claim/provider dispatch вимкнено.';
+  } else if (!policy) {
+    status.textContent = `Specialist automation policy не задана. Automatic claim/provider dispatch вимкнено. Durable revision: ${ui.specialistAutomationPolicyRevision}.`;
+  } else {
+    status.textContent = `Specialist automation policy revision ${policy.revision}: ${policy.enabled ? 'увімкнено' : 'вимкнено'}. Product-wide capacity визначає ResourceBudgetV1.`;
+  }
+}
+
+async function loadSpecialistAutomationPolicy() {
+  try {
+    const state = await core('GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY');
+    ui.specialistAutomationPolicy = state?.policy || null;
+    ui.specialistAutomationPolicyRevision = Number(state?.revision || 0);
+    ui.specialistAutomationPolicyQuarantined = state?.quarantined === true;
+    renderSpecialistAutomationPolicy();
+  } catch (error) {
+    $('agent-specialist-automation-status').textContent = `Specialist automation policy не завантажено: ${error.message}`;
+  }
+}
+
+async function saveSpecialistAutomationPolicy() {
+  const button = $('agent-specialist-automation-save-button');
+  try {
+    button.disabled = true;
+    const result = await core('SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+      enabled: $('agent-specialist-automation-enabled').checked,
+    });
+    ui.specialistAutomationPolicy = result?.policy || null;
+    ui.specialistAutomationPolicyRevision = Number(result?.policy?.revision || ui.specialistAutomationPolicyRevision);
+    ui.specialistAutomationPolicyQuarantined = false;
+    renderSpecialistAutomationPolicy();
+    announce('Specialist automation policy збережено.');
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальний стан перезавантажено; перевірте його перед повторним збереженням.';
+      announce('Specialist automation policy змінилася. Актуальний стан перезавантажено.');
+    } else {
+      $('agent-specialist-automation-status').textContent = `Policy не збережено: ${error.message}`;
+    }
+  } finally {
+    if (!ui.specialistAutomationPolicyQuarantined) button.disabled = false;
+  }
+}
+
+async function clearSpecialistAutomationPolicy() {
+  const button = $('agent-specialist-automation-clear-button');
+  try {
+    button.disabled = true;
+    await core('CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+    });
+    await loadSpecialistAutomationPolicy();
+    announce('Specialist automation policy очищено; automatic dispatch вимкнено.');
+    $('agent-specialist-automation-enabled').focus();
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальний стан перезавантажено.';
+    } else {
+      $('agent-specialist-automation-status').textContent = `Policy не очищено: ${error.message}`;
+    }
+  } finally {
+    renderSpecialistAutomationPolicy();
+  }
+}
+
+async function loadBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  try {
+    const state = await core('GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET');
+    ui.ownerResourceBudgetState = state;
+    input.value = String(state?.budget?.maxConcurrentAgents ?? 0);
+    const quarantined = state?.quarantined === true;
+    input.disabled = quarantined;
+    saveButton.disabled = quarantined;
+    status.textContent = quarantined
+      ? `ResourceBudgetV1 у карантині як пошкоджений; нова Specialist capacity закрита. Revision ${state?.revision ?? 0}.`
+      : `Глобальна Specialist capacity: ${state?.budget?.maxConcurrentAgents ?? 0}; revision ${state?.revision ?? 0}.`;
+  } catch (error) {
+    ui.ownerResourceBudgetState = null;
+    input.disabled = true;
+    saveButton.disabled = true;
+    status.textContent = `Не вдалося завантажити глобальний ResourceBudgetV1: ${error.message}`;
+  }
+}
+
+async function saveBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  const state = ui.ownerResourceBudgetState;
+  if (!state || state.quarantined === true) {
+    status.textContent = 'ResourceBudgetV1 недоступний для безпечного збереження; спочатку перечитайте стан.';
+    return;
+  }
+  let maxConcurrentAgents;
+  try {
+    maxConcurrentAgents = parseStrictBoundedInteger(input.value, {
+      min: 0,
+      max: 256,
+      label: 'Глобальна Specialist capacity',
+    });
+  } catch (error) {
+    status.textContent = error.message;
+    input.focus();
+    return;
+  }
+  input.disabled = true;
+  saveButton.disabled = true;
+  status.textContent = 'Зберігаю глобальну Specialist capacity…';
+  try {
+    const committed = await core('SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET', {
+      expectedRevision: state.revision,
+      budget: {
+        ...(state.budget || {}),
+        maxConcurrentAgents,
+      },
+    });
+    ui.ownerResourceBudgetState = committed;
+    input.value = String(committed?.budget?.maxConcurrentAgents ?? 0);
+    status.textContent = `Збережено глобальну Specialist capacity ${committed?.budget?.maxConcurrentAgents ?? 0}; revision ${committed?.revision ?? 0}.`;
+    announce('Глобальну Specialist capacity збережено.');
+  } catch (error) {
+    await loadBrowserAgentOwnerResourceBudget();
+    status.textContent = `Глобальну capacity не збережено: ${error.message}. Поточний стан перечитано.`;
+    announce('Глобальну Specialist capacity не збережено.');
+    return;
+  } finally {
+    if (ui.ownerResourceBudgetState && ui.ownerResourceBudgetState.quarantined !== true) {
+      input.disabled = false;
+      saveButton.disabled = false;
+    }
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
@@ -4892,8 +5245,17 @@ $('mode-sessions').addEventListener('click', () => setUiMode('sessions', { focus
 $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { focus: true }));
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
-$('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('mode-agent').addEventListener('click', () => {
+  setUiMode('agent', { focus: true });
+  void loadSpecialistAutomationPolicy();
+  void loadSpecialistProviderConfig();
+});
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
+$('agent-specialist-automation-save-button').addEventListener('click', () => { void saveSpecialistAutomationPolicy(); });
+$('agent-specialist-automation-clear-button').addEventListener('click', () => { void clearSpecialistAutomationPolicy(); });
+$('agent-specialist-provider-save-button').addEventListener('click', () => { void saveSpecialistProviderConfig(); });
+$('agent-specialist-provider-probe-button').addEventListener('click', () => { void probeSpecialistProviderConfig(); });
+$('agent-specialist-provider-clear-button').addEventListener('click', () => { void clearSpecialistProviderConfig(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -5007,6 +5369,7 @@ $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgen
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
+$('agent-owner-resource-budget-save-button').addEventListener('click', saveBrowserAgentOwnerResourceBudget);
 $('specialist-registry-list').addEventListener('change', selectSpecialistRegistry);
 $('specialist-create-registry-button').addEventListener('click', createSpecialistRegistry);
 $('specialist-list').addEventListener('change', selectSpecialistDefinition);
@@ -5219,6 +5582,8 @@ async function initialLoad() {
   await loadSpecialistRegistries();
   await loadOpenHandsProviderConfig();
   await loadSpecialistProviderRuntime();
+  await loadSpecialistAutomationPolicy();
+  await loadSpecialistProviderConfig();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);

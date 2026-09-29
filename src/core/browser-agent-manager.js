@@ -97,6 +97,7 @@ import {
   recordSpecialistProviderExecutionOutcomeV1,
 } from './specialist-provider-execution.js';
 import { OpenHandsCodingSpecialistError } from './coding-specialist-provider.js';
+import { normalizeResourceBudgetV1 } from './resource-budget-governor.js';
 
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
@@ -115,7 +116,9 @@ const SPECIALIST_AUTOMATION_CLAIM_ADMISSION_KEYS = new Set([
 ]);
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
-const SPECIALIST_AUTOMATION_POLICY_SET_KEYS = new Set(['expectedRevision', 'enabled', 'maxConcurrentHandoffs']);
+const SPECIALIST_AUTOMATION_POLICY_SET_KEYS = new Set(['expectedRevision', 'enabled']);
+const LEGACY_SPECIALIST_AUTOMATION_POLICY_KEYS = new Set(['schemaVersion', 'revision', 'enabled', 'maxConcurrentHandoffs', 'updatedAt']);
+const OWNER_RESOURCE_BUDGET_SET_KEYS = new Set(['expectedRevision', 'budget']);
 const SPECIALIST_AUTOMATION_POLICY_CLEAR_KEYS = new Set(['expectedRevision']);
 const SPECIALIST_READINESS_DEPENDENCY_KEYS = new Set(['specialistProviderReadinessResolver']);
 const SPECIALIST_PROVIDER_EXECUTE_KEYS = new Set(['agentId', 'conversationId', 'expectedControlEpoch', 'at']);
@@ -490,7 +493,13 @@ function normalizePersistedSpecialistAutomationClaimAdmissions(raw) {
 
 function pruneSpecialistAutomationClaimAdmissions(store) {
   const live = Object.create(null);
+  const policy = store.specialistAutomationPolicy;
+  const policyBindingKey = policy?.enabled === true ? JSON.stringify(policy) : '';
   for (const [key, admission] of Object.entries(store.specialistAutomationClaimAdmissionsByKey || {})) {
+    if (!policy
+        || policy.enabled !== true
+        || admission.policyRevision !== policy.revision
+        || admission.policyBindingKey !== policyBindingKey) continue;
     const job = store.byId?.[admission.jobId];
     const assignment = (job?.runtime?.specialistHandoffs || []).find(item =>
       item?.agentId === admission.agentId
@@ -529,7 +538,33 @@ function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevisio
   }
   try {
     if (!revisionIsValid) throw new Error('Specialist automation policy revision tombstone is invalid');
-    const policy = normalizeSpecialistAutomationPolicyV1(rawPolicy);
+    let policy;
+    try {
+      policy = normalizeSpecialistAutomationPolicyV1(rawPolicy);
+    } catch (error) {
+      // Schema v1 originally carried product-wide numeric capacity. Migrate only
+      // that exact historical shape to the gate-only policy; the numeric value
+      // grants no authority. ResourceBudgetV1 remains independently fail-closed.
+      const legacy = snapshotExactOwnDataRequest(
+        rawPolicy,
+        LEGACY_SPECIALIST_AUTOMATION_POLICY_KEYS,
+        'Legacy Specialist automation policy',
+      );
+      const legacyCapacity = legacy.maxConcurrentHandoffs;
+      if (typeof legacyCapacity !== 'number'
+          || !Number.isSafeInteger(legacyCapacity)
+          || Object.is(legacyCapacity, -0)
+          || legacyCapacity < 0
+          || legacyCapacity > 256) {
+        throw error;
+      }
+      policy = normalizeSpecialistAutomationPolicyV1({
+        schemaVersion: legacy.schemaVersion,
+        revision: legacy.revision,
+        enabled: legacy.enabled,
+        updatedAt: legacy.updatedAt,
+      });
+    }
     const durableRevision = hasRevision ? revision : policy.revision;
     if (durableRevision !== policy.revision) {
       throw new Error('Specialist automation policy revision drifted from durable tombstone');
@@ -538,6 +573,26 @@ function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevisio
   } catch {
     return { policy: null, revision, quarantined: true };
   }
+}
+
+function normalizePersistedOwnerResourceBudgetState(rawBudget, rawRevision, rawQuarantined) {
+  let quarantined = rawQuarantined === true;
+  let revision = 0;
+  if (rawRevision !== undefined) {
+    try {
+      revision = nonNegativeSafeInteger(rawRevision, 'Stored owner resource budget revision');
+    } catch {
+      quarantined = true;
+    }
+  }
+  let budget;
+  try {
+    budget = normalizeResourceBudgetV1(rawBudget === undefined ? {} : rawBudget);
+  } catch {
+    budget = normalizeResourceBudgetV1({});
+    quarantined = true;
+  }
+  return { budget, revision, quarantined };
 }
 
 function specialistProviderConfigHasLiveExecution(store, providerId, at) {
@@ -674,6 +729,9 @@ function freshStore() {
     specialistAutomationPolicyRevision: 0,
     specialistAutomationPolicyQuarantined: false,
     specialistAutomationClaimAdmissionsByKey: Object.create(null),
+    ownerResourceBudget: normalizeResourceBudgetV1({}),
+    ownerResourceBudgetRevision: 0,
+    ownerResourceBudgetQuarantined: false,
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -892,6 +950,7 @@ function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
   for (const [field, expected] of [
     ['registryId', canonical.registryId],
     ['registryRevision', canonical.registryRevision],
+    ['registryBindingKey', canonical.registryBindingKey],
     ['specialistId', canonical.specialistId],
     ['providerId', canonical.providerId],
     ['definitionRevision', canonical.definitionRevision],
@@ -904,13 +963,17 @@ function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
   if (readinessOwnData(readiness, 'executable') !== true) {
     throw new Error('Selected Specialist provider is not currently executable');
   }
+  const observedAt = readinessOwnData(readiness, 'observedAt');
   const resolvedAt = readinessOwnData(readiness, 'resolvedAt');
   const maxAgeMs = readinessOwnData(readiness, 'maxAgeMs');
+  const observedMs = typeof observedAt === 'string' ? Date.parse(observedAt) : NaN;
   const resolvedMs = typeof resolvedAt === 'string' ? Date.parse(resolvedAt) : NaN;
-  if (!Number.isFinite(resolvedMs) || new Date(resolvedMs).toISOString() !== resolvedAt
+  if (!Number.isFinite(observedMs) || new Date(observedMs).toISOString() !== observedAt
+      || !Number.isFinite(resolvedMs) || new Date(resolvedMs).toISOString() !== resolvedAt
       || !Number.isSafeInteger(maxAgeMs) || Object.is(maxAgeMs, -0)
       || maxAgeMs < 1 || maxAgeMs > 5 * 60_000
-      || !Number.isSafeInteger(nowMs) || nowMs < resolvedMs || nowMs - resolvedMs > maxAgeMs) {
+      || !Number.isSafeInteger(nowMs)
+      || observedMs > resolvedMs || resolvedMs > nowMs || nowMs - observedMs > maxAgeMs) {
     throw new Error('Trusted Specialist provider readiness expired before claim');
   }
   return readiness;
@@ -938,6 +1001,20 @@ function assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admissio
   });
 }
 
+
+function productWideSpecialistCapacityOwnerships(store) {
+  const ownerships = (store.order || [])
+    .flatMap(jobId => store.byId?.[jobId]?.runtime?.specialistExecutionOwnerships || [])
+    .map(normalizeExecutionOwnershipV1);
+  const effectIds = new Set();
+  for (const ownership of ownerships) {
+    if (effectIds.has(ownership.effectId)) {
+      throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
+    }
+    effectIds.add(ownership.effectId);
+  }
+  return ownerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
+}
 
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
   const profile = job?.specialistDelegationBinding?.profile;
@@ -1215,6 +1292,14 @@ function normalizeStore(raw, now) {
   out.specialistAutomationClaimAdmissionsByKey = normalizePersistedSpecialistAutomationClaimAdmissions(
     raw.specialistAutomationClaimAdmissionsByKey,
   );
+  const ownerResourceBudgetState = normalizePersistedOwnerResourceBudgetState(
+    raw.ownerResourceBudget,
+    raw.ownerResourceBudgetRevision,
+    raw.ownerResourceBudgetQuarantined,
+  );
+  out.ownerResourceBudget = ownerResourceBudgetState.budget;
+  out.ownerResourceBudgetRevision = ownerResourceBudgetState.revision;
+  out.ownerResourceBudgetQuarantined = ownerResourceBudgetState.quarantined;
   return out;
 }
 
@@ -1567,7 +1652,6 @@ export class BrowserAgentManager {
     const prepared = createSpecialistAutomationPolicyV1({
       revision: 1,
       enabled: request.enabled,
-      maxConcurrentHandoffs: request.maxConcurrentHandoffs,
       updatedAt: new Date(this.now()).toISOString(),
     });
     let committed = null;
@@ -1590,7 +1674,6 @@ export class BrowserAgentManager {
       committed = createSpecialistAutomationPolicyV1({
         revision: currentRevision + 1,
         enabled: prepared.enabled,
-        maxConcurrentHandoffs: prepared.maxConcurrentHandoffs,
         updatedAt,
       });
       store.specialistAutomationPolicy = committed;
@@ -1688,6 +1771,59 @@ export class BrowserAgentManager {
       }
     }
     return { candidates };
+  }
+
+  async getOwnerResourceBudget() {
+    const store = await this.load();
+    return {
+      budget: clone(store.ownerResourceBudget),
+      revision: store.ownerResourceBudgetRevision,
+      quarantined: store.ownerResourceBudgetQuarantined === true,
+    };
+  }
+
+  async setOwnerResourceBudget(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      OWNER_RESOURCE_BUDGET_SET_KEYS,
+      'Browser Agent owner resource budget set request',
+    );
+    for (const key of OWNER_RESOURCE_BUDGET_SET_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent owner resource budget set request requires ${key}`);
+      }
+    }
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Owner resource budget expectedRevision',
+    );
+    const prepared = normalizeResourceBudgetV1(request.budget);
+    let committed = null;
+    await this.update(store => {
+      if (store.ownerResourceBudgetQuarantined === true) {
+        throw new Error('Owner resource budget is quarantined as corrupt and cannot authorize mutation');
+      }
+      const currentRevision = nonNegativeSafeInteger(
+        store.ownerResourceBudgetRevision,
+        'Owner resource budget current revision',
+      );
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Owner resource budget revision drifted before update');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Owner resource budget revision cannot advance');
+      }
+      store.ownerResourceBudget = prepared;
+      store.ownerResourceBudgetRevision = currentRevision + 1;
+      store.ownerResourceBudgetQuarantined = false;
+      committed = {
+        budget: clone(prepared),
+        revision: store.ownerResourceBudgetRevision,
+        quarantined: false,
+      };
+      return store;
+    });
+    return committed;
   }
 
   async listSpecialistProviderConfigs() {
@@ -2669,9 +2805,24 @@ export class BrowserAgentManager {
           );
         }
       }
+      const ownerBudget = normalizeResourceBudgetV1(store.ownerResourceBudget || {});
+      const ownerLimit = store.ownerResourceBudgetQuarantined === true
+        ? 0
+        : Math.min(256, ownerBudget.maxConcurrentAgents);
+      const productCapacityObligations = productWideSpecialistCapacityOwnerships(store).length;
+      const productAvailableSlots = Math.max(0, ownerLimit - productCapacityObligations);
+      const globallyBoundRequest = { ...request, at };
+      if (Number.isSafeInteger(globallyBoundRequest.availableSlots)
+          && !Object.is(globallyBoundRequest.availableSlots, -0)
+          && globallyBoundRequest.availableSlots >= 0) {
+        globallyBoundRequest.availableSlots = Math.min(
+          globallyBoundRequest.availableSlots,
+          productAvailableSlots,
+        );
+      }
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
       const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
-      const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
+      const boundedRequest = boundSpecialistClaimRequestForJob(job, globallyBoundRequest, capacityObligations);
       const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
         ...boundedRequest,
         executionOwnerships: currentOwnerships,
@@ -2721,9 +2872,7 @@ export class BrowserAgentManager {
       revision: policy.revision,
       bindingKey: JSON.stringify(policy),
     });
-    const claimed = await this.#claimSpecialistHandoffsAcrossJobs({
-      maxConcurrentHandoffs: policy.maxConcurrentHandoffs,
-    }, dependencies, fence);
+    const claimed = await this.#claimSpecialistHandoffsAcrossJobs({}, dependencies, fence);
     return {
       kind: 'AUTOMATION_CLAIM',
       policy: clone(policy),
@@ -2753,9 +2902,15 @@ export class BrowserAgentManager {
         }
       }
     }
-    const limit = request.maxConcurrentHandoffs;
-    if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
-      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    const requestedLimit = Object.hasOwn(request, 'maxConcurrentHandoffs')
+      ? request.maxConcurrentHandoffs
+      : 256;
+    if (typeof requestedLimit !== 'number'
+        || !Number.isSafeInteger(requestedLimit)
+        || Object.is(requestedLimit, -0)
+        || requestedLimit < 0
+        || requestedLimit > 256) {
+      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256 when supplied');
     }
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
@@ -2777,19 +2932,18 @@ export class BrowserAgentManager {
         }
       }
       const automationClaims = pruneSpecialistAutomationClaimAdmissions(store);
+      const ownerBudget = normalizeResourceBudgetV1(store.ownerResourceBudget || {});
+      const ownerBudgetRevision = nonNegativeSafeInteger(
+        store.ownerResourceBudgetRevision,
+        'Owner resource budget current revision',
+      );
+      const ownerLimit = store.ownerResourceBudgetQuarantined === true
+        ? 0
+        : Math.min(256, ownerBudget.maxConcurrentAgents);
+      const limit = Math.min(requestedLimit, ownerLimit);
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
-      const specialistOwnerships = store.order
-        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
-        .map(normalizeExecutionOwnershipV1);
-      const effectIds = new Set();
-      for (const ownership of specialistOwnerships) {
-        if (effectIds.has(ownership.effectId)) {
-          throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
-        }
-        effectIds.add(ownership.effectId);
-      }
-      const capacityOwnerships = specialistOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
+      const capacityOwnerships = productWideSpecialistCapacityOwnerships(store);
       let remaining = Math.max(0, limit - capacityOwnerships.length);
       const claimed = [];
       const reconciliationRequired = [];
@@ -2858,6 +3012,10 @@ export class BrowserAgentManager {
       }
       result = {
         maxConcurrentHandoffs: limit,
+        requestedMaxConcurrentHandoffs: requestedLimit,
+        ownerMaxConcurrentAgents: ownerLimit,
+        ownerResourceBudgetRevision: ownerBudgetRevision,
+        ownerResourceBudgetQuarantined: store.ownerResourceBudgetQuarantined === true,
         activeLeases: liveLeases.length,
         capacityObligations: capacityOwnerships.length,
         remainingSlots: remaining,
