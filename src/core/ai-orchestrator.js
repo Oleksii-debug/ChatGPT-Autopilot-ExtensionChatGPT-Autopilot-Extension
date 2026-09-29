@@ -112,6 +112,22 @@ function snapshotProviderReservationReceipt(value) {
   return Object.freeze(snapshot);
 }
 
+function assertProviderReservationSettlement(value) {
+  if (value == null || (typeof value !== 'object' && typeof value !== 'function')) return;
+  const descriptor = Object.getOwnPropertyDescriptor(value, 'settled');
+  if (!descriptor) return;
+  if (!Object.hasOwn(descriptor, 'value')) {
+    const error = new Error('AI provider-call lifecycle settlement status must be an own data property');
+    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
+    throw error;
+  }
+  if (descriptor.value !== true) {
+    const error = new Error('AI provider-call lifecycle did not settle the durable budget reservation');
+    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
+    throw error;
+  }
+}
+
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
   const model = clean(raw?.model);
@@ -345,13 +361,14 @@ export class AiOrchestrator {
       } catch (error) {
         if (lifecycle) {
           try {
-            await lifecycle.afterProviderCall({
+            const settlement = await lifecycle.afterProviderCall({
               context: providerCallBudgetContext,
               reservation,
               route: routeIdentity,
               ok: false,
               error,
             });
+            assertProviderReservationSettlement(settlement);
           } catch (settlementError) {
             throw attachNonProviderFailureRuntime(settlementError);
           }
@@ -360,13 +377,14 @@ export class AiOrchestrator {
       }
       if (lifecycle) {
         try {
-          await lifecycle.afterProviderCall({
+          const settlement = await lifecycle.afterProviderCall({
             context: providerCallBudgetContext,
             reservation,
             route: routeIdentity,
             ok: true,
             result: value,
           });
+          assertProviderReservationSettlement(settlement);
         } catch (settlementError) {
           throw attachNonProviderFailureRuntime(settlementError);
         }
