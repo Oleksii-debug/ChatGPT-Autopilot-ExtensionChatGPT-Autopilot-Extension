@@ -27,6 +27,35 @@ const DELETABLE_STATES = new Set([RunState.STOPPED, RunState.PAUSED, RunState.ER
 const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns one of these ChatGPT conversations';
 
+const OUTCOME_LIST_PAYLOAD_KEYS = new Set(['projectId']);
+const OUTCOME_GET_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
+const OUTCOME_CREATE_PAYLOAD_KEYS = new Set(['contract']);
+const OUTCOME_UPDATE_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision', 'contract']);
+const OUTCOME_DELETE_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
+
+function snapshotExactOutcomeCommandPayload(payload, allowedKeys, label) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(payload);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(payload);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
+}
+
 const AI_ROUTER_OVERRIDE_MODES = new Set(['primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
 const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
@@ -674,45 +703,70 @@ export class CoreCommandDispatcher {
   }
   async execute(command, payload = {}, internal = {}) {
     if (command === CoreCommand.LIST_OUTCOME_CONTRACTS) {
+      const exactPayload = snapshotExactOutcomeCommandPayload(
+        payload,
+        OUTCOME_LIST_PAYLOAD_KEYS,
+        'OutcomeContract LIST command payload',
+      );
       const state = await this.repo.load();
-      return { contracts: structuredClone(listStoredOutcomeContractsV1(state, { projectId: payload.projectId })) };
+      return { contracts: structuredClone(listStoredOutcomeContractsV1(state, { projectId: exactPayload.projectId })) };
     }
     if (command === CoreCommand.GET_OUTCOME_CONTRACT) {
+      const exactPayload = snapshotExactOutcomeCommandPayload(
+        payload,
+        OUTCOME_GET_PAYLOAD_KEYS,
+        'OutcomeContract GET command payload',
+      );
       const state = await this.repo.load();
       return { contract: structuredClone(resolveStoredOutcomeContractV1(state, {
-        projectId: payload.projectId,
-        contractId: payload.contractId,
-        expectedRevision: payload.expectedRevision,
+        projectId: exactPayload.projectId,
+        contractId: exactPayload.contractId,
+        expectedRevision: exactPayload.expectedRevision,
       })) };
     }
     if (command === CoreCommand.CREATE_OUTCOME_CONTRACT) {
+      const exactPayload = snapshotExactOutcomeCommandPayload(
+        payload,
+        OUTCOME_CREATE_PAYLOAD_KEYS,
+        'OutcomeContract CREATE command payload',
+      );
       let created;
       await this.repo.update(draft => {
-        created = createStoredOutcomeContractV1(draft, payload.contract);
+        created = createStoredOutcomeContractV1(draft, exactPayload.contract);
         return draft;
       });
       return { contract: structuredClone(created) };
     }
     if (command === CoreCommand.UPDATE_OUTCOME_CONTRACT) {
+      const exactPayload = snapshotExactOutcomeCommandPayload(
+        payload,
+        OUTCOME_UPDATE_PAYLOAD_KEYS,
+        'OutcomeContract UPDATE command payload',
+      );
       let updated;
       await this.repo.update(draft => {
         updated = updateStoredOutcomeContractV1(draft, {
-          projectId: payload.projectId,
-          contractId: payload.contractId,
-          expectedRevision: payload.expectedRevision,
-          contract: payload.contract,
+          projectId: exactPayload.projectId,
+          contractId: exactPayload.contractId,
+          expectedRevision: exactPayload.expectedRevision,
+          contract: exactPayload.contract,
         });
         return draft;
       });
       return { contract: structuredClone(updated) };
     }
     if (command === CoreCommand.DELETE_OUTCOME_CONTRACT) {
+      const exactPayload = snapshotExactOutcomeCommandPayload(
+        payload,
+        OUTCOME_DELETE_PAYLOAD_KEYS,
+        'OutcomeContract DELETE command payload',
+      );
       let deleted;
       await this.repo.update(draft => {
         deleted = deleteStoredOutcomeContractV1(draft, {
-          projectId: payload.projectId,
-          contractId: payload.contractId,
-          expectedRevision: payload.expectedRevision,
+          projectId: exactPayload.projectId,
+          contractId: exactPayload.contractId,
+          expectedRevision: exactPayload.expectedRevision,
         });
         return draft;
       });
