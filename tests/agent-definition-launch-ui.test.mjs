@@ -56,7 +56,7 @@ test('definition launch uses the canonical create command and never auto-starts 
   assert.doesNotMatch(body, /RUN_BROWSER_AGENT_NOW/u);
   assert.doesNotMatch(body, /assertBrowserAgentRouteReadyForLaunch/u);
   assert.match(body, /runState !== 'STOPPED'/u);
-  assert.match(body, /loadBrowserAgentJobs\(\{ selectId: id \}\)/u);
+  assert.match(body, /loadBrowserAgentJobs\(\{ selectId: createdId \}\)/u);
 });
 
 test('definition launch request carries exact registry content binding to Core', () => {
