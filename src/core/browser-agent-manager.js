@@ -442,6 +442,12 @@ function specialistProviderConfigHasLiveExecution(store, providerId, at) {
       if (!ownership) return true;
 
       if ([ExecutionOwnershipState.AVAILABLE, ExecutionOwnershipState.VERIFIED].includes(ownership.state)) {
+        const assignment = (runtime?.specialistHandoffs || []).find(candidate =>
+          candidate?.agentId === execution.agentId);
+        const resolvedPair = ownership.state === ExecutionOwnershipState.AVAILABLE
+          ? assignment?.state === 'READY' && !assignment?.leaseId && !assignment?.leaseExpiresAt
+          : assignment?.state === 'COMPLETED';
+        if (!resolvedPair) return true;
         // Canonical trusted reconciliation/verification released this effect
         // identity. The old provider record remains audit history only.
         continue;
