@@ -192,6 +192,8 @@ test('prepares exact canonical provider identity only after fresh bound ranking'
     endpointId: '',
   });
   assert.deepEqual(result.availableRouteIds, ['route.b', 'route.a']);
+  assert.deepEqual(result.capabilityIds, ['cap.reason']);
+  assert.equal(result.preparedAt, 1790620000000);
   assert.equal(result.definitionRevision, 4);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.route), true);
@@ -208,6 +210,7 @@ test('child dispatch forwards exact owner-current parent policy provenance', () 
   }));
 
   assert.equal(result.routeId, 'route.b');
+  assert.equal(result.parentModelPolicyBindingKey, parentBinding.bindingKey);
 
   assert.throws(
     () => createBoundAgentModelRouteDispatchIntentV1(request({
@@ -312,4 +315,43 @@ test('dispatch intent grants no provider, execution, credential or route-selecti
   assert.equal(result.authority.executionAuthorized, false);
   assert.equal(result.authority.requiresCanonicalAiOrchestrator, true);
   assert.equal(result.authority.requiresProviderCallLifecycleRevalidation, true);
+});
+
+
+test('dispatch capability provenance is dense data-only and duplicate-free', () => {
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({
+      capabilityIds: ['cap.reason', 'cap.reason'],
+    })),
+    /contains duplicates/u,
+  );
+
+  let reads = 0;
+  const capabilities = ['cap.reason'];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'cap.reason';
+    },
+  });
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({ capabilityIds: capabilities })),
+    /contains an invalid value/u,
+  );
+  assert.equal(reads, 0);
+});
+
+test('dispatch preparation requires canonical explicit time', () => {
+  const missing = request();
+  delete missing.now;
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(missing),
+    /dispatch now is required/u,
+  );
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({ now: -0 })),
+    /dispatch now is invalid/u,
+  );
 });

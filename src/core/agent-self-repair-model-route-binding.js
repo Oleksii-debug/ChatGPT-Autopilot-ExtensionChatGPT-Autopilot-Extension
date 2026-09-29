@@ -10,6 +10,9 @@ import {
 import {
   createBoundAgentModelRouteDispatchIntentV1,
 } from './agent-model-route-dispatch-intent.js';
+import {
+  createBoundAgentModelOrchestratorEnvelopeV1,
+} from './agent-model-orchestrator-envelope.js';
 
 export const AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_VERSION = 1;
 
@@ -52,6 +55,28 @@ export const AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY = Object.freeze(
   requiresProviderCallLifecycleRevalidation: true,
 });
 
+export const AGENT_SELF_REPAIR_MODEL_ORCHESTRATOR_BINDING_AUTHORITY = Object.freeze({
+  advisoryOnly: true,
+  orchestratorEnvelopeOnly: true,
+  routeSelectionAuthorized: false,
+  orchestratorInvocationAuthorized: false,
+  providerCallAuthorized: false,
+  credentialAccessAuthorized: false,
+  modelDispatchAuthorized: false,
+  executionAuthorized: false,
+  policyAuthorized: false,
+  persistenceAuthorized: false,
+  schedulingAuthorized: false,
+  recoveryAuthorized: false,
+  completionAuthorized: false,
+  verificationAuthorized: false,
+  requiresCurrentSelfRepairBinding: true,
+  requiresCurrentAgentPolicyBinding: true,
+  requiresCurrentRouterPolicy: true,
+  requiresCanonicalAiOrchestrator: true,
+  requiresProviderCallLifecycleRevalidation: true,
+});
+
 const INPUT_KEYS = new Set([
   'selfRepairModelIntent',
   'currentSelfRepairModelBindingKey',
@@ -71,6 +96,13 @@ const INPUT_KEYS = new Set([
 const DISPATCH_INPUT_KEYS = new Set([
   ...INPUT_KEYS,
   'expectedPreferredRouteId',
+]);
+
+const ORCHESTRATOR_INPUT_KEYS = new Set([
+  ...DISPATCH_INPUT_KEYS,
+  'currentRouterSettings',
+  'currentRouterRuntime',
+  'currentNow',
 ]);
 
 const ACTIVE_WORK_KINDS = new Set([
@@ -231,6 +263,9 @@ export function createBoundAgentSelfRepairModelDispatchV1(input) {
     DISPATCH_INPUT_KEYS,
     'Bound Agent self-repair model dispatch request',
   );
+  if (!Object.hasOwn(raw, 'now')) {
+    throw new Error('Agent self-repair model dispatch requires explicit now');
+  }
 
   const candidateInput = Object.create(null);
   for (const key of INPUT_KEYS) {
@@ -269,8 +304,15 @@ export function createBoundAgentSelfRepairModelDispatchV1(input) {
   }
 
   const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1(dispatchInput);
+  const capabilityIdsMatch = dispatchIntent.capabilityIds.length
+      === boundCandidates.routeIntent.capabilityIds.length
+    && dispatchIntent.capabilityIds.every(
+      (capabilityId, index) => capabilityId === boundCandidates.routeIntent.capabilityIds[index],
+    );
   if (dispatchIntent.role !== boundCandidates.routeIntent.role
-      || dispatchIntent.requiresVision !== boundCandidates.routeIntent.requiresVision) {
+      || dispatchIntent.requiresVision !== boundCandidates.routeIntent.requiresVision
+      || !capabilityIdsMatch
+      || dispatchIntent.preparedAt !== own(raw, 'now')) {
     throw new Error('Agent self-repair dispatch intent drifted from durable route intent');
   }
 
@@ -292,5 +334,82 @@ export function createBoundAgentSelfRepairModelDispatchV1(input) {
     routePoolRevision: dispatchIntent.routePoolRevision,
     dispatchIntent,
     authority: AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY,
+  });
+}
+
+
+/**
+ * Compose current self-repair dispatch evidence into the canonical bounded
+ * AiOrchestrator envelope. This is still non-authorizing: the returned
+ * envelope cannot invoke a model or access credentials.
+ */
+export function createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(input) {
+  const raw = strictRecord(
+    input,
+    ORCHESTRATOR_INPUT_KEYS,
+    'Bound Agent self-repair model orchestrator request',
+  );
+
+  const dispatchInput = Object.create(null);
+  for (const key of DISPATCH_INPUT_KEYS) {
+    if (Object.hasOwn(raw, key)) dispatchInput[key] = raw[key];
+  }
+  const dispatchBinding = createBoundAgentSelfRepairModelDispatchV1(dispatchInput);
+
+  const orchestratorRequest = {
+    dispatchIntent: dispatchBinding.dispatchIntent,
+    currentDefinitionModelPolicyBindingKey: own(raw, 'currentDefinitionModelPolicyBindingKey'),
+    currentJobId: own(raw, 'currentJobId'),
+    currentProjectId: own(raw, 'currentProjectId'),
+    currentRoutePoolRevision: own(raw, 'currentRoutePoolRevision'),
+    currentRouterSettings: own(raw, 'currentRouterSettings'),
+    currentRouterRuntime: own(raw, 'currentRouterRuntime'),
+    currentNow: own(raw, 'currentNow'),
+  };
+  if (Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+    orchestratorRequest.currentParentModelPolicyBindingKey = own(
+      raw,
+      'currentParentModelPolicyBindingKey',
+    );
+  }
+  const orchestratorEnvelope = createBoundAgentModelOrchestratorEnvelopeV1(
+    orchestratorRequest,
+  );
+
+  const capabilitiesMatch = orchestratorEnvelope.capabilityIds.length
+      === dispatchBinding.routeIntent.capabilityIds.length
+    && orchestratorEnvelope.capabilityIds.every(
+      (capabilityId, index) => capabilityId === dispatchBinding.routeIntent.capabilityIds[index],
+    );
+  if (orchestratorEnvelope.jobId !== dispatchBinding.ownerId
+      || orchestratorEnvelope.role !== dispatchBinding.routeIntent.role
+      || orchestratorEnvelope.requiresVision !== dispatchBinding.routeIntent.requiresVision
+      || !capabilitiesMatch
+      || orchestratorEnvelope.definitionModelPolicyBindingKey
+        !== dispatchBinding.definitionModelPolicyBindingKey
+      || orchestratorEnvelope.modelPolicyBindingKey !== dispatchBinding.modelPolicyBindingKey
+      || orchestratorEnvelope.routePoolRevision !== dispatchBinding.routePoolRevision) {
+    throw new Error('Agent self-repair orchestrator envelope drifted from durable dispatch binding');
+  }
+
+  return freezeDeep({
+    schemaVersion: AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_VERSION,
+    selfRepairModelBindingKey: dispatchBinding.selfRepairModelBindingKey,
+    planId: dispatchBinding.planId,
+    jobId: dispatchBinding.jobId,
+    cycleId: dispatchBinding.cycleId,
+    workKind: dispatchBinding.workKind,
+    activeAttemptNumber: dispatchBinding.activeAttemptNumber,
+    nodeId: dispatchBinding.nodeId,
+    ownerId: dispatchBinding.ownerId,
+    executionPlane: dispatchBinding.executionPlane,
+    workBudget: dispatchBinding.workBudget,
+    routeIntent: dispatchBinding.routeIntent,
+    definitionModelPolicyBindingKey: dispatchBinding.definitionModelPolicyBindingKey,
+    modelPolicyBindingKey: dispatchBinding.modelPolicyBindingKey,
+    routePoolRevision: dispatchBinding.routePoolRevision,
+    dispatchBinding,
+    orchestratorEnvelope,
+    authority: AGENT_SELF_REPAIR_MODEL_ORCHESTRATOR_BINDING_AUTHORITY,
   });
 }

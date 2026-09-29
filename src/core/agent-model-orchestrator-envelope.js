@@ -2,6 +2,7 @@ import {
   normalizeAiRouterRuntime,
   normalizeAiRouterSettings,
 } from './ai-orchestrator.js';
+import { selectAiRouteCandidates } from './ai-route-pool.js';
 import {
   AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY,
 } from './agent-model-route-dispatch-intent.js';
@@ -11,15 +12,16 @@ export const AGENT_MODEL_ORCHESTRATOR_ENVELOPE_VERSION = 1;
 const INTENT_KEYS = new Set([
   'schemaVersion','jobId','projectId','registryId','registryRevision',
   'agentDefinitionId','definitionRevision','definitionModelPolicyBindingKey',
-  'modelPolicyBindingKey','routePoolRevision','role','requiresVision','routeId',
-  'route','eligibleRouteIds','availableRouteIds','retryAt','authority',
+  'modelPolicyBindingKey','parentModelPolicyBindingKey','routePoolRevision','role',
+  'capabilityIds','requiresVision','preparedAt','routeId','route',
+  'eligibleRouteIds','availableRouteIds','retryAt','authority',
 ]);
 const ROUTE_KEYS = new Set(['routeId','provider','model','endpointId']);
 const AUTH_KEYS = new Set(Object.keys(AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY));
 const INPUT_KEYS = new Set([
   'dispatchIntent','currentDefinitionModelPolicyBindingKey','currentJobId',
-  'currentProjectId','currentRoutePoolRevision','currentRouterSettings',
-  'currentRouterRuntime',
+  'currentProjectId','currentParentModelPolicyBindingKey','currentRoutePoolRevision','currentRouterSettings',
+  'currentRouterRuntime','currentNow',
 ]);
 
 function strictRecord(value, allowed, label) {
@@ -47,6 +49,40 @@ function exactString(value, label) {
   return value;
 }
 
+function exactTimestamp(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function exactCapabilityIds(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 64) {
+    throw new Error('dispatch intent capabilityIds must be a bounded array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+  if (Reflect.ownKeys(descriptors).some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error('dispatch intent capabilityIds must be a dense data-only array');
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    const item = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+    if (!descriptor || descriptor.enumerable !== true
+        || typeof item !== 'string' || item !== item.trim()
+        || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(item)) {
+      throw new Error('dispatch intent capabilityIds contains an invalid value');
+    }
+    out.push(item);
+  }
+  if (new Set(out).size !== out.length) throw new Error('dispatch intent capabilityIds contains duplicates');
+  return Object.freeze(out);
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -63,8 +99,16 @@ function normalizeIntent(value) {
   if (raw.schemaVersion !== 1) throw new Error('Unsupported Agent model route dispatch intent schemaVersion');
   const routeId = exactString(raw.routeId, 'dispatch intent routeId');
   if (route.routeId !== routeId) throw new Error('Agent model route dispatch intent route identity mismatch');
+  const capabilityIds = exactCapabilityIds(raw.capabilityIds);
+  const preparedAt = exactTimestamp(raw.preparedAt, 'dispatch intent preparedAt');
+  const parentModelPolicyBindingKey = raw.parentModelPolicyBindingKey === undefined
+    ? null
+    : exactString(raw.parentModelPolicyBindingKey, 'dispatch intent parentModelPolicyBindingKey');
   return {
     ...raw,
+    ...(parentModelPolicyBindingKey ? { parentModelPolicyBindingKey } : {}),
+    capabilityIds,
+    preparedAt,
     routeId,
     route: {
       routeId,
@@ -82,13 +126,31 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   const currentJobId = exactString(raw.currentJobId, 'currentJobId');
   const currentProjectId = exactString(raw.currentProjectId, 'currentProjectId');
   const currentRoutePoolRevision = exactInteger(raw.currentRoutePoolRevision, 'currentRoutePoolRevision');
+  const currentNow = exactTimestamp(raw.currentNow, 'currentNow');
+  if (currentNow < intent.preparedAt) {
+    throw new Error('currentNow cannot precede dispatch intent preparedAt');
+  }
 
   if (intent.definitionModelPolicyBindingKey !== currentBindingKey) throw new Error('Dispatch intent owner binding is stale');
   if (intent.jobId !== currentJobId) throw new Error('Dispatch intent job identity is stale');
   if (intent.projectId !== currentProjectId) throw new Error('Dispatch intent Project identity is stale');
   if (intent.routePoolRevision !== currentRoutePoolRevision) throw new Error('Dispatch intent route-pool revision is stale');
 
+  if (intent.parentModelPolicyBindingKey) {
+    const currentParentBindingKey = exactString(
+      raw.currentParentModelPolicyBindingKey,
+      'currentParentModelPolicyBindingKey',
+    );
+    if (intent.parentModelPolicyBindingKey !== currentParentBindingKey) {
+      throw new Error('Dispatch intent parent model-policy binding is stale');
+    }
+  } else if (Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+    throw new Error('Root dispatch intent must not supply current parent model-policy provenance');
+  }
+
   const settings = normalizeAiRouterSettings(raw.currentRouterSettings);
+  if (settings.enabled !== true) throw new Error('Canonical AI Router is disabled');
+  const runtime = normalizeAiRouterRuntime(raw.currentRouterRuntime);
   const route = settings.routes.find(item => item.routeId === intent.routeId);
   if (!route) throw new Error('Dispatch intent route is missing from current canonical Router settings');
   if (route.provider !== intent.route.provider
@@ -97,9 +159,30 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
     throw new Error('Dispatch intent provider identity drifted from current canonical Router settings');
   }
 
+  const currentSelection = selectAiRouteCandidates({
+    routes: settings.routes,
+    policy: settings.routePolicy,
+    routeStates: runtime.routeStates,
+    role: intent.role,
+    capabilityIds: intent.capabilityIds,
+    requiresVision: intent.requiresVision,
+    now: currentNow,
+  });
+  if (!currentSelection.candidates.some(candidate => candidate.routeId === route.routeId)) {
+    throw new Error('Dispatch intent route is not currently authorized by canonical Router policy/state');
+  }
+
+  const routeWorkerCount = settings.workerPolicy.manualRouteWorkers?.[route.routeId];
+  const scopedWorkerPolicy = {
+    ...settings.workerPolicy,
+    manualRouteWorkers: routeWorkerCount === undefined
+      ? {}
+      : { [route.routeId]: routeWorkerCount },
+  };
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
     routes: [route],
+    workerPolicy: scopedWorkerPolicy,
     routePolicy: {
       ...settings.routePolicy,
       autoSwitch: false,
@@ -110,7 +193,6 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
     },
   });
 
-  const runtime = normalizeAiRouterRuntime(raw.currentRouterRuntime);
   const routeState = runtime.routeStates?.[route.routeId];
   const scopedRuntime = {
     ...runtime,
@@ -125,7 +207,15 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
     projectId: intent.projectId,
     definitionModelPolicyBindingKey: intent.definitionModelPolicyBindingKey,
     modelPolicyBindingKey: intent.modelPolicyBindingKey,
+    ...(intent.parentModelPolicyBindingKey ? {
+      parentModelPolicyBindingKey: intent.parentModelPolicyBindingKey,
+    } : {}),
     routePoolRevision: intent.routePoolRevision,
+    role: intent.role,
+    capabilityIds: [...intent.capabilityIds],
+    requiresVision: intent.requiresVision,
+    preparedAt: intent.preparedAt,
+    revalidatedAt: currentNow,
     routeId: route.routeId,
     settings: scopedSettings,
     runtime: scopedRuntime,
