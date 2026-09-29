@@ -1195,6 +1195,9 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+      if (job.definitionSelection != null) {
+        throw new Error('Reusable Agent definition-bound jobs are immutable; create a new job from the current definition');
+      }
 
       let nextProjectId = job.config.projectId || '';
       if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
