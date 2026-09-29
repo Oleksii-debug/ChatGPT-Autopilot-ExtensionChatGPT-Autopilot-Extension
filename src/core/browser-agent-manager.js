@@ -1598,26 +1598,31 @@ export class BrowserAgentManager {
   }
 
   executeClaimedSpecialistProvider(id, payload = {}) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      SPECIALIST_PROVIDER_EXECUTE_KEYS,
-      'Browser Agent Specialist provider execute request',
-    );
-    for (const key of ['agentId', 'conversationId', 'expectedControlEpoch']) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider execute request requires ${key}`);
+    let request;
+    try {
+      request = snapshotExactOwnDataRequest(
+        payload,
+        SPECIALIST_PROVIDER_EXECUTE_KEYS,
+        'Browser Agent Specialist provider execute request',
+      );
+      for (const key of ['agentId', 'conversationId', 'expectedControlEpoch']) {
+        if (!Object.hasOwn(request, key)) {
+          throw new Error(`Browser Agent Specialist provider execute request requires ${key}`);
+        }
       }
-    }
-    if (typeof request.agentId !== 'string' || !request.agentId) {
-      throw new Error('Browser Agent Specialist provider execute agentId must be exact text');
-    }
-    if (typeof request.conversationId !== 'string' || !request.conversationId) {
-      throw new Error('Browser Agent Specialist provider execute conversationId must be exact text');
-    }
-    if (!Number.isSafeInteger(request.expectedControlEpoch)
-        || request.expectedControlEpoch < 0
-        || Object.is(request.expectedControlEpoch, -0)) {
-      throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
+      if (typeof request.agentId !== 'string' || !request.agentId) {
+        throw new Error('Browser Agent Specialist provider execute agentId must be exact text');
+      }
+      if (typeof request.conversationId !== 'string' || !request.conversationId) {
+        throw new Error('Browser Agent Specialist provider execute conversationId must be exact text');
+      }
+      if (!Number.isSafeInteger(request.expectedControlEpoch)
+          || request.expectedControlEpoch < 0
+          || Object.is(request.expectedControlEpoch, -0)) {
+        throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
+      }
+    } catch (error) {
+      return Promise.reject(error);
     }
     const inFlightKey = `specialist-provider:${id}:${request.agentId}:${request.conversationId}:${request.expectedControlEpoch}`;
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
