@@ -7,6 +7,7 @@ import {
   createProjectWorkspace,
   getProjectArtifactProvenance,
   projectCurrentState,
+  resolveProjectWorkspaceContextV1,
   putProjectArtifactProvenance,
   putProjectContextCapsule,
   replaceProjectSnapshot,
@@ -165,4 +166,185 @@ test('workspace lookup identities are string-only and persisted record prototype
   const poisoned = structuredClone(workspace);
   Object.setPrototypeOf(poisoned.projectsById, { hidden: true });
   assert.throws(() => validateProjectWorkspace(poisoned), /projectsById prototype/);
+});
+
+
+test('snapshot revision identity cannot be reused for semantically different content', () => {
+  const workspace = createProjectWorkspace(1);
+  const project = addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+
+  const replay = replaceProjectSnapshot(workspace, snapshot(), { nowMs: 50 });
+  assert.equal(replay, project);
+  assert.equal(project.updatedAt, 2);
+
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, { ...snapshot(), title: 'Substituted title' }, { nowMs: 51 }),
+    /revisionId cannot be reused for different content/,
+  );
+  assert.equal(project.snapshot.title, 'Project A');
+  assert.equal(project.snapshot.revisionId, 'project-r1');
+
+  const substitutedSource = snapshot();
+  substitutedSource.sourceRefs = [{
+    ...source(),
+    uri: 'https://github.com/acme/substituted',
+  }];
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, substitutedSource, { nowMs: 52 }),
+    /revisionId cannot be reused for different content/,
+  );
+  assert.equal(project.snapshot.sourceRefs[0].uri, 'https://github.com/acme/repo');
+});
+
+test('trusted context resolver returns only the exact current durable snapshot and current capsule', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+
+  const resolved = resolveProjectWorkspaceContextV1(workspace, {
+    projectId: 'project-a',
+    expectedProjectRevisionId: 'project-r1',
+    capsuleId: 'capsule-1',
+  });
+
+  assert.equal(resolved.workspaceRevision, 0);
+  assert.equal(resolved.projectId, 'project-a');
+  assert.equal(resolved.projectRevisionId, 'project-r1');
+  assert.equal(resolved.snapshot.revisionId, 'project-r1');
+  assert.equal(resolved.capsule.capsuleId, 'capsule-1');
+  assert.equal(resolved.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+  assert.equal(resolved.sourceAuthorityAuthenticated, false);
+  assert.equal(resolved.retrievalAuthorized, false);
+  assert.equal(resolved.executionAuthorized, false);
+  assert.equal(resolved.mutationAuthorized, false);
+  assert.equal(resolved.policyAuthority, false);
+  assert.equal(Object.isFrozen(resolved), true);
+  assert.equal(Object.isFrozen(resolved.snapshot), true);
+  assert.equal(Object.isFrozen(resolved.capsule), true);
+});
+
+test('trusted context resolver fails closed on stale revision, stale capsule and shaped lookup aliases', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: 'project-a',
+      expectedProjectRevisionId: 'project-r2',
+      capsuleId: 'capsule-1',
+    }),
+    /snapshot revision binding mismatch/,
+  );
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: ' project-a',
+      expectedProjectRevisionId: 'project-r1',
+    }),
+    /Invalid projectId/,
+  );
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: 'project-a',
+      expectedProjectRevisionId: 'project-r1',
+      unexpectedAuthority: true,
+    }),
+    /unknown field/,
+  );
+
+  replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 4 });
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: 'project-a',
+      expectedProjectRevisionId: 'project-r2',
+      capsuleId: 'capsule-1',
+    }),
+    /does not bind current project snapshot/,
+  );
+});
+
+test('repository context resolver snapshots caller identity before storage await and survives restart', async () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+
+  const data = { [PROJECT_WORKSPACE_STORAGE_KEY]: structuredClone(workspace) };
+  let releaseGet;
+  const gate = new Promise(resolve => { releaseGet = resolve; });
+  const chrome = {
+    data,
+    storage: {
+      local: {
+        async get(key) {
+          await gate;
+          return { [key]: structuredClone(data[key]) };
+        },
+        async set(value) {
+          Object.assign(data, structuredClone(value));
+        },
+      },
+    },
+  };
+  const repo = new ProjectWorkspaceRepository(chrome);
+  const request = {
+    projectId: 'project-a',
+    expectedProjectRevisionId: 'project-r1',
+    capsuleId: 'capsule-1',
+  };
+
+  const pending = repo.resolveContext(request);
+  request.projectId = 'project-other';
+  request.expectedProjectRevisionId = 'project-r999';
+  request.capsuleId = 'capsule-other';
+  releaseGet();
+
+  const resolved = await pending;
+  assert.equal(resolved.projectId, 'project-a');
+  assert.equal(resolved.projectRevisionId, 'project-r1');
+  assert.equal(resolved.capsule.capsuleId, 'capsule-1');
+
+  const restarted = new ProjectWorkspaceRepository(fakeChrome({
+    [PROJECT_WORKSPACE_STORAGE_KEY]: data[PROJECT_WORKSPACE_STORAGE_KEY],
+  }));
+  const afterRestart = await restarted.resolveContext({
+    projectId: 'project-a',
+    expectedProjectRevisionId: 'project-r1',
+    capsuleId: 'capsule-1',
+  });
+  assert.equal(afterRestart.snapshot.sourceRefs[0].sourceId, 'github-main');
+  assert.equal(afterRestart.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+});
+
+test('repository context resolver rejects accessor-backed requests before storage read', async () => {
+  let getterCalls = 0;
+  let storageReads = 0;
+  const chrome = {
+    storage: {
+      local: {
+        async get() {
+          storageReads += 1;
+          return {};
+        },
+        async set() {},
+      },
+    },
+  };
+  const repo = new ProjectWorkspaceRepository(chrome);
+  const request = {
+    expectedProjectRevisionId: 'project-r1',
+  };
+  Object.defineProperty(request, 'projectId', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'project-a';
+    },
+  });
+
+  await assert.rejects(
+    repo.resolveContext(request),
+    /enumerable own data properties/,
+  );
+  assert.equal(getterCalls, 0);
+  assert.equal(storageReads, 0);
 });
