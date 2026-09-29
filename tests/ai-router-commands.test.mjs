@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreCommandDispatcher } from '../src/core/commands.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 import { createEmptyState, validateState } from '../src/core/schema.js';
 
 class MemoryRepo {

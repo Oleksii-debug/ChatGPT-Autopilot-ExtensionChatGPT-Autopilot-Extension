@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
-import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
+import { AgentDefinitionRegistryMutationKind, createAgentDefinitionRegistryV1 } from '../src/core/agent-definition-registry.js';
 
 function makeChromeStorage() {
   const data = Object.create(null);
@@ -53,10 +53,10 @@ function definition(overrides = {}) {
       maxTotalTokens: 9000,
       maxOutputTokensPerCall: 1000,
       maxRuntimeMinutes: 20,
-      aiPinnedRouteId: 'route.research',
     },
     modelRoutePolicy: {
       autoSwitch: false,
+      pinnedRouteId: 'route.research',
       allowRouteIds: ['route.research'],
       freeOnly: true,
       locality: 'local',
@@ -84,19 +84,30 @@ function ownerBudget(overrides = {}) {
 }
 
 async function seedRegistry(manager, def = definition()) {
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
+}
+
+function defaultRegistryBindingKey() {
+  return createAgentDefinitionRegistryV1({
+    schemaVersion: 1,
+    registryId: 'agents:project-1',
+    revision: 2,
+    definitions: [definition()],
+  }).bindingKey;
 }
 
 function launchRequest(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: defaultRegistryBindingKey(),
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
     jobId: 'job.research-1',
@@ -122,7 +133,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.equal(created.job.config.projectId, 'project-1');
   assert.equal(created.job.config.maxSteps, 50, 'definition ceiling must narrow owner ceiling');
   assert.equal(created.job.config.maxModelCalls, 8);
-  assert.equal(created.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(created.job.config.aiPinnedRouteId, '');
   assert.match(created.job.config.goal, /^Reusable Agent definition instructions:/);
   assert.match(created.job.config.goal, /Owner task:\nCompare the current evidence/);
 
@@ -136,6 +147,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   });
   assert.deepEqual(created.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
@@ -154,7 +166,8 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.deepEqual(loaded.job.definitionScope.toolIds, ['browser.read']);
   assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
-  assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
+  assert.equal(loaded.job.config.aiPinnedRouteId, '');
 });
 
 test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
@@ -204,9 +217,11 @@ test('launch requires exact live registry and definition revisions at the serial
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -220,16 +235,18 @@ test('launch requires exact live registry and definition revisions at the serial
     () => manager.createFromAgentDefinition(launchRequest()),
     /registry revision drifted before launch/,
   );
+  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
     () => manager.createFromAgentDefinition(launchRequest({
       expectedRegistryRevision: 3,
+      expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
       expectedDefinitionRevision: 1,
     })),
     /definition revision drifted before launch/,
   );
-
   const current = await manager.createFromAgentDefinition(launchRequest({
     expectedRegistryRevision: 3,
+    expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
     expectedDefinitionRevision: 2,
     jobId: 'job.research-v2',
   }));
@@ -237,14 +254,32 @@ test('launch requires exact live registry and definition revisions at the serial
   assert.equal(current.job.definitionSelection.definitionRevision, 2);
 });
 
+test('definition launch rejects stale same-revision registry binding before materialization', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const live = await manager.getAgentDefinitionRegistry('agents:project-1');
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId: 'job.stale-binding',
+      expectedRegistryBindingKey: live.registry.bindingKey + ':stale',
+    })),
+    /bindingKey drifted before launch/,
+  );
+  assert.equal((await manager.get('job.stale-binding')).job, null);
+});
+
 test('a registry mutation queued before launch cannot be bypassed by stale launch expectations', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeQueuedUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   const mutation = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeQueuedUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -285,8 +320,11 @@ test('disabled definitions and duplicate job identity fail closed', async () => 
   const firstStore = makeChromeStorage();
   const disabledManager = managerFor(firstStore.chrome);
   await seedRegistry(disabledManager, definition({ enabled: false }));
+  const disabledRegistry = await disabledManager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
-    () => disabledManager.createFromAgentDefinition(launchRequest()),
+    () => disabledManager.createFromAgentDefinition(launchRequest({
+      expectedRegistryBindingKey: disabledRegistry.registry.bindingKey,
+    })),
     /missing or disabled/,
   );
 
@@ -390,7 +428,8 @@ test('definition-bound jobs reject generic config mutation that could bypass dur
   const reloaded = await manager.get('job.immutable-definition');
   assert.equal(reloaded.job.config.goal, created.job.config.goal);
   assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
-  assert.equal(reloaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(reloaded.job.config.aiPinnedRouteId, '');
+  assert.equal(reloaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
   assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
 });
