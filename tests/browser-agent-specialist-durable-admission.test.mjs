@@ -224,3 +224,162 @@ test('idempotent admission rejects changed bounded delegation proposal and prese
   assert.deepEqual(persisted.handoffs[0], first.assignment);
   assert.deepEqual(persisted.executionOwnerships[0], first.executionOwnership);
 });
+
+
+function trustedReadinessFor(selection, { executable = true, assertCurrent = async () => true } = {}) {
+  const now = new Date(Date.now()).toISOString();
+  return {
+    resolver: {
+      async resolve() {
+        return {
+          registryId: selection.registryId,
+          registryRevision: selection.registryRevision,
+          registryBindingKey: selection.registryBindingKey,
+          specialistId: selection.specialistId,
+          providerId: selection.providerId,
+          definitionRevision: selection.definitionRevision,
+          executionPlane: selection.executionPlane,
+          observedAt: now,
+          resolvedAt: now,
+          executable,
+          trustedResolverInvoked: true,
+          callerReadinessAccepted: false,
+        };
+      },
+      assertCurrent,
+    },
+  };
+}
+
+test('owner-bound claim requires trusted executable readiness and rechecks it inside serialized claim', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  const prepared = await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const claim = {
+    availableSlots: 1,
+    maxChildrenPerAgent: 1,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:06:00.000Z',
+  };
+
+  const denied = trustedReadinessFor(prepared.proposal.selection, { executable: false });
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', claim, {
+      specialistProviderReadinessResolver: denied.resolver,
+    }),
+    /not executable according to trusted readiness/,
+  );
+  let persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+
+  let currentChecks = 0;
+  const allowed = trustedReadinessFor(prepared.proposal.selection, {
+    assertCurrent: async () => { currentChecks += 1; return true; },
+  });
+  const claimed = await manager.claimSpecialistHandoffs('job.research', claim, {
+    specialistProviderReadinessResolver: allowed.resolver,
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(currentChecks, 1);
+  persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'LEASED');
+  assert.equal(persisted.executionOwnerships[0].state, 'OWNED');
+});
+
+test('owner-bound claim fails closed when durable provider readiness drifts before lease persistence', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  const prepared = await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const drifted = trustedReadinessFor(prepared.proposal.selection, {
+    assertCurrent: async () => { throw new Error('Specialist provider config changed after readiness probe'); },
+  });
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: drifted.resolver }),
+    /config changed after readiness probe/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('registry drift after durable selection blocks claim before lease authority is acquired', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  await manager.mutateSpecialistRegistry({
+    registryId: 'specialists:project-1',
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedRegistryBindingKey: registry.nextRegistry.bindingKey,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: specialistDefinition.specialistId,
+    expectedDefinitionRevision: 1,
+    definition: { ...specialistDefinition, enabled: false, definitionRevision: 2 },
+  });
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }),
+    /bindingKey drifted|selection registry identity, revision or bindingKey drifted/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('product-wide claim path cannot bypass owner-bound trusted readiness', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  const prepared = await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const denied = trustedReadinessFor(prepared.proposal.selection, { executable: false });
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: 2,
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: denied.resolver }),
+    /not executable according to trusted readiness/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
