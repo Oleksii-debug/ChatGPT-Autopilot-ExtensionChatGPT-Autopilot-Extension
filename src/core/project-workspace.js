@@ -346,7 +346,14 @@ function validateProjectRecord(project) {
 }
 
 export function createProjectWorkspace(nowMs = Date.now()) {
-  return { schemaVersion: PROJECT_WORKSPACE_SCHEMA_VERSION, revision: 0, createdAt: nowMs, updatedAt: nowMs, projectsById: {} };
+  const createdAt = timestamp(nowMs, 'project workspace createdAt');
+  return {
+    schemaVersion: PROJECT_WORKSPACE_SCHEMA_VERSION,
+    revision: 0,
+    createdAt,
+    updatedAt: createdAt,
+    projectsById: {},
+  };
 }
 
 export function validateProjectWorkspace(workspace) {
@@ -369,11 +376,12 @@ export function validateProjectWorkspace(workspace) {
 
 export function createProjectRecord(snapshot, { nowMs = Date.now() } = {}) {
   const normalized = normalizeProjectSnapshotV1(snapshot);
+  const createdAt = timestamp(nowMs, 'project workspace project createdAt');
   return {
     projectId: normalized.projectId,
     snapshot: normalized,
-    createdAt: nowMs,
-    updatedAt: nowMs,
+    createdAt,
+    updatedAt: createdAt,
     snapshotRevisionIds: [normalized.revisionId],
     capsulesById: {},
     provenanceByArtifactId: {},
@@ -430,6 +438,7 @@ export function addProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } =
 }
 
 export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
@@ -466,13 +475,14 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
 
   project.snapshotRevisionIds = [...revisionIds, normalized.revisionId];
   project.snapshot = normalized;
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   // Existing capsules and provenance remain intentionally visible. Their
   // revision bindings make them stale rather than silently re-authorizing them.
   return project;
 }
 
 export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
@@ -486,11 +496,12 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
   }
   if (Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
   setOwn(project.capsulesById, normalized.capsuleId, normalized);
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   return normalized;
 }
 
 export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeArtifactProvenanceV1(provenance);
   const project = requireProject(workspace, normalized.projectId);
@@ -505,7 +516,7 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   }
   if (Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
   setOwn(project.provenanceByArtifactId, artifactId, normalized);
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   return normalized;
 }
 
