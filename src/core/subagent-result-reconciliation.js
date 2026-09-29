@@ -31,6 +31,7 @@ export const SubagentResultReconciliationDecision = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const TASK_DISPATCH_IDENTITY = /^subagent-task:[a-f0-9]{64}$/u;
 const MAX_ROWS = 128;
 const REQUEST_KEYS = new Set([
   'resultEnvelope',
@@ -123,6 +124,13 @@ function own(value, key, label) {
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function exactTaskDispatchIdentity(value) {
+  if (typeof value !== 'string' || !TASK_DISPATCH_IDENTITY.test(value)) {
+    throw new Error('taskDispatchIdentity is invalid');
   }
   return value;
 }
@@ -455,9 +463,8 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
       own(raw, 'taskEnvelopeId', 'TrustedSubagentTaskActivationBindingV1'),
       'taskEnvelopeId',
     ),
-    taskDispatchIdentity: exactId(
+    taskDispatchIdentity: exactTaskDispatchIdentity(
       own(raw, 'taskDispatchIdentity', 'TrustedSubagentTaskActivationBindingV1'),
-      'taskDispatchIdentity',
     ),
     planId: exactId(own(raw, 'planId', 'TrustedSubagentTaskActivationBindingV1'), 'planId'),
     planRevision: exactInteger(

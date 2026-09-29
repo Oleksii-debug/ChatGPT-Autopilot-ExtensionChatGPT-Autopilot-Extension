@@ -1127,6 +1127,14 @@ test('task activation binding identity changes with exact task, plan and outcome
     }),
     /bindingId is not canonical/u,
   );
+  assert.throws(
+    () => normalizeTrustedSubagentTaskActivationBindingV1({
+      ...binding(),
+      taskDispatchIdentity: 'caller-chosen-task-fingerprint',
+      bindingId: canonicalBindingId({ taskDispatchIdentity: 'caller-chosen-task-fingerprint' }),
+    }),
+    /taskDispatchIdentity is invalid/u,
+  );
 
   const revised = normalizeTrustedSubagentTaskActivationBindingV1({
     ...binding(),
