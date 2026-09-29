@@ -343,7 +343,7 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
     throw new Error('Pinned model route ID одночасно заборонений deny policy.');
   }
 
-  return {
+  const out = {
     autoSwitch: policy.autoSwitch,
     pinnedRouteId: policy.pinnedRouteId,
     orderedRouteIds: [...policy.orderedRouteIds],
@@ -357,6 +357,26 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
     circuitBreakerFailures: policy.circuitBreakerFailures,
     circuitBreakerSeconds: policy.circuitBreakerSeconds,
   };
+
+  // The Options UI displays Router defaults for the three failover controls
+  // when an older persisted policy does not contain them. Saving an unrelated
+  // edit must not turn those display fallbacks into explicit child overrides:
+  // omission is what allows a child Agent to inherit stricter parent values.
+  // A new definition, an already-explicit field, or a non-default owner edit
+  // remains explicit and therefore continues through canonical validation.
+  if (persistedPolicy != null) {
+    for (const [key, defaultValue] of [
+      ['retryBackoffSeconds', 60],
+      ['circuitBreakerFailures', 2],
+      ['circuitBreakerSeconds', 300],
+    ]) {
+      if (!Object.hasOwn(persistedPolicy, key) && out[key] === defaultValue) {
+        delete out[key];
+      }
+    }
+  }
+
+  return out;
 }
 
 const AGENT_MODEL_ROUTE_POLICY_KEYS = new Set([
