@@ -419,21 +419,19 @@ test('Specialist automation policy owner surface is native, bounded and Core-aut
   for (const id of [
     'agent-specialist-automation-details',
     'agent-specialist-automation-enabled',
-    'agent-specialist-automation-capacity',
     'agent-specialist-automation-save-button',
     'agent-specialist-automation-clear-button',
     'agent-specialist-automation-status',
   ]) {
     assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
   }
-  has(/id="agent-specialist-automation-capacity" type="number" min="0" max="256" step="1" inputmode="numeric"/);
+  assert.doesNotMatch(html, /id="agent-specialist-automation-capacity"/, 'automation policy must not own numeric capacity');
+  has(/id="agent-owner-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric"/);
   has(/id="agent-specialist-automation-status" role="status"/);
   assert.match(js, /GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
   assert.match(js, /SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
   assert.match(js, /CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
   assert.match(js, /expectedRevision:\s*ui\.specialistAutomationPolicyRevision/);
-  assert.match(js, /Number\.isSafeInteger\(capacity\)[\s\S]*?capacity < 0 \|\| capacity > 256/);
-  assert.match(js, /agent-specialist-automation-capacity'\)\.focus\(\)/);
   assert.match(js, /enabled\.disabled = quarantined/);
   assert.match(js, /save\.disabled = quarantined/);
 });
