@@ -39,7 +39,7 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -615,9 +615,11 @@ function normalizeRuntime(raw, now) {
         if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
         const agentId = clean(item.agentId, 180);
         const selection = normalizeSpecialistSelectionV1(item.selection);
+        const handoff = normalizeSpecialistHandoffV1(item.handoff);
         const assignment = specialistHandoffs.find(candidate => candidate?.agentId === agentId);
-        if (!agentId || !assignment || assignment.specialistId !== selection.specialistId) return [];
-        return [{ agentId, selection }];
+        if (!agentId || !assignment || assignment.specialistId !== selection.specialistId
+            || handoff.specialistId !== selection.specialistId) return [];
+        return [{ agentId, selection, handoff }];
       } catch {
         return [];
       }
@@ -1375,6 +1377,7 @@ export class BrowserAgentManager {
       const selectionProvenance = Object.freeze({
         agentId: assignment.agentId,
         selection: normalizeSpecialistSelectionV1(proposal.selection),
+        handoff: normalizeSpecialistHandoffV1(proposal.binding.handoff),
       });
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
