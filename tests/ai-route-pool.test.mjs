@@ -828,3 +828,71 @@ test('route selection capability requirements reject present falsy aliases while
     );
   }
 });
+
+
+test('optional route and policy booleans reject present representation aliases while preserving exact defaults', () => {
+  const [defaults] = normalizeAiRoutePool([{
+    routeId:'boolean-defaults',
+    provider:'ollama',
+    model:'local',
+  }]);
+  assert.equal(defaults.enabled, true);
+  assert.equal(defaults.supportsVision, false);
+
+  const [explicit] = normalizeAiRoutePool([{
+    routeId:'boolean-explicit',
+    provider:'ollama',
+    model:'local',
+    enabled:false,
+    supportsVision:true,
+  }]);
+  assert.equal(explicit.enabled, false);
+  assert.equal(explicit.supportsVision, true);
+
+  const [undefinedRoute] = normalizeAiRoutePool([{
+    routeId:'boolean-undefined',
+    provider:'ollama',
+    model:'local',
+    enabled:undefined,
+    supportsVision:undefined,
+  }]);
+  assert.equal(undefinedRoute.enabled, true);
+  assert.equal(undefinedRoute.supportsVision, false);
+
+  for (const field of ['enabled', 'supportsVision']) {
+    for (const invalid of [0, 1, '', 'true', 'false', null]) {
+      assert.throws(
+        () => normalizeAiRoutePool([{
+          routeId:`invalid-boolean-${field}`,
+          provider:'ollama',
+          model:'local',
+          [field]:invalid,
+        }]),
+        new RegExp(`AI route 1 ${field} must be boolean`, 'u'),
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+
+  const defaultPolicy = normalizeAiRoutePolicy({});
+  assert.equal(defaultPolicy.autoSwitch, true);
+  assert.equal(defaultPolicy.freeOnly, false);
+
+  const explicitPolicy = normalizeAiRoutePolicy({ autoSwitch:false, freeOnly:true });
+  assert.equal(explicitPolicy.autoSwitch, false);
+  assert.equal(explicitPolicy.freeOnly, true);
+
+  const undefinedPolicy = normalizeAiRoutePolicy({ autoSwitch:undefined, freeOnly:undefined });
+  assert.equal(undefinedPolicy.autoSwitch, true);
+  assert.equal(undefinedPolicy.freeOnly, false);
+
+  for (const field of ['autoSwitch', 'freeOnly']) {
+    for (const invalid of [0, 1, '', 'true', 'false', null]) {
+      assert.throws(
+        () => normalizeAiRoutePolicy({ [field]:invalid }),
+        new RegExp(`AI route ${field} must be boolean`, 'u'),
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+});
