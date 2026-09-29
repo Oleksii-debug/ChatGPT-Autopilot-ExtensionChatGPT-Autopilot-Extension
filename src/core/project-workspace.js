@@ -121,14 +121,14 @@ function snapshotContextResolutionRequest(input) {
   if (!hasOwn(raw, 'expectedProjectRevisionId')) {
     throw new Error('Project workspace context resolution request is missing expectedProjectRevisionId');
   }
-  const capsuleId = hasOwn(raw, 'capsuleId')
-    ? workspaceId(raw.capsuleId, 'capsuleId')
-    : '';
-  return Object.freeze({
+  const request = {
     projectId: workspaceId(raw.projectId, 'projectId'),
     expectedProjectRevisionId: workspaceId(raw.expectedProjectRevisionId, 'expectedProjectRevisionId'),
-    capsuleId,
-  });
+  };
+  if (hasOwn(raw, 'capsuleId')) {
+    request.capsuleId = workspaceId(raw.capsuleId, 'capsuleId');
+  }
+  return Object.freeze(request);
 }
 
 function validateProjectRecord(project) {
