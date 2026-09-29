@@ -1033,3 +1033,60 @@ test('bounded provider execution history retains the newest PREPARED record befo
   assert.equal(durable.providerExecutions.length, 128);
   assert.ok(durable.providerExecutions.some(item => item.conversationId === currentConversationId));
 });
+
+
+test('readiness await cannot carry provider PREPARED past lease expiry', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T1) };
+  let calls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() {
+        calls += 1;
+        throw new Error('expired lease must not dispatch');
+      },
+    }]]),
+  });
+  clock.value = Date.parse(T0);
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+
+  const resolver = {
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: T1,
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() {
+      clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+    },
+  };
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '12121212-1212-4212-8212-121212121212',
+      expectedControlEpoch: 0,
+      at: T1,
+    }, { specialistProviderReadinessResolver: resolver }),
+    /lease expired before provider preparation/,
+  );
+
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+  assert.equal(durable.executionOwnerships[0].state, 'OWNED');
+});
