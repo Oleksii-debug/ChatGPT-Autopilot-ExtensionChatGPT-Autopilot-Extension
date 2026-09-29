@@ -318,7 +318,12 @@ function snapshotPolicy(input) {
 }
 
 export function parseAgentDraftProfile(input) {
-  const raw = dataRecord(input, DRAFT_KEYS, 'Чернетка Agent');
+  const raw = dataRecord(
+    input,
+    DRAFT_KEYS,
+    'Чернетка Agent',
+    'Невідомий формат або невідоме поле чернетки Agent.',
+  );
   if (raw.format !== AGENT_DRAFT_FORMAT || raw.version !== 1) {
     throw new Error('Невідомий формат або версія чернетки Agent.');
   }
