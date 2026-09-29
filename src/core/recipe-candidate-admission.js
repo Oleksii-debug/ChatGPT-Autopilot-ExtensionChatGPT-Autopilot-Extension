@@ -381,7 +381,7 @@ export async function prepareTrustedRecipeCandidateAdmissionV1(input, trustedOpt
   if (compiled.verificationEvidence.length > MAX_EVIDENCE_ARTIFACTS) {
     throw new Error('Recipe candidate references too many verification evidence artifacts');
   }
-  const evidenceArtifactRefs = [];
+  const evidenceBindings = [];
   const evidenceByArtifactId = new Map();
   for (const evidence of compiled.verificationEvidence) {
     let artifact = evidenceByArtifactId.get(evidence.evidenceArtifactId);
@@ -397,7 +397,12 @@ export async function prepareTrustedRecipeCandidateAdmissionV1(input, trustedOpt
         throw new Error('Trusted Recipe evidence SHA-256 mismatch for ' + evidence.stepId);
       }
       evidenceByArtifactId.set(artifact.artifactId, artifact);
-      evidenceArtifactRefs.push(artifact);
+      evidenceBindings.push(freezeDeep({
+        artifactId: artifact.artifactId,
+        sha256: artifact.sha256,
+        createdAt: artifact.createdAt,
+        sensitive: artifact.sensitive,
+      }));
     } else if (artifact.sha256 !== evidence.evidenceSha256) {
       throw new Error('Trusted Recipe reused evidence identity has conflicting SHA-256');
     }
@@ -440,7 +445,7 @@ export async function prepareTrustedRecipeCandidateAdmissionV1(input, trustedOpt
     traceBindingSha256: compiled.traceBinding.contentSha256,
     parameterSchemaSha256: compiled.parameterSchemaBinding.contentSha256,
     resolvedSourceBindings,
-    evidenceArtifactRefs,
+    evidenceBindings,
     secretScan,
     recipeDefinition: candidate,
     nextRegistry,
