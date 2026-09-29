@@ -387,6 +387,34 @@ test('tool-specific path readiness overrides provider-wide fallback for mixed-mo
 });
 
 
+test('stale tool-specific readiness does not fall back to fresh provider-wide readiness', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('windows.uia', 'windows/provider', ['filesystem.read'])],
+    providerStates:[
+      state('windows/provider', {
+        sourceId:'health.provider',
+        sourceRevision:3,
+        pathKind:'API',
+      }),
+      state('windows/provider', {
+        toolId:'windows.uia',
+        sourceId:'health.tool',
+        sourceRevision:4,
+        pathKind:'UIA',
+        observedAt:'2026-09-29T03:00:00.000Z',
+        validThrough:'2026-09-29T04:00:00.000Z',
+      }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.equal(result.candidates[0].readiness, CapabilityPathReadiness.NEEDS_HEALTH_CHECK);
+  assert.equal(result.candidates[0].reasonCode, 'PROVIDER_STATE_STALE');
+  assert.equal(result.candidates[0].readinessSourceId, 'health.tool');
+  assert.deepEqual(result.plan, []);
+});
+
 test('deterministic path class outranks broader visual coverage in the executable plan', () => {
   const result = discover({
     capabilities:[capability('a.read'), capability('b.read')],
@@ -542,6 +570,26 @@ test('readiness records, array lengths and request envelopes are snapshot withou
     }),
     /unknown field/,
   );
+});
+
+test('discovery asOf authority rejects accessors without executing getters', () => {
+  let reads = 0;
+  const request = {
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs')],
+    requestedCapabilityIds:['filesystem.read'],
+  };
+  Object.defineProperty(request, 'asOf', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return AS_OF;
+    },
+  });
+  assert.throws(() => discoverCapabilityPathsV1(request), /own data properties/);
+  assert.equal(reads, 0, 'asOf getter must never execute');
 });
 
 test('collection boundaries reject accessor-backed inventory and request items without executing getters', () => {
