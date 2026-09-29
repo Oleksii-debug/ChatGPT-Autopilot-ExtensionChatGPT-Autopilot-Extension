@@ -687,7 +687,7 @@ export class AiOrchestrator {
       strongError,
       routing: { selectedRouteId:finalResult?.routeSelection?.routeId || '', reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'), failoverChain:structuredClone(routeAttempts) },
       ...(finalResult?.providerReservation
-        ? { providerReservation: structuredClone(finalResult.providerReservation) }
+        ? { providerReservation: finalResult.providerReservation }
         : {}),
       runtime: nextRuntime,
     };
