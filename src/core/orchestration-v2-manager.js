@@ -262,6 +262,7 @@ export class OrchestrationV2Manager {
     fetchFn = globalThis.fetch,
     collectAssistantReport = null,
     resolveHierarchyProvider = null,
+    projectWorkspaceRepository = null,
     now = () => Date.now(),
     createId = null,
   } = {}) {
@@ -809,6 +810,58 @@ export class OrchestrationV2Manager {
       schedulingAuthority: false,
       verificationAuthority: false,
       completionAuthority: false,
+    });
+  }
+
+  /**
+   * Resolve one child-visible Project context only after proving that the caller's
+   * task envelope is the exact task already bound into durable orchestration
+   * activation evidence. Project bytes then come from the existing canonical
+   * ProjectWorkspaceRepository; neither caller state nor this adapter can mint
+   * execution, retrieval, scheduling, completion, credential, or policy authority.
+   */
+  async resolveDurableSubagentTaskContext(input = {}, id = '') {
+    const request = snapshotSubagentContextResolution(input);
+    const task = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
+
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+    const runtime = await controller.runtimeRepository.load();
+    const binding = resolveSubagentTaskActivationBindingV1(
+      storedSubagentTaskActivationBindingRegistry(runtime),
+      { bindingId: request.bindingId },
+    );
+    if (!binding) throw new Error('Durable subagent activation binding not found');
+    if (binding.projectId !== runtime.projectId) {
+      throw new Error('Durable subagent activation binding crosses orchestra project authority');
+    }
+
+    const taskDispatchIdentity = assertTaskMatchesDurableSubagentBinding(task, binding);
+    const contextRequest = {
+      schemaVersion: 1,
+      authorityEnvelope: request.authorityEnvelope,
+      taskEnvelope: task,
+      expectedParentAgentId: binding.parentAgentId,
+      expectedChildAgentId: binding.childAgentId,
+      expectedTaskId: binding.taskId,
+      expectedProjectRevisionId: request.expectedProjectRevisionId,
+    };
+    if (Object.hasOwn(request, 'capsuleId')) contextRequest.capsuleId = request.capsuleId;
+
+    const projected = await projectDurableSubagentTaskContextV1(
+      contextRequest,
+      lookup => this.projectWorkspaceRepository.resolveContext(lookup),
+    );
+    return Object.freeze({
+      ...projected,
+      orchestraId,
+      bindingId: binding.bindingId,
+      taskDispatchIdentity,
+      activationId: binding.activationId,
+      generation: binding.generation,
+      activationPurpose: binding.activationPurpose,
     });
   }
 
