@@ -309,6 +309,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
   assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical config defaults');
   assert.match(js, /modelRoutePolicy: current\?\.modelRoutePolicy \?\? null/, 'definition edits must preserve per-Agent model route policy');
+  assert.match(js, /specialistDelegationProfile: current && Object\.hasOwn\(current, 'specialistDelegationProfile'\)/, 'definition edits must preserve specialist delegation profile');
   assert.match(js, /ui\.agentDefinitionMode === 'edit'/, 'definition create and edit paths must remain explicit');
   assert.match(js, /revision drifted/, 'stale definition writes must force a current-state reload');
   assert.match(js, /agentDefinitionQuarantineCount/, 'quarantined registries must be visible as aggregate owner-attention state');
