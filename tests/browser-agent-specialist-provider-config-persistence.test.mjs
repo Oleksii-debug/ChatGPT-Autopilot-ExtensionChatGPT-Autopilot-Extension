@@ -246,3 +246,20 @@ test('provider config rejects clock rollback without advancing durable revision'
   assert.equal(state.config.revision, 1);
   assert.equal(state.revision, 1);
 });
+
+
+test('provider revision tombstone history above active-config capacity survives restart normalization', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.setSpecialistProviderConfig(setRequest(0));
+  const revisions = data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById;
+  for (let index = 0; index < 40; index += 1) {
+    revisions[`provider.history.${index}`] = index + 1;
+  }
+
+  await managerFor(chrome).update(store => store);
+  const persisted = data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById;
+  assert.equal(Object.keys(persisted).length, 41);
+  assert.equal(persisted[OPENHANDS_CODING_PROVIDER_ID], 1);
+  assert.equal(persisted['provider.history.39'], 40);
+});
