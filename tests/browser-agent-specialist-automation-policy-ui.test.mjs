@@ -14,7 +14,10 @@ test('Specialist automation owner controls are native, labeled and expose zero-c
     'agent-specialist-automation-clear-button',
     'agent-specialist-automation-status',
   ]) {
-    assert.match(html, new RegExp('id=["\\\']' + id + '["\\\']', 'u'));
+    assert.ok(
+      html.includes(`id="${id}"`) || html.includes(`id='${id}'`),
+      `missing Specialist automation control ${id}`,
+    );
   }
   assert.match(html, /agent-specialist-automation-capacity" type="number" min="0" max="256" step="1"/u);
   assert.match(html, /0 означає: нові handoffs автоматично не claim-ити/u);

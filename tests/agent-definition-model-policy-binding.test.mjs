@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createAgentDefinitionRegistryV1,
   materializeAgentDefinitionV1,
   selectAgentDefinitionV1,
 } from '../src/core/agent-definition-registry.js';
@@ -83,11 +84,14 @@ function definition(overrides = {}) {
 }
 
 function registry(definitionOverrides = {}, registryOverrides = {}) {
-  return {
+  const canonical = createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project.alpha',
     revision: 6,
     definitions: [definition(definitionOverrides)],
+  });
+  return {
+    ...canonical,
     ...registryOverrides,
   };
 }
