@@ -280,3 +280,118 @@ test('Agent draft rejects non-canonical nested site policy decisions before fall
   assert.equal(draft.policy.siteRules[0].defaultDecision, 'ASK');
   assert.equal(draft.policy.siteRules[0].actionDecisions.credentials, 'DENY');
 });
+
+
+test('Agent draft rejects numeric fallback, rounding and out-of-range aliases', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити числові межі',
+  };
+  const invalid = [
+    ['maxSteps', 0],
+    ['maxSteps', 10001],
+    ['maxSteps', 3.5],
+    ['stepDelayMs', 60001],
+    ['intervalSeconds', 0],
+    ['intervalSeconds', 604801],
+    ['maxModelCalls', 1000001],
+    ['maxInputTokens', 2000000001],
+    ['maxOutputTokensPerCall', 127],
+    ['maxOutputTokensPerCall', 200001],
+    ['maxRuntimeMinutes', 525601],
+    ['maxCostUsd', -1],
+    ['inputPricePerMillionUsd', 1000001],
+    ['scheduleStartAt', 1.5],
+    ['scheduleEndAt', -1],
+  ];
+  for (const [key, value] of invalid) {
+    assert.throws(
+      () => parseAgentDraftProfile({ ...base, policy: { [key]: value } }),
+      /(межі|timestamp)/,
+      `${key}=${value}`,
+    );
+  }
+});
+
+test('Agent draft rejects silent string truncation at provider and route identities', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити текстові межі',
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { aiPrimaryModel: `m${'x'.repeat(300)}` } }),
+    /model ID/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { aiPrimaryModel: ' model-a' } }),
+    /model ID/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { aiPinnedRouteId: `r${'x'.repeat(180)}` } }),
+    /route ID/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { aiPinnedRouteId: ' route-a' } }),
+    /route ID/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { startUrl: `https://example.com/${'x'.repeat(4096)}` } }),
+    /4096/,
+  );
+});
+
+test('Agent draft rejects nested site-rule unknown fields and lossy text bounds', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити вкладені межі',
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: {
+        siteRules: [{
+          pattern: 'example.com',
+          defaultDecision: 'ASK',
+          actionDecisions: {},
+          credentialToken: 'secret',
+        }],
+      },
+    }),
+    /невідоме поле/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: {
+        siteRules: [{
+          pattern: `${'a'.repeat(490)}.example.com`,
+          defaultDecision: 'ASK',
+          actionDecisions: {},
+        }],
+      },
+    }),
+    /500 символів/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: { acceptanceCriteria: ['x'.repeat(1001)] },
+    }),
+    /1000 символів/,
+  );
+});
+
+test('Agent draft rejects schedule chronology inversion before normalization', () => {
+  assert.throws(
+    () => parseAgentDraftProfile({
+      format: 'chatgpt-autopilot-agent-draft',
+      version: 1,
+      goal: 'Перевірити календар',
+      policy: { scheduleStartAt: 2000, scheduleEndAt: 1000 },
+    }),
+    /пізніше scheduleStartAt/,
+  );
+});
