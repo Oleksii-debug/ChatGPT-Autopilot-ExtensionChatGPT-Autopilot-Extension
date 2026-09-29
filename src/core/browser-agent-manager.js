@@ -111,7 +111,7 @@ const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const MAX_SPECIALIST_AUTOMATION_CLAIM_ADMISSIONS = 256;
 const SPECIALIST_AUTOMATION_CLAIM_ADMISSION_KEYS = new Set([
-  'jobId', 'agentId', 'leaseId', 'policyRevision', 'policyBindingKey', 'claimedAt',
+  'jobId', 'agentId', 'leaseId', 'controlEpoch', 'policyRevision', 'policyBindingKey', 'claimedAt',
 ]);
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
@@ -450,6 +450,11 @@ function normalizeSpecialistAutomationClaimAdmission(raw, expectedKey = null) {
   if (record.jobId.length > 128 || record.agentId.length > 256 || record.leaseId.length > 256
       || record.policyBindingKey.length > 8192) {
     throw new Error('Specialist automation claim admission text exceeds durable bounds');
+  }
+  if (!Number.isSafeInteger(record.controlEpoch)
+      || Object.is(record.controlEpoch, -0)
+      || record.controlEpoch < 0) {
+    throw new Error('Specialist automation claim admission controlEpoch must be a canonical non-negative safe integer');
   }
   if (!Number.isSafeInteger(record.policyRevision)
       || Object.is(record.policyRevision, -0)
@@ -1671,12 +1676,13 @@ export class BrowserAgentManager {
         const key = specialistAutomationClaimAdmissionKey(jobId, assignment.agentId, assignment.leaseId);
         const admission = admissions[key];
         if (!admission
+            || admission.controlEpoch !== job.runtime.controlEpoch
             || admission.policyRevision !== currentPolicy.revision
             || admission.policyBindingKey !== currentPolicyBindingKey) continue;
         candidates.push({
           jobId,
           agentId: assignment.agentId,
-          expectedControlEpoch: job.runtime.controlEpoch,
+          expectedControlEpoch: admission.controlEpoch,
           recoverPrepared: false,
         });
       }
@@ -2152,6 +2158,7 @@ export class BrowserAgentManager {
     const claimAdmission = initial.specialistAutomationClaimAdmissionsByKey?.[claimKey];
     const bindingKey = JSON.stringify(policy);
     if (!claimAdmission
+        || claimAdmission.controlEpoch !== job?.runtime?.controlEpoch
         || claimAdmission.policyRevision !== policy.revision
         || claimAdmission.policyBindingKey !== bindingKey) {
       throw new Error('Automatic Specialist provider execution lacks current durable automation claim provenance');
@@ -2821,7 +2828,7 @@ export class BrowserAgentManager {
         job.runtime.updatedAt = this.now();
         remaining -= outcome.claimed.length;
         for (const agentId of outcome.claimed) {
-          claimed.push({ jobId, agentId });
+          claimed.push({ jobId, agentId, controlEpoch: job.runtime.controlEpoch });
           if (automationPolicyFence) {
             const assignment = (job.runtime.specialistHandoffs || []).find(item =>
               item?.agentId === agentId && item?.state === 'LEASED' && item?.leaseId);
@@ -2836,6 +2843,7 @@ export class BrowserAgentManager {
               jobId,
               agentId,
               leaseId: assignment.leaseId,
+              controlEpoch: job.runtime.controlEpoch,
               policyRevision: automationPolicyFence.revision,
               policyBindingKey: automationPolicyFence.bindingKey,
               claimedAt: at,
