@@ -252,6 +252,22 @@ test('trusted context resolver fails closed on stale revision, stale capsule and
     }),
     /unknown field/,
   );
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: 'project-a',
+      expectedProjectRevisionId: 'project-r1',
+      capsuleId: '',
+    }),
+    /Invalid capsuleId/,
+  );
+  assert.throws(
+    () => resolveProjectWorkspaceContextV1(workspace, {
+      projectId: 'project-a',
+      expectedProjectRevisionId: 'project-r1',
+      capsuleId: null,
+    }),
+    /Invalid capsuleId/,
+  );
 
   replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 4 });
   assert.throws(
