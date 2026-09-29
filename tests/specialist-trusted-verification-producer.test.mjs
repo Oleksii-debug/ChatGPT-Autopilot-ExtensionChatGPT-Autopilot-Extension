@@ -8,6 +8,11 @@ import {
   authorizeExecutionSafeRetryWithTrustedRecordV1,
   verifyExecutionWithTrustedRecordV1,
 } from '../src/core/execution-plane-ownership.js';
+import {
+  appendTrustedExecutionVerificationRecordV1,
+  createTrustedExecutionVerificationLedgerV1,
+  resolveTrustedExecutionVerificationRecordV1,
+} from '../src/core/trusted-execution-verification-ledger.js';
 
 const T0 = '2026-09-29T04:00:00.000Z';
 const T1 = '2026-09-29T04:01:00.000Z';
@@ -274,6 +279,44 @@ test('independent resolver produces exact trusted Specialist record consumable b
   );
   assert.equal(consumed.ownership.state, 'VERIFIED');
   assert.equal(consumed.trustedRecord.recordId, 'trusted-record:specialist:1');
+});
+
+test('producer record round-trips through canonical trusted ledger before existing consumer', async () => {
+  const produced = await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request(),
+    { resolveTrustedSpecialistExecutionVerification: async () => proof() },
+  );
+  const ledger = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    produced.trustedRecord,
+  );
+  assert.equal(ledger.revision, 1);
+  assert.equal(ledger.records.length, 1);
+
+  const exactLookup = {
+    taskId: 'browser-agent-task:plan-1',
+    planId: 'plan-1',
+    nodeId: 'local',
+    effectId: EFFECT_ID,
+    policyEnvelopeId: POLICY_ID,
+    executionId: LEASE_ID,
+    verificationId: VERIFICATION_ID,
+    expectedOutcome: 'EFFECT_VERIFIED',
+  };
+  const resolved = resolveTrustedExecutionVerificationRecordV1(ledger, exactLookup);
+  assert.equal(resolved.recordId, produced.trustedRecord.recordId);
+
+  const consumed = await verifyExecutionWithTrustedRecordV1(
+    ownership(),
+    { leaseId: LEASE_ID, verificationId: VERIFICATION_ID, at: T5 },
+    {
+      resolveTrustedExecutionVerificationRecord: async lookup => (
+        resolveTrustedExecutionVerificationRecordV1(ledger, lookup)
+      ),
+    },
+  );
+  assert.equal(consumed.ownership.state, 'VERIFIED');
+  assert.equal(consumed.trustedRecord.recordId, produced.trustedRecord.recordId);
 });
 
 test('provider success alone cannot mint verification without independent resolver', async () => {
