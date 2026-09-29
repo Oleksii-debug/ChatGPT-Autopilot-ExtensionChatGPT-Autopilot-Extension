@@ -1979,7 +1979,32 @@ export class BrowserAgentManager {
     return result;
   }
 
-  executeClaimedSpecialistProvider(id, payload = {}, dependencies = null) {
+  async executeClaimedSpecialistProviderFromAutomationPolicy(id, payload = {}, dependencies = null) {
+    const initial = await this.load();
+    if (initial.specialistAutomationPolicyQuarantined === true) {
+      return {
+        kind: 'AUTOMATION_POLICY_QUARANTINED',
+        completionAuthorized: false,
+        verificationRequired: true,
+      };
+    }
+    const policy = initial.specialistAutomationPolicy;
+    if (!policy || policy.enabled !== true) {
+      return {
+        kind: 'AUTOMATION_DISABLED',
+        revision: Number(initial.specialistAutomationPolicyRevision || 0),
+        completionAuthorized: false,
+        verificationRequired: true,
+      };
+    }
+    const fence = Object.freeze({
+      revision: policy.revision,
+      bindingKey: JSON.stringify(policy),
+    });
+    return this.executeClaimedSpecialistProvider(id, payload, dependencies, fence);
+  }
+
+  executeClaimedSpecialistProvider(id, payload = {}, dependencies = null, automationPolicyFence = null) {
     let request;
     try {
       request = snapshotExactOwnDataRequest(
@@ -2018,13 +2043,13 @@ export class BrowserAgentManager {
       request.expectedControlEpoch,
     ]);
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
-    const operation = this.#executeClaimedSpecialistProvider(id, request, dependencies)
+    const operation = this.#executeClaimedSpecialistProvider(id, request, dependencies, automationPolicyFence)
       .finally(() => this.inFlight.delete(inFlightKey));
     this.inFlight.set(inFlightKey, operation);
     return operation;
   }
 
-  async #executeClaimedSpecialistProvider(id, request, dependencies) {
+  async #executeClaimedSpecialistProvider(id, request, dependencies, automationPolicyFence = null) {
     const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
     let executionReadiness = null;
     if (trustedReadiness) {
@@ -2045,6 +2070,16 @@ export class BrowserAgentManager {
     let providerRequest = null;
     let resumedPrepared = false;
     await this.update(async store => {
+      if (automationPolicyFence) {
+        const livePolicy = store.specialistAutomationPolicy;
+        if (store.specialistAutomationPolicyQuarantined === true
+            || !livePolicy
+            || livePolicy.enabled !== true
+            || livePolicy.revision !== automationPolicyFence.revision
+            || JSON.stringify(livePolicy) !== automationPolicyFence.bindingKey) {
+          throw new Error('Specialist automation policy drifted before provider preparation');
+        }
+      }
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING
