@@ -207,8 +207,32 @@ function assertExactPolicyValueType(key, value) {
       && (value !== value.trim() || value.length > 180)) {
     throw new Error('Політика Agent.aiPinnedRouteId має бути канонічним route ID до 180 символів.');
   }
-  if (key === 'startUrl' && value.length > 4096) {
-    throw new Error('Політика Agent.startUrl перевищує 4096 символів.');
+  if (key === 'startUrl') {
+    if (value !== value.trim() || value.length > 4096) {
+      throw new Error('Політика Agent.startUrl має бути канонічним URL до 4096 символів.');
+    }
+    if (value) {
+      let parsed;
+      try {
+        parsed = new URL(value);
+      } catch {
+        throw new Error('Політика Agent.startUrl має бути валідним HTTP(S) URL.');
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('Політика Agent.startUrl має використовувати HTTP(S).');
+      }
+      if (parsed.username || parsed.password) {
+        throw new Error('Політика Agent.startUrl не може містити credentials.');
+      }
+      if (parsed.hash) {
+        throw new Error('Політика Agent.startUrl не може містити fragment, який буде втрачено.');
+      }
+    }
+  }
+  if (key === 'activeWindowStart' || key === 'activeWindowEnd') {
+    if (value && !/^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(value)) {
+      throw new Error(`Політика Agent.${key} має бути канонічним HH:MM.`);
+    }
   }
 }
 
@@ -284,6 +308,11 @@ function snapshotPolicy(input) {
       && out.scheduleEndAt > 0
       && out.scheduleEndAt <= out.scheduleStartAt) {
     throw new Error('Політика Agent.scheduleEndAt має бути пізніше scheduleStartAt.');
+  }
+  const hasWindowStart = Boolean(out.activeWindowStart);
+  const hasWindowEnd = Boolean(out.activeWindowEnd);
+  if (hasWindowStart !== hasWindowEnd) {
+    throw new Error('Політика Agent active window вимагає і start, і end.');
   }
   return out;
 }
