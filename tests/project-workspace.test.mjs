@@ -862,3 +862,40 @@ test('workspace validation rejects duplicate or non-current snapshot revision hi
     /does not end at current snapshot/,
   );
 });
+
+
+test('snapshot revision history rejects accessor-backed and decorated array shapes without getter execution', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+
+  const accessorBacked = structuredClone(workspace);
+  let getterCalls = 0;
+  Object.defineProperty(accessorBacked.projectsById['project-a'], 'snapshotRevisionIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return ['project-r1'];
+    },
+  });
+  assert.throws(
+    () => validateProjectWorkspace(accessorBacked),
+    /enumerable own data property/,
+  );
+  assert.equal(getterCalls, 0);
+
+  const decorated = structuredClone(workspace);
+  decorated.projectsById['project-a'].snapshotRevisionIds.extra = 'authority';
+  assert.throws(
+    () => validateProjectWorkspace(decorated),
+    /contains non-index field/,
+  );
+
+  const sparse = structuredClone(workspace);
+  sparse.projectsById['project-a'].snapshotRevisionIds = new Array(2);
+  sparse.projectsById['project-a'].snapshotRevisionIds[1] = 'project-r1';
+  assert.throws(
+    () => validateProjectWorkspace(sparse),
+    /must be dense/,
+  );
+});
