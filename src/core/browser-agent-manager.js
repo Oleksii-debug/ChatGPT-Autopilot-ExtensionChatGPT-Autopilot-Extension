@@ -1710,12 +1710,10 @@ export class BrowserAgentManager {
       const executions = Array.isArray(job.runtime.specialistProviderExecutions)
         ? job.runtime.specialistProviderExecutions
         : [];
-      const existing = executions.find(item => item?.agentId === request.agentId);
+      const existing = executions.find(item =>
+        item?.agentId === request.agentId && item?.leaseId === assignment.leaseId);
       if (existing) {
         const canonical = normalizeSpecialistProviderExecutionV1(existing);
-        if (canonical.leaseId !== assignment.leaseId) {
-          throw new Error('Specialist provider execution already exists for this assignment identity');
-        }
         const exactPreparedIdentity = canonical.status === 'PREPARED'
           && canonical.planId === plan.planId
           && canonical.nodeId === node.nodeId
@@ -1942,18 +1940,21 @@ export class BrowserAgentManager {
       }
       job.runtime.specialistProviderExecutions = executions.map((item, itemIndex) =>
         itemIndex === index ? outcome : item);
-      if (outcome.reconciliationRequired || outcome.manualReviewRequired) {
+      if (outcome.reconciliationRequired || outcome.manualReviewRequired || outcome.safeToRetry) {
         const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const ownershipIndex = ownerships.findIndex(item =>
           item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
         if (ownershipIndex < 0) {
-          throw new Error('Specialist provider ambiguous outcome lacks exact execution ownership');
+          throw new Error('Specialist provider nonterminal outcome lacks exact execution ownership');
         }
+        const reason = outcome.reconciliationRequired
+          ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
+          : outcome.manualReviewRequired
+            ? `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`
+            : `Specialist provider reported retryable no-effect failure: ${outcome.errorCode || 'trusted NO_EFFECT verification required'}`;
         ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
           leaseId: prepared.leaseId,
-          reason: outcome.reconciliationRequired
-            ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
-            : `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`,
+          reason,
           at: observedAt,
         });
         job.runtime.specialistExecutionOwnerships = ownerships;
