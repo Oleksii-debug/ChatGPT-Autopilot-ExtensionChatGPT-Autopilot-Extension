@@ -214,6 +214,8 @@ function recommendation(candidate, required) {
     capabilitySurplus: candidate.capabilityIds.length - required.length,
     authority: {
       advisoryOnly: true,
+      requiresPreauthorizedInventory: true,
+      inventoryVisibilityAuthorized: false,
       executionAuthorized: false,
       permissionGranted: false,
       installationAuthorized: false,
@@ -267,6 +269,8 @@ export function recommendCapabilityBestPathV1(input = {}) {
     blocked,
     authority: {
       advisoryOnly: true,
+      requiresPreauthorizedInventory: true,
+      inventoryVisibilityAuthorized: false,
       executionAuthorized: false,
       permissionGranted: false,
       installationAuthorized: false,
