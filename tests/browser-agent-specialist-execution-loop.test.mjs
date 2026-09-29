@@ -77,6 +77,7 @@ async function seed(manager, {
   createRegistry = delegation,
   maxConcurrentHandoffs = 2,
   leaseSeconds = 600,
+  twoExternalNodes = false,
 } = {}) {
   const agent = definition({ delegation, maxConcurrentHandoffs, leaseSeconds });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
@@ -133,7 +134,20 @@ async function seed(manager, {
         state: 'READY',
         evidence: '',
         updatedAt: '2026-09-29T03:00:00.000Z',
-      }],
+      }, ...(twoExternalNodes ? [{
+        nodeId: 'local:research-2',
+        title: 'Second specialist research',
+        objective: 'Research a second bounded evidence set.',
+        dependsOn: [],
+        conflictKeys: ['artifact:research-2'],
+        ownerId: 'agent:root',
+        executionPlane: 'LOCAL',
+        acceptanceCriteria: ['Second artifact verified'],
+        budget: { maxModelCalls: 5, maxRuntimeSeconds: 1200, maxCostUsdMicros: 700000 },
+        state: 'READY',
+        evidence: '',
+        updatedAt: '2026-09-29T03:00:00.000Z',
+      }] : [])],
     };
     return store;
   });
@@ -365,10 +379,14 @@ test('cross-job claim caps lease duration by each durable Agent profile', async 
 });
 
 
-test('existing owned Specialist work consumes durable Agent profile capacity before another claim', async () => {
+test('existing owned Specialist work consumes durable Agent profile capacity before another canonical handoff claim', async () => {
   const { chrome } = chromeStorage();
   const manager = managerFor(chrome);
-  const id = await seed(manager, { maxConcurrentHandoffs: 1, leaseSeconds: 600 });
+  const id = await seed(manager, {
+    maxConcurrentHandoffs: 1,
+    leaseSeconds: 600,
+    twoExternalNodes: true,
+  });
 
   assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
   const first = await manager.claimSpecialistHandoffs(id, {
@@ -379,34 +397,29 @@ test('existing owned Specialist work consumes durable Agent profile capacity bef
     at: '2026-09-29T03:06:00.000Z',
   });
   assert.equal(first.claimed.length, 1);
-  assert.equal(first.executionOwnerships[0].state, 'OWNED');
+  assert.equal(first.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
 
-  await manager.update(store => {
-    const job = store.byId[id];
-    const existingAssignment = structuredClone(job.runtime.specialistHandoffs[0]);
-    existingAssignment.agentId = existingAssignment.agentId + ':second';
-    existingAssignment.effectId = existingAssignment.effectId + ':second';
-    existingAssignment.state = 'READY';
-    existingAssignment.leaseId = '';
-    existingAssignment.leaseExpiresAt = '';
-    job.runtime.specialistHandoffs.push(existingAssignment);
-
-    const existingOwnership = structuredClone(job.runtime.specialistExecutionOwnerships[0]);
-    existingOwnership.effectId = existingAssignment.effectId;
-    existingOwnership.state = 'UNOWNED';
-    existingOwnership.leaseId = '';
-    existingOwnership.leaseExpiresAt = '';
-    job.runtime.specialistExecutionOwnerships.push(existingOwnership);
-    return store;
+  const preparedSecond = await manager.prepareSpecialistHandoff(id, {
+    nodeId: 'local:research-2',
+    specialistId: 'specialist.research.local',
+    requestedCapabilityIds: ['research'],
+    parentCapabilityIds: ['research'],
+    policyEnvelopeId: 'policy:research',
+    deadlineAt: '2026-09-29T03:20:00.000Z',
+    priority: 7,
+    at: '2026-09-29T03:07:00.000Z',
   });
+  assert.equal(preparedSecond.reused, false);
+  assert.equal(preparedSecond.assignment.state, 'READY');
 
   const second = await manager.claimSpecialistHandoffs(id, {
     availableSlots: 10,
     maxChildrenPerAgent: 10,
     maxDepth: 2,
     leaseSeconds: 600,
-    at: '2026-09-29T03:07:00.000Z',
+    at: '2026-09-29T03:08:00.000Z',
   });
   assert.deepEqual(second.claimed, []);
   assert.equal(second.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
+  assert.equal(second.assignments.filter(item => item.state === 'READY').length, 1);
 });
