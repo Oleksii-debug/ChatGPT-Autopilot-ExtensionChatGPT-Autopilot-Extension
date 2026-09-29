@@ -15,6 +15,7 @@ export const MAX_SNAPSHOT_REVISIONS_PER_PROJECT = 512;
 export const PROJECT_WORKSPACE_CONTEXT_RESOLUTION_VERSION = 1;
 
 const CONTEXT_RESOLUTION_REQUEST_KEYS = new Set(['projectId', 'expectedProjectRevisionId', 'capsuleId']);
+const PROJECT_WORKSPACE_SAVE_QUEUES = new WeakMap();
 const WORKSPACE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function record(value, label) {
@@ -485,37 +486,55 @@ export class ProjectWorkspaceRepository {
   }
 
   async save(workspace, { expectedPreviousRevision = null } = {}) {
+    // Snapshot caller-owned state before the first async boundary. A caller
+    // cannot mutate the candidate while durable state is being checked.
     validateProjectWorkspace(workspace);
+    const candidate = structuredClone(workspace);
+    validateProjectWorkspace(candidate);
     if (expectedPreviousRevision !== null
         && (!Number.isInteger(expectedPreviousRevision) || expectedPreviousRevision < 0)) {
       throw new Error('Invalid expected project workspace revision');
     }
-
-    const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
-    const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
-    if (durableRaw === undefined) {
-      if (expectedPreviousRevision !== null && expectedPreviousRevision !== 0) {
-        throw new Error('Project workspace durable revision changed before save');
-      }
-      if (expectedPreviousRevision === null && workspace.revision !== 0) {
-        throw new Error('Initial project workspace save must use revision 0');
-      }
-    } else {
-      const durable = validateProjectWorkspace(durableRaw);
-      if (expectedPreviousRevision !== null && durable.revision !== expectedPreviousRevision) {
-        throw new Error('Project workspace durable revision changed before save');
-      }
-      if (workspace.revision === durable.revision && sameCanonicalData(workspace, durable)) {
-        return durable;
-      }
-      if (workspace.revision !== durable.revision + 1) {
-        throw new Error('Project workspace revision must advance exactly once');
-      }
-      assertSnapshotRevisionContinuity(durable, workspace);
+    const expectedRevision = expectedPreviousRevision;
+    const queueKey = this.chrome.storage.local;
+    if (!queueKey || (typeof queueKey !== 'object' && typeof queueKey !== 'function')) {
+      throw new Error('Project workspace storage.local is unavailable');
     }
 
-    await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: workspace });
-    return workspace;
+    const previousSave = PROJECT_WORKSPACE_SAVE_QUEUES.get(queueKey) || Promise.resolve();
+    const task = previousSave.catch(() => undefined).then(async () => {
+      const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
+      const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
+      if (durableRaw === undefined) {
+        if (expectedRevision !== null && expectedRevision !== 0) {
+          throw new Error('Project workspace durable revision changed before save');
+        }
+        if (expectedRevision === null) {
+          if (candidate.revision !== 0) {
+            throw new Error('Initial project workspace save must use revision 0');
+          }
+        } else if (candidate.revision !== 1) {
+          throw new Error('Initial project workspace update must advance revision exactly once');
+        }
+      } else {
+        const durable = validateProjectWorkspace(durableRaw);
+        if (expectedRevision !== null && durable.revision !== expectedRevision) {
+          throw new Error('Project workspace durable revision changed before save');
+        }
+        if (candidate.revision === durable.revision && sameCanonicalData(candidate, durable)) {
+          return durable;
+        }
+        if (candidate.revision !== durable.revision + 1) {
+          throw new Error('Project workspace revision must advance exactly once');
+        }
+        assertSnapshotRevisionContinuity(durable, candidate);
+      }
+
+      await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: candidate });
+      return candidate;
+    });
+    PROJECT_WORKSPACE_SAVE_QUEUES.set(queueKey, task.catch(() => undefined));
+    return task;
   }
 
   async resolveContext(input = {}) {
