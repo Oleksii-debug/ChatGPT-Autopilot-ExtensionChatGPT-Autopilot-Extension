@@ -11,7 +11,9 @@ export const PROJECT_WORKSPACE_SCHEMA_VERSION = 1;
 export const MAX_PROJECTS = 64;
 export const MAX_CAPSULES_PER_PROJECT = 128;
 export const MAX_PROVENANCE_PER_PROJECT = 512;
+export const PROJECT_WORKSPACE_CONTEXT_RESOLUTION_VERSION = 1;
 
+const CONTEXT_RESOLUTION_REQUEST_KEYS = new Set(['projectId', 'expectedProjectRevisionId', 'capsuleId']);
 const WORKSPACE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function record(value, label) {
@@ -19,6 +21,25 @@ function record(value, label) {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`Invalid ${label} prototype`);
   return value;
+}
+
+function strictDataRecord(value, allowedKeys, label) {
+  record(value, label);
+  const out = Object.create(null);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
 }
 
 function workspaceId(value, label) {
@@ -54,6 +75,46 @@ function artifactIdentity(ref) {
 
 function sourceIdentity(source) {
   return `${source.sourceId}\u001f${source.revisionId}\u001f${source.contentSha256 || ''}`;
+}
+
+function sameCanonicalData(left, right) {
+  if (Object.is(left, right)) return true;
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  const leftArray = Array.isArray(left);
+  if (leftArray !== Array.isArray(right)) return false;
+  if (leftArray) {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameCanonicalData(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    const key = leftKeys[index];
+    if (key !== rightKeys[index] || !sameCanonicalData(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+function snapshotContextResolutionRequest(input) {
+  const raw = strictDataRecord(input, CONTEXT_RESOLUTION_REQUEST_KEYS, 'Project workspace context resolution request');
+  if (!hasOwn(raw, 'projectId')) throw new Error('Project workspace context resolution request is missing projectId');
+  if (!hasOwn(raw, 'expectedProjectRevisionId')) {
+    throw new Error('Project workspace context resolution request is missing expectedProjectRevisionId');
+  }
+  const capsuleId = hasOwn(raw, 'capsuleId') && raw.capsuleId != null && raw.capsuleId !== ''
+    ? workspaceId(raw.capsuleId, 'capsuleId')
+    : '';
+  return Object.freeze({
+    projectId: workspaceId(raw.projectId, 'projectId'),
+    expectedProjectRevisionId: workspaceId(raw.expectedProjectRevisionId, 'expectedProjectRevisionId'),
+    capsuleId,
+  });
 }
 
 function validateProjectRecord(project) {
@@ -164,6 +225,13 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
+  const current = normalizeProjectSnapshotV1(project.snapshot);
+  if (normalized.revisionId === current.revisionId) {
+    if (!sameCanonicalData(normalized, current)) {
+      throw new Error('Project snapshot revisionId cannot be reused for different content');
+    }
+    return project;
+  }
   project.snapshot = normalized;
   project.updatedAt = nowMs;
   // Existing capsules and provenance remain intentionally visible. Their
@@ -206,6 +274,38 @@ export function getProjectArtifactProvenance(workspace, projectId, artifactId) {
   return provenance;
 }
 
+export function resolveProjectWorkspaceContextV1(workspace, input = {}) {
+  const request = snapshotContextResolutionRequest(input);
+  validateProjectWorkspace(workspace);
+  const project = requireProject(workspace, request.projectId);
+  const snapshot = normalizeProjectSnapshotV1(project.snapshot);
+  if (snapshot.revisionId !== request.expectedProjectRevisionId) {
+    throw new Error('Project workspace snapshot revision binding mismatch');
+  }
+
+  let capsule = null;
+  if (request.capsuleId) {
+    if (!hasOwn(project.capsulesById, request.capsuleId)) throw new Error('Context capsule not found');
+    capsule = normalizeContextCapsuleV1(project.capsulesById[request.capsuleId]);
+    assertCapsuleMatchesSnapshot(capsule, snapshot);
+  }
+
+  return Object.freeze({
+    schemaVersion: PROJECT_WORKSPACE_CONTEXT_RESOLUTION_VERSION,
+    workspaceRevision: workspace.revision,
+    projectId: snapshot.projectId,
+    projectRevisionId: snapshot.revisionId,
+    snapshot,
+    capsule,
+    ownerStateSource: 'DURABLE_PROJECT_WORKSPACE',
+    sourceAuthorityAuthenticated: false,
+    retrievalAuthorized: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    policyAuthority: false,
+  });
+}
+
 export function projectCurrentState(workspace, projectId, capsuleId, currentSourceRefs = []) {
   validateProjectWorkspace(workspace);
   const project = requireProject(workspace, projectId);
@@ -245,6 +345,15 @@ export class ProjectWorkspaceRepository {
     validateProjectWorkspace(workspace);
     await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: workspace });
     return workspace;
+  }
+
+  async resolveContext(input = {}) {
+    // Snapshot the caller request before the first await. The durable workspace
+    // remains the source of truth; caller mutation cannot swap the requested
+    // project/revision/capsule while storage is being read.
+    const request = snapshotContextResolutionRequest(input);
+    const workspace = await this.load();
+    return resolveProjectWorkspaceContextV1(workspace, request);
   }
 
   update(mutator, { nowMs = Date.now() } = {}) {
