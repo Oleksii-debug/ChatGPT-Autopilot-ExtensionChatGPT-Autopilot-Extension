@@ -384,6 +384,30 @@ test('route, provider, model and selected text must match the admitted one-route
   }
 });
 
+test('provider-result provenance compares exact raw model text without whitespace aliasing', () => {
+  const topLevelText = ' Applied the bounded repair and produced evidence for independent verification. ';
+  const exact = projectAgentSelfRepairModelObservationV1(request({
+    modelResult: modelResult({ text: topLevelText }),
+  }));
+  assert.match(exact.summary, /Applied the bounded repair/u);
+
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      modelResult: modelResult({
+        text: topLevelText,
+        primary: {
+          provider: 'openai',
+          model: 'agent-model',
+          routeId: 'route.observe',
+          text: topLevelText.trim(),
+          usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
+        },
+      }),
+    })),
+    /text disagrees/u,
+  );
+});
+
 test('observation admits exactly one bounded provider call and canonical token counters', () => {
   for (const usage of [
     { inputTokens: 10, outputTokens: 20, totalTokens: 30, modelCalls: 0 },
