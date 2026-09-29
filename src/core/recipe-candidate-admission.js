@@ -338,11 +338,18 @@ export async function prepareTrustedRecipeCandidateAdmissionV1(input, trustedOpt
   const candidate = compiled.recipeDefinition;
   if (candidate.lifecycle !== 'CANDIDATE'
       || candidate.qualification.status !== 'UNQUALIFIED'
+      || compiled.rawContentAccepted !== false
+      || compiled.parameterValuesAccepted !== false
       || compiled.registryAdmissionAuthorized !== false
       || compiled.replayAuthorized !== false
       || compiled.promotionAuthorized !== false
       || compiled.executionAuthorized !== false
-      || compiled.permissionGranted !== false) {
+      || compiled.permissionGranted !== false
+      || compiled.requiresCanonicalRecipeRegistry !== true
+      || compiled.requiresCanonicalTraceResolution !== true
+      || compiled.requiresCanonicalEvidenceResolution !== true
+      || compiled.requiresTrustedReplayEvaluation !== true
+      || compiled.requiresSecretScan !== true) {
     throw new Error('Recipe compiler output violates candidate authority fence');
   }
   if (Date.parse(candidate.createdAt) > Date.parse(request.admittedAt)) {
