@@ -477,3 +477,49 @@ test('registry drift after admission blocks owner-bound claim before lease autho
   assert.equal(persisted.handoffs[0].state, 'READY');
   assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
 });
+
+
+test('product-wide claim path cannot bypass trusted readiness for owner-bound admissions', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const resolver = {
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: false,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: new Date(Date.now()).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() { return true; },
+  };
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: 2,
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: resolver }),
+    /not currently executable/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
