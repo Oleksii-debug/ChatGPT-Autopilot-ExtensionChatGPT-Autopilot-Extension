@@ -90,3 +90,19 @@ test('RUN command uses one injected trusted OpenHands client and never grants co
   assert.doesNotMatch(branch[1], /message\.payload\?\.conversationId/);
   assert.doesNotMatch(branch[1], /completeSpecialistHandoff/);
 });
+
+
+test('Specialist mutation commands strip caller time authority before BrowserAgent delegation', () => {
+  assert.match(
+    source,
+    /PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION'[\s\S]*?const delegation = structuredClone[\s\S]*?delete delegation\.at[\s\S]*?prepareDefinitionSpecialistDelegation/,
+  );
+  assert.match(
+    source,
+    /PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF'[\s\S]*?const handoff = structuredClone[\s\S]*?delete handoff\.at[\s\S]*?prepareSpecialistHandoff/,
+  );
+  assert.match(
+    source,
+    /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'[\s\S]*?const claim = structuredClone[\s\S]*?delete claim\.at[\s\S]*?claimSpecialistHandoffs/,
+  );
+});
