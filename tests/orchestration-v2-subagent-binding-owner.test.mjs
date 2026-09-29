@@ -166,6 +166,21 @@ test('orchestration owner derives and persists activation binding from latest du
     await restarted.resolveSubagentTaskActivationBinding({bindingId:first.binding.bindingId},'orch-1'),
     first.binding,
   );
+
+  const substituted=structuredClone(canonicalTaskEnvelope);
+  substituted.objective += ' restart substitution';
+  await assert.rejects(
+    ()=>restarted.registerSubagentTaskActivationBinding({
+      ...request,
+      taskEnvelope:substituted,
+    },'orch-1'),
+    /dispatch identity does not match task envelope/u,
+  );
+  assert.equal(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1']
+      .subagentTaskActivationBindingRegistry.revision,
+    1,
+  );
 });
 
 test('binding owner rejects forged activation, cross-project task and caller authority fields without mutation',async()=>{
