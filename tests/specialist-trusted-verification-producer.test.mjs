@@ -360,6 +360,23 @@ test('EFFECT_VERIFIED requires durable provider success and OWNED execution', as
   );
 });
 
+test('EFFECT_VERIFIED cannot be produced after the exact execution lease expires', async () => {
+  let resolverCalls = 0;
+  await assert.rejects(
+    produceTrustedSpecialistExecutionVerificationRecordV1(
+      request({ at: '2026-09-29T05:00:00.001Z' }),
+      {
+        resolveTrustedSpecialistExecutionVerification: async () => {
+          resolverCalls += 1;
+          return proof();
+        },
+      },
+    ),
+    /cannot outlive the current execution lease/,
+  );
+  assert.equal(resolverCalls, 0);
+});
+
 test('trusted proof must hash-cover every requested result artifact identity', async () => {
   await assert.rejects(
     produceTrustedSpecialistExecutionVerificationRecordV1(
