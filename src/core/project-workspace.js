@@ -397,6 +397,23 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   if (revisionIds.length >= MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
     throw new Error('Project workspace snapshot revision history limit exceeded');
   }
+
+  const currentArtifacts = new Map(current.artifactRefs.map(ref => [ref.artifactId, ref]));
+  for (const nextArtifact of normalized.artifactRefs) {
+    const currentArtifact = currentArtifacts.get(nextArtifact.artifactId);
+    if (currentArtifact && artifactIdentity(currentArtifact) !== artifactIdentity(nextArtifact)) {
+      throw new Error(`Project artifactId cannot be reused for different immutable content: ${nextArtifact.artifactId}`);
+    }
+    if (hasOwn(project.provenanceByArtifactId, nextArtifact.artifactId)) {
+      const priorProvenance = normalizeArtifactProvenanceV1(
+        project.provenanceByArtifactId[nextArtifact.artifactId],
+      );
+      if (artifactIdentity(priorProvenance.artifactRef) !== artifactIdentity(nextArtifact)) {
+        throw new Error(`Project artifactId cannot be rebound after durable provenance: ${nextArtifact.artifactId}`);
+      }
+    }
+  }
+
   project.snapshotRevisionIds = [...revisionIds, normalized.revisionId];
   project.snapshot = normalized;
   project.updatedAt = nowMs;
