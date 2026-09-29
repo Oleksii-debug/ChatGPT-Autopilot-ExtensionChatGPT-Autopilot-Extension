@@ -363,3 +363,50 @@ test('cross-job claim caps lease duration by each durable Agent profile', async 
   assert.equal(persisted.handoffs[0].leaseExpiresAt, '2026-09-29T03:11:00.000Z');
   assert.equal(persisted.executionOwnerships[0].state, 'OWNED');
 });
+
+
+test('existing owned Specialist work consumes durable Agent profile capacity before another claim', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { maxConcurrentHandoffs: 1, leaseSeconds: 600 });
+
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  const first = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(first.claimed.length, 1);
+  assert.equal(first.executionOwnerships[0].state, 'OWNED');
+
+  await manager.update(store => {
+    const job = store.byId[id];
+    const existingAssignment = structuredClone(job.runtime.specialistHandoffs[0]);
+    existingAssignment.agentId = existingAssignment.agentId + ':second';
+    existingAssignment.effectId = existingAssignment.effectId + ':second';
+    existingAssignment.state = 'READY';
+    existingAssignment.leaseId = '';
+    existingAssignment.leaseExpiresAt = '';
+    job.runtime.specialistHandoffs.push(existingAssignment);
+
+    const existingOwnership = structuredClone(job.runtime.specialistExecutionOwnerships[0]);
+    existingOwnership.effectId = existingAssignment.effectId;
+    existingOwnership.state = 'UNOWNED';
+    existingOwnership.leaseId = '';
+    existingOwnership.leaseExpiresAt = '';
+    job.runtime.specialistExecutionOwnerships.push(existingOwnership);
+    return store;
+  });
+
+  const second = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:07:00.000Z',
+  });
+  assert.deepEqual(second.claimed, []);
+  assert.equal(second.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
+});
