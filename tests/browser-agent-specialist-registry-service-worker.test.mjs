@@ -38,3 +38,16 @@ test('Specialist registry service-worker commands delegate only to BrowserAgentM
     /message\.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY'[\s\S]*?browserAgent\.mutateSpecialistRegistry\(message\.payload \|\| \{\}\)/,
   );
 });
+
+
+test('definition-bound Specialist admission command remains mutation-only and delegates exact payload', () => {
+  const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
+  const end = source.indexOf(']);', start);
+  const block = source.slice(start, end);
+  assert.doesNotMatch(block, /PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION/);
+
+  assert.match(
+    source,
+    /message\.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION'[\s\S]*?browserAgent\.prepareDefinitionSpecialistDelegation\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.delegation \|\| \{\}[\s\S]*?\)/,
+  );
+});
