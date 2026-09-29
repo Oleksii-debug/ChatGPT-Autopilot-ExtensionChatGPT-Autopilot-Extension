@@ -270,6 +270,10 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
   const expectedOutcome = raw.expectedOutcome;
 
   assertOutcomeAdmission(expectedOutcome, providerExecution, ownership, resultArtifactIds);
+  if (expectedOutcome === TrustedExecutionVerificationOutcome.EFFECT_VERIFIED
+      && Date.parse(at) > Date.parse(ownership.leaseUntil)) {
+    throw new Error('Trusted Specialist verification cannot outlive the current execution lease');
+  }
 
   assertSame(providerExecution.planId, ownership.planId, 'planId');
   assertSame(providerExecution.nodeId, ownership.nodeId, 'nodeId');
