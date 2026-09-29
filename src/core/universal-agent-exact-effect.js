@@ -483,7 +483,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       if (!reconciliationObservation) throw new Error('VERIFIED reconciliation requires observation evidence');
       const verification = normalizeVerificationV1(event.verification);
       assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
-      if (!verification.status === VerificationStatus.VERIFIED) {
+      if (verification.status !== VerificationStatus.VERIFIED) {
         throw new Error('VERIFIED reconciliation requires a verified verification');
       }
       state.verification = verification;
