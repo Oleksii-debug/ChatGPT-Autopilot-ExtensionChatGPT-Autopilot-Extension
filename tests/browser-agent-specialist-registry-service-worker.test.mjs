@@ -60,6 +60,7 @@ test('Specialist provider config commands preserve one BrowserAgent control plan
 
   assert.match(block, /'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS'/);
   assert.match(block, /'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
+  assert.match(block, /'PREPARE_BROWSER_AGENT_SPECIALIST_PROVIDER_DISPATCH'/);
   assert.doesNotMatch(block, /'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
 
   assert.match(
@@ -73,5 +74,9 @@ test('Specialist provider config commands preserve one BrowserAgent control plan
   assert.match(
     source,
     /message\.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]*?browserAgent\.putSpecialistProviderConfig\(message\.payload \|\| \{\}\)/,
+  );
+  assert.match(
+    source,
+    /message\.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_PROVIDER_DISPATCH'[\s\S]*?browserAgent\.prepareClaimedSpecialistProviderDispatch\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.dispatch \|\| \{\}[\s\S]*?\)/,
   );
 });
