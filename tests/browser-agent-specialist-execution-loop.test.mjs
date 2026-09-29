@@ -367,3 +367,63 @@ test('definition-bound handoff without durable admission provenance cannot be re
   assert.equal(persisted.handoffs.length, 1);
   assert.equal(persisted.executionOwnerships.length, 1);
 });
+
+
+test('reusable-Agent profile caps Specialist lease duration on the canonical per-job claim path', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  await manager.update(store => {
+    store.byId[id].specialistDelegationBinding.profile.leaseSeconds = 300;
+    return store;
+  });
+
+  const prepared = await manager.cycleOne(id);
+  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+
+  const claimed = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.assignments[0].leaseExpiresAt, '2026-09-29T03:11:00.000Z');
+});
+
+test('reusable-Agent zero Specialist capacity cannot be widened by per-job or cross-job callers', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  await manager.update(store => {
+    store.byId[id].specialistDelegationBinding.profile.maxConcurrentHandoffs = 0;
+    return store;
+  });
+
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+
+  const perJob = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(perJob.claimed, []);
+  assert.equal(perJob.assignments[0].state, 'READY');
+
+  const acrossJobs = await manager.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs: 32,
+    availableSlots: 32,
+    maxChildrenPerAgent: 32,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(acrossJobs.claimed, []);
+  assert.equal(acrossJobs.remainingSlots, 32);
+
+  const persisted = await manager.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs[0].state, 'READY');
+});
