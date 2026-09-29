@@ -92,6 +92,7 @@ const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
+const SPECIALIST_READINESS_DEPENDENCY_KEYS = new Set(['specialistProviderReadinessResolver']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
@@ -619,6 +620,79 @@ function assertOwnerBoundSpecialistAdmissionProvenance(job) {
       throw new Error('Owner-bound specialist handoff lacks durable admission provenance');
     }
   }
+}
+
+function trustedSpecialistReadinessDependencies(dependencies) {
+  if (dependencies === undefined || dependencies === null) return null;
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    SPECIALIST_READINESS_DEPENDENCY_KEYS,
+    'Browser Agent Specialist readiness dependencies',
+  );
+  if (!Object.hasOwn(raw, 'specialistProviderReadinessResolver')) return null;
+  const resolver = raw.specialistProviderReadinessResolver;
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
+    throw new Error('Trusted Specialist provider readiness resolver is required');
+  }
+  const dataMethod = name => {
+    let cursor = resolver;
+    while (cursor && cursor !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, name);
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error(`Trusted Specialist provider readiness resolver.${name} must be a data method`);
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
+    }
+    throw new Error(`Trusted Specialist provider readiness resolver.${name} must be a data method`);
+  };
+  const resolve = dataMethod('resolve');
+  const assertCurrent = dataMethod('assertCurrent');
+  return Object.freeze({
+    resolve: selection => resolve.call(resolver, selection),
+    assertCurrent: readiness => assertCurrent.call(resolver, readiness),
+  });
+}
+
+function readinessOwnData(value, key) {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
+  const canonical = normalizeSpecialistSelectionV1(selection);
+  if (readinessOwnData(readiness, 'trustedResolverInvoked') !== true
+      || readinessOwnData(readiness, 'callerReadinessAccepted') !== false) {
+    throw new Error('Trusted Specialist provider readiness resolver returned non-canonical provenance');
+  }
+  for (const [field, expected] of [
+    ['registryId', canonical.registryId],
+    ['registryRevision', canonical.registryRevision],
+    ['specialistId', canonical.specialistId],
+    ['providerId', canonical.providerId],
+    ['definitionRevision', canonical.definitionRevision],
+    ['executionPlane', canonical.executionPlane],
+  ]) {
+    if (readinessOwnData(readiness, field) !== expected) {
+      throw new Error('Trusted Specialist provider readiness provenance does not match durable admission');
+    }
+  }
+  if (readinessOwnData(readiness, 'executable') !== true) {
+    throw new Error('Selected Specialist provider is not currently executable');
+  }
+  const resolvedAt = readinessOwnData(readiness, 'resolvedAt');
+  const maxAgeMs = readinessOwnData(readiness, 'maxAgeMs');
+  const resolvedMs = typeof resolvedAt === 'string' ? Date.parse(resolvedAt) : NaN;
+  if (!Number.isFinite(resolvedMs) || new Date(resolvedMs).toISOString() !== resolvedAt
+      || !Number.isSafeInteger(maxAgeMs) || Object.is(maxAgeMs, -0)
+      || maxAgeMs < 1 || maxAgeMs > 5 * 60_000
+      || !Number.isSafeInteger(nowMs) || nowMs < resolvedMs || nowMs - resolvedMs > maxAgeMs) {
+    throw new Error('Trusted Specialist provider readiness expired before claim');
+  }
+  return readiness;
 }
 
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
@@ -1579,15 +1653,48 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async claimSpecialistHandoffs(id, payload = {}) {
+  async claimSpecialistHandoffs(id, payload = {}, dependencies = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist claim request');
-    const now = new Date(this.now()).toISOString();
+    const nowMs = this.now();
+    const now = new Date(nowMs).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    const readinessByAgentId = new Map();
+    if (trustedReadiness) {
+      const initial = await this.get(id);
+      if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      const admissions = normalizeSpecialistDelegationAdmissions(initial.job.runtime.specialistDelegationAdmissions);
+      const readyIds = new Set((initial.job.runtime.specialistHandoffs || [])
+        .filter(item => item?.state === 'READY')
+        .map(item => item.agentId));
+      for (const admission of admissions) {
+        if (!readyIds.has(admission.agentId)) continue;
+        const readiness = assertTrustedSpecialistReadiness(
+          await trustedReadiness.resolve(admission.selection),
+          admission.selection,
+          nowMs,
+        );
+        readinessByAgentId.set(admission.agentId, readiness);
+      }
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
       assertOwnerBoundSpecialistAdmissionProvenance(job);
+      if (trustedReadiness && job.specialistDelegationBinding?.profile?.enabled) {
+        const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+        const readyAssignments = (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY');
+        for (const assignment of readyAssignments) {
+          const admission = admissions.find(item => item.agentId === assignment.agentId);
+          const readiness = admission ? readinessByAgentId.get(assignment.agentId) : null;
+          if (!admission || !readiness) {
+            throw new Error('Owner-bound Specialist claim lacks trusted provider readiness');
+          }
+          assertTrustedSpecialistReadiness(readiness, admission.selection, this.now());
+          await trustedReadiness.assertCurrent(readiness);
+        }
+      }
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
       const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
       const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
