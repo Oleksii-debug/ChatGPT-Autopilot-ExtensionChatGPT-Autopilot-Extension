@@ -2485,12 +2485,12 @@ function renderSpecialistProviderRuntime() {
   $('specialist-provider-runtime-job').textContent = jobId
     ? `Поточний Browser Agent job: ${jobId}; control epoch ${Number.isSafeInteger(controlEpoch) ? controlEpoch : 'невідомий'}.`
     : 'Browser Agent job не вибрано.';
-  $('specialist-provider-runtime-status').textContent = jobId
+  $('specialist-provider-runtime-summary').textContent = jobId
     ? `Handoffs: ${ui.specialistHandoffs.length}. Provider executions: ${ui.specialistProviderExecutions.length}. Execution evidence quarantine: ${ui.specialistProviderExecutionQuarantined ? 'так' : 'ні'}.`
     : 'Оберіть Browser Agent job, щоб переглянути Specialist handoffs та provider evidence.';
 }
 
-async function loadSpecialistProviderRuntime() {
+async function loadSpecialistProviderRuntime({ announceResult = false } = {}) {
   const generation = ++ui.specialistProviderRuntimeLoadGeneration;
   const jobId = ui.selectedBrowserAgentId || '';
   if (!jobId) {
@@ -2499,6 +2499,9 @@ async function loadSpecialistProviderRuntime() {
     ui.specialistProviderExecutionQuarantined = false;
     ui.selectedSpecialistHandoffAgentId = '';
     renderSpecialistProviderRuntime();
+    if (announceResult) {
+      $('specialist-provider-runtime-status').textContent = 'Оберіть Browser Agent job, щоб оновити Specialist runtime evidence.';
+    }
     return;
   }
   try {
@@ -2508,6 +2511,10 @@ async function loadSpecialistProviderRuntime() {
     ui.specialistProviderExecutions = Array.isArray(durable?.providerExecutions) ? durable.providerExecutions : [];
     ui.specialistProviderExecutionQuarantined = durable?.providerExecutionQuarantined === true;
     renderSpecialistProviderRuntime();
+    if (announceResult) {
+      $('specialist-provider-runtime-status').textContent =
+        `Specialist runtime evidence оновлено. Handoffs: ${ui.specialistHandoffs.length}. Provider executions: ${ui.specialistProviderExecutions.length}.`;
+    }
   } catch (error) {
     if (ui.specialistProviderRuntimeLoadGeneration !== generation || ui.selectedBrowserAgentId !== jobId) return;
     $('specialist-provider-runtime-status').textContent = `Specialist runtime evidence не завантажено: ${error.message}`;
@@ -5378,7 +5385,9 @@ $('specialist-delete-button').addEventListener('click', deleteSpecialistDefiniti
 $('openhands-provider-save-button').addEventListener('click', saveOpenHandsProviderConfig);
 $('openhands-provider-probe-button').addEventListener('click', probeOpenHandsProviderConfig);
 $('openhands-provider-clear-button').addEventListener('click', clearOpenHandsProviderConfig);
-$('specialist-provider-runtime-refresh-button').addEventListener('click', loadSpecialistProviderRuntime);
+$('specialist-provider-runtime-refresh-button').addEventListener('click', () => {
+  void loadSpecialistProviderRuntime({ announceResult: true });
+});
 $('specialist-provider-handoff-list').addEventListener('change', selectSpecialistProviderHandoff);
 $('specialist-provider-run-button').addEventListener('click', runSelectedSpecialistProviderExecution);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
