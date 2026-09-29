@@ -659,3 +659,51 @@ test('durable reusable-Agent zero specialist capacity prevents legacy claim wide
   assert.deepEqual(claimed.claimed, []);
   assert.equal(claimed.assignments[0].state, 'READY');
 });
+
+
+test('reuses the same handoff after mutable claim state advances', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seed(manager);
+  await manager.createFromAgentDefinition(launch());
+  await attachDelegationPlan(manager);
+
+  const first = await manager.prepareDefinitionSpecialistDelegation(
+    'job.research-binding',
+    {
+      registry: specialistRegistry(),
+      expectedRegistryRevision: 12,
+      expectedPlanRevision: 4,
+      nodeId: 'local:research',
+      at: '2026-09-29T03:05:00.000Z',
+    },
+  );
+  const claimed = await manager.claimSpecialistHandoffs(
+    'job.research-binding',
+    {
+      availableSlots: 1,
+      maxChildrenPerAgent: 3,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    },
+  );
+  assert.equal(claimed.assignments[0].state, 'LEASED');
+  assert.equal(claimed.executionOwnerships[0].state, 'OWNED');
+
+  const repeated = await manager.prepareDefinitionSpecialistDelegation(
+    'job.research-binding',
+    {
+      registry: specialistRegistry(),
+      expectedRegistryRevision: 12,
+      expectedPlanRevision: claimed.plan.revision,
+      nodeId: 'local:research',
+      at: '2026-09-29T03:07:00.000Z',
+    },
+  );
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.assignment.agentId, first.assignment.agentId);
+  assert.equal(repeated.assignment.state, 'LEASED');
+  assert.equal(repeated.executionOwnership.state, 'OWNED');
+  assert.equal((await manager.listSpecialistHandoffs('job.research-binding')).handoffs.length, 1);
+});
