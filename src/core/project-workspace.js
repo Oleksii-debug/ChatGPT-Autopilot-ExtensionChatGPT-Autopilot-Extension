@@ -93,7 +93,9 @@ function setOwn(value, key, entry) {
 }
 
 function timestamp(value, label) {
-  if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid ${label}`);
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0) {
+    throw new Error(`Invalid ${label}`);
+  }
   return value;
 }
 
@@ -195,6 +197,29 @@ function sameCanonicalData(left, right) {
   return true;
 }
 
+function assertNewProjectEvidenceAdmitted(previousWorkspace, nextWorkspace) {
+  for (const [projectId, nextProject] of Object.entries(nextWorkspace.projectsById)) {
+    const previousProject = hasOwn(previousWorkspace.projectsById, projectId)
+      ? previousWorkspace.projectsById[projectId]
+      : null;
+    const nextSnapshot = normalizeProjectSnapshotV1(nextProject.snapshot);
+
+    for (const [capsuleId, capsuleValue] of Object.entries(nextProject.capsulesById)) {
+      if (!previousProject || !hasOwn(previousProject.capsulesById, capsuleId)) {
+        const capsule = normalizeContextCapsuleV1(capsuleValue);
+        assertCapsuleMatchesSnapshot(capsule, nextSnapshot);
+      }
+    }
+
+    for (const [artifactId, provenanceValue] of Object.entries(nextProject.provenanceByArtifactId)) {
+      if (!previousProject || !hasOwn(previousProject.provenanceByArtifactId, artifactId)) {
+        const provenance = normalizeArtifactProvenanceV1(provenanceValue);
+        assertProvenanceMatchesSnapshot(provenance, nextSnapshot);
+      }
+    }
+  }
+}
+
 function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
   if (nextWorkspace.createdAt !== previousWorkspace.createdAt) {
     throw new Error('Project workspace createdAt is immutable');
@@ -278,6 +303,7 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
       }
     }
   }
+  assertNewProjectEvidenceAdmitted(previousWorkspace, nextWorkspace);
 }
 
 function snapshotContextResolutionRequest(input) {
@@ -319,8 +345,23 @@ function validateProjectRecord(project) {
   return project;
 }
 
+function assertDurableWorkspaceChronology(workspace) {
+  for (const [projectId, project] of Object.entries(workspace.projectsById)) {
+    if (project.updatedAt > workspace.updatedAt) {
+      throw new Error(`Project workspace project updatedAt cannot postdate workspace updatedAt: ${projectId}`);
+    }
+  }
+}
+
 export function createProjectWorkspace(nowMs = Date.now()) {
-  return { schemaVersion: PROJECT_WORKSPACE_SCHEMA_VERSION, revision: 0, createdAt: nowMs, updatedAt: nowMs, projectsById: {} };
+  const createdAt = timestamp(nowMs, 'project workspace createdAt');
+  return {
+    schemaVersion: PROJECT_WORKSPACE_SCHEMA_VERSION,
+    revision: 0,
+    createdAt,
+    updatedAt: createdAt,
+    projectsById: {},
+  };
 }
 
 export function validateProjectWorkspace(workspace) {
@@ -343,11 +384,12 @@ export function validateProjectWorkspace(workspace) {
 
 export function createProjectRecord(snapshot, { nowMs = Date.now() } = {}) {
   const normalized = normalizeProjectSnapshotV1(snapshot);
+  const createdAt = timestamp(nowMs, 'project workspace project createdAt');
   return {
     projectId: normalized.projectId,
     snapshot: normalized,
-    createdAt: nowMs,
-    updatedAt: nowMs,
+    createdAt,
+    updatedAt: createdAt,
     snapshotRevisionIds: [normalized.revisionId],
     capsulesById: {},
     provenanceByArtifactId: {},
@@ -404,6 +446,7 @@ export function addProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } =
 }
 
 export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
@@ -414,6 +457,9 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
       throw new Error('Project snapshot revisionId cannot be reused for different content');
     }
     return project;
+  }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
   }
   if (revisionIds.includes(normalized.revisionId)) {
     throw new Error('Project snapshot revisionId cannot be reused after it was superseded');
@@ -440,13 +486,14 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
 
   project.snapshotRevisionIds = [...revisionIds, normalized.revisionId];
   project.snapshot = normalized;
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   // Existing capsules and provenance remain intentionally visible. Their
   // revision bindings make them stale rather than silently re-authorizing them.
   return project;
 }
 
 export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
@@ -458,13 +505,17 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
     }
     return current;
   }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
+  }
   if (Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
   setOwn(project.capsulesById, normalized.capsuleId, normalized);
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   return normalized;
 }
 
 export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Date.now() } = {}) {
+  const updatedAt = timestamp(nowMs, 'project workspace project updatedAt');
   validateProjectWorkspace(workspace);
   const normalized = normalizeArtifactProvenanceV1(provenance);
   const project = requireProject(workspace, normalized.projectId);
@@ -477,9 +528,12 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
     }
     return current;
   }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
+  }
   if (Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
   setOwn(project.provenanceByArtifactId, artifactId, normalized);
-  project.updatedAt = nowMs;
+  project.updatedAt = updatedAt;
   return normalized;
 }
 
@@ -560,8 +614,11 @@ export class ProjectWorkspaceRepository {
     const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
     if (durableRaw === undefined) return createProjectWorkspace(emptyNowMs);
     validateProjectWorkspace(durableRaw);
+    assertDurableWorkspaceChronology(durableRaw);
     const workspace = structuredClone(durableRaw);
-    return validateProjectWorkspace(workspace);
+    validateProjectWorkspace(workspace);
+    assertDurableWorkspaceChronology(workspace);
+    return workspace;
   }
 
   async save(workspace, { expectedPreviousRevision = null } = {}) {
@@ -570,6 +627,7 @@ export class ProjectWorkspaceRepository {
     validateProjectWorkspace(workspace);
     const candidate = structuredClone(workspace);
     validateProjectWorkspace(candidate);
+    assertDurableWorkspaceChronology(candidate);
     if (expectedPreviousRevision !== null
         && (!Number.isSafeInteger(expectedPreviousRevision)
           || Object.is(expectedPreviousRevision, -0)
@@ -587,6 +645,8 @@ export class ProjectWorkspaceRepository {
       const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
       const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
       if (durableRaw === undefined) {
+        const emptyBaseline = createProjectWorkspace(candidate.createdAt);
+        assertNewProjectEvidenceAdmitted(emptyBaseline, candidate);
         if (expectedRevision !== null && expectedRevision !== 0) {
           throw new Error('Project workspace durable revision changed before save');
         }

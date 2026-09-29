@@ -1322,3 +1322,229 @@ test('save return values cannot alias durable storage objects', async () => {
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
 });
+
+
+test('generic repository mutation rejects newly admitted capsule outside the current snapshot', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const futureCapsule = {
+        ...capsule('project-r2', 'r2'),
+        capsuleId: 'capsule-future',
+      };
+      workspace.projectsById['project-a'].capsulesById['capsule-future'] = futureCapsule;
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /Context capsule does not bind current project snapshot/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(
+    Object.hasOwn(durable.projectsById['project-a'].capsulesById, 'capsule-future'),
+    false,
+  );
+});
+
+test('generic repository mutation rejects newly admitted provenance outside the current snapshot', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const mismatched = provenance();
+      mismatched.artifactRef = {
+        ...artifact(),
+        uri: 'drive://unbound-build',
+      };
+      workspace.projectsById['project-a'].provenanceByArtifactId.build = mismatched;
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /Artifact provenance artifact is not current: build/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(
+    Object.hasOwn(durable.projectsById['project-a'].provenanceByArtifactId, 'build'),
+    false,
+  );
+});
+
+test('initial direct save cannot bootstrap future capsule evidence', async () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  workspace.projectsById['project-a'].capsulesById['capsule-future'] = {
+    ...capsule('project-r2', 'r2'),
+    capsuleId: 'capsule-future',
+  };
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(workspace),
+    /Context capsule does not bind current project snapshot/,
+  );
+});
+
+test('initial direct save cannot bootstrap mismatched artifact provenance', async () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const mismatched = provenance();
+  mismatched.artifactRef = {
+    ...artifact(),
+    uri: 'drive://unbound-build',
+  };
+  workspace.projectsById['project-a'].provenanceByArtifactId.build = mismatched;
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(workspace),
+    /Artifact provenance artifact is not current: build/,
+  );
+});
+
+
+test('durable workspace millisecond timestamps reject signed zero, fractions and unsafe integers', async () => {
+  for (const value of [-0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => createProjectWorkspace(value),
+      /Invalid project workspace createdAt/,
+    );
+  }
+
+  const workspace = createProjectWorkspace(1);
+  workspace.updatedAt = 1.5;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /Invalid project workspace updatedAt/,
+  );
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.update(value => value, { nowMs: -0 }),
+    /Invalid project workspace update nowMs/,
+  );
+});
+
+
+test('project workspace mutation helpers reject noncanonical timestamps before mutating durable draft state', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 2.5 }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: -0 }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, provenance(), {
+      nowMs: Number.MAX_SAFE_INTEGER + 1,
+    }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => addProjectSnapshot(createProjectWorkspace(1), snapshot(), { nowMs: 1.25 }),
+    /Invalid project workspace project createdAt/,
+  );
+});
+
+
+test('direct project mutation helpers reject chronology rollback before mutation', () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 20 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, provenance(), { nowMs: 19 }),
+    /project updatedAt cannot move backward/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+});
+
+
+test('exact helper replays remain no-op safe with an older caller timestamp', () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 20 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 30 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 40 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.doesNotThrow(
+    () => replaceProjectSnapshot(workspace, snapshot(), { nowMs: 1 }),
+  );
+  assert.doesNotThrow(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: 1 }),
+  );
+  assert.doesNotThrow(
+    () => putProjectArtifactProvenance(workspace, provenance(), { nowMs: 1 }),
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+});
+
+
+test('durable repository rejects project time that postdates workspace time', async () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 11 });
+
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await assert.rejects(
+    repository.save(workspace),
+    /project updatedAt cannot postdate workspace updatedAt/,
+  );
+  assert.equal(
+    Object.hasOwn(chrome.data, PROJECT_WORKSPACE_STORAGE_KEY),
+    false,
+  );
+});
+
+test('repository update cannot persist nested future project time', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  await assert.rejects(
+    repository.update(workspace => {
+      addProjectSnapshot(workspace, snapshot(), { nowMs: 11 });
+      return workspace;
+    }, { nowMs: 10 }),
+    /project updatedAt cannot postdate workspace updatedAt/,
+  );
+
+  const restored = await repository.load({ emptyNowMs: 12 });
+  assert.equal(restored.revision, 0);
+  assert.deepEqual(restored.projectsById, {});
+});
