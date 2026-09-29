@@ -1398,3 +1398,63 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
   assert.equal(policy.policy.enabled, false);
   assert.equal(policy.policy.maxConcurrentHandoffs, 0);
 });
+
+test('fresh automatic provider PREPARED atomically consumes transient claim provenance', async () => {
+  const storage = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let manager;
+  let observed = null;
+  const client = {
+    async execute() {
+      const durable = storage.data.autopilotBrowserAgentV1;
+      assert.deepEqual(Object.keys(durable.specialistAutomationClaimAdmissionsByKey || {}), []);
+      const candidates = await manager.listSpecialistAutomationDispatchCandidates();
+      assert.deepEqual(candidates.candidates, [{
+        jobId: 'job.coder',
+        agentId: observed.agentId,
+        expectedControlEpoch: 0,
+        recoverPrepared: true,
+      }]);
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager, { claim: false });
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  observed = claimed.claimed[0];
+  assert.equal(observed.agentId, agentId);
+  assert.equal(Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey).length, 1);
+
+  clock.value = Date.parse(T1);
+  const result = await manager.executeClaimedSpecialistProviderFromAutomationPolicy(
+    'job.coder',
+    {
+      agentId,
+      conversationId: '72727272-7272-4727-8727-727272727272',
+      expectedControlEpoch: 0,
+      at: T1,
+    },
+  );
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.deepEqual(Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey || {}), []);
+});
