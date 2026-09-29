@@ -481,6 +481,9 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
     ['before','qwen:8b'],
     ['gateway','qwen:8b'],
     ['after','job-2:model-budget:1','qwen:8b',false,'provider failed'],
+    ['before','gpt-strong'],
+    ['gateway','gpt-strong'],
+    ['after','job-2:model-budget:2','gpt-strong',false,'provider failed'],
   ]);
 });
 

@@ -71,10 +71,10 @@ function definition(overrides = {}) {
       maxTotalTokens: 9000,
       maxOutputTokensPerCall: 1000,
       maxRuntimeMinutes: 20,
-      aiPinnedRouteId: 'route.research',
     },
     modelRoutePolicy: {
       autoSwitch: false,
+      pinnedRouteId: 'route.research',
       allowRouteIds: ['route.research'],
       freeOnly: true,
       locality: 'local',
@@ -151,7 +151,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.equal(created.job.config.projectId, 'project-1');
   assert.equal(created.job.config.maxSteps, 50, 'definition ceiling must narrow owner ceiling');
   assert.equal(created.job.config.maxModelCalls, 8);
-  assert.equal(created.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(created.job.config.aiPinnedRouteId, '');
   assert.match(created.job.config.goal, /^Reusable Agent definition instructions:/);
   assert.match(created.job.config.goal, /Owner task:\nCompare the current evidence/);
 
@@ -186,7 +186,7 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.deepEqual(loaded.job.definitionScope.toolIds, ['browser.read']);
   assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
-  assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(loaded.job.config.aiPinnedRouteId, '');
   assert.equal(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.routePoolRevision, 7);
   assert.deepEqual(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds, ['route.research']);
 });
@@ -460,7 +460,8 @@ test('definition-bound jobs reject generic config mutation that could bypass dur
   const reloaded = await manager.get('job.immutable-definition');
   assert.equal(reloaded.job.config.goal, created.job.config.goal);
   assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
-  assert.equal(reloaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(reloaded.job.config.aiPinnedRouteId, '');
+  assert.equal(reloaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
   assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
 });

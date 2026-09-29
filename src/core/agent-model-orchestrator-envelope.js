@@ -194,6 +194,7 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   };
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
+    mode: 'primary',
     routes: [route],
     workerPolicy: scopedWorkerPolicy,
     routePolicy: {
