@@ -11,6 +11,12 @@ import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
+import {
+  createSubagentTaskActivationBindingRegistryV1,
+  normalizeSubagentTaskActivationBindingRegistryV1,
+  putSubagentTaskActivationBindingV1,
+  resolveSubagentTaskActivationBindingV1,
+} from './subagent-task-activation-binding-registry.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -18,6 +24,7 @@ const MANAGER_SCHEMA_VERSION = 1;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
+const SUBAGENT_BINDING_LOOKUP_KEYS = new Set(['bindingId']);
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
@@ -41,6 +48,33 @@ function plainIntent(value, label) {
 }
 function storedSubagentPolicy(value) {
   return { ...normalizeSubagentStructurePolicyV1(value === undefined ? {} : value) };
+}
+function storedSubagentTaskActivationBindingRegistry(runtime) {
+  const value = runtime?.subagentTaskActivationBindingRegistry;
+  return value === undefined
+    ? createSubagentTaskActivationBindingRegistryV1()
+    : normalizeSubagentTaskActivationBindingRegistryV1(value);
+}
+function plainSubagentBindingLookup(value, label = 'Subagent activation-binding lookup') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const normalized = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !SUBAGENT_BINDING_LOOKUP_KEYS.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    normalized[key] = descriptor.value;
+  }
+  return normalized;
 }
 function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
@@ -502,6 +536,73 @@ export class OrchestrationV2Manager {
     const meta = await this.loadMeta();
     if (!meta.selectedId || !meta.byId[meta.selectedId]) throw new Error('Create or select an orchestra first.');
     return { id: meta.selectedId, item: meta.byId[meta.selectedId], controller: this.controllerFor(meta.selectedId) };
+  }
+
+  /**
+   * Persists one canonical task↔activation↔invocation binding inside the existing
+   * namespaced OrchestrationRuntimeRepository. The registry remains an append-only
+   * owner-state projection and grants no execution/scheduling/completion authority.
+   *
+   * Input is normalized synchronously before the first await so caller mutation or
+   * accessor-backed objects cannot alter the durable record after admission starts.
+   */
+  async registerSubagentTaskActivationBinding(input = {}, id = '') {
+    const canonicalSingleton = putSubagentTaskActivationBindingV1(
+      createSubagentTaskActivationBindingRegistryV1(),
+      input,
+    );
+    const candidate = canonicalSingleton.records[0];
+    if (!candidate) throw new Error('Subagent activation binding registration is empty');
+
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+
+    const runtime = await controller.runtimeRepository.update(current => {
+      const registry = storedSubagentTaskActivationBindingRegistry(current);
+      current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
+        registry,
+        {
+          binding: candidate.binding,
+          registeredAt: candidate.registeredAt,
+        },
+      );
+      return current;
+    });
+    const registry = storedSubagentTaskActivationBindingRegistry(runtime);
+    const binding = resolveSubagentTaskActivationBindingV1(
+      registry,
+      { bindingId: candidate.binding.bindingId },
+    );
+    return Object.freeze({
+      orchestraId,
+      revision: registry.revision,
+      binding,
+    });
+  }
+
+  /**
+   * Trusted read adapter for prepareSubagentResultReconciliationV1. Reads only the
+   * existing Orchestration runtime owner and never accepts caller-supplied registry
+   * state. Missing bindings resolve to null; corrupt durable history fails closed.
+   */
+  async resolveSubagentTaskActivationBinding(input = {}, id = '') {
+    const lookup = plainSubagentBindingLookup(input);
+    // Validate exact bindingId synchronously before any owner-state await.
+    resolveSubagentTaskActivationBindingV1(
+      createSubagentTaskActivationBindingRegistryV1(),
+      lookup,
+    );
+
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+    const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
+    return resolveSubagentTaskActivationBindingV1(
+      storedSubagentTaskActivationBindingRegistry(runtime),
+      lookup,
+    );
   }
 
   /**

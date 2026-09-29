@@ -4,6 +4,10 @@ import { StorageRepository } from '../src/core/storage.js';
 import { OrchestrationV2Manager, ORCHESTRATION_V2_ALARM_PREFIX } from '../src/core/orchestration-v2-manager.js';
 import { RunState } from '../src/core/schema.js';
 import { exportOrchestrationProfile } from '../src/core/orchestration-v2-profile.js';
+import {
+  OrchestrationActivationPurpose,
+  compactOrchestrationEventId,
+} from '../src/core/orchestration-hierarchy.js';
 
 function chromeFake() {
   const data = {};
@@ -71,6 +75,46 @@ function managerFixture(){
   let n=0;
   const manager = new OrchestrationV2Manager({ coreRepository:core, chromeApi:chrome, createId:()=>`orch-${++n}`, now:()=>1000 });
   return { chrome, core, manager };
+}
+function subagentActivationBinding(overrides = {}) {
+  const value = {
+    schemaVersion:1,
+    projectId:'binding-project',
+    parentAgentId:'parent-1',
+    childAgentId:'child-1',
+    taskId:'task-1',
+    taskEnvelopeId:'envelope-1',
+    planId:'plan-1',
+    planRevision:3,
+    outcomeContractId:'outcome-1',
+    outcomeContractRevision:1,
+    invocationId:'invocation-1',
+    controlEpoch:7,
+    activationId:'activation-1',
+    generation:1,
+    activationPurpose:OrchestrationActivationPurpose.WORK,
+    boundAt:'2026-09-29T04:00:00.000Z',
+    ...overrides,
+  };
+  value.bindingId=compactOrchestrationEventId(
+    'subagent-task-activation-binding',
+    value.projectId,
+    value.parentAgentId,
+    value.childAgentId,
+    value.taskId,
+    value.taskEnvelopeId,
+    value.planId,
+    String(value.planRevision),
+    value.outcomeContractId,
+    String(value.outcomeContractRevision),
+    String(value.controlEpoch),
+    value.activationId,
+    String(value.generation),
+    value.activationPurpose,
+    value.invocationId,
+  );
+  if(Object.hasOwn(overrides,'bindingId')) value.bindingId=overrides.bindingId;
+  return value;
 }
 
 test('independent multiple orchestras keep namespaced config/runtime and selection', async()=>{
@@ -517,6 +561,96 @@ test('subagent structural precheck defaults to deny and fails closed without dur
   });
   assert.equal(decision.decision,'DENY');
   assert.equal(decision.reasonCode,'AGENT_CHILD_CREATION_DISABLED');
+});
+
+test('subagent activation binding history persists in the existing orchestra runtime and survives manager restart', async()=>{
+  const {manager,chrome,core}=managerFixture();
+  await manager.create({name:'Bindings A',config:cfg('binding-project')});
+  await manager.create({name:'Bindings B',config:cfg('binding-project-b')});
+
+  const value=subagentActivationBinding();
+  const first=await manager.registerSubagentTaskActivationBinding({
+    binding:value,
+    registeredAt:'2026-09-29T04:00:01.000Z',
+  },'orch-1');
+  assert.equal(first.orchestraId,'orch-1');
+  assert.equal(first.revision,1);
+  assert.deepEqual(first.binding,value);
+
+  const replay=await manager.registerSubagentTaskActivationBinding({
+    binding:structuredClone(value),
+    registeredAt:'2026-09-29T04:10:00.000Z',
+  },'orch-1');
+  assert.equal(replay.revision,1,'exact replay must preserve first append-only record');
+
+  assert.equal(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-2']?.subagentTaskActivationBindingRegistry,
+    undefined,
+    'binding history must stay orchestra-local',
+  );
+  assert.equal(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry.records[0].registeredAt,
+    '2026-09-29T04:00:01.000Z',
+  );
+
+  const restarted=new OrchestrationV2Manager({
+    coreRepository:core,
+    chromeApi:chrome,
+    createId:()=> 'unused',
+    now:()=>2000,
+  });
+  assert.deepEqual(
+    await restarted.resolveSubagentTaskActivationBinding({bindingId:value.bindingId},'orch-1'),
+    first.binding,
+  );
+  assert.equal(
+    await restarted.resolveSubagentTaskActivationBinding({
+      bindingId:subagentActivationBinding({taskId:'missing-task'}).bindingId,
+    },'orch-1'),
+    null,
+  );
+});
+
+test('subagent activation binding persistence rejects rebinding and accessor-backed lookup without mutating durable history', async()=>{
+  const {manager,chrome}=managerFixture();
+  await manager.create({name:'Bindings',config:cfg('binding-project')});
+  const first=subagentActivationBinding();
+  await manager.registerSubagentTaskActivationBinding({
+    binding:first,
+    registeredAt:'2026-09-29T04:00:01.000Z',
+  },'orch-1');
+  const before=structuredClone(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
+  );
+
+  const rebound=subagentActivationBinding({
+    taskId:'task-2',
+    taskEnvelopeId:'envelope-2',
+    invocationId:'invocation-2',
+  });
+  await assert.rejects(
+    ()=>manager.registerSubagentTaskActivationBinding({
+      binding:rebound,
+      registeredAt:'2026-09-29T04:05:00.000Z',
+    },'orch-1'),
+    /activation cannot be rebound/u,
+  );
+  assert.deepEqual(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
+    before,
+  );
+
+  let getterReads=0;
+  const lookup={};
+  Object.defineProperty(lookup,'bindingId',{
+    enumerable:true,
+    get(){ getterReads+=1; return first.bindingId; },
+  });
+  await assert.rejects(
+    ()=>manager.resolveSubagentTaskActivationBinding(lookup,'orch-1'),
+    /enumerable own data properties/u,
+  );
+  assert.equal(getterReads,0);
 });
 
 test('hierarchy profile import fails closed after the first Start even when the orchestra is owner-paused', async()=>{
