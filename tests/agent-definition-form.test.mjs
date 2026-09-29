@@ -354,6 +354,61 @@ test('Specialist delegation form rejects non-canonical numeric aliases and out-o
   );
 });
 
+test('Specialist delegation form admission is descriptor-safe and requires explicit booleans', () => {
+  let reads = 0;
+  const persistedProfile = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const hostile = form();
+  Object.defineProperty(hostile, 'specialistDelegationConfigured', {
+    enumerable: true,
+    get() { reads += 1; return false; },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(hostile, { specialistDelegationProfile: persistedProfile }),
+    /data property/u,
+  );
+  assert.equal(reads, 0);
+
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({
+      specialistDelegationConfigured: 'false',
+    }), { specialistDelegationProfile: persistedProfile }),
+    /має бути boolean/u,
+  );
+
+  const configured = form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  });
+  Object.defineProperty(configured, 'specialistRegistryId', {
+    enumerable: true,
+    get() { reads += 1; return 'specialists:project-1'; },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(configured),
+    /data property/u,
+  );
+  assert.equal(reads, 0);
+});
+
 test('persisted Specialist delegation profile is canonicalized and detached on unrelated edits', () => {
   const persisted = {
     schemaVersion: 1,
