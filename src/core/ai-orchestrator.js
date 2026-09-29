@@ -582,8 +582,10 @@ export class AiOrchestrator {
             try {
               strongResult = await tryStrong(handoff, clean(systemPrompt), requestedTrigger);
             } catch (error) {
+              const optionalStrongCallBudgetExhausted = error?.code === 'AI_MODEL_CALL_BUDGET_EXHAUSTED';
               if (error && (typeof error === 'object' || typeof error === 'function')
-                  && nonProviderRouteFailures.has(error)) throw error;
+                  && nonProviderRouteFailures.has(error)
+                  && !optionalStrongCallBudgetExhausted) throw error;
               if (!settings.keepPrimaryIfStrongFails) throw error;
               trigger = `${requestedTrigger}-strong-failed-primary-used`;
             }
