@@ -15,6 +15,7 @@ import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
+import { createStoredOutcomeContractV1, deleteStoredOutcomeContractV1, listStoredOutcomeContractsV1, resolveStoredOutcomeContractV1, updateStoredOutcomeContractV1 } from './outcome-contract-control.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -458,6 +459,57 @@ export class CoreCommandDispatcher {
     }
   }
   async execute(command, payload = {}, internal = {}) {
+    if (command === CoreCommand.LIST_OUTCOME_CONTRACTS) {
+      const state = await this.repo.load();
+      return { contracts: structuredClone(listStoredOutcomeContractsV1(state, { projectId: payload.projectId })) };
+    }
+    if (command === CoreCommand.GET_OUTCOME_CONTRACT) {
+      const state = await this.repo.load();
+      return { contract: structuredClone(resolveStoredOutcomeContractV1(state, {
+        projectId: payload.projectId,
+        contractId: payload.contractId,
+        expectedRevision: payload.expectedRevision,
+      })) };
+    }
+    if (command === CoreCommand.CREATE_OUTCOME_CONTRACT) {
+      let created;
+      await this.repo.update(draft => {
+        created = createStoredOutcomeContractV1(draft, payload.contract);
+        return draft;
+      });
+      return { contract: structuredClone(created) };
+    }
+    if (command === CoreCommand.UPDATE_OUTCOME_CONTRACT) {
+      let updated;
+      await this.repo.update(draft => {
+        updated = updateStoredOutcomeContractV1(draft, {
+          projectId: payload.projectId,
+          contractId: payload.contractId,
+          expectedRevision: payload.expectedRevision,
+          contract: payload.contract,
+        });
+        return draft;
+      });
+      return { contract: structuredClone(updated) };
+    }
+    if (command === CoreCommand.DELETE_OUTCOME_CONTRACT) {
+      let deleted;
+      await this.repo.update(draft => {
+        deleted = deleteStoredOutcomeContractV1(draft, {
+          projectId: payload.projectId,
+          contractId: payload.contractId,
+          expectedRevision: payload.expectedRevision,
+        });
+        return draft;
+      });
+      return {
+        deleted: {
+          projectId: deleted.projectId,
+          contractId: deleted.contractId,
+          revision: deleted.revision,
+        },
+      };
+    }
     if (command === CoreCommand.RESOLVE_UNCERTAIN) {
       const state = await this.repo.update(draft => {
         const session = requireSession(draft, payload.sessionId);
