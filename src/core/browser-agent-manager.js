@@ -57,6 +57,7 @@ import {
   createSpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
@@ -585,8 +586,14 @@ function normalizeSpecialistDelegationAdmissions(raw) {
       && item.admissionKey.length <= 100_000
       ? item.admissionKey
       : '';
+    let selection = null;
+    try {
+      selection = normalizeSpecialistSelectionV1(item.selection);
+    } catch {
+      continue;
+    }
     if (!agentId || !admissionKey || out.some(entry => entry.agentId === agentId)) continue;
-    out.push({ agentId, admissionKey });
+    out.push({ agentId, admissionKey, selection });
   }
   return out;
 }
@@ -1488,7 +1495,10 @@ export class BrowserAgentManager {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
         const existingAdmission = admissions.find(item => item.agentId === assignment.agentId);
         if (!existingOwnership || !existingAdmission) throw new Error('Existing specialist handoff lacks canonical durable admission provenance');
-        if (existingAdmission.admissionKey !== admissionKey) throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+        if (existingAdmission.admissionKey !== admissionKey
+            || JSON.stringify(existingAdmission.selection) !== JSON.stringify(proposal.selection)) {
+          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+        }
         if (JSON.stringify(existing) !== JSON.stringify(assignment)
             || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
           throw new Error('Existing specialist handoff runtime state drifted from its canonical READY proposal');
@@ -1501,7 +1511,11 @@ export class BrowserAgentManager {
       }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
-      job.runtime.specialistDelegationAdmissions = [...admissions, { agentId: assignment.agentId, admissionKey }];
+      job.runtime.specialistDelegationAdmissions = [...admissions, {
+        agentId: assignment.agentId,
+        admissionKey,
+        selection: clone(proposal.selection),
+      }];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
