@@ -45,6 +45,11 @@ test('LEASED-only provider run binds current exact Browser Agent control epoch',
   assert.doesNotMatch(body, /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS|VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF|COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF/u);
   assert.doesNotMatch(body, /providerDispatched/u);
   assert.match(body, /Result kind: \$\{result\?\.kind \|\| 'невідомий'\}/u);
+  assert.doesNotMatch(
+    body,
+    /finally\s*\{[\s\S]*?renderSpecialistProviderRuntime\(\)/u,
+    'final operation status must remain in the role=status live region for NVDA',
+  );
 });
 
 test('runtime run control is disabled without a canonical epoch or with terminal evidence', () => {
