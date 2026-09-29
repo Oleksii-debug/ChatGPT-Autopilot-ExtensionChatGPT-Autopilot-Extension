@@ -60,6 +60,8 @@ test('best path prefers deterministic path classes and never grants authority', 
   );
   for (const authority of [result.authority, result.selected.authority, ...result.alternatives.map(item => item.authority)]) {
     assert.equal(authority.advisoryOnly, true);
+    assert.equal(authority.requiresPreauthorizedInventory, true);
+    assert.equal(authority.inventoryVisibilityAuthorized, false);
     assert.equal(authority.executionAuthorized, false);
     assert.equal(authority.permissionGranted, false);
     assert.equal(authority.installationAuthorized, false);
