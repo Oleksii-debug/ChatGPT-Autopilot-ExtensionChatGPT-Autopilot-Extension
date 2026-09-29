@@ -74,7 +74,7 @@ const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
@@ -1074,7 +1074,7 @@ export class BrowserAgentManager {
       'Browser Agent definition launch request',
     );
     for (const key of [
-      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
       'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
       'requestedCapabilityIds', 'requestedToolIds',
     ]) {
@@ -1104,6 +1104,9 @@ export class BrowserAgentManager {
       if (!registry) throw new Error('Agent definition registry not found');
       if (registry.revision !== request.expectedRegistryRevision) {
         throw new Error('Agent definition registry revision drifted before launch');
+      }
+      if (registry.bindingKey !== request.expectedRegistryBindingKey) {
+        throw new Error('Agent definition registry bindingKey drifted before launch');
       }
 
       const selection = selectAgentDefinitionV1({
