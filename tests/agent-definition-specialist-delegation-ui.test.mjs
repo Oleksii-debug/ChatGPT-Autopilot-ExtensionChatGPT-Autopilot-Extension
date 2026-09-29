@@ -38,6 +38,11 @@ test('Specialist delegation profile controls have explicit accessible labels and
     html,
     /Збереження profile нічого не запускає[\s\S]*?Runtime все одно повторно перевіряє plan, registry, policy, provider readiness і product-wide capacity/u,
   );
+  assert.match(
+    html,
+    /id="agent-definition-specialist-delegation-group" aria-describedby="agent-definition-specialist-delegation-help"/u,
+    'Specialist delegation group must expose its setup-only warning to screen readers',
+  );
 });
 
 test('inactive Specialist delegation profile removes subordinate controls from keyboard tab flow', () => {
