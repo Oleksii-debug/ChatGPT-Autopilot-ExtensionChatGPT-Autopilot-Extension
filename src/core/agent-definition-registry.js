@@ -54,6 +54,7 @@ const DEFINITION_CEILING_KEYS = Object.freeze([
 const MODEL_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const OWNER_BUDGET_KEYS = new Set([
   ...DEFINITION_CEILING_KEYS,
@@ -219,7 +220,13 @@ export function normalizeAgentModelRoutePolicyV1(input) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
     }
   }
-  for (const key of ['maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
+  for (const key of [
+    'maxInputPricePerMillionUsd',
+    'maxOutputPricePerMillionUsd',
+    'retryBackoffSeconds',
+    'circuitBreakerFailures',
+    'circuitBreakerSeconds',
+  ]) {
     if (Object.hasOwn(raw, key)
         && (Object.is(raw[key], -0) || !Object.is(raw[key], normalized[key]))) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
@@ -234,7 +241,7 @@ export function normalizeAgentModelRoutePolicyV1(input) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
     }
   }
-  return freeze({
+  const out = {
     autoSwitch: normalized.autoSwitch,
     pinnedRouteId: normalized.pinnedRouteId,
     orderedRouteIds: [...normalized.orderedRouteIds],
@@ -244,7 +251,20 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-  });
+  };
+  // These failover controls were added after the original durable
+  // AgentDefinitionV1 policy shape. Preserve omission for legacy/partial
+  // definitions so a child Agent can inherit stricter parent failover
+  // constraints instead of silently materializing global Router defaults.
+  // Owner UI writes all three explicitly for newly configured full policies.
+  for (const key of [
+    'retryBackoffSeconds',
+    'circuitBreakerFailures',
+    'circuitBreakerSeconds',
+  ]) {
+    if (Object.hasOwn(raw, key)) out[key] = normalized[key];
+  }
+  return freeze(out);
 }
 
 function normalizeOwnerBudget(input) {

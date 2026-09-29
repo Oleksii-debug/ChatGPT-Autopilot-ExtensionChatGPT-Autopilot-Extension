@@ -1,4 +1,5 @@
 import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
+import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
@@ -145,54 +146,263 @@ export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Форма Specialist delegation недоступна.');
   }
-  const configured = input.specialistDelegationConfigured === true;
+  const configuredField = optionalOwnModelPolicyFormValue(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
+  const configured = configuredField.present
+    ? exactModelPolicyBoolean(configuredField.value, 'Specialist delegation configured')
+    : false;
   if (!configured) {
     return persistedProfile === undefined ? undefined : null;
   }
   const profile = normalizeAgentSpecialistDelegationProfileV1({
     schemaVersion: 1,
     registryId: parseCanonicalAgentIdentity(
-      input.specialistRegistryId,
+      modelPolicyFormValue(input, 'specialistRegistryId', 'Specialist registry ID', undefined),
       'Specialist registry ID',
     ),
     requiredCapabilityIds: listFromLines(
-      input.specialistCapabilityIdsText ?? '',
+      modelPolicyFormValue(input, 'specialistCapabilityIdsText', 'Specialist capability IDs', ''),
       'Specialist capability ID',
       { maxItems: 64, itemMax: 180, identity: true },
     ),
     requiredToolIds: listFromLines(
-      input.specialistToolIdsText ?? '',
+      modelPolicyFormValue(input, 'specialistToolIdsText', 'Specialist tool IDs', ''),
       'Specialist tool ID',
       { maxItems: 128, itemMax: 180, identity: true },
     ),
     policyEnvelopeId: parseCanonicalAgentIdentity(
-      input.specialistPolicyEnvelopeId,
+      modelPolicyFormValue(input, 'specialistPolicyEnvelopeId', 'Policy envelope ID', undefined),
       'Policy envelope ID',
     ),
     deadlineSeconds: exactIntegerText(
-      input.specialistDeadlineSeconds,
+      modelPolicyFormValue(input, 'specialistDeadlineSeconds', 'Specialist deadline', undefined),
       'Specialist deadline',
       { min: 1, max: 31_536_000 },
     ),
     maxConcurrentHandoffs: exactIntegerText(
-      input.specialistMaxConcurrentHandoffs,
+      modelPolicyFormValue(input, 'specialistMaxConcurrentHandoffs', 'Specialist concurrency', undefined),
       'Specialist concurrency',
       { min: 0, max: 256 },
     ),
     leaseSeconds: exactIntegerText(
-      input.specialistLeaseSeconds,
+      modelPolicyFormValue(input, 'specialistLeaseSeconds', 'Specialist lease', undefined),
       'Specialist lease',
       { min: 1, max: 86_400 },
     ),
     priority: exactIntegerText(
-      input.specialistPriority,
+      modelPolicyFormValue(input, 'specialistPriority', 'Specialist priority', undefined),
       'Specialist priority',
       { min: 0, max: 1_000_000 },
     ),
-    enabled: input.specialistDelegationEnabled === true,
+    enabled: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'specialistDelegationEnabled', 'Specialist delegation enabled', false),
+      'Specialist delegation enabled',
+    ),
   });
   return profile;
 }
+
+function modelRouteIdListFromLines(value, label) {
+  if (typeof value !== 'string') throw new Error(label + ' має бути текстом.');
+  const values = [];
+  const seen = new Set();
+  for (const raw of value.replace(/\r\n?/g, '\n').split('\n')) {
+    if (raw === '') continue;
+    const item = parseCanonicalAgentIdentity(raw, label);
+    if (seen.has(item)) throw new Error(label + ' містить дублікат: ' + item);
+    seen.add(item);
+    values.push(item);
+    if (values.length > 32) throw new Error(label + ' містить забагато значень.');
+  }
+  return values;
+}
+
+function optionalOwnModelPolicyFormValue(input, key, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor) return { present: false, value: undefined };
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  return { present: true, value: descriptor.value };
+}
+
+function modelPolicyFormValue(input, key, label, fallback) {
+  const field = optionalOwnModelPolicyFormValue(input, key, label);
+  return field.present ? field.value : fallback;
+}
+
+function exactModelPolicyBoolean(value, label) {
+  if (typeof value !== 'boolean') throw new Error(label + ' має бути boolean.');
+  return value;
+}
+
+function optionalPolicyPriceText(value, label) {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(label + ' має бути канонічним числом або порожнім.');
+  }
+  if (value === '') return null;
+  if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u.test(value)) {
+    throw new Error(label + ' має бути канонічним невід’ємним числом.');
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || Object.is(number, -0)) {
+    throw new Error(label + ' має бути скінченним невід’ємним числом.');
+  }
+  return number;
+}
+
+export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
+  persistedPolicy = null,
+} = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма Agent model policy недоступна.');
+  }
+  const configuredField = optionalOwnModelPolicyFormValue(
+    input,
+    'modelRoutePolicyConfigured',
+    'Model route policy configured',
+  );
+  if (!configuredField.present) return copyModelRoutePolicy(persistedPolicy);
+  const configured = exactModelPolicyBoolean(
+    configuredField.value,
+    'Model route policy configured',
+  );
+  if (!configured) return null;
+
+  const pinnedRouteId = exactText(
+    modelPolicyFormValue(input, 'modelRoutePinnedRouteId', 'Pinned model route ID', ''),
+    'Pinned model route ID',
+    180,
+    { optional: true },
+  );
+  const locality = exactText(
+    modelPolicyFormValue(input, 'modelRouteLocality', 'Model route locality', 'any'),
+    'Model route locality',
+    20,
+  );
+  const policy = normalizeAiRoutePolicy({
+    autoSwitch: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'modelRouteAutoSwitch', 'Model route auto switch', true),
+      'Model route auto switch',
+    ),
+    pinnedRouteId: pinnedRouteId
+      ? parseCanonicalAgentIdentity(pinnedRouteId, 'Pinned model route ID')
+      : '',
+    orderedRouteIds: modelRouteIdListFromLines(
+      modelPolicyFormValue(input, 'modelRouteOrderedRouteIdsText', 'Ordered model route IDs', ''),
+      'Ordered model route ID',
+    ),
+    allowRouteIds: modelRouteIdListFromLines(
+      modelPolicyFormValue(input, 'modelRouteAllowRouteIdsText', 'Allowed model route IDs', ''),
+      'Allowed model route ID',
+    ),
+    denyRouteIds: modelRouteIdListFromLines(
+      modelPolicyFormValue(input, 'modelRouteDenyRouteIdsText', 'Denied model route IDs', ''),
+      'Denied model route ID',
+    ),
+    freeOnly: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'modelRouteFreeOnly', 'Model route free only', false),
+      'Model route free only',
+    ),
+    locality,
+    maxInputPricePerMillionUsd: optionalPolicyPriceText(
+      modelPolicyFormValue(input, 'modelRouteMaxInputPriceText', 'Максимальна input-ціна', ''),
+      'Максимальна input-ціна',
+    ),
+    maxOutputPricePerMillionUsd: optionalPolicyPriceText(
+      modelPolicyFormValue(input, 'modelRouteMaxOutputPriceText', 'Максимальна output-ціна', ''),
+      'Максимальна output-ціна',
+    ),
+    retryBackoffSeconds: exactIntegerText(
+      modelPolicyFormValue(input, 'modelRouteRetryBackoffSeconds', 'Model route retry backoff', ''),
+      'Model route retry backoff',
+      { min: 1, max: 86_400 },
+    ),
+    circuitBreakerFailures: exactIntegerText(
+      modelPolicyFormValue(input, 'modelRouteCircuitBreakerFailures', 'Model route circuit breaker failures', ''),
+      'Model route circuit breaker failures',
+      { min: 1, max: 100 },
+    ),
+    circuitBreakerSeconds: exactIntegerText(
+      modelPolicyFormValue(input, 'modelRouteCircuitBreakerSeconds', 'Model route circuit breaker duration', ''),
+      'Model route circuit breaker duration',
+      { min: 1, max: 86_400 },
+    ),
+  });
+  if (policy.allowRouteIds.length) {
+    const allow = new Set(policy.allowRouteIds);
+    for (const [label, routeIds] of [
+      ['Ordered model route ID', policy.orderedRouteIds],
+      ['Denied model route ID', policy.denyRouteIds],
+    ]) {
+      const outside = routeIds.find(routeId => !allow.has(routeId));
+      if (outside) throw new Error(label + ' поза allow scope: ' + outside);
+    }
+    if (policy.pinnedRouteId && !allow.has(policy.pinnedRouteId)) {
+      throw new Error('Pinned model route ID поза allow scope: ' + policy.pinnedRouteId);
+    }
+    const denied = new Set(policy.denyRouteIds);
+    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) {
+      throw new Error('Model Router policy deny scope перекриває весь явний allow scope.');
+    }
+  }
+  if (policy.pinnedRouteId && policy.denyRouteIds.includes(policy.pinnedRouteId)) {
+    throw new Error('Pinned model route ID одночасно заборонений deny policy.');
+  }
+
+  const out = {
+    autoSwitch: policy.autoSwitch,
+    pinnedRouteId: policy.pinnedRouteId,
+    orderedRouteIds: [...policy.orderedRouteIds],
+    allowRouteIds: [...policy.allowRouteIds],
+    denyRouteIds: [...policy.denyRouteIds],
+    freeOnly: policy.freeOnly,
+    locality: policy.locality,
+    maxInputPricePerMillionUsd: policy.maxInputPricePerMillionUsd,
+    maxOutputPricePerMillionUsd: policy.maxOutputPricePerMillionUsd,
+    retryBackoffSeconds: policy.retryBackoffSeconds,
+    circuitBreakerFailures: policy.circuitBreakerFailures,
+    circuitBreakerSeconds: policy.circuitBreakerSeconds,
+  };
+
+  // The Options UI displays Router defaults for the three failover controls
+  // when an older persisted policy does not contain them. Saving an unrelated
+  // edit must not turn those display fallbacks into explicit child overrides:
+  // omission is what allows a child Agent to inherit stricter parent values.
+  // A new definition, an already-explicit field, or a non-default owner edit
+  // remains explicit and therefore continues through canonical validation.
+  if (persistedPolicy != null) {
+    for (const [key, defaultValue] of [
+      ['retryBackoffSeconds', 60],
+      ['circuitBreakerFailures', 2],
+      ['circuitBreakerSeconds', 300],
+    ]) {
+      if (!Object.hasOwn(persistedPolicy, key) && out[key] === defaultValue) {
+        delete out[key];
+      }
+    }
+  }
+
+  return out;
+}
+
+const AGENT_MODEL_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch',
+  'pinnedRouteId',
+  'orderedRouteIds',
+  'allowRouteIds',
+  'denyRouteIds',
+  'freeOnly',
+  'locality',
+  'maxInputPricePerMillionUsd',
+  'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds',
+  'circuitBreakerFailures',
+  'circuitBreakerSeconds',
+]);
 
 function copyModelRoutePolicy(value) {
   if (value == null) return null;
@@ -202,7 +412,9 @@ function copyModelRoutePolicy(value) {
   const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    if (typeof key !== 'string' || !AGENT_MODEL_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('modelRoutePolicy містить неканонічне поле: ' + String(key) + '.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('modelRoutePolicy.' + key + ' має бути enumerable data property.');
@@ -248,20 +460,60 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
+  const effectiveConfigDefaults = mergeAgentDefinitionModelDefaultsV1(input, configDefaults);
+  const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
+    persistedPolicy: modelRoutePolicy,
+  });
+  const agentDefinitionId = modelPolicyFormValue(input, 'agentDefinitionId', 'Agent definition ID', undefined);
+  const label = modelPolicyFormValue(input, 'label', 'Назва', undefined);
+  const description = modelPolicyFormValue(input, 'description', 'Опис', '');
+  const instructions = modelPolicyFormValue(input, 'instructions', 'Інструкції', undefined);
+  const capabilityIdsText = modelPolicyFormValue(input, 'capabilityIdsText', 'Capability IDs', '');
+  const toolIdsText = modelPolicyFormValue(input, 'toolIdsText', 'Tool IDs', '');
+  const tagsText = modelPolicyFormValue(input, 'tagsText', 'Tags', '');
+  const acceptanceCriteriaText = modelPolicyFormValue(input, 'acceptanceCriteriaText', 'Критерії завершення', '');
+  const enabled = exactModelPolicyBoolean(
+    modelPolicyFormValue(input, 'enabled', 'Agent definition enabled', false),
+    'Agent definition enabled',
+  );
+  const specialistConfiguredField = optionalOwnModelPolicyFormValue(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
+  const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
+  if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
+    const policyPinnedRouteId = effectiveModelRoutePolicy.pinnedRouteId || '';
+    const policyAllowRouteIds = Array.isArray(effectiveModelRoutePolicy.allowRouteIds)
+      ? effectiveModelRoutePolicy.allowRouteIds
+      : [];
+    const policyDenyRouteIds = Array.isArray(effectiveModelRoutePolicy.denyRouteIds)
+      ? effectiveModelRoutePolicy.denyRouteIds
+      : [];
+    if (policyPinnedRouteId && policyPinnedRouteId !== legacyPinnedRouteId) {
+      throw new Error('Legacy pinned route конфліктує з Model Router policy pinned route.');
+    }
+    if (policyAllowRouteIds.length && !policyAllowRouteIds.includes(legacyPinnedRouteId)) {
+      throw new Error('Legacy pinned route поза Model Router policy allow scope.');
+    }
+    if (policyDenyRouteIds.includes(legacyPinnedRouteId)) {
+      throw new Error('Legacy pinned route заборонений Model Router policy deny scope.');
+    }
+  }
   return {
     schemaVersion: 1,
-    agentDefinitionId: parseCanonicalAgentIdentity(input.agentDefinitionId, 'Agent definition ID'),
-    label: exactText(input.label, 'Назва', 160),
-    description: exactText(input.description ?? '', 'Опис', 4000, { optional: true }),
-    instructions: exactText(input.instructions, 'Інструкції', 12000),
-    capabilityIds: listFromLines(input.capabilityIdsText ?? '', 'Capability ID', { maxItems:64, itemMax:180, identity:true }),
-    toolIds: listFromLines(input.toolIdsText ?? '', 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
-    tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
-    acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
-    configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
-    modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
+    agentDefinitionId: parseCanonicalAgentIdentity(agentDefinitionId, 'Agent definition ID'),
+    label: exactText(label, 'Назва', 160),
+    description: exactText(description, 'Опис', 4000, { optional: true }),
+    instructions: exactText(instructions, 'Інструкції', 12000),
+    capabilityIds: listFromLines(capabilityIdsText, 'Capability ID', { maxItems:64, itemMax:180, identity:true }),
+    toolIds: listFromLines(toolIdsText, 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
+    tags: listFromLines(tagsText, 'Тег', { maxItems:32, itemMax:180, identity:true }),
+    acceptanceCriteria: listFromLines(acceptanceCriteriaText, 'Критерій завершення', { maxItems:20, itemMax:1000 }),
+    configDefaults: effectiveConfigDefaults,
+    modelRoutePolicy: effectiveModelRoutePolicy,
     ...(() => {
-      const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
+      const effectiveProfile = specialistConfiguredField.present
         ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
           persistedProfile: specialistDelegationProfile,
         })
@@ -272,7 +524,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
         ? {}
         : { specialistDelegationProfile: effectiveProfile };
     })(),
-    enabled: input.enabled === true,
+    enabled,
     definitionRevision,
   };
 }

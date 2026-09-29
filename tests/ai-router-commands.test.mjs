@@ -611,20 +611,119 @@ test('Agent route policy fails closed when it widens global allow-list, locality
   }), /conflicts with the global pinned route/);
 });
 
-test('Agent route policy rejects resilience controls and hostile fields instead of creating policy authority', async () => {
+test('Agent route policy narrows resilience controls without weakening global Router policy', async () => {
+  const seen = [];
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
-    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+    aiOrchestrator: {
+      async run(settings, runtime) {
+        seen.push(structuredClone(settings.routePolicy));
+        return { text:'ok', runtime };
+      },
+    },
   });
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
     enabled:true,
     routes:[{ routeId:'local', provider:'ollama', model:'local' }],
+    routePolicy:{
+      retryBackoffSeconds:90,
+      circuitBreakerFailures:4,
+      circuitBreakerSeconds:300,
+    },
   } });
-  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
-    prompt:'x', isolatedRuntime:true,
-    routerOverride:{ routePolicy:{ retryBackoffSeconds:1 } },
-  }), /unsupported field/);
+
+  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'stricter', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{
+      retryBackoffSeconds:120,
+      circuitBreakerFailures:2,
+      circuitBreakerSeconds:600,
+    } },
+  });
+  assert.equal(seen[0].retryBackoffSeconds, 120);
+  assert.equal(seen[0].circuitBreakerFailures, 2);
+  assert.equal(seen[0].circuitBreakerSeconds, 600);
+
+  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'attempt-weaker', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{
+      retryBackoffSeconds:30,
+      circuitBreakerFailures:10,
+      circuitBreakerSeconds:60,
+    } },
+  });
+  assert.equal(seen[1].retryBackoffSeconds, 90);
+  assert.equal(seen[1].circuitBreakerFailures, 4);
+  assert.equal(seen[1].circuitBreakerSeconds, 300);
+
+  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'legacy-partial', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ freeOnly:true } },
+  });
+  assert.equal(seen[2].retryBackoffSeconds, 90);
+  assert.equal(seen[2].circuitBreakerFailures, 4);
+  assert.equal(seen[2].circuitBreakerSeconds, 300);
 });
 
+test('Agent resilience policy reaches real route failure state before provider fallback', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: {
+        async complete(request) {
+          calls.push(request);
+          const error = new Error('provider quota exhausted');
+          error.status = 429;
+          throw error;
+        },
+      },
+    }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{
+      routeId:'agent-route',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'agent-model',
+      roles:['planner'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
+    }],
+    routePolicy:{
+      retryBackoffSeconds:60,
+      circuitBreakerFailures:2,
+      circuitBreakerSeconds:300,
+    },
+  } });
+
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'agent task',
+      isolatedRuntime:true,
+      routerOverride:{
+        routePolicy:{
+          autoSwitch:false,
+          pinnedRouteId:'agent-route',
+          allowRouteIds:['agent-route'],
+          retryBackoffSeconds:120,
+          circuitBreakerFailures:1,
+          circuitBreakerSeconds:600,
+        },
+      },
+    }),
+    error => {
+      const state = error?.routerRuntime?.routeStates?.['agent-route'];
+      assert.equal(state?.backoffUntil, 125000);
+      assert.equal(state?.circuitOpenUntil, 605000);
+      assert.equal(error?.retryAt, 605000);
+      return true;
+    },
+  );
+  assert.equal(calls.length, 1, 'Agent resilience policy must fail closed without a hidden fallback call');
+});
 
 test('Agent route policy composes with legacy per-Agent route pin without mutating frozen policy', async () => {
   const calls = [];
@@ -700,6 +799,24 @@ test('Agent router override boundary rejects accessors without executing them', 
     /data-only fields/,
   );
   assert.equal(reads, 0);
+
+  const hostilePolicy = {};
+  Object.defineProperty(hostilePolicy, 'retryBackoffSeconds', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 120;
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:{ routePolicy: hostilePolicy },
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
 });
 
 
@@ -723,6 +840,12 @@ test('Agent runtime route policy rejects coercive aliases before provider I/O', 
     { locality:' local ' },
     { maxInputPricePerMillionUsd:'0' },
     { maxOutputPricePerMillionUsd:-0 },
+    { retryBackoffSeconds:'120' },
+    { retryBackoffSeconds:-0 },
+    { circuitBreakerFailures:'2' },
+    { circuitBreakerFailures:-0 },
+    { circuitBreakerSeconds:'600' },
+    { circuitBreakerSeconds:-0 },
     { allowRouteIds:[' local '] },
   ]) {
     await assert.rejects(
