@@ -630,6 +630,29 @@ test('malformed or unavailable quality evidence falls back to canonical baseline
   }
 });
 
+test('incomparable fresh route-quality suites fall back to canonical baseline dispatch', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  const gateway = new FakeGateway(['baseline-cross-suite']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async () => [
+      await qualityBenchmarkBinding(routes[0], { suffix:'suite-a' }),
+      await qualityBenchmarkBinding(routes[1], { suffix:'suite-b' }),
+    ],
+  });
+
+  const result = await router.run(
+    settings({ routes }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'task',
+    { taskRole:'planner' },
+  );
+
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.deepEqual(gateway.calls.map(call => call.model), ['model-route-a']);
+});
+
 test('canonical route eligibility is refreshed after asynchronous quality evidence resolution', async () => {
   const routes = [
     qualityRoute('route-a', { priority:100 }),
