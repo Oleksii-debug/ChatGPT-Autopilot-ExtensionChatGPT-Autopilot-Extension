@@ -163,6 +163,9 @@ function intentBindingKey(value) {
     value.nodeId,
     value.ownerId,
     value.executionPlane ?? null,
+    value.workTitle ?? null,
+    value.workObjective ?? null,
+    value.workAcceptanceCriteria ?? null,
     value.workBudget
       ? [
         value.workBudget.maxModelCalls,
@@ -209,6 +212,11 @@ function activeIntent({
     nodeId: retest ? 'retest-node-1' : 'repair-node-1',
     ownerId: retest ? 'verifier-1' : 'actor-1',
     executionPlane: 'LOCAL',
+    workTitle: retest ? 'Retest repaired output' : 'Repair failed output',
+    workObjective: retest ? 'Independently verify the bounded repair' : 'Apply the bounded repair',
+    workAcceptanceCriteria: retest
+      ? ['Repaired output independently verified']
+      : ['Repair artifact materialized'],
     workBudget: {
       maxModelCalls: 2,
       maxRuntimeSeconds: 120,
