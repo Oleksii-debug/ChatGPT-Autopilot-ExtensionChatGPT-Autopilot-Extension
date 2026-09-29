@@ -66,6 +66,8 @@ import {
   materializeBoundAgentSpecialistDelegationIntentV1,
   normalizeAgentSpecialistDelegationBindingV1,
 } from './agent-specialist-delegation-profile.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
+import { normalizeSpecialistRegistryV1 } from './specialist-registry.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -339,6 +341,33 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
   return new Date(millis).toISOString();
 }
+function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
+  const profile = job?.specialistDelegationBinding?.profile;
+  if (!profile?.enabled) return request;
+  const out = { ...request };
+  const obligations = Number.isSafeInteger(capacityObligations) && capacityObligations >= 0
+    ? capacityObligations
+    : 0;
+  const profileSlots = Math.max(0, profile.maxConcurrentHandoffs - obligations);
+  if (out.availableSlots === undefined) {
+    out.availableSlots = 0;
+  } else if (Number.isSafeInteger(out.availableSlots) && out.availableSlots >= 0) {
+    out.availableSlots = Math.min(out.availableSlots, profileSlots);
+  }
+  const requestedLeaseSeconds = out.leaseSeconds === undefined ? 900 : out.leaseSeconds;
+  if (Number.isSafeInteger(requestedLeaseSeconds) && requestedLeaseSeconds >= 1) {
+    out.leaseSeconds = Math.min(requestedLeaseSeconds, profile.leaseSeconds);
+  }
+  const requestedMaxChildren = out.maxChildrenPerAgent === undefined ? 4 : out.maxChildrenPerAgent;
+  if (Number.isSafeInteger(requestedMaxChildren) && requestedMaxChildren >= 1) {
+    out.maxChildrenPerAgent = Math.min(
+      requestedMaxChildren,
+      Math.max(1, profile.maxConcurrentHandoffs),
+    );
+  }
+  return out;
+}
+
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function freshStore() {
   return {
@@ -995,6 +1024,130 @@ export class BrowserAgentManager {
     }));
   }
 
+  async prepareDefinitionSpecialistDelegation(id, payload = {}) {
+    const allowed = new Set(['registry','expectedRegistryRevision','expectedPlanRevision','nodeId','at','childBudget','parentInvocationId']);
+    const request = snapshotExactOwnDataRequest(payload, allowed, 'Browser Agent definition specialist delegation request');
+    for (const key of ['registry','expectedRegistryRevision','expectedPlanRevision','nodeId']) {
+      if (!Object.hasOwn(request, key)) throw new Error(`Browser Agent definition specialist delegation request requires ${key}`);
+    }
+    const registry = normalizeSpecialistRegistryV1(request.registry);
+    if (Object.hasOwn(request, 'childBudget')) {
+      request.childBudget = snapshotAgentDefinitionLaunchRecord(request.childBudget, 'Browser Agent definition specialist delegation childBudget', 3);
+    }
+    if (Object.hasOwn(request, 'parentInvocationId') && typeof request.parentInvocationId !== 'string') {
+      throw new Error('Browser Agent definition specialist delegation parentInvocationId must be exact text');
+    }
+    const at = specialistRequestTimestamp(request.at, new Date(this.now()).toISOString(), 'Browser Agent definition specialist delegation at');
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
+      if (!job.definitionSelection || !job.specialistDelegationBinding || !job.definitionScope) {
+        throw new Error('Browser Agent job has no durable Agent-definition specialist delegation authority');
+      }
+      if (!job.config?.projectId) throw new Error('Browser Agent definition specialist delegation requires a Project-bound job');
+      if (!job.runtime?.plan) throw new Error('Browser Agent has no durable plan for specialist delegation');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.jobId !== job.id) throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      const intent = materializeBoundAgentSpecialistDelegationIntentV1({
+        binding: job.specialistDelegationBinding,
+        jobId: job.id,
+        projectId: job.config.projectId,
+        agentDefinitionRegistryId: job.definitionSelection.registryId,
+        agentDefinitionRegistryRevision: job.definitionSelection.registryRevision,
+        agentDefinitionId: job.definitionSelection.agentDefinitionId,
+        definitionRevision: job.definitionSelection.definitionRevision,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedPlanRevision: request.expectedPlanRevision,
+        nodeId: request.nodeId,
+        at,
+        ...(Object.hasOwn(request, 'childBudget') ? { childBudget: request.childBudget } : {}),
+        ...(Object.hasOwn(request, 'parentInvocationId') ? { parentInvocationId: request.parentInvocationId } : {}),
+      });
+      if (registry.registryId !== intent.request.registryId || registry.revision !== intent.request.expectedRegistryRevision) {
+        throw new Error('Specialist registry identity or revision drifted before durable delegation');
+      }
+      if (plan.revision !== intent.request.expectedPlanRevision) throw new Error('Browser Agent AgentPlan revision drifted before durable delegation');
+      const node = plan.nodes.find(candidate => candidate.nodeId === intent.request.nodeId);
+      if (!node) throw new Error('Browser Agent AgentPlan node not found before durable delegation');
+
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const expectedAgentId = specialistAssignmentIdForPlanNodeV1(plan.planId, node.nodeId);
+      const existing = handoffs.find(item => item?.agentId === expectedAgentId);
+      if (existing) {
+        const definition = registry.definitions.find(item => item.specialistId === existing.specialistId);
+        const existingOwnership = ownerships.find(item => item?.planId === plan.planId && item?.nodeId === node.nodeId);
+        const requiredCapabilities = new Set(intent.request.requiredCapabilityIds);
+        const requiredTools = new Set(intent.request.requiredToolIds);
+        const definitionCapabilities = new Set(definition?.capabilityIds || []);
+        const definitionTools = new Set(definition?.toolIds || []);
+        const assignmentCapabilities = new Set(existing.requestedCapabilityIds || []);
+        const assignmentStillBound = existing.jobId === job.id
+          && existing.purpose === node.objective
+          && existing.priority === intent.request.priority
+          && existing.specialistId === definition?.specialistId
+          && existing.deadlineAt >= existing.updatedAt
+          && requiredCapabilities.size === assignmentCapabilities.size
+          && [...requiredCapabilities].every(item => assignmentCapabilities.has(item));
+        const definitionStillEligible = Boolean(definition?.enabled)
+          && definition.executionPlane === node.executionPlane
+          && [...requiredCapabilities].every(item => definitionCapabilities.has(item))
+          && [...requiredTools].every(item => definitionTools.has(item));
+        const ownershipStillBound = Boolean(existingOwnership)
+          && existingOwnership.taskId === `browser-agent-task:${plan.planId}`
+          && existingOwnership.policyEnvelopeId === intent.request.policyEnvelopeId;
+        if (!assignmentStillBound || !definitionStillEligible || !ownershipStillBound) {
+          throw new Error('Existing specialist handoff drifted from current owner-bound delegation authority');
+        }
+        result = {
+          proposal: null,
+          assignment: clone(existing),
+          executionOwnership: clone(existingOwnership),
+          reused: true,
+        };
+        return store;
+      }
+
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        plan,
+        expectedPlanRevision: intent.request.expectedPlanRevision,
+        nodeId: intent.request.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: intent.request.requiredCapabilityIds,
+        requiredToolIds: intent.request.requiredToolIds,
+        policyEnvelopeId: intent.request.policyEnvelopeId,
+        deadlineAt: intent.request.deadlineAt,
+        priority: intent.request.priority,
+        ...(Object.hasOwn(intent.request, 'childBudget') ? { childBudget: intent.request.childBudget } : {}),
+        ...(intent.request.parentInvocationId ? { parentInvocationId: intent.request.parentInvocationId } : {}),
+        at,
+      });
+      const assignment = proposal.preview.assignment;
+      const executionOwnership = proposal.preview.executionOwnership;
+      job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'agent-definition-specialist-delegation-prepared',
+        nodeId: proposal.nodeId,
+        agentId: assignment.agentId,
+        specialistId: proposal.selection.specialistId,
+        specialistRegistryId: proposal.registryId,
+        specialistRegistryRevision: proposal.registryRevision,
+        message: 'Owner-bound reusable Agent profile selected the least-authority eligible specialist; execution remains unclaimed.',
+      });
+      result = { proposal: clone(proposal), assignment: clone(assignment), executionOwnership: clone(executionOwnership), reused: false };
+      return store;
+    });
+    return result;
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -1049,7 +1202,14 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+      const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+      const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+        ...boundedRequest,
+        executionOwnerships: currentOwnerships,
+        at,
+      });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
@@ -1102,10 +1262,16 @@ export class BrowserAgentManager {
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
+        const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+        const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+        const boundedClaimRequest = boundSpecialistClaimRequestForJob(
+          job,
+          { ...claimRequest, availableSlots: remaining, at },
+          jobCapacityObligations,
+        );
         const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...claimRequest,
-          availableSlots: remaining,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          ...boundedClaimRequest,
+          executionOwnerships: currentJobOwnerships,
           at,
         });
         job.runtime.plan = outcome.plan;
