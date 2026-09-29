@@ -419,7 +419,18 @@ export function readLatestAiRouteQualityBenchmarkRequestsV1(registryInput, input
   const requested = new Set(routeIds);
   const latest = new Map();
   for (const item of registry.records) {
-    if (requested.has(item.routeId)) latest.set(item.routeId, item);
+    if (!requested.has(item.routeId)) continue;
+    const current = latest.get(item.routeId);
+    if (!current) {
+      latest.set(item.routeId, item);
+      continue;
+    }
+    const completedDelta = Date.parse(item.completedAt) - Date.parse(current.completedAt);
+    if (completedDelta > 0
+        || (completedDelta === 0
+          && Date.parse(item.registeredAt) >= Date.parse(current.registeredAt))) {
+      latest.set(item.routeId, item);
+    }
   }
   return Object.freeze(routeIds.flatMap(routeId => {
     const item = latest.get(routeId);
