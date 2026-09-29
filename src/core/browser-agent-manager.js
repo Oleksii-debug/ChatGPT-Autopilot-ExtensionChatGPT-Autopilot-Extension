@@ -62,7 +62,10 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
-import { normalizeAgentSpecialistDelegationBindingV1 } from './agent-specialist-delegation-profile.js';
+import {
+  materializeBoundAgentSpecialistDelegationIntentV1,
+  normalizeAgentSpecialistDelegationBindingV1,
+} from './agent-specialist-delegation-profile.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -81,6 +84,10 @@ const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
+const AGENT_DEFINITION_SPECIALIST_INTENT_KEYS = new Set([
+  'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId', 'at',
+  'childBudget', 'parentInvocationId',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -900,6 +907,82 @@ export class BrowserAgentManager {
       projectId,
       planId,
     });
+  }
+
+  async materializeDefinitionSpecialistDelegationIntent(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      AGENT_DEFINITION_SPECIALIST_INTENT_KEYS,
+      'Browser Agent definition specialist delegation intent request',
+    );
+    for (const key of ['expectedRegistryRevision', 'expectedPlanRevision', 'nodeId']) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent definition specialist delegation intent request requires ${key}`);
+      }
+    }
+    if (Object.hasOwn(request, 'childBudget')) {
+      request.childBudget = snapshotAgentDefinitionLaunchRecord(
+        request.childBudget,
+        'Browser Agent definition specialist delegation childBudget',
+        3,
+      );
+    }
+    if (Object.hasOwn(request, 'parentInvocationId')) {
+      const parentInvocationId = request.parentInvocationId;
+      if (typeof parentInvocationId !== 'string') {
+        throw new Error('Browser Agent definition specialist delegation parentInvocationId must be exact text');
+      }
+      request.parentInvocationId = parentInvocationId;
+    }
+
+    const current = await this.get(id);
+    const job = current.job;
+    if (!job) throw new Error('Browser Agent job not found');
+    if (!job.definitionSelection || !job.specialistDelegationBinding) {
+      throw new Error('Browser Agent job has no durable Agent-definition specialist delegation binding');
+    }
+    if (!job.definitionScope) {
+      throw new Error('Browser Agent job has no durable Agent-definition scope');
+    }
+    if (!job.config?.projectId) {
+      throw new Error('Browser Agent definition specialist delegation requires a Project-bound job');
+    }
+    if (!job.runtime?.plan) {
+      throw new Error('Browser Agent has no durable plan for specialist delegation');
+    }
+
+    const plan = normalizeAgentPlanV1(job.runtime.plan);
+    if (plan.jobId !== job.id) {
+      throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+    }
+    if (plan.revision !== request.expectedPlanRevision) {
+      throw new Error('Browser Agent AgentPlan revision drifted before specialist delegation intent materialization');
+    }
+
+    const at = specialistRequestTimestamp(
+      request.at,
+      new Date(this.now()).toISOString(),
+      'Browser Agent definition specialist delegation at',
+    );
+    return clone(materializeBoundAgentSpecialistDelegationIntentV1({
+      binding: job.specialistDelegationBinding,
+      jobId: job.id,
+      projectId: job.config.projectId,
+      agentDefinitionRegistryId: job.definitionSelection.registryId,
+      agentDefinitionRegistryRevision: job.definitionSelection.registryRevision,
+      agentDefinitionId: job.definitionSelection.agentDefinitionId,
+      definitionRevision: job.definitionSelection.definitionRevision,
+      parentCapabilityIds: job.definitionScope.capabilityIds,
+      parentToolIds: job.definitionScope.toolIds,
+      expectedRegistryRevision: request.expectedRegistryRevision,
+      expectedPlanRevision: request.expectedPlanRevision,
+      nodeId: request.nodeId,
+      at,
+      ...(Object.hasOwn(request, 'childBudget') ? { childBudget: request.childBudget } : {}),
+      ...(Object.hasOwn(request, 'parentInvocationId')
+        ? { parentInvocationId: request.parentInvocationId }
+        : {}),
+    }));
   }
 
   async listSpecialistHandoffs(id = '') {
