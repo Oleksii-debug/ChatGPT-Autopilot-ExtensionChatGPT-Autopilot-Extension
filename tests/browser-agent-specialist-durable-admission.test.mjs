@@ -142,7 +142,7 @@ test('automatic Agent delegation consumes the canonical durable Specialist regis
   assert.equal(first.reused, false);
   assert.equal(first.proposal.registryId, 'specialists:project-1');
   assert.equal(first.proposal.selection.specialistId, 'specialist.research.local');
-  assert.equal(first.executionOwnership.state, 'UNOWNED');
+  assert.equal(first.executionOwnership.state, 'AVAILABLE');
 
   const second = await manager.prepareDefinitionSpecialistDelegation('job.research', request);
   assert.equal(second.reused, true);
@@ -223,4 +223,74 @@ test('idempotent admission rejects changed bounded delegation proposal and prese
   assert.equal(persisted.executionOwnerships.length, 1);
   assert.deepEqual(persisted.handoffs[0], first.assignment);
   assert.deepEqual(persisted.executionOwnerships[0], first.executionOwnership);
+});
+
+
+test('durable specialist admission provenance survives restart and rejects missing provenance', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  const request = {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+    childBudget: { maxModelCalls: 3, maxRuntimeSeconds: 300, maxCostUsdMicros: 250000 },
+    parentInvocationId: 'invoke:parent-1',
+  };
+  const first = await manager.prepareDefinitionSpecialistDelegation('job.research', request);
+  const restarted = managerFor(storage.chrome);
+  const repeated = await restarted.prepareDefinitionSpecialistDelegation('job.research', request);
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.assignment.agentId, first.assignment.agentId);
+
+  delete storage.data.autopilotBrowserAgentV1.byId['job.research'].runtime.specialistDelegationAdmissions;
+  const missing = managerFor(storage.chrome);
+  await assert.rejects(
+    () => missing.prepareDefinitionSpecialistDelegation('job.research', request),
+    /lacks canonical durable admission provenance/,
+  );
+});
+
+test('owner-bound delegation profile caps legacy per-job claim lease', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const claimed = await manager.claimSpecialistHandoffs('job.research', {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.assignments[0].leaseExpiresAt, '2026-09-29T03:16:00.000Z');
+});
+
+test('owner-bound delegation profile caps lease inside product-wide claim authority', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 1);
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].leaseExpiresAt, '2026-09-29T03:16:00.000Z');
 });
