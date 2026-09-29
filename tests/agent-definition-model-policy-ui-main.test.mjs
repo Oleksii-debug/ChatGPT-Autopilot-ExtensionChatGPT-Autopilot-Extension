@@ -34,14 +34,11 @@ function configuredPolicy(overrides = {}) {
     modelRouteLocality: 'local',
     modelRouteMaxInputPriceText: '0',
     modelRouteMaxOutputPriceText: '0',
-    modelRouteRetryBackoffSeconds: '120',
-    modelRouteCircuitBreakerFailures: '1',
-    modelRouteCircuitBreakerSeconds: '600',
     ...overrides,
   };
 }
 
-test('per-Agent model policy round-trips canonical route order and resilience controls', () => {
+test('per-Agent model policy round-trips canonical route narrowing without resilience authority', () => {
   const policy = buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy());
   assert.equal(policy.autoSwitch, false);
   assert.equal(policy.pinnedRouteId, 'route.fast');
@@ -49,9 +46,6 @@ test('per-Agent model policy round-trips canonical route order and resilience co
   assert.deepEqual(policy.allowRouteIds, ['route.fast','route.strong']);
   assert.equal(policy.freeOnly, true);
   assert.equal(policy.locality, 'local');
-  assert.equal(policy.retryBackoffSeconds, 120);
-  assert.equal(policy.circuitBreakerFailures, 1);
-  assert.equal(policy.circuitBreakerSeconds, 600);
 });
 
 test('ordered model routes preserve owner priority instead of sorting identities', () => {
@@ -82,12 +76,14 @@ test('model policy rejects duplicate, coercive and contradictory form aliases', 
     })),
     /дублікат/u,
   );
-  assert.throws(
-    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
-      modelRouteRetryBackoffSeconds:120,
-    })),
-    /канонічному форматі/u,
-  );
+  const noResilienceAuthority = buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
+    modelRouteRetryBackoffSeconds:'120',
+    modelRouteCircuitBreakerFailures:'1',
+    modelRouteCircuitBreakerSeconds:'600',
+  }));
+  assert.equal(Object.hasOwn(noResilienceAuthority, 'retryBackoffSeconds'), false);
+  assert.equal(Object.hasOwn(noResilienceAuthority, 'circuitBreakerFailures'), false);
+  assert.equal(Object.hasOwn(noResilienceAuthority, 'circuitBreakerSeconds'), false);
   assert.throws(
     () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
       modelRouteAllowRouteIdsText:'route.fast',
@@ -154,11 +150,8 @@ test('Agent model-policy UI is native, labeled and removes inactive controls fro
     'agent-definition-model-route-locality',
     'agent-definition-model-route-max-input-price',
     'agent-definition-model-route-max-output-price',
-    'agent-definition-model-route-backoff-seconds',
-    'agent-definition-model-route-circuit-failures',
-    'agent-definition-model-route-circuit-seconds',
   ];
-  for (const id of ids) assert.match(html, new RegExp('id=["\\']' + id + '["\\']', 'u'));
+  for (const id of ids) assert.match(html, new RegExp(`id=["']${id}["']`, 'u'));
   assert.match(html, /Збереження policy не вибирає модель, не запускає provider і не запускає Agent/u);
   assert.match(source, /function syncAgentDefinitionModelRoutePolicyControls\(\)[\s\S]*?\$\(id\)\.disabled = !configured/u);
   assert.match(source, /agent-definition-model-route-policy-configured'\)\.addEventListener\('change', syncAgentDefinitionModelRoutePolicyControls\)/u);
