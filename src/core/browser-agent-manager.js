@@ -61,6 +61,10 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import {
+  createAgentDefinitionModelPolicyBindingV1,
+  normalizeAgentDefinitionModelPolicyBindingV1,
+} from './agent-definition-model-policy-binding.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -382,6 +386,27 @@ function normalizePersistedDefinitionRouterOverride(raw, selection) {
   }
   return Object.freeze({ routePolicy });
 }
+function normalizePersistedDefinitionModelPolicyBinding(raw, selection, config) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition model policy binding requires persisted selection provenance');
+  }
+  if (raw == null) {
+    throw new Error('Browser Agent reusable definition requires persisted model policy binding');
+  }
+  const binding = normalizeAgentDefinitionModelPolicyBindingV1(raw);
+  if (binding.jobId !== config.id || binding.projectId !== config.projectId) {
+    throw new Error('Browser Agent definition model policy binding identity drifted from persisted job');
+  }
+  const provenance = binding.definitionBinding;
+  if (provenance.registryId !== selection.registryId
+      || provenance.registryRevision !== selection.registryRevision
+      || provenance.agentDefinitionId !== selection.agentDefinitionId
+      || provenance.definitionRevision !== selection.definitionRevision) {
+    throw new Error('Browser Agent definition model policy binding drifted from persisted definition selection');
+  }
+  return binding;
+}
 function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
   const out = definitionRouterOverride?.routePolicy
     ? { routePolicy: definitionRouterOverride.routePolicy }
@@ -587,6 +612,11 @@ function normalizeStore(raw, now) {
         definitionSelection,
         config,
       );
+      const definitionModelPolicyBinding = normalizePersistedDefinitionModelPolicyBinding(
+        raw.byId[id].definitionModelPolicyBinding,
+        definitionSelection,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -595,6 +625,7 @@ function normalizeStore(raw, now) {
         definitionScope,
         definitionRouterOverride,
         definitionConfigBindingKey: definitionConfigBindingKeyValue,
+        definitionModelPolicyBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -614,7 +645,7 @@ function normalizeStore(raw, now) {
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
+  constructor({ chromeApi, routePrompt, readModelRouteContext = null, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -624,6 +655,7 @@ export class BrowserAgentManager {
     if (typeof routePrompt !== 'function') throw new Error('Browser Agent routePrompt is required');
     this.chrome = chromeApi;
     this.routePrompt = routePrompt;
+    this.readModelRouteContext = typeof readModelRouteContext === 'function' ? readModelRouteContext : null;
     this.now = now;
     this.createId = createId;
     this.nativeCompanion = nativeCompanionClient === undefined
@@ -1096,7 +1128,7 @@ export class BrowserAgentManager {
       throw new Error('Browser Agent definition launch jobId must be exact bounded text');
     }
 
-    await this.update(store => {
+    await this.update(async store => {
       const now = this.now();
       if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
       const registries = store.definitionRegistriesById || Object.create(null);
@@ -1132,6 +1164,22 @@ export class BrowserAgentManager {
       if (materialized.config.id !== jobId) {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
+      if (!this.readModelRouteContext) {
+        throw new Error('Reusable Agent launch requires canonical AI route-pool context');
+      }
+      const modelRouteContext = await this.readModelRouteContext();
+      if (!modelRouteContext || typeof modelRouteContext !== 'object' || Array.isArray(modelRouteContext)) {
+        throw new Error('Canonical AI route-pool context is unavailable');
+      }
+      const definitionModelPolicyBinding = createAgentDefinitionModelPolicyBindingV1({
+        materializedAgent: materialized,
+        currentDefinitionSelection: selection,
+        currentJobId: jobId,
+        currentProjectId: materialized.config.projectId,
+        routePool: modelRouteContext.routePool,
+        routePoolRevision: modelRouteContext.routePoolRevision,
+        ownerAllowedRouteIds: modelRouteContext.ownerAllowedRouteIds,
+      });
 
       store.byId[jobId] = {
         id: jobId,
@@ -1141,6 +1189,7 @@ export class BrowserAgentManager {
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
+        definitionModelPolicyBinding: clone(definitionModelPolicyBinding),
         createdAt: now,
         updatedAt: now,
       };
@@ -1203,6 +1252,7 @@ export class BrowserAgentManager {
         definitionScope: null,
         definitionRouterOverride: null,
         definitionConfigBindingKey: null,
+        definitionModelPolicyBinding: null,
         createdAt: now,
         updatedAt: now,
       };
