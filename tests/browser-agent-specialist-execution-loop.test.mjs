@@ -442,3 +442,149 @@ test('existing owner-bound handoff with missing admission provenance enters boun
   assert.equal(persisted.handoffs[0].state, 'READY');
   assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
 });
+
+
+test('product-wide owner automation policy can fail closed at zero capacity', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 0,
+  });
+
+  const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(result.kind, 'AUTOMATION_CLAIM');
+  assert.deepEqual(result.claimed, []);
+  assert.equal(result.maxConcurrentHandoffs, 0);
+
+  const durable = await manager.listSpecialistHandoffs(id);
+  assert.equal(durable.handoffs[0].state, 'READY');
+  assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('disabled or missing automation policy never invents product-wide claim authority', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+
+  const missing = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(missing.kind, 'AUTOMATION_DISABLED');
+  assert.deepEqual(missing.claimed, []);
+
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: false,
+    maxConcurrentHandoffs: 4,
+  });
+  const disabled = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(disabled.kind, 'AUTOMATION_DISABLED');
+  assert.deepEqual(disabled.claimed, []);
+
+  const durable = await manager.listSpecialistHandoffs(id);
+  assert.equal(durable.handoffs[0].state, 'READY');
+});
+
+test('automation policy CAS fence blocks stale high-capacity claim after readiness await', async () => {
+  const storage = chromeStorage();
+  const clock = { value: Date.parse('2026-09-29T03:05:00.000Z') };
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+  });
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+
+  let changed = false;
+  const resolver = {
+    async resolve(selection) {
+      if (!changed) {
+        changed = true;
+        clock.value += 1000;
+        await manager.setSpecialistAutomationPolicy({
+          expectedRevision: 1,
+          enabled: true,
+          maxConcurrentHandoffs: 0,
+        });
+      }
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: new Date(clock.value).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() {},
+  };
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy({
+      specialistProviderReadinessResolver: resolver,
+    }),
+    /automation policy drifted/,
+  );
+  const durable = await manager.listSpecialistHandoffs(id);
+  assert.equal(durable.handoffs[0].state, 'READY');
+  assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
+  assert.equal((await manager.getSpecialistAutomationPolicy()).policy.maxConcurrentHandoffs, 0);
+});
+
+
+test('automation-policy claim skips paused jobs and does not reserve effect authority', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  await manager.pause(id);
+
+  const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(result.kind, 'AUTOMATION_CLAIM');
+  assert.deepEqual(result.claimed, []);
+
+  const durable = await manager.listSpecialistHandoffs(id);
+  assert.equal(durable.handoffs[0].state, 'READY');
+  assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('automation-policy claim returns the exact claim-time control epoch for provider fencing', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+
+  const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(result.claimed.length, 1);
+  assert.equal(result.claimed[0].jobId, id);
+  assert.equal(result.claimed[0].controlEpoch, 0);
+
+  await manager.pause(id);
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.controlEpoch, 1);
+  assert.notEqual(result.claimed[0].controlEpoch, current.job.runtime.controlEpoch);
+});
