@@ -591,3 +591,71 @@ test('idempotent reusable-Agent delegation refuses same-revision registry conten
   assert.equal(persisted.handoffs.length, 1);
   assert.equal(persisted.handoffs[0].specialistId, 'specialist.research.tight');
 });
+
+
+test('durable reusable-Agent profile caps specialist lease duration at claim time', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seed(manager);
+  await manager.createFromAgentDefinition(launch());
+  await attachDelegationPlan(manager);
+  await manager.prepareDefinitionSpecialistDelegation(
+    'job.research-binding',
+    {
+      registry: specialistRegistry(),
+      expectedRegistryRevision: 12,
+      expectedPlanRevision: 4,
+      nodeId: 'local:research',
+      at: '2026-09-29T03:05:00.000Z',
+    },
+  );
+
+  const claimed = await manager.claimSpecialistHandoffs(
+    'job.research-binding',
+    {
+      availableSlots: 10,
+      maxChildrenPerAgent: 10,
+      maxDepth: 2,
+      leaseSeconds: 3600,
+      at: '2026-09-29T03:06:00.000Z',
+    },
+  );
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.assignments[0].leaseExpiresAt, '2026-09-29T03:16:00.000Z');
+});
+
+test('durable reusable-Agent zero specialist capacity prevents legacy claim widening', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const zeroCapacity = definition({
+    specialistDelegationProfile: delegationProfile({ maxConcurrentHandoffs: 0 }),
+  });
+  await seed(manager, zeroCapacity);
+  await manager.createFromAgentDefinition(launch({
+    expectedRegistryBindingKey: bindingKey(zeroCapacity),
+  }));
+  await attachDelegationPlan(manager);
+  await manager.prepareDefinitionSpecialistDelegation(
+    'job.research-binding',
+    {
+      registry: specialistRegistry(),
+      expectedRegistryRevision: 12,
+      expectedPlanRevision: 4,
+      nodeId: 'local:research',
+      at: '2026-09-29T03:05:00.000Z',
+    },
+  );
+
+  const claimed = await manager.claimSpecialistHandoffs(
+    'job.research-binding',
+    {
+      availableSlots: 10,
+      maxChildrenPerAgent: 10,
+      maxDepth: 2,
+      leaseSeconds: 3600,
+      at: '2026-09-29T03:06:00.000Z',
+    },
+  );
+  assert.deepEqual(claimed.claimed, []);
+  assert.equal(claimed.assignments[0].state, 'READY');
+});
