@@ -1494,3 +1494,23 @@ test('direct project mutation helpers reject chronology rollback before mutation
   );
   assert.deepEqual(workspace.projectsById['project-a'], before);
 });
+
+
+test('exact helper replays remain no-op safe with an older caller timestamp', () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 20 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 30 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 40 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.doesNotThrow(
+    () => replaceProjectSnapshot(workspace, snapshot(), { nowMs: 1 }),
+  );
+  assert.doesNotThrow(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: 1 }),
+  );
+  assert.doesNotThrow(
+    () => putProjectArtifactProvenance(workspace, provenance(), { nowMs: 1 }),
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+});
