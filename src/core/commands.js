@@ -818,11 +818,12 @@ export class CoreCommandDispatcher {
             throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
           }
         }
-        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
-        if (!Number.isSafeInteger(boundedOutputTokens)
+        const boundedOutputTokens = payload.maxOutputTokens;
+        if (typeof boundedOutputTokens !== 'number'
+            || !Number.isSafeInteger(boundedOutputTokens)
             || Object.is(boundedOutputTokens, -0)
             || boundedOutputTokens < 1) {
-          throw new Error('Agent model invocation requires bounded maxOutputTokens');
+          throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
         const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
         if (imageDescriptor
