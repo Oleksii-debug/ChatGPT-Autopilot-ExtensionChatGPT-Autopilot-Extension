@@ -190,8 +190,40 @@ test('clear is exact-revision fenced and restart durable', async () => {
     expectedRevision: 1,
   });
   assert.equal(cleared.cleared, true);
+  assert.equal(cleared.revision, 2);
+  const restartedState = await managerFor(chrome).getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(restartedState.config, null);
+  assert.equal(restartedState.revision, 2);
+
+  await assert.rejects(
+    () => managerFor(chrome).setSpecialistProviderConfig(setRequest(0)),
+    /revision drifted/,
+  );
+  const recreated = await managerFor(chrome).setSpecialistProviderConfig(setRequest(2));
+  assert.equal(recreated.config.revision, 3);
+});
+
+
+test('provider config revision tombstone survives a normalized save and blocks ABA recreation', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.setSpecialistProviderConfig(setRequest(0));
+  await manager.clearSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision: 1,
+  });
+  await manager.update(store => store);
+
   assert.equal(
-    (await managerFor(chrome).getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID)).config,
-    null,
+    data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById[OPENHANDS_CODING_PROVIDER_ID],
+    2,
+  );
+  const restarted = managerFor(chrome);
+  const state = await restarted.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(state.config, null);
+  assert.equal(state.revision, 2);
+  await assert.rejects(
+    () => restarted.setSpecialistProviderConfig(setRequest(0)),
+    /revision drifted/,
   );
 });
