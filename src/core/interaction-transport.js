@@ -15,6 +15,8 @@ const READ_ONLY_TAB_FALLBACK_CODES = new Set([
   'TAB_WAKE_TIMEOUT',
   'TAB_WAKE_FAILED',
   'INTERACTION_SEND_FAILED',
+  'ASSISTANT_RESPONSE_TAB_MISSING',
+  'ASSISTANT_RESPONSE_TAB_FROZEN',
 ]);
 const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
 const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
@@ -95,6 +97,38 @@ export class ChromeInteractionTransport {
       ...this.tabReadinessOptions,
       allowPostSendNavigation: request?.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
     };
+  }
+
+  canUseFreshReadTab(request, code, allowReadOnlyTabFallback) {
+    return allowReadOnlyTabFallback
+      && request?.mode === 'READ_ASSISTANT_REPORT'
+      && Boolean(request?.expectedUrl)
+      && READ_ONLY_TAB_FALLBACK_CODES.has(code)
+      && typeof this.chrome?.tabs?.create === 'function';
+  }
+
+  async executeOnFreshReadTab(request, cause = null) {
+    let replacementTabId = null;
+    try {
+      const replacement = await this.chrome.tabs.create({
+        url: request.expectedUrl,
+        active: false,
+      });
+      replacementTabId = replacement?.id ?? null;
+      if (replacementTabId == null) {
+        throw diagnosticError(
+          'ASSISTANT_RESPONSE_TAB_REPLACEMENT_FAILED',
+          'Read-only assistant report recovery could not create a replacement ChatGPT tab',
+          cause,
+          request,
+        );
+      }
+      return await this.execute(replacementTabId, request, { allowReadOnlyTabFallback: false });
+    } finally {
+      if (replacementTabId != null && typeof this.chrome?.tabs?.remove === 'function') {
+        try { await this.chrome.tabs.remove(replacementTabId); } catch (_) {}
+      }
+    }
   }
 
   async waitForCheckOnlyUiReady(tabId, request, initialResponse) {
@@ -230,37 +264,16 @@ export class ChromeInteractionTransport {
           request,
         );
       }
+      if (this.canUseFreshReadTab(request, response.data.safeDiagnosticCode, allowReadOnlyTabFallback)) {
+        return await this.executeOnFreshReadTab(request);
+      }
       return response.data;
     } catch (error) {
       const contextual = attachRequestContext(error, request);
-      const canUseFreshReadTab = allowReadOnlyTabFallback
-        && request?.mode === 'READ_ASSISTANT_REPORT'
-        && Boolean(request?.expectedUrl)
-        && READ_ONLY_TAB_FALLBACK_CODES.has(contextual.safeDiagnosticCode)
-        && typeof this.chrome?.tabs?.create === 'function';
-      if (!canUseFreshReadTab) throw contextual;
-
-      let replacementTabId = null;
-      try {
-        const replacement = await this.chrome.tabs.create({
-          url: request.expectedUrl,
-          active: false,
-        });
-        replacementTabId = replacement?.id ?? null;
-        if (replacementTabId == null) {
-          throw diagnosticError(
-            'ASSISTANT_RESPONSE_TAB_REPLACEMENT_FAILED',
-            'Read-only assistant report recovery could not create a replacement ChatGPT tab',
-            contextual,
-            request,
-          );
-        }
-        return await this.execute(replacementTabId, request, { allowReadOnlyTabFallback: false });
-      } finally {
-        if (replacementTabId != null && typeof this.chrome?.tabs?.remove === 'function') {
-          try { await this.chrome.tabs.remove(replacementTabId); } catch (_) {}
-        }
+      if (!this.canUseFreshReadTab(request, contextual.safeDiagnosticCode, allowReadOnlyTabFallback)) {
+        throw contextual;
       }
+      return this.executeOnFreshReadTab(request, contextual);
     }
   }
 }
