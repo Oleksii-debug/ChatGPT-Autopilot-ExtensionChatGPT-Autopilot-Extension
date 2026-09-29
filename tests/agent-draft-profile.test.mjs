@@ -442,3 +442,59 @@ test('Agent draft requires exact and complete active-window identities', () => {
   assert.equal(draft.policy.activeWindowStart, '09:00');
   assert.equal(draft.policy.activeWindowEnd, '17:00');
 });
+
+
+test('Agent draft requires canonical hostname-only site patterns', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити site identity',
+  };
+  for (const pattern of [
+    'HTTPS://EXAMPLE.COM/path',
+    'https://user:secret@example.com/',
+    'Example.com',
+    ' example.com',
+    'localhost',
+    '*.example.*',
+  ]) {
+    assert.throws(
+      () => parseAgentDraftProfile({
+        ...base,
+        policy: {
+          siteRules: [{
+            pattern,
+            defaultDecision: 'ASK',
+            actionDecisions: {},
+          }],
+        },
+      }),
+      /(hostname|канонічним hostname)/,
+      pattern,
+    );
+  }
+
+  const exact = parseAgentDraftProfile({
+    ...base,
+    policy: {
+      siteRules: [{
+        pattern: '*.example.com',
+        defaultDecision: 'ASK',
+        actionDecisions: {},
+      }],
+    },
+  });
+  assert.equal(exact.policy.siteRules[0].pattern, '*.example.com');
+});
+
+test('Agent draft rejects acceptance-criterion whitespace aliases rather than silently trimming them', () => {
+  assert.throws(
+    () => parseAgentDraftProfile({
+      format: 'chatgpt-autopilot-agent-draft',
+      version: 1,
+      goal: 'Перевірити criteria identity',
+      policy: { acceptanceCriteria: [' Готово'] },
+    }),
+    /канонічним непорожнім рядком/,
+  );
+});
