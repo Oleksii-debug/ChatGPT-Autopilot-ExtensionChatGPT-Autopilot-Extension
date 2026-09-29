@@ -53,10 +53,10 @@ function definition(overrides = {}) {
       maxTotalTokens: 9000,
       maxOutputTokensPerCall: 1000,
       maxRuntimeMinutes: 20,
-      aiPinnedRouteId: 'route.research',
     },
     modelRoutePolicy: {
       autoSwitch: false,
+      pinnedRouteId: 'route.research',
       allowRouteIds: ['route.research'],
       freeOnly: true,
       locality: 'local',
@@ -133,7 +133,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.equal(created.job.config.projectId, 'project-1');
   assert.equal(created.job.config.maxSteps, 50, 'definition ceiling must narrow owner ceiling');
   assert.equal(created.job.config.maxModelCalls, 8);
-  assert.equal(created.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(created.job.config.aiPinnedRouteId, '');
   assert.match(created.job.config.goal, /^Reusable Agent definition instructions:/);
   assert.match(created.job.config.goal, /Owner task:\nCompare the current evidence/);
 
@@ -147,6 +147,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   });
   assert.deepEqual(created.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
@@ -165,7 +166,8 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.deepEqual(loaded.job.definitionScope.toolIds, ['browser.read']);
   assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
-  assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
+  assert.equal(loaded.job.config.aiPinnedRouteId, '');
 });
 
 test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
@@ -233,15 +235,15 @@ test('launch requires exact live registry and definition revisions at the serial
     () => manager.createFromAgentDefinition(launchRequest()),
     /registry revision drifted before launch/,
   );
+  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
     () => manager.createFromAgentDefinition(launchRequest({
       expectedRegistryRevision: 3,
+      expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
       expectedDefinitionRevision: 1,
     })),
     /definition revision drifted before launch/,
   );
-
-  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   const current = await manager.createFromAgentDefinition(launchRequest({
     expectedRegistryRevision: 3,
     expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
@@ -318,8 +320,11 @@ test('disabled definitions and duplicate job identity fail closed', async () => 
   const firstStore = makeChromeStorage();
   const disabledManager = managerFor(firstStore.chrome);
   await seedRegistry(disabledManager, definition({ enabled: false }));
+  const disabledRegistry = await disabledManager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
-    () => disabledManager.createFromAgentDefinition(launchRequest()),
+    () => disabledManager.createFromAgentDefinition(launchRequest({
+      expectedRegistryBindingKey: disabledRegistry.registry.bindingKey,
+    })),
     /missing or disabled/,
   );
 
@@ -423,7 +428,8 @@ test('definition-bound jobs reject generic config mutation that could bypass dur
   const reloaded = await manager.get('job.immutable-definition');
   assert.equal(reloaded.job.config.goal, created.job.config.goal);
   assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
-  assert.equal(reloaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(reloaded.job.config.aiPinnedRouteId, '');
+  assert.equal(reloaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
   assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
 });
