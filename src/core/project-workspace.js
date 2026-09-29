@@ -326,7 +326,7 @@ export function createProjectWorkspace(nowMs = Date.now()) {
 export function validateProjectWorkspace(workspace) {
   const raw = strictDataRecord(workspace, WORKSPACE_KEYS, 'project workspace');
   if (raw.schemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION) throw new Error('Unsupported project workspace schema');
-  if (!Number.isInteger(raw.revision) || Object.is(raw.revision, -0) || raw.revision < 0) {
+  if (!Number.isSafeInteger(raw.revision) || Object.is(raw.revision, -0) || raw.revision < 0) {
     throw new Error('Invalid project workspace revision');
   }
   const createdAt = timestamp(raw.createdAt, 'project workspace createdAt');
@@ -557,9 +557,10 @@ export class ProjectWorkspaceRepository {
   async load({ emptyNowMs = Date.now() } = {}) {
     timestamp(emptyNowMs, 'project workspace emptyNowMs');
     const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
-    const workspace = record[PROJECT_WORKSPACE_STORAGE_KEY] === undefined
-      ? createProjectWorkspace(emptyNowMs)
-      : record[PROJECT_WORKSPACE_STORAGE_KEY];
+    const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
+    if (durableRaw === undefined) return createProjectWorkspace(emptyNowMs);
+    validateProjectWorkspace(durableRaw);
+    const workspace = structuredClone(durableRaw);
     return validateProjectWorkspace(workspace);
   }
 
@@ -570,7 +571,7 @@ export class ProjectWorkspaceRepository {
     const candidate = structuredClone(workspace);
     validateProjectWorkspace(candidate);
     if (expectedPreviousRevision !== null
-        && (!Number.isInteger(expectedPreviousRevision)
+        && (!Number.isSafeInteger(expectedPreviousRevision)
           || Object.is(expectedPreviousRevision, -0)
           || expectedPreviousRevision < 0)) {
       throw new Error('Invalid expected project workspace revision');
@@ -602,6 +603,10 @@ export class ProjectWorkspaceRepository {
         // previous expected revision because the original write may have
         // committed before its acknowledgement was lost.
         if (candidate.revision === durable.revision && sameCanonicalData(candidate, durable)) {
+          if (expectedRevision !== null
+              && (durable.revision < 1 || expectedRevision !== durable.revision - 1)) {
+            throw new Error('Project workspace exact replay expected revision mismatch');
+          }
           return durable;
         }
         if (expectedRevision !== null && durable.revision !== expectedRevision) {
