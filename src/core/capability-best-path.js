@@ -150,6 +150,11 @@ export function normalizeCapabilityPathCandidateV1(input) {
   if (typeof raw.pathKind !== 'string' || !PATHS.has(raw.pathKind)) {
     throw new Error('CapabilityPathCandidateV1.pathKind is invalid');
   }
+  const observedAt = timestamp(raw.observedAt, 'observedAt');
+  const validThrough = timestamp(raw.validThrough, 'validThrough');
+  if (Date.parse(validThrough) < Date.parse(observedAt)) {
+    throw new Error('CapabilityPathCandidateV1 validThrough cannot predate observedAt');
+  }
   return freeze({
     schemaVersion: CAPABILITY_BEST_PATH_VERSION,
     candidateId: id(raw.candidateId, 'candidateId'),
@@ -161,14 +166,13 @@ export function normalizeCapabilityPathCandidateV1(input) {
     ready: bool(raw.ready, 'ready'),
     setupRequired: bool(raw.setupRequired, 'setupRequired'),
     sourceRevision: revision(raw.sourceRevision, 'sourceRevision'),
-    observedAt: timestamp(raw.observedAt, 'observedAt'),
-    validThrough: timestamp(raw.validThrough, 'validThrough'),
+    observedAt,
+    validThrough,
   });
 }
 
 function blockReason(candidate, required, asOf) {
   if (Date.parse(candidate.observedAt) > Date.parse(asOf)) return 'FUTURE_OBSERVATION';
-  if (Date.parse(candidate.validThrough) < Date.parse(candidate.observedAt)) return 'INVALID_VALIDITY_WINDOW';
   if (Date.parse(candidate.validThrough) < Date.parse(asOf)) return 'STALE';
   if (!candidate.enabled) return 'DISABLED';
   const available = new Set(candidate.capabilityIds);
