@@ -224,10 +224,16 @@ function envelopeForIntent(intent, overrides = {}) {
 }
 
 function request(intent = activeIntent(), overrides = {}) {
+  const orchestratorEnvelope = envelopeForIntent(intent);
   return {
     selfRepairModelIntent: intent,
     currentSelfRepairModelBindingKey: intent.bindingKey,
-    orchestratorEnvelope: envelopeForIntent(intent),
+    currentProjectId: orchestratorEnvelope.projectId,
+    currentDefinitionModelPolicyBindingKey: orchestratorEnvelope.definitionModelPolicyBindingKey,
+    currentModelPolicyBindingKey: orchestratorEnvelope.modelPolicyBindingKey,
+    currentRoutePoolRevision: orchestratorEnvelope.routePoolRevision,
+    currentSelfRepairDispatchRouteId: orchestratorEnvelope.routeId,
+    orchestratorEnvelope,
     providerCallBudgetContext: {
       kind: 'browser-agent',
       jobId: intent.ownerId,
@@ -368,6 +374,47 @@ test('orchestrator owner, role, capability and vision drift fail closed', () => 
       /owner drifted|drifted from durable route intent/u,
     );
   }
+});
+
+test('current Agent policy and exact dispatch-route provenance are required before invocation', () => {
+  const intent = activeIntent();
+  const cases = [
+    [{ currentProjectId:'project.other' }, /Project identity is stale/u],
+    [{ currentDefinitionModelPolicyBindingKey:'definition.other' }, /model-policy provenance is stale/u],
+    [{ currentModelPolicyBindingKey:'model.other' }, /model-policy provenance is stale/u],
+    [{ currentRoutePoolRevision:10 }, /route-pool revision is stale/u],
+    [{ currentSelfRepairDispatchRouteId:'route.other' }, /route drifted from current dispatch/u],
+    [{ currentParentModelPolicyBindingKey:'parent.binding' }, /parent policy provenance is stale/u],
+  ];
+  for (const [overrides, pattern] of cases) {
+    assert.throws(
+      () => prepareBoundAgentSelfRepairModelInvocationV1(request(intent, overrides)),
+      pattern,
+    );
+  }
+});
+
+test('current parent model-policy provenance must match the bounded envelope when present', () => {
+  const intent = activeIntent();
+  const orchestratorEnvelope = envelopeForIntent(intent, {
+    parentModelPolicyBindingKey:'parent.binding',
+  });
+  const prepared = prepareBoundAgentSelfRepairModelInvocationV1(request(intent, {
+    orchestratorEnvelope,
+    currentParentModelPolicyBindingKey:'parent.binding',
+  }));
+  assert.equal(
+    prepared.internal.agentModelOrchestratorEnvelope.parentModelPolicyBindingKey,
+    'parent.binding',
+  );
+
+  assert.throws(
+    () => prepareBoundAgentSelfRepairModelInvocationV1(request(intent, {
+      orchestratorEnvelope,
+      currentParentModelPolicyBindingKey:'parent.other',
+    })),
+    /parent policy provenance is stale/u,
+  );
 });
 
 test('provider budget lifecycle must be the existing exact-owner BrowserAgent lifecycle', () => {
