@@ -124,6 +124,23 @@ function assertSame(left, right, label) {
   if (left !== right) throw new Error(label + ' identity mismatch');
 }
 
+function assertSameIds(left, right, label) {
+  const actual = [...left].sort(compareId);
+  const expected = [...right].sort(compareId);
+  if (actual.length !== expected.length
+      || actual.some((value, index) => value !== expected[index])) {
+    throw new Error(label + ' identity mismatch');
+  }
+}
+
+function canonicalBindingKey(value, label) {
+  const key = JSON.stringify(value);
+  if (!key || key.length > 200_000) {
+    throw new Error(label + ' exceeds canonical binding bound');
+  }
+  return key;
+}
+
 function assertChronology(
   record,
   providerExecution,
@@ -284,9 +301,17 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
   assertSame(selection.providerId, providerExecution.providerId, 'providerId');
   assertSame(selection.specialistId, handoff.specialistId, 'specialistId');
   assertSame(handoff.handoffId, providerExecution.handoffId, 'handoffId');
+  assertSameIds(
+    handoff.requestedCapabilityIds,
+    selection.requestedCapabilityIds,
+    'requestedCapabilityIds',
+  );
   if (Date.parse(handoff.createdAt) > Date.parse(providerExecution.preparedAt)) {
     throw new Error('Specialist handoff cannot postdate provider execution preparation');
   }
+
+  const selectionBindingKey = canonicalBindingKey(selection, 'selectionBindingKey');
+  const handoffBindingKey = canonicalBindingKey(handoff, 'handoffBindingKey');
 
   const lookup = freeze({
     schemaVersion: SPECIALIST_TRUSTED_VERIFICATION_PRODUCER_VERSION,
@@ -298,9 +323,19 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     executionId: ownership.leaseId,
     ownerId: ownership.ownerId,
     ownerPlane: ownership.ownerPlane,
+    registryId: selection.registryId,
+    registryRevision: selection.registryRevision,
+    registryBindingKey: selection.registryBindingKey,
     specialistId: selection.specialistId,
     providerId: providerExecution.providerId,
+    definitionRevision: selection.definitionRevision,
+    requestedCapabilityIds: selection.requestedCapabilityIds,
+    grantedToolIds: selection.grantedToolIds,
+    selectionBindingKey,
     handoffId: providerExecution.handoffId,
+    handoffBindingKey,
+    handoffCreatedAt: handoff.createdAt,
+    parentInvocationId: handoff.parentInvocationId,
     conversationId: providerExecution.conversationId,
     resultContractId: selection.resultContractId,
     resultArtifactIds,
