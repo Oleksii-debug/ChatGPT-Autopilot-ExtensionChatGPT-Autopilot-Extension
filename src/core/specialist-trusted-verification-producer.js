@@ -124,17 +124,25 @@ function assertSame(left, right, label) {
   if (left !== right) throw new Error(label + ' identity mismatch');
 }
 
-function assertChronology(record, providerExecution, ownership, at) {
-  const lowerBound = Math.max(
+function assertChronology(
+  record,
+  providerExecution,
+  ownership,
+  at,
+  resultArtifactIds,
+) {
+  const durableVerificationLowerBound = Math.max(
     Date.parse(providerExecution.updatedAt),
     Date.parse(ownership.updatedAt),
   );
+  const resultLowerBound = Date.parse(providerExecution.preparedAt);
+  const resultIds = new Set(resultArtifactIds);
   const atMs = Date.parse(at);
   if (Date.parse(providerExecution.updatedAt) > atMs || Date.parse(ownership.updatedAt) > atMs) {
     throw new Error('Trusted Specialist verification request predates durable execution state');
   }
   const verifiedAt = Date.parse(record.verification.verifiedAt);
-  if (verifiedAt < lowerBound || verifiedAt > atMs) {
+  if (verifiedAt < durableVerificationLowerBound || verifiedAt > atMs) {
     throw new Error('Trusted Specialist verification chronology is invalid');
   }
   const recordedAt = Date.parse(record.recordedAt);
@@ -146,6 +154,9 @@ function assertChronology(record, providerExecution, ownership, at) {
   }
   for (const artifact of record.evidenceArtifacts) {
     const createdAt = Date.parse(artifact.createdAt);
+    const lowerBound = resultIds.has(artifact.artifactId)
+      ? resultLowerBound
+      : durableVerificationLowerBound;
     if (createdAt < lowerBound || createdAt > verifiedAt) {
       throw new Error('Trusted Specialist evidence chronology is invalid: ' + artifact.artifactId);
     }
@@ -336,7 +347,7 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
 
   assertIndependentVerifier(trustedRecord, providerExecution, ownership, selection);
   assertResultCoverage(resultArtifactIds, trustedRecord, expectedOutcome);
-  assertChronology(trustedRecord, providerExecution, ownership, at);
+  assertChronology(trustedRecord, providerExecution, ownership, at, resultArtifactIds);
 
   return freeze({
     schemaVersion: SPECIALIST_TRUSTED_VERIFICATION_PRODUCER_VERSION,
