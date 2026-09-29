@@ -584,7 +584,7 @@ test('idempotent reusable-Agent delegation refuses same-revision registry conten
         registry: driftedSameRevisionSpecialistRegistry(),
       },
     ),
-    /drifted from current owner-bound delegation proposal/,
+    /drifted from current owner-bound delegation authority/,
   );
 
   const persisted = await manager.listSpecialistHandoffs('job.research-binding');
