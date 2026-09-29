@@ -69,3 +69,24 @@ test('claim command injects trusted durable-config-backed readiness resolver', (
   );
   assert.match(source, /Specialist provider config changed after readiness probe/);
 });
+
+
+test('RUN command uses one injected trusted OpenHands client and never grants completion', () => {
+  assert.match(
+    source,
+    /specialistProviderClients:\s*new Map\(\[\[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient\]\]\)/,
+  );
+  const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
+  const end = source.indexOf(']);', start);
+  const readOnly = source.slice(start, end);
+  assert.doesNotMatch(readOnly, /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION/);
+
+  const branch = source.match(
+    /} else if \(message\.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,
+  );
+  assert.ok(branch, 'RUN Specialist provider command must remain structurally identifiable');
+  assert.match(branch[1], /globalThis\.crypto\?\.randomUUID/);
+  assert.match(branch[1], /browserAgent\.executeClaimedSpecialistProvider/);
+  assert.doesNotMatch(branch[1], /message\.payload\?\.conversationId/);
+  assert.doesNotMatch(branch[1], /completeSpecialistHandoff/);
+});
