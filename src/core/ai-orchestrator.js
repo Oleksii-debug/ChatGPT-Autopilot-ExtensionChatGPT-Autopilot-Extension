@@ -533,7 +533,7 @@ export class AiOrchestrator {
         primaryError = clean(error?.message || error);
         if (error && (typeof error === 'object' || typeof error === 'function')
             && nonProviderRouteFailures.has(error)) throw error;
-        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (nonProviderRouteFailures.has(error) || error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY MODEL FAILED. Continue the original task directly.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
@@ -552,7 +552,7 @@ export class AiOrchestrator {
         primaryError = clean(error?.message || error);
         if (error && (typeof error === 'object' || typeof error === 'function')
             && nonProviderRouteFailures.has(error)) throw error;
-        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (nonProviderRouteFailures.has(error) || error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY/LOCAL MODEL FAILED BEFORE PRODUCING A HANDOFF. Complete the original task.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
