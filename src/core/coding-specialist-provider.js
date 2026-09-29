@@ -113,6 +113,15 @@ function exactUuid(value, label) {
   return value;
 }
 
+function providerTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must be a provider timestamp`);
+  }
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis)) throw new Error(`${label} must be a provider timestamp`);
+  return new Date(millis).toISOString();
+}
+
 function integer(value, label, min, max) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
     throw new Error(`${label} is invalid`);
@@ -408,7 +417,7 @@ function validateConversationInfo(info, prepared) {
   return {
     id: info.id,
     executionStatus: statusOf(info),
-    updatedAt: typeof info.updated_at === 'string' ? info.updated_at : '',
+    providerUpdatedAt: providerTimestamp(info.updated_at, 'OpenHands conversation updated_at'),
   };
 }
 
@@ -562,7 +571,28 @@ export class OpenHandsCodingSpecialistClient {
       effectDispatched,
       deadlineMs,
     });
-    return info == null ? null : validateConversationInfo(info, prepared);
+    if (info == null) return null;
+    try {
+      const validated = validateConversationInfo(info, prepared);
+      return deepFreeze({
+        ...validated,
+        observedAt: new Date(this.nowFn()).toISOString(),
+      });
+    } catch {
+      // A conversation with our durable identity exists but does not satisfy
+      // the admitted workspace/profile/status contract. Treat that external
+      // state as ambiguous even when this particular GET dispatched no effect.
+      throw new OpenHandsCodingSpecialistError(
+        'OpenHands conversation provenance does not match admitted execution',
+        {
+          code: 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH',
+          conversationId: prepared.conversationId,
+          effectMayHaveOccurred: true,
+          reconciliationRequired: true,
+          safeToRetry: false,
+        },
+      );
+    }
   }
 
   async execute(preparedInput) {
@@ -590,7 +620,20 @@ export class OpenHandsCodingSpecialistClient {
         }
         throw error;
       }
-      conversation = validateConversationInfo(createdInfo, prepared);
+      try {
+        conversation = validateConversationInfo(createdInfo, prepared);
+      } catch {
+        throw new OpenHandsCodingSpecialistError(
+          'Created OpenHands conversation provenance does not match admitted execution',
+          {
+            code: 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH',
+            conversationId: prepared.conversationId,
+            effectMayHaveOccurred: true,
+            reconciliationRequired: true,
+            safeToRetry: false,
+          },
+        );
+      }
       created = true;
     }
 
@@ -601,12 +644,15 @@ export class OpenHandsCodingSpecialistClient {
     while (this.nowFn() <= deadline) {
       const status = last.executionStatus;
       if (TERMINAL.has(status)) {
-        if (status === stableTerminal) stableTerminalCount += 1;
+        if (!last.observedAt) {
+          stableTerminal = '';
+          stableTerminalCount = 0;
+        } else if (status === stableTerminal) stableTerminalCount += 1;
         else {
           stableTerminal = status;
           stableTerminalCount = 1;
         }
-        if (stableTerminalCount >= 2) {
+        if (last.observedAt && stableTerminalCount >= 2) {
           return deepFreeze({
             schemaVersion: CODING_SPECIALIST_PROVIDER_VERSION,
             providerId: OPENHANDS_CODING_PROVIDER_ID,
@@ -626,13 +672,15 @@ export class OpenHandsCodingSpecialistClient {
             agentProfileRevision: prepared.config.agentProfileRevision,
             workspacePath: prepared.config.workspacePath,
             maxIterations: prepared.config.maxIterations,
+            providerUpdatedAt: last.providerUpdatedAt,
+            providerObservedAt: last.observedAt,
             effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
           });
         }
       } else {
         stableTerminal = '';
         stableTerminalCount = 0;
-        if (MANUAL.has(status)) {
+        if (MANUAL.has(status) && last.observedAt) {
           return deepFreeze({
             schemaVersion: CODING_SPECIALIST_PROVIDER_VERSION,
             providerId: OPENHANDS_CODING_PROVIDER_ID,
@@ -652,6 +700,8 @@ export class OpenHandsCodingSpecialistClient {
             agentProfileRevision: prepared.config.agentProfileRevision,
             workspacePath: prepared.config.workspacePath,
             maxIterations: prepared.config.maxIterations,
+            providerUpdatedAt: last.providerUpdatedAt,
+            providerObservedAt: last.observedAt,
             effectEvidence: 'OPENHANDS_CONVERSATION_REQUIRES_HUMAN_INTERVENTION',
           });
         }

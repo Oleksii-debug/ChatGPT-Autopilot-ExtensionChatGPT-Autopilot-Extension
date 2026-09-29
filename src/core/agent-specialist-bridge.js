@@ -13,6 +13,8 @@ import {
   claimExecutionOwnershipV1,
   recoverExpiredExecutionOwnershipV1,
   verifyExecutionByAuthorityV1,
+  verifyExecutionWithTrustedRecordV1,
+  authorizeExecutionSafeRetryWithTrustedRecordV1,
 } from './execution-plane-ownership.js';
 
 const EXTERNAL_PLANES = new Set([AgentExecutionPlane.LOCAL, AgentExecutionPlane.CLOUD, AgentExecutionPlane.REMOTE]);
@@ -26,6 +28,9 @@ const CLAIM_REQUEST_KEYS = new Set([
 ]);
 const COMPLETE_REQUEST_KEYS = new Set([
   'executionOwnerships', 'agentId', 'leaseId', 'resultArtifactIds', 'at',
+]);
+const TRUSTED_VERIFICATION_REQUEST_KEYS = new Set([
+  'executionOwnerships', 'agentId', 'leaseId', 'verificationId', 'at',
 ]);
 
 function record(value, allowed, label) {
@@ -270,4 +275,170 @@ export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, ra
  */
 export function verifyAgentPlanSpecialistHandoffV1() {
   throw new Error('Specialist verification requires canonical trusted verifier provenance');
+}
+
+
+/**
+ * Positive SAFE_RETRY path backed by the canonical trusted execution verifier
+ * resolver. Existing authorizeAgentPlanSpecialistSafeRetryV1 intentionally
+ * remains a fail-closed compatibility boundary for caller-owned verification.
+ */
+export async function authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+  rawPlan,
+  rawAssignments,
+  rawOptions = {},
+  dependencies = {},
+) {
+  const request = record(
+    rawOptions,
+    TRUSTED_VERIFICATION_REQUEST_KEYS,
+    'Trusted specialist SAFE_RETRY request',
+  );
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
+  let plan = normalizeAgentPlanV1(rawPlan);
+  const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
+  let ownerships = validateExecutionOwnerships(
+    plan,
+    assignments,
+    request.executionOwnerships === undefined ? [] : request.executionOwnerships,
+  ).map(item => structuredClone(item));
+  const agentId = id(request.agentId, 'agentId');
+  const leaseId = id(request.leaseId, 'leaseId');
+  const verificationId = id(request.verificationId, 'verificationId');
+  const target = assignments.find(item => item.agentId === agentId);
+  if (!target || target.state !== SpecialistAssignmentState.LEASED || target.leaseId !== leaseId) {
+    throw new Error('Trusted specialist SAFE_RETRY requires the preserved leased assignment identity');
+  }
+  const node = nodeForAssignment(plan, target);
+  if (!node || node.state !== AgentPlanNodeState.RUNNING) {
+    throw new Error('Trusted specialist SAFE_RETRY requires RUNNING AgentPlan node');
+  }
+  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
+  const ownershipIndex = ownerships.findIndex(item => item.effectId === effectId);
+  const ownership = ownerships[ownershipIndex];
+  if (!ownership || ownership.state !== ExecutionOwnershipState.RECONCILE || ownership.leaseId !== leaseId) {
+    throw new Error('Trusted specialist SAFE_RETRY requires matching RECONCILE execution ownership');
+  }
+  const resolved = await authorizeExecutionSafeRetryWithTrustedRecordV1(
+    ownership,
+    { leaseId, verificationId, at },
+    dependencies,
+  );
+  target.state = SpecialistAssignmentState.READY;
+  target.leaseId = '';
+  target.leaseExpiresAt = '';
+  target.resultArtifactIds = [];
+  target.updatedAt = at;
+  assignments[assignments.indexOf(target)] = normalizeSpecialistAssignmentV1(target);
+  ownerships[ownershipIndex] = resolved.ownership;
+  plan = transitionAgentPlanNodeV1(plan, {
+    nodeId: node.nodeId,
+    state: AgentPlanNodeState.READY,
+    at,
+  });
+  return freeze({
+    plan,
+    assignments: assignments.map(normalizeSpecialistAssignmentV1),
+    executionOwnerships: ownerships.map(normalizeExecutionOwnershipV1),
+    retriableAgentId: agentId,
+    trustedVerification: {
+      recordId: resolved.trustedRecord.recordId,
+      verificationId: resolved.trustedRecord.verification.verificationId,
+      verifierId: resolved.trustedRecord.verification.verifierId,
+      verificationAuthorityId: resolved.trustedRecord.verification.verificationAuthorityId,
+      evidenceArtifactIds: resolved.trustedRecord.verification.evidenceArtifactIds,
+      outcome: resolved.trustedRecord.outcome,
+      provenance: resolved.verificationProvenance,
+    },
+    executionDispatched: false,
+  });
+}
+
+/**
+ * Positive completion path backed by canonical trusted verifier provenance.
+ * The durable child stays RUNNING/OWNED after reporting result artifacts until
+ * this function independently resolves evidence for the exact execution lease.
+ */
+export async function verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+  rawPlan,
+  rawAssignments,
+  rawOptions = {},
+  dependencies = {},
+) {
+  const request = record(
+    rawOptions,
+    TRUSTED_VERIFICATION_REQUEST_KEYS,
+    'Trusted specialist completion verification request',
+  );
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
+  let plan = normalizeAgentPlanV1(rawPlan);
+  const assignments = validateAssignments(plan, rawAssignments);
+  let ownerships = validateExecutionOwnerships(
+    plan,
+    assignments,
+    request.executionOwnerships === undefined ? [] : request.executionOwnerships,
+  ).map(item => structuredClone(item));
+  const agentId = id(request.agentId, 'agentId');
+  const leaseId = id(request.leaseId, 'leaseId');
+  const verificationId = id(request.verificationId, 'verificationId');
+  const target = assignments.find(item => item.agentId === agentId);
+  if (!target || target.state !== SpecialistAssignmentState.COMPLETED) {
+    throw new Error('Trusted specialist completion verification requires COMPLETED assignment');
+  }
+  if (!target.resultArtifactIds.length) {
+    throw new Error('Trusted specialist completion verification requires result artifacts');
+  }
+  const node = nodeForAssignment(plan, target);
+  if (!node || node.state !== AgentPlanNodeState.RUNNING) {
+    throw new Error('Trusted specialist completion verification requires RUNNING AgentPlan node');
+  }
+  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
+  const ownershipIndex = ownerships.findIndex(item => item.effectId === effectId);
+  const ownership = ownerships[ownershipIndex];
+  if (!ownership
+      || ownership.state !== ExecutionOwnershipState.OWNED
+      || ownership.ownerId !== agentId
+      || ownership.leaseId !== leaseId) {
+    throw new Error('Trusted specialist completion verification requires exact current execution ownership');
+  }
+  const resolved = await verifyExecutionWithTrustedRecordV1(
+    ownership,
+    { leaseId, verificationId, at },
+    dependencies,
+  );
+  const evidenceIds = new Set(resolved.trustedRecord.verification.evidenceArtifactIds);
+  const missingResults = target.resultArtifactIds.filter(artifactId => !evidenceIds.has(artifactId));
+  if (missingResults.length) {
+    throw new Error(`Trusted specialist verification does not cover result artifacts: ${missingResults.join(', ')}`);
+  }
+  ownerships[ownershipIndex] = resolved.ownership;
+  const evidence = [
+    `trusted-record=${resolved.trustedRecord.recordId}`,
+    `verification=${resolved.trustedRecord.verification.verificationId}`,
+    `verifier=${resolved.trustedRecord.verification.verifierId}`,
+    `artifacts=${target.resultArtifactIds.join(',')}`,
+  ].join('; ');
+  plan = transitionAgentPlanNodeV1(plan, {
+    nodeId: node.nodeId,
+    state: AgentPlanNodeState.VERIFIED,
+    evidence: text(evidence, 'trusted specialist AgentPlan evidence'),
+    at,
+  });
+  return freeze({
+    plan,
+    assignments,
+    executionOwnerships: ownerships.map(normalizeExecutionOwnershipV1),
+    verifiedAgentId: agentId,
+    trustedVerification: {
+      recordId: resolved.trustedRecord.recordId,
+      verificationId: resolved.trustedRecord.verification.verificationId,
+      verifierId: resolved.trustedRecord.verification.verifierId,
+      verificationAuthorityId: resolved.trustedRecord.verification.verificationAuthorityId,
+      evidenceArtifactIds: resolved.trustedRecord.verification.evidenceArtifactIds,
+      outcome: resolved.trustedRecord.outcome,
+      provenance: resolved.verificationProvenance,
+    },
+    completionAuthorizedByTrustedVerifier: true,
+    executionAuthorized: false,
+  });
 }
