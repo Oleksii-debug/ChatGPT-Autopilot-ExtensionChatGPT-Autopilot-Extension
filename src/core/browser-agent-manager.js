@@ -614,26 +614,6 @@ function assertOwnerBoundSpecialistAdmissionProvenance(job) {
   }
 }
 
-function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
-  const profile = job?.specialistDelegationBinding?.profile;
-  if (!profile?.enabled) return request;
-  const out = { ...request };
-  const obligations = Number.isSafeInteger(capacityObligations) && capacityObligations >= 0 ? capacityObligations : 0;
-  const profileSlots = Math.max(0, profile.maxConcurrentHandoffs - obligations);
-  if (out.availableSlots !== undefined && Number.isSafeInteger(out.availableSlots) && out.availableSlots >= 0) {
-    out.availableSlots = Math.min(out.availableSlots, profileSlots);
-  } else if (out.availableSlots === undefined) {
-    out.availableSlots = 0;
-  }
-  const leaseSeconds = out.leaseSeconds === undefined ? 900 : out.leaseSeconds;
-  if (Number.isSafeInteger(leaseSeconds) && leaseSeconds >= 1) out.leaseSeconds = Math.min(leaseSeconds, profile.leaseSeconds);
-  const maxChildren = out.maxChildrenPerAgent === undefined ? 4 : out.maxChildrenPerAgent;
-  if (Number.isSafeInteger(maxChildren) && maxChildren >= 1) {
-    out.maxChildrenPerAgent = Math.min(maxChildren, Math.max(1, profile.maxConcurrentHandoffs));
-  }
-  return out;
-}
-
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const reservationId = clean(raw.reservationId, 240);
@@ -1567,12 +1547,9 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
       assertOwnerBoundSpecialistAdmissionProvenance(job);
-      const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
-      const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
-      const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
       const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...boundedRequest,
-        executionOwnerships: currentOwnerships,
+        ...request,
+        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
         at,
       });
       job.runtime.plan = claimed.plan;
@@ -1628,16 +1605,10 @@ export class BrowserAgentManager {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
         assertOwnerBoundSpecialistAdmissionProvenance(job);
-        const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
-        const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
-        const boundedClaimRequest = boundSpecialistClaimRequestForJob(
-          job,
-          { ...claimRequest, availableSlots: remaining, at },
-          jobCapacityObligations,
-        );
         const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...boundedClaimRequest,
-          executionOwnerships: currentJobOwnerships,
+          ...claimRequest,
+          availableSlots: remaining,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
           at,
         });
         job.runtime.plan = outcome.plan;
