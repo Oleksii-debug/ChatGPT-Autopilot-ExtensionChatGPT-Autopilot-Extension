@@ -67,6 +67,7 @@ test('selected provider result carries the exact pre-I/O durable reservation sna
     async afterProviderCall({ reservation: settledReservation, ok }) {
       assert.equal(ok, true);
       settled = settledReservation;
+      return { settled: true };
     },
   };
   const router = new AiOrchestrator({
@@ -262,6 +263,7 @@ test('retryable failed reservation is not leaked when canonical failover later s
     },
     async afterProviderCall({ reservation: settledReservation, ok }) {
       settled.push([settledReservation.reservationId, ok]);
+      return { settled: true };
     },
   };
   const router = new AiOrchestrator({
@@ -318,6 +320,50 @@ test('ordinary calls without a durable provider lifecycle do not expose reservat
   assert.equal(Object.hasOwn(result, 'providerReservation'), false);
 });
 
+
+test('Browser Agent lifecycle requires explicit durable settlement evidence after provider success', async () => {
+  const router = new AiOrchestrator({
+    gatewayClient: {
+      async complete() {
+        return {
+          text: 'must not escape without settlement evidence',
+          usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
+        };
+      },
+    },
+    providerCallLifecycle: {
+      async beforeProviderCall() {
+        return reservation();
+      },
+      async afterProviderCall() {
+        return undefined;
+      },
+    },
+    now: () => 1000,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings(),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'repair one node',
+      {
+        maxOutputTokens: 128,
+        maxModelCallsForRequest: 1,
+        providerCallBudgetContext: {
+          kind: 'browser-agent',
+          jobId: 'job.receipt',
+          controlEpoch: 7,
+        },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED');
+      assert.match(error.message, /did not return durable settlement evidence/u);
+      return true;
+    },
+  );
+});
 
 test('explicit durable settlement rejection fails closed after provider success', async () => {
   let gatewayCalls = 0;
