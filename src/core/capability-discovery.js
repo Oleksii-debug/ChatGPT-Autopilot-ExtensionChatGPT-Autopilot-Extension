@@ -28,6 +28,12 @@ export const CapabilityPathKind = Object.freeze({
   OCR: 'OCR',
 });
 
+export const ProviderReadinessFreshness = Object.freeze({
+  FRESH: 'FRESH',
+  FUTURE: 'FUTURE',
+  STALE: 'STALE',
+});
+
 const HEALTH = new Set(Object.values(ProviderHealthStatus));
 const PATH_KINDS = new Set(Object.values(CapabilityPathKind));
 const EXECUTABLE = new Set([CapabilityPathReadiness.READY, CapabilityPathReadiness.DEGRADED]);
@@ -206,10 +212,37 @@ export function normalizeProviderReadinessV1(input) {
   });
 }
 
+export function assessProviderReadinessFreshnessV1(input, asOf) {
+  const state = normalizeProviderReadinessV1(input);
+  const canonicalAsOf = canonicalTimestamp(asOf, 'ProviderReadinessFreshnessV1.asOf');
+  const asOfMs = Date.parse(canonicalAsOf);
+  const observedMs = Date.parse(state.observedAt);
+  const validThroughMs = Date.parse(state.validThrough);
+  const status = observedMs > asOfMs
+    ? ProviderReadinessFreshness.FUTURE
+    : validThroughMs < asOfMs
+      ? ProviderReadinessFreshness.STALE
+      : ProviderReadinessFreshness.FRESH;
+  return frozen({
+    schemaVersion: 1,
+    status,
+    fresh: status === ProviderReadinessFreshness.FRESH,
+    reasonCode: status === ProviderReadinessFreshness.FUTURE
+      ? 'PROVIDER_STATE_FUTURE'
+      : status === ProviderReadinessFreshness.STALE
+        ? 'PROVIDER_STATE_STALE'
+        : '',
+    asOf: canonicalAsOf,
+    sourceId: state.sourceId,
+    sourceRevision: state.sourceRevision,
+    observedAt: state.observedAt,
+    validThrough: state.validThrough,
+  });
+}
+
 function readinessFor(state, asOf) {
   if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
-  if (Date.parse(state.observedAt) > Date.parse(asOf)) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
-  if (Date.parse(state.validThrough) < Date.parse(asOf)) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+  if (!assessProviderReadinessFreshnessV1(state, asOf).fresh) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
   if (state.health === ProviderHealthStatus.UNAVAILABLE) return CapabilityPathReadiness.UNAVAILABLE;
   if (state.installationRequired && !state.installed) return CapabilityPathReadiness.NEEDS_INSTALL;
   if (state.authenticationRequired && !state.authenticated) return CapabilityPathReadiness.NEEDS_AUTH;
@@ -220,8 +253,8 @@ function readinessFor(state, asOf) {
 
 function readinessReasonCode(state, asOf) {
   if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return 'PROVIDER_STATE_MISSING';
-  if (Date.parse(state.observedAt) > Date.parse(asOf)) return 'PROVIDER_STATE_FUTURE';
-  if (Date.parse(state.validThrough) < Date.parse(asOf)) return 'PROVIDER_STATE_STALE';
+  const freshness = assessProviderReadinessFreshnessV1(state, asOf);
+  if (!freshness.fresh) return freshness.reasonCode;
   return state.reasonCode;
 }
 
