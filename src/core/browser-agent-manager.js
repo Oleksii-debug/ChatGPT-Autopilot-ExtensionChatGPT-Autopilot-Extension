@@ -1161,12 +1161,11 @@ export class BrowserAgentManager {
   }
 
   async prepareDefinitionSpecialistDelegation(id, payload = {}) {
-    const allowed = new Set(['registry','expectedRegistryRevision','expectedPlanRevision','nodeId','at','childBudget','parentInvocationId']);
+    const allowed = new Set(['expectedRegistryRevision','expectedPlanRevision','nodeId','at','childBudget','parentInvocationId']);
     const request = snapshotExactOwnDataRequest(payload, allowed, 'Browser Agent definition specialist delegation request');
-    for (const key of ['registry','expectedRegistryRevision','expectedPlanRevision','nodeId']) {
+    for (const key of ['expectedRegistryRevision','expectedPlanRevision','nodeId']) {
       if (!Object.hasOwn(request, key)) throw new Error(`Browser Agent definition specialist delegation request requires ${key}`);
     }
-    const registry = normalizeSpecialistRegistryV1(request.registry);
     if (Object.hasOwn(request, 'childBudget')) {
       request.childBudget = snapshotAgentDefinitionLaunchRecord(request.childBudget, 'Browser Agent definition specialist delegation childBudget', 3);
     }
@@ -1202,8 +1201,19 @@ export class BrowserAgentManager {
         ...(Object.hasOwn(request, 'childBudget') ? { childBudget: request.childBudget } : {}),
         ...(Object.hasOwn(request, 'parentInvocationId') ? { parentInvocationId: request.parentInvocationId } : {}),
       });
-      if (registry.registryId !== intent.request.registryId || registry.revision !== intent.request.expectedRegistryRevision) {
-        throw new Error('Specialist registry identity or revision drifted before durable delegation');
+      const registries = store.specialistRegistriesById || Object.create(null);
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, intent.request.registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot authorize delegation');
+      }
+      const registry = Object.hasOwn(registries, intent.request.registryId)
+        ? registries[intent.request.registryId]
+        : null;
+      if (!registry) {
+        throw new Error('Owner-bound Specialist registry is not durably configured');
+      }
+      if (registry.revision !== intent.request.expectedRegistryRevision) {
+        throw new Error('Specialist registry revision drifted before durable delegation');
       }
       if (plan.revision !== intent.request.expectedPlanRevision) throw new Error('Browser Agent AgentPlan revision drifted before durable delegation');
       if (!plan.nodes.some(node => node.nodeId === intent.request.nodeId)) throw new Error('Browser Agent AgentPlan node not found before durable delegation');
