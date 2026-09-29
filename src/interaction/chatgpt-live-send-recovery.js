@@ -170,7 +170,6 @@
         await wait(80);
         continue;
       }
-
       try {
         last.control.click();
         clicks += 1;
@@ -179,13 +178,11 @@
         continue;
       }
       await wait(120);
-
       const high = findHighOption(doc);
       if (!high) {
         await closePicker(doc, last.control, wait);
         continue;
       }
-
       try {
         high.click();
         clicks += 1;
@@ -194,7 +191,6 @@
         continue;
       }
       await wait(160);
-
       const verified = currentEffortLevel(doc, adapter);
       if (verified.level === 'HIGH' || verified.level === 'EXTRA_HIGH') {
         return { outcome: 'HIGH_SELECTED', attempts: attempt, clicks };
@@ -205,30 +201,25 @@
       if (selectedHigh) return { outcome: 'HIGH_SELECTED', attempts: attempt, clicks };
       await closePicker(doc, last.control, wait);
     }
-
     return { outcome: 'HIGH_UNAVAILABLE_CONTINUE_SEND', attempts: 2, clicks };
   }
 
   function parseUrl(value) {
     try { return new URL(value); } catch (_) { return null; }
   }
-
   function conversationId(value) {
     const url = parseUrl(value);
     return url?.pathname?.match(/\/c\/([^/]+)/u)?.[1] || '';
   }
-
   function isFreshLaunch(value) {
     const url = parseUrl(value);
     return Boolean(url) && (url.pathname === '/' || /^\/g\/[^/]+\/?$/u.test(url.pathname));
   }
-
   function sameHost(a, b) {
     const left = parseUrl(a);
     const right = parseUrl(b);
     return Boolean(left && right && left.hostname.toLowerCase() === right.hostname.toLowerCase());
   }
-
   function routeProvesExpectedConversation(observed, expected) {
     const observedId = conversationId(observed);
     if (!observedId || !sameHost(observed, expected)) return false;
@@ -236,20 +227,17 @@
     const expectedId = conversationId(expected);
     return Boolean(expectedId) && expectedId === observedId;
   }
-
   function composerIsEmpty(doc, adapter) {
     const found = adapter?.findVisibleComposer?.(doc);
     if (!found || found.ambiguous || !found.element) return false;
     const value = String(found.element.value ?? found.element.innerText ?? found.element.textContent ?? '');
     return compact(value) === '';
   }
-
   function countAssistantMessages(doc) {
     const nodes = Array.from(doc.querySelectorAll?.('[data-message-author-role="assistant"], [data-author="assistant"]') || []);
     return new Set(nodes).size;
   }
-
-  function canUpgradeUncertainSubmit(doc, adapter, request, result) {
+  function canUpgradeUncertainSubmit(doc, adapter, request, result, assistantBaselineCount = null) {
     if (!SUBMIT_MODES.has(request?.mode) && !VERIFY_MODES.has(request?.mode)) return false;
     if (result?.status !== 'SUBMISSION_UNCERTAIN') return false;
     if (!RECOVERABLE_UNCERTAIN_CODES.has(result?.safeDiagnosticCode)) return false;
@@ -257,9 +245,10 @@
     if (!routeProvesExpectedConversation(observed, request.expectedUrl)) return false;
     if (!composerIsEmpty(doc, adapter)) return false;
     const blocking = adapter?.detectBlockingState?.(doc);
-    return blocking?.status === 'BUSY';
+    if (blocking?.status === 'BUSY') return true;
+    const baseline = Number(assistantBaselineCount);
+    return Number.isInteger(baseline) && baseline >= 0 && countAssistantMessages(doc) > baseline;
   }
-
   function upgradeResult(result, assistantBaselineCount) {
     return Object.assign({}, result, {
       status: 'SENT_VERIFIED',
@@ -270,7 +259,6 @@
       assistantBaselineCount
     });
   }
-
   function decorateEffort(result, effort) {
     if (!result || !effort) return result;
     return Object.assign({}, result, {
@@ -278,7 +266,6 @@
       effortSelectionAttempts: effort.attempts
     });
   }
-
   function install(root, adapter) {
     if (!adapter || typeof adapter.execute !== 'function' || adapter.__liveSendRecoveryInstalled) return false;
     const originalExecute = adapter.execute.bind(adapter);
@@ -293,9 +280,8 @@
         try { effort = await ensureHighEffort(doc, adapter, deps || {}); }
         catch (_) { effort = { outcome: 'HIGH_SELECTION_ERROR_CONTINUE_SEND', attempts: 2 }; }
       }
-
       const result = await originalExecute(request, deps);
-      if (doc?.querySelectorAll && canUpgradeUncertainSubmit(doc, adapter, request, result)) {
+      if (doc?.querySelectorAll && canUpgradeUncertainSubmit(doc, adapter, request, result, assistantBaselineCount)) {
         return decorateEffort(upgradeResult(result, assistantBaselineCount ?? 0), effort);
       }
       return decorateEffort(result, effort);
