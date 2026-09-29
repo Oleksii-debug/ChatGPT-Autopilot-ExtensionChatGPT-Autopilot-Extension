@@ -518,3 +518,76 @@ test('owner-bound specialist runtime admission fails closed on registry revision
   assert.equal(persisted.handoffs.length, 0);
   assert.equal(persisted.executionOwnerships.length, 0);
 });
+
+
+function driftedSameRevisionSpecialistRegistry() {
+  return createSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    revision: 12,
+    definitions: [
+      {
+        schemaVersion: 1,
+        specialistId: 'specialist.research.tight',
+        providerId: 'provider.local-tight',
+        label: 'Tight research specialist',
+        description: 'Exact bounded research scope.',
+        executionPlane: 'LOCAL',
+        capabilityIds: ['research'],
+        toolIds: ['browser.read'],
+        resultContractId: 'result.research',
+        enabled: false,
+        definitionRevision: 1,
+      },
+      {
+        schemaVersion: 1,
+        specialistId: 'specialist.research.wide',
+        providerId: 'provider.local-wide',
+        label: 'Wide research specialist',
+        description: 'Broader authority than required.',
+        executionPlane: 'LOCAL',
+        capabilityIds: ['browser', 'research'],
+        toolIds: ['browser.read', 'files.read'],
+        resultContractId: 'result.research',
+        enabled: true,
+        definitionRevision: 1,
+      },
+    ],
+  });
+}
+
+test('idempotent reusable-Agent delegation refuses same-revision registry content drift', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seed(manager);
+  await manager.createFromAgentDefinition(launch());
+  await attachDelegationPlan(manager);
+
+  const baseRequest = {
+    registry: specialistRegistry(),
+    expectedRegistryRevision: 12,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  };
+  const first = await manager.prepareDefinitionSpecialistDelegation(
+    'job.research-binding',
+    baseRequest,
+  );
+  assert.equal(first.assignment.specialistId, 'specialist.research.tight');
+
+  await assert.rejects(
+    () => manager.prepareDefinitionSpecialistDelegation(
+      'job.research-binding',
+      {
+        ...baseRequest,
+        registry: driftedSameRevisionSpecialistRegistry(),
+      },
+    ),
+    /drifted from current owner-bound delegation proposal/,
+  );
+
+  const persisted = await manager.listSpecialistHandoffs('job.research-binding');
+  assert.equal(persisted.handoffs.length, 1);
+  assert.equal(persisted.handoffs[0].specialistId, 'specialist.research.tight');
+});
