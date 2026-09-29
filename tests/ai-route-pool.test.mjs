@@ -729,3 +729,63 @@ test('route profile prompts preserve exact owner text and reject representation 
     /workerPrompt must be text/u,
   );
 });
+
+
+test('optional route and policy ID collections reject present falsy aliases while preserving absence defaults', () => {
+  const [absent] = normalizeAiRoutePool([{
+    routeId:'absent-collections',
+    provider:'ollama',
+    model:'local',
+  }]);
+  assert.deepEqual(absent.roles, []);
+  assert.deepEqual(absent.capabilityIds, []);
+
+  const undefinedCollections = normalizeAiRoutePool([{
+    routeId:'undefined-collections',
+    provider:'ollama',
+    model:'local',
+    roles:undefined,
+    capabilityIds:undefined,
+  }])[0];
+  assert.deepEqual(undefinedCollections.roles, []);
+  assert.deepEqual(undefinedCollections.capabilityIds, []);
+
+  for (const field of ['roles', 'capabilityIds']) {
+    for (const invalid of [false, 0, '', null]) {
+      assert.throws(
+        () => normalizeAiRoutePool([{
+          routeId:`invalid-${field}`,
+          provider:'ollama',
+          model:'local',
+          [field]:invalid,
+        }]),
+        /bounded array/u,
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+
+  const defaultPolicy = normalizeAiRoutePolicy({});
+  assert.deepEqual(defaultPolicy.orderedRouteIds, []);
+  assert.deepEqual(defaultPolicy.allowRouteIds, []);
+  assert.deepEqual(defaultPolicy.denyRouteIds, []);
+
+  const undefinedPolicy = normalizeAiRoutePolicy({
+    orderedRouteIds:undefined,
+    allowRouteIds:undefined,
+    denyRouteIds:undefined,
+  });
+  assert.deepEqual(undefinedPolicy.orderedRouteIds, []);
+  assert.deepEqual(undefinedPolicy.allowRouteIds, []);
+  assert.deepEqual(undefinedPolicy.denyRouteIds, []);
+
+  for (const field of ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds']) {
+    for (const invalid of [false, 0, '', null]) {
+      assert.throws(
+        () => normalizeAiRoutePolicy({ [field]:invalid }),
+        /bounded array/u,
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+});

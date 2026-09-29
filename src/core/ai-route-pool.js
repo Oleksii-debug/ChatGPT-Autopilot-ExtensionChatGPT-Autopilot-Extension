@@ -143,6 +143,11 @@ function ids(value, label, max = MAX_ROUTES) {
   return out;
 }
 
+function optionalIds(record, key, label, max = MAX_ROUTES) {
+  const value = own(record, key);
+  return ids(value === undefined ? [] : value, label, max);
+}
+
 export function normalizeAiRoutePool(raw = []) {
   if (raw == null) return [];
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
@@ -153,7 +158,7 @@ export function normalizeAiRoutePool(raw = []) {
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
     const model = clean(own(item, 'model'), 300);
     if (!model) throw new Error('AI route model is required');
-    const roles = ids(own(item, 'roles') || [], `AI route ${index + 1} roles`, 12);
+    const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const locality = clean(own(item, 'locality') || (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE), 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
@@ -171,7 +176,7 @@ export function normalizeAiRoutePool(raw = []) {
       workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
       endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
       roles,
-      capabilityIds: ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64),
+      capabilityIds: optionalIds(item, 'capabilityIds', `AI route ${index + 1} capabilityIds`, 64),
       priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
       enabled: own(item, 'enabled') !== false,
       locality,
@@ -196,9 +201,9 @@ export function normalizeAiRoutePolicy(raw = {}) {
   return Object.freeze({
     autoSwitch: own(source, 'autoSwitch') !== false,
     pinnedRouteId: id(own(source, 'pinnedRouteId'), 'AI route pinnedRouteId', true),
-    orderedRouteIds: ids(own(source, 'orderedRouteIds') || [], 'AI route orderedRouteIds'),
-    allowRouteIds: ids(own(source, 'allowRouteIds') || [], 'AI route allowRouteIds'),
-    denyRouteIds: ids(own(source, 'denyRouteIds') || [], 'AI route denyRouteIds'),
+    orderedRouteIds: optionalIds(source, 'orderedRouteIds', 'AI route orderedRouteIds'),
+    allowRouteIds: optionalIds(source, 'allowRouteIds', 'AI route allowRouteIds'),
+    denyRouteIds: optionalIds(source, 'denyRouteIds', 'AI route denyRouteIds'),
     freeOnly: own(source, 'freeOnly') === true,
     locality,
     maxInputPricePerMillionUsd: priceCap(own(source, 'maxInputPricePerMillionUsd'), 'AI route maximum input price'),
