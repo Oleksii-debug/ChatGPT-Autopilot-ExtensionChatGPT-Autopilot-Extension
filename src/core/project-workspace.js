@@ -72,7 +72,18 @@ function timestamp(value, label) {
 
 function artifactIdentity(ref) {
   if (!ref) return '';
-  return `${ref.artifactId}\u001f${ref.sha256 || ''}\u001f${ref.sizeBytes}`;
+  return JSON.stringify([
+    ref.schemaVersion,
+    ref.artifactId,
+    ref.kind,
+    ref.uri,
+    ref.mediaType,
+    ref.sha256,
+    ref.sizeBytes,
+    ref.createdAt,
+    ref.producerInvocationId,
+    ref.sensitive,
+  ]);
 }
 
 function sourceIdentity(source) {
