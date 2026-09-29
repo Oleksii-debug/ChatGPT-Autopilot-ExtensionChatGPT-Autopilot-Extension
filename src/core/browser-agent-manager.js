@@ -39,7 +39,7 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -57,6 +57,7 @@ import {
   createSpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
@@ -78,6 +79,10 @@ import {
   canonicalSpecialistProviderIdV1,
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
+import {
+  OPENHANDS_CODING_PROVIDER_ID,
+  prepareOpenHandsCodingSpecialistV1,
+} from './coding-specialist-provider.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -88,6 +93,7 @@ const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 128;
 const SPECIALIST_PROVIDER_CONFIG_PUT_KEYS = new Set(['providerConfig', 'expectedRevision']);
+const SPECIALIST_PROVIDER_DISPATCH_PREPARE_KEYS = new Set(['agentId', 'leaseId', 'conversationId', 'expectedProviderRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
@@ -608,11 +614,29 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistProviderAdmissionProvenance = plan && Array.isArray(raw.specialistProviderAdmissionProvenance)
+    ? raw.specialistProviderAdmissionProvenance.slice(0, 128).flatMap(item => {
+      try {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+        const agentId = clean(item.agentId, 180);
+        const selection = normalizeSpecialistSelectionV1(item.selection);
+        const handoff = normalizeSpecialistHandoffV1(item.handoff);
+        const assignment = specialistHandoffs.find(candidate => candidate?.agentId === agentId);
+        if (!agentId || !assignment
+            || assignment.specialistId !== selection.specialistId
+            || handoff.specialistId !== selection.specialistId) return [];
+        return [{ agentId, selection, handoff }];
+      } catch {
+        return [];
+      }
+    })
+    : [];
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistProviderAdmissionProvenance,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1355,6 +1379,14 @@ export class BrowserAgentManager {
       const executionOwnership = proposal.preview.executionOwnership;
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const providerProvenance = Array.isArray(job.runtime.specialistProviderAdmissionProvenance)
+        ? job.runtime.specialistProviderAdmissionProvenance
+        : [];
+      const providerAdmission = Object.freeze({
+        agentId: assignment.agentId,
+        selection: normalizeSpecialistSelectionV1(proposal.selection),
+        handoff: normalizeSpecialistHandoffV1(proposal.binding.handoff),
+      });
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
@@ -1363,11 +1395,20 @@ export class BrowserAgentManager {
             || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
           throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
         }
+        const existingProviderAdmission = providerProvenance.find(item => item?.agentId === assignment.agentId);
+        if (existingProviderAdmission
+            && JSON.stringify(existingProviderAdmission) !== JSON.stringify(providerAdmission)) {
+          throw new Error('Existing Specialist provider admission provenance drifted from current owner-bound delegation proposal');
+        }
+        if (!existingProviderAdmission) {
+          job.runtime.specialistProviderAdmissionProvenance = [...providerProvenance, providerAdmission];
+        }
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
         return store;
       }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.specialistProviderAdmissionProvenance = [...providerProvenance, providerAdmission];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
@@ -1385,6 +1426,84 @@ export class BrowserAgentManager {
     return result;
   }
 
+  async prepareClaimedSpecialistProviderDispatch(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SPECIALIST_PROVIDER_DISPATCH_PREPARE_KEYS,
+      'Browser Agent Specialist provider dispatch prepare request',
+    );
+    for (const key of SPECIALIST_PROVIDER_DISPATCH_PREPARE_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider dispatch prepare request requires ${key}`);
+      }
+    }
+    if (typeof request.expectedProviderRevision !== 'number'
+        || !Number.isSafeInteger(request.expectedProviderRevision)
+        || Object.is(request.expectedProviderRevision, -0)
+        || request.expectedProviderRevision < 1) {
+      throw new Error('expectedProviderRevision must be a positive safe integer');
+    }
+    const store = await this.load();
+    const job = store.byId[id];
+    if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for Specialist provider dispatch');
+    const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === request.agentId);
+    if (!assignment) throw new Error('Specialist assignment not found for provider dispatch');
+    if (assignment.state !== 'LEASED' || assignment.leaseId !== request.leaseId) {
+      throw new Error('Specialist provider dispatch requires the current leased assignment');
+    }
+    const ownership = (job.runtime.specialistExecutionOwnerships || [])
+      .map(normalizeExecutionOwnershipV1)
+      .find(item => item.ownerId === assignment.agentId && item.leaseId === request.leaseId);
+    if (!ownership || ownership.state !== ExecutionOwnershipState.OWNED) {
+      throw new Error('Specialist provider dispatch requires matching canonical OWNED execution');
+    }
+    const provenance = (job.runtime.specialistProviderAdmissionProvenance || [])
+      .find(item => item?.agentId === assignment.agentId);
+    if (!provenance) throw new Error('Specialist provider dispatch requires durable provider admission provenance');
+    const selection = normalizeSpecialistSelectionV1(provenance.selection);
+    const handoff = normalizeSpecialistHandoffV1(provenance.handoff);
+    if (selection.specialistId !== assignment.specialistId || handoff.specialistId !== assignment.specialistId) {
+      throw new Error('Specialist provider dispatch provenance drifted from claimed assignment');
+    }
+    if (selection.providerId !== OPENHANDS_CODING_PROVIDER_ID) {
+      throw new Error('No supported Specialist provider runtime is configured for this selection');
+    }
+    if (Object.hasOwn(store.specialistProviderConfigQuarantineById || Object.create(null), selection.providerId)) {
+      throw new Error('Specialist provider config is quarantined and unavailable for dispatch');
+    }
+    const providerConfig = store.specialistProviderConfigsById?.[selection.providerId];
+    if (!providerConfig) throw new Error('Specialist provider config not found for claimed selection');
+    const normalizedProviderConfig = normalizeSpecialistProviderConfigV1(providerConfig);
+    if (normalizedProviderConfig.revision !== request.expectedProviderRevision) {
+      throw new Error('Specialist provider config revision drifted before dispatch preparation');
+    }
+    const prepared = prepareOpenHandsCodingSpecialistV1({
+      handoff,
+      grantedCapabilityIds: selection.requestedCapabilityIds,
+      config: normalizedProviderConfig.config,
+      conversationId: request.conversationId,
+    });
+    if (prepared.providerId !== selection.providerId
+        || prepared.specialistId !== selection.specialistId
+        || prepared.handoff.handoffId !== handoff.handoffId) {
+      throw new Error('Prepared Specialist provider dispatch drifted from durable selection provenance');
+    }
+    return {
+      jobId: job.id,
+      agentId: assignment.agentId,
+      leaseId: assignment.leaseId,
+      effectId: ownership.effectId,
+      providerConfigRevision: normalizedProviderConfig.revision,
+      prepared: clone(prepared),
+      authority: {
+        dispatchAuthorized: false,
+        completionAuthorized: false,
+        verificationAuthorized: false,
+        requiresPersistBeforeDispatch: true,
+      },
+    };
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -1394,6 +1513,7 @@ export class BrowserAgentManager {
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
+      providerAdmissionProvenance: clone(current.job.runtime.specialistProviderAdmissionProvenance || []),
     };
   }
 
