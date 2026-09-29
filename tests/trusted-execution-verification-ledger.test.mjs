@@ -235,7 +235,6 @@ test('ledger normalization rejects duplicate canonical identities and hostile ac
   assert.equal(getterCalls, 0);
 });
 
-
 test('ledger rejects records whose own chronology cannot represent trusted verification', () => {
   const empty = createTrustedExecutionVerificationLedgerV1();
 
@@ -267,6 +266,33 @@ test('ledger rejects records whose own chronology cannot represent trusted verif
       }),
     ),
     /evidence postdates verification/u,
+  );
+});
+
+test('ledger revision is exact append history and one execution cannot carry contradictory outcomes', () => {
+  assert.throws(
+    () => normalizeTrustedExecutionVerificationLedgerV1({
+      schemaVersion: 1,
+      revision: 1,
+      records: [],
+    }),
+    /revision must exactly match append history/u,
+  );
+
+  const effect = appendTrustedExecutionVerificationRecordV1(
+    createTrustedExecutionVerificationLedgerV1(),
+    trustedRecord(),
+  );
+  assert.throws(
+    () => appendTrustedExecutionVerificationRecordV1(
+      effect,
+      trustedRecord({
+        recordId: 'record.specialist.no-effect',
+        verificationId: 'verification.specialist.no-effect',
+        outcome: TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
+      }),
+    ),
+    /contradictory outcomes for one execution/u,
   );
 });
 
@@ -308,6 +334,14 @@ test('durable repository serializes concurrent appends and supplies the canonica
     outcome: TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
     recordId: 'record.specialist.2',
     verificationId: 'verification.specialist.2',
+    executionId: 'lease.specialist.2',
+    verificationOverrides: {
+      executionId: 'lease.specialist.2',
+      effectId: 'effect.specialist.2',
+    },
+    overrides: {
+      effectId: 'effect.specialist.2',
+    },
   });
 
   await Promise.all([
@@ -324,11 +358,6 @@ test('durable repository serializes concurrent appends and supplies the canonica
 
   const resolved = await repository.resolver()(lookup());
   assert.equal(resolved.recordId, 'record.specialist.1');
-  const noEffectResolved = await repository.resolve(lookup({
-    expectedOutcome: TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
-    verificationId: 'verification.specialist.2',
-  }));
-  assert.equal(noEffectResolved.recordId, 'record.specialist.2');
 });
 
 test('existing execution ownership completion consumes only the ledger resolver', async () => {
