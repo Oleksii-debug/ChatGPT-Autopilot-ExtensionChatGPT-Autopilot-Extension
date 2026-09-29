@@ -1414,3 +1414,26 @@ test('initial direct save cannot bootstrap mismatched artifact provenance', asyn
     /Artifact provenance artifact is not current: build/,
   );
 });
+
+
+test('durable workspace millisecond timestamps reject signed zero, fractions and unsafe integers', async () => {
+  for (const value of [-0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => createProjectWorkspace(value),
+      /Invalid project workspace createdAt/,
+    );
+  }
+
+  const workspace = createProjectWorkspace(1);
+  workspace.updatedAt = 1.5;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /Invalid project workspace updatedAt/,
+  );
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.update(value => value, { nowMs: -0 }),
+    /Invalid project workspace update nowMs/,
+  );
+});
