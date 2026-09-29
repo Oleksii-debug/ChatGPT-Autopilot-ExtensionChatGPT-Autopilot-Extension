@@ -2323,6 +2323,9 @@ async function saveAgentDefinition() {
       definitionRevision,
       configDefaults: current?.configDefaults || {},
       modelRoutePolicy: current?.modelRoutePolicy ?? null,
+      specialistDelegationProfile: current && Object.hasOwn(current, 'specialistDelegationProfile')
+        ? current.specialistDelegationProfile
+        : undefined,
     });
     const payload = current
       ? {
