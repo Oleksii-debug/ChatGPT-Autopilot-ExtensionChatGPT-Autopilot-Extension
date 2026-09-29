@@ -84,7 +84,6 @@ function plan({ jobId, planId, policyEnvelopeId }) {
         updatedAt: T0,
       },
     ],
-    policyEnvelopeId,
   };
 }
 
