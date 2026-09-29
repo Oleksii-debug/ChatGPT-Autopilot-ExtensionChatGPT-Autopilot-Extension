@@ -168,8 +168,8 @@ export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
   }
   const configuredField = ownData(input, 'specialistDelegationConfigured', 'Specialist delegation configured');
   if (!configuredField.present) {
-    return persistedProfile === undefined
-      ? undefined
+    return persistedProfile === undefined || persistedProfile === null
+      ? persistedProfile
       : normalizeAgentSpecialistDelegationProfileV1(persistedProfile);
   }
   if (typeof configuredField.value !== 'boolean') {
