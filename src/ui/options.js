@@ -46,6 +46,9 @@ const ui = {
   agentDefinitionMode: 'none',
   agentDefinitionQuarantineCount: 0,
   agentDefinitionLaunchDefinitionId: '',
+  specialistAutomationPolicyRevision: 0,
+  specialistAutomationPolicyConfigured: false,
+  specialistAutomationPolicyQuarantined: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -2637,6 +2640,86 @@ function renderBrowserAgentList() {
   }
 }
 
+function syncSpecialistAutomationPolicyControls() {
+  const enabled = $('agent-specialist-automation-enabled').checked;
+  $('agent-specialist-automation-max-concurrent').disabled = !enabled;
+  $('agent-specialist-automation-save').disabled = ui.specialistAutomationPolicyQuarantined;
+  $('agent-specialist-automation-clear').disabled = ui.specialistAutomationPolicyQuarantined
+    || !ui.specialistAutomationPolicyConfigured;
+}
+
+async function loadSpecialistAutomationPolicy() {
+  try {
+    const data = await core('GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY');
+    const policy = data?.policy || null;
+    ui.specialistAutomationPolicyRevision = Number(data?.revision || 0);
+    ui.specialistAutomationPolicyConfigured = Boolean(policy);
+    ui.specialistAutomationPolicyQuarantined = data?.quarantined === true;
+    $('agent-specialist-automation-enabled').checked = policy?.enabled === true;
+    $('agent-specialist-automation-max-concurrent').value = String(
+      Number.isSafeInteger(policy?.maxConcurrentHandoffs) ? policy.maxConcurrentHandoffs : 1,
+    );
+    syncSpecialistAutomationPolicyControls();
+    $('agent-specialist-automation-status').textContent = ui.specialistAutomationPolicyQuarantined
+      ? `Policy revision ${ui.specialistAutomationPolicyRevision} пошкоджена й ізольована. Автоматичний CLAIM заблоковано до явного відновлення storage.`
+      : policy
+        ? `Policy revision ${policy.revision}: automation ${policy.enabled ? 'увімкнено' : 'вимкнено'}, глобальний максимум ${policy.maxConcurrentHandoffs}.`
+        : `Policy не налаштовано. Автоматичний Specialist CLAIM вимкнено fail-closed; durable revision ${ui.specialistAutomationPolicyRevision}.`;
+  } catch (error) {
+    $('agent-specialist-automation-status').textContent = `Не вдалося завантажити Specialist automation policy: ${error.message}`;
+  }
+}
+
+async function saveSpecialistAutomationPolicy() {
+  let maxConcurrentHandoffs;
+  try {
+    maxConcurrentHandoffs = parseStrictBoundedInteger(
+      $('agent-specialist-automation-max-concurrent').value,
+      { min: 0, max: 256, label: 'Максимум Specialist handoffs' },
+    );
+  } catch (error) {
+    $('agent-specialist-automation-status').textContent = error.message;
+    $('agent-specialist-automation-max-concurrent').focus();
+    return;
+  }
+  try {
+    const saved = await core('SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+      enabled: $('agent-specialist-automation-enabled').checked,
+      maxConcurrentHandoffs,
+    });
+    ui.specialistAutomationPolicyRevision = Number(saved?.policy?.revision || ui.specialistAutomationPolicyRevision);
+    await loadSpecialistAutomationPolicy();
+    announce('Specialist automation policy збережено.');
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
+      announce('Specialist automation policy змінилася. Актуальні дані перезавантажено.');
+      return;
+    }
+    $('agent-specialist-automation-status').textContent = `Policy не збережено: ${error.message}`;
+  }
+}
+
+async function clearSpecialistAutomationPolicy() {
+  try {
+    await core('CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+    });
+    await loadSpecialistAutomationPolicy();
+    announce('Specialist automation policy очищено. Автоматичний CLAIM вимкнено.');
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним очищенням.';
+      announce('Specialist automation policy змінилася. Актуальні дані перезавантажено.');
+      return;
+    }
+    $('agent-specialist-automation-status').textContent = `Policy не очищено: ${error.message}`;
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
@@ -4325,7 +4408,10 @@ $('mode-sessions').addEventListener('click', () => setUiMode('sessions', { focus
 $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { focus: true }));
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
-$('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('mode-agent').addEventListener('click', () => {
+  setUiMode('agent', { focus: true });
+  void loadSpecialistAutomationPolicy();
+});
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
@@ -4440,6 +4526,9 @@ $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgen
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
+$('agent-specialist-automation-enabled').addEventListener('change', syncSpecialistAutomationPolicyControls);
+$('agent-specialist-automation-save').addEventListener('click', saveSpecialistAutomationPolicy);
+$('agent-specialist-automation-clear').addEventListener('click', clearSpecialistAutomationPolicy);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
@@ -4636,6 +4725,7 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadSpecialistAutomationPolicy();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
