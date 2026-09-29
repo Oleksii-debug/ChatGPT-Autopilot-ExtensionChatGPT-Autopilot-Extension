@@ -452,3 +452,26 @@ test('canonical repository update rejects same-revision snapshot substitution wi
   assert.equal(restored.projectsById['project-a'].snapshot.title, 'Project A');
   assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
 });
+
+
+test('canonical repository update cannot remove an existing durable project record', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      delete workspace.projectsById['project-a'];
+      return workspace;
+    }, { nowMs: 3 }),
+    /cannot remove an existing project/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.updatedAt, 2);
+  assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+});
