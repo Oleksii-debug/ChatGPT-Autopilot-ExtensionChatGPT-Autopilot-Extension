@@ -191,6 +191,32 @@ test('definition persistence boundaries are descriptor-safe, exact-shape and zer
   assert.equal(created.registry.registryId, 'agents:project-2');
 });
 
+test('legacy persisted V1 registries without bindingKey migrate at the storage boundary', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:legacy' });
+
+  delete data.autopilotBrowserAgentV1.definitionRegistriesById['agents:legacy'].bindingKey;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.getAgentDefinitionRegistry('agents:legacy');
+  assert.equal(loaded.quarantined, false);
+  assert.equal(loaded.registry.registryId, 'agents:legacy');
+  assert.equal(typeof loaded.registry.bindingKey, 'string');
+  assert.ok(loaded.registry.bindingKey.length > 0);
+
+  await restarted.create({
+    id: 'agent-migration-save',
+    name: 'Migration save',
+    goal: 'Persist canonical migrated registry bytes.',
+  });
+  assert.equal(
+    typeof data.autopilotBrowserAgentV1.definitionRegistriesById['agents:legacy'].bindingKey,
+    'string',
+    'the next canonical store save must persist the migrated bindingKey',
+  );
+});
+
 test('one corrupt persisted definition registry does not poison jobs or other valid registries', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
