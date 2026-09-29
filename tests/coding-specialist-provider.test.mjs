@@ -236,6 +236,31 @@ test('fresh execution creates once and requires two terminal observations before
 });
 
 
+test('provider updated_at regression between fresh reads requires reconciliation', async () => {
+  let reads = 0;
+  const newerAt = '2026-09-25T08:00:00.500Z';
+  const client = clientFor(async url => {
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`)) {
+      reads += 1;
+      return json(info(reads === 1 ? 'running' : 'finished', {
+        updated_at: reads === 1 ? newerAt : CREATED_AT,
+      }));
+    }
+    throw new Error('POST must not occur for an existing conversation');
+  });
+
+  await assert.rejects(
+    () => client.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_PROVIDER_CHRONOLOGY_REGRESSION'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
+  assert.equal(reads, 2);
+});
+
 test('terminal double-read requires the same provider revision, not status alone', async () => {
   let reads = 0;
   const revisedAt = '2026-09-25T08:00:00.500Z';
