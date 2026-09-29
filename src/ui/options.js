@@ -2167,7 +2167,7 @@ function specialistDefinitionFormValue() {
 }
 
 async function reloadAfterSpecialistDrift(error, { specialistId = '' } = {}) {
-  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  if (!/(?:revision|bindingKey) drifted/i.test(String(error?.message || ''))) return false;
   const registryId = ui.selectedSpecialistRegistryId;
   await loadSpecialistRegistries({ selectRegistryId: registryId, selectSpecialistId: specialistId });
   $('specialist-status').textContent = 'Specialist реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
@@ -2187,6 +2187,7 @@ async function saveSpecialistDefinition() {
       ? {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'UPDATE',
           specialistId: current.specialistId,
           expectedDefinitionRevision: current.definitionRevision,
@@ -2195,6 +2196,7 @@ async function saveSpecialistDefinition() {
       : {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'CREATE',
           definition,
         };
@@ -2224,6 +2226,7 @@ async function toggleSpecialistEnabled() {
     await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'UPDATE',
       specialistId: current.specialistId,
       expectedDefinitionRevision: current.definitionRevision,
@@ -2250,6 +2253,7 @@ async function deleteSpecialistDefinition() {
     await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'DELETE',
       specialistId: current.specialistId,
       expectedDefinitionRevision: current.definitionRevision,
