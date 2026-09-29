@@ -86,6 +86,7 @@ import {
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
 import {
+  SpecialistProviderExecutionStatus,
   createSpecialistProviderExecutionV1,
   normalizeSpecialistProviderExecutionV1,
   recordSpecialistProviderExecutionOutcomeV1,
@@ -433,30 +434,59 @@ function trustedSpecialistReadinessDependencies(dependencies) {
     'Browser Agent Specialist readiness dependencies',
   );
   const resolver = raw.specialistProviderReadinessResolver;
-  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')
-      || typeof resolver.resolve !== 'function' || typeof resolver.assertCurrent !== 'function') {
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
     throw new Error('Browser Agent Specialist readiness dependencies require a trusted resolver');
   }
-  return resolver;
+  const dataMethod = name => {
+    let cursor = resolver;
+    while (cursor && cursor !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, name);
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error(`Browser Agent Specialist readiness resolver.${name} must be a data method`);
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
+    }
+    throw new Error(`Browser Agent Specialist readiness resolver.${name} must be a data method`);
+  };
+  const resolve = dataMethod('resolve');
+  const assertCurrent = dataMethod('assertCurrent');
+  return Object.freeze({
+    resolve: selection => resolve.call(resolver, selection),
+    assertCurrent: readiness => assertCurrent.call(resolver, readiness),
+  });
+}
+function readinessOwnData(value, key) {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
 }
 function assertTrustedSpecialistReadiness(readiness, selectionInput, nowMs) {
   const selection = normalizeSpecialistSelectionV1(selectionInput);
-  if (!readiness || typeof readiness !== 'object' || Array.isArray(readiness)) {
-    throw new Error('Specialist provider readiness must be a trusted resolver result');
-  }
-  if (readiness.trustedResolverInvoked !== true || readiness.callerReadinessAccepted !== false
-      || readiness.executable !== true) {
+  if (readinessOwnData(readiness, 'trustedResolverInvoked') !== true
+      || readinessOwnData(readiness, 'callerReadinessAccepted') !== false
+      || readinessOwnData(readiness, 'executable') !== true) {
     throw new Error('Specialist provider is not executable according to trusted readiness');
   }
   for (const key of ['registryId','registryRevision','registryBindingKey','specialistId','providerId','definitionRevision','executionPlane']) {
-    if (readiness[key] !== selection[key]) {
+    if (readinessOwnData(readiness, key) !== selection[key]) {
       throw new Error('Specialist provider readiness drifted from durable selection provenance');
     }
   }
-  const resolvedAt = Date.parse(readiness.resolvedAt || '');
-  const observedAt = Date.parse(readiness.observedAt || '');
-  if (!Number.isFinite(resolvedAt) || !Number.isFinite(observedAt)
-      || observedAt > resolvedAt || resolvedAt > nowMs) {
+  const resolvedRaw = readinessOwnData(readiness, 'resolvedAt');
+  const observedRaw = readinessOwnData(readiness, 'observedAt');
+  const maxAgeMs = readinessOwnData(readiness, 'maxAgeMs');
+  const resolvedAt = typeof resolvedRaw === 'string' ? Date.parse(resolvedRaw) : NaN;
+  const observedAt = typeof observedRaw === 'string' ? Date.parse(observedRaw) : NaN;
+  if (!Number.isSafeInteger(nowMs) || nowMs < 0 || Object.is(nowMs, -0)
+      || !Number.isFinite(resolvedAt) || !Number.isFinite(observedAt)
+      || new Date(resolvedAt).toISOString() !== resolvedRaw
+      || new Date(observedAt).toISOString() !== observedRaw
+      || !Number.isSafeInteger(maxAgeMs) || Object.is(maxAgeMs, -0)
+      || maxAgeMs < 1 || maxAgeMs > 5 * 60_000
+      || observedAt > resolvedAt || resolvedAt > nowMs || nowMs - observedAt > maxAgeMs) {
     throw new Error('Specialist provider readiness chronology is invalid');
   }
   return readiness;
@@ -488,6 +518,28 @@ function assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admissio
     selection: admission.selection,
     handoff: admission.handoff,
   });
+}
+function specialistProviderConfigHasLiveExecution(store, providerId) {
+  for (const jobId of store.order || []) {
+    const executions = store.byId?.[jobId]?.runtime?.specialistProviderExecutions || [];
+    for (const item of executions) {
+      let execution;
+      try {
+        execution = normalizeSpecialistProviderExecutionV1(item);
+      } catch {
+        return true;
+      }
+      if (execution.providerId !== providerId) continue;
+      if ([
+        SpecialistProviderExecutionStatus.PREPARED,
+        SpecialistProviderExecutionStatus.RECONCILE,
+        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+      ].includes(execution.status)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function freshStore() {
@@ -1306,6 +1358,9 @@ export class BrowserAgentManager {
       if (currentRevision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before persistence');
       }
+      if (specialistProviderConfigHasLiveExecution(store, providerId)) {
+        throw new Error('Specialist provider config is bound to a live provider execution');
+      }
       const requiredRevision = currentRevision + 1;
       if (!Number.isSafeInteger(requiredRevision) || providerConfig.revision !== requiredRevision) {
         throw new Error('Specialist provider config must increment revision exactly once');
@@ -1353,6 +1408,9 @@ export class BrowserAgentManager {
       const currentRevision = Number(revisions[providerId] || current.revision);
       if (currentRevision !== expectedRevision || current.revision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before clear');
+      }
+      if (specialistProviderConfigHasLiveExecution(store, providerId)) {
+        throw new Error('Specialist provider config is bound to a live provider execution');
       }
       nextRevision = currentRevision + 1;
       if (!Number.isSafeInteger(nextRevision)) {
@@ -2307,7 +2365,7 @@ export class BrowserAgentManager {
     }
     claimRequest.at = at;
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
       const specialistOwnerships = store.order
