@@ -11,6 +11,13 @@ const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_RESPONSE_CHUNKS = 8192;
 const SAFE_HTTP_FAILURES = new Set([400, 401, 403, 404, 405, 409, 412, 415, 422, 429]);
 const PULL_REQUEST_MERGE_METHODS = new Set(['merge', 'squash', 'rebase']);
+const PULL_REQUEST_REVIEW_EVENTS = new Set(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']);
+const PULL_REQUEST_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'PENDING', 'DISMISSED']);
+const PULL_REQUEST_REVIEW_STATE_BY_EVENT = Object.freeze({
+  APPROVE: 'APPROVED',
+  REQUEST_CHANGES: 'CHANGES_REQUESTED',
+  COMMENT: 'COMMENTED',
+});
 const WORKFLOW_RUN_STATUSES = new Set([
   'completed', 'action_required', 'cancelled', 'failure', 'neutral', 'skipped',
   'stale', 'success', 'timed_out', 'in_progress', 'queued', 'requested',
@@ -1096,6 +1103,37 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async readPullRequestReview({ repositoryFullName, pullRequestNumber, reviewId } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const id = positiveInteger(reviewId, 'reviewId');
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/pulls/${number}/reviews/${id}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request review response is invalid');
+    }
+    const returnedId = responsePositiveInteger(payload.id, 'pull request review id');
+    if (returnedId !== id) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request review identity mismatch');
+    const state = responseText(payload.state, 'pull request review state', 80);
+    if (!PULL_REQUEST_REVIEW_STATES.has(state)) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request review state is invalid');
+    }
+    const expectedPullUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/pulls/${number}`;
+    if (typeof payload.pull_request_url !== 'string'
+        || payload.pull_request_url.toLowerCase() !== expectedPullUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request review parent identity mismatch');
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+      reviewId: id,
+      body: responseText(payload.body, 'pull request review body', 100_000, { nullable: true }),
+      state,
+      commitId: responseSha(payload.commit_id, 'pull request review commit id'),
+      url: responseText(payload.html_url, 'pull request review URL', 4096),
+    });
+  }
+
   async readPullRequestComment({ repositoryFullName, pullRequestNumber, commentId } = {}) {
     const repository = exactRepositoryName(repositoryFullName);
     this.assertRepositoryAllowed(repository);
@@ -1293,6 +1331,75 @@ export class GitHubRestClientV1 {
       mergeMethod,
       merged: true,
       mergeCommitSha,
+    });
+  }
+
+
+  async createPullRequestReview({
+    repositoryFullName,
+    pullRequestNumber,
+    expectedHeadSha,
+    event,
+    body = '',
+  } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const expectedHead = exactSha(expectedHeadSha, 'expectedHeadSha');
+    if (typeof event !== 'string' || !PULL_REQUEST_REVIEW_EVENTS.has(event)) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'event must be APPROVE, REQUEST_CHANGES, or COMMENT', { safeToRetry: true });
+    }
+    const reviewBody = event === 'APPROVE'
+      ? optionalText(body, 'body', 100_000)
+      : exactNonBlankText(body, 'body', 100_000);
+
+    const before = await this.readPullRequest({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+    });
+    if (before.state !== 'open' || before.merged) {
+      throw githubError('GITHUB_PULL_REQUEST_NOT_OPEN', 'Pull request is not open for review', { safeToRetry: true });
+    }
+    if (before.headSha !== expectedHead) {
+      throw githubError('GITHUB_PULL_REQUEST_HEAD_MISMATCH', 'Pull request head changed from expectedHeadSha', { safeToRetry: true });
+    }
+
+    const requestBody = { commit_id: expectedHead, event };
+    if (reviewBody) requestBody.body = reviewBody;
+    const payload = await this.request('POST', `/repos/${repositoryPath(repository)}/pulls/${number}/reviews`, {
+      effectful: true,
+      expectedStatuses: [200],
+      body: requestBody,
+    });
+    const reviewId = responsePositiveInteger(payload?.id, 'pull request review id', { effectMayHaveOccurred: true });
+    const state = responseText(payload?.state, 'pull request review state', 80, { effectMayHaveOccurred: true });
+    const returnedBody = responseText(payload?.body, 'pull request review body', 100_000, {
+      nullable: true,
+      effectMayHaveOccurred: true,
+    });
+    const commitId = responseSha(payload?.commit_id, 'pull request review commit id', { effectMayHaveOccurred: true });
+    const expectedState = PULL_REQUEST_REVIEW_STATE_BY_EVENT[event];
+    const expectedPullUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/pulls/${number}`;
+    if (state !== expectedState
+        || returnedBody !== reviewBody
+        || commitId !== expectedHead
+        || typeof payload?.pull_request_url !== 'string'
+        || payload.pull_request_url.toLowerCase() !== expectedPullUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub created pull request review does not match the requested review', {
+        effectMayHaveOccurred: true,
+        safeToRetry: false,
+      });
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+      reviewId,
+      expectedHeadSha: expectedHead,
+      event,
+      body: returnedBody,
+      state,
+      commitId,
+      url: responseText(payload?.html_url, 'pull request review URL', 4096, { effectMayHaveOccurred: true }),
     });
   }
 
