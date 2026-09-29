@@ -238,11 +238,16 @@ test('selection carries a full immutable definition snapshot so same-revision by
       definition({ instructions: 'Changed instructions without a revision bump.' }),
     ],
   });
+  assert.notEqual(
+    drifted.bindingKey,
+    reg.bindingKey,
+    'same-revision definition bytes must change the canonical registry binding',
+  );
   assert.throws(() => materializeAgentDefinitionV1({
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -550,7 +555,7 @@ test('requested capability and tool scope is the explicit intersection of owner 
   })), /exceeds allowed authority/);
 });
 
-test('disabled, removed and registry-revision drift require fresh selection', () => {
+test('disabled, removed and registry-revision drift invalidate the exact registry binding', () => {
   const reg = registry();
   const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
   const base = materialization({ selection: selected });
@@ -563,12 +568,12 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
