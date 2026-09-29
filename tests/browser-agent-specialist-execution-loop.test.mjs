@@ -162,6 +162,11 @@ test('execution loop automatically prepares a durable definition-bound Specialis
   const persisted = await manager.listSpecialistHandoffs(id);
   assert.equal(persisted.handoffs.length, 1);
   assert.equal(persisted.executionOwnerships.length, 1);
+  assert.equal(persisted.selectionProvenance.length, 1);
+  assert.equal(persisted.selectionProvenance[0].agentId, result.handoff.agentId);
+  assert.equal(persisted.selectionProvenance[0].selection.specialistId, 'specialist.research.local');
+  assert.equal(persisted.selectionProvenance[0].selection.providerId, 'provider.local');
+  assert.equal(persisted.selectionProvenance[0].selection.registryRevision, 2);
 
   const repeated = await manager.cycleOne(id);
   assert.equal(repeated.kind, 'SPECIALIST_PENDING');
@@ -274,4 +279,21 @@ test('persistent automatic Specialist admission failure reaches the existing ter
   assert.equal(current.job.runtime.runState, 'ERROR');
   assert.equal(current.job.runtime.nextWakeAt, 0);
   assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
+});
+
+
+test('automatic Specialist selection provenance survives BrowserAgent restart without caller reconstruction', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  const prepared = await manager.cycleOne(id);
+  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+
+  const restarted = managerFor(chrome);
+  const persisted = await restarted.listSpecialistHandoffs(id);
+  assert.equal(persisted.selectionProvenance.length, 1);
+  assert.equal(persisted.selectionProvenance[0].agentId, prepared.handoff.agentId);
+  assert.equal(persisted.selectionProvenance[0].selection.providerId, 'provider.local');
+  assert.equal(persisted.selectionProvenance[0].selection.definitionRevision, 1);
+  assert.equal(persisted.selectionProvenance[0].selection.resultContractId, 'result.research');
 });
