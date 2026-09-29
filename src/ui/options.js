@@ -46,6 +46,9 @@ const ui = {
   agentDefinitionMode: 'none',
   agentDefinitionQuarantineCount: 0,
   agentDefinitionLaunchDefinitionId: '',
+  specialistAutomationPolicy: null,
+  specialistAutomationPolicyRevision: 0,
+  specialistAutomationPolicyQuarantined: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -2637,6 +2640,98 @@ function renderBrowserAgentList() {
   }
 }
 
+function renderSpecialistAutomationPolicy() {
+  const policy = ui.specialistAutomationPolicy;
+  const quarantined = ui.specialistAutomationPolicyQuarantined === true;
+  const enabled = $('agent-specialist-automation-enabled');
+  const capacity = $('agent-specialist-automation-capacity');
+  const save = $('agent-specialist-automation-save-button');
+  const clear = $('agent-specialist-automation-clear-button');
+  const status = $('agent-specialist-automation-status');
+
+  enabled.checked = policy?.enabled === true;
+  capacity.value = String(policy?.maxConcurrentHandoffs ?? 0);
+  enabled.disabled = quarantined;
+  capacity.disabled = quarantined;
+  save.disabled = quarantined;
+  clear.disabled = quarantined || !policy;
+
+  if (quarantined) {
+    status.textContent = `Specialist automation policy revision ${ui.specialistAutomationPolicyRevision} пошкоджена й заблокована fail-closed. Нові automatic claims не запускаються; потрібне явне відновлення durable storage.`;
+  } else if (!policy) {
+    status.textContent = `Specialist automation policy не задана. Automatic claim/provider dispatch вимкнено. Durable revision: ${ui.specialistAutomationPolicyRevision}.`;
+  } else {
+    status.textContent = `Specialist automation policy revision ${policy.revision}: ${policy.enabled ? 'увімкнено' : 'вимкнено'}, product-wide capacity ${policy.maxConcurrentHandoffs}.`;
+  }
+}
+
+async function loadSpecialistAutomationPolicy() {
+  try {
+    const state = await core('GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY');
+    ui.specialistAutomationPolicy = state?.policy || null;
+    ui.specialistAutomationPolicyRevision = Number(state?.revision || 0);
+    ui.specialistAutomationPolicyQuarantined = state?.quarantined === true;
+    renderSpecialistAutomationPolicy();
+  } catch (error) {
+    $('agent-specialist-automation-status').textContent = `Specialist automation policy не завантажено: ${error.message}`;
+  }
+}
+
+async function saveSpecialistAutomationPolicy() {
+  const capacity = Number($('agent-specialist-automation-capacity').value);
+  if (!Number.isSafeInteger(capacity) || capacity < 0 || capacity > 256) {
+    $('agent-specialist-automation-status').textContent = 'Введіть ціле product-wide значення від 0 до 256.';
+    $('agent-specialist-automation-capacity').focus();
+    return;
+  }
+  const button = $('agent-specialist-automation-save-button');
+  try {
+    button.disabled = true;
+    const result = await core('SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+      enabled: $('agent-specialist-automation-enabled').checked,
+      maxConcurrentHandoffs: capacity,
+    });
+    ui.specialistAutomationPolicy = result?.policy || null;
+    ui.specialistAutomationPolicyRevision = Number(result?.policy?.revision || ui.specialistAutomationPolicyRevision);
+    ui.specialistAutomationPolicyQuarantined = false;
+    renderSpecialistAutomationPolicy();
+    announce('Specialist automation policy збережено.');
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальний стан перезавантажено; перевірте його перед повторним збереженням.';
+      announce('Specialist automation policy змінилася. Актуальний стан перезавантажено.');
+    } else {
+      $('agent-specialist-automation-status').textContent = `Policy не збережено: ${error.message}`;
+    }
+  } finally {
+    if (!ui.specialistAutomationPolicyQuarantined) button.disabled = false;
+  }
+}
+
+async function clearSpecialistAutomationPolicy() {
+  const button = $('agent-specialist-automation-clear-button');
+  try {
+    button.disabled = true;
+    await core('CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
+      expectedRevision: ui.specialistAutomationPolicyRevision,
+    });
+    await loadSpecialistAutomationPolicy();
+    announce('Specialist automation policy очищено; automatic dispatch вимкнено.');
+    $('agent-specialist-automation-enabled').focus();
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadSpecialistAutomationPolicy();
+      $('agent-specialist-automation-status').textContent = 'Policy змінилася в іншій операції. Актуальний стан перезавантажено.';
+    } else {
+      $('agent-specialist-automation-status').textContent = `Policy не очищено: ${error.message}`;
+    }
+  } finally {
+    renderSpecialistAutomationPolicy();
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
@@ -4325,8 +4420,13 @@ $('mode-sessions').addEventListener('click', () => setUiMode('sessions', { focus
 $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { focus: true }));
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
-$('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('mode-agent').addEventListener('click', () => {
+  setUiMode('agent', { focus: true });
+  void loadSpecialistAutomationPolicy();
+});
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
+$('agent-specialist-automation-save-button').addEventListener('click', () => { void saveSpecialistAutomationPolicy(); });
+$('agent-specialist-automation-clear-button').addEventListener('click', () => { void clearSpecialistAutomationPolicy(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -4636,6 +4736,7 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadSpecialistAutomationPolicy();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
