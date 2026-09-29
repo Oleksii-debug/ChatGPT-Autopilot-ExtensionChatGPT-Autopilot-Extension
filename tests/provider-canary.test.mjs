@@ -373,3 +373,31 @@ test('canary result never grants routing, repair, readiness-update, task, policy
   assert.equal('effectId' in result, false);
   assert.equal('policyDecision' in result, false);
 });
+
+test('fresh canaries cannot re-authorize stale or future base readiness facts', () => {
+  const def = definition('github.read', 'github.read', { requiredPasses:1 });
+  const observations = [observation('fresh.pass', 'github.read', 'github.read', 'PASS')];
+
+  const stale = evaluate([def], observations, {
+    currentReadiness: currentReadiness({
+      observedAt:'2026-09-25T05:54:00.000Z',
+      validThrough:'2026-09-25T05:55:29.999Z',
+    }),
+  });
+  assert.equal(stale.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(stale.recommendedProviderReadiness.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(stale.recommendedProviderReadiness.reasonCode, 'PROVIDER_STATE_STALE');
+  assert.equal(stale.recommendations.blockConsequentialWorkSuggested, true);
+  assert.equal(stale.readinessUpdateAuthorized, false);
+  assert.equal(stale.executionAuthorized, false);
+
+  const future = evaluate([def], observations, {
+    currentReadiness: currentReadiness({
+      observedAt:'2026-09-25T05:55:30.001Z',
+      validThrough:'2026-09-25T06:10:00.000Z',
+    }),
+  });
+  assert.equal(future.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(future.recommendedProviderReadiness.reasonCode, 'PROVIDER_STATE_FUTURE');
+  assert.equal(future.recommendations.blockConsequentialWorkSuggested, true);
+});
