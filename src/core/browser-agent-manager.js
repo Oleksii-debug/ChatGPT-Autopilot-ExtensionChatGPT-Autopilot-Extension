@@ -50,7 +50,11 @@ import {
   verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
-import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import {
+  ExecutionOwnershipState,
+  normalizeExecutionOwnershipV1,
+  requireExecutionReconciliationV1,
+} from './execution-plane-ownership.js';
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
@@ -1811,6 +1815,22 @@ export class BrowserAgentManager {
       }
       job.runtime.specialistProviderExecutions = executions.map((item, itemIndex) =>
         itemIndex === index ? outcome : item);
+      if (outcome.reconciliationRequired || outcome.manualReviewRequired) {
+        const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+        const ownershipIndex = ownerships.findIndex(item =>
+          item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+        if (ownershipIndex < 0) {
+          throw new Error('Specialist provider ambiguous outcome lacks exact execution ownership');
+        }
+        ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
+          leaseId: prepared.leaseId,
+          reason: outcome.reconciliationRequired
+            ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
+            : `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`,
+          at: observedAt,
+        });
+        job.runtime.specialistExecutionOwnerships = ownerships;
+      }
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
