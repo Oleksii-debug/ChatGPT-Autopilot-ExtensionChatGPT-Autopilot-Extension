@@ -677,6 +677,7 @@ test('trusted readiness drift before PREPARED blocks provider execution without 
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -684,6 +685,7 @@ test('trusted readiness drift before PREPARED blocks provider execution without 
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: T1,
         resolvedAt: T1,
         maxAgeMs: 60_000,
       };
@@ -1057,6 +1059,7 @@ test('readiness await cannot carry provider PREPARED past lease expiry', async (
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -1064,6 +1067,7 @@ test('readiness await cannot carry provider PREPARED past lease expiry', async (
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: T1,
         resolvedAt: T1,
         maxAgeMs: 60_000,
       };
@@ -1362,6 +1366,7 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -1369,6 +1374,7 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(clock.value).toISOString(),
         resolvedAt: new Date(clock.value).toISOString(),
         maxAgeMs: 60_000,
       };
