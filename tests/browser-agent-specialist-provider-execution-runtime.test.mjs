@@ -968,3 +968,87 @@ test('historical terminal provider execution from a prior lease does not block a
   assert.ok(durable.providerExecutions.some(item => item.leaseId === 'lease:prior-safe-retry'));
   assert.ok(durable.providerExecutions.some(item => item.leaseId === assignment.leaseId));
 });
+
+
+test('bounded provider execution history retains the newest PREPARED record before the 129th effect', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  let manager;
+  const currentConversationId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const client = {
+    async execute() {
+      calls += 1;
+      const duringEffect = await manager.listSpecialistHandoffs('job.coder');
+      assert.equal(duringEffect.providerExecutions.length, 128);
+      assert.ok(duringEffect.providerExecutions.some(item =>
+        item.conversationId === currentConversationId && item.status === 'PREPARED'));
+      assert.ok(!duringEffect.providerExecutions.some(item =>
+        item.leaseId === 'lease:historical-0'));
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+
+  const historical = Array.from({ length: 128 }, (_, index) => {
+    const prepared = createSpecialistProviderExecutionV1({
+      planId: current.job.runtime.plan.planId,
+      nodeId: current.job.runtime.plan.nodes[0].nodeId,
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: `lease:historical-${index}`,
+      leaseUntil: T2,
+      conversationId: `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`,
+      providerConfig: providerConfig(),
+      at: T0,
+    });
+    return recordSpecialistProviderExecutionOutcomeV1(prepared, {
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: true,
+      effectEvidence: '',
+      errorCode: 'OPENHANDS_PROVIDER_UNAVAILABLE',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      at: T1,
+    });
+  });
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = historical;
+    return store;
+  });
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: currentConversationId,
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 128);
+  assert.ok(durable.providerExecutions.some(item => item.conversationId === currentConversationId));
+});
