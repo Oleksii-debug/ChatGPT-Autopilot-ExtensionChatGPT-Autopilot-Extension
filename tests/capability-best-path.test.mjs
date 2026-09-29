@@ -239,21 +239,22 @@ test('stale and future readiness observations cannot win recommendation', () => 
   assert.equal(result.selected.candidate.sourceRevision, 1);
 });
 
-test('invalid candidate validity window is blocked rather than treated as readiness', () => {
-  const result = recommendCapabilityBestPathV1({
-    schemaVersion: 1,
-    asOf: '2026-09-29T04:30:00.000Z',
-    requiredCapabilityIds: ['repo.read'],
-    candidates: [
-      candidate({
-        candidateId: 'api-invalid-window',
-        observedAt: '2026-09-29T04:20:00.000Z',
-        validThrough: '2026-09-29T04:10:00.000Z',
-      }),
-    ],
-  });
-  assert.equal(result.selected, null);
-  assert.equal(result.blocked[0].reason, 'INVALID_VALIDITY_WINDOW');
+test('impossible candidate validity window fails closed as malformed provenance', () => {
+  assert.throws(
+    () => recommendCapabilityBestPathV1({
+      schemaVersion: 1,
+      asOf: '2026-09-29T04:30:00.000Z',
+      requiredCapabilityIds: ['repo.read'],
+      candidates: [
+        candidate({
+          candidateId: 'api-invalid-window',
+          observedAt: '2026-09-29T04:20:00.000Z',
+          validThrough: '2026-09-29T04:10:00.000Z',
+        }),
+      ],
+    }),
+    /validThrough cannot predate observedAt/,
+  );
 });
 
 test('no eligible candidate returns null selected without manufacturing permission', () => {
