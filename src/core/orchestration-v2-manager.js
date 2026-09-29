@@ -17,6 +17,7 @@ import {
   putSubagentTaskActivationBindingV1,
   resolveSubagentTaskActivationBindingV1,
 } from './subagent-task-activation-binding-registry.js';
+import { deriveSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -25,6 +26,7 @@ const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPha
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
 const SUBAGENT_BINDING_LOOKUP_KEYS = new Set(['bindingId']);
+const SUBAGENT_BINDING_REGISTRATION_KEYS = new Set(['taskEnvelope', 'activationAction', 'invocationId']);
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
@@ -75,6 +77,60 @@ function plainSubagentBindingLookup(value, label = 'Subagent activation-binding 
     normalized[key] = descriptor.value;
   }
   return normalized;
+}
+function snapshotDataOnly(value, label, depth = 0) {
+  if (depth > 64) throw new Error(`${label} nesting is too deep`);
+  if (value === null || ['string', 'number', 'boolean', 'undefined'].includes(typeof value)) return value;
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) throw new Error(`${label} array prototype is invalid`);
+    if (Object.getOwnPropertySymbols(value).length) throw new Error(`${label} contains symbol field`);
+    const names = Object.getOwnPropertyNames(value).filter(name => name !== 'length');
+    if (names.length !== value.length || names.some((name, index) => name !== String(index))) {
+      throw new Error(`${label} arrays must be dense and undecorated`);
+    }
+    return Object.freeze(names.map((name, index) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, name);
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+        throw new Error(`${label}[${index}] must be an enumerable own data property`);
+      }
+      return snapshotDataOnly(descriptor.value, `${label}[${index}]`, depth + 1);
+    }));
+  }
+  if (typeof value !== 'object') throw new Error(`${label} contains unsupported value`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must contain plain objects only`);
+  const output = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label}.${key} must be an enumerable own data property`);
+    }
+    output[key] = snapshotDataOnly(descriptor.value, `${label}.${key}`, depth + 1);
+  }
+  return Object.freeze(output);
+}
+function snapshotSubagentBindingRegistration(value) {
+  const snapshot = snapshotDataOnly(value, 'Subagent activation-binding registration');
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new Error('Subagent activation-binding registration must be a plain object');
+  }
+  for (const key of Object.keys(snapshot)) {
+    if (!SUBAGENT_BINDING_REGISTRATION_KEYS.has(key)) {
+      throw new Error('Subagent activation-binding registration contains unknown field: ' + key);
+    }
+  }
+  for (const key of SUBAGENT_BINDING_REGISTRATION_KEYS) {
+    if (!Object.hasOwn(snapshot, key)) {
+      throw new Error('Subagent activation-binding registration is missing field: ' + key);
+    }
+  }
+  return snapshot;
+}
+function sameBindingIdentity(left, right) {
+  if (!left || !right) return false;
+  return Object.keys(left).every(key => key === 'boundAt' || left[key] === right[key])
+    && Object.keys(right).every(key => key === 'boundAt' || left[key] === right[key]);
 }
 function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
@@ -546,43 +602,60 @@ export class OrchestrationV2Manager {
    * Input is normalized synchronously before the first await so caller mutation or
    * accessor-backed objects cannot alter the durable record after admission starts.
    */
-  async registerSubagentTaskActivationBinding(bindingInput = {}, id = '') {
-    const ownerRegisteredAt = new Date(this.now()).toISOString();
-    const canonicalSingleton = putSubagentTaskActivationBindingV1(
-      createSubagentTaskActivationBindingRegistryV1(),
-      {
-        binding: bindingInput,
-        registeredAt: ownerRegisteredAt,
-      },
-    );
-    const candidate = canonicalSingleton.records[0];
-    if (!candidate) throw new Error('Subagent activation binding registration is empty');
+  async registerSubagentTaskActivationBinding(input = {}, id = '') {
+    const request = snapshotSubagentBindingRegistration(input);
+    const ownerBoundAt = new Date(this.now()).toISOString();
 
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
     const controller = this.controllerFor(orchestraId);
 
+    let persistedBinding = null;
     const runtime = await controller.runtimeRepository.update(current => {
+      const hierarchy = current?.hierarchy;
+      if (!hierarchy?.graph || !hierarchy?.state) {
+        throw new Error('Durable orchestration hierarchy is required for subagent activation binding');
+      }
+      const derived = deriveSubagentTaskActivationBindingV1({
+        taskEnvelope: request.taskEnvelope,
+        graph: hierarchy.graph,
+        runtime: hierarchy.state,
+        activationAction: request.activationAction,
+        invocationId: request.invocationId,
+        boundAt: ownerBoundAt,
+      });
+      if (derived.projectId !== current.projectId) {
+        throw new Error('Subagent activation binding project does not match orchestra owner project');
+      }
+
       const registry = storedSubagentTaskActivationBindingRegistry(current);
+      const existing = resolveSubagentTaskActivationBindingV1(
+        registry,
+        { bindingId: derived.bindingId },
+      );
+      if (existing) {
+        if (!sameBindingIdentity(existing, derived)) {
+          throw new Error('Divergent subagent activation binding replay');
+        }
+        persistedBinding = existing;
+        return current;
+      }
+
       current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
         registry,
-        {
-          binding: candidate.binding,
-          registeredAt: candidate.registeredAt,
-        },
+        { binding: derived, registeredAt: ownerBoundAt },
       );
+      persistedBinding = derived;
       return current;
     });
+
+    if (!persistedBinding) throw new Error('Subagent activation binding was not persisted');
     const registry = storedSubagentTaskActivationBindingRegistry(runtime);
-    const binding = resolveSubagentTaskActivationBindingV1(
-      registry,
-      { bindingId: candidate.binding.bindingId },
-    );
     return Object.freeze({
       orchestraId,
       revision: registry.revision,
-      binding,
+      binding: persistedBinding,
     });
   }
 
@@ -603,10 +676,14 @@ export class OrchestrationV2Manager {
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
     const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
-    return resolveSubagentTaskActivationBindingV1(
+    const binding = resolveSubagentTaskActivationBindingV1(
       storedSubagentTaskActivationBindingRegistry(runtime),
       lookup,
     );
+    if (binding && binding.projectId !== runtime.projectId) {
+      throw new Error('Durable subagent activation binding crosses orchestra project authority');
+    }
+    return binding;
   }
 
   /**
