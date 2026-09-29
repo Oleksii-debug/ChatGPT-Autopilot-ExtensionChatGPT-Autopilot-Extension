@@ -40,8 +40,6 @@ const INPUT_KEYS = new Set([
   'currentSelfRepairDispatchRouteId',
   'orchestratorEnvelope',
   'providerCallBudgetContext',
-  'prompt',
-  'systemPrompt',
   'maxOutputTokens',
   'currentNow',
 ]);
@@ -117,15 +115,31 @@ function exactPositiveInteger(value, label) {
   return value;
 }
 
-function boundedText(value, label, maxLength, { optional = false } = {}) {
-  if (value === undefined && optional) return '';
-  if (typeof value !== 'string' || value.length > maxLength) {
-    throw new Error(label + ' is invalid');
-  }
-  if (!optional && !value.trim()) {
-    throw new Error(label + ' must not be empty');
-  }
-  return value;
+function canonicalSelfRepairPrompt(intent) {
+  const criteria = intent.workAcceptanceCriteria.length
+    ? '\nAcceptance criteria:\n' + intent.workAcceptanceCriteria
+      .map((criterion, index) => String(index + 1) + '. ' + criterion)
+      .join('\n')
+    : '';
+  return [
+    'Self-repair work: ' + intent.workTitle,
+    'Objective: ' + intent.workObjective,
+    'Bound plan: ' + intent.planId,
+    'Bound cycle: ' + intent.cycleId,
+    'Bound failed node: ' + intent.failedNodeId,
+    'Bound work node: ' + intent.nodeId,
+    criteria,
+  ].filter(Boolean).join('\n');
+}
+
+function canonicalSelfRepairSystemPrompt(intent) {
+  return [
+    'Execute only the canonical self-repair work bound to this invocation.',
+    'Do not broaden the task, change owner authority, or invent additional work.',
+    intent.workKind === AgentSelfRepairWorkKind.RETEST
+      ? 'Act only as the independent verifier for the bound RETEST work.'
+      : 'Act only as the bound repair actor for the REPAIR work.',
+  ].join(' ');
 }
 
 function sameCanonicalIds(left, right) {
@@ -259,13 +273,8 @@ export function prepareBoundAgentSelfRepairModelInvocationV1(input) {
     raw.providerCallBudgetContext,
     intent.ownerId,
   );
-  const prompt = boundedText(raw.prompt, 'Agent self-repair invocation prompt', 100_000);
-  const systemPrompt = boundedText(
-    raw.systemPrompt,
-    'Agent self-repair invocation systemPrompt',
-    50_000,
-    { optional: true },
-  );
+  const prompt = canonicalSelfRepairPrompt(intent);
+  const systemPrompt = canonicalSelfRepairSystemPrompt(intent);
   const maxOutputTokens = exactPositiveInteger(
     raw.maxOutputTokens,
     'Agent self-repair invocation maxOutputTokens',
