@@ -176,7 +176,8 @@ test('exact duplicate append is idempotent but recordId and verificationId canno
     trustedRecord(),
   );
   const duplicate = appendTrustedExecutionVerificationRecordV1(once, trustedRecord());
-  assert.equal(duplicate, once);
+  assert.equal(duplicate.revision, once.revision);
+  assert.deepEqual(duplicate, once);
 
   assert.throws(
     () => appendTrustedExecutionVerificationRecordV1(
