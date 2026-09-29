@@ -29,9 +29,12 @@ const REQUEST_KEYS = new Set([
 const OPTIONS_KEYS = new Set([
   'recipeRegistry',
   'resolveTrustedRecipeTrace',
+  'resolveTrustedRecipeSourceBinding',
   'resolveTrustedEvidenceArtifact',
   'resolveTrustedSecretScan',
 ]);
+
+const SOURCE_BINDING_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
 
 const SECRET_SCAN_KEYS = new Set([
   'schemaVersion',
@@ -147,6 +150,10 @@ function normalizeOptions(input) {
       raw.resolveTrustedRecipeTrace,
       'resolveTrustedRecipeTrace',
     ),
+    resolveTrustedRecipeSourceBinding: requiredFunction(
+      raw.resolveTrustedRecipeSourceBinding,
+      'resolveTrustedRecipeSourceBinding',
+    ),
     resolveTrustedEvidenceArtifact: requiredFunction(
       raw.resolveTrustedEvidenceArtifact,
       'resolveTrustedEvidenceArtifact',
@@ -170,6 +177,21 @@ function originalSourceBindings(compiled) {
     throw new Error('Compiler provenance bindings are not exact');
   }
   return values;
+}
+
+function normalizeTrustedSourceBinding(input, expected) {
+  const raw = strictRecord(input, SOURCE_BINDING_KEYS, 'TrustedRecipeSourceBindingV1');
+  const normalized = freezeDeep({
+    sourceId: exactId(raw.sourceId, 'trusted source sourceId'),
+    revisionId: exactId(raw.revisionId, 'trusted source revisionId'),
+    contentSha256: exactSha256(raw.contentSha256, 'trusted source contentSha256'),
+  });
+  if (normalized.sourceId !== expected.sourceId
+      || normalized.revisionId !== expected.revisionId
+      || normalized.contentSha256 !== expected.contentSha256) {
+    throw new Error('Trusted Recipe source binding does not match compiler source');
+  }
+  return normalized;
 }
 
 function trustedCompilerInput(compiled, trustedTrace) {
@@ -244,6 +266,19 @@ function traceLookup(request, compiled) {
     recipeId: compiled.recipeDefinition.recipeId,
     recipeVersion: compiled.recipeDefinition.version,
     traceBindingSha256: compiled.traceBinding.contentSha256,
+    requestedAt: request.admittedAt,
+  });
+}
+
+function sourceLookup(request, compiled, binding) {
+  return freezeDeep({
+    schemaVersion: RECIPE_CANDIDATE_ADMISSION_VERSION,
+    admissionId: request.admissionId,
+    recipeId: compiled.recipeDefinition.recipeId,
+    recipeVersion: compiled.recipeDefinition.version,
+    sourceId: binding.sourceId,
+    revisionId: binding.revisionId,
+    contentSha256: binding.contentSha256,
     requestedAt: request.admittedAt,
   });
 }
@@ -328,6 +363,14 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
     throw new Error('Trusted Recipe trace does not reproduce exact candidate');
   }
 
+  const resolvedSourceBindings = [];
+  for (const binding of originalSourceBindings(compiled)) {
+    const resolved = await options.resolveTrustedRecipeSourceBinding(
+      sourceLookup(request, compiled, binding),
+    );
+    resolvedSourceBindings.push(normalizeTrustedSourceBinding(resolved, binding));
+  }
+
   if (compiled.verificationEvidence.length > MAX_EVIDENCE_ARTIFACTS) {
     throw new Error('Recipe candidate references too many verification evidence artifacts');
   }
@@ -387,11 +430,13 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
     subjectSha256,
     traceBindingSha256: compiled.traceBinding.contentSha256,
     parameterSchemaSha256: compiled.parameterSchemaBinding.contentSha256,
+    resolvedSourceBindings,
     evidenceArtifactRefs,
     secretScan,
     recipeDefinition: candidate,
     nextRegistry,
     traceTrust: 'TRUSTED_RESOLVER',
+    sourceTrust: 'TRUSTED_RESOLVER',
     evidenceTrust: 'TRUSTED_ARTIFACT_REFS',
     secretScanTrust: 'TRUSTED_RESOLVER',
     registryAdmissionAuthorized: true,
