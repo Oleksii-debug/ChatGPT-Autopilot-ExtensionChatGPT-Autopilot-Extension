@@ -394,7 +394,7 @@ function statusOf(info) {
   return status;
 }
 
-function validateConversationInfo(info, prepared) {
+function validateConversationInfo(info, prepared, observedAtInput) {
   if (!info || typeof info !== 'object' || Array.isArray(info)) {
     throw new Error('OpenHands conversation response must be an object');
   }
@@ -414,10 +414,18 @@ function validateConversationInfo(info, prepared) {
       || profile.revision !== prepared.config.agentProfileRevision) {
     throw new Error('OpenHands launched agent profile provenance does not match qualified profile revision');
   }
+  const providerUpdatedAt = providerTimestamp(info.updated_at, 'OpenHands conversation updated_at');
+  const observedAt = providerTimestamp(observedAtInput, 'OpenHands conversation observedAt');
+  if (Date.parse(providerUpdatedAt) < Date.parse(prepared.handoff.createdAt)) {
+    throw new Error('OpenHands conversation updated_at predates admitted specialist handoff');
+  }
+  if (Date.parse(providerUpdatedAt) > Date.parse(observedAt)) {
+    throw new Error('OpenHands conversation updated_at is future-dated relative to local observation');
+  }
   return {
     id: info.id,
     executionStatus: statusOf(info),
-    providerUpdatedAt: providerTimestamp(info.updated_at, 'OpenHands conversation updated_at'),
+    providerUpdatedAt,
   };
 }
 
@@ -573,10 +581,11 @@ export class OpenHandsCodingSpecialistClient {
     });
     if (info == null) return null;
     try {
-      const validated = validateConversationInfo(info, prepared);
+      const observedAt = new Date(this.nowFn()).toISOString();
+      const validated = validateConversationInfo(info, prepared, observedAt);
       return deepFreeze({
         ...validated,
-        observedAt: new Date(this.nowFn()).toISOString(),
+        observedAt,
       });
     } catch {
       // A conversation with our durable identity exists but does not satisfy
@@ -621,7 +630,11 @@ export class OpenHandsCodingSpecialistClient {
         throw error;
       }
       try {
-        conversation = validateConversationInfo(createdInfo, prepared);
+        conversation = validateConversationInfo(
+          createdInfo,
+          prepared,
+          new Date(this.nowFn()).toISOString(),
+        );
       } catch {
         throw new OpenHandsCodingSpecialistError(
           'Created OpenHands conversation provenance does not match admitted execution',
