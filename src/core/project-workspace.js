@@ -345,6 +345,14 @@ function validateProjectRecord(project) {
   return project;
 }
 
+function assertDurableWorkspaceChronology(workspace) {
+  for (const [projectId, project] of Object.entries(workspace.projectsById)) {
+    if (project.updatedAt > workspace.updatedAt) {
+      throw new Error(`Project workspace project updatedAt cannot postdate workspace updatedAt: ${projectId}`);
+    }
+  }
+}
+
 export function createProjectWorkspace(nowMs = Date.now()) {
   const createdAt = timestamp(nowMs, 'project workspace createdAt');
   return {
@@ -606,8 +614,11 @@ export class ProjectWorkspaceRepository {
     const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
     if (durableRaw === undefined) return createProjectWorkspace(emptyNowMs);
     validateProjectWorkspace(durableRaw);
+    assertDurableWorkspaceChronology(durableRaw);
     const workspace = structuredClone(durableRaw);
-    return validateProjectWorkspace(workspace);
+    validateProjectWorkspace(workspace);
+    assertDurableWorkspaceChronology(workspace);
+    return workspace;
   }
 
   async save(workspace, { expectedPreviousRevision = null } = {}) {
@@ -616,6 +627,7 @@ export class ProjectWorkspaceRepository {
     validateProjectWorkspace(workspace);
     const candidate = structuredClone(workspace);
     validateProjectWorkspace(candidate);
+    assertDurableWorkspaceChronology(candidate);
     if (expectedPreviousRevision !== null
         && (!Number.isSafeInteger(expectedPreviousRevision)
           || Object.is(expectedPreviousRevision, -0)
