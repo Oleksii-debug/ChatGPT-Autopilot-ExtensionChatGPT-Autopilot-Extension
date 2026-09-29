@@ -191,3 +191,92 @@ test('Agent draft applies one bounded complexity budget across the whole importe
     /допустимий розмір/,
   );
 });
+
+
+test('Agent draft rejects unknown or non-canonical enum aliases instead of silently falling back', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити enum admission',
+  };
+  const invalid = [
+    ['repeatMode', 'sometimes'],
+    ['approvalMode', 'allow_all'],
+    ['credentialDecision', 'ask'],
+    ['aiRoutingMode', 'PRIMARY'],
+    ['aiPrimaryProvider', 'other-provider'],
+    ['aiStrongProvider', 'OPENAI'],
+  ];
+  for (const [key, value] of invalid) {
+    assert.throws(
+      () => parseAgentDraftProfile({ ...base, policy: { [key]: value } }),
+      /непідтримуване значення/,
+      key,
+    );
+  }
+
+  const valid = parseAgentDraftProfile({
+    ...base,
+    policy: {
+      repeatMode: 'INTERVAL',
+      intervalSeconds: 60,
+      approvalMode: 'CONSEQUENTIAL',
+      credentialDecision: 'ASK',
+      aiRoutingMode: 'primary',
+      aiPrimaryProvider: 'openai-compatible',
+      aiPrimaryModel: 'model-a',
+      aiStrongProvider: 'inherit',
+    },
+  });
+  assert.equal(valid.policy.repeatMode, 'INTERVAL');
+  assert.equal(valid.policy.credentialDecision, 'ASK');
+  assert.equal(valid.policy.aiRoutingMode, 'primary');
+  assert.equal(valid.policy.aiPrimaryProvider, 'openai-compatible');
+});
+
+test('Agent draft rejects non-canonical nested site policy decisions before fallback normalization', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити site policy',
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: {
+        siteRules: [{
+          pattern: 'example.com',
+          defaultDecision: 'ask',
+          actionDecisions: {},
+        }],
+      },
+    }),
+    /непідтримуване значення/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({
+      ...base,
+      policy: {
+        siteRules: [{
+          pattern: 'example.com',
+          defaultDecision: 'ASK',
+          actionDecisions: { credentials: 'allow' },
+        }],
+      },
+    }),
+    /непідтримуване значення/,
+  );
+
+  const draft = parseAgentDraftProfile({
+    ...base,
+    policy: {
+      siteRules: [{
+        pattern: 'example.com',
+        defaultDecision: 'ASK',
+        actionDecisions: { credentials: 'DENY' },
+      }],
+    },
+  });
+  assert.equal(draft.policy.siteRules[0].defaultDecision, 'ASK');
+  assert.equal(draft.policy.siteRules[0].actionDecisions.credentials, 'DENY');
+});
