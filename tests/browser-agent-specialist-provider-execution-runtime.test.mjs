@@ -35,18 +35,18 @@ function chromeStorage() {
   };
 }
 
-function providerConfig() {
+function providerConfig(revision = 1, updatedAt = T0) {
   return createSpecialistProviderConfigV1({
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
-    revision: 1,
-    updatedAt: T0,
+    revision,
+    updatedAt,
     config: {
       schemaVersion: 1,
       serverUrl: 'http://127.0.0.1:3000',
       agentServerVersion: OPENHANDS_AGENT_SERVER_VERSION,
       agentProfileId: '11111111-1111-4111-8111-111111111111',
-      agentProfileRevision: 1,
+      agentProfileRevision: revision,
       workspacePath: 'C:\\Autopilot\\workspace',
       qualifiedCapabilityIds: ['code.write'],
       requestTimeoutSeconds: 10,
@@ -327,20 +327,22 @@ test('ambiguous provider transport failure is durably fenced for reconciliation'
   assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
 });
 
-test('durable PREPARED record is never blindly redispatched after restart-shaped re-entry', async () => {
+test('durable PREPARED record resumes only the exact provider conversation after restart-shaped re-entry', async () => {
   const { chrome } = chromeStorage();
   const clock = { value: Date.parse(T0) };
   let calls = 0;
+  let observedConversationId = '';
   const client = {
-    async execute() {
+    async execute(input) {
       calls += 1;
+      observedConversationId = input.conversationId;
       return {
         providerStatus: 'finished',
         providerSucceeded: true,
         manualReviewRequired: false,
         reconciliationRequired: false,
         safeToRetry: false,
-        effectEvidence: 'terminal',
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
         providerUpdatedAt: T1,
         providerObservedAt: T1,
       };
@@ -385,16 +387,217 @@ test('durable PREPARED record is never blindly redispatched after restart-shaped
   });
   clock.value = Date.parse(T1);
 
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '55555555-5555-4555-8555-555555555555',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(observedConversationId, '55555555-5555-4555-8555-555555555555');
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.equal(result.execution.status, 'PROVIDER_SUCCEEDED');
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 1);
+  assert.equal(durable.providerExecutions[0].status, 'PROVIDER_SUCCEEDED');
+  const history = (await manager.get('job.coder')).job.runtime.history;
+  assert.ok(history.some(item => item.type === 'specialist-provider-execution-resumed'));
+});
+
+test('durable PREPARED restart attach fails closed on conversation drift', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [{
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: assignment.leaseId,
+      leaseUntil: assignment.leaseExpiresAt,
+      conversationId: '55555555-5555-4555-8555-555555555555',
+      providerConfig: providerConfig(),
+      status: 'PREPARED',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: '',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }];
+    return store;
+  });
+  clock.value = Date.parse(T1);
+
   await assert.rejects(
     () => manager.executeClaimedSpecialistProvider('job.coder', {
       agentId,
-      conversationId: '55555555-5555-4555-8555-555555555555',
+      conversationId: '66666666-6666-4666-8666-666666666666',
       expectedControlEpoch: 0,
       at: T1,
     }),
     /requires reconciliation before redispatch/,
   );
   assert.equal(calls, 0);
+});
+
+test('durable PREPARED restart attach fails closed on provider config drift', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [{
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: assignment.leaseId,
+      leaseUntil: assignment.leaseExpiresAt,
+      conversationId: '77777777-7777-4777-8777-777777777777',
+      providerConfig: providerConfig(),
+      status: 'PREPARED',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: '',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }];
+    return store;
+  });
+  clock.value = Date.parse(T1);
+  await manager.putSpecialistProviderConfig({
+    providerConfig: providerConfig(2, T1),
+    expectedRevision: 1,
+  });
+  clock.value = Date.parse(T2);
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '77777777-7777-4777-8777-777777777777',
+      expectedControlEpoch: 0,
+      at: T2,
+    }),
+    /provider config drifted before restart attach/,
+  );
+  assert.equal(calls, 0);
+});
+
+test('owner control drift during durable PREPARED recovery requires reconciliation', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [{
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: assignment.leaseId,
+      leaseUntil: assignment.leaseExpiresAt,
+      conversationId: '99999999-9999-4999-8999-999999999999',
+      providerConfig: providerConfig(),
+      status: 'PREPARED',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: '',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }];
+    return store;
+  });
+  clock.value = Date.parse(T1);
+
+  const originalGet = manager.get.bind(manager);
+  let injected = false;
+  manager.get = async id => {
+    const value = await originalGet(id);
+    if (!injected) {
+      injected = true;
+      await manager.update(store => {
+        store.byId[id].runtime.controlEpoch += 1;
+        store.byId[id].runtime.runState = 'PAUSED';
+        return store;
+      });
+    }
+    return value;
+  };
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '99999999-9999-4999-8999-999999999999',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(calls, 0);
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  assert.equal(result.execution.status, 'RECONCILE');
+  assert.equal(result.execution.reconciliationRequired, true);
+  assert.equal(result.execution.safeToRetry, false);
+  assert.equal(result.execution.errorCode, 'OWNER_CONTROL_CHANGED_DURING_PREPARED_RECOVERY');
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
 });
 
 
