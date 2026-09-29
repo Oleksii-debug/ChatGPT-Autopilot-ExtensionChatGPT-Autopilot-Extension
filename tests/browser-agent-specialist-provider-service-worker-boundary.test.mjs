@@ -67,3 +67,19 @@ test('Specialist mutation commands strip caller time authority before BrowserAge
     /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'[\s\S]*?const claim = structuredClone[\s\S]*?delete claim\.at[\s\S]*?claimSpecialistHandoffs/,
   );
 });
+
+test('Specialist CLAIM and EXECUTE consume the injected trusted readiness resolver', () => {
+  const claimBranch = source.match(
+    /} else if \(message\.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,
+  );
+  assert.ok(claimBranch, 'Specialist claim branch must remain structurally identifiable');
+  assert.match(claimBranch[1], /specialistProviderReadinessResolver/);
+  assert.doesNotMatch(claimBranch[1], /message\.payload\?\.readiness|message\.payload\.readiness/);
+
+  const executeBranch = source.match(
+    /} else if \(message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'\) \{([\s\S]*?)\n  } else if \(message\.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION'\) \{/,
+  );
+  assert.ok(executeBranch, 'Specialist provider execution branch must remain structurally identifiable');
+  assert.match(executeBranch[1], /specialistProviderReadinessResolver/);
+  assert.doesNotMatch(executeBranch[1], /message\.payload\?\.readiness|message\.payload\.readiness/);
+});
