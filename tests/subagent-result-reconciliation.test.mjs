@@ -162,6 +162,8 @@ function taskEnvelope(contract = outcomeContract()) {
   });
 }
 
+const DEFAULT_TASK_DISPATCH_IDENTITY = deriveSubagentTaskDispatchIdentityV1(taskEnvelope());
+
 function rawVerification(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -316,6 +318,7 @@ function runtimeFixture({ confirmEffect = true } = {}) {
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
+      providerDispatchIdentity: DEFAULT_TASK_DISPATCH_IDENTITY,
     },
     EPOCH_T1,
   );
@@ -347,7 +350,7 @@ function canonicalBindingId({
   childAgentId = 'child-1',
   taskId = 'task-1',
   taskEnvelopeId = 'envelope-1',
-  taskDispatchIdentity = 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  taskDispatchIdentity = DEFAULT_TASK_DISPATCH_IDENTITY,
   planId = 'plan-1',
   planRevision = 3,
   outcomeContractId = 'outcome-1',
@@ -387,7 +390,7 @@ function binding(overrides = {}) {
     childAgentId: 'child-1',
     taskId: 'task-1',
     taskEnvelopeId: 'envelope-1',
-    taskDispatchIdentity: 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    taskDispatchIdentity: DEFAULT_TASK_DISPATCH_IDENTITY,
     planId: 'plan-1',
     planRevision: 3,
     outcomeContractId: 'outcome-1',
