@@ -23,10 +23,19 @@ import {
   deriveSubagentTaskDispatchIdentityV1,
 } from '../src/core/subagent-task-envelope.js';
 import { deriveSubagentAuthorityEnvelopeIdentityV1 } from '../src/core/subagent-authority-envelope.js';
+import { createSubagentResultEnvelopeV1 } from '../src/core/subagent-result-envelope.js';
+import {
+  ObservationStatus,
+  VerificationStatus,
+} from '../src/core/universal-agent-contracts.js';
 
 const T0='2026-09-29T04:00:00.000Z';
 const T1='2026-09-29T04:01:00.000Z';
 const T2='2026-09-29T04:02:00.000Z';
+const T3='2026-09-29T04:03:00.000Z';
+const T4='2026-09-29T04:04:00.000Z';
+const T5='2026-09-29T04:05:00.000Z';
+const T6='2026-09-29T04:06:00.000Z';
 
 function chromeFake(){
   const data={};
@@ -121,12 +130,63 @@ function taskEnvelope(projectId='project-1'){
     outcomeContract:contract(projectId),createdAt:T1,
   });
 }
-async function fixture(){
+function resultArtifact(artifactId, {
+  sha256='a'.repeat(64),
+  createdAt=T3,
+  producerInvocationId='invocation-child-1',
+  kind='ARTIFACT',
+}={}){
+  return {
+    schemaVersion:1,artifactId,kind,uri:'artifact://'+artifactId,mediaType:'text/plain',
+    sha256,sizeBytes:12,createdAt,producerInvocationId,sensitive:false,
+  };
+}
+function terminalResult(task=taskEnvelope()){
+  const verification={
+    schemaVersion:1,verificationId:'verification-1',invocationId:'invocation-child-1',
+    observationId:'observation-1',status:VerificationStatus.VERIFIED,
+    reasonCode:'INDEPENDENT_CHECK_PASS',summary:'Independent verifier confirmed result.',
+    evidenceArtifactIds:['evidence-1'],verifiedAt:T4,verifierId:'verifier-1',
+    verificationAuthorityId:'verification-authority-1',effectId:null,executionId:null,attempt:1,
+  };
+  const evidence=resultArtifact('evidence-1',{
+    sha256:'3'.repeat(64),createdAt:T4,producerInvocationId:'invocation-verifier-1',
+  });
+  const result=createSubagentResultEnvelopeV1({
+    resultId:'result-1',taskEnvelope:task,
+    observation:{
+      schemaVersion:1,observationId:'observation-1',invocationId:'invocation-child-1',
+      status:ObservationStatus.OK,summary:'Child produced result.',data:{},
+      artifactRefs:[resultArtifact('result-1',{sha256:'2'.repeat(64)})],observedAt:T3,
+    },
+    verification,evidenceArtifactRefs:[evidence],completedAt:T5,
+  });
+  const outcomeContract=contract();
+  const criterion=outcomeContract.completionCriteria[0];
+  const trustedRecord={
+    schemaVersion:1,recordId:'trusted-record-1',contractId:outcomeContract.contractId,
+    contractRevision:outcomeContract.revision,verifierPlanId:outcomeContract.verifierPlan.planId,
+    criterion:{
+      criterionId:criterion.criterionId,description:criterion.description,
+      observable:criterion.observable,requiredEvidenceKinds:[...criterion.requiredEvidenceKinds],
+    },
+    verifierId:'verifier-1',verificationAuthorityId:'verification-authority-1',
+    verification,evidenceArtifacts:[evidence],recordedAt:T5,
+    validThrough:'2026-09-29T05:00:00.000Z',
+  };
+  return {result,outcomeContract,trustedRecord,verification};
+}
+async function fixture({
+  resolveTrustedOutcomeContract=null,
+  resolveTrustedVerificationRecord=null,
+}={}){
   const chrome=chromeFake();
   const core=new StorageRepository(chrome);
   let nowMs=Date.parse(T2);
   const manager=new OrchestrationV2Manager({
     coreRepository:core,chromeApi:chrome,createId:()=> 'orch-1',now:()=>nowMs,
+    resolveTrustedOutcomeContract,
+    resolveTrustedVerificationRecord,
   });
   await manager.create({name:'Bindings',config:config()});
   const g=graph();
@@ -348,4 +408,179 @@ test('registration rejects authority-envelope identity substitution before owner
     /authority envelope does not match task identity/u,
   );
   assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'], before);
+});
+
+
+test('owner reconciliation commits trusted child result through canonical reducer and survives manager restart', async () => {
+  const preparedResult=terminalResult();
+  const resolveTrustedOutcomeContract=async lookup=>(
+    lookup.contractId===preparedResult.outcomeContract.contractId
+    && lookup.contractRevision===preparedResult.outcomeContract.revision
+      ? preparedResult.outcomeContract:null
+  );
+  const resolveTrustedVerificationRecord=async lookup=>(
+    lookup.verificationId===preparedResult.verification.verificationId
+      ? preparedResult.trustedRecord:null
+  );
+  const {chrome,core,manager,g,prepared,canonicalTaskEnvelope,setNow}=await fixture({
+    resolveTrustedOutcomeContract,resolveTrustedVerificationRecord,
+  });
+  const registration=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],
+    invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
+  },'orch-1');
+
+  const confirmed=reduceOrchestrationHierarchyEvent(
+    g,prepared.runtime,{
+      type:OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId:'confirm-child-result',controlEpoch:7,nodeId:'child-1',generation:1,
+      activationId:'child-activation-1',effectRef:'effect://child-result',
+    },Date.parse(T2)+1,
+  );
+  await manager.controllerFor('orch-1').runtimeRepository.update(runtime=>{
+    runtime.hierarchy={schemaVersion:1,graph:g,state:confirmed.runtime};
+    return runtime;
+  });
+  setNow(Date.parse(T6));
+
+  const restarted=new OrchestrationV2Manager({
+    coreRepository:core,chromeApi:chrome,createId:()=> 'unused',now:()=>Date.parse(T6),
+    resolveTrustedOutcomeContract,resolveTrustedVerificationRecord,
+  });
+  const committed=await restarted.reconcileDurableSubagentResult({
+    resultEnvelope:preparedResult.result,
+    outcomeContract:preparedResult.outcomeContract,
+    criterionVerifications:[{criterionId:'criterion-1',verificationId:'verification-1'}],
+    taskActivationBindingId:registration.binding.bindingId,
+  },'orch-1');
+
+  assert.equal(committed.committed,true);
+  assert.equal(committed.terminalStatus,'COMPLETED');
+  assert.equal(committed.reconciliation.decision,'ADMIT_TERMINAL');
+  assert.equal(
+    committed.dispatch.actions.some(action=>(
+      action.type==='SEND_RECONCILIATION_PROMPT'&&action.nodeId==='parent-1'
+    )),
+    true,
+  );
+  const durable=chrome.data['autopilotOrchestrationV2Runtime:orch-1'];
+  assert.equal(
+    durable.hierarchy.state.nodesById['child-1'].activationLedger['child-activation-1'].phase,
+    'TERMINAL',
+  );
+  assert.equal(
+    durable.hierarchy.state.nodesById['child-1'].activationLedger['child-activation-1'].terminalStatus,
+    'COMPLETED',
+  );
+});
+
+test('owner reconciliation WAIT never dispatches or mutates a prepared child activation', async () => {
+  const preparedResult=terminalResult();
+  const {chrome,manager,prepared,canonicalTaskEnvelope,setNow}=await fixture({
+    resolveTrustedOutcomeContract:async()=>preparedResult.outcomeContract,
+    resolveTrustedVerificationRecord:async()=>preparedResult.trustedRecord,
+  });
+  const registration=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],
+    invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
+  },'orch-1');
+  setNow(Date.parse(T6));
+  const before=structuredClone(chrome.data['autopilotOrchestrationV2Runtime:orch-1']);
+
+  const value=await manager.reconcileDurableSubagentResult({
+    resultEnvelope:preparedResult.result,
+    outcomeContract:preparedResult.outcomeContract,
+    criterionVerifications:[{criterionId:'criterion-1',verificationId:'verification-1'}],
+    taskActivationBindingId:registration.binding.bindingId,
+  },'orch-1');
+
+  assert.equal(value.committed,false);
+  assert.equal(value.reconciliation.decision,'WAIT');
+  assert.equal(value.dispatch,null);
+  assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'],before);
+});
+
+test('owner reconciliation rejects caller authority aliases before durable reads', async () => {
+  const preparedResult=terminalResult();
+  const {chrome,manager}=await fixture({
+    resolveTrustedOutcomeContract:async()=>preparedResult.outcomeContract,
+    resolveTrustedVerificationRecord:async()=>preparedResult.trustedRecord,
+  });
+  const before=structuredClone(chrome.data);
+  await assert.rejects(
+    ()=>manager.reconcileDurableSubagentResult({
+      resultEnvelope:preparedResult.result,
+      outcomeContract:preparedResult.outcomeContract,
+      criterionVerifications:[{criterionId:'criterion-1',verificationId:'verification-1'}],
+      taskActivationBindingId:'binding-forged',
+      graph:graph(),
+    },'orch-1'),
+    /unknown field: graph/u,
+  );
+  await assert.rejects(
+    ()=>manager.reconcileDurableSubagentResult({
+      resultEnvelope:preparedResult.result,
+      outcomeContract:preparedResult.outcomeContract,
+      criterionVerifications:[{criterionId:'criterion-1',verificationId:'verification-1'}],
+      taskActivationBindingId:'binding-forged',
+      evaluatedAt:T6,
+    },'orch-1'),
+    /unknown field: evaluatedAt/u,
+  );
+  assert.deepEqual(chrome.data,before);
+});
+
+test('concurrent recovery cannot be misreported as a committed stale child result', async () => {
+  const preparedResult=terminalResult();
+  const {manager,g,prepared,canonicalTaskEnvelope,setNow}=await fixture({
+    resolveTrustedOutcomeContract:async()=>preparedResult.outcomeContract,
+    resolveTrustedVerificationRecord:async()=>preparedResult.trustedRecord,
+  });
+  const registration=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],
+    invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
+  },'orch-1');
+  const confirmed=reduceOrchestrationHierarchyEvent(
+    g,prepared.runtime,{
+      type:OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId:'confirm-before-race',controlEpoch:7,nodeId:'child-1',generation:1,
+      activationId:'child-activation-1',effectRef:'effect://before-race',
+    },Date.parse(T2)+1,
+  );
+  const controller=manager.controllerFor('orch-1');
+  await controller.runtimeRepository.update(runtime=>{
+    runtime.hierarchy={schemaVersion:1,graph:g,state:confirmed.runtime};
+    return runtime;
+  });
+  setNow(Date.parse(T6));
+
+  const canonicalDispatch=controller.dispatchHierarchyEvent.bind(controller);
+  let raced=false;
+  controller.dispatchHierarchyEvent=async(event,options)=>{
+    if(!raced&&event.type===OrchestrationHierarchyEventType.NODE_TERMINAL){
+      raced=true;
+      await canonicalDispatch({
+        type:OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+        eventId:'race-recovery',controlEpoch:7,nodeId:'child-1',generation:1,
+        newGeneration:2,activationId:'child-recovery-race',
+      },options);
+    }
+    return canonicalDispatch(event,options);
+  };
+
+  await assert.rejects(
+    ()=>manager.reconcileDurableSubagentResult({
+      resultEnvelope:preparedResult.result,
+      outcomeContract:preparedResult.outcomeContract,
+      criterionVerifications:[{criterionId:'criterion-1',verificationId:'verification-1'}],
+      taskActivationBindingId:registration.binding.bindingId,
+    },'orch-1'),
+    /not durably committed|generation|activation|stale|current/iu,
+  );
+  const latest=await controller.runtimeRepository.load();
+  assert.equal(latest.hierarchy.state.nodesById['child-1'].generation,2);
+  assert.notEqual(
+    latest.hierarchy.state.nodesById['child-1'].activationLedger['child-activation-1'].phase,
+    'TERMINAL',
+  );
 });
