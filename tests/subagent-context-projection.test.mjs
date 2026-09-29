@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { projectSubagentContextV1 } from '../src/core/subagent-context-projection.js';
+import {
+  projectSubagentContextV1,
+  projectSubagentTaskContextV1,
+} from '../src/core/subagent-context-projection.js';
 import { compileDeltaContextPlanV1 } from '../src/core/context-compiler.js';
 import { createSha256FingerprintV1 } from '../src/core/fingerprint.js';
 
@@ -411,4 +414,168 @@ test('unused tool descriptor objects are never traversed by context projection',
 
   assert.equal(reads, 0);
   assert.deepEqual(result.projectedSnapshot.sourceRefs.map(item => item.sourceId), ['source.allowed']);
+});
+
+
+function taskEnvelope(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    envelopeId: 'task-envelope.1',
+    projectId: 'project.alpha',
+    parentAgentId: 'agent.parent',
+    childAgentId: 'agent.child',
+    taskId: 'task.child',
+    planId: 'plan.1',
+    planRevision: 1,
+    objective: 'Use only the exact task inputs.',
+    conflictKeys: [],
+    budget: {
+      maxModelCalls: 1,
+      maxRuntimeSeconds: 60,
+      maxCostUsdMicros: 1000,
+    },
+    inputSourceRefs: [{
+      sourceId: 'source.allowed',
+      location: 'private://parent/source.allowed',
+      revisionId: 'r1',
+    }],
+    inputArtifactRefs: [artifact('artifact.allowed')],
+    outcome: {
+      contractId: 'outcome.1',
+      contractRevision: 1,
+      desiredResult: 'Return one verified result.',
+      criterionIds: ['criterion.1'],
+      deliverableIds: ['deliverable.1'],
+      verifierId: 'verifier.1',
+      requiredEvidenceArtifactCount: 1,
+    },
+    createdAt: T2,
+    planProvenance: 'UNVERIFIED_INPUT',
+    outcomeProvenance: 'UNVERIFIED_INPUT',
+    inputReferenceProvenance: 'UNVERIFIED_INPUT',
+    trustedResolutionRequired: true,
+    executionAuthority: false,
+    schedulingAuthority: false,
+    policyAuthority: false,
+    credentialAuthority: false,
+    completionAuthority: false,
+    ...overrides,
+  };
+}
+
+function taskContextRequest(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    authorityEnvelope: envelope({
+      sourceIds: ['source.allowed', 'source.secret'],
+      artifactIds: ['artifact.allowed', 'artifact.secret'],
+    }),
+    taskEnvelope: taskEnvelope(),
+    expectedParentAgentId: 'agent.parent',
+    expectedChildAgentId: 'agent.child',
+    expectedTaskId: 'task.child',
+    expectedProjectRevisionId: 'project-r2',
+    parentProjectSnapshot: snapshot(),
+    priorParentCapsule: capsule(),
+    ...overrides,
+  };
+}
+
+test('task-bound child context narrows broader authority to exact immutable task inputs', () => {
+  const result = projectSubagentTaskContextV1(taskContextRequest());
+
+  assert.deepEqual(
+    result.projectedSnapshot.sourceRefs.map(item => item.sourceId),
+    ['source.allowed'],
+  );
+  assert.deepEqual(
+    result.projectedSnapshot.artifactRefs.map(item => item.artifactId),
+    ['artifact.allowed'],
+  );
+  assert.deepEqual(
+    result.priorBindings.sourceBindings.map(item => item.sourceId),
+    ['source.allowed'],
+  );
+  assert.deepEqual(
+    result.priorBindings.artifactRefs.map(item => item.artifactId),
+    ['artifact.allowed'],
+  );
+  assert.equal(JSON.stringify(result).includes('source.secret'), false);
+  assert.equal(JSON.stringify(result).includes('artifact.secret'), false);
+  assert.equal(result.sourceTrust, 'CALLER_BOUND_NOT_AUTHENTICATED');
+  assert.equal(result.retrievalAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
+});
+
+test('task-bound child context rejects task inputs outside the admitted authority scope', () => {
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      authorityEnvelope: envelope({
+        sourceIds: ['source.secret'],
+        artifactIds: ['artifact.allowed', 'artifact.secret'],
+      }),
+    })),
+    /task source is outside child authority: source\.allowed/,
+  );
+
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      authorityEnvelope: envelope({
+        sourceIds: ['source.allowed', 'source.secret'],
+        artifactIds: ['artifact.secret'],
+      }),
+    })),
+    /task artifact is outside child authority: artifact\.allowed/,
+  );
+});
+
+test('task-bound child context rejects stale source and artifact identities', () => {
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({
+        inputSourceRefs: [{
+          sourceId: 'source.allowed',
+          location: 'private://parent/source.allowed',
+          revisionId: 'r-stale',
+        }],
+      }),
+    })),
+    /task source identity is stale or mismatched: source\.allowed/,
+  );
+
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({
+        inputArtifactRefs: [artifact('artifact.allowed', { sha: 'e'.repeat(64) })],
+      }),
+    })),
+    /task artifact identity is stale or mismatched: artifact\.allowed/,
+  );
+});
+
+test('task-bound child context binds exact project parent child and task identities', () => {
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({ projectId: 'project.other' }),
+    })),
+    /task projectId does not match authority envelope/,
+  );
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({ parentAgentId: 'agent.other' }),
+    })),
+    /task parentAgentId binding mismatch/,
+  );
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({ childAgentId: 'agent.other' }),
+    })),
+    /task childAgentId binding mismatch/,
+  );
+  assert.throws(
+    () => projectSubagentTaskContextV1(taskContextRequest({
+      taskEnvelope: taskEnvelope({ taskId: 'task.other' }),
+    })),
+    /task taskId binding mismatch/,
+  );
 });
