@@ -841,6 +841,13 @@ export async function dispatchUiMessage(message) {
     const handoff = structuredClone(message.payload?.handoff || {});
     delete handoff.at;
     result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', handoff);
+  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS_ACROSS_JOBS') {
+    const claim = structuredClone(message.payload?.claim || {});
+    delete claim.at;
+    result = await browserAgent.claimSpecialistHandoffsAcrossJobs(
+      claim,
+      { specialistProviderReadinessResolver },
+    );
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     const claim = structuredClone(message.payload?.claim || {});
     delete claim.at;
