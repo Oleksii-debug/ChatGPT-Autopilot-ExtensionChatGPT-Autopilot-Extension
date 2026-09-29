@@ -251,10 +251,12 @@ function normalizedState(input) {
   if (phase === ExactEffectPhase.SAFE_RETRY
       && (attempt < 1
         || !observation
+        || observation.data?.committed !== false
         || verification?.status !== VerificationStatus.FAILED
+        || verification.reasonCode !== 'NO_COMMITTED_EFFECT'
         || reconciliation.outcome !== ReconciliationOutcome.SAFE_RETRY
         || commitId)) {
-    throw new Error('SAFE_RETRY exact-effect phase requires failed no-effect verification');
+    throw new Error('SAFE_RETRY exact-effect phase requires canonical no-effect verification');
   }
   if ([ExactEffectPhase.VERIFIED, ExactEffectPhase.COMMITTED].includes(phase)
       && verification?.status !== VerificationStatus.VERIFIED) {
@@ -510,8 +512,10 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       }
       const verification = normalizeVerificationV1(event.verification);
       assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
-      if (verification.status !== VerificationStatus.FAILED) {
-        throw new Error('SAFE_RETRY reconciliation requires FAILED verification proving no committed effect');
+      if (reconciliationObservation.data?.committed !== false
+          || verification.status !== VerificationStatus.FAILED
+          || verification.reasonCode !== 'NO_COMMITTED_EFFECT') {
+        throw new Error('SAFE_RETRY reconciliation requires canonical no-effect verification');
       }
       state.verification = verification;
       state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
