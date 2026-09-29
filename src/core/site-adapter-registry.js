@@ -23,6 +23,12 @@ function requireExactSiteAdapterId(adapterId) {
   return adapterId;
 }
 
+function exactUrlText(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && value === value.trim();
+}
+
 function cloneDescriptor(descriptor) {
   return {
     ...descriptor,
@@ -45,6 +51,7 @@ export function getSiteAdapter(adapterId) {
 
 export function siteAdapterAcceptsUrl(adapterId, value) {
   const descriptor = getSiteAdapter(adapterId);
+  if (!exactUrlText(value)) return false;
   try {
     const url = new URL(value);
     return url.protocol === 'https:' && descriptor.hosts.includes(url.hostname.toLowerCase());
@@ -56,7 +63,7 @@ export function siteAdapterAcceptsUrl(adapterId, value) {
 export function requireSiteAdapterUrl(adapterId, value) {
   const descriptor = getSiteAdapter(adapterId);
   if (!siteAdapterAcceptsUrl(adapterId, value)) {
-    throw new Error(`Site adapter ${descriptor.id} does not accept URL: ${String(value || '(empty)')}`);
+    throw new Error(`Site adapter ${descriptor.id} does not accept URL value`);
   }
   return descriptor;
 }
