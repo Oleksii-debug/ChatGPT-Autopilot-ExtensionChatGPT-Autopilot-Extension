@@ -387,14 +387,14 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     prepared,
   );
   const embeddedProviderReservation = modelResult.providerReservation;
-  if (embeddedProviderReservation && sidecarProviderReservation
+  if (!embeddedProviderReservation) {
+    throw new Error('Agent self-repair model observation requires embedded durable provider reservation receipt');
+  }
+  if (sidecarProviderReservation
       && !sameProviderReservation(embeddedProviderReservation, sidecarProviderReservation)) {
     throw new Error('Agent self-repair provider reservation receipt disagrees with caller sidecar');
   }
-  const providerReservation = embeddedProviderReservation || sidecarProviderReservation;
-  if (!providerReservation) {
-    throw new Error('Agent self-repair model observation requires durable provider reservation provenance');
-  }
+  const providerReservation = embeddedProviderReservation;
   if (observedAt.milliseconds < providerReservation.createdAt) {
     throw new Error('Agent self-repair model observation predates durable provider admission');
   }
