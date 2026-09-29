@@ -1090,3 +1090,74 @@ test('readiness await cannot carry provider PREPARED past lease expiry', async (
   assert.equal(durable.providerExecutions.length, 0);
   assert.equal(durable.executionOwnerships[0].state, 'OWNED');
 });
+
+
+test('canonical resolved ownership releases historical PREPARED provider config fence', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map(),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const admission = current.job.runtime.specialistDelegationAdmissions[0];
+  const prepared = createSpecialistProviderExecutionV1({
+    planId: current.job.runtime.plan.planId,
+    nodeId: current.job.runtime.plan.nodes[0].nodeId,
+    agentId,
+    handoffId: admission.handoff.handoffId,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    leaseId: assignment.leaseId,
+    leaseUntil: assignment.leaseExpiresAt,
+    conversationId: '13131313-1313-4313-8313-131313131313',
+    providerConfig: providerConfig(),
+    at: T0,
+  });
+
+  await manager.update(store => {
+    const job = store.byId['job.coder'];
+    job.runtime.specialistProviderExecutions = [prepared];
+    job.runtime.specialistHandoffs = job.runtime.specialistHandoffs.map(item => ({
+      ...item,
+      state: 'READY',
+      leaseId: '',
+      leaseExpiresAt: '',
+      resultArtifactIds: [],
+      updatedAt: T1,
+    }));
+    job.runtime.specialistExecutionOwnerships = job.runtime.specialistExecutionOwnerships.map(item => ({
+      ...item,
+      state: 'AVAILABLE',
+      ownerPlane: '',
+      ownerId: '',
+      leaseId: '',
+      leaseUntil: '',
+      handoffToPlane: '',
+      handoffId: '',
+      ambiguityReason: '',
+      updatedAt: T1,
+      revision: item.revision + 1,
+    }));
+    return store;
+  });
+
+  clock.value = Date.parse(T1);
+  const updated = await manager.setSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision: 1,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    config: {
+      ...providerConfig().config,
+      agentProfileRevision: 2,
+    },
+  });
+
+  assert.equal(updated.config.revision, 2);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions[0].status, 'PREPARED');
+  assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
+});

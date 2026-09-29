@@ -422,7 +422,6 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
   return { configs, revisions, quarantine };
 }
 
-
 function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevision, rawQuarantined) {
   const hasRevision = rawRevision !== undefined;
   const revisionIsValid = !hasRevision
@@ -457,20 +456,55 @@ function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevisio
 function specialistProviderConfigHasLiveExecution(store, providerId, at) {
   if (!Number.isFinite(Date.parse(at))) return true;
   for (const jobId of store.order || []) {
-    const executions = store.byId?.[jobId]?.runtime?.specialistProviderExecutions || [];
+    const runtime = store.byId?.[jobId]?.runtime;
+    const executions = runtime?.specialistProviderExecutions || [];
+    let ownerships;
+    try {
+      ownerships = (runtime?.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+    } catch {
+      return true;
+    }
     for (const item of executions) {
       let execution;
       try { execution = normalizeSpecialistProviderExecutionV1(item); } catch { return true; }
       if (execution.providerId !== providerId) continue;
-      if ([
+      if (![
         SpecialistProviderExecutionStatus.PREPARED,
         SpecialistProviderExecutionStatus.RECONCILE,
         SpecialistProviderExecutionStatus.MANUAL_REVIEW,
-      ].includes(execution.status)) {
-        // Lease expiry does not resolve an external effect. These states remain
-        // provider-config authority until canonical reconciliation/terminalization.
+      ].includes(execution.status)) continue;
+
+      const ownership = ownerships.find(candidate =>
+        candidate.planId === execution.planId && candidate.nodeId === execution.nodeId);
+      if (!ownership) return true;
+
+      if ([ExecutionOwnershipState.AVAILABLE, ExecutionOwnershipState.VERIFIED].includes(ownership.state)) {
+        const assignment = (runtime?.specialistHandoffs || []).find(candidate =>
+          candidate?.agentId === execution.agentId);
+        const resolvedPair = ownership.state === ExecutionOwnershipState.AVAILABLE
+          ? assignment?.state === 'READY' && !assignment?.leaseId && !assignment?.leaseExpiresAt
+          : assignment?.state === 'COMPLETED';
+        if (!resolvedPair) return true;
+        // Canonical trusted reconciliation/verification released this effect
+        // identity. The old provider record remains audit history only.
+        continue;
+      }
+
+      if (ownership.leaseId === execution.leaseId
+          && ownership.ownerId === execution.agentId
+          && [
+            ExecutionOwnershipState.OWNED,
+            ExecutionOwnershipState.HANDOFF_PENDING,
+            ExecutionOwnershipState.RECONCILE,
+            ExecutionOwnershipState.MANUAL_REVIEW,
+          ].includes(ownership.state)) {
+        // Lease expiry alone never resolves an external effect.
         return true;
       }
+
+      // Any identity/state disagreement around unresolved effect provenance is
+      // corruption or split-brain: provider config must remain fail-closed.
+      return true;
     }
   }
   return false;
