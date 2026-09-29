@@ -157,7 +157,7 @@ test('execution loop automatically prepares a durable definition-bound Specialis
   assert.equal(result.reused, false);
   assert.equal(result.node.nodeId, 'local:research');
   assert.equal(result.handoff.specialistId, 'specialist.research.local');
-  assert.equal(result.executionOwnership.state, 'UNOWNED');
+  assert.equal(result.executionOwnership.state, 'AVAILABLE');
 
   const persisted = await manager.listSpecialistHandoffs(id);
   assert.equal(persisted.handoffs.length, 1);
