@@ -455,3 +455,41 @@ test('concurrent exact provider execution calls coalesce onto one external effec
   assert.equal(durable.providerExecutions.length, 1);
   assert.equal(durable.providerExecutions[0].status, 'PROVIDER_SUCCEEDED');
 });
+
+
+test('stale caller timestamp cannot extend an expired Specialist provider lease', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = {
+    async execute() {
+      calls += 1;
+      throw new Error('expired lease must not dispatch');
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+
+  // seed() leases at T0 for 600 seconds. Move the live authority clock beyond
+  // expiry while deliberately supplying an old pre-expiry request timestamp.
+  clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '77777777-7777-4777-8777-777777777777',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /lease expired before provider preparation/,
+  );
+  assert.equal(calls, 0);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
