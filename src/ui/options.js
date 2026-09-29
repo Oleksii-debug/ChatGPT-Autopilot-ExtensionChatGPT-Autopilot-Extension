@@ -4936,6 +4936,7 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadAgentDefinitionRegistries();
   await loadSpecialistAutomationPolicy();
   await loadSpecialistProviderConfig();
   await loadRemoteDispatchStatus();
