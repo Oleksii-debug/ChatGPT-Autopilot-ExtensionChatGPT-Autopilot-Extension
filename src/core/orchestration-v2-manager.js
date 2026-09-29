@@ -546,10 +546,14 @@ export class OrchestrationV2Manager {
    * Input is normalized synchronously before the first await so caller mutation or
    * accessor-backed objects cannot alter the durable record after admission starts.
    */
-  async registerSubagentTaskActivationBinding(input = {}, id = '') {
+  async registerSubagentTaskActivationBinding(bindingInput = {}, id = '') {
+    const ownerRegisteredAt = new Date(this.now()).toISOString();
     const canonicalSingleton = putSubagentTaskActivationBindingV1(
       createSubagentTaskActivationBindingRegistryV1(),
-      input,
+      {
+        binding: bindingInput,
+        registeredAt: ownerRegisteredAt,
+      },
     );
     const candidate = canonicalSingleton.records[0];
     if (!candidate) throw new Error('Subagent activation binding registration is empty');

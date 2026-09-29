@@ -93,7 +93,7 @@ function subagentActivationBinding(overrides = {}) {
     activationId:'activation-1',
     generation:1,
     activationPurpose:OrchestrationActivationPurpose.WORK,
-    boundAt:'2026-09-29T04:00:00.000Z',
+    boundAt:'1970-01-01T00:00:00.500Z',
     ...overrides,
   };
   value.bindingId=compactOrchestrationEventId(
@@ -569,18 +569,12 @@ test('subagent activation binding history persists in the existing orchestra run
   await manager.create({name:'Bindings B',config:cfg('binding-project-b')});
 
   const value=subagentActivationBinding();
-  const first=await manager.registerSubagentTaskActivationBinding({
-    binding:value,
-    registeredAt:'2026-09-29T04:00:01.000Z',
-  },'orch-1');
+  const first=await manager.registerSubagentTaskActivationBinding(value,'orch-1');
   assert.equal(first.orchestraId,'orch-1');
   assert.equal(first.revision,1);
   assert.deepEqual(first.binding,value);
 
-  const replay=await manager.registerSubagentTaskActivationBinding({
-    binding:structuredClone(value),
-    registeredAt:'2026-09-29T04:10:00.000Z',
-  },'orch-1');
+  const replay=await manager.registerSubagentTaskActivationBinding(structuredClone(value),'orch-1');
   assert.equal(replay.revision,1,'exact replay must preserve first append-only record');
 
   assert.equal(
@@ -590,7 +584,7 @@ test('subagent activation binding history persists in the existing orchestra run
   );
   assert.equal(
     chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry.records[0].registeredAt,
-    '2026-09-29T04:00:01.000Z',
+    '1970-01-01T00:00:01.000Z',
   );
 
   const restarted=new OrchestrationV2Manager({
@@ -615,10 +609,7 @@ test('subagent activation binding persistence rejects rebinding and accessor-bac
   const {manager,chrome}=managerFixture();
   await manager.create({name:'Bindings',config:cfg('binding-project')});
   const first=subagentActivationBinding();
-  await manager.registerSubagentTaskActivationBinding({
-    binding:first,
-    registeredAt:'2026-09-29T04:00:01.000Z',
-  },'orch-1');
+  await manager.registerSubagentTaskActivationBinding(first,'orch-1');
   const before=structuredClone(
     chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
   );
@@ -629,10 +620,7 @@ test('subagent activation binding persistence rejects rebinding and accessor-bac
     invocationId:'invocation-2',
   });
   await assert.rejects(
-    ()=>manager.registerSubagentTaskActivationBinding({
-      binding:rebound,
-      registeredAt:'2026-09-29T04:05:00.000Z',
-    },'orch-1'),
+    ()=>manager.registerSubagentTaskActivationBinding(rebound,'orch-1'),
     /activation cannot be rebound/u,
   );
   assert.deepEqual(
