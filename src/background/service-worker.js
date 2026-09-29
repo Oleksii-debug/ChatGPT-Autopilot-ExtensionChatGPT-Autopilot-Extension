@@ -24,6 +24,7 @@ import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { selectAgentDefinitionV1 } from '../core/agent-definition-registry.js';
 import { createBoundAgentModelRouteDispatchIntentV1 } from '../core/agent-model-route-dispatch-intent.js';
 import { createBoundAgentModelOrchestratorEnvelopeV1 } from '../core/agent-model-orchestrator-envelope.js';
+import { TrustedExecutionVerificationLedgerRepository } from '../core/trusted-execution-verification-ledger.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
@@ -232,6 +233,7 @@ function ownerAllowedRouteIdsForSettings(settings) {
     .map(route => route.routeId);
 }
 
+const trustedExecutionVerificationLedger = new TrustedExecutionVerificationLedgerRepository(chrome);
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
@@ -248,6 +250,7 @@ const browserAgent = new BrowserAgentManager({
       ownerAllowedRouteIds: ownerAllowedRouteIdsForSettings(settings),
     };
   },
+  resolveTrustedExecutionVerificationRecord: lookup => trustedExecutionVerificationLedger.resolve(lookup),
 });
 browserAgentLifecycle.current = browserAgent;
 const runSafely = (operation) => {
