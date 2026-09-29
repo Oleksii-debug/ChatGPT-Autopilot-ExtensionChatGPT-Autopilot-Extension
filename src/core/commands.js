@@ -808,6 +808,11 @@ export class CoreCommandDispatcher {
         : normalizeBoundAgentModelOrchestratorEnvelopeV1(
           internal.agentModelOrchestratorEnvelope,
         );
+      let internalImageDataUrl = '';
+      let internalPrompt = '';
+      let internalSystemPrompt = '';
+      let internalMaxOutputTokens = 0;
+      let internalMaxModelCallsForRequest = 0;
       if (internalEnvelope) {
         for (const alias of [
           'settings','routerOverride','routerRuntime','isolatedRuntime',
@@ -817,12 +822,60 @@ export class CoreCommandDispatcher {
             throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
           }
         }
-        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
-        if (!Number.isSafeInteger(boundedOutputTokens)
+        const promptDescriptor = Object.getOwnPropertyDescriptor(payload, 'prompt');
+        if (!promptDescriptor
+            || promptDescriptor.enumerable !== true
+            || !Object.hasOwn(promptDescriptor, 'value')
+            || typeof promptDescriptor.value !== 'string') {
+          throw new Error('Agent model invocation prompt must be an enumerable own text data property');
+        }
+        const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
+        if (systemPromptDescriptor
+            && (systemPromptDescriptor.enumerable !== true
+              || !Object.hasOwn(systemPromptDescriptor, 'value')
+              || typeof systemPromptDescriptor.value !== 'string')) {
+          throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
+        }
+        const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
+        const boundedOutputTokens = maxOutputTokensDescriptor?.value;
+        if (!maxOutputTokensDescriptor
+            || maxOutputTokensDescriptor.enumerable !== true
+            || !Object.hasOwn(maxOutputTokensDescriptor, 'value')
+            || typeof boundedOutputTokens !== 'number'
+            || !Number.isSafeInteger(boundedOutputTokens)
             || Object.is(boundedOutputTokens, -0)
             || boundedOutputTokens < 1) {
-          throw new Error('Agent model invocation requires bounded maxOutputTokens');
+          throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
+        const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
+        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
+        if (maxModelCallsDescriptor
+            && (maxModelCallsDescriptor.enumerable !== true
+              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
+              || typeof maxModelCallsForRequest !== 'number'
+              || !Number.isSafeInteger(maxModelCallsForRequest)
+              || Object.is(maxModelCallsForRequest, -0)
+              || maxModelCallsForRequest < 0)) {
+          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
+        }
+        internalPrompt = promptDescriptor.value;
+        internalSystemPrompt = systemPromptDescriptor?.value ?? '';
+        internalMaxOutputTokens = boundedOutputTokens;
+        internalMaxModelCallsForRequest = maxModelCallsForRequest;
+        const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
+        if (imageDescriptor
+            && (imageDescriptor.enumerable !== true
+              || !Object.hasOwn(imageDescriptor, 'value'))) {
+          throw new Error('Agent model invocation imageDataUrl must be an enumerable own data property');
+        }
+        const imageDataUrl = imageDescriptor?.value ?? '';
+        if (typeof imageDataUrl !== 'string' || imageDataUrl !== imageDataUrl.trim()) {
+          throw new Error('Agent model invocation imageDataUrl must already be canonical text');
+        }
+        if ((imageDataUrl.length > 0) !== internalEnvelope.requiresVision) {
+          throw new Error('Agent model image input does not match durable requiresVision intent');
+        }
+        internalImageDataUrl = imageDataUrl;
       }
       const providerCallBudgetContext = internalEnvelope
         ? normalizeInternalAgentProviderBudgetContext(
@@ -895,12 +948,18 @@ export class CoreCommandDispatcher {
           : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
-        result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
-          systemPrompt: payload.systemPrompt || '',
+        result = await this.aiOrchestrator.run(
+          settings,
+          runtime,
+          internalEnvelope ? internalPrompt : payload.prompt,
+          {
+          systemPrompt: internalEnvelope ? internalSystemPrompt : payload.systemPrompt || '',
           forceStrong: internalEnvelope ? false : payload.forceStrong === true,
-          maxOutputTokens: Number(payload.maxOutputTokens || 0),
-          maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
-          imageDataUrl: payload.imageDataUrl || '',
+          maxOutputTokens: internalEnvelope ? internalMaxOutputTokens : Number(payload.maxOutputTokens || 0),
+          maxModelCallsForRequest: internalEnvelope
+            ? internalMaxModelCallsForRequest
+            : Number(payload.maxModelCallsForRequest || 0),
+          imageDataUrl: internalEnvelope ? internalImageDataUrl : payload.imageDataUrl || '',
           taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
           strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
           capabilityIds: internalEnvelope
