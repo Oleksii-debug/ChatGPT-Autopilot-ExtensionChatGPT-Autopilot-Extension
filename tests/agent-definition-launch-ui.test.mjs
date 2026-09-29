@@ -93,3 +93,28 @@ test('selected definition controls launch admission and prefilled least-authorit
   assert.match(body, /agentDefinitionLaunchScopeTextV1\(definition\)/u);
   assert.match(body, /button\.disabled = !launchable/u);
 });
+
+
+test('launch scope prefill cache is bound to exact registry and definition provenance', () => {
+  const start = options.indexOf('function fillAgentDefinitionLaunchForm');
+  const end = options.indexOf('\nfunction browserAgentOwnerBudgetPolicyFromForm', start);
+  assert.ok(start >= 0 && end > start);
+  const body = options.slice(start, end);
+
+  assert.match(
+    body,
+    /selectedAgentDefinitionRegistry\.registryId.*selectedAgentDefinitionRegistry\.revision.*agentDefinitionId.*definitionRevision/su,
+    'prefill cache key must change when registry identity or revision changes even if definition ID/revision are reused',
+  );
+});
+
+
+test('post-create verification failure preserves the durable job identity and forbids blind retry messaging', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /let createdId = ''/u);
+  assert.match(body, /createdId = created\?\.job\?\.id \|\| created\?\.selectedId \|\| ''/u);
+  assert.match(body, /if \(createdId\)/u);
+  assert.match(body, /уже створено/u);
+  assert.match(body, /Не створюйте повторно/u);
+  assert.match(body, /оновіть список Agent jobs/u);
+});
