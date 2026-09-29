@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { projectSubagentContextV1 } from '../src/core/subagent-context-projection.js';
+import { compileDeltaContextPlanV1 } from '../src/core/context-compiler.js';
+import { createSha256FingerprintV1 } from '../src/core/fingerprint.js';
 
 const T1 = '2026-09-28T00:00:01.000Z';
 const T2 = '2026-09-28T00:00:02.000Z';
@@ -325,4 +327,52 @@ test('empty child context scope is valid and does not inherit parent visibility'
   assert.deepEqual(result.projectedSnapshot.artifactRefs, []);
   assert.deepEqual(result.priorBindings.sourceBindings, []);
   assert.deepEqual(result.priorBindings.artifactRefs, []);
+});
+
+
+test('projected child snapshot prevents compiler reuse of cached fragments bound to parent-only sources', async () => {
+  const projected = projectSubagentContextV1(request({ priorParentCapsule: null }));
+  const allowedSummary = 'allowed child fact';
+  const secretSummary = 'SECRET PARENT FACT MUST NOT ENTER CHILD CONTEXT';
+
+  const plan = await compileDeltaContextPlanV1({
+    schemaVersion: 1,
+    compilerId: 'child-context-compiler',
+    projectSnapshot: projected.projectedSnapshot,
+    priorCapsule: null,
+    fragments: [
+      {
+        fragmentId: 'allowed-fragment',
+        sourceBindings: [{
+          sourceId: 'source.allowed',
+          revisionId: 'r1',
+          contentSha256: 'a'.repeat(64),
+          authority: 'CANONICAL',
+        }],
+        dependencyFragmentIds: [],
+        summary: allowedSummary,
+        summarySha256: await createSha256FingerprintV1(allowedSummary),
+        createdAt: T2,
+      },
+      {
+        fragmentId: 'parent-secret-fragment',
+        sourceBindings: [{
+          sourceId: 'source.secret',
+          revisionId: 'r1',
+          contentSha256: 'c'.repeat(64),
+          authority: 'CANONICAL',
+        }],
+        dependencyFragmentIds: [],
+        summary: secretSummary,
+        summarySha256: await createSha256FingerprintV1(secretSummary),
+        createdAt: T2,
+      },
+    ],
+    compiledAt: '2026-09-28T00:00:03.000Z',
+  });
+
+  assert.deepEqual(plan.reusableFragments.map(item => item.fragmentId), ['allowed-fragment']);
+  assert.deepEqual(plan.staleFragments.map(item => item.fragmentId), ['parent-secret-fragment']);
+  assert.deepEqual(plan.staleFragments[0].staleSourceIds, ['source.secret']);
+  assert.equal(JSON.stringify(plan).includes(secretSummary), false);
 });
