@@ -456,6 +456,16 @@ test('large model output is summary-bounded and requires canonical artifact mate
   );
 });
 
+test('raw provider whitespace remains provenance-exact while observation summary stays canonical', () => {
+  const text = ' '.repeat(8_050) + 'bounded result';
+  const observation = projectAgentSelfRepairModelObservationV1(request({
+    modelResult: modelResult({ text }),
+  }));
+  assert.equal(observation.summary, 'bounded result');
+  assert.equal(observation.data.outputTruncated, true);
+  assert.equal(observation.data.fullOutputArtifactRequired, true);
+});
+
 test('stale self-repair binding still fails before observation projection', () => {
   const intent = selfRepairIntent();
   assert.throws(
