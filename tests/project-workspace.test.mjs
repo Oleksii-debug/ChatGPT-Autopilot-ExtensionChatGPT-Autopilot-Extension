@@ -1090,3 +1090,54 @@ test('stored provenance becomes stale if a later project revision moves the arti
     /provenance artifact is not current: build/,
   );
 });
+
+
+test('workspace and project records reject hidden authority fields and signed-zero revisions', () => {
+  const workspace = createProjectWorkspace(1);
+  workspace.ownerOverride = true;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /project workspace contains unknown field: ownerOverride/,
+  );
+  delete workspace.ownerOverride;
+
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  workspace.projectsById['project-a'].policyAuthority = true;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /project workspace project contains unknown field: policyAuthority/,
+  );
+  delete workspace.projectsById['project-a'].policyAuthority;
+
+  workspace.revision = -0;
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /Invalid project workspace revision/,
+  );
+});
+
+test('dynamic workspace maps reject accessors without executing them', () => {
+  let reads = 0;
+  const workspace = createProjectWorkspace(1);
+  Object.defineProperty(workspace.projectsById, 'project-a', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return createProjectRecord(snapshot(), { nowMs: 2 });
+    },
+  });
+
+  assert.throws(
+    () => validateProjectWorkspace(workspace),
+    /projectsById entries must be enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('repository save rejects signed-zero expected revisions', async () => {
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(createProjectWorkspace(1), { expectedPreviousRevision: -0 }),
+    /Invalid expected project workspace revision/,
+  );
+});
