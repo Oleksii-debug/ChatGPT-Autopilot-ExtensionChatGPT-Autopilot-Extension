@@ -1020,7 +1020,7 @@ test('internal Agent authority options reject accessors without executing getter
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt:'agent', maxOutputTokens:128 },
+      { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1 },
       envelopeAccessor,
     ),
     /orchestrator envelope must be an enumerable own data property/u,
@@ -1039,7 +1039,7 @@ test('internal Agent authority options reject accessors without executing getter
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt:'agent', maxOutputTokens:128 },
+      { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1 },
       budgetAccessor,
     ),
     /provider budget context must be an enumerable own data property/u,
@@ -1062,7 +1062,7 @@ test('internal Agent envelope rejects image input that does not match durable vi
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt:'agent', maxOutputTokens:128, imageDataUrl:'data:image/png;base64,AAAA' },
+      { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1, imageDataUrl:'data:image/png;base64,AAAA' },
       {
         agentModelOrchestratorEnvelope: nonVision,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1078,7 +1078,7 @@ test('internal Agent envelope rejects image input that does not match durable vi
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt:'agent', maxOutputTokens:128 },
+      { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1 },
       {
         agentModelOrchestratorEnvelope: vision,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1148,6 +1148,7 @@ test('internal Agent dispatcher snapshots validated vision input across async Ro
   const payload = {
     prompt:'agent',
     maxOutputTokens:128,
+    maxModelCallsForRequest:1,
     imageDataUrl:'data:image/png;base64,ORIGINAL',
   };
   const pending = dispatcher.execute(
@@ -1261,7 +1262,7 @@ test('internal Agent dispatcher rejects accessor-backed prompt and request-budge
           providerCallBudgetContext: internalAgentBudgetContext(),
         },
       ),
-      /enumerable own text data property|canonical bounded maxOutputTokens|maxModelCallsForRequest must be canonical/u,
+      /enumerable own text data property|canonical bounded maxOutputTokens|canonical bounded maxModelCallsForRequest/u,
     );
   }
   assert.equal(reads, 0);
@@ -1282,7 +1283,7 @@ test('internal Agent image boundary rejects coercive text and accessors without 
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt:'agent', maxOutputTokens:128, imageDataUrl:' data:image/png;base64,AAAA ' },
+      { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1, imageDataUrl:' data:image/png;base64,AAAA ' },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1291,7 +1292,7 @@ test('internal Agent image boundary rejects coercive text and accessors without 
     /imageDataUrl must already be canonical text/u,
   );
 
-  const payload = { prompt:'agent', maxOutputTokens:128 };
+  const payload = { prompt:'agent', maxOutputTokens:128, maxModelCallsForRequest:1 };
   Object.defineProperty(payload, 'imageDataUrl', {
     enumerable:true,
     get() {
@@ -1357,7 +1358,7 @@ test('internal Agent envelope rejects route-state leakage before model invocatio
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1382,7 +1383,7 @@ test('internal Agent envelope rechecks live canonical Router deny before provide
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1406,7 +1407,7 @@ test('internal Agent envelope rechecks live route identity before provider invoc
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1430,7 +1431,7 @@ test('internal Agent envelope rechecks live route backoff before provider invoca
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1454,7 +1455,7 @@ test('internal Agent envelope fails closed when live canonical Router is disable
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1479,7 +1480,7 @@ test('internal Agent invocation requires the existing durable browser-agent budg
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       { agentModelOrchestratorEnvelope: envelope },
     ),
     /requires canonical provider budget context/u,
@@ -1487,7 +1488,7 @@ test('internal Agent invocation requires the existing durable browser-agent budg
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: { kind:'self-repair', jobId:'agent.job.1', controlEpoch:7 },
@@ -1498,7 +1499,7 @@ test('internal Agent invocation requires the existing durable browser-agent budg
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext('other.job'),
@@ -1545,7 +1546,7 @@ test('internal Agent invocation rejects coercive maxOutputTokens aliases before 
     await assert.rejects(
       dispatcher.execute(
         'RUN_AI_ROUTED_PROMPT',
-        { prompt:'agent', maxOutputTokens },
+        { prompt:'agent', maxOutputTokens, maxModelCallsForRequest:1 },
         {
           agentModelOrchestratorEnvelope: envelope,
           providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1601,7 +1602,7 @@ test('internal Agent invocation time cannot precede envelope revalidation', asyn
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
@@ -1625,7 +1626,7 @@ test('internal Agent invocation rejects live Gateway identity drift', async () =
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent', maxOutputTokens: 128 },
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
       {
         agentModelOrchestratorEnvelope: envelope,
         providerCallBudgetContext: internalAgentBudgetContext(),
