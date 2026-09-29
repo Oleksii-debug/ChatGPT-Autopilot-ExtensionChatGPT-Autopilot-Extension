@@ -708,3 +708,69 @@ test('monotonic repository update remains valid after chronology hardening', asy
   assert.equal(restored.projectsById['project-a'].updatedAt, 5);
   assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r2');
 });
+
+
+test('repository save rejects direct durable revision rollback and stale-writer expectations', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  const initial = createProjectWorkspace(1);
+  await repository.save(initial);
+
+  const revisionOne = structuredClone(initial);
+  revisionOne.revision = 1;
+  revisionOne.updatedAt = 2;
+  addProjectSnapshot(revisionOne, snapshot(), { nowMs: 2 });
+  await repository.save(revisionOne);
+
+  await assert.rejects(
+    repository.save(initial),
+    /revision must advance exactly once/,
+  );
+
+  const staleWriter = structuredClone(revisionOne);
+  staleWriter.revision = 2;
+  staleWriter.updatedAt = 3;
+  replaceProjectSnapshot(staleWriter, snapshot('project-r2', 'r2'), { nowMs: 3 });
+  await assert.rejects(
+    repository.save(staleWriter, { expectedPreviousRevision: 0 }),
+    /durable revision changed before save/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+});
+
+test('repository save cannot bootstrap arbitrary nonzero revision into empty durable storage', async () => {
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  const forged = createProjectWorkspace(1);
+  forged.revision = 7;
+  forged.updatedAt = 8;
+
+  await assert.rejects(
+    repository.save(forged),
+    /Initial project workspace save must use revision 0/,
+  );
+});
+
+test('repository save revalidates immutable owner identity against durable state', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  const initial = createProjectWorkspace(1);
+  await repository.save(initial);
+
+  const next = structuredClone(initial);
+  next.revision = 1;
+  next.updatedAt = 2;
+  next.createdAt = 0;
+
+  await assert.rejects(
+    repository.save(next),
+    /workspace createdAt is immutable/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 0);
+  assert.equal(restored.createdAt, 1);
+});
