@@ -2453,7 +2453,7 @@ function renderSpecialistProviderRuntime() {
   }
   const selected = selectedSpecialistHandoff();
   const selectedExecution = selected ? executionsByLease.get(`${selected.agentId}\n${selected.leaseId}`) : null;
-  const terminal = new Set(['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'MANUAL_REVIEW']);
+  const terminal = new Set(['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'RECONCILE', 'MANUAL_REVIEW']);
   const controlEpoch = ui.selectedBrowserAgent?.runtime?.controlEpoch;
   $('specialist-provider-run-button').disabled = !selected
     || selected.state !== 'LEASED'
