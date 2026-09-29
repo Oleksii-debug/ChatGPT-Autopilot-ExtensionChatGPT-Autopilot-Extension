@@ -2550,7 +2550,7 @@ async function runSelectedSpecialistProviderExecution() {
     const execution = result?.execution || null;
     const evidence = execution?.effectEvidence ? ` Evidence: ${execution.effectEvidence}.` : '';
     const providerState = execution?.status || 'невідомий';
-    status.textContent = `Provider execution: ${providerState}. providerDispatched=${result?.providerDispatched === true ? 'так' : 'ні'}. completionAuthorized=ні.${evidence}`;
+    status.textContent = `Provider execution: ${providerState}. Result kind: ${result?.kind || 'невідомий'}. completionAuthorized=ні.${evidence}`;
     announce(`Provider execution оновлено: ${providerState}.`);
   } catch (error) {
     if (ui.selectedBrowserAgentId === jobId) {
