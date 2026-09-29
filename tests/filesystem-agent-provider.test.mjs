@@ -58,6 +58,7 @@ function nativeCapabilities(...capabilityIds) {
 function nativeClient(overrides = {}) {
   return {
     readText: async payload => ({ ...payload, text: 'hello' }),
+    readBinary: async payload => ({ ...payload, offsetBytes: payload.offsetBytes ?? 0, chunkSizeBytes: 3, sizeBytes: 3, sha256: digest('abc'), dataBase64: Buffer.from('abc').toString('base64'), eof: true }),
     searchFiles: async payload => ({ ...payload, items: ['docs/a.txt'], truncated: false }),
     listFiles: async payload => ({ ...payload, items: [], visitedEntries: 0, truncated: false }),
     statPath: async payload => ({ ...payload, kind: 'FILE', sizeBytes: 1, modifiedAt: at, hashed: false, sha256: '' }),
@@ -66,7 +67,7 @@ function nativeClient(overrides = {}) {
   };
 }
 
-test('filesystem provider advertises only executable read/search/list/stat tools while retaining hidden write recovery contract', async () => {
+test('filesystem provider advertises executable read/binary/search/list/stat tools while retaining hidden write recovery contract', async () => {
   const calls = [];
   const client = nativeClient({
     searchFiles: async payload => { calls.push(payload); return { items: ['docs/a.txt'], truncated: false }; },
@@ -76,6 +77,7 @@ test('filesystem provider advertises only executable read/search/list/stat tools
     nativeClient: client,
     nativeCapabilities: nativeCapabilities(
       'filesystem.readText',
+      'filesystem.readBinary',
       'filesystem.search',
       'filesystem.list',
       'filesystem.stat',
@@ -83,9 +85,10 @@ test('filesystem provider advertises only executable read/search/list/stat tools
     grantedCapabilityIds: ['filesystem.search'],
     now: () => Date.parse(at),
   });
-  assert.equal(provider.tools().length, 4);
+  assert.equal(provider.tools().length, 5);
   assert.deepEqual(provider.tools().map(tool => tool.toolId), [
     FilesystemToolId.READ_TEXT,
+    FilesystemToolId.READ_BINARY,
     FilesystemToolId.SEARCH,
     FilesystemToolId.LIST,
     FilesystemToolId.STAT,
@@ -96,6 +99,70 @@ test('filesystem provider advertises only executable read/search/list/stat tools
   const result = await provider.invoke({ invocation: inv, policyDecision: allow() });
   assert.equal(result.providerId, FILESYSTEM_PROVIDER_ID);
   assert.deepEqual(calls, [{ rootId: 'workspace', query: 'a' }]);
+});
+
+test('binary filesystem read is capability-discovered, policy-gated and read-only', async () => {
+  const calls = [];
+  const client = nativeClient({
+    readBinary: async payload => {
+      calls.push(structuredClone(payload));
+      return {
+        rootId: payload.rootId,
+        relativePath: payload.relativePath,
+        offsetBytes: payload.offsetBytes,
+        chunkSizeBytes: 2,
+        sizeBytes: 5,
+        sha256: digest('abcde'),
+        dataBase64: Buffer.from('bc').toString('base64'),
+        eof: false,
+      };
+    },
+  });
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: client,
+    nativeCapabilities: nativeCapabilities('filesystem.readText', 'filesystem.readBinary', 'filesystem.search'),
+    grantedCapabilityIds: ['filesystem.readBinary'],
+    now: () => Date.parse(at),
+  });
+  assert.deepEqual(provider.tools().map(tool => tool.toolId), [
+    FilesystemToolId.READ_TEXT,
+    FilesystemToolId.READ_BINARY,
+    FilesystemToolId.SEARCH,
+  ]);
+
+  const inv = invocation(
+    FilesystemToolId.READ_BINARY,
+    'filesystem.readBinary',
+    { rootId: 'workspace', relativePath: 'asset.bin', offsetBytes: 1, maxBytes: 2, expectedSha256: digest('abcde') },
+    'fs-binary-1',
+  );
+  await assert.rejects(
+    () => provider.invoke({ invocation: inv, policyDecision: { ...allow('fs-binary-1'), decision: 'DENY' } }),
+    /not authorized/u,
+  );
+  const result = await provider.invoke({ invocation: inv, policyDecision: allow('fs-binary-1') });
+  assert.equal(result.result.sha256, digest('abcde'));
+  assert.equal(result.result.dataBase64, Buffer.from('bc').toString('base64'));
+  assert.equal(result.observedAt, at);
+  assert.deepEqual(calls, [{
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 1,
+    maxBytes: 2,
+    expectedSha256: digest('abcde'),
+  }]);
+
+  const failed = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({
+      readBinary: async () => { throw Object.assign(new Error('changed'), { code: 'PRECONDITION_FAILED' }); },
+    }),
+    nativeCapabilities: nativeCapabilities('filesystem.readText', 'filesystem.readBinary', 'filesystem.search'),
+    grantedCapabilityIds: ['filesystem.readBinary'],
+  });
+  await assert.rejects(
+    () => failed.invoke({ invocation: inv, policyDecision: allow('fs-binary-1') }),
+    error => error.code === 'PRECONDITION_FAILED' && error.effectMayHaveOccurred === false && error.safeToRetry === true,
+  );
 });
 
 test('write invocation persists only ArtifactRef identity while resolver supplies transient content', async () => {
