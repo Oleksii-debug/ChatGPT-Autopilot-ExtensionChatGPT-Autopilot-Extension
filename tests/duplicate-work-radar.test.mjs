@@ -323,6 +323,32 @@ test('policy weights and threshold are strict, bounded and nonzero', () => {
   })), /at least one positive/);
 });
 
+test('zero-valued weights have one canonical numeric representation', () => {
+  const zeroWeightPolicy = policy({
+    weights:{
+      conflictKeys:1000,
+      subsystems:0,
+      files:1000,
+      resources:800,
+      outcomes:700,
+      dependencies:300,
+      acceptanceCriteria:600,
+      semanticTags:700,
+      sideEffects:400,
+    },
+  });
+  const normalized = normalizeDuplicateWorkRadarPolicyV1(zeroWeightPolicy);
+  assert.equal(normalized.weights.subsystems, 0);
+  assert.equal(Object.is(normalized.weights.subsystems, -0), false);
+
+  assert.throws(() => normalizeDuplicateWorkRadarPolicyV1(policy({
+    weights:{
+      ...zeroWeightPolicy.weights,
+      subsystems:-0,
+    },
+  })), /weights\.subsystems is invalid/);
+});
+
 test('lifecycle, mode and variants reject coercive aliases', () => {
   assert.throws(() => normalizeWorkIntentV1(work('x', 'worker.a', {
     mode:'mutation',
