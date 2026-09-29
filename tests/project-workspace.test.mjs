@@ -1514,3 +1514,37 @@ test('exact helper replays remain no-op safe with an older caller timestamp', ()
   );
   assert.deepEqual(workspace.projectsById['project-a'], before);
 });
+
+
+test('durable repository rejects project time that postdates workspace time', async () => {
+  const workspace = createProjectWorkspace(10);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 11 });
+
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await assert.rejects(
+    repository.save(workspace),
+    /project updatedAt cannot postdate workspace updatedAt/,
+  );
+  assert.equal(
+    Object.hasOwn(chrome.data, PROJECT_WORKSPACE_STORAGE_KEY),
+    false,
+  );
+});
+
+test('repository update cannot persist nested future project time', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  await assert.rejects(
+    repository.update(workspace => {
+      addProjectSnapshot(workspace, snapshot(), { nowMs: 11 });
+      return workspace;
+    }, { nowMs: 10 }),
+    /project updatedAt cannot postdate workspace updatedAt/,
+  );
+
+  const restored = await repository.load({ emptyNowMs: 12 });
+  assert.equal(restored.revision, 0);
+  assert.deepEqual(restored.projectsById, {});
+});
