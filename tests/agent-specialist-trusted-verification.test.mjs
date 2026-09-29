@@ -205,7 +205,7 @@ test('trusted EFFECT_VERIFIED record cannot complete an expired owned specialist
   const claimed = claimAgentPlanSpecialistHandoffsV1(
     plan(),
     [assignment],
-    { executionOwnerships: [ownership], availableSlots: 1, leaseSeconds: 60, at: T0 },
+    { executionOwnerships: [ownership], availableSlots: 1, leaseSeconds: 90, at: T0 },
   );
   const agentId = claimed.claimed[0];
   const leaseId = claimed.assignments[0].leaseId;
