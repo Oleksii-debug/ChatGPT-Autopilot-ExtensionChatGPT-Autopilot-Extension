@@ -12,7 +12,9 @@ import {
   AGENT_SELF_REPAIR_MODEL_BINDING_AUTHORITY,
 } from '../src/core/agent-self-repair-model-binding.js';
 import {
+  AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY,
   AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_AUTHORITY,
+  createBoundAgentSelfRepairModelDispatchV1,
   rankBoundAgentSelfRepairModelCandidatesV1,
 } from '../src/core/agent-self-repair-model-route-binding.js';
 
@@ -301,6 +303,49 @@ test('RETEST binds independent verifier Agent identity to verifier candidates', 
   assert.equal(result.candidates.preferredRouteId, 'route.b');
 });
 
+test('REPAIR dispatch reuses durable role intent and resolves exact provider identity', () => {
+  const intent = activeIntent({ role: 'coder', capabilityIds: ['cap.code'] });
+  const result = createBoundAgentSelfRepairModelDispatchV1(request(intent));
+
+  assert.equal(result.workKind, 'REPAIR');
+  assert.equal(result.ownerId, 'actor-1');
+  assert.equal(result.routeIntent.role, 'coder');
+  assert.equal(result.dispatchIntent.role, 'coder');
+  assert.equal(result.dispatchIntent.routeId, 'route.a');
+  assert.deepEqual(result.dispatchIntent.route, {
+    routeId: 'route.a',
+    provider: 'openai',
+    model: 'model-route.a',
+    endpointId: '',
+  });
+  assert.deepEqual(result.authority, AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY);
+  assert.equal(result.authority.providerCallAuthorized, false);
+});
+
+test('RETEST dispatch stays bound to the independent verifier route role', () => {
+  const intent = activeIntent({
+    workKind: 'RETEST',
+    role: 'verifier',
+    capabilityIds: ['cap.reason'],
+  });
+  const result = createBoundAgentSelfRepairModelDispatchV1(request(intent));
+
+  assert.equal(result.ownerId, 'verifier-1');
+  assert.equal(result.dispatchIntent.jobId, 'verifier-1');
+  assert.equal(result.dispatchIntent.role, 'verifier');
+  assert.equal(result.dispatchIntent.routeId, 'route.b');
+});
+
+test('self-repair dispatch preserves expected-preference TOCTOU assertion', () => {
+  const intent = activeIntent({ role: 'coder', capabilityIds: ['cap.code'] });
+  assert.throws(
+    () => createBoundAgentSelfRepairModelDispatchV1(request(intent, {
+      expectedPreferredRouteId: 'route.b',
+    })),
+    /preference changed before dispatch preparation/u,
+  );
+});
+
 test('stale self-repair binding key and Agent owner substitution fail closed', () => {
   const intent = activeIntent();
   assert.throws(
@@ -341,6 +386,25 @@ test('caller cannot override durable role, capabilities, vision or route authori
   ]) {
     assert.throws(
       () => rankBoundAgentSelfRepairModelCandidatesV1({
+        ...request(),
+        ...extra,
+      }),
+      /contains unknown field/u,
+    );
+  }
+});
+
+test('dispatch adapter rejects caller routing aliases before canonical dispatch', () => {
+  for (const extra of [
+    { role: 'verifier' },
+    { capabilityIds: ['cap.reason'] },
+    { requiresVision: true },
+    { provider: 'forged' },
+    { model: 'forged' },
+    { providerCallAuthorized: true },
+  ]) {
+    assert.throws(
+      () => createBoundAgentSelfRepairModelDispatchV1({
         ...request(),
         ...extra,
       }),
