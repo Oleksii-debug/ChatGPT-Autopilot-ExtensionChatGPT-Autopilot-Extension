@@ -40,7 +40,7 @@ import {
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
-import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
+import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
@@ -1122,8 +1122,15 @@ export class BrowserAgentManager {
     if (plan.revision !== request.expectedPlanRevision) {
       throw new Error('Browser Agent AgentPlan revision drifted before specialist delegation intent materialization');
     }
-    if (!plan.nodes.some(node => node.nodeId === request.nodeId)) {
+    const node = plan.nodes.find(candidate => candidate.nodeId === request.nodeId);
+    if (!node) {
       throw new Error('Browser Agent AgentPlan node not found for specialist delegation intent');
+    }
+    if (node.state !== AgentPlanNodeState.READY) {
+      throw new Error('Browser Agent AgentPlan node must be READY for specialist delegation intent');
+    }
+    if (![AgentExecutionPlane.LOCAL, AgentExecutionPlane.CLOUD, AgentExecutionPlane.REMOTE].includes(node.executionPlane)) {
+      throw new Error('Browser Agent specialist delegation intent requires LOCAL, CLOUD or REMOTE AgentPlan node');
     }
 
     const at = specialistRequestTimestamp(
