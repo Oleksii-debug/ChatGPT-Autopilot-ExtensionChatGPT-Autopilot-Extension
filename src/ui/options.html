@@ -131,6 +131,54 @@
         </fieldset>
       </details>
 
+      <details id="agent-specialist-provider-details">
+        <summary>OpenHands Specialist provider</summary>
+        <p id="agent-specialist-provider-help" class="field-help">Provider v1 працює лише з локальним OpenHands Agent Server 1.49.5 через http://localhost або http://127.0.0.1 з явним портом. Паролі, API keys і CredentialRef тут не використовуються.</p>
+        <fieldset class="settings-group" aria-describedby="agent-specialist-provider-help agent-specialist-provider-status">
+          <legend>OpenHands Agent Server</legend>
+          <p id="agent-specialist-provider-identity" tabindex="0">Provider ID: openhands-agent-server. Auth: LOCAL_UNAUTHENTICATED.</p>
+
+          <label for="agent-specialist-provider-server-url">Local server URL</label>
+          <input id="agent-specialist-provider-server-url" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:3000">
+
+          <label for="agent-specialist-provider-profile-id">Agent profile UUID</label>
+          <input id="agent-specialist-provider-profile-id" type="text" autocomplete="off" spellcheck="false" placeholder="00000000-0000-4000-8000-000000000000">
+
+          <label for="agent-specialist-provider-profile-revision">Agent profile revision</label>
+          <input id="agent-specialist-provider-profile-revision" type="number" min="1" step="1" inputmode="numeric" value="1">
+
+          <label for="agent-specialist-provider-workspace">Absolute isolated workspace path</label>
+          <input id="agent-specialist-provider-workspace" type="text" maxlength="4096" autocomplete="off" spellcheck="false" aria-describedby="agent-specialist-provider-workspace-help">
+          <p id="agent-specialist-provider-workspace-help" class="field-help">Дозволено абсолютний Windows або POSIX path. Network shares та . або .. segments заборонені.</p>
+
+          <label for="agent-specialist-provider-capabilities">Qualified capability IDs — по одному в рядку</label>
+          <textarea id="agent-specialist-provider-capabilities" rows="4" spellcheck="false" aria-describedby="agent-specialist-provider-capabilities-help"></textarea>
+          <p id="agent-specialist-provider-capabilities-help" class="field-help">Список має точно збігатися з capability scope Specialist handoff.</p>
+
+          <label for="agent-specialist-provider-request-timeout">Request timeout, секунд</label>
+          <input id="agent-specialist-provider-request-timeout" type="number" min="1" max="120" step="1" inputmode="numeric" value="30">
+
+          <label for="agent-specialist-provider-max-execution">Maximum execution, секунд</label>
+          <input id="agent-specialist-provider-max-execution" type="number" min="1" max="21600" step="1" inputmode="numeric" value="1800">
+
+          <label for="agent-specialist-provider-poll-interval">Poll interval, мс</label>
+          <input id="agent-specialist-provider-poll-interval" type="number" min="100" max="30000" step="1" inputmode="numeric" value="1000">
+
+          <label for="agent-specialist-provider-max-iterations">Maximum iterations</label>
+          <input id="agent-specialist-provider-max-iterations" type="number" min="1" max="500" step="1" inputmode="numeric" value="100">
+
+          <label for="agent-specialist-provider-max-response-bytes">Maximum response bytes</label>
+          <input id="agent-specialist-provider-max-response-bytes" type="number" min="1024" max="2000000" step="1" inputmode="numeric" value="200000">
+
+          <div class="agent-actions" aria-label="Керування OpenHands Specialist provider">
+            <button id="agent-specialist-provider-save-button" type="button">Зберегти provider config</button>
+            <button id="agent-specialist-provider-probe-button" type="button">Перевірити збережений provider</button>
+            <button id="agent-specialist-provider-clear-button" type="button">Очистити provider config</button>
+          </div>
+          <p id="agent-specialist-provider-status" role="status">OpenHands provider config ще не завантажено.</p>
+        </fieldset>
+      </details>
+
       <details id="agent-definition-details">
         <summary>Збережені reusable Agent definitions</summary>
         <p class="field-help">Definitions зберігають постійні інструкції, capabilities, tools і per-agent model routing. Вони не запускають Agent самі по собі.</p>
