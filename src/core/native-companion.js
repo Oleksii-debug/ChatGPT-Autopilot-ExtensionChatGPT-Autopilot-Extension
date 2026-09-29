@@ -2,7 +2,7 @@ export const NATIVE_COMPANION_HOST_NAME = 'org.chatgpt_autopilot.companion';
 export const NATIVE_COMPANION_PROTOCOL_VERSION = 1;
 
 export const NativeCompanionRequestType = Object.freeze({
-  HELLO: 'hello', HEALTH: 'health', CAPABILITIES: 'capabilities', FILESYSTEM_READ_TEXT: 'filesystem.readText',
+  HELLO: 'hello', HEALTH: 'health', CAPABILITIES: 'capabilities', FILESYSTEM_READ_TEXT: 'filesystem.readText', FILESYSTEM_READ_BINARY: 'filesystem.readBinary',
   FILESYSTEM_SEARCH: 'filesystem.search', FILESYSTEM_LIST: 'filesystem.list', FILESYSTEM_STAT: 'filesystem.stat', FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
   CREDENTIALS_LIST: 'credentials.list', CREDENTIALS_RESOLVE: 'credentials.resolve', MCP_REQUEST: 'mcp.request', MCP_CLOSE: 'mcp.close',
   WINDOWS_EXEC_PINNED: 'windows.execPinned', WINDOWS_UIA_QUERY: 'windows.uia.query',
@@ -23,6 +23,7 @@ export class NativeCompanionClient{
  async send(type,payload={}){const id=this.createId?this.createId():'';const request=createNativeCompanionRequest(type,payload,{id});let raw;try{raw=await this.chrome.runtime.sendNativeMessage(this.hostName,request);}catch(error){throw new NativeCompanionError('NATIVE_TRANSPORT_ERROR',clean(error?.message||error,4000)||'Native Companion transport failed');}const response=normalizeNativeCompanionResponse(raw,{requestId:request.requestId,type:request.type});if(!response.ok)throw new NativeCompanionError(response.error.code,response.error.message);return response.result;}
  hello(clientVersion=''){return this.send(NativeCompanionRequestType.HELLO,{clientVersion:clean(clientVersion,120)});} health(){return this.send(NativeCompanionRequestType.HEALTH);} capabilities(){return this.send(NativeCompanionRequestType.CAPABILITIES);}
  readText({rootId,relativePath,maxBytes=262144}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_READ_TEXT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',maxBytes});}
+ readBinary({rootId,relativePath,offsetBytes=0,maxBytes=262144,expectedSha256=''}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_READ_BINARY,{rootId:typeof rootId==='string'?rootId:'',relativePath:typeof relativePath==='string'?relativePath:'',offsetBytes,maxBytes,expectedSha256:typeof expectedSha256==='string'?expectedSha256:''});}
  searchFiles({rootId,query,maxResults=64,maxEntries=2048}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_SEARCH,{rootId:clean(rootId,128),query:typeof query==='string'?query:'',maxResults,maxEntries});}
  listFiles({rootId,relativePath='.',maxEntries=256}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_LIST,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',maxEntries});}
  statPath({rootId,relativePath,hash=false,maxHashBytes=16777216}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_STAT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',hash,maxHashBytes});}

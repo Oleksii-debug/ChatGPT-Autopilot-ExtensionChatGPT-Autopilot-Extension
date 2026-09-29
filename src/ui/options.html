@@ -114,6 +114,79 @@
       <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
       <p class="field-help">Опишіть результат звичайною мовою. AI сам планує роботу та керує браузерними інструментами Autopilot. Налаштування нижче є лише політикою й лімітами; для звичайного запуску їх заповнювати не потрібно.</p>
 
+      <details id="agent-definition-details">
+        <summary>Збережені reusable Agent definitions</summary>
+        <p class="field-help">Definitions зберігають постійні інструкції, capabilities, tools і per-agent model routing. Вони не запускають Agent самі по собі.</p>
+        <fieldset class="settings-group" id="agent-definition-registry-group">
+          <legend>Реєстри reusable Agent</legend>
+          <label for="agent-definition-registry-list">Реєстр Agent definitions</label>
+          <select id="agent-definition-registry-list" size="4"></select>
+          <label for="agent-definition-create-registry-id">ID нового реєстру</label>
+          <input id="agent-definition-create-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false" placeholder="agents:project-1">
+          <button id="agent-definition-create-registry-button" type="button">Створити реєстр</button>
+          <p id="agent-definition-quarantine-status" tabindex="0">Пошкоджених reusable-Agent реєстрів у карантині немає.</p>
+        </fieldset>
+
+        <fieldset class="settings-group" id="agent-definition-selection-group">
+          <legend>Збережені Agent definitions</legend>
+          <label for="agent-definition-list">Agent definition</label>
+          <select id="agent-definition-list" size="5"></select>
+          <button id="agent-definition-new-button" type="button" disabled>Нова definition</button>
+        </fieldset>
+
+        <fieldset class="settings-group" id="agent-definition-form-group" disabled>
+          <legend>Definition</legend>
+          <label for="agent-definition-id">Agent definition ID</label>
+          <input id="agent-definition-id" type="text" maxlength="180" autocomplete="off" spellcheck="false" placeholder="agent.research">
+          <label for="agent-definition-label">Назва</label>
+          <input id="agent-definition-label" type="text" maxlength="160" autocomplete="off">
+          <label for="agent-definition-description">Опис — необов’язково</label>
+          <textarea id="agent-definition-description" rows="3" maxlength="4000" spellcheck="true"></textarea>
+          <label for="agent-definition-instructions">Постійні інструкції Agent</label>
+          <textarea id="agent-definition-instructions" rows="7" maxlength="12000" spellcheck="true"></textarea>
+          <label for="agent-definition-capabilities">Capability IDs — по одному в рядку</label>
+          <textarea id="agent-definition-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-tools">Tool IDs — по одному в рядку</label>
+          <textarea id="agent-definition-tools" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-tags">Теги — по одному в рядку</label>
+          <textarea id="agent-definition-tags" rows="3" spellcheck="false"></textarea>
+          <label for="agent-definition-acceptance">Критерії завершення — по одному в рядку</label>
+          <textarea id="agent-definition-acceptance" rows="4" spellcheck="true"></textarea>
+          <label><input id="agent-definition-enabled" type="checkbox" checked>Definition увімкнена</label>
+          <p id="agent-definition-revision" tabindex="0">Реєстр не вибрано.</p>
+          <p class="field-help">Поточні config defaults і model route policy зберігаються без змін під час редагування; їхня окрема модельна поверхня використовує канонічний Router.</p>
+          <div class="agent-actions" aria-label="Дії з reusable Agent definition">
+            <button id="agent-definition-save-button" type="button" disabled>Зберегти definition</button>
+            <button id="agent-definition-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
+            <button id="agent-definition-delete-button" type="button" disabled>Видалити definition</button>
+          </div>
+        </fieldset>
+        <p id="agent-definition-status" role="status">Reusable Agent definitions ще не завантажено.</p>
+
+        <fieldset class="settings-group" id="agent-definition-launch-group" disabled>
+          <legend>Створити завдання з reusable Agent</legend>
+          <p>Створення зберігає нове завдання у стані STOPPED і не запускає Agent. Бюджет береться з поточних полів Safety / Budget нижче.</p>
+          <label for="agent-definition-launch-goal">Завдання власника</label>
+          <textarea id="agent-definition-launch-goal" rows="5" maxlength="50000" spellcheck="true"></textarea>
+          <label for="agent-definition-launch-project-id">Project ID — необов’язково</label>
+          <input id="agent-definition-launch-project-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="agent-definition-launch-job-id">Job ID — необов’язково; якщо порожньо, буде створено автоматично</label>
+          <input id="agent-definition-launch-job-id" type="text" maxlength="128" autocomplete="off" spellcheck="false">
+
+          <label for="agent-definition-launch-owner-capabilities">Дозволені owner capability IDs — по одному в рядку</label>
+          <textarea id="agent-definition-launch-owner-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-owner-tools">Дозволені owner tool IDs — по одному в рядку</label>
+          <textarea id="agent-definition-launch-owner-tools" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-requested-capabilities">Capability IDs для цього завдання — по одному в рядку</label>
+          <textarea id="agent-definition-launch-requested-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-requested-tools">Tool IDs для цього завдання — по одному в рядку</label>
+          <textarea id="agent-definition-launch-requested-tools" rows="4" spellcheck="false"></textarea>
+
+          <button id="agent-definition-launch-button" type="button" disabled>Створити STOPPED-завдання з definition</button>
+          <p id="agent-definition-launch-status" role="status">Оберіть увімкнену Agent definition. Створення не запускає виконання.</p>
+        </fieldset>
+      </details>
+
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true" placeholder="Наприклад: перевір предмети зимового семестру, підбери розклад без конфліктів і виконай задачу відповідно до вибраної нижче політики автономності."></textarea>
       <div class="agent-actions" aria-label="Основні дії агента">
@@ -764,6 +837,9 @@
           <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
           <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="displayName">Назва профілю моделі</label><input data-route-field="displayName" type="text" maxlength="160" autocomplete="off">
+          <label data-label-for="systemPrompt">Системний промпт цієї моделі</label><textarea data-route-field="systemPrompt" rows="3" maxlength="8000"></textarea>
+          <label data-label-for="workerPrompt">Інструкція воркеру цієї моделі</label><textarea data-route-field="workerPrompt" rows="3" maxlength="8000"></textarea>
           <button type="button" data-route-action="discover-models">Отримати моделі цього постачальника</button>
           <label data-label-for="discoveredModel">Моделі постачальника</label><select data-route-field="discoveredModel"><option value="">Оберіть модель після оновлення</option></select>
           <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>

@@ -276,6 +276,10 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
     'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
+    'agent-definition-details','agent-definition-registry-list','agent-definition-create-registry-id','agent-definition-create-registry-button','agent-definition-quarantine-status',
+    'agent-definition-list','agent-definition-new-button','agent-definition-form-group','agent-definition-id','agent-definition-label','agent-definition-description','agent-definition-instructions',
+    'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance','agent-definition-enabled','agent-definition-revision',
+    'agent-definition-save-button','agent-definition-toggle-enabled-button','agent-definition-delete-button','agent-definition-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -297,6 +301,25 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.match(js, /core\('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES'\)/, 'reusable Agent UI must list registries through canonical Core');
+  assert.match(js, /core\('GET_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must refresh the exact selected registry through canonical Core');
+  assert.match(js, /core\('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must create registries through canonical Core');
+  assert.match(js, /core\('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must commit definition CRUD through canonical Core');
+  assert.match(js, /expectedRegistryRevision: registry\.revision/, 'definition mutations must carry exact registry CAS');
+  assert.equal((js.match(/expectedRegistryBindingKey: registry\.bindingKey/g) || []).length, 4, 'every definition mutation must carry the current content-bound registry CAS key');
+  assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
+  assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical config defaults');
+  assert.match(js, /modelRoutePolicy: current\?\.modelRoutePolicy \?\? null/, 'definition edits must preserve per-Agent model route policy');
+  assert.match(js, /specialistDelegationProfile: current && Object\.hasOwn\(current, 'specialistDelegationProfile'\)/, 'definition edits must preserve specialist delegation profile');
+  assert.match(js, /ui\.agentDefinitionMode === 'edit'/, 'definition create and edit paths must remain explicit');
+  assert.match(js, /revision drifted/, 'stale definition writes must force a current-state reload');
+  assert.match(js, /agentDefinitionQuarantineCount/, 'quarantined registries must be visible as aggregate owner-attention state');
+  assert.doesNotMatch(js, /quarantinedRegistryIds\[[^\]]+\]/, 'UI must not render raw quarantined registry identities');
+  assert.match(html, /<label for="agent-definition-registry-list">/, 'definition registry selector needs a persistent native label');
+  assert.match(html, /<label for="agent-definition-list">/, 'definition selector needs a persistent native label');
+  assert.match(html, /id="agent-definition-status" role="status"/, 'definition CRUD outcomes must be announced');
+  assert.match(html, /id="agent-definition-quarantine-status" tabindex="0"/, 'definition quarantine summary must be keyboard readable without a noisy live region');
+  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadAgentDefinitionRegistries\(\);/, 'Agent runtime and reusable-definition state must load through the canonical startup sequence');
 });
 
 test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration and status', () => {

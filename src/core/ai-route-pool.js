@@ -109,6 +109,12 @@ function denseDataArray(value, label, max) {
   return out;
 }
 function clean(value, max = 4000) { const out = typeof value === 'string' ? value.trim() : ''; if (out.length > max) throw new Error('AI route text is too long'); return out; }
+function exactPromptText(value, label, max = 8_000) {
+  if (value == null) return '';
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  if (value.length > max) throw new Error(`${label} is too long`);
+  return value;
+}
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
@@ -141,7 +147,7 @@ export function normalizeAiRoutePool(raw = []) {
   if (raw == null) return [];
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
   const routes = source.map((rawItem, index) => {
-    const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
+    const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
     if (integer(own(item, 'schemaVersion') ?? AI_ROUTE_POOL_VERSION, 'AI route schemaVersion', AI_ROUTE_POOL_VERSION, AI_ROUTE_POOL_VERSION) !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
     const provider = clean(own(item, 'provider'), 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
@@ -160,6 +166,9 @@ export function normalizeAiRoutePool(raw = []) {
       routeId: id(own(item, 'routeId'), 'AI route routeId'),
       provider,
       model,
+      displayName: clean(own(item, 'displayName'), 160),
+      systemPrompt: exactPromptText(own(item, 'systemPrompt'), 'AI route systemPrompt'),
+      workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
       endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
       roles,
       capabilityIds: ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64),
