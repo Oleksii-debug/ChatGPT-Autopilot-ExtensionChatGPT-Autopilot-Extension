@@ -18,7 +18,11 @@ import {
   resolveSubagentTaskActivationBindingV1,
   resolveSubagentTaskActivationEvidenceV1,
 } from './subagent-task-activation-binding-registry.js';
-import { deriveSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
+import {
+  SubagentResultReconciliationDecision,
+  deriveSubagentTaskActivationBindingV1,
+  prepareSubagentResultReconciliationV1,
+} from './subagent-result-reconciliation.js';
 import { deriveSubagentAuthorityEnvelopeIdentityV1 } from './subagent-authority-envelope.js';
 import {
   deriveSubagentTaskDispatchIdentityV1,
@@ -50,6 +54,12 @@ const SUBAGENT_CONTEXT_RESOLUTION_KEYS = new Set([
   'bindingId',
   'expectedProjectRevisionId',
   'capsuleId',
+]);
+const SUBAGENT_RESULT_RECONCILIATION_KEYS = new Set([
+  'resultEnvelope',
+  'outcomeContract',
+  'criterionVerifications',
+  'taskActivationBindingId',
 ]);
 
 function clone(value) { return structuredClone(value); }
@@ -170,6 +180,24 @@ function snapshotSubagentContextResolution(value) {
   return snapshot;
 }
 
+function snapshotSubagentResultReconciliation(value) {
+  const snapshot = snapshotDataOnly(value, 'Subagent result reconciliation');
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new Error('Subagent result reconciliation must be a plain object');
+  }
+  for (const key of Object.keys(snapshot)) {
+    if (!SUBAGENT_RESULT_RECONCILIATION_KEYS.has(key)) {
+      throw new Error('Subagent result reconciliation contains unknown field: ' + key);
+    }
+  }
+  for (const key of SUBAGENT_RESULT_RECONCILIATION_KEYS) {
+    if (!Object.hasOwn(snapshot, key)) {
+      throw new Error('Subagent result reconciliation is missing field: ' + key);
+    }
+  }
+  return snapshot;
+}
+
 function assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding) {
   const exact = [
     ['projectId', task.projectId],
@@ -274,6 +302,8 @@ export class OrchestrationV2Manager {
     collectAssistantReport = null,
     resolveHierarchyProvider = null,
     projectWorkspaceRepository = null,
+    resolveTrustedOutcomeContract = null,
+    resolveTrustedVerificationRecord = null,
     now = () => Date.now(),
     createId = null,
   } = {}) {
@@ -287,6 +317,12 @@ export class OrchestrationV2Manager {
     if (typeof this.projectWorkspaceRepository?.resolveContext !== 'function') {
       throw new Error('Project Workspace context resolver dependency is required');
     }
+    this.resolveTrustedOutcomeContract = typeof resolveTrustedOutcomeContract === 'function'
+      ? resolveTrustedOutcomeContract
+      : null;
+    this.resolveTrustedVerificationRecord = typeof resolveTrustedVerificationRecord === 'function'
+      ? resolveTrustedVerificationRecord
+      : null;
     this.now = now;
     this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     this.controllers = new Map();
@@ -835,6 +871,138 @@ export class OrchestrationV2Manager {
       activationId: binding.activationId,
       generation: binding.generation,
       activationPurpose: binding.activationPurpose,
+    });
+  }
+
+  /**
+   * Admit one child result through the existing trusted Outcome Verification
+   * boundary, then commit only the returned inert terminal event through the
+   * canonical OrchestrationHierarchy reducer owner.
+   *
+   * Caller input cannot supply graph/runtime/evaluation time or trusted binding
+   * state. Those facts come from this manager's durable owner repositories and
+   * owner clock. Trusted OutcomeContract / VerificationRecord authorities remain
+   * injected canonical dependencies rather than new stores owned here.
+   */
+  async reconcileDurableSubagentResult(input = {}, id = '') {
+    const request = snapshotSubagentResultReconciliation(input);
+    if (typeof this.resolveTrustedOutcomeContract !== 'function') {
+      throw new Error('Trusted OutcomeContract resolver dependency is required');
+    }
+    if (typeof this.resolveTrustedVerificationRecord !== 'function') {
+      throw new Error('Trusted VerificationRecord resolver dependency is required');
+    }
+
+    const bindingLookup = plainSubagentBindingLookup(
+      { bindingId: request.taskActivationBindingId },
+      'Subagent result activation-binding lookup',
+    );
+    // Exact binding identity is rejected before the first durable read.
+    resolveSubagentTaskActivationBindingV1(
+      createSubagentTaskActivationBindingRegistryV1(),
+      bindingLookup,
+    );
+
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+    const runtime = await controller.runtimeRepository.load();
+    const hierarchy = runtime?.hierarchy;
+    if (!hierarchy?.graph || !hierarchy?.state) {
+      throw new Error('Durable orchestration hierarchy is required for subagent result reconciliation');
+    }
+
+    const registry = storedSubagentTaskActivationBindingRegistry(runtime);
+    const durableBinding = resolveSubagentTaskActivationBindingV1(registry, bindingLookup);
+    if (!durableBinding) {
+      throw new Error('Durable subagent activation binding not found');
+    }
+    if (durableBinding.projectId !== runtime.projectId) {
+      throw new Error('Durable subagent activation binding crosses orchestra project authority');
+    }
+
+    const evaluatedAtMs = this.now();
+    if (!Number.isFinite(evaluatedAtMs) || evaluatedAtMs < 0) {
+      throw new Error('Owner reconciliation clock is invalid');
+    }
+    const evaluatedAt = new Date(evaluatedAtMs).toISOString();
+
+    const reconciliation = await prepareSubagentResultReconciliationV1(
+      {
+        resultEnvelope: request.resultEnvelope,
+        outcomeContract: request.outcomeContract,
+        criterionVerifications: request.criterionVerifications,
+        evaluatedAt,
+        graph: hierarchy.graph,
+        runtime: hierarchy.state,
+        taskActivationBindingId: durableBinding.bindingId,
+      },
+      {
+        resolveTrustedOutcomeContract: this.resolveTrustedOutcomeContract,
+        resolveTrustedVerificationRecord: this.resolveTrustedVerificationRecord,
+        resolveTrustedTaskActivationBinding: async lookup => {
+          const binding = resolveSubagentTaskActivationBindingV1(
+            registry,
+            { bindingId: lookup.bindingId },
+          );
+          if (binding && binding.projectId !== runtime.projectId) {
+            throw new Error('Trusted subagent activation binding crosses orchestra project authority');
+          }
+          return binding;
+        },
+      },
+    );
+
+    const terminal = new Set([
+      SubagentResultReconciliationDecision.ADMIT_TERMINAL,
+      SubagentResultReconciliationDecision.REOPEN,
+    ]).has(reconciliation.decision);
+    if (!terminal) {
+      return Object.freeze({
+        orchestraId,
+        reconciliation,
+        committed: false,
+        dispatch: null,
+      });
+    }
+    if (!reconciliation.terminalEvent) {
+      throw new Error('Terminal subagent reconciliation omitted canonical terminal event');
+    }
+
+    const commitNowMs = this.now();
+    if (!Number.isFinite(commitNowMs) || commitNowMs < evaluatedAtMs) {
+      throw new Error('Owner reconciliation commit clock regressed');
+    }
+    const dispatch = await controller.dispatchHierarchyEvent(
+      reconciliation.terminalEvent,
+      { nowMs: commitNowMs },
+    );
+
+    // Prove the canonical reducer persisted the exact activation terminal state.
+    // A concurrent recovery/supersession must not be reported as completion.
+    const committedRuntime = await controller.runtimeRepository.load();
+    const nodeRuntime = committedRuntime?.hierarchy?.state?.nodesById?.[
+      reconciliation.terminalEvent.nodeId
+    ];
+    const ledger = nodeRuntime?.activationLedger?.[
+      reconciliation.terminalEvent.activationId
+    ];
+    if (!ledger
+        || ledger.phase !== 'TERMINAL'
+        || ledger.generation !== reconciliation.terminalEvent.generation
+        || ledger.terminalStatus !== reconciliation.terminalEvent.status) {
+      throw new Error('Canonical subagent terminal event was not durably committed');
+    }
+
+    return Object.freeze({
+      orchestraId,
+      reconciliation,
+      committed: true,
+      dispatch,
+      activationId: reconciliation.terminalEvent.activationId,
+      generation: reconciliation.terminalEvent.generation,
+      terminalStatus: reconciliation.terminalEvent.status,
     });
   }
 
