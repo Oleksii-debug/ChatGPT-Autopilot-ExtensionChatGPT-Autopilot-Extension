@@ -1035,7 +1035,7 @@ test('restart normalization rejects evidence outside durable exact-effect chrono
   assert.throws(
     () => normalizeExactEffectStateV1({
       ...state,
-      observation: { ...state.observation, observedAt: '2026-09-19T12:00:05.000Z' },
+      observation: { ...state.observation, observedAt: '2026-09-19T12:01:05.000Z' },
     }),
     /observation chronology is invalid/,
   );
@@ -1049,10 +1049,16 @@ test('restart normalization rejects evidence outside durable exact-effect chrono
   assert.throws(
     () => normalizeExactEffectStateV1({
       ...state,
-      verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:05.000Z' },
+      verification: { ...state.verification, verifiedAt: '2026-09-19T12:01:05.000Z' },
     }),
     /verification chronology is invalid/,
   );
+
+  const boundedSkew = normalizeExactEffectStateV1({
+    ...state,
+    verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:34.000Z' },
+  });
+  assert.equal(boundedSkew.verification.verifiedAt, '2026-09-19T12:00:34.000Z');
 });
 
 test('state envelope rejects hidden, symbol and inherited authority aliases', () => {
