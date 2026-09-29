@@ -2456,6 +2456,7 @@ export class BrowserAgentManager {
       for (const jobId of initial.order || []) {
         const job = initial.byId?.[jobId];
         if (!job?.runtime?.plan || !job.specialistDelegationBinding?.profile?.enabled) continue;
+        if (automationPolicyFence && job.runtime.runState !== BrowserAgentRunState.RUNNING) continue;
         const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
         for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
           const admission = admissions.find(item => item.agentId === assignment.agentId);
@@ -2511,6 +2512,7 @@ export class BrowserAgentManager {
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
+        if (automationPolicyFence && job.runtime.runState !== BrowserAgentRunState.RUNNING) continue;
         assertOwnerBoundSpecialistAdmissionProvenance(job);
         if (job.specialistDelegationBinding?.profile?.enabled) {
           const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
@@ -2543,7 +2545,9 @@ export class BrowserAgentManager {
         job.runtime.updatedAt = this.now();
         remaining -= outcome.claimed.length;
         for (const agentId of outcome.claimed) {
-          claimed.push({ jobId, agentId });
+          claimed.push(automationPolicyFence
+            ? { jobId, agentId, controlEpoch: job.runtime.controlEpoch }
+            : { jobId, agentId });
           appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
         }
         for (const agentId of outcome.reconciliationRequired) {

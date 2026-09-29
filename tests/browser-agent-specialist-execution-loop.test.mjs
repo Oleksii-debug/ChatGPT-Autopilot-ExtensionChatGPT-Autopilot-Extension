@@ -544,3 +544,47 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
   assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
   assert.equal((await manager.getSpecialistAutomationPolicy()).policy.maxConcurrentHandoffs, 0);
 });
+
+
+test('automation-policy claim skips paused jobs and does not reserve effect authority', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  await manager.pause(id);
+
+  const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(result.kind, 'AUTOMATION_CLAIM');
+  assert.deepEqual(result.claimed, []);
+
+  const durable = await manager.listSpecialistHandoffs(id);
+  assert.equal(durable.handoffs[0].state, 'READY');
+  assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('automation-policy claim returns the exact claim-time control epoch for provider fencing', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+
+  const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(result.claimed.length, 1);
+  assert.equal(result.claimed[0].jobId, id);
+  assert.equal(result.claimed[0].controlEpoch, 0);
+
+  await manager.pause(id);
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.controlEpoch, 1);
+  assert.notEqual(result.claimed[0].controlEpoch, current.job.runtime.controlEpoch);
+});

@@ -84,6 +84,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
+  'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -288,6 +289,57 @@ const specialistProviderReadinessResolver = Object.freeze({
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
+
+let browserAgentCycleInFlight = null;
+export function runBrowserAgentCycle() {
+  if (browserAgentCycleInFlight) return browserAgentCycleInFlight;
+  const cycle = (async () => {
+    await ensureColdStartReconciled();
+    const prepared = await browserAgent.cycleAll();
+    const claim = await browserAgent.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy({
+      specialistProviderReadinessResolver,
+    });
+    if (!Array.isArray(claim?.claimed) || claim.claimed.length === 0) {
+      await browserAgent.reconcileAlarm();
+      return { prepared, claim, executions: [] };
+    }
+    const randomUuid = globalThis.crypto?.randomUUID;
+    if (typeof randomUuid !== 'function') {
+      throw new Error('Secure UUID generation is unavailable for automatic Specialist provider execution');
+    }
+    const executions = await Promise.all(claim.claimed.map(async claimed => {
+      try {
+        const execution = await browserAgent.executeClaimedSpecialistProvider(
+          claimed.jobId,
+          {
+            agentId: claimed.agentId,
+            conversationId: randomUuid.call(globalThis.crypto).toLowerCase(),
+            expectedControlEpoch: claimed.controlEpoch,
+          },
+          { specialistProviderReadinessResolver },
+        );
+        return {
+          jobId: claimed.jobId,
+          agentId: claimed.agentId,
+          kind: execution?.kind || 'SPECIALIST_PROVIDER_EXECUTION_RECORDED',
+          execution,
+        };
+      } catch {
+        return {
+          jobId: claimed.jobId,
+          agentId: claimed.agentId,
+          kind: 'SPECIALIST_PROVIDER_EXECUTION_BLOCKED_SAFE',
+        };
+      }
+    }));
+    await browserAgent.reconcileAlarm();
+    return { prepared, claim, executions };
+  })();
+  browserAgentCycleInFlight = cycle.finally(() => { browserAgentCycleInFlight = null; });
+  return browserAgentCycleInFlight;
+}
+
+
 
 async function notifyStatusChanged(state) {
   if (!chrome.runtime?.sendMessage) return;
@@ -535,7 +587,7 @@ async function runStartupCycle() {
   // allowed to resume sends. Controller itself never performs browser sends.
   const orchestration = await orchestrationV2.cycleAll();
   const scenario = await scenarioWork.cycleAll();
-  const agent = await browserAgent.cycleAll();
+  const agent = await runBrowserAgentCycle();
   const execution = await runExecutionCycle();
   return { execution, orchestration, scenario, agent };
 }
@@ -706,6 +758,12 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createSpecialistRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
+  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
+    result = await browserAgent.getSpecialistAutomationPolicy();
+  } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
+    result = await browserAgent.setSpecialistAutomationPolicy(message.payload || {});
+  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
+    result = await browserAgent.clearSpecialistAutomationPolicy(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
     result = await browserAgent.listSpecialistProviderConfigs();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
@@ -813,7 +871,7 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'DELETE_BROWSER_AGENT_JOB') {
     result = await browserAgent.delete(message.payload?.id || '');
   } else if (message.command === 'RUN_BROWSER_AGENT_NOW') {
-    result = await browserAgent.cycleAll();
+    result = await runBrowserAgentCycle();
   } else if (message.command === 'GET_REMOTE_DISPATCH_STATUS') {
     result = await remoteDispatch.getStatus();
   } else if (message.command === 'TEST_REMOTE_DISPATCH_FEED') {
@@ -853,7 +911,7 @@ chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
   if (alarm.name === AI_REPORT_ALARM) runSafely(runAiReportCycle());
   if (alarm.name === AI_MANAGER_ALARM) runSafely(runAiManagerCycle());
-  if (alarm.name === BROWSER_AGENT_ALARM) runSafely(browserAgent.cycleAll());
+  if (alarm.name === BROWSER_AGENT_ALARM) runSafely(runBrowserAgentCycle());
   if (alarm.name === REMOTE_DISPATCH_ALARM) runSafely(runRemoteDispatchCycle());
   if (orchestrationV2.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const orchestration = await orchestrationV2.cycleAlarm(alarm.name); const state = await reconcileRuntime(); return { orchestration, state }; })());
   if (scenarioWork.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const scenario = await scenarioWork.cycleAll(); const state = await reconcileRuntime(); return { scenario, state }; })());
