@@ -4,6 +4,8 @@ import {
   CapabilityPathKind,
   CapabilityPathReadiness,
   ProviderHealthStatus,
+  ProviderReadinessFreshness,
+  assessProviderReadinessFreshnessV1,
   discoverCapabilityPathsV1,
   normalizeProviderReadinessV1,
 } from '../src/core/capability-discovery.js';
@@ -899,4 +901,34 @@ test('stale deterministic path cannot outrank fresh executable fallback, but fre
     ['ocr.ready', 'READY'],
   ]);
   assert.equal(freshDegradedApi.plan[0].toolId, 'api.degraded');
+});
+
+test('direct readiness freshness assessment is canonical and preserves exact source evidence', () => {
+  const fresh = assessProviderReadinessFreshnessV1(state('local/fs', {
+    sourceId:'health.windows',
+    sourceRevision:7,
+  }), AS_OF);
+  assert.equal(fresh.status, ProviderReadinessFreshness.FRESH);
+  assert.equal(fresh.fresh, true);
+  assert.equal(fresh.reasonCode, '');
+  assert.equal(fresh.sourceId, 'health.windows');
+  assert.equal(fresh.sourceRevision, 7);
+  assert.equal(fresh.observedAt, OBSERVED_AT);
+  assert.equal(fresh.validThrough, VALID_THROUGH);
+  assert.equal(fresh.asOf, AS_OF);
+
+  const stale = assessProviderReadinessFreshnessV1(state('local/fs', {
+    validThrough:'2026-09-29T04:29:59.999Z',
+  }), AS_OF);
+  assert.equal(stale.status, ProviderReadinessFreshness.STALE);
+  assert.equal(stale.fresh, false);
+  assert.equal(stale.reasonCode, 'PROVIDER_STATE_STALE');
+
+  const future = assessProviderReadinessFreshnessV1(state('local/fs', {
+    observedAt:'2026-09-29T04:30:00.001Z',
+    validThrough:'2026-09-29T05:00:00.000Z',
+  }), AS_OF);
+  assert.equal(future.status, ProviderReadinessFreshness.FUTURE);
+  assert.equal(future.reasonCode, 'PROVIDER_STATE_FUTURE');
+  assert.ok(Object.isFrozen(fresh));
 });
