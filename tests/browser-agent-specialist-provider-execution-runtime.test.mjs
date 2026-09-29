@@ -14,6 +14,10 @@ import {
   SpecialistProviderConfigKind,
   createSpecialistProviderConfigV1,
 } from '../src/core/specialist-provider-config.js';
+import {
+  createSpecialistProviderExecutionV1,
+  recordSpecialistProviderExecutionOutcomeV1,
+} from '../src/core/specialist-provider-execution.js';
 
 const T0 = '2026-09-29T04:00:00.000Z';
 const T1 = '2026-09-29T04:01:00.000Z';
@@ -887,4 +891,80 @@ test('retryable pre-effect provider failure enters canonical reconciliation befo
   assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
   assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
   assert.equal(durable.handoffs[0].state, 'LEASED');
+});
+
+
+test('historical terminal provider execution from a prior lease does not block a newly claimed lease', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = {
+    async execute() {
+      calls += 1;
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+
+  const priorPrepared = createSpecialistProviderExecutionV1({
+    planId: current.job.runtime.plan.planId,
+    nodeId: current.job.runtime.plan.nodes[0].nodeId,
+    agentId,
+    handoffId: provenance.handoff.handoffId,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    leaseId: 'lease:prior-safe-retry',
+    leaseUntil: T2,
+    conversationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    providerConfig: providerConfig(),
+    at: T0,
+  });
+  const priorRetryable = recordSpecialistProviderExecutionOutcomeV1(priorPrepared, {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: true,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_PROVIDER_UNAVAILABLE',
+    providerUpdatedAt: '',
+    providerObservedAt: '',
+    at: T1,
+  });
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [priorRetryable];
+    return store;
+  });
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.equal(calls, 1);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 2);
+  assert.ok(durable.providerExecutions.some(item => item.leaseId === 'lease:prior-safe-retry'));
+  assert.ok(durable.providerExecutions.some(item => item.leaseId === assignment.leaseId));
 });
