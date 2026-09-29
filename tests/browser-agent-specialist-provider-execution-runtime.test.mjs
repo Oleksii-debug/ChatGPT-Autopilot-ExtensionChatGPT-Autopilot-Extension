@@ -109,7 +109,7 @@ function specialistDefinition() {
   };
 }
 
-async function seed(manager) {
+async function seed(manager, { claim = true } = {}) {
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const agentMutation = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
@@ -183,6 +183,7 @@ async function seed(manager) {
   });
   const prepared = await manager.cycleOne('job.coder');
   assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+  if (!claim) return prepared.handoff.agentId;
   const claimed = await manager.claimSpecialistHandoffs('job.coder', {
     availableSlots: 1,
     leaseSeconds: 600,
@@ -1335,12 +1336,15 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
     now: () => clock.value,
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
-  const agentId = await seed(manager);
+  const agentId = await seed(manager, { claim: false });
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
     maxConcurrentHandoffs: 1,
   });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.claimed[0].agentId, agentId);
   clock.value = Date.parse(T1);
 
   let changed = false;
