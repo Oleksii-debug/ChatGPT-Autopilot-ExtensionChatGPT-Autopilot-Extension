@@ -446,3 +446,61 @@ test('BrowserAgentManager rejects caller-shaped verifier authority fields before
   assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'OWNED');
   assert.equal(store.byId['job-1'].runtime.history.length, 0);
 });
+
+
+test('BrowserAgentManager leaves reconciliation fenced when trusted NO_EFFECT record is absent', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    {
+      executionOwnerships: [ownership],
+      availableSlots: 1,
+      leaseSeconds: 30,
+      at: T0,
+    },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const expired = claimAgentPlanSpecialistHandoffsV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      availableSlots: 1,
+      at: T1,
+    },
+  );
+  const store = {
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: expired.plan,
+          specialistHandoffs: expired.assignments,
+          specialistExecutionOwnerships: expired.executionOwnerships,
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+  };
+  const manager = managerWithStore(store, T1D);
+
+  await assert.rejects(
+    () => manager.authorizeSpecialistSafeRetry('job-1', {
+      agentId,
+      leaseId,
+      verificationId: 'verification-no-effect-missing',
+      at: T1D,
+    }),
+    /trusted.*verification.*record.*not found/i,
+  );
+
+  assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(store.byId['job-1'].runtime.specialistHandoffs[0].state, 'LEASED');
+  assert.equal(store.byId['job-1'].runtime.specialistHandoffs[0].leaseId, leaseId);
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'RECONCILE');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].leaseId, leaseId);
+  assert.equal(store.byId['job-1'].runtime.history.length, 0);
+  assert.equal(store.byId['job-1'].runtime.updatedAt, Date.parse(T1));
+});
