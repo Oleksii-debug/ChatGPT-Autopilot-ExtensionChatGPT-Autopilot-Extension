@@ -375,21 +375,24 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
     throw new Error('Recipe candidate references too many verification evidence artifacts');
   }
   const evidenceArtifactRefs = [];
-  const seenEvidenceIds = new Set();
+  const evidenceByArtifactId = new Map();
   for (const evidence of compiled.verificationEvidence) {
-    if (seenEvidenceIds.has(evidence.evidenceArtifactId)) {
-      throw new Error('Recipe candidate reuses verification evidence artifact identity');
-    }
-    seenEvidenceIds.add(evidence.evidenceArtifactId);
-    const resolved = await options.resolveTrustedEvidenceArtifact(
-      evidenceLookup(request, compiled, evidence),
-    );
-    const artifact = normalizeArtifactRefV1(resolved);
-    if (artifact.artifactId !== evidence.evidenceArtifactId) {
-      throw new Error('Trusted Recipe evidence artifactId mismatch for ' + evidence.stepId);
-    }
-    if (!artifact.sha256 || artifact.sha256 !== evidence.evidenceSha256) {
-      throw new Error('Trusted Recipe evidence SHA-256 mismatch for ' + evidence.stepId);
+    let artifact = evidenceByArtifactId.get(evidence.evidenceArtifactId);
+    if (!artifact) {
+      const resolved = await options.resolveTrustedEvidenceArtifact(
+        evidenceLookup(request, compiled, evidence),
+      );
+      artifact = normalizeArtifactRefV1(resolved);
+      if (artifact.artifactId !== evidence.evidenceArtifactId) {
+        throw new Error('Trusted Recipe evidence artifactId mismatch for ' + evidence.stepId);
+      }
+      if (!artifact.sha256 || artifact.sha256 !== evidence.evidenceSha256) {
+        throw new Error('Trusted Recipe evidence SHA-256 mismatch for ' + evidence.stepId);
+      }
+      evidenceByArtifactId.set(artifact.artifactId, artifact);
+      evidenceArtifactRefs.push(artifact);
+    } else if (artifact.sha256 !== evidence.evidenceSha256) {
+      throw new Error('Trusted Recipe reused evidence identity has conflicting SHA-256');
     }
     if (Date.parse(artifact.createdAt) > Date.parse(evidence.verifiedAt)) {
       throw new Error('Trusted Recipe evidence postdates verification for ' + evidence.stepId);
@@ -397,7 +400,6 @@ export async function admitTrustedRecipeCandidateV1(input, trustedOptions) {
     if (Date.parse(evidence.verifiedAt) > Date.parse(request.admittedAt)) {
       throw new Error('Trusted Recipe verification postdates admission for ' + evidence.stepId);
     }
-    evidenceArtifactRefs.push(artifact);
   }
 
   const subjectSha256 = await computeRecipeSubjectSha256V1(candidate);
