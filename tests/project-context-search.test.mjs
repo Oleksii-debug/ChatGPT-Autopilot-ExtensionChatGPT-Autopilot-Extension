@@ -327,3 +327,15 @@ test('project title is not searchable without a separate content-visibility auth
   assert.equal(sourceIdentityQuery.results[0].capsuleId, 'cap-1');
   assert.equal(JSON.stringify(sourceIdentityQuery).includes('needle-private-project-title'), false);
 });
+
+
+test('project title cannot influence score or ranking of otherwise identical permitted context', () => {
+  const upper = candidate({ capsuleId: 'Z-cap' });
+  upper.snapshot.title = 'runtime runtime runtime runtime private ranking hint';
+  const lower = candidate({ capsuleId: 'a-cap' });
+  lower.snapshot.title = 'neutral';
+
+  const out = search('runtime', [lower, upper]);
+  assert.deepEqual(out.results.map(item => item.capsuleId), ['Z-cap', 'a-cap']);
+  assert.equal(out.results[0].score, out.results[1].score);
+});
