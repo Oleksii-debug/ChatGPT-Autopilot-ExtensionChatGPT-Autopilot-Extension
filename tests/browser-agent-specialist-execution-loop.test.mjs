@@ -179,3 +179,37 @@ test('execution loop preserves explicit SPECIALIST_REQUIRED behavior without dur
   assert.equal(result.node.nodeId, 'local:research');
   assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
 });
+
+
+test('automatic Specialist prepare is cancelled when owner control changes after registry read', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+
+  const originalGetRegistry = manager.getSpecialistRegistry.bind(manager);
+  let injected = false;
+  manager.getSpecialistRegistry = async registryId => {
+    const result = await originalGetRegistry(registryId);
+    if (!injected) {
+      injected = true;
+      await manager.update(store => {
+        const job = store.byId[id];
+        job.runtime.controlEpoch += 1;
+        job.runtime.runState = 'PAUSED';
+        return store;
+      });
+    }
+    return result;
+  };
+
+  await assert.rejects(
+    () => manager.cycleOne(id),
+    /controlEpoch or run state drifted/,
+  );
+
+  const persisted = await manager.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs.length, 0);
+  assert.equal(persisted.executionOwnerships.length, 0);
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.runState, 'PAUSED');
+});
