@@ -398,50 +398,20 @@ test('Agent route policy fails closed when it widens global allow-list, locality
   }), /conflicts with the global pinned route/);
 });
 
-test('Agent route policy can only tighten global resilience controls', async () => {
-  const seen = [];
+test('Agent route policy rejects resilience controls and hostile fields instead of creating policy authority', async () => {
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
-    aiOrchestrator: {
-      async run(settings, runtime) {
-        seen.push(structuredClone(settings.routePolicy));
-        return { text:'ok', runtime };
-      },
-    },
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
   });
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
     enabled:true,
     routes:[{ routeId:'local', provider:'ollama', model:'local' }],
-    routePolicy:{
-      retryBackoffSeconds:90,
-      circuitBreakerFailures:4,
-      circuitBreakerSeconds:300,
-    },
   } });
-
-  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
-    prompt:'stricter', isolatedRuntime:true,
-    routerOverride:{ routePolicy:{
-      retryBackoffSeconds:120,
-      circuitBreakerFailures:2,
-      circuitBreakerSeconds:600,
-    } },
-  });
-  assert.equal(seen[0].retryBackoffSeconds, 120);
-  assert.equal(seen[0].circuitBreakerFailures, 2);
-  assert.equal(seen[0].circuitBreakerSeconds, 600);
-
-  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
-    prompt:'cannot-weaken', isolatedRuntime:true,
-    routerOverride:{ routePolicy:{
-      retryBackoffSeconds:30,
-      circuitBreakerFailures:10,
-      circuitBreakerSeconds:60,
-    } },
-  });
-  assert.equal(seen[1].retryBackoffSeconds, 90);
-  assert.equal(seen[1].circuitBreakerFailures, 4);
-  assert.equal(seen[1].circuitBreakerSeconds, 300);
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ retryBackoffSeconds:1 } },
+  }), /unsupported field/);
 });
+
 
 test('Agent route policy composes with legacy per-Agent route pin without mutating frozen policy', async () => {
   const calls = [];
@@ -540,12 +510,6 @@ test('Agent runtime route policy rejects coercive aliases before provider I/O', 
     { locality:' local ' },
     { maxInputPricePerMillionUsd:'0' },
     { maxOutputPricePerMillionUsd:-0 },
-    { retryBackoffSeconds:'120' },
-    { retryBackoffSeconds:-0 },
-    { circuitBreakerFailures:'2' },
-    { circuitBreakerFailures:-0 },
-    { circuitBreakerSeconds:'600' },
-    { circuitBreakerSeconds:-0 },
     { allowRouteIds:[' local '] },
   ]) {
     await assert.rejects(
@@ -678,7 +642,14 @@ function internalAgentEnvelope(overrides = {}) {
       timeoutSeconds: 180,
       mode: 'primary',
       primary: { provider: 'openai', model: 'agent-model' },
-      strong: { provider: 'openai', model: 'unused' },
+      strong: { provider: 'openai', model: 'agent-model' },
+      strongEveryNRequests: 0,
+      strongEveryMinutes: 0,
+      strongMinGapMinutes: 0,
+      strongMaxPerHour: 0,
+      carryStrongResultToPrimary: false,
+      fallbackToStrongOnPrimaryError: false,
+      keepPrimaryIfStrongFails: true,
       routes: [route],
       routePolicy: {
         autoSwitch: false,
