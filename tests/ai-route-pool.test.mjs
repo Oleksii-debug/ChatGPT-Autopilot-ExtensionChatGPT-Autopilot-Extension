@@ -729,3 +729,170 @@ test('route profile prompts preserve exact owner text and reject representation 
     /workerPrompt must be text/u,
   );
 });
+
+
+test('optional route and policy ID collections reject present falsy aliases while preserving absence defaults', () => {
+  const [absent] = normalizeAiRoutePool([{
+    routeId:'absent-collections',
+    provider:'ollama',
+    model:'local',
+  }]);
+  assert.deepEqual(absent.roles, []);
+  assert.deepEqual(absent.capabilityIds, []);
+
+  const undefinedCollections = normalizeAiRoutePool([{
+    routeId:'undefined-collections',
+    provider:'ollama',
+    model:'local',
+    roles:undefined,
+    capabilityIds:undefined,
+  }])[0];
+  assert.deepEqual(undefinedCollections.roles, []);
+  assert.deepEqual(undefinedCollections.capabilityIds, []);
+
+  for (const field of ['roles', 'capabilityIds']) {
+    for (const invalid of [false, 0, '', null]) {
+      assert.throws(
+        () => normalizeAiRoutePool([{
+          routeId:`invalid-${field}`,
+          provider:'ollama',
+          model:'local',
+          [field]:invalid,
+        }]),
+        /bounded array/u,
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+
+  const defaultPolicy = normalizeAiRoutePolicy({});
+  assert.deepEqual(defaultPolicy.orderedRouteIds, []);
+  assert.deepEqual(defaultPolicy.allowRouteIds, []);
+  assert.deepEqual(defaultPolicy.denyRouteIds, []);
+
+  const undefinedPolicy = normalizeAiRoutePolicy({
+    orderedRouteIds:undefined,
+    allowRouteIds:undefined,
+    denyRouteIds:undefined,
+  });
+  assert.deepEqual(undefinedPolicy.orderedRouteIds, []);
+  assert.deepEqual(undefinedPolicy.allowRouteIds, []);
+  assert.deepEqual(undefinedPolicy.denyRouteIds, []);
+
+  for (const field of ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds']) {
+    for (const invalid of [false, 0, '', null]) {
+      assert.throws(
+        () => normalizeAiRoutePolicy({ [field]:invalid }),
+        /bounded array/u,
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+});
+
+test('route selection capability requirements reject present falsy aliases while preserving the default', () => {
+  const routesWithCapability = normalizeAiRoutePool([{
+    routeId:'selection-capability-exact',
+    provider:'ollama',
+    model:'local',
+    roles:['planner'],
+    capabilityIds:['filesystem.read'],
+  }]);
+
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, capabilityIds:undefined, now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, capabilityIds:['filesystem.read'], now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+
+  for (const invalid of [false, 0, '', null]) {
+    assert.throws(
+      () => selectAiRouteCandidates({
+        routes:routesWithCapability,
+        policy:{},
+        capabilityIds:invalid,
+        now:1000,
+      }),
+      /AI route requested capabilityIds must be a bounded array/u,
+      `capabilityIds=${String(invalid)}`,
+    );
+  }
+});
+
+
+test('optional route and policy booleans reject present representation aliases while preserving exact defaults', () => {
+  const [defaults] = normalizeAiRoutePool([{
+    routeId:'boolean-defaults',
+    provider:'ollama',
+    model:'local',
+  }]);
+  assert.equal(defaults.enabled, true);
+  assert.equal(defaults.supportsVision, false);
+
+  const [explicit] = normalizeAiRoutePool([{
+    routeId:'boolean-explicit',
+    provider:'ollama',
+    model:'local',
+    enabled:false,
+    supportsVision:true,
+  }]);
+  assert.equal(explicit.enabled, false);
+  assert.equal(explicit.supportsVision, true);
+
+  const [undefinedRoute] = normalizeAiRoutePool([{
+    routeId:'boolean-undefined',
+    provider:'ollama',
+    model:'local',
+    enabled:undefined,
+    supportsVision:undefined,
+  }]);
+  assert.equal(undefinedRoute.enabled, true);
+  assert.equal(undefinedRoute.supportsVision, false);
+
+  for (const field of ['enabled', 'supportsVision']) {
+    for (const invalid of [0, 1, '', 'true', 'false', null]) {
+      assert.throws(
+        () => normalizeAiRoutePool([{
+          routeId:`invalid-boolean-${field}`,
+          provider:'ollama',
+          model:'local',
+          [field]:invalid,
+        }]),
+        new RegExp(`AI route 1 ${field} must be boolean`, 'u'),
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+
+  const defaultPolicy = normalizeAiRoutePolicy({});
+  assert.equal(defaultPolicy.autoSwitch, true);
+  assert.equal(defaultPolicy.freeOnly, false);
+
+  const explicitPolicy = normalizeAiRoutePolicy({ autoSwitch:false, freeOnly:true });
+  assert.equal(explicitPolicy.autoSwitch, false);
+  assert.equal(explicitPolicy.freeOnly, true);
+
+  const undefinedPolicy = normalizeAiRoutePolicy({ autoSwitch:undefined, freeOnly:undefined });
+  assert.equal(undefinedPolicy.autoSwitch, true);
+  assert.equal(undefinedPolicy.freeOnly, false);
+
+  for (const field of ['autoSwitch', 'freeOnly']) {
+    for (const invalid of [0, 1, '', 'true', 'false', null]) {
+      assert.throws(
+        () => normalizeAiRoutePolicy({ [field]:invalid }),
+        new RegExp(`AI route ${field} must be boolean`, 'u'),
+        `${field}=${String(invalid)}`,
+      );
+    }
+  }
+});
