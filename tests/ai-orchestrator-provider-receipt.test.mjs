@@ -97,7 +97,9 @@ test('selected provider result carries the exact pre-I/O durable reservation sna
   assert.equal(result.providerReservation.model, 'receipt-model');
   assert.deepEqual({ ...result.providerReservation }, reservation());
   assert.deepEqual({ ...settled }, reservation());
+  assert.equal(Object.isFrozen(result.providerReservation), true);
   assert.equal(Object.isFrozen(settled), true);
+  assert.equal(result.providerReservation, settled);
   assert.notEqual(settled, admitted);
 });
 
