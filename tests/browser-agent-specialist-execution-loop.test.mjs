@@ -519,6 +519,7 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -526,6 +527,7 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(clock.value).toISOString(),
         resolvedAt: new Date(clock.value).toISOString(),
         maxAgeMs: 60_000,
       };
