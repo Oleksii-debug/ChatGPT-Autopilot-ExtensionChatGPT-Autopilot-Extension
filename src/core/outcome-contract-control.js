@@ -4,6 +4,7 @@ export const MAX_STORED_OUTCOME_CONTRACTS = 512;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const RESOLVE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
+const TRUSTED_RESOLVE_KEYS = new Set(['contractId', 'contractRevision']);
 const UPDATE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision', 'contract']);
 const DELETE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
 
@@ -109,6 +110,20 @@ export function resolveStoredOutcomeContractV1(state, input = {}) {
   if (!contract) throw new Error('OutcomeContract not found');
   if (contract.projectId !== projectId) throw new Error('OutcomeContract project binding mismatch');
   if (contract.revision !== expectedRevision) throw new Error('OutcomeContract revision binding mismatch');
+  return contract;
+}
+
+export function resolveCanonicalStoredOutcomeContractV1(state, input = {}) {
+  const raw = exactRequest(input, TRUSTED_RESOLVE_KEYS, 'Canonical OutcomeContract resolve request');
+  const contractId = exactId(required(raw, 'contractId', 'Canonical OutcomeContract resolve request'), 'contractId');
+  const contractRevision = exactRevision(
+    required(raw, 'contractRevision', 'Canonical OutcomeContract resolve request'),
+    'contractRevision',
+  );
+  const registry = normalizeOutcomeContractRegistryV1(registryInput(state));
+  const contract = registry[contractId];
+  if (!contract) return null;
+  if (contract.revision !== contractRevision) throw new Error('OutcomeContract revision binding mismatch');
   return contract;
 }
 
