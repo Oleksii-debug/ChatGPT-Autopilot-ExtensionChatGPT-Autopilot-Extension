@@ -205,6 +205,26 @@ test('prepared request binds stable conversation, profile revision, workspace an
   assert.match(prepared.requestBody.initial_message.content[0].text, /Autopilot verifies results independently/);
 });
 
+test('allowNotFound cancels unread 404 response body before returning absence', async () => {
+  let cancelled = false;
+  const prepared = prepareOpenHandsCodingSpecialistV1(input());
+  const client = clientFor(async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('ignored'));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  }), {
+    status: 404,
+    headers: { 'content-type': 'application/json' },
+  }));
+
+  const result = await client.getConversation(prepared, { allowNotFound: true });
+  assert.equal(result, null);
+  assert.equal(cancelled, true);
+});
+
 test('fresh execution creates once and requires two terminal observations before returning evidence', async () => {
   const calls = [];
   let terminalReads = 0;
