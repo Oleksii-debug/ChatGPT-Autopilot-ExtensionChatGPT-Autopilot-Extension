@@ -262,3 +262,48 @@ test('provider config clear is exact-revision fenced and leaves active config un
   assert.deepEqual(fetched.providerConfig, current);
   assert.equal(fetched.revision, 1);
 });
+
+
+test('corrupt cleared-provider revision tombstone quarantines identity instead of reopening revision zero', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.putSpecialistProviderConfig({
+    providerConfig: providerConfig(),
+    expectedRevision: 0,
+  });
+  await manager.clearSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision: 1,
+  });
+
+  data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById[OPENHANDS_CODING_PROVIDER_ID] = 0;
+
+  const restarted = managerFor(chrome);
+  const fetched = await restarted.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(fetched.providerConfig, null);
+  assert.equal(fetched.quarantined, true);
+
+  await assert.rejects(
+    () => restarted.putSpecialistProviderConfig({
+      providerConfig: providerConfig(),
+      expectedRevision: 0,
+    }),
+    /quarantined/,
+  );
+});
+
+test('active provider config revision metadata drift quarantines the provider', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.putSpecialistProviderConfig({
+    providerConfig: providerConfig(),
+    expectedRevision: 0,
+  });
+
+  data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById[OPENHANDS_CODING_PROVIDER_ID] = 2;
+
+  const restarted = managerFor(chrome);
+  const fetched = await restarted.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(fetched.providerConfig, null);
+  assert.equal(fetched.quarantined, true);
+});
