@@ -248,8 +248,20 @@ function assertCanonicalSiteRules(siteRules) {
         throw new Error(`Політика Agent.siteRules[${ruleIndex}] містить невідоме поле: ${key}`);
       }
     }
-    if (typeof rule.pattern !== 'string' || rule.pattern.length > 500) {
-      throw new Error(`Політика Agent.siteRules[${ruleIndex}].pattern має бути рядком до 500 символів.`);
+    if (typeof rule.pattern !== 'string'
+        || !rule.pattern
+        || rule.pattern !== rule.pattern.trim()
+        || rule.pattern !== rule.pattern.toLowerCase()
+        || rule.pattern.length > 500) {
+      throw new Error(`Політика Agent.siteRules[${ruleIndex}].pattern має бути канонічним hostname до 500 символів.`);
+    }
+    const suffix = rule.pattern.startsWith('*.') ? rule.pattern.slice(2) : rule.pattern;
+    if (!suffix
+        || !suffix.includes('.')
+        || suffix.includes('*')
+        || suffix.includes('/')
+        || suffix.includes(':')) {
+      throw new Error(`Політика Agent.siteRules[${ruleIndex}].pattern має бути hostname або *.hostname.`);
     }
     if (Object.hasOwn(rule, 'defaultDecision')) {
       assertCanonicalEnum(
@@ -278,8 +290,11 @@ function assertCanonicalAcceptanceCriteria(criteria) {
   if (criteria.length > 20) throw new Error('Політика Agent.acceptanceCriteria перевищує 20 критеріїв.');
   for (let index = 0; index < criteria.length; index += 1) {
     const criterion = criteria[index];
-    if (typeof criterion !== 'string' || !criterion.trim() || criterion.length > 1000) {
-      throw new Error(`Політика Agent.acceptanceCriteria[${index}] має бути непорожнім рядком до 1000 символів.`);
+    if (typeof criterion !== 'string'
+        || !criterion
+        || criterion !== criterion.trim()
+        || criterion.length > 1000) {
+      throw new Error(`Політика Agent.acceptanceCriteria[${index}] має бути канонічним непорожнім рядком до 1000 символів.`);
     }
   }
 }
