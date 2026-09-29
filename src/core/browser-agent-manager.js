@@ -1876,7 +1876,10 @@ export class BrowserAgentManager {
       },
     );
     try {
-      rawOutcome = await providerRequest.client.execute(providerRequest.input);
+      rawOutcome = await providerRequest.client.execute(providerRequest.input, {
+        allowCreate: !resumedPrepared,
+        deadlineMs: Date.parse(prepared.leaseUntil),
+      });
     } catch (error) {
       providerError = error;
     }
