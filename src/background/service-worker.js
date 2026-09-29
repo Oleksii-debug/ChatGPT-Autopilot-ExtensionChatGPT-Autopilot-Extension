@@ -658,6 +658,8 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
   } else if (message.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.putSpecialistProviderConfig(message.payload || {});
+  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.clearSpecialistProviderConfig(message.payload || {});
   } else if (message.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER') {
     result = await browserAgent.executeClaimedSpecialistProvider(
       message.payload?.id || '',
