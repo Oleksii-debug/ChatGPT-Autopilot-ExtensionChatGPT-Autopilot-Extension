@@ -1,12 +1,14 @@
 import { normalizeOutcomeContractV1 } from './outcome-contract.js';
 
 export const MAX_STORED_OUTCOME_CONTRACTS = 512;
+export const MAX_OUTCOME_CONTRACT_REVISIONS = 256;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const RESOLVE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
 const TRUSTED_RESOLVE_KEYS = new Set(['contractId', 'contractRevision']);
 const UPDATE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision', 'contract']);
 const DELETE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
+const ENTRY_KEYS = new Set(['projectId', 'latestRevision', 'deleted', 'revisionsByNumber']);
 
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
@@ -45,6 +47,15 @@ function exactRequest(value, allowedKeys, label) {
   return raw;
 }
 
+function exactEntry(value, label) {
+  const raw = dataRecord(value, label);
+  const keys = Object.keys(raw);
+  if (keys.length !== ENTRY_KEYS.size || keys.some(key => !ENTRY_KEYS.has(key))) {
+    throw new Error(`${label} must contain the exact canonical fields`);
+  }
+  return raw;
+}
+
 function required(raw, key, label) {
   if (!Object.hasOwn(raw, key)) throw new Error(`${label} is missing ${key}`);
   return raw[key];
@@ -55,6 +66,54 @@ function registryInput(state) {
   return state.outcomeContractsById === undefined ? {} : state.outcomeContractsById;
 }
 
+function normalizeRegistryEntry(contractId, input) {
+  const raw = exactEntry(input, `OutcomeContract registry entry ${contractId}`);
+  const projectId = exactId(raw.projectId, 'OutcomeContract registry projectId');
+  const latestRevision = exactRevision(raw.latestRevision, 'OutcomeContract registry latestRevision');
+  if (typeof raw.deleted !== 'boolean') throw new Error('OutcomeContract registry deleted must be boolean');
+
+  const revisionsRaw = dataRecord(raw.revisionsByNumber, `OutcomeContract revisions ${contractId}`);
+  const revisionKeys = Object.keys(revisionsRaw);
+  if (revisionKeys.length < 1 || revisionKeys.length > MAX_OUTCOME_CONTRACT_REVISIONS) {
+    throw new Error('OutcomeContract revision history limit exceeded');
+  }
+  if (latestRevision > MAX_OUTCOME_CONTRACT_REVISIONS) {
+    throw new Error('OutcomeContract latestRevision exceeds revision history limit');
+  }
+  if (revisionKeys.length !== latestRevision) {
+    throw new Error('OutcomeContract revision history must be contiguous');
+  }
+
+  const revisionsByNumber = Object.create(null);
+  let createdAt = '';
+  for (let revision = 1; revision <= latestRevision; revision += 1) {
+    const key = String(revision);
+    if (!Object.hasOwn(revisionsRaw, key)) throw new Error('OutcomeContract revision history must be contiguous');
+    const contract = normalizeOutcomeContractV1(revisionsRaw[key]);
+    if (contract.contractId !== contractId) throw new Error(`Stored OutcomeContract key mismatch: ${contractId}`);
+    if (!contract.projectId || contract.projectId !== projectId) {
+      throw new Error(`Stored OutcomeContract ${contractId} project binding mismatch`);
+    }
+    if (contract.revision !== revision) throw new Error(`Stored OutcomeContract ${contractId} revision key mismatch`);
+    if (!createdAt) createdAt = contract.createdAt;
+    if (contract.createdAt !== createdAt) throw new Error('OutcomeContract createdAt is immutable across revisions');
+    revisionsByNumber[key] = contract;
+  }
+
+  for (const key of revisionKeys) {
+    if (!/^[1-9][0-9]*$/u.test(key) || Number(key) > latestRevision) {
+      throw new Error('OutcomeContract revision history contains a non-canonical revision key');
+    }
+  }
+
+  return Object.freeze({
+    projectId,
+    latestRevision,
+    deleted: raw.deleted,
+    revisionsByNumber: Object.freeze(revisionsByNumber),
+  });
+}
+
 export function normalizeOutcomeContractRegistryV1(input = {}) {
   const raw = dataRecord(input, 'OutcomeContract registry');
   const keys = Object.keys(raw);
@@ -63,10 +122,7 @@ export function normalizeOutcomeContractRegistryV1(input = {}) {
   const normalized = Object.create(null);
   for (const contractId of keys.sort()) {
     exactId(contractId, 'OutcomeContract registry key');
-    const contract = normalizeOutcomeContractV1(raw[contractId]);
-    if (!contract.projectId) throw new Error(`Stored OutcomeContract ${contractId} must be project-bound`);
-    if (contract.contractId !== contractId) throw new Error(`Stored OutcomeContract key mismatch: ${contractId}`);
-    normalized[contractId] = contract;
+    normalized[contractId] = normalizeRegistryEntry(contractId, raw[contractId]);
   }
   return Object.freeze(normalized);
 }
@@ -79,9 +135,9 @@ export function validateOutcomeContractRegistryV1(input = {}) {
 function mutableRegistry(state) {
   const normalized = normalizeOutcomeContractRegistryV1(registryInput(state));
   const mutable = {};
-  for (const [contractId, contract] of Object.entries(normalized)) {
+  for (const [contractId, entry] of Object.entries(normalized)) {
     Object.defineProperty(mutable, contractId, {
-      value: structuredClone(contract),
+      value: structuredClone(entry),
       enumerable: true,
       configurable: true,
       writable: true,
@@ -91,12 +147,23 @@ function mutableRegistry(state) {
   return mutable;
 }
 
+function requireRegistryEntry(registry, contractId) {
+  const entry = registry[contractId];
+  if (!entry) throw new Error('OutcomeContract not found');
+  return entry;
+}
+
+function latestContract(entry) {
+  return entry.revisionsByNumber[String(entry.latestRevision)];
+}
+
 export function listStoredOutcomeContractsV1(state, input = {}) {
   const raw = exactRequest(input, new Set(['projectId']), 'OutcomeContract list request');
   const projectId = exactId(required(raw, 'projectId', 'OutcomeContract list request'), 'projectId');
   const registry = normalizeOutcomeContractRegistryV1(registryInput(state));
-  return Object.freeze(Object.values(registry)
-    .filter(contract => contract.projectId === projectId)
+  return Object.freeze(Object.entries(registry)
+    .filter(([, entry]) => entry.projectId === projectId && !entry.deleted)
+    .map(([, entry]) => latestContract(entry))
     .sort((a, b) => a.contractId < b.contractId ? -1 : a.contractId > b.contractId ? 1 : 0));
 }
 
@@ -106,11 +173,11 @@ export function resolveStoredOutcomeContractV1(state, input = {}) {
   const contractId = exactId(required(raw, 'contractId', 'OutcomeContract resolve request'), 'contractId');
   const expectedRevision = exactRevision(required(raw, 'expectedRevision', 'OutcomeContract resolve request'), 'expectedRevision');
   const registry = normalizeOutcomeContractRegistryV1(registryInput(state));
-  const contract = registry[contractId];
-  if (!contract) throw new Error('OutcomeContract not found');
-  if (contract.projectId !== projectId) throw new Error('OutcomeContract project binding mismatch');
-  if (contract.revision !== expectedRevision) throw new Error('OutcomeContract revision binding mismatch');
-  return contract;
+  const entry = requireRegistryEntry(registry, contractId);
+  if (entry.projectId !== projectId) throw new Error('OutcomeContract project binding mismatch');
+  if (entry.deleted) throw new Error('OutcomeContract is deleted');
+  if (entry.latestRevision !== expectedRevision) throw new Error('OutcomeContract revision binding mismatch');
+  return latestContract(entry);
 }
 
 export function resolveCanonicalStoredOutcomeContractV1(state, input = {}) {
@@ -121,9 +188,10 @@ export function resolveCanonicalStoredOutcomeContractV1(state, input = {}) {
     'contractRevision',
   );
   const registry = normalizeOutcomeContractRegistryV1(registryInput(state));
-  const contract = registry[contractId];
-  if (!contract) return null;
-  if (contract.revision !== contractRevision) throw new Error('OutcomeContract revision binding mismatch');
+  const entry = registry[contractId];
+  if (!entry) return null;
+  const contract = entry.revisionsByNumber[String(contractRevision)];
+  if (!contract) throw new Error('OutcomeContract revision binding mismatch');
   return contract;
 }
 
@@ -134,8 +202,13 @@ export function createStoredOutcomeContractV1(state, input) {
   const registry = mutableRegistry(state);
   if (Object.hasOwn(registry, contract.contractId)) throw new Error('OutcomeContract already exists');
   if (Object.keys(registry).length >= MAX_STORED_OUTCOME_CONTRACTS) throw new Error('OutcomeContract registry limit exceeded');
-  registry[contract.contractId] = structuredClone(contract);
-  return normalizeOutcomeContractV1(registry[contract.contractId]);
+  registry[contract.contractId] = {
+    projectId: contract.projectId,
+    latestRevision: 1,
+    deleted: false,
+    revisionsByNumber: { 1: structuredClone(contract) },
+  };
+  return normalizeOutcomeContractV1(registry[contract.contractId].revisionsByNumber['1']);
 }
 
 export function updateStoredOutcomeContractV1(state, input = {}) {
@@ -150,10 +223,13 @@ export function updateStoredOutcomeContractV1(state, input = {}) {
   if (next.projectId !== projectId) throw new Error('OutcomeContract projectId is immutable');
   if (next.createdAt !== current.createdAt) throw new Error('OutcomeContract createdAt is immutable');
   if (next.revision !== expectedRevision + 1) throw new Error('OutcomeContract update must advance revision by exactly one');
+  if (next.revision > MAX_OUTCOME_CONTRACT_REVISIONS) throw new Error('OutcomeContract revision history limit exceeded');
 
   const registry = mutableRegistry(state);
-  registry[contractId] = structuredClone(next);
-  return normalizeOutcomeContractV1(registry[contractId]);
+  const entry = registry[contractId];
+  entry.revisionsByNumber[String(next.revision)] = structuredClone(next);
+  entry.latestRevision = next.revision;
+  return normalizeOutcomeContractV1(entry.revisionsByNumber[String(next.revision)]);
 }
 
 export function deleteStoredOutcomeContractV1(state, input = {}) {
@@ -163,6 +239,6 @@ export function deleteStoredOutcomeContractV1(state, input = {}) {
   const expectedRevision = exactRevision(required(raw, 'expectedRevision', 'OutcomeContract delete request'), 'expectedRevision');
   const current = resolveStoredOutcomeContractV1(state, { projectId, contractId, expectedRevision });
   const registry = mutableRegistry(state);
-  delete registry[contractId];
+  registry[contractId].deleted = true;
   return current;
 }
