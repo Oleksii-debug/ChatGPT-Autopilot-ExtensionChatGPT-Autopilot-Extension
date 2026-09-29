@@ -695,6 +695,56 @@ test('canonical route eligibility is refreshed after asynchronous quality eviden
   assert.equal(gateway.calls[0].model, 'model-route-a');
 });
 
+test('newly eligible route after async quality lookup is not falsely ranked as missing evidence', async () => {
+  const routes = [
+    qualityRoute('route-a'),
+    qualityRoute('route-b'),
+    qualityRoute('route-c'),
+  ];
+  let clock = QUALITY_NOW;
+  let resolverRouteIds = null;
+  const gateway = new FakeGateway(['fresh-baseline-after-expansion']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => clock,
+    routeQualityEvidenceResolver:async request => {
+      resolverRouteIds = [...request.routeIds];
+      clock += 100;
+      return [
+        await qualityBenchmarkBinding(routes[1], { suffix:'partial-snapshot' }),
+      ];
+    },
+  });
+  const runtime = {
+    ...DEFAULT_AI_ROUTER_RUNTIME,
+    routeStates:{
+      'route-a':{
+        consecutiveFailures:1,
+        successes:0,
+        failures:1,
+        backoffUntil:QUALITY_NOW + 50,
+        circuitOpenUntil:0,
+        lastErrorCode:'HTTP_429',
+        lastErrorCategory:'quota-or-rate',
+        lastErrorAt:QUALITY_NOW - 100,
+        lastSuccessAt:0,
+        lastLatencyMs:1,
+      },
+    },
+  };
+
+  const result = await router.run(
+    settings({ routes }),
+    runtime,
+    'task',
+    { taskRole:'planner' },
+  );
+
+  assert.deepEqual(resolverRouteIds, ['route-b', 'route-c']);
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.deepEqual(gateway.calls.map(call => call.model), ['model-route-a']);
+});
+
 test('pinned canonical route bypasses advisory lookup and cannot be widened by quality', async () => {
   const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
   let resolverCalls = 0;
