@@ -304,37 +304,7 @@ export function runBrowserAgentAutomationCycle() {
     const claim = await browserAgent.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy({
       specialistProviderReadinessResolver,
     });
-    const allowFreshDispatch = claim?.kind === 'AUTOMATION_CLAIM';
-    const snapshot = await browserAgent.list();
-    const candidates = [];
-    for (const job of snapshot.jobs || []) {
-      if (job?.runtime?.runState !== 'RUNNING'
-          || job.runtime.specialistProviderExecutionQuarantined === true) continue;
-      const executions = Array.isArray(job.runtime.specialistProviderExecutions)
-        ? job.runtime.specialistProviderExecutions
-        : [];
-      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships)
-        ? job.runtime.specialistExecutionOwnerships
-        : [];
-      for (const assignment of (job.runtime.specialistHandoffs || [])) {
-        if (assignment?.state !== 'LEASED' || !assignment.leaseId || !assignment.agentId) continue;
-        const ownership = ownerships.find(item =>
-          item?.ownerId === assignment.agentId
-          && item?.leaseId === assignment.leaseId);
-        if (!ownership || ownership.state !== 'OWNED') continue;
-        const execution = executions.find(item =>
-          item?.agentId === assignment.agentId
-          && item?.leaseId === assignment.leaseId);
-        if (execution && execution.status !== 'PREPARED') continue;
-        if (!execution && !allowFreshDispatch) continue;
-        candidates.push({
-          jobId: job.id,
-          agentId: assignment.agentId,
-          expectedControlEpoch: job.runtime.controlEpoch,
-          recoverPrepared: execution?.status === 'PREPARED',
-        });
-      }
-    }
+    const { candidates } = await browserAgent.listSpecialistAutomationDispatchCandidates();
 
     const executions = [];
     for (const candidate of candidates) {

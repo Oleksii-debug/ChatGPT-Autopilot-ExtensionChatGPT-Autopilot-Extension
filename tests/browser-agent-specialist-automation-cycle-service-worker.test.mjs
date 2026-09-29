@@ -19,14 +19,13 @@ test('Browser Agent automation cycle reuses canonical cycle, policy claim and tr
   const block = automationCycleSource();
   assert.match(block, /browserAgent\.cycleAll\(\)/);
   assert.match(block, /browserAgent\.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy\(\{[\s\S]*?specialistProviderReadinessResolver/);
-  assert.match(block, /claim\?\.kind === 'AUTOMATION_CLAIM'/);
+  assert.match(block, /browserAgent\.listSpecialistAutomationDispatchCandidates\(\)/);
   assert.doesNotMatch(block, /maxConcurrentHandoffs\s*:\s*[1-9]/);
 });
 
 test('automatic dispatch resumes PREPARED but never redispatches terminal provider records', () => {
   const block = automationCycleSource();
-  assert.match(block, /execution && execution\.status !== 'PREPARED'\) continue/);
-  assert.match(block, /recoverPrepared:\s*execution\?\.status === 'PREPARED'/);
+  assert.match(block, /listSpecialistAutomationDispatchCandidates\(\)/);
   assert.match(block, /candidate\.recoverPrepared[\s\S]*?executeClaimedSpecialistProvider\([\s\S]*?: await browserAgent\.executeClaimedSpecialistProviderFromAutomationPolicy/);
   assert.match(block, /createSpecialistConversationId\(\)/);
 });

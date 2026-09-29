@@ -109,7 +109,7 @@ function specialistDefinition() {
   };
 }
 
-async function seed(manager) {
+async function seed(manager, { claim = true } = {}) {
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const agentMutation = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
@@ -183,6 +183,7 @@ async function seed(manager) {
   });
   const prepared = await manager.cycleOne('job.coder');
   assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+  if (!claim) return prepared.handoff.agentId;
   const claimed = await manager.claimSpecialistHandoffs('job.coder', {
     availableSlots: 1,
     leaseSeconds: 600,
@@ -676,6 +677,7 @@ test('trusted readiness drift before PREPARED blocks provider execution without 
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -683,6 +685,7 @@ test('trusted readiness drift before PREPARED blocks provider execution without 
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: T1,
         resolvedAt: T1,
         maxAgeMs: 60_000,
       };
@@ -1056,6 +1059,7 @@ test('readiness await cannot carry provider PREPARED past lease expiry', async (
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -1063,6 +1067,7 @@ test('readiness await cannot carry provider PREPARED past lease expiry', async (
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: T1,
         resolvedAt: T1,
         maxAgeMs: 60_000,
       };
@@ -1335,12 +1340,15 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
     now: () => clock.value,
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
-  const agentId = await seed(manager);
+  const agentId = await seed(manager, { claim: false });
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
     maxConcurrentHandoffs: 1,
   });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.claimed[0].agentId, agentId);
   clock.value = Date.parse(T1);
 
   let changed = false;
@@ -1358,6 +1366,7 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
       return {
         registryId: selection.registryId,
         registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
         specialistId: selection.specialistId,
         providerId: selection.providerId,
         definitionRevision: selection.definitionRevision,
@@ -1365,6 +1374,7 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
+        observedAt: new Date(clock.value).toISOString(),
         resolvedAt: new Date(clock.value).toISOString(),
         maxAgeMs: 60_000,
       };
@@ -1393,4 +1403,64 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
   const policy = await manager.getSpecialistAutomationPolicy();
   assert.equal(policy.policy.enabled, false);
   assert.equal(policy.policy.maxConcurrentHandoffs, 0);
+});
+
+test('fresh automatic provider PREPARED atomically consumes transient claim provenance', async () => {
+  const storage = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let manager;
+  let observed = null;
+  const client = {
+    async execute() {
+      const durable = storage.data.autopilotBrowserAgentV1;
+      assert.deepEqual(Object.keys(durable.specialistAutomationClaimAdmissionsByKey || {}), []);
+      const candidates = await manager.listSpecialistAutomationDispatchCandidates();
+      assert.deepEqual(candidates.candidates, [{
+        jobId: 'job.coder',
+        agentId: observed.agentId,
+        expectedControlEpoch: 0,
+        recoverPrepared: true,
+      }]);
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager, { claim: false });
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claimed.claimed.length, 1);
+  observed = claimed.claimed[0];
+  assert.equal(observed.agentId, agentId);
+  assert.equal(Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey).length, 1);
+
+  clock.value = Date.parse(T1);
+  const result = await manager.executeClaimedSpecialistProviderFromAutomationPolicy(
+    'job.coder',
+    {
+      agentId,
+      conversationId: '72727272-7272-4727-8727-727272727272',
+      expectedControlEpoch: 0,
+      at: T1,
+    },
+  );
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.deepEqual(Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey || {}), []);
 });
