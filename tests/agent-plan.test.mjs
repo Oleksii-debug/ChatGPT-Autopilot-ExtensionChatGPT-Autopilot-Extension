@@ -482,3 +482,98 @@ test('AgentPlan live evolution rejects stale, shrinking or mutating replacement 
   mutating.nodes.push(node('later', ['discover']));
   assert.throws(() => evolveAgentPlanV1(current, mutating, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /cannot replace existing nodes/);
 });
+
+
+test('AgentPlan durable chronology is monotonic and nodes stay inside the plan time envelope', () => {
+  const earlier = '2026-09-23T11:29:00.000Z';
+  const later = '2026-09-23T11:31:00.000Z';
+
+  const reversedPlan = plan([node('discover')]);
+  reversedPlan.updatedAt = earlier;
+  assert.throws(
+    () => normalizeAgentPlanV1(reversedPlan),
+    /updatedAt cannot precede createdAt/,
+  );
+
+  const nodeBeforeCreation = plan([node('discover')]);
+  nodeBeforeCreation.updatedAt = later;
+  nodeBeforeCreation.nodes[0].updatedAt = earlier;
+  assert.throws(
+    () => normalizeAgentPlanV1(nodeBeforeCreation),
+    /node discover updatedAt cannot precede plan createdAt/,
+  );
+
+  const nodeAfterPlan = plan([node('discover')]);
+  nodeAfterPlan.nodes[0].updatedAt = later;
+  assert.throws(
+    () => normalizeAgentPlanV1(nodeAfterPlan),
+    /node discover updatedAt cannot exceed plan updatedAt/,
+  );
+
+  const monotonic = plan([node('discover')]);
+  monotonic.updatedAt = later;
+  monotonic.nodes[0].updatedAt = later;
+  const normalized = normalizeAgentPlanV1(monotonic);
+  assert.equal(normalized.createdAt, AT);
+  assert.equal(normalized.updatedAt, later);
+  assert.equal(normalized.nodes[0].updatedAt, later);
+});
+
+test('AgentPlan mutation entrypoints reject durable time rollback while equal and later time remain valid', () => {
+  const later = '2026-09-23T11:31:00.000Z';
+  const latest = '2026-09-23T11:32:00.000Z';
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: later });
+  const revision = current.revision;
+
+  assert.throws(
+    () => reconcileAgentPlanV1(current, { at: AT }),
+    /mutation timestamp cannot precede current updatedAt/,
+  );
+  assert.throws(
+    () => extendAgentPlanV1(current, {
+      expectedRevision: current.revision,
+      nodes: [node('later')],
+      resourceEnvelope: ZERO_ENVELOPE,
+      at: AT,
+    }),
+    /mutation timestamp cannot precede current updatedAt/,
+  );
+
+  const candidate = structuredClone(current);
+  candidate.nodes.push({ ...node('later'), updatedAt: later });
+  assert.throws(
+    () => evolveAgentPlanV1(current, candidate, {
+      resourceEnvelope: ZERO_ENVELOPE,
+      at: AT,
+    }),
+    /mutation timestamp cannot precede current updatedAt/,
+  );
+  assert.throws(
+    () => transitionAgentPlanNodeV1(current, {
+      nodeId: 'discover',
+      state: AgentPlanNodeState.RUNNING,
+      at: AT,
+    }),
+    /mutation timestamp cannot precede current updatedAt/,
+  );
+  assert.equal(current.revision, revision);
+  assert.equal(current.updatedAt, later);
+  assert.equal(current.nodes[0].state, AgentPlanNodeState.READY);
+
+  const running = transitionAgentPlanNodeV1(current, {
+    nodeId: 'discover',
+    state: AgentPlanNodeState.RUNNING,
+    at: later,
+  });
+  assert.equal(running.nodes[0].updatedAt, later);
+  assert.equal(running.updatedAt, later);
+
+  const verified = transitionAgentPlanNodeV1(running, {
+    nodeId: 'discover',
+    state: AgentPlanNodeState.VERIFIED,
+    evidence: 'Fresh evidence after execution',
+    at: latest,
+  });
+  assert.equal(verified.nodes[0].updatedAt, latest);
+  assert.equal(verified.updatedAt, latest);
+});
