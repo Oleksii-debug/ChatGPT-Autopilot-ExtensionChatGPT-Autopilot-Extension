@@ -29,7 +29,6 @@ function definition(overrides = {}) {
       maxModelCalls: 20,
       maxRuntimeMinutes: 30,
       aiRoutingMode: 'primary',
-      aiPinnedRouteId: 'mistral-agent',
       aiPrimaryProvider: 'openai-compatible',
       aiPrimaryModel: 'mistral-small-latest',
       visionOnDemand: false,
@@ -276,7 +275,7 @@ test('materialization reuses Browser Agent config and binds model defaults under
   assert.equal(result.config.maxModelCalls, 20);
   assert.equal(result.config.maxRuntimeMinutes, 30);
   assert.equal(result.config.aiRoutingMode, 'primary');
-  assert.equal(result.config.aiPinnedRouteId, 'mistral-agent');
+  assert.equal(result.config.aiPinnedRouteId, '');
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
   assert.equal(result.config.maxCostUsd, 5);
@@ -645,11 +644,10 @@ test('config defaults reject every legacy-normalizer alias instead of silently c
     configDefaults: {
       ...definition().configDefaults,
       startUrl: 'https://example.com/',
-      aiPinnedRouteId: 'mistral-agent',
     },
   }));
   assert.equal(canonical.configDefaults.startUrl, 'https://example.com/');
-  assert.equal(canonical.configDefaults.aiPinnedRouteId, 'mistral-agent');
+  assert.equal(Object.hasOwn(canonical.configDefaults, 'aiPinnedRouteId'), false);
 });
 
 test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {
