@@ -2198,29 +2198,80 @@ export class BrowserAgentManager {
     };
   }
 
-  async claimSpecialistHandoffs(id, payload = {}) {
+  async claimSpecialistHandoffs(id, payload = {}, dependencies = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist claim request');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    const readinessByAgentId = new Map();
+
+    if (trustedReadiness) {
+      const initial = await this.get(id);
+      if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      if (initial.job.specialistDelegationBinding?.profile?.enabled) {
+        for (const assignment of (initial.job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          const provenance = (initial.job.runtime.specialistSelectionProvenance || [])
+            .find(item => item?.agentId === assignment.agentId);
+          if (!provenance) throw new Error('Owner-bound Specialist claim lacks durable selection provenance');
+          readinessByAgentId.set(
+            assignment.agentId,
+            assertTrustedSpecialistReadiness(
+              await trustedReadiness.resolve(provenance.selection),
+              provenance.selection,
+              this.now(),
+            ),
+          );
+        }
+      }
+    }
+
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      assertOwnerBoundSpecialistAdmissionProvenance(job);
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
       const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+
+      if (job.specialistDelegationBinding?.profile?.enabled) {
+        for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          const provenance = (job.runtime.specialistSelectionProvenance || [])
+            .find(item => item?.agentId === assignment.agentId);
+          const { selection } = assertSelectionProvenanceRegistryCurrent(store, job, provenance);
+          if (trustedReadiness) {
+            const readiness = readinessByAgentId.get(assignment.agentId);
+            if (!readiness) throw new Error('Owner-bound Specialist claim lacks trusted provider readiness');
+            assertTrustedSpecialistReadiness(readiness, selection, this.now());
+            await trustedReadiness.assertCurrent(readiness);
+          }
+        }
+      }
+
       const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...boundedRequest,
-        executionOwnerships: currentOwnerships,
-        at,
-      });
+      const claimed = claimAgentPlanSpecialistHandoffsV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        { ...boundedRequest, executionOwnerships: currentOwnerships, at },
+      );
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      for (const agentId of claimed.claimed) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease claimed; no provider effect was dispatched by this bridge.' });
-      for (const agentId of claimed.reconciliationRequired) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+      for (const agentId of claimed.claimed) {
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-handoff-claimed',
+          agentId,
+          message: 'Specialist lease claimed under owner-bound capacity and readiness fences; no provider effect was dispatched by this bridge.',
+        });
+      }
+      for (const agentId of claimed.reconciliationRequired) {
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-handoff-reconcile',
+          agentId,
+          message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.',
+        });
+      }
       result = clone(claimed);
       return store;
     });
