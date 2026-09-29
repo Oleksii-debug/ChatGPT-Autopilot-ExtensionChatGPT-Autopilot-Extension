@@ -405,7 +405,12 @@ test('owner-bound claim requires trusted executable readiness on the product dep
 
 test('owner-bound claim fails closed when trusted readiness becomes stale before serialized claim', async () => {
   const storage = chromeStorage();
-  const manager = managerFor(storage.chrome);
+  const ownerNow = Date.parse('2026-09-29T03:06:00.000Z');
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => ownerNow,
+  });
   const registry = await setup(manager);
   await manager.prepareDefinitionSpecialistDelegation('job.research', {
     expectedRegistryRevision: registry.nextRegistryRevision,
