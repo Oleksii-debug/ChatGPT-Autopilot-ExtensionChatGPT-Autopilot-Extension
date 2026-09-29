@@ -1002,6 +1002,53 @@ test('internal Agent envelope cannot be mixed with caller Router or role aliases
   }
 });
 
+test('internal Agent authority options reject accessors without executing getters', async () => {
+  let calls = 0;
+  let reads = 0;
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  const envelopeAccessor = {};
+  Object.defineProperty(envelopeAccessor, 'agentModelOrchestratorEnvelope', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return internalAgentEnvelope();
+    },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', maxOutputTokens:128 },
+      envelopeAccessor,
+    ),
+    /orchestrator envelope must be an enumerable own data property/u,
+  );
+
+  const budgetAccessor = {
+    agentModelOrchestratorEnvelope: internalAgentEnvelope(),
+  };
+  Object.defineProperty(budgetAccessor, 'providerCallBudgetContext', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return internalAgentBudgetContext();
+    },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', maxOutputTokens:128 },
+      budgetAccessor,
+    ),
+    /provider budget context must be an enumerable own data property/u,
+  );
+
+  assert.equal(reads, 0);
+  assert.equal(calls, 0);
+});
+
 test('internal Agent envelope rejects image input that does not match durable vision intent before provider use', async () => {
   let calls = 0;
   const repo = new MemoryRepo();
