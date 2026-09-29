@@ -86,6 +86,10 @@ import {
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
 import {
+  createSpecialistAutomationPolicyV1,
+  normalizeSpecialistAutomationPolicyV1,
+} from './specialist-automation-policy.js';
+import {
   SpecialistProviderExecutionStatus,
   createSpecialistProviderExecutionV1,
   normalizeSpecialistProviderExecutionV1,
@@ -106,6 +110,8 @@ const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
+const SPECIALIST_AUTOMATION_POLICY_SET_KEYS = new Set(['expectedRevision', 'enabled', 'maxConcurrentHandoffs']);
+const SPECIALIST_AUTOMATION_POLICY_CLEAR_KEYS = new Set(['expectedRevision']);
 const SPECIALIST_READINESS_DEPENDENCY_KEYS = new Set(['specialistProviderReadinessResolver']);
 const SPECIALIST_PROVIDER_EXECUTE_KEYS = new Set(['agentId', 'conversationId', 'expectedControlEpoch', 'at']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -416,6 +422,38 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
   return { configs, revisions, quarantine };
 }
 
+
+function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevision, rawQuarantined) {
+  const hasRevision = rawRevision !== undefined;
+  const revisionIsValid = !hasRevision
+    || (typeof rawRevision === 'number'
+      && Number.isSafeInteger(rawRevision)
+      && !Object.is(rawRevision, -0)
+      && rawRevision >= 0);
+  const revision = revisionIsValid && hasRevision ? rawRevision : 0;
+  if (rawQuarantined === true) {
+    return { policy: null, revision, quarantined: true };
+  }
+  if (rawPolicy == null) {
+    return {
+      policy: null,
+      revision,
+      quarantined: hasRevision && !revisionIsValid,
+    };
+  }
+  try {
+    if (!revisionIsValid) throw new Error('Specialist automation policy revision tombstone is invalid');
+    const policy = normalizeSpecialistAutomationPolicyV1(rawPolicy);
+    const durableRevision = hasRevision ? revision : policy.revision;
+    if (durableRevision !== policy.revision) {
+      throw new Error('Specialist automation policy revision drifted from durable tombstone');
+    }
+    return { policy, revision: durableRevision, quarantined: false };
+  } catch {
+    return { policy: null, revision, quarantined: true };
+  }
+}
+
 function specialistProviderConfigHasLiveExecution(store, providerId, at) {
   if (!Number.isFinite(Date.parse(at))) return true;
   for (const jobId of store.order || []) {
@@ -511,6 +549,9 @@ function freshStore() {
     specialistProviderConfigsById: Object.create(null),
     specialistProviderConfigRevisionById: Object.create(null),
     specialistProviderConfigQuarantineById: Object.create(null),
+    specialistAutomationPolicy: null,
+    specialistAutomationPolicyRevision: 0,
+    specialistAutomationPolicyQuarantined: false,
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -1041,6 +1082,14 @@ function normalizeStore(raw, now) {
   out.specialistProviderConfigsById = providerConfigState.configs;
   out.specialistProviderConfigRevisionById = providerConfigState.revisions;
   out.specialistProviderConfigQuarantineById = providerConfigState.quarantine;
+  const automationPolicyState = normalizePersistedSpecialistAutomationPolicyState(
+    raw.specialistAutomationPolicy,
+    raw.specialistAutomationPolicyRevision,
+    raw.specialistAutomationPolicyQuarantined,
+  );
+  out.specialistAutomationPolicy = automationPolicyState.policy;
+  out.specialistAutomationPolicyRevision = automationPolicyState.revision;
+  out.specialistAutomationPolicyQuarantined = automationPolicyState.quarantined;
   return out;
 }
 
@@ -1364,6 +1413,103 @@ export class BrowserAgentManager {
       return store;
     });
     return clone(committed);
+  }
+
+  async getSpecialistAutomationPolicy() {
+    const store = await this.load();
+    return {
+      policy: store.specialistAutomationPolicy ? clone(store.specialistAutomationPolicy) : null,
+      revision: Number(store.specialistAutomationPolicyRevision || store.specialistAutomationPolicy?.revision || 0),
+      quarantined: store.specialistAutomationPolicyQuarantined === true,
+    };
+  }
+
+  async setSpecialistAutomationPolicy(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_AUTOMATION_POLICY_SET_KEYS,
+      'Browser Agent Specialist automation policy set request',
+    );
+    for (const key of SPECIALIST_AUTOMATION_POLICY_SET_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist automation policy set request requires ${key}`);
+      }
+    }
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist automation policy expectedRevision',
+    );
+    const prepared = createSpecialistAutomationPolicyV1({
+      revision: 1,
+      enabled: request.enabled,
+      maxConcurrentHandoffs: request.maxConcurrentHandoffs,
+      updatedAt: new Date(this.now()).toISOString(),
+    });
+    let committed = null;
+    await this.update(store => {
+      if (store.specialistAutomationPolicyQuarantined === true) {
+        throw new Error('Specialist automation policy is quarantined as corrupt and cannot be overwritten');
+      }
+      const current = store.specialistAutomationPolicy || null;
+      const currentRevision = Number(store.specialistAutomationPolicyRevision || current?.revision || 0);
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Specialist automation policy revision drifted before update');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Specialist automation policy revision cannot advance');
+      }
+      const updatedAt = new Date(this.now()).toISOString();
+      if (current && Date.parse(updatedAt) <= Date.parse(current.updatedAt)) {
+        throw new Error('Specialist automation policy updatedAt cannot move backwards or repeat');
+      }
+      committed = createSpecialistAutomationPolicyV1({
+        revision: currentRevision + 1,
+        enabled: prepared.enabled,
+        maxConcurrentHandoffs: prepared.maxConcurrentHandoffs,
+        updatedAt,
+      });
+      store.specialistAutomationPolicy = committed;
+      store.specialistAutomationPolicyRevision = committed.revision;
+      store.specialistAutomationPolicyQuarantined = false;
+      return store;
+    });
+    return { policy: clone(committed) };
+  }
+
+  async clearSpecialistAutomationPolicy(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_AUTOMATION_POLICY_CLEAR_KEYS,
+      'Browser Agent Specialist automation policy clear request',
+    );
+    if (!Object.hasOwn(request, 'expectedRevision')) {
+      throw new Error('Browser Agent Specialist automation policy clear request requires expectedRevision');
+    }
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist automation policy expectedRevision',
+    );
+    let cleared = false;
+    await this.update(store => {
+      if (store.specialistAutomationPolicyQuarantined === true) {
+        throw new Error('Specialist automation policy is quarantined as corrupt and requires explicit storage recovery');
+      }
+      const current = store.specialistAutomationPolicy || null;
+      const currentRevision = Number(store.specialistAutomationPolicyRevision || current?.revision || 0);
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Specialist automation policy revision drifted before clear');
+      }
+      if (!current) return store;
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Specialist automation policy revision cannot advance');
+      }
+      store.specialistAutomationPolicy = null;
+      store.specialistAutomationPolicyRevision = currentRevision + 1;
+      cleared = true;
+      return store;
+    });
+    const state = await this.getSpecialistAutomationPolicy();
+    return { cleared, revision: state.revision };
   }
 
   async listSpecialistProviderConfigs() {
@@ -2232,6 +2378,42 @@ export class BrowserAgentManager {
    * worker restart cannot briefly over-admit independent jobs.
    */
   async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = null) {
+    return this.#claimSpecialistHandoffsAcrossJobs(payload, dependencies, null);
+  }
+
+  async claimSpecialistHandoffsAcrossJobsFromAutomationPolicy(dependencies = null) {
+    const initial = await this.load();
+    if (initial.specialistAutomationPolicyQuarantined === true) {
+      return {
+        kind: 'AUTOMATION_POLICY_QUARANTINED',
+        claimed: [],
+        reconciliationRequired: [],
+      };
+    }
+    const policy = initial.specialistAutomationPolicy;
+    if (!policy || policy.enabled !== true) {
+      return {
+        kind: 'AUTOMATION_DISABLED',
+        revision: Number(initial.specialistAutomationPolicyRevision || 0),
+        claimed: [],
+        reconciliationRequired: [],
+      };
+    }
+    const fence = Object.freeze({
+      revision: policy.revision,
+      bindingKey: JSON.stringify(policy),
+    });
+    const claimed = await this.#claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: policy.maxConcurrentHandoffs,
+    }, dependencies, fence);
+    return {
+      kind: 'AUTOMATION_CLAIM',
+      policy: clone(policy),
+      ...claimed,
+    };
+  }
+
+  async #claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = null, automationPolicyFence = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
     const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
     const readinessByAssignment = new Map();
@@ -2266,6 +2448,16 @@ export class BrowserAgentManager {
     claimRequest.at = at;
     let result = null;
     await this.update(async store => {
+      if (automationPolicyFence) {
+        const livePolicy = store.specialistAutomationPolicy;
+        if (store.specialistAutomationPolicyQuarantined === true
+            || !livePolicy
+            || livePolicy.enabled !== true
+            || livePolicy.revision !== automationPolicyFence.revision
+            || JSON.stringify(livePolicy) !== automationPolicyFence.bindingKey) {
+          throw new Error('Specialist automation policy drifted before product-wide claim');
+        }
+      }
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
       const specialistOwnerships = store.order
