@@ -187,6 +187,36 @@ test('disabled, stale-representation and duplicate inputs fail before command co
     /canonical non-negative number/u);
 });
 
+test('selected definition authority arrays reject hostile accessors and sparse slots without execution', () => {
+  let reads = 0;
+  const capabilityIds = ['browser', 'research'];
+  Object.defineProperty(capabilityIds, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'browser';
+    },
+  });
+
+  assert.throws(() => agentDefinitionLaunchScopeTextV1(definition({ capabilityIds })),
+    /enumerable own data property/u);
+  assert.equal(reads, 0);
+
+  const sparseTools = new Array(2);
+  sparseTools[1] = 'files.read';
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry(),
+    definition: definition({ toolIds: sparseTools }),
+    ownerPolicy: ownerPolicy(),
+  }), /enumerable own data property/u);
+
+  const symbolTools = ['browser.read'];
+  symbolTools[Symbol('authority')] = 'files.read';
+  assert.throws(() => agentDefinitionLaunchScopeTextV1(definition({ toolIds: symbolTools })),
+    /non-canonical fields/u);
+});
+
 test('hostile form accessors are rejected without execution', () => {
   let reads = 0;
   const hostile = form();
