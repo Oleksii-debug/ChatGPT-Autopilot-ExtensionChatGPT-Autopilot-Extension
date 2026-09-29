@@ -442,6 +442,9 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
+  }
   const current = normalizeProjectSnapshotV1(project.snapshot);
   const revisionIds = snapshotRevisionHistory(project, current);
   if (normalized.revisionId === current.revisionId) {
@@ -486,6 +489,9 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
   validateProjectWorkspace(workspace);
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
+  }
   assertCapsuleMatchesSnapshot(normalized, project.snapshot);
   if (hasOwn(project.capsulesById, normalized.capsuleId)) {
     const current = normalizeContextCapsuleV1(project.capsulesById[normalized.capsuleId]);
@@ -505,6 +511,9 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   validateProjectWorkspace(workspace);
   const normalized = normalizeArtifactProvenanceV1(provenance);
   const project = requireProject(workspace, normalized.projectId);
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
+  }
   assertProvenanceMatchesSnapshot(normalized, project.snapshot);
   const artifactId = normalized.artifactRef.artifactId;
   if (hasOwn(project.provenanceByArtifactId, artifactId)) {
