@@ -391,6 +391,56 @@ test('durable repository serializes concurrent appends and supplies the canonica
   assert.equal(noEffectResolved.recordId, 'record.specialist.2');
 });
 
+test('durable repository save is monotonic and cannot rewrite or roll back observed history', async () => {
+  const repository = new TrustedExecutionVerificationLedgerRepository(storageChrome());
+  await repository.append(trustedRecord());
+
+  const current = await repository.load();
+  const rewrittenRecord = trustedRecord({
+    overrides: { validThrough: '2026-09-29T00:06:00.000Z' },
+  });
+  const rewritten = normalizeTrustedExecutionVerificationLedgerV1({
+    schemaVersion: 1,
+    revision: 1,
+    records: [rewrittenRecord],
+  });
+
+  await assert.rejects(
+    () => repository.save(rewritten),
+    /cannot rewrite append-only history/u,
+  );
+  await assert.rejects(
+    () => repository.save(createTrustedExecutionVerificationLedgerV1()),
+    /cannot roll back revision/u,
+  );
+
+  const secondRecord = trustedRecord({
+    outcome: TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
+    recordId: 'record.specialist.2',
+    verificationId: 'verification.specialist.2',
+  });
+  const extended = appendTrustedExecutionVerificationRecordV1(current, secondRecord);
+  const saved = await repository.save(extended);
+  assert.equal(saved.revision, 2);
+  assert.deepEqual(saved.records.map(item => item.recordId), [
+    'record.specialist.1',
+    'record.specialist.2',
+  ]);
+
+  const stale = extended;
+  await repository.append(trustedRecord({
+    recordId: 'record.specialist.3',
+    verificationId: 'verification.specialist.3',
+  }));
+  await assert.rejects(
+    () => repository.save(stale),
+    /cannot roll back revision/u,
+  );
+  const durable = await repository.load();
+  assert.equal(durable.revision, 3);
+  assert.equal(durable.records.at(-1).recordId, 'record.specialist.3');
+});
+
 test('existing execution ownership completion consumes only the ledger resolver', async () => {
   const repository = new TrustedExecutionVerificationLedgerRepository(storageChrome());
   await repository.append(trustedRecord());
