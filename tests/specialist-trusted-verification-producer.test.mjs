@@ -431,17 +431,48 @@ test('provider, specialist, and current execution owner cannot self-issue truste
   }
 });
 
-test('trusted evidence must be fresh relative to durable provider and ownership state', async () => {
+test('result artifacts may predate terminal provider persistence but cannot predate preparation', async () => {
+  const produced = await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request(),
+    {
+      resolveTrustedSpecialistExecutionVerification: async () => proof({
+        artifacts: [evidenceArtifact({ createdAt: T1 })],
+      }),
+    },
+  );
+  assert.equal(produced.trustedRecord.evidenceArtifacts[0].artifactId, RESULT_ID);
+
   await assert.rejects(
     produceTrustedSpecialistExecutionVerificationRecordV1(
       request(),
       {
         resolveTrustedSpecialistExecutionVerification: async () => proof({
-          artifacts: [evidenceArtifact({ createdAt: T1 })],
+          artifacts: [evidenceArtifact({ createdAt: '2026-09-29T03:59:59.000Z' })],
         }),
       },
     ),
-    /evidence chronology is invalid/,
+    /evidence chronology is invalid: artifact:specialist-result/,
+  );
+});
+
+test('independent verifier evidence must be fresh relative to durable provider and ownership state', async () => {
+  await assert.rejects(
+    produceTrustedSpecialistExecutionVerificationRecordV1(
+      request(),
+      {
+        resolveTrustedSpecialistExecutionVerification: async () => proof({
+          artifacts: [
+            evidenceArtifact({ createdAt: T1 }),
+            evidenceArtifact({
+              artifactId: 'artifact:independent-proof',
+              createdAt: T1,
+              sha256: 'b'.repeat(64),
+            }),
+          ],
+        }),
+      },
+    ),
+    /evidence chronology is invalid: artifact:independent-proof/,
   );
 
   await assert.rejects(
