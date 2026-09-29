@@ -81,6 +81,9 @@ const BINDING_KEYS = new Set([
   'nodeId',
   'ownerId',
   'executionPlane',
+  'workTitle',
+  'workObjective',
+  'workAcceptanceCriteria',
   'workBudget',
   'routeIntent',
   'bindingKey',
@@ -134,6 +137,51 @@ function exactInteger(value, label, min = 0) {
     throw new Error(label + ' is invalid');
   }
   return value;
+}
+
+function exactText(value, label, maxLength) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > maxLength) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function denseTexts(value, label, max = 32, maxTextLength = 1000) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(label + ' must be a canonical array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || Object.is(lengthDescriptor.value, -0)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(label + ' has invalid length');
+  }
+  const length = lengthDescriptor.value;
+  const expected = new Set(['length']);
+  for (let index = 0; index < length; index += 1) expected.add(String(index));
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(label + ' must be dense and data-only');
+    }
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + '[' + index + '] must be an enumerable own data property');
+    }
+    out.push(exactText(descriptor.value, label + '[' + index + ']', maxTextLength));
+  }
+  return Object.freeze(out);
 }
 
 function normalizeWorkBudget(value) {
@@ -261,6 +309,9 @@ function modelIntentBindingKey({
   nodeId = null,
   ownerId = null,
   executionPlane = null,
+  workTitle = null,
+  workObjective = null,
+  workAcceptanceCriteria = null,
   workBudget = null,
   routeIntent = null,
 }) {
@@ -285,6 +336,9 @@ function modelIntentBindingKey({
     nodeId,
     ownerId,
     executionPlane,
+    workTitle,
+    workObjective,
+    workAcceptanceCriteria,
     workBudget
       ? [workBudget.maxModelCalls, workBudget.maxRuntimeSeconds, workBudget.maxCostUsdMicros]
       : null,
@@ -473,6 +527,20 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
   if (typeof executionPlane !== 'string' || !EXECUTION_PLANES.has(executionPlane)) {
     throw new Error('Agent self-repair model executionPlane is invalid');
   }
+  const workTitle = exactText(
+    required(raw, 'workTitle', 'AgentSelfRepairModelBindingV1'),
+    'workTitle',
+    500,
+  );
+  const workObjective = exactText(
+    required(raw, 'workObjective', 'AgentSelfRepairModelBindingV1'),
+    'workObjective',
+    12_000,
+  );
+  const workAcceptanceCriteria = denseTexts(
+    required(raw, 'workAcceptanceCriteria', 'AgentSelfRepairModelBindingV1'),
+    'workAcceptanceCriteria',
+  );
   const workBudget = normalizeWorkBudget(
     required(raw, 'workBudget', 'AgentSelfRepairModelBindingV1'),
   );
@@ -500,6 +568,9 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
     nodeId,
     ownerId,
     executionPlane,
+    workTitle,
+    workObjective,
+    workAcceptanceCriteria,
     workBudget,
     routeIntent: routing,
   });
@@ -529,6 +600,9 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
     nodeId,
     ownerId,
     executionPlane,
+    workTitle,
+    workObjective,
+    workAcceptanceCriteria: [...workAcceptanceCriteria],
     workBudget,
     routeIntent: {
       role: routing.role,
@@ -628,6 +702,9 @@ export function bindAgentSelfRepairModelIntentV1(input) {
     nodeId: node.nodeId,
     ownerId: node.ownerId,
     executionPlane: node.executionPlane,
+    workTitle: node.title,
+    workObjective: node.objective,
+    workAcceptanceCriteria: [...node.acceptanceCriteria],
     workBudget: {
       maxModelCalls: node.budget.maxModelCalls,
       maxRuntimeSeconds: node.budget.maxRuntimeSeconds,
