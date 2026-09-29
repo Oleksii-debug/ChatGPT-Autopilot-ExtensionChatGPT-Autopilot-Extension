@@ -27,6 +27,18 @@ const managerFor = chrome => new BrowserAgentManager({
   now: () => Date.parse('2026-09-29T03:05:00.000Z'),
 });
 
+function resourceBudget(maxConcurrentAgents = 32) {
+  return {
+    maxConcurrentAgents,
+    maxChildAgents: 128,
+    maxModelCalls: 1000,
+    maxModelInputTokens: 1000000,
+    maxModelOutputTokens: 1000000,
+    maxRuntimeSeconds: 86400,
+    maxCostUsdMicros: 100000000,
+  };
+}
+
 function definition({ delegation = true, maxConcurrentHandoffs = 2, leaseSeconds = 600 } = {}) {
   return {
     schemaVersion: 1,
@@ -80,6 +92,10 @@ async function seed(manager, {
   leaseSeconds = 600,
   twoExternalNodes = false,
 } = {}) {
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: resourceBudget(32),
+  });
   const agent = definition({ delegation, maxConcurrentHandoffs, leaseSeconds });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
@@ -448,10 +464,13 @@ test('product-wide owner automation policy can fail closed at zero capacity', as
   const manager = managerFor(chrome);
   const id = await seed(manager);
   assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 1,
+    budget: resourceBudget(0),
+  });
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 0,
   });
 
   const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
@@ -477,7 +496,6 @@ test('disabled or missing automation policy never invents product-wide claim aut
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: false,
-    maxConcurrentHandoffs: 4,
   });
   const disabled = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
   assert.equal(disabled.kind, 'AUTOMATION_DISABLED');
@@ -500,7 +518,6 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
 
   let changed = false;
@@ -512,7 +529,6 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
         await manager.setSpecialistAutomationPolicy({
           expectedRevision: 1,
           enabled: true,
-          maxConcurrentHandoffs: 0,
         });
       }
       return {
@@ -543,7 +559,8 @@ test('automation policy CAS fence blocks stale high-capacity claim after readine
   const durable = await manager.listSpecialistHandoffs(id);
   assert.equal(durable.handoffs[0].state, 'READY');
   assert.equal(durable.executionOwnerships[0].state, 'AVAILABLE');
-  assert.equal((await manager.getSpecialistAutomationPolicy()).policy.maxConcurrentHandoffs, 0);
+  assert.equal((await manager.getSpecialistAutomationPolicy()).policy.enabled, true);
+  assert.equal(Object.hasOwn((await manager.getSpecialistAutomationPolicy()).policy, 'maxConcurrentHandoffs'), false);
 });
 
 
@@ -555,7 +572,6 @@ test('automation-policy claim skips paused jobs and does not reserve effect auth
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
   await manager.pause(id);
 
@@ -576,7 +592,6 @@ test('automation-policy claim returns the exact claim-time control epoch for pro
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
 
   const result = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
@@ -598,7 +613,6 @@ test('manual Specialist claim is never promoted into automatic provider dispatch
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
 
   const manual = await manager.claimSpecialistHandoffs(id, {
@@ -620,7 +634,6 @@ test('policy-admitted fresh Specialist dispatch provenance survives manager rest
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
 
   const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
@@ -647,7 +660,6 @@ test('owner control epoch drift revokes unprepared automatic Specialist dispatch
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
   const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
   assert.equal(claimed.claimed.length, 1);
@@ -672,7 +684,6 @@ test('automation policy revision drift revokes and prunes unprepared automatic S
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
   assert.equal((await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy()).claimed.length, 1);
   assert.equal((await manager.listSpecialistAutomationDispatchCandidates()).candidates.length, 1);
@@ -681,7 +692,6 @@ test('automation policy revision drift revokes and prunes unprepared automatic S
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 1,
     enabled: true,
-    maxConcurrentHandoffs: 0,
   });
   assert.deepEqual((await manager.listSpecialistAutomationDispatchCandidates()).candidates, []);
   assert.equal(
@@ -691,7 +701,7 @@ test('automation policy revision drift revokes and prunes unprepared automatic S
   );
 
   const next = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
-  assert.equal(next.maxConcurrentHandoffs, 0);
+  assert.equal(next.ownerMaxConcurrentAgents, 32);
   assert.deepEqual(next.claimed, []);
   assert.deepEqual(
     Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey || {}),
