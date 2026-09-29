@@ -71,6 +71,27 @@ function dataField(descriptors, key, required = false) {
   return descriptor.value;
 }
 
+function snapshotExactOptions(input, allowedKeys, label) {
+  const descriptors = plainRecordDescriptors(input);
+  if (!descriptors) {
+    throw new Error(`${label} must be a plain record with enumerable own data properties`);
+  }
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must contain enumerable own data properties only`);
+    }
+    out[key] = descriptor.value;
+  }
+  return Object.freeze(out);
+}
+
 function snapshotDenseArrayValues(input) {
   if (!Array.isArray(input)) return Object.freeze([]);
   const descriptors = Object.getOwnPropertyDescriptors(input);
