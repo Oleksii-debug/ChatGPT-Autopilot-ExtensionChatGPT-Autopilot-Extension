@@ -442,6 +442,38 @@ test('replay cannot bypass initiator validation', () => {
   );
 });
 
+test('replay preserves ALL_DIRECT_CHILDREN barrier semantics after restart', () => {
+  const canonicalGraph = graph([
+    node('root', null, ['existing']),
+    node('existing', 'root'),
+  ]);
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: runtimeFor(canonicalGraph),
+    requestedChildren: 1,
+    spawnId: 'all-direct-replay',
+    nowMs: 300,
+  }));
+
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.graph.nodesById.root.barrier.mode, 'ALL_DIRECT_CHILDREN');
+  assert.deepEqual(first.graph.nodesById.root.barrier.childIds, []);
+
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    requestedChildren: 1,
+    spawnId: 'all-direct-replay',
+    nowMs: 301,
+  }));
+
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.createdNodeIds, first.createdNodeIds);
+  assert.deepEqual(replay.graph, first.graph);
+});
+
 test('same spawn identity is exact-effect idempotent after restart', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
