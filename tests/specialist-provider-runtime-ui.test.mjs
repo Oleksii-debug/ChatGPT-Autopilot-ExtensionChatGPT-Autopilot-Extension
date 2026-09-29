@@ -23,6 +23,8 @@ test('Specialist runtime panel exposes evidence and leased run without manual ca
   assert.match(html, /id="specialist-provider-handoff-list"/u);
   assert.match(html, /id="specialist-provider-execution-list"/u);
   assert.match(html, /id="specialist-provider-run-button"/u);
+  assert.match(html, /id="specialist-provider-runtime-summary"[^>]*tabindex="0"/u);
+  assert.match(html, /id="specialist-provider-runtime-status"[^>]*role="status"/u);
   assert.doesNotMatch(html, /specialist-provider-claim-button|specialist-provider-max-concurrent-handoffs/u);
   assert.match(html, /не claim-ить capacity/u);
   assert.match(html, /Provider terminal status не завершує Specialist автоматично/u);
@@ -34,6 +36,8 @@ test('runtime evidence comes from the canonical consolidated handoff projection'
   assert.match(body, /durable\?\.providerExecutions/u);
   assert.match(body, /durable\?\.providerExecutionQuarantined === true/u);
   assert.doesNotMatch(body, /LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS|CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS/u);
+  assert.match(body, /announceResult = false/u);
+  assert.match(body, /if \(announceResult\)/u);
 });
 
 test('LEASED-only provider run binds current exact Browser Agent control epoch', () => {
@@ -62,10 +66,26 @@ test('runtime run control is disabled without a canonical epoch or with terminal
   assert.match(body, /PROVIDER_SUCCEEDED/u);
   assert.match(body, /RECONCILE/u);
   assert.match(body, /MANUAL_REVIEW/u);
+  assert.match(body, /specialist-provider-runtime-summary/u);
+  assert.doesNotMatch(body, /specialist-provider-runtime-status/u);
 });
 
-test('job selection and visible Agent mode refresh durable Specialist evidence', () => {
+test('job selection and visible Agent mode refresh durable Specialist evidence without live-region polling', () => {
   const select = functionBody('selectBrowserAgentJob');
   assert.match(select, /await loadSpecialistProviderRuntime\(\);/u);
   assert.match(options, /if \(document\.visibilityState === 'visible' && storageGet\(UI_MODE_KEY\) === 'agent'\) void loadSpecialistProviderRuntime\(\);/u);
+  assert.doesNotMatch(
+    options,
+    /setInterval\([\s\S]*?loadSpecialistProviderRuntime\(\{\s*announceResult:\s*true\s*\}\)[\s\S]*?,\s*5000\)/u,
+  );
+});
+
+test('manual Specialist evidence refresh is the only refresh path that requests an NVDA announcement', () => {
+  assert.match(
+    options,
+    /specialist-provider-runtime-refresh-button'[\s\S]*?loadSpecialistProviderRuntime\(\{ announceResult: true \}\)/u,
+  );
+  const render = functionBody('renderSpecialistProviderRuntime');
+  assert.match(render, /specialist-provider-runtime-summary/u);
+  assert.doesNotMatch(render, /specialist-provider-runtime-status/u);
 });
