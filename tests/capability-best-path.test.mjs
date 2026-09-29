@@ -14,7 +14,9 @@ function candidate({
   capabilityIds = ['repo.read'],
   enabled = true,
   ready = true,
-  setupRequired = false,
+  installationRequired = false,
+  authenticationRequired = false,
+  configurationRequired = false,
   sourceRevision = 1,
   sourceId = 'inventory.local',
   observedAt = '2026-09-29T04:00:00.000Z',
@@ -29,7 +31,9 @@ function candidate({
     capabilityIds,
     enabled,
     ready,
-    setupRequired,
+    installationRequired,
+    authenticationRequired,
+    configurationRequired,
     sourceRevision,
     observedAt,
     validThrough,
@@ -66,7 +70,7 @@ test('best path prefers deterministic path classes and never grants authority', 
   }
 });
 
-test('unready, disabled, setup-required and capability-incomplete candidates cannot win', () => {
+test('unready, disabled, setup-blocked and capability-incomplete candidates cannot win', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
     asOf: '2026-09-29T04:30:00.000Z',
@@ -88,7 +92,7 @@ test('unready, disabled, setup-required and capability-incomplete candidates can
         candidateId: 'mcp-setup',
         pathKind: CapabilityPathKind.MCP,
         capabilityIds: ['repo.read', 'repo.write'],
-        setupRequired: true,
+        authenticationRequired: true,
       }),
       candidate({
         candidateId: 'semantic-missing',
@@ -109,7 +113,7 @@ test('unready, disabled, setup-required and capability-incomplete candidates can
     {
       'api-unready': 'NOT_READY',
       'cli-disabled': 'DISABLED',
-      'mcp-setup': 'SETUP_REQUIRED',
+      'mcp-setup': 'AUTHENTICATION_REQUIRED',
       'semantic-missing': 'MISSING_CAPABILITY',
     },
   );
@@ -173,7 +177,7 @@ test('ranking is deterministic and uses least surplus within the same path kind'
   assert.equal(first.alternatives.at(-1).candidate.candidateId, 'api-wide');
 });
 
-test('setup-required API remains blocked instead of silently outranking a ready fallback', () => {
+test('authentication-required API remains blocked instead of silently outranking a ready fallback', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
     asOf: '2026-09-29T04:30:00.000Z',
@@ -184,7 +188,7 @@ test('setup-required API remains blocked instead of silently outranking a ready 
         providerId: 'gmail',
         pathKind: CapabilityPathKind.API,
         capabilityIds: ['mail.read'],
-        setupRequired: true,
+        authenticationRequired: true,
       }),
       candidate({
         candidateId: 'browser-ready',
@@ -197,7 +201,45 @@ test('setup-required API remains blocked instead of silently outranking a ready 
 
   assert.equal(result.selected.candidate.candidateId, 'browser-ready');
   assert.equal(result.blocked[0].candidate.candidateId, 'gmail-api-needs-auth');
-  assert.equal(result.blocked[0].reason, 'SETUP_REQUIRED');
+  assert.equal(result.blocked[0].reason, 'AUTHENTICATION_REQUIRED');
+  assert.equal(result.authority.authenticationAuthorized, false);
+});
+
+test('installation and configuration blockers remain advisory and explicit', () => {
+  const result = recommendCapabilityBestPathV1({
+    schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
+    requiredCapabilityIds: ['files.read'],
+    candidates: [
+      candidate({
+        candidateId: 'cli-needs-install',
+        pathKind: CapabilityPathKind.CLI,
+        capabilityIds: ['files.read'],
+        installationRequired: true,
+      }),
+      candidate({
+        candidateId: 'mcp-needs-config',
+        pathKind: CapabilityPathKind.MCP,
+        capabilityIds: ['files.read'],
+        configurationRequired: true,
+      }),
+      candidate({
+        candidateId: 'uia-ready-files',
+        pathKind: CapabilityPathKind.UIA,
+        capabilityIds: ['files.read'],
+      }),
+    ],
+  });
+
+  assert.equal(result.selected.candidate.candidateId, 'uia-ready-files');
+  assert.deepEqual(
+    Object.fromEntries(result.blocked.map(item => [item.candidate.candidateId, item.reason])),
+    {
+      'cli-needs-install': 'INSTALLATION_REQUIRED',
+      'mcp-needs-config': 'CONFIGURATION_REQUIRED',
+    },
+  );
+  assert.equal(result.authority.installationAuthorized, false);
   assert.equal(result.authority.authenticationAuthorized, false);
 });
 
