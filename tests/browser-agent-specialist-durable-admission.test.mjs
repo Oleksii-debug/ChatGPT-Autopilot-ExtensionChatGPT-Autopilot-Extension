@@ -347,3 +347,26 @@ test('owner-bound maxConcurrentHandoffs caps a wider legacy claim', async () => 
   assert.equal(claimed.assignments.filter(item => item.state === 'LEASED').length, 2);
   assert.equal(claimed.assignments.filter(item => item.state === 'READY').length, 1);
 });
+
+
+test('persisted READY assignment drift is rejected independently of matching admission provenance', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  const request = {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  };
+  await manager.prepareDefinitionSpecialistDelegation('job.research', request);
+  await manager.update(store => {
+    store.byId['job.research'].runtime.specialistHandoffs[0].priority = 6;
+    return store;
+  });
+
+  await assert.rejects(
+    () => manager.prepareDefinitionSpecialistDelegation('job.research', request),
+    /runtime state drifted from its canonical READY proposal/,
+  );
+});
