@@ -1821,15 +1821,25 @@ export class BrowserAgentManager {
         if (resumedPrepared) {
           const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
           const ownershipIndex = ownerships.findIndex(item =>
-            item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+            item.ownerId === prepared.agentId
+            && item.leaseId === prepared.leaseId
+            && item.nodeId === prepared.nodeId);
           if (ownershipIndex < 0) {
             throw new Error('Recovered PREPARED Specialist execution lacks exact execution ownership');
           }
-          ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
-            leaseId: prepared.leaseId,
-            reason: 'Owner control changed while recovering a durable PREPARED provider execution with ambiguous prior effect.',
-            at: cancelledAt,
-          });
+          const ownership = ownerships[ownershipIndex];
+          const reason = 'Owner control changed while recovering a durable PREPARED provider execution with ambiguous prior effect.';
+          ownerships[ownershipIndex] = ownership.state === ExecutionOwnershipState.RECONCILE
+            || Date.parse(cancelledAt) <= Date.parse(ownership.leaseUntil)
+            ? requireExecutionReconciliationV1(ownership, {
+              leaseId: prepared.leaseId,
+              reason,
+              at: cancelledAt,
+            })
+            : recoverExpiredExecutionOwnershipV1(ownership, {
+              reason,
+              at: cancelledAt,
+            });
           job.runtime.specialistExecutionOwnerships = ownerships;
         }
         job.runtime.updatedAt = this.now();
