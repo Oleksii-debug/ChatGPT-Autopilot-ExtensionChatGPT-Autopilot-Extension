@@ -192,3 +192,39 @@ test('Specialist registry manager rejects accessor-backed mutation authority wit
   const fetched = await manager.getSpecialistRegistry('specialists:project-1');
   assert.equal(fetched.registry.revision, 1);
 });
+
+
+test('Specialist registry mutation snapshots nested Specialist definition before asynchronous storage reads', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const created = await manager.createSpecialistRegistry({
+    registryId: 'specialists:project-1',
+  });
+  const definition = specialist();
+
+  const pending = manager.mutateSpecialistRegistry({
+    registryId: 'specialists:project-1',
+    expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
+    kind: SpecialistRegistryMutationKind.CREATE,
+    definition,
+  });
+
+  definition.providerId = 'provider.forced-after-call';
+  definition.capabilityIds.push('filesystem.write');
+  definition.toolIds.push('filesystem.write');
+
+  const committed = await pending;
+  assert.equal(
+    committed.nextRegistry.definitions[0].providerId,
+    'provider.local.research',
+  );
+  assert.deepEqual(
+    committed.nextRegistry.definitions[0].capabilityIds,
+    ['research'],
+  );
+  assert.deepEqual(
+    committed.nextRegistry.definitions[0].toolIds,
+    ['browser.read'],
+  );
+});
