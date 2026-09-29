@@ -490,7 +490,13 @@ function normalizePersistedSpecialistAutomationClaimAdmissions(raw) {
 
 function pruneSpecialistAutomationClaimAdmissions(store) {
   const live = Object.create(null);
+  const policy = store.specialistAutomationPolicy;
+  const policyBindingKey = policy?.enabled === true ? JSON.stringify(policy) : '';
   for (const [key, admission] of Object.entries(store.specialistAutomationClaimAdmissionsByKey || {})) {
+    if (!policy
+        || policy.enabled !== true
+        || admission.policyRevision !== policy.revision
+        || admission.policyBindingKey !== policyBindingKey) continue;
     const job = store.byId?.[admission.jobId];
     const assignment = (job?.runtime?.specialistHandoffs || []).find(item =>
       item?.agentId === admission.agentId
