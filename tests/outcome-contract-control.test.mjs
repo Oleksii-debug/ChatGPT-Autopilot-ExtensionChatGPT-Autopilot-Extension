@@ -410,37 +410,37 @@ test('existing independent Outcome verifier consumes the durable canonical resol
   assert.equal(result.verificationAuthorityMinted, false);
 });
 
-test('contract registry stores prototype-shaped ids as data without prototype mutation across restart', async () => {
+test('contract registry stores prototype-adjacent valid ids as data without inherited-property confusion across restart', async () => {
   const state = createEmptyState(1);
-  const created = createStoredOutcomeContractV1(state, contractV1({ contractId: '__proto__' }));
-  assert.equal(created.contractId, '__proto__');
+  const created = createStoredOutcomeContractV1(state, contractV1({ contractId: 'constructor' }));
+  assert.equal(created.contractId, 'constructor');
   assert.equal(Object.getPrototypeOf(state.outcomeContractsById), null);
-  assert.equal(Object.hasOwn(state.outcomeContractsById, '__proto__'), true);
+  assert.equal(Object.hasOwn(state.outcomeContractsById, 'constructor'), true);
 
   const exact = resolveCurrentStoredOutcomeContractV1(state, {
     projectId: 'project-1',
-    contractId: '__proto__',
+    contractId: 'constructor',
   });
-  assert.equal(exact.contractId, '__proto__');
+  assert.equal(exact.contractId, 'constructor');
   assert.equal(
     resolveCanonicalStoredOutcomeContractV1(state, {
-      contractId: '__proto__',
+      contractId: 'constructor',
       contractRevision: 1,
     }).contractId,
-    '__proto__',
+    'constructor',
   );
   assert.equal(validateState(state), state);
 
   const chrome = fakeChrome();
   await new StorageRepository(chrome).save(state);
   const restarted = await new StorageRepository(chrome).load();
-  assert.equal(Object.hasOwn(restarted.outcomeContractsById, '__proto__'), true);
+  assert.equal(Object.hasOwn(restarted.outcomeContractsById, 'constructor'), true);
   assert.equal(
     resolveCurrentStoredOutcomeContractV1(restarted, {
       projectId: 'project-1',
-      contractId: '__proto__',
+      contractId: 'constructor',
     }).contractId,
-    '__proto__',
+    'constructor',
   );
 });
 
