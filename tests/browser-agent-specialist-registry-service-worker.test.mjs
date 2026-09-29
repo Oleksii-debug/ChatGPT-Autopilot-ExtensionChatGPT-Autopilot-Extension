@@ -88,3 +88,16 @@ test('Specialist provider execution command remains mutation-only and delegates 
     /message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\s\S]*?browserAgent\.executeClaimedSpecialistProvider\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.execution \|\| \{\}[\s\S]*?\)/,
   );
 });
+
+
+test('Specialist provider execution command remains mutation-only and delegates exact payload', () => {
+  const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
+  const end = source.indexOf(']);', start);
+  const block = source.slice(start, end);
+  assert.doesNotMatch(block, /EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER/);
+
+  assert.match(
+    source,
+    /message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\s\S]*?browserAgent\.executeClaimedSpecialistProvider\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.execution \|\| \{\}[\s\S]*?\)/,
+  );
+});
