@@ -148,6 +148,21 @@ test('durable OutcomeContract registry creates, resolves, lists, updates and del
   });
   assert.equal(updated.revision, 2);
   assert.equal(updated.desiredResult, 'Deliver revision two with exact proof.');
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 1,
+    }).desiredResult,
+    created.desiredResult,
+    'revision 1 remains canonical after revision 2 is admitted',
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 2,
+    }).desiredResult,
+    updated.desiredResult,
+  );
 
   assert.throws(
     () => updateStoredOutcomeContractV1(state, {
@@ -174,6 +189,30 @@ test('durable OutcomeContract registry creates, resolves, lists, updates and del
   });
   assert.equal(deleted.revision, 2);
   assert.deepEqual(listStoredOutcomeContractsV1(state, { projectId: 'project-1' }), []);
+  assert.throws(
+    () => resolveStoredOutcomeContractV1(state, {
+      projectId: 'project-1',
+      contractId: 'outcome-1',
+      expectedRevision: 2,
+    }),
+    /is deleted/,
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 1,
+    }).revision,
+    1,
+    'tombstone preserves historical revision 1 for in-flight verifier/recovery',
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 2,
+    }).revision,
+    2,
+    'tombstone preserves latest exact revision for verifier/recovery',
+  );
 });
 
 test('canonical verifier resolver matches the existing contractId/contractRevision bridge shape without dropping project binding', () => {
@@ -371,12 +410,34 @@ test('legacy schema-v2 state without OutcomeContract registry remains valid and 
 
 test('corrupt persisted OutcomeContract fails canonical state load', async () => {
   const state = createEmptyState(1);
-  state.outcomeContractsById['outcome-1'] = {
-    ...structuredClone(contractV1()),
-    executionAuthorized: true,
-  };
+  createStoredOutcomeContractV1(state, contractV1());
+  state.outcomeContractsById['outcome-1'].revisionsByNumber['1'].executionAuthorized = true;
   const repository = new StorageRepository(fakeChrome({ [STORAGE_KEY]: state }));
   await assert.rejects(repository.load(), /cannot grant execution authority/);
+});
+
+test('persisted revision history rejects gaps, rebinding and creation-time drift', () => {
+  const state = createEmptyState(1);
+  const first = createStoredOutcomeContractV1(state, contractV1());
+  const second = nextContract(first, { desiredResult: 'Revision two.' });
+  updateStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 1,
+    contract: second,
+  });
+
+  const gap = structuredClone(state.outcomeContractsById);
+  delete gap['outcome-1'].revisionsByNumber['1'];
+  assert.throws(() => normalizeOutcomeContractRegistryV1(gap), /must be contiguous/);
+
+  const rebound = structuredClone(state.outcomeContractsById);
+  rebound['outcome-1'].revisionsByNumber['1'].projectId = 'project-other';
+  assert.throws(() => normalizeOutcomeContractRegistryV1(rebound), /project binding mismatch/);
+
+  const timeDrift = structuredClone(state.outcomeContractsById);
+  timeDrift['outcome-1'].revisionsByNumber['2'].createdAt = '2026-09-29T04:00:01.000Z';
+  assert.throws(() => normalizeOutcomeContractRegistryV1(timeDrift), /createdAt is immutable/);
 });
 
 test('Core commands persist canonical OutcomeContracts across restart and return detached clones', async () => {
