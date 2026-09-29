@@ -394,7 +394,7 @@ function statusOf(info) {
   return status;
 }
 
-function validateConversationInfo(info, prepared) {
+function validateConversationInfo(info, prepared, observedAtInput) {
   if (!info || typeof info !== 'object' || Array.isArray(info)) {
     throw new Error('OpenHands conversation response must be an object');
   }
@@ -414,10 +414,18 @@ function validateConversationInfo(info, prepared) {
       || profile.revision !== prepared.config.agentProfileRevision) {
     throw new Error('OpenHands launched agent profile provenance does not match qualified profile revision');
   }
+  const providerUpdatedAt = providerTimestamp(info.updated_at, 'OpenHands conversation updated_at');
+  const observedAt = providerTimestamp(observedAtInput, 'OpenHands conversation observedAt');
+  if (Date.parse(providerUpdatedAt) < Date.parse(prepared.handoff.createdAt)) {
+    throw new Error('OpenHands conversation updated_at predates admitted specialist handoff');
+  }
+  if (Date.parse(providerUpdatedAt) > Date.parse(observedAt)) {
+    throw new Error('OpenHands conversation updated_at is future-dated relative to local observation');
+  }
   return {
     id: info.id,
     executionStatus: statusOf(info),
-    providerUpdatedAt: providerTimestamp(info.updated_at, 'OpenHands conversation updated_at'),
+    providerUpdatedAt,
   };
 }
 
@@ -499,7 +507,10 @@ export class OpenHandsCodingSpecialistClient {
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      if (allowNotFound && response.status === 404) return null;
+      if (allowNotFound && response.status === 404) {
+        try { await response?.body?.cancel?.(); } catch {}
+        return null;
+      }
       const parsed = await responseJsonBounded(response, prepared.config.maxResponseBytes);
       if (!response.ok) {
         // Server payload is untrusted data. Never promote body.detail (or any
@@ -525,7 +536,7 @@ export class OpenHandsCodingSpecialistClient {
       throw new OpenHandsCodingSpecialistError(
         controller.signal.aborted
           ? `OpenHands request timed out after ${timeoutMs} ms`
-          : `Could not reach OpenHands Agent Server: ${error?.message || 'network error'}`,
+          : 'Could not reach OpenHands Agent Server',
         {
           code: controller.signal.aborted ? 'OPENHANDS_REQUEST_TIMEOUT' : 'OPENHANDS_TRANSPORT_FAILURE',
           conversationId: prepared.conversationId,
@@ -573,10 +584,11 @@ export class OpenHandsCodingSpecialistClient {
     });
     if (info == null) return null;
     try {
-      const validated = validateConversationInfo(info, prepared);
+      const observedAt = new Date(this.nowFn()).toISOString();
+      const validated = validateConversationInfo(info, prepared, observedAt);
       return deepFreeze({
         ...validated,
-        observedAt: new Date(this.nowFn()).toISOString(),
+        observedAt,
       });
     } catch {
       // A conversation with our durable identity exists but does not satisfy
@@ -641,7 +653,11 @@ export class OpenHandsCodingSpecialistClient {
         throw error;
       }
       try {
-        conversation = validateConversationInfo(createdInfo, prepared);
+        conversation = validateConversationInfo(
+          createdInfo,
+          prepared,
+          new Date(this.nowFn()).toISOString(),
+        );
       } catch {
         throw new OpenHandsCodingSpecialistError(
           'Created OpenHands conversation provenance does not match admitted execution',
@@ -658,18 +674,40 @@ export class OpenHandsCodingSpecialistClient {
     }
 
     let stableTerminal = '';
+    let stableTerminalProviderUpdatedAt = '';
     let stableTerminalCount = 0;
+    let lastObservedProviderUpdatedAt = '';
     let last = conversation;
 
     while (this.nowFn() <= deadline) {
+      if (last.observedAt) {
+        if (lastObservedProviderUpdatedAt
+            && Date.parse(last.providerUpdatedAt) < Date.parse(lastObservedProviderUpdatedAt)) {
+          throw new OpenHandsCodingSpecialistError(
+            'OpenHands provider chronology regressed between independent readbacks',
+            {
+              code: 'OPENHANDS_PROVIDER_CHRONOLOGY_REGRESSION',
+              conversationId: prepared.conversationId,
+              effectMayHaveOccurred: true,
+              reconciliationRequired: true,
+              safeToRetry: false,
+            },
+          );
+        }
+        lastObservedProviderUpdatedAt = last.providerUpdatedAt;
+      }
       const status = last.executionStatus;
       if (TERMINAL.has(status)) {
         if (!last.observedAt) {
           stableTerminal = '';
+          stableTerminalProviderUpdatedAt = '';
           stableTerminalCount = 0;
-        } else if (status === stableTerminal) stableTerminalCount += 1;
-        else {
+        } else if (status === stableTerminal
+            && last.providerUpdatedAt === stableTerminalProviderUpdatedAt) {
+          stableTerminalCount += 1;
+        } else {
           stableTerminal = status;
+          stableTerminalProviderUpdatedAt = last.providerUpdatedAt;
           stableTerminalCount = 1;
         }
         if (last.observedAt && stableTerminalCount >= 2) {
@@ -699,6 +737,7 @@ export class OpenHandsCodingSpecialistClient {
         }
       } else {
         stableTerminal = '';
+        stableTerminalProviderUpdatedAt = '';
         stableTerminalCount = 0;
         if (MANUAL.has(status) && last.observedAt) {
           return deepFreeze({
