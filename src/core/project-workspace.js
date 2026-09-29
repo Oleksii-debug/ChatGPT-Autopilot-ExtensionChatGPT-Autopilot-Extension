@@ -233,6 +233,30 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
         || nextRevisionIds[nextRevisionIds.length - 1] !== nextSnapshot.revisionId) {
       throw new Error('Project snapshot advance must append exactly one revisionId');
     }
+
+    const previousArtifacts = new Map(
+      previousSnapshot.artifactRefs.map(ref => [ref.artifactId, ref]),
+    );
+    for (const nextArtifact of nextSnapshot.artifactRefs) {
+      const previousArtifact = previousArtifacts.get(nextArtifact.artifactId);
+      if (previousArtifact
+          && artifactIdentity(previousArtifact) !== artifactIdentity(nextArtifact)) {
+        throw new Error(
+          `Project artifactId cannot be reused for different immutable content: ${nextArtifact.artifactId}`,
+        );
+      }
+      if (hasOwn(previousProject.provenanceByArtifactId, nextArtifact.artifactId)) {
+        const priorProvenance = normalizeArtifactProvenanceV1(
+          previousProject.provenanceByArtifactId[nextArtifact.artifactId],
+        );
+        if (artifactIdentity(priorProvenance.artifactRef) !== artifactIdentity(nextArtifact)) {
+          throw new Error(
+            `Project artifactId cannot be rebound after durable provenance: ${nextArtifact.artifactId}`,
+          );
+        }
+      }
+    }
+
     for (const [capsuleId, previousCapsuleValue] of Object.entries(previousProject.capsulesById)) {
       if (!hasOwn(nextProject.capsulesById, capsuleId)) {
         throw new Error('Project workspace update cannot remove an existing context capsule');
