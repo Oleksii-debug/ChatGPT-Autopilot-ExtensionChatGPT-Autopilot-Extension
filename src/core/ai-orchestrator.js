@@ -237,12 +237,22 @@ export class AiOrchestrator {
       }
       return error;
     };
+    const nonProviderRouteFailures = new WeakSet();
+    const attachNonProviderFailureRuntime = error => {
+      if (error && (typeof error === 'object' || typeof error === 'function')) nonProviderRouteFailures.add(error);
+      return attachFailureRuntime(error);
+    };
     const invoke = async (route, callPrompt, callSystem, bounded) => {
       if (callCeiling && callsUsed >= callCeiling) {
         const error = new Error('AI model-call budget exhausted before another provider call');
         error.code = 'AI_MODEL_CALL_BUDGET_EXHAUSTED';
         error.modelCallsUsed = callsUsed;
-        throw attachFailureRuntime(error);
+        throw attachNonProviderFailureRuntime(error);
+      }
+      if (providerCallBudgetContext && !this.providerCallLifecycle) {
+        const error = new Error('AI provider-call budget context requires the canonical provider-call lifecycle');
+        error.code = 'AI_PROVIDER_BUDGET_LIFECYCLE_UNAVAILABLE';
+        throw attachNonProviderFailureRuntime(error);
       }
       const lifecycle = providerCallBudgetContext ? this.providerCallLifecycle : null;
       const routeIdentity = Object.freeze({
@@ -253,14 +263,27 @@ export class AiOrchestrator {
       });
       let reservation = null;
       if (lifecycle) {
-        reservation = await lifecycle.beforeProviderCall({
-          context: providerCallBudgetContext,
-          route: routeIdentity,
-          prompt: callPrompt,
-          systemPrompt: callSystem,
-          maxOutputTokens: bounded,
-          callNumber: callsUsed + 1,
-        });
+        try {
+          reservation = await lifecycle.beforeProviderCall({
+            context: providerCallBudgetContext,
+            route: routeIdentity,
+            prompt: callPrompt,
+            systemPrompt: callSystem,
+            maxOutputTokens: bounded,
+            callNumber: callsUsed + 1,
+          });
+        } catch (error) {
+          throw attachNonProviderFailureRuntime(error);
+        }
+        if (!reservation
+            || typeof reservation !== 'object'
+            || Array.isArray(reservation)
+            || typeof reservation.reservationId !== 'string'
+            || !reservation.reservationId.trim()) {
+          const error = new Error('AI provider-call lifecycle did not admit a durable budget reservation');
+          error.code = 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
+          throw attachNonProviderFailureRuntime(error);
+        }
       }
       callsUsed += 1;
       let value;
@@ -287,7 +310,7 @@ export class AiOrchestrator {
               error,
             });
           } catch (settlementError) {
-            throw attachFailureRuntime(settlementError);
+            throw attachNonProviderFailureRuntime(settlementError);
           }
         }
         throw attachFailureRuntime(error);
@@ -302,7 +325,7 @@ export class AiOrchestrator {
             result: value,
           });
         } catch (settlementError) {
-          throw attachFailureRuntime(settlementError);
+          throw attachNonProviderFailureRuntime(settlementError);
         }
       }
       return value;
@@ -332,6 +355,10 @@ export class AiOrchestrator {
           routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
           return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
         } catch (error) {
+          if (error && (typeof error === 'object' || typeof error === 'function')
+              && nonProviderRouteFailures.has(error)) {
+            throw attachFailureRuntime(error);
+          }
           const classification = classifyAiRouteError(error);
           if (error && typeof error === 'object') error.routeFailureClassification = classification;
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
