@@ -18,6 +18,7 @@ import {
   validateOrchestrationGraphV1,
 } from '../src/core/orchestration-hierarchy.js';
 import { deriveSubagentTaskDispatchIdentityV1 } from '../src/core/subagent-task-envelope.js';
+import { deriveSubagentAuthorityEnvelopeIdentityV1 } from '../src/core/subagent-authority-envelope.js';
 
 const T0 = '2026-09-29T04:00:00.000Z';
 const T1 = '2026-09-29T04:01:00.000Z';
@@ -127,6 +128,20 @@ function capsule() {
   };
 }
 
+function toolDescriptor() {
+  return {
+    schemaVersion: 1,
+    toolId: 'tool.read',
+    providerId: 'provider.main',
+    label: 'Read',
+    description: '',
+    capabilityIds: ['cap.read'],
+    inputSchemaRef: null,
+    outputSchemaRef: null,
+    readOnly: true,
+  };
+}
+
 function authorityEnvelope(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -141,7 +156,7 @@ function authorityEnvelope(overrides = {}) {
     sourceIds: ['source.allowed', 'source.secret'],
     artifactIds: ['artifact.allowed', 'artifact.secret'],
     toolIds: ['tool.read'],
-    toolDescriptors: [],
+    toolDescriptors: [toolDescriptor()],
     executionAuthority: false,
     credentialAuthority: false,
     policyAuthority: false,
@@ -156,6 +171,7 @@ function taskEnvelope(overrides = {}) {
     projectId: 'project.alpha',
     parentAgentId: 'agent.parent',
     childAgentId: 'agent.child',
+    authorityEnvelopeIdentity: deriveSubagentAuthorityEnvelopeIdentityV1(authorityEnvelope()),
     taskId: 'task.child',
     planId: 'plan.1',
     planRevision: 1,
@@ -442,5 +458,30 @@ test('orchestration owner context request rejects authority aliases and accessor
     /expectedProjectRevisionId must be an enumerable own data property/,
   );
   assert.equal(reads, 0);
+  assert.equal(resolverCalls, 0);
+});
+
+
+test('durable context rejects substituted least-authority envelope before Project workspace lookup', async () => {
+  let resolverCalls = 0;
+  const projectWorkspaceRepository = {
+    async resolveContext() {
+      resolverCalls += 1;
+      throw new Error('workspace resolver must not be reached for authority substitution');
+    },
+  };
+  const { manager, task, registered } = await fixture({ projectWorkspaceRepository });
+  const substitutedAuthority = authorityEnvelope({
+    capabilityIds: ['cap.read', 'cap.extra'],
+  });
+  await assert.rejects(
+    () => manager.resolveDurableSubagentTaskContext(
+      contextRequest(task, registered.binding.bindingId, {
+        authorityEnvelope: substitutedAuthority,
+      }),
+      'orch-1',
+    ),
+    /authority envelope does not match task activation identity/u,
+  );
   assert.equal(resolverCalls, 0);
 });

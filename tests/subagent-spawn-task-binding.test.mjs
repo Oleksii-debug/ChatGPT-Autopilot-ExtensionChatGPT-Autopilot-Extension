@@ -15,6 +15,7 @@ import {
 import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import { SubagentSpawnInitiator } from '../src/core/subagent-structure-policy.js';
 import { deriveSubagentTaskDispatchIdentityV1 } from '../src/core/subagent-task-envelope.js';
+import { deriveSubagentAuthorityEnvelopeIdentityV1 } from '../src/core/subagent-authority-envelope.js';
 import {
   SubagentSpawnTaskBindingDecision,
   bindSubagentSpawnTaskAuthorityV1,
@@ -291,6 +292,10 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
   assert.equal(binding.taskEnvelope.parentAgentId, 'root');
   assert.equal(binding.taskEnvelope.childAgentId, CHILD_ID);
   assert.equal(binding.taskEnvelope.taskId, 'task.one');
+  assert.equal(
+    binding.taskEnvelope.authorityEnvelopeIdentity,
+    deriveSubagentAuthorityEnvelopeIdentityV1(binding.authorityEnvelope),
+  );
   assert.deepEqual(binding.taskEnvelope.inputSourceRefs.map(item => item.sourceId), ['source.repo']);
   assert.deepEqual(binding.taskEnvelope.inputArtifactRefs.map(item => item.artifactId), ['artifact.input']);
   assert.equal(result.activationRequests.length, 1);
@@ -720,5 +725,33 @@ test('boundary rejects accessors, sparse arrays, symbols and duplicate envelope 
       ],
     })),
     /duplicate envelopeId/u,
+  );
+});
+
+
+test('task dispatch fingerprint changes when least-authority scope changes even if task semantics do not', () => {
+  const withTool = bindSubagentSpawnTaskAuthorityV1(request());
+  assert.equal(withTool.decision, SubagentSpawnTaskBindingDecision.ALLOW);
+
+  const withoutTool = bindSubagentSpawnTaskAuthorityV1(request({
+    authorityRequest: authorityRequest({
+      childTasks: [{
+        taskId: 'task.one',
+        providerId: 'provider.main',
+        taskRequestedCapabilityIds: ['cap.read'],
+        taskSourceIds: ['source.repo'],
+        taskArtifactIds: ['artifact.input'],
+        requestedToolIds: [],
+      }],
+    }),
+  }));
+  assert.equal(withoutTool.decision, SubagentSpawnTaskBindingDecision.ALLOW);
+
+  const first = withTool.taskBindings[0].taskEnvelope;
+  const second = withoutTool.taskBindings[0].taskEnvelope;
+  assert.notEqual(first.authorityEnvelopeIdentity, second.authorityEnvelopeIdentity);
+  assert.notEqual(
+    deriveSubagentTaskDispatchIdentityV1(first),
+    deriveSubagentTaskDispatchIdentityV1(second),
   );
 });

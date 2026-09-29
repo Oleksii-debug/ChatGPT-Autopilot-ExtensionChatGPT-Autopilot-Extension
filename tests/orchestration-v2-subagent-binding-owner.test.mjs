@@ -26,6 +26,7 @@ import {
 const T0='2026-09-29T04:00:00.000Z';
 const T1='2026-09-29T04:01:00.000Z';
 const T2='2026-09-29T04:02:00.000Z';
+const AUTHORITY_ENVELOPE_IDENTITY='subagent-authority:'+'0'.repeat(64);
 
 function chromeFake(){
   const data={};
@@ -107,6 +108,7 @@ function taskEnvelope(projectId='project-1'){
   });
   return createSubagentTaskEnvelopeV1({
     envelopeId:'envelope-1',projectId,parentAgentId:'parent-1',childAgentId:'child-1',
+    authorityEnvelopeIdentity:AUTHORITY_ENVELOPE_IDENTITY,
     plan,nodeId:'task-1',inputSourceIds:[],inputArtifactRefs:[],
     outcomeContract:contract(projectId),createdAt:T1,
   });
@@ -290,4 +292,19 @@ test('binding owner rejects forged activation, cross-project task and caller aut
   );
   assert.equal(reads,0);
   assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'],before);
+});
+
+
+test('orchestration owner refuses activation bindings without an authority-bound task fingerprint', async () => {
+  const { manager, prepared, canonicalTaskEnvelope } = await fixture();
+  const unbound = structuredClone(canonicalTaskEnvelope);
+  delete unbound.authorityEnvelopeIdentity;
+  await assert.rejects(
+    () => manager.registerSubagentTaskActivationBinding({
+      taskEnvelope: unbound,
+      activationAction: prepared.actions[0],
+      invocationId: 'invocation-unbound',
+    }, 'orch-1'),
+    /requires task-bound authority envelope identity/u,
+  );
 });
