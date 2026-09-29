@@ -375,7 +375,8 @@ export function projectAgentSelfRepairModelObservationV1(input) {
   if (modelResult.usage.outputTokens > providerReservation.outputTokens) {
     throw new Error('Agent self-repair model usage exceeds the durable provider output-token reservation');
   }
-  const summary = modelResult.text.slice(0, MAX_OBSERVATION_SUMMARY);
+  const canonicalSummarySource = modelResult.text.trim();
+  const summary = canonicalSummarySource.slice(0, MAX_OBSERVATION_SUMMARY);
   const outputTruncated = modelResult.text.length > summary.length;
 
   return normalizeObservationV1({
