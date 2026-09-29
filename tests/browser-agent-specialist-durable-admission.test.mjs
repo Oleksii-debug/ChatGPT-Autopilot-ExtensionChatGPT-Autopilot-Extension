@@ -62,14 +62,21 @@ const specialistDefinition = {
   definitionRevision: 1,
 };
 
-async function setup(manager) {
+async function setup(manager, { profileOverrides = {} } = {}) {
+  const selectedAgentDefinition = {
+    ...agentDefinition,
+    specialistDelegationProfile: {
+      ...agentDefinition.specialistDelegationProfile,
+      ...profileOverrides,
+    },
+  };
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     expectedRegistryBindingKey: agents.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
-    definition: agentDefinition,
+    definition: selectedAgentDefinition,
   });
   await manager.createFromAgentDefinition({
     registryId: 'agents:project-1',
@@ -423,4 +430,108 @@ test('product-wide claim fails closed when an owner-bound handoff lost admission
     }),
     /lacks durable admission provenance/,
   );
+});
+
+
+test('owner-bound zero Specialist capacity cannot be widened by per-job claim input', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager, { profileOverrides: { maxConcurrentHandoffs: 0 } });
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  const claimed = await manager.claimSpecialistHandoffs('job.research', {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(claimed.claimed, []);
+  assert.equal(claimed.assignments[0].state, 'READY');
+  assert.equal(claimed.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('owner-bound zero Specialist capacity cannot be widened by product-wide claim input', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager, { profileOverrides: { maxConcurrentHandoffs: 0 } });
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs: 32,
+    maxChildrenPerAgent: 32,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(claimed.claimed, []);
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('existing OWNED Specialist work consumes profile capacity before a later claim', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager, { profileOverrides: { maxConcurrentHandoffs: 1 } });
+
+  await manager.update(store => {
+    const job = store.byId['job.research'];
+    const first = job.runtime.plan.nodes[0];
+    job.runtime.plan = {
+      ...job.runtime.plan,
+      nodes: [
+        first,
+        {
+          ...first,
+          nodeId: 'local:research-2',
+          title: 'Specialist research 2',
+          objective: 'Research bounded evidence 2.',
+          conflictKeys: ['artifact:research-2'],
+        },
+      ],
+    };
+    return store;
+  });
+
+  for (const nodeId of ['local:research', 'local:research-2']) {
+    await manager.prepareDefinitionSpecialistDelegation('job.research', {
+      expectedRegistryRevision: registry.nextRegistryRevision,
+      expectedPlanRevision: 4,
+      nodeId,
+      at: '2026-09-29T03:05:00.000Z',
+    });
+  }
+
+  const firstClaim = await manager.claimSpecialistHandoffs('job.research', {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(firstClaim.claimed.length, 1);
+  assert.equal(firstClaim.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
+  assert.equal(firstClaim.assignments.filter(item => item.state === 'READY').length, 1);
+
+  const secondClaim = await manager.claimSpecialistHandoffs('job.research', {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:07:00.000Z',
+  });
+  assert.deepEqual(secondClaim.claimed, []);
+  assert.equal(secondClaim.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
+  assert.equal(secondClaim.assignments.filter(item => item.state === 'READY').length, 1);
 });
