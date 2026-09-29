@@ -22,11 +22,11 @@ import {
   createSubagentTaskEnvelopeV1,
   deriveSubagentTaskDispatchIdentityV1,
 } from '../src/core/subagent-task-envelope.js';
+import { deriveSubagentAuthorityEnvelopeIdentityV1 } from '../src/core/subagent-authority-envelope.js';
 
 const T0='2026-09-29T04:00:00.000Z';
 const T1='2026-09-29T04:01:00.000Z';
 const T2='2026-09-29T04:02:00.000Z';
-const AUTHORITY_ENVELOPE_IDENTITY='subagent-authority:'+'0'.repeat(64);
 
 function chromeFake(){
   const data={};
@@ -71,6 +71,14 @@ function graph(){
     ],
   });
 }
+function authorityEnvelope(projectId='project-1'){
+  return {
+    schemaVersion:1,decision:'ALLOW',reasonCode:'LEAST_AUTHORITY_DERIVED',
+    projectId,parentAgentId:'parent-1',childAgentId:'child-1',taskId:'task-1',
+    providerId:'provider.main',capabilityIds:[],sourceIds:[],artifactIds:[],
+    toolIds:[],toolDescriptors:[],executionAuthority:false,credentialAuthority:false,policyAuthority:false,
+  };
+}
 function contract(projectId='project-1'){
   return createOutcomeContractV1({
     contractId:'outcome-1',projectId,desiredResult:'Return one verified result.',
@@ -108,7 +116,7 @@ function taskEnvelope(projectId='project-1'){
   });
   return createSubagentTaskEnvelopeV1({
     envelopeId:'envelope-1',projectId,parentAgentId:'parent-1',childAgentId:'child-1',
-    authorityEnvelopeIdentity:AUTHORITY_ENVELOPE_IDENTITY,
+    authorityEnvelopeIdentity:deriveSubagentAuthorityEnvelopeIdentityV1(authorityEnvelope(projectId)),
     plan,nodeId:'task-1',inputSourceIds:[],inputArtifactRefs:[],
     outcomeContract:contract(projectId),createdAt:T1,
   });
@@ -142,7 +150,7 @@ async function fixture(){
 test('orchestration owner derives and persists activation binding from latest durable hierarchy',async()=>{
   const {chrome,core,manager,prepared,canonicalTaskEnvelope,setNow}=await fixture();
   const request={
-    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],invocationId:'invocation-child-1',
+    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
   };
   const first=await manager.registerSubagentTaskActivationBinding(request,'orch-1');
   assert.equal(first.revision,1);
@@ -190,7 +198,7 @@ test('recovery binding inherits exact durable WORK task identity and rejects cal
   const workRequest={
     taskEnvelope:canonicalTaskEnvelope,
     activationAction:prepared.actions[0],
-    invocationId:'invocation-child-1',
+    invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
   };
   const work=await manager.registerSubagentTaskActivationBinding(workRequest,'orch-1');
   assert.equal(work.revision,1);
@@ -227,7 +235,7 @@ test('recovery binding inherits exact durable WORK task identity and rejects cal
     ()=>manager.registerSubagentTaskActivationBinding({
       taskEnvelope:substituted,
       activationAction:recoveryAction,
-      invocationId:'invocation-recovery-2',
+      invocationId:'invocation-recovery-2',authorityEnvelope:authorityEnvelope(),
     },'orch-1'),
     /requires prior durable WORK task dispatch identity/u,
   );
@@ -240,7 +248,7 @@ test('recovery binding inherits exact durable WORK task identity and rejects cal
   const recovery=await manager.registerSubagentTaskActivationBinding({
     taskEnvelope:canonicalTaskEnvelope,
     activationAction:recoveryAction,
-    invocationId:'invocation-recovery-2',
+    invocationId:'invocation-recovery-2',authorityEnvelope:authorityEnvelope(),
   },'orch-1');
   assert.equal(recovery.revision,2);
   assert.equal(recovery.binding.activationPurpose,OrchestrationActivationPurpose.RECOVERY);
@@ -250,7 +258,7 @@ test('recovery binding inherits exact durable WORK task identity and rejects cal
 test('binding owner rejects forged activation, cross-project task and caller authority fields without mutation',async()=>{
   const {chrome,manager,prepared}=await fixture();
   const base={
-    taskEnvelope:taskEnvelope(),activationAction:prepared.actions[0],invocationId:'invocation-child-1',
+    taskEnvelope:taskEnvelope(),activationAction:prepared.actions[0],invocationId:'invocation-child-1',authorityEnvelope:authorityEnvelope(),
   };
   const before=structuredClone(chrome.data['autopilotOrchestrationV2Runtime:orch-1']);
 
