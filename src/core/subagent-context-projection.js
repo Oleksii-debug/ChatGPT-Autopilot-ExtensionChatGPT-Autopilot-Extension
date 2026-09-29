@@ -30,6 +30,7 @@ const REQUEST_KEYS = new Set([
   'expectedParentAgentId',
   'expectedChildAgentId',
   'expectedTaskId',
+  'expectedProjectRevisionId',
   'parentProjectSnapshot',
   'priorParentCapsule',
 ]);
@@ -201,6 +202,10 @@ export function projectSubagentContextV1(input = {}) {
     'expectedChildAgentId',
   );
   const expectedTaskId = exactId(own(request, 'expectedTaskId'), 'expectedTaskId');
+  const expectedProjectRevisionId = exactId(
+    own(request, 'expectedProjectRevisionId'),
+    'expectedProjectRevisionId',
+  );
 
   if (envelope.parentAgentId !== expectedParentAgentId) {
     throw new Error('Subagent authority parentAgentId binding mismatch');
@@ -215,6 +220,9 @@ export function projectSubagentContextV1(input = {}) {
   const parentSnapshot = normalizeProjectSnapshotV1(own(request, 'parentProjectSnapshot'));
   if (parentSnapshot.projectId !== envelope.projectId) {
     throw new Error('Subagent authority projectId does not match parent project snapshot');
+  }
+  if (parentSnapshot.revisionId !== expectedProjectRevisionId) {
+    throw new Error('Parent project snapshot revision binding mismatch');
   }
 
   const sourceById = new Map(parentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
