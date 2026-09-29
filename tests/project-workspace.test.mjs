@@ -1395,6 +1395,7 @@ test('generic repository mutation rejects newly admitted provenance outside the 
 test('initial direct save cannot bootstrap future capsule evidence', async () => {
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  workspace.updatedAt = 2;
   workspace.projectsById['project-a'].capsulesById['capsule-future'] = {
     ...capsule('project-r2', 'r2'),
     capsuleId: 'capsule-future',
@@ -1410,6 +1411,7 @@ test('initial direct save cannot bootstrap future capsule evidence', async () =>
 test('initial direct save cannot bootstrap mismatched artifact provenance', async () => {
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  workspace.updatedAt = 2;
   const mismatched = provenance();
   mismatched.artifactRef = {
     ...artifact(),
