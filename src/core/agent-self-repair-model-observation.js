@@ -184,8 +184,8 @@ function normalizeProviderReservation(value, prepared) {
     throw new Error('Provider reservation output-token bound drifted from the prepared invocation');
   }
   const totalTokens = safeCounter(raw.totalTokens, 'provider reservation totalTokens');
-  if (totalTokens < inputTokens + outputTokens) {
-    throw new Error('Provider reservation totalTokens is inconsistent');
+  if (totalTokens !== inputTokens + outputTokens) {
+    throw new Error('Provider reservation totalTokens must exactly equal inputTokens plus outputTokens');
   }
   if (typeof raw.estimatedCostUsd !== 'number'
       || !Number.isFinite(raw.estimatedCostUsd)
