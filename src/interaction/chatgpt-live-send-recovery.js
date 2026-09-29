@@ -21,6 +21,13 @@
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const SUBMIT_MODES = new Set(['SUBMIT_EXISTING', 'INSERT_AND_SEND']);
+  const VERIFY_MODES = new Set(['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+  const RECOVERABLE_UNCERTAIN_CODES = new Set([
+    'SEND_CLICK_UNCERTAIN',
+    'POST_CLICK_PROMPT_STILL_PENDING',
+    'RECOVERY_BOUND_REPRESENTATION_UNCERTAIN',
+    'RECOVERY_UNCERTAIN'
+  ]);
   const HIGH_ALIASES = new Set([
     'high',
     'високий',
@@ -139,8 +146,6 @@
       doc.dispatchEvent?.(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
     } catch (_) { /* synthetic keyboard events are best effort */ }
     await wait(40);
-    // If an effort menu remained open, toggling the same control is safer than
-    // leaving a modal surface behind for the main adapter to classify as blocking.
     const stillOpen = findHighOption(doc);
     if (stillOpen && control?.isConnected) {
       try { control.click(); } catch (_) { /* best effort */ }
@@ -194,8 +199,6 @@
       if (verified.level === 'HIGH' || verified.level === 'EXTRA_HIGH') {
         return { outcome: 'HIGH_SELECTED', attempts: attempt, clicks };
       }
-      // Some ChatGPT variants close the menu after a successful choice before
-      // updating the button label. A selected/checked High option is equivalent.
       const selectedHigh = Array.from(doc.querySelectorAll('[aria-checked="true"], [aria-selected="true"], [data-state="checked"]'))
         .filter(visible)
         .some((el) => exactLevelFromLabel(elementLabel(el)) === 'HIGH');
@@ -247,9 +250,9 @@
   }
 
   function canUpgradeUncertainSubmit(doc, adapter, request, result) {
-    if (!SUBMIT_MODES.has(request?.mode)) return false;
+    if (!SUBMIT_MODES.has(request?.mode) && !VERIFY_MODES.has(request?.mode)) return false;
     if (result?.status !== 'SUBMISSION_UNCERTAIN') return false;
-    if (!['SEND_CLICK_UNCERTAIN', 'POST_CLICK_PROMPT_STILL_PENDING'].includes(result?.safeDiagnosticCode)) return false;
+    if (!RECOVERABLE_UNCERTAIN_CODES.has(result?.safeDiagnosticCode)) return false;
     const observed = result.normalizedObservedUrl || (typeof location !== 'undefined' ? location.href : '');
     if (!routeProvesExpectedConversation(observed, request.expectedUrl)) return false;
     if (!composerIsEmpty(doc, adapter)) return false;
@@ -283,10 +286,10 @@
     adapter.execute = async function patchedExecute(request, deps) {
       const doc = deps?.document || root?.document;
       const submitMode = SUBMIT_MODES.has(request?.mode);
-      const assistantBaselineCount = submitMode && doc?.querySelectorAll ? countAssistantMessages(doc) : undefined;
+      const verificationMode = VERIFY_MODES.has(request?.mode);
+      const assistantBaselineCount = (submitMode || verificationMode) && doc?.querySelectorAll ? countAssistantMessages(doc) : undefined;
       let effort = null;
       if (submitMode && doc?.querySelectorAll) {
-        // Failure to select High is intentionally non-fatal. Two attempts max.
         try { effort = await ensureHighEffort(doc, adapter, deps || {}); }
         catch (_) { effort = { outcome: 'HIGH_SELECTION_ERROR_CONTINUE_SEND', attempts: 2 }; }
       }
