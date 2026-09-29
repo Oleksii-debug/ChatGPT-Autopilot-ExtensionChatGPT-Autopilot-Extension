@@ -1501,3 +1501,199 @@ test('corrupt durable provider execution fails closed across restart and Start',
   assert.equal(final.job.runtime.specialistProviderExecutionIntegrityFault, true);
   assert.equal(final.job.runtime.runState, 'ERROR');
 });
+
+
+function trustedExecutionReadiness(selection, at, assertCurrent = async () => true) {
+  return {
+    async resolve() {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        observedAt: at,
+        resolvedAt: at,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+      };
+    },
+    assertCurrent,
+  };
+}
+
+test('trusted readiness drift before PREPARED blocks provider execution without durable effect provenance', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() { calls += 1; throw new Error('must not dispatch'); },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  const state = await manager.listSpecialistHandoffs('job.coder');
+  const selection = state.selectionProvenance[0].selection;
+  clock.value = Date.parse(T1);
+  const resolver = trustedExecutionReadiness(selection, T1, async () => {
+    throw new Error('Specialist provider config changed after readiness probe');
+  });
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '88888888-8888-4888-8888-888888888888',
+      expectedControlEpoch: 0,
+      at: T1,
+    }, { specialistProviderReadinessResolver: resolver }),
+    /config changed after readiness probe/,
+  );
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+  assert.equal(durable.executionOwnerships[0].state, 'OWNED');
+});
+
+test('registry drift after lease blocks provider PREPARED and external dispatch', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() { calls += 1; throw new Error('must not dispatch'); },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  const registryState = await manager.getSpecialistRegistry('specialists:project-1');
+  const currentDefinition = registryState.registry.definitions.find(
+    item => item.specialistId === OPENHANDS_CODING_SPECIALIST_ID,
+  );
+  await manager.mutateSpecialistRegistry({
+    registryId: registryState.registry.registryId,
+    expectedRegistryRevision: registryState.registry.revision,
+    expectedRegistryBindingKey: registryState.registry.bindingKey,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: currentDefinition.specialistId,
+    expectedDefinitionRevision: currentDefinition.definitionRevision,
+    definition: {
+      ...currentDefinition,
+      enabled: false,
+      definitionRevision: currentDefinition.definitionRevision + 1,
+    },
+  });
+  clock.value = Date.parse(T1);
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '99999999-9999-4999-8999-999999999999',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /bindingKey drifted|selection registry identity, revision or bindingKey drifted/,
+  );
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
+
+test('readiness await cannot carry provider PREPARED past lease expiry', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() { calls += 1; throw new Error('expired lease must not dispatch'); },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  const state = await manager.listSpecialistHandoffs('job.coder');
+  const selection = state.selectionProvenance[0].selection;
+  clock.value = Date.parse(T1);
+  const resolver = trustedExecutionReadiness(selection, T1, async () => {
+    clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+  });
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '12121212-1212-4212-8212-121212121212',
+      expectedControlEpoch: 0,
+      at: T1,
+    }, { specialistProviderReadinessResolver: resolver }),
+    /lease expired before provider preparation/,
+  );
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
+
+test('provider config mutation is fenced while canonical effect authority remains active', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let releaseEffect;
+  let enteredEffect;
+  const gate = new Promise(resolve => { releaseEffect = resolve; });
+  const entered = new Promise(resolve => { enteredEffect = resolve; });
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() {
+        enteredEffect();
+        await gate;
+        return {
+          providerStatus: 'finished',
+          providerSucceeded: true,
+          manualReviewRequired: false,
+          reconciliationRequired: false,
+          safeToRetry: false,
+          effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+          providerUpdatedAt: T1,
+          providerObservedAt: T1,
+        };
+      },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  const execution = manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '34343434-3434-4434-8434-343434343434',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  await entered;
+
+  await assert.rejects(
+    () => manager.putSpecialistProviderConfig({
+      providerConfig: providerConfig(2, T1),
+      expectedRevision: 1,
+    }),
+    /cannot change while provider execution owns effect authority/,
+  );
+  await assert.rejects(
+    () => manager.clearSpecialistProviderConfig({
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: 1,
+    }),
+    /cannot change while provider execution owns effect authority/,
+  );
+
+  releaseEffect();
+  const result = await execution;
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+});
