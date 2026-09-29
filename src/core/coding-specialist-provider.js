@@ -334,17 +334,25 @@ export function prepareOpenHandsCodingSpecialistV1(input) {
   });
 }
 
+class OpenHandsResponseValidationError extends Error {
+  constructor(message, code) {
+    super(message);
+    this.name = 'OpenHandsResponseValidationError';
+    this.code = code;
+  }
+}
+
 async function responseTextBounded(response, maxBytes) {
   const declared = response?.headers?.get?.('content-length');
   if (declared != null && declared !== '') {
     const parsed = Number(declared);
     if (Number.isSafeInteger(parsed) && parsed > maxBytes) {
       try { await response?.body?.cancel?.(); } catch {}
-      throw new Error('OpenHands response exceeds configured byte limit');
+      throw new OpenHandsResponseValidationError('OpenHands response exceeds configured byte limit', 'OPENHANDS_RESPONSE_TOO_LARGE');
     }
   }
   if (!response?.body || typeof response.body.getReader !== 'function') {
-    throw new Error('OpenHands response body is not a readable byte stream');
+    throw new OpenHandsResponseValidationError('OpenHands response body is not a readable byte stream', 'OPENHANDS_RESPONSE_BODY_UNREADABLE');
   }
   const reader = response.body.getReader();
   const chunks = [];
@@ -353,11 +361,11 @@ async function responseTextBounded(response, maxBytes) {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (!(value instanceof Uint8Array)) throw new Error('OpenHands response stream returned non-byte data');
+      if (!(value instanceof Uint8Array)) throw new OpenHandsResponseValidationError('OpenHands response stream returned non-byte data', 'OPENHANDS_RESPONSE_STREAM_INVALID');
       total += value.byteLength;
       if (total > maxBytes) {
         try { await reader.cancel(); } catch {}
-        throw new Error('OpenHands response exceeds configured byte limit');
+        throw new OpenHandsResponseValidationError('OpenHands response exceeds configured byte limit', 'OPENHANDS_RESPONSE_TOO_LARGE');
       }
       chunks.push(value);
     }
@@ -373,7 +381,7 @@ async function responseTextBounded(response, maxBytes) {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new Error('OpenHands response is not valid UTF-8');
+    throw new OpenHandsResponseValidationError('OpenHands response is not valid UTF-8', 'OPENHANDS_RESPONSE_INVALID_UTF8');
   }
 }
 
@@ -383,7 +391,7 @@ async function responseJsonBounded(response, maxBytes) {
   try {
     body = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(`OpenHands Agent Server returned invalid JSON (HTTP ${response.status})`);
+    throw new OpenHandsResponseValidationError(`OpenHands Agent Server returned invalid JSON (HTTP ${response.status})`, 'OPENHANDS_RESPONSE_INVALID_JSON');
   }
   return body;
 }
@@ -533,6 +541,15 @@ export class OpenHandsCodingSpecialistClient {
     } catch (error) {
       if (error instanceof OpenHandsCodingSpecialistError) throw error;
       const ambiguous = effectDispatched && fetchStarted;
+      if (error instanceof OpenHandsResponseValidationError) {
+        throw new OpenHandsCodingSpecialistError(error.message, {
+          code: error.code,
+          conversationId: prepared.conversationId,
+          effectMayHaveOccurred: ambiguous,
+          reconciliationRequired: ambiguous,
+          safeToRetry: !ambiguous,
+        });
+      }
       throw new OpenHandsCodingSpecialistError(
         controller.signal.aborted
           ? `OpenHands request timed out after ${timeoutMs} ms`

@@ -121,6 +121,29 @@ function ownerResourceBudget(maxConcurrentAgents = 4) {
   };
 }
 
+function trustedReadinessResolver(at = T0) {
+  return {
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        observedAt: at,
+        resolvedAt: at,
+        maxAgeMs: 5 * 60_000,
+      };
+    },
+    async assertCurrent() { return true; },
+  };
+}
+
 async function seed(manager, { claim = true } = {}) {
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const agentMutation = await manager.mutateAgentDefinitionRegistry({
@@ -196,10 +219,16 @@ async function seed(manager, { claim = true } = {}) {
   const prepared = await manager.cycleOne('job.coder');
   assert.equal(prepared.kind, 'SPECIALIST_PENDING');
   if (!claim) return prepared.handoff.agentId;
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: ownerResourceBudget(),
+  });
   const claimed = await manager.claimSpecialistHandoffs('job.coder', {
     availableSlots: 1,
     leaseSeconds: 600,
     at: T0,
+  }, {
+    specialistProviderReadinessResolver: trustedReadinessResolver(T0),
   });
   assert.equal(claimed.claimed.length, 1);
   return claimed.claimed[0];
@@ -528,7 +557,7 @@ test('stale caller timestamp cannot extend an expired Specialist provider lease'
 
 test('future caller timestamp is rejected before durable PREPARED or provider effect', async () => {
   const { chrome } = chromeStorage();
-  const clock = { value: Date.parse(T1) };
+  const clock = { value: Date.parse(T0) };
   let calls = 0;
   const client = {
     async execute() {
@@ -543,6 +572,7 @@ test('future caller timestamp is rejected before durable PREPARED or provider ef
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
   const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
 
   await assert.rejects(
     () => manager.executeClaimedSpecialistProvider('job.coder', {
@@ -591,6 +621,7 @@ test('corrupt persisted provider execution is quarantined and cannot authorize r
   const state = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(state.providerExecutions.length, 0);
   assert.equal(state.providerExecutionQuarantined, true);
+  clock.value = Date.parse(T1);
   await assert.rejects(
     () => manager.executeClaimedSpecialistProvider('job.coder', {
       agentId,

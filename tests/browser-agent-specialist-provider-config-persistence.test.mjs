@@ -87,8 +87,10 @@ test('owner-qualified provider config persists in the existing BrowserAgent stor
 
 test('provider config CAS is serialized and only one concurrent same-revision update commits', async () => {
   const { chrome } = makeChromeStorage();
-  const manager = managerFor(chrome);
+  const clock = { value: T0 };
+  const manager = managerFor(chrome, () => clock.value);
   await manager.setSpecialistProviderConfig(setRequest(0));
+  clock.value += 1000;
 
   const first = manager.setSpecialistProviderConfig(setRequest(1, {
     config: config({ agentProfileRevision: 3 }),

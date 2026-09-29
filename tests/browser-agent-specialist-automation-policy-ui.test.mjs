@@ -13,7 +13,10 @@ test('Specialist automation owner controls are native, labeled and gate-only', (
     'agent-specialist-automation-clear-button',
     'agent-specialist-automation-status',
   ]) {
-    assert.match(html, new RegExp('id=["\\\']' + id + '["\\\']', 'u'));
+    assert.ok(
+      html.includes(`id="${id}"`) || html.includes(`id='${id}'`),
+      `missing Specialist automation control ${id}`,
+    );
   }
   assert.doesNotMatch(html, /id="agent-specialist-automation-capacity"/u);
   assert.match(html, /Product-wide числовий ліміт задається окремо через ResourceBudgetV1/u);
