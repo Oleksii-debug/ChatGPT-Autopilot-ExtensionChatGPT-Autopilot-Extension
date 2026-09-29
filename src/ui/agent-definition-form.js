@@ -140,54 +140,82 @@ function exactIntegerText(value, label, { min, max }) {
   return number;
 }
 
+function specialistFormDataValue(input, key, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  return descriptor.value;
+}
+
+function specialistFormBoolean(input, key, label) {
+  const value = specialistFormDataValue(input, key, label);
+  if (typeof value !== 'boolean') {
+    throw new Error(label + ' має бути boolean.');
+  }
+  return value;
+}
+
 export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
   persistedProfile = undefined,
 } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Форма Specialist delegation недоступна.');
   }
-  const configured = input.specialistDelegationConfigured === true;
+  const configured = specialistFormBoolean(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
   if (!configured) {
     return persistedProfile === undefined ? undefined : null;
   }
+  const enabled = specialistFormBoolean(
+    input,
+    'specialistDelegationEnabled',
+    'Specialist delegation enabled',
+  );
   return normalizeAgentSpecialistDelegationProfileV1({
     schemaVersion: 1,
-    registryId: parseCanonicalAgentIdentity(input.specialistRegistryId, 'Specialist registry ID'),
+    registryId: parseCanonicalAgentIdentity(
+      specialistFormDataValue(input, 'specialistRegistryId', 'Specialist registry ID'),
+      'Specialist registry ID',
+    ),
     requiredCapabilityIds: listFromLines(
-      input.specialistCapabilityIdsText ?? '',
+      specialistFormDataValue(input, 'specialistCapabilityIdsText', 'Specialist capability IDs'),
       'Specialist capability ID',
       { maxItems: 64, itemMax: 180, identity: true },
     ),
     requiredToolIds: listFromLines(
-      input.specialistToolIdsText ?? '',
+      specialistFormDataValue(input, 'specialistToolIdsText', 'Specialist tool IDs'),
       'Specialist tool ID',
       { maxItems: 128, itemMax: 180, identity: true },
     ),
     policyEnvelopeId: parseCanonicalAgentIdentity(
-      input.specialistPolicyEnvelopeId,
+      specialistFormDataValue(input, 'specialistPolicyEnvelopeId', 'Policy envelope ID'),
       'Policy envelope ID',
     ),
     deadlineSeconds: exactIntegerText(
-      input.specialistDeadlineSeconds,
+      specialistFormDataValue(input, 'specialistDeadlineSeconds', 'Specialist deadline'),
       'Specialist deadline',
       { min: 1, max: 31_536_000 },
     ),
     maxConcurrentHandoffs: exactIntegerText(
-      input.specialistMaxConcurrentHandoffs,
+      specialistFormDataValue(input, 'specialistMaxConcurrentHandoffs', 'Specialist concurrency'),
       'Specialist concurrency',
       { min: 0, max: 256 },
     ),
     leaseSeconds: exactIntegerText(
-      input.specialistLeaseSeconds,
+      specialistFormDataValue(input, 'specialistLeaseSeconds', 'Specialist lease'),
       'Specialist lease',
       { min: 1, max: 86_400 },
     ),
     priority: exactIntegerText(
-      input.specialistPriority,
+      specialistFormDataValue(input, 'specialistPriority', 'Specialist priority'),
       'Specialist priority',
       { min: 0, max: 1_000_000 },
     ),
-    enabled: input.specialistDelegationEnabled === true,
+    enabled,
   });
 }
 
