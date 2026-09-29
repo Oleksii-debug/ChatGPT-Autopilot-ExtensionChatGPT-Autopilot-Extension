@@ -156,11 +156,15 @@ export function createSpecialistRegistryV1(input) {
   const definitions = denseArray(raw.definitions, 'definitions', 128).map(normalizeSpecialistDefinitionV1)
     .sort((left, right) => compareId(left.specialistId, right.specialistId));
   if (new Set(definitions.map(item => item.specialistId)).size !== definitions.length) throw new Error('SpecialistRegistryV1 contains duplicate specialistId');
+  const bindingKey = exactBindingKey(
+    registryBindingKey(registryId, revision, definitions),
+    'SpecialistRegistryV1.bindingKey',
+  );
   return freeze({
     schemaVersion: 1,
     registryId,
     revision,
-    bindingKey: registryBindingKey(registryId, revision, definitions),
+    bindingKey,
     definitions,
   });
 }
