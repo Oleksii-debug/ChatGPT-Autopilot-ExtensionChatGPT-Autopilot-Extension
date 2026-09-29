@@ -146,3 +146,48 @@ test('Agent draft snapshots nested JSON data and canonicalizes goal whitespace',
   assert.deepEqual(draft.policy.acceptanceCriteria, ['Готово']);
   assert.equal(draft.policy.siteRules[0].pattern, 'example.com');
 });
+
+
+test('Agent draft rejects coercive scalar aliases instead of relying on Browser Agent coercion', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити точні типи',
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { maxSteps: '300' } }),
+    /канонічним числом/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { startFromActiveTab: 1 } }),
+    /boolean/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { aiPinnedRouteId: 123 } }),
+    /рядком/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { acceptanceCriteria: 'Готово' } }),
+    /масивом/,
+  );
+});
+
+test('Agent draft applies one bounded complexity budget across the whole imported policy', () => {
+  const policy = {
+    acceptanceCriteria: Array.from({ length: 6000 }, (_, index) => `Критерій ${index}`),
+    siteRules: Array.from({ length: 6000 }, (_, index) => ({
+      pattern: `sub${index}.example.com`,
+      defaultDecision: 'ASK',
+      actionDecisions: {},
+    })),
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({
+      format: 'chatgpt-autopilot-agent-draft',
+      version: 1,
+      goal: 'Перевірити bounded import',
+      policy,
+    }),
+    /допустимий розмір/,
+  );
+});
