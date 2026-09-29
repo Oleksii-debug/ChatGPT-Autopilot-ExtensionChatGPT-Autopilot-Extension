@@ -189,6 +189,11 @@ function normalizedState(input) {
     throw new Error('Exact effect phase is invalid');
   }
   const phase = raw.phase;
+  const createdAt = timestamp(raw.createdAt, 'createdAt');
+  const updatedAt = timestamp(raw.updatedAt, 'updatedAt');
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error('Exact-effect durable time cannot predate creation');
+  }
   const attempt = raw.attempt;
   if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
     throw new Error('Exact effect attempt is invalid');
@@ -198,7 +203,13 @@ function normalizedState(input) {
     throw new Error('Exact effect executionId is inconsistent');
   }
   const observation = raw.observation == null ? null : normalizeObservationV1(raw.observation);
-  if (observation) assertObservationBinding(observation, { invocation });
+  if (observation) {
+    assertObservationBinding(observation, { invocation });
+    if (Date.parse(observation.observedAt) < Date.parse(createdAt)
+        || Date.parse(observation.observedAt) > Date.parse(updatedAt)) {
+      throw new Error('Exact-effect observation chronology is invalid');
+    }
+  }
   const verification = raw.verification == null ? null : normalizeVerificationV1(raw.verification);
   if (verification) {
     if (!observation) throw new Error('Verification requires observation');
@@ -209,6 +220,10 @@ function normalizedState(input) {
       executionId: expectedExecutionId,
       attempt,
     });
+    if (Date.parse(verification.verifiedAt) < Date.parse(observation.observedAt)
+        || Date.parse(verification.verifiedAt) > Date.parse(updatedAt)) {
+      throw new Error('Exact-effect verification chronology is invalid');
+    }
   }
   const processedEventIds = dataArray(raw.processedEventIds, 'processedEventIds', MAX_PROCESSED_EVENTS)
     .map((value, index) => id(value, `processedEventIds[${index}]`));
@@ -291,8 +306,8 @@ function normalizedState(input) {
     ambiguity,
     reconciliation,
     commitId,
-    createdAt: timestamp(raw.createdAt, 'createdAt'),
-    updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
+    createdAt,
+    updatedAt,
     processedEventIds,
   });
 }
