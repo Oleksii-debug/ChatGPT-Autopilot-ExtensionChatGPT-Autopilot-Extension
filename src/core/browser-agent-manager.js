@@ -2417,10 +2417,54 @@ export class BrowserAgentManager {
       return store;
     });
 
-    const beforeDispatch = await this.get(id);
-    if (!beforeDispatch.job
-        || beforeDispatch.job.runtime.runState !== BrowserAgentRunState.RUNNING
-        || beforeDispatch.job.runtime.controlEpoch !== request.expectedControlEpoch) {
+    // PREPARED is deliberately persisted before the external effect. Re-enter
+    // the serialized durable authority boundary after that async gap so an
+    // owner PAUSE/STOP/controlEpoch change that committed after PREPARED wins
+    // before provider dispatch. This update is the linearization point: once
+    // the authorization marker is durably appended, a later owner command is
+    // ordered after dispatch admission and PREPARED recovery remains
+    // conservative about a possibly-started external effect.
+    await this.get(id);
+    let dispatchAuthorized = false;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan
+          || job.runtime.runState !== BrowserAgentRunState.RUNNING
+          || job.runtime.controlEpoch !== request.expectedControlEpoch) {
+        return store;
+      }
+      if (automationPolicyFence) {
+        const livePolicy = store.specialistAutomationPolicy;
+        if (store.specialistAutomationPolicyQuarantined === true
+            || !livePolicy
+            || livePolicy.enabled !== true
+            || livePolicy.revision !== automationPolicyFence.revision
+            || JSON.stringify(livePolicy) !== automationPolicyFence.bindingKey) {
+          return store;
+        }
+      }
+      const livePrepared = (job.runtime.specialistProviderExecutions || []).find(item =>
+        item?.agentId === prepared.agentId
+        && item?.leaseId === prepared.leaseId
+        && item?.conversationId === prepared.conversationId);
+      if (!livePrepared) return store;
+      const canonicalPrepared = normalizeSpecialistProviderExecutionV1(livePrepared);
+      if (canonicalPrepared.status !== SpecialistProviderExecutionStatus.PREPARED
+          || Date.parse(canonicalPrepared.leaseUntil) <= this.now()) {
+        return store;
+      }
+      dispatchAuthorized = true;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-provider-dispatch-authorized',
+        agentId: prepared.agentId,
+        providerId: prepared.providerId,
+        message: 'Current owner lifecycle authority revalidated immediately before Specialist provider dispatch.',
+      });
+      return store;
+    });
+    if (!dispatchAuthorized) {
       const cancelledAt = new Date(this.now()).toISOString();
       let cancelled = null;
       await this.update(store => {
