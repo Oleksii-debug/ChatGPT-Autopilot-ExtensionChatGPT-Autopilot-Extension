@@ -396,10 +396,11 @@ export function projectCurrentState(workspace, projectId, capsuleId, currentSour
 export class ProjectWorkspaceRepository {
   constructor(chromeApi) { this.chrome = chromeApi; this.updateQueue = Promise.resolve(); }
 
-  async load() {
+  async load({ emptyNowMs = Date.now() } = {}) {
+    timestamp(emptyNowMs, 'project workspace emptyNowMs');
     const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
     const workspace = record[PROJECT_WORKSPACE_STORAGE_KEY] === undefined
-      ? createProjectWorkspace()
+      ? createProjectWorkspace(emptyNowMs)
       : record[PROJECT_WORKSPACE_STORAGE_KEY];
     return validateProjectWorkspace(workspace);
   }
@@ -421,8 +422,8 @@ export class ProjectWorkspaceRepository {
 
   update(mutator, { nowMs = Date.now() } = {}) {
     const task = this.updateQueue.then(async () => {
-      const current = await this.load();
       timestamp(nowMs, 'project workspace update nowMs');
+      const current = await this.load({ emptyNowMs: nowMs });
       if (nowMs < current.updatedAt) {
         throw new Error('Project workspace update nowMs cannot precede durable updatedAt');
       }
