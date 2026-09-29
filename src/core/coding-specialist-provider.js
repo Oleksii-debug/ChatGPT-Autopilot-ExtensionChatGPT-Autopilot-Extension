@@ -507,7 +507,10 @@ export class OpenHandsCodingSpecialistClient {
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
-      if (allowNotFound && response.status === 404) return null;
+      if (allowNotFound && response.status === 404) {
+        try { await response?.body?.cancel?.(); } catch {}
+        return null;
+      }
       const parsed = await responseJsonBounded(response, prepared.config.maxResponseBytes);
       if (!response.ok) {
         // Server payload is untrusted data. Never promote body.detail (or any
