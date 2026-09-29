@@ -622,6 +622,10 @@ test('live PREPARED execution fences provider config mutation until external eff
   });
   await started;
 
+  // The provider effect remains unresolved after the execution lease expires;
+  // expiry alone must not release provider-config authority.
+  clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+
   const configured = providerConfig();
   await assert.rejects(
     () => manager.setSpecialistProviderConfig({
