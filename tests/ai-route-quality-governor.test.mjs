@@ -46,10 +46,16 @@ function paid(routeId, inputPrice, outputPrice, overrides = {}) {
   });
 }
 
-async function benchmarkBinding(routeValue, { pass = true, suffix = 'a', maxAgeMs = 60_000 } = {}) {
+async function benchmarkBinding(routeValue, {
+  pass = true,
+  suffix = 'a',
+  suiteSuffix = suffix,
+  suiteRevisionSuffix = suiteSuffix,
+  maxAgeMs = 60_000,
+} = {}) {
   const routeId = routeValue.routeId;
-  const suiteId = 'route-quality-' + suffix;
-  const suiteRevisionId = 'suite-' + suffix;
+  const suiteId = 'route-quality-' + suiteSuffix;
+  const suiteRevisionId = 'suite-' + suiteRevisionSuffix;
   const runId = 'run-' + routeId + '-' + suffix;
   const subjectRevisionId = await deriveAiRouteQualitySubjectRevisionIdV1(routeValue);
   const invocationId = 'benchmark-' + routeId + '-' + suffix;
@@ -190,8 +196,16 @@ test('quality evidence ranks PASS before missing evidence and known FAIL last', 
   const report = await rank({
     routes,
     benchmarkRequests: [
-      await benchmarkBinding(routes[0], { pass: true, suffix: 'pass' }),
-      await benchmarkBinding(routes[2], { pass: false, suffix: 'fail' }),
+      await benchmarkBinding(routes[0], {
+        pass: true,
+        suffix: 'pass',
+        suiteSuffix: 'quality',
+      }),
+      await benchmarkBinding(routes[2], {
+        pass: false,
+        suffix: 'fail',
+        suiteSuffix: 'quality',
+      }),
     ],
   });
 
@@ -202,6 +216,66 @@ test('quality evidence ranks PASS before missing evidence and known FAIL last', 
   );
   assert.equal(report.candidates[0].quality.passedCaseCount, 1);
   assert.equal(report.candidates[2].quality.failedCaseCount, 1);
+});
+
+test('fresh evidence from different benchmark suite identities fails closed instead of ranking incomparable quality', async () => {
+  const routes = [route('route-a'), route('route-b')];
+  await assert.rejects(
+    rank({
+      routes,
+      benchmarkRequests: [
+        await benchmarkBinding(routes[0], { suffix: 'a', suiteSuffix: 'suite-a' }),
+        await benchmarkBinding(routes[1], { suffix: 'b', suiteSuffix: 'suite-b' }),
+      ],
+    }),
+    /must use one comparable suiteId and suiteRevisionId/u,
+  );
+});
+
+test('fresh evidence from different revisions of the same benchmark suite fails closed', async () => {
+  const routes = [route('route-a'), route('route-b')];
+  await assert.rejects(
+    rank({
+      routes,
+      benchmarkRequests: [
+        await benchmarkBinding(routes[0], {
+          suffix: 'a',
+          suiteSuffix: 'shared',
+          suiteRevisionSuffix: 'rev-a',
+        }),
+        await benchmarkBinding(routes[1], {
+          suffix: 'b',
+          suiteSuffix: 'shared',
+          suiteRevisionSuffix: 'rev-b',
+        }),
+      ],
+    }),
+    /must use one comparable suiteId and suiteRevisionId/u,
+  );
+});
+
+test('stale historical suite evidence does not block a fresh comparable quality signal', async () => {
+  const routes = [route('route-fresh'), route('route-stale')];
+  const report = await rank({
+    routes,
+    now: NOW + 60_000,
+    benchmarkRequests: [
+      await benchmarkBinding(routes[0], {
+        suffix: 'fresh',
+        suiteSuffix: 'current',
+        maxAgeMs: 120_000,
+      }),
+      await benchmarkBinding(routes[1], {
+        suffix: 'stale',
+        suiteSuffix: 'historical',
+        maxAgeMs: 1_000,
+      }),
+    ],
+  });
+
+  assert.deepEqual(report.rankedRouteIds, ['route-fresh', 'route-stale']);
+  assert.equal(report.candidates[0].quality.class, AiRouteQualityClass.PASS);
+  assert.equal(report.candidates[1].quality.class, AiRouteQualityClass.STALE);
 });
 
 test('stale quality evidence is explicit and does not retain PASS ranking authority', async () => {
@@ -244,7 +318,7 @@ test('cost is deterministic after equal owner and quality evidence, then latency
   ];
   const benchmarkRequests = await Promise.all(routes.map((item, index) => benchmarkBinding(
     item,
-    { pass: true, suffix: String(index + 1) },
+    { pass: true, suffix: String(index + 1), suiteSuffix: 'cost' },
   )));
   const routeStates = {
     'free-slow': { successes: 1, lastLatencyMs: 500 },
