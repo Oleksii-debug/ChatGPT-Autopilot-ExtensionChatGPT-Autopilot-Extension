@@ -1,0 +1,36 @@
+QA 0.5.1 — SESSION TUNING + UNATTENDED API CREDENTIALS
+
+FINAL AUTOMATED MATRIX:
+- New AI / Gateway / Windows companion: 82/82 PASS.
+- Core + integration regression: 233/233 PASS.
+- ChatGPT interaction regression: 111/111 PASS.
+- UI regression: 45/45 PASS.
+- Reliability regression: 22/22 PASS.
+- Legacy AI Manager regression: 18/18 PASS.
+- Release gates: 7/7 PASS.
+- Разом автоматизованих тестів: 518/518 PASS.
+
+NEW 0.5.1 PROOF:
+- OpenAI-compatible key setup uses Read-Host -AsSecureString + ConvertFrom-SecureString + compatible-key.dpapi;
+- one-click launcher decrypts compatible DPAPI key, exposes only COMPATIBLE_API_KEY to child Gateway, then clears env and zeroes BSTR;
+- hidden Windows autostart does the same without interaction;
+- interactive compatible launcher reuses saved key or uses an unsaved one-process secure prompt;
+- delete script and Gateway menu wiring statically verified.
+
+0.5.0 SESSION TUNING PROOF PRESERVED:
+- TUNE_SESSION explicit opt-in, four bounded timing fields only;
+- prompts/URLs/tasks/run mode/rate-limit holds cannot be changed through this action;
+- SUBMITTING/AMBIGUOUS mutation blocked; current send gate never shortened.
+
+ADDITIONAL GATES:
+- JS/MJS/CJS syntax: PASS.
+- JSON parse: PASS.
+- deterministic extension packaging: PASS.
+- ZIP integrity/SHA256: see final SHA256SUMS.
+
+NOT PHYSICALLY CLAIMED:
+- actual PowerShell/DPAPI/Startup execution on owner PC;
+- real remote compatible provider credentials;
+- real Ollama/LM Studio model;
+- overnight Chrome run;
+- physical NVDA acceptance.

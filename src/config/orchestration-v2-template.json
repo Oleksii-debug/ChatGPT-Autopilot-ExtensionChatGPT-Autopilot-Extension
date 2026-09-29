@@ -1,0 +1,46 @@
+{
+  "kind": "chatgpt-autopilot-orchestration-v2",
+  "version": 1,
+  "name": "My project",
+  "project": {
+    "id": "project-main",
+    "target_repository": "owner/project"
+  },
+  "github_control": {
+    "repository": "owner/project",
+    "issue": 1,
+    "comment_id": 0,
+    "bootstrap_pinned_control_first": false
+  },
+  "providers": {
+    "coordinator": "chatgpt-browser",
+    "worker": "chatgpt-browser"
+  },
+  "coordinator": {
+    "launch_url": "https://chatgpt.com/",
+    "master_prompt": "PASTE MASTER COORDINATOR PROMPT HERE",
+    "tick_prompt": "Продовжуй координацію. Перечитай live GitHub і прийми наступне рішення.",
+    "prompt_version": 1,
+    "max_turns_per_chat": 10
+  },
+  "local_limits": {
+    "initial_workers": 5,
+    "max_active_workers": 8,
+    "max_launches_per_window": 6,
+    "launch_window_seconds": 300,
+    "minimum_launch_interval_seconds": 0,
+    "worker_probe_interval_seconds": 30,
+    "watchdog_seconds": 300,
+    "stale_worker_seconds": 3600
+  },
+  "timing": {
+    "worker_pre_send_seconds": 8,
+    "worker_busy_check_seconds": 2,
+    "worker_retry_seconds": 60,
+    "coordinator_pre_send_seconds": 8,
+    "coordinator_retry_seconds": 60
+  },
+  "safety": {
+    "fallback_universal_prompt_enabled": false
+  }
+}

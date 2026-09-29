@@ -1,0 +1,35 @@
+name: UI accessibility contract tests
+
+on:
+  push:
+    branches: ["main", "source/0.9.19-canonical-convergence"]
+    paths:
+      - "src/ui/**"
+      - "tests-regression/ui/**"
+      - "package.json"
+      - ".github/workflows/ui-tests.yml"
+  pull_request:
+    paths:
+      - "src/ui/**"
+      - "tests-regression/ui/**"
+      - "package.json"
+      - ".github/workflows/ui-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Collapse only superseded heads of the same pull request/workflow.
+  # Push/main and manual runs use a unique run_id so exact-main evidence is preserved.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ui-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm run test:ui

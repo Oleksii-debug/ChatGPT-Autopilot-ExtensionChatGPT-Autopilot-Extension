@@ -1,0 +1,40 @@
+QA 0.9.5 — IMMEDIATE ORCHESTRA START / OWNER UX FIX
+
+FINAL AUTOMATED QUALIFICATION — 2026-09-12
+
+Functional matrix:
+- AI / Orchestration / Gateway: 275/275 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 239/239 PASS
+- ChatGPT interaction: 111/111 PASS
+- UI: 54/54 PASS
+- Release: 14/14 PASS
+- Reliability: 22/22 PASS
+- TOTAL: 733/733 PASS
+
+Focused start-lifecycle regression:
+- zero-state JSON import still creates a disabled selected orchestra: PASS
+- explicit «Запустити оркестр» enables and materializes the first Coordinator turn immediately: PASS
+- disabled -> enabled via normal Save triggers the initial Coordinator cycle immediately: PASS
+- «Зберегти й запустити зараз» is present and wired: PASS
+- owner-local Resume enters RECOVERING and starts recovery/reconciliation immediately: PASS
+- Start while owner-paused fails closed and requires Resume semantics: PASS
+- watchdog remains reconciliation/self-healing and is not used as the first-start delay: PASS
+- physical Send still honors Coordinator pre-send delay: PASS
+
+Browser gates:
+- Native Chromium ChatGPT-like phased interaction: PASS
+- Chromium keyboard/mode/accessibility contract: PASS
+
+Known non-failing Node warning:
+- MODULE_TYPELESS_PACKAGE_JSON may be printed because source modules are validated directly by Node without package-wide type=module.
+
+Physical boundary remains separate:
+OWNER_CHATGPT_ACCOUNT_TESTED=false
+REAL_WINDOWS_OWNER_CHROME_TESTED=false
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+REAL_OPENAI_API_KEY_ACCOUNT_TESTED=false
+
+Interpretation:
+0.9.5 fixes the real owner-reported delayed-first-start defect. An explicit owner start no longer waits for the 300-second watchdog baseline; the orchestration cycle starts immediately, while the configured Coordinator pre-send delay remains authoritative.

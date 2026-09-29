@@ -1,0 +1,79 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Автопілот",
+  "version": "0.9.19",
+  "description": "Керує ChatGPT-сеансами та multi-agent оркестрацією з відновленням, GitHub control і локальними лімітами.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "alarms",
+    "tabs",
+    "scripting",
+    "debugger",
+    "identity",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://localhost/*",
+    "https://127.0.0.1/*",
+    "https://api.github.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/deterministic-web-service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Відкрити ChatGPT Автопілот",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Відкрити панель ChatGPT Автопілот"
+    }
+  },
+  "options_ui": {
+    "page": "src/ui/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "src/interaction/chatgpt-adapter.js",
+        "src/interaction/content-script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "short_name": "Autopilot",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "optional_permissions": [
+    "downloads",
+    "notifications"
+  ]
+}

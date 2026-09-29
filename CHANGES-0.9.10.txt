@@ -1,0 +1,44 @@
+ChatGPT Автопілот 0.9.10 — NIGHT MIXED-LOAD ADVERSARIAL HARDENING
+
+Мета цього релізу:
+- повторно пройти 0.9.9 від А до Я перед багатогодинним нічним запуском кількох Ordinary Sessions + кількох Scenario Sessions в одному Chrome-профілі;
+- не міняти архітектуру заради нових режимів, а закрити реальні race/recovery/fairness ризики, які можуть зіпсувати unattended run.
+
+Нові критичні виправлення поверх 0.9.9:
+1. AMBIGUOUS SEND ДЛЯ ORDINARY ТЕЖ VERIFICATION-ONLY
+- після фактичної Send-attempt з SEND_CLICK_UNCERTAIN / SUBMISSION_UNCERTAIN жодна unattended Session не робить blind resend;
+- Ordinary, Scenario Work та Orchestration утримують ту саму durable operation і переходять у verification-only;
+- якщо adapter уже побачив concrete /c/<conversation>, exact conversation identity записується в task + operation і використовується для recovery;
+- healthy peers продовжують роботу: uncertain lane не перетворюється на profile-wide блокування.
+
+2. SAME-CONVERSATION OWNERSHIP RACE
+- дві активні Session, що помилково націлені на одну concrete /c/<conversation>, більше не можуть паралельно взяти одну вкладку/composer зі stale snapshots;
+- ownership серіалізується тільки за exact conversation identity, а не по всьому профілю;
+- друга Session отримує fail-safe TAB_CONVERSATION_OWNERSHIP_CONFLICT; unrelated conversations/root launches лишаються паралельними.
+
+3. FROZEN AUDITOR SNAPSHOT
+- first_audit snapshot фіксується один раз на round audit authority;
+- invalid output, correction, timeout і replacement не можуть заново переписати snapshot пізніми FIRST completions;
+- downstream verifier використовує той самий frozen audit evidence.
+
+4. BOUNDED CORRECTION / REPLACEMENT
+- worker/auditor correction attempts лишаються bounded;
+- додано maxReplacementAttempts (default 2, bounded 0..10);
+- після вичерпання replacement budget сценарій переходить у fail-safe STOPPED/EXHAUSTED, а не запускає нескінченні replacement chats усю ніч;
+- це зупиняє проблемний Scenario, не отруюючи інші Ordinary/Scenario lanes профілю.
+
+Збережені mixed-load гарантії:
+- немає legacy 90-second cross-session barrier та profile-wide Send lock у сучасному submit path;
+- default maxConcurrentSessionOperations=10, configurable до 32;
+- Ordinary/MANAGED interleaving дає bounded progress навіть при queue > concurrency;
+- 5 Ordinary + 5 Scenario-managed працюють через один parallel Core runtime з власними tabs/operations;
+- slow tab, COMPOSER_LOST_AFTER_INSERT і TAB_NAVIGATION_TIMEOUT однієї lane не блокують healthy peers;
+- profile.rateLimitUntil має один fixed deadline: repeated detections не продовжують його;
+- dependency-blocked Scenario slot не створює Core Session/tab; strict result/allocation/DAG semantics збережені.
+
+Physical verification boundary:
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+
+Автоматизовані Chromium gates не замінюють реальний Windows 11 + Chrome + NVDA тест exact final ZIP.

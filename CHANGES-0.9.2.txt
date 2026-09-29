@@ -1,0 +1,12 @@
+ChatGPT Автопілот 0.9.2 — MULTI-ORCHESTRA / STORE-READINESS / UX CANDIDATE
+
+- Clarified per-orchestra pause/resume controls in the Orchestration UI.
+- Added explicit help: pausing one orchestra preserves its state and does not pause other orchestras.
+- Clarified emergency Stop as selected-orchestra-only.
+- Removed the misleading user-facing Universal fallback prompt toggle; its profile field remains false only for backward-compatible schema parsing.
+- Added regression coverage for pausing/editing/resuming one orchestra while a second orchestra remains independently configured and unpaused.
+- Reworked Options visual hierarchy for sighted users while preserving keyboard/NVDA semantics: responsive cards, clearer tab selection, larger action targets, primary/danger separation, focus-visible, dark scheme, forced-colors and reduced-motion support.
+- Fixed orchestration action availability so async completion cannot blindly re-enable invalid Pause/Resume/Delete/Import/Save/Stop controls.
+- Added Chrome Web Store readiness packaging: Manifest V3 CSP, 16/32/48/128 icons, action icons, root-manifest CWS ZIP and Store listing/privacy draft assets.
+- Added release tests for CWS structure, icon dimensions, remote-code restrictions and deterministic Store packaging.
+- Final automated matrix: 721/721 PASS; native-browser and Chrome UI/accessibility Chromium gates PASS.

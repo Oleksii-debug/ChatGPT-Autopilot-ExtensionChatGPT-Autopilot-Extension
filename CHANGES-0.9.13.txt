@@ -1,0 +1,10 @@
+ChatGPT Автопілот 0.9.13 — SESSION LIVENESS / PHYSICAL TAB RETIREMENT HARDENING
+
+- Повторний критичний аудит Sessions після 0.9.12.
+- Явний Stop тепер негайно закриває власні open-close/extension-owned worker вкладки, коли вони не потрібні для post-submit recovery.
+- Якщо Chrome тимчасово відмовляє у tabs.remove, ownership не губиться: hint лишається retirePending і мусить бути закритий перед reuse.
+- Delete, Update та portable-profile replacement більше не стирають ownership extension-owned вкладок до підтвердженого фізичного close.
+- keep-open dead/stale вкладки тепер використовують provenance: власна вкладка безпечно retire/recreate, adopted user tab лише відв’язується і ніколи не закривається автоматично.
+- Збережено bounded ordinary AMBIGUOUS recovery, fresh-launch durable recovery та Stop/Pause -> Start/Continue semantics з 0.9.12.
+- Додано точний двогодинний regression для 2-хвилинної Ordinary Session та сценарій stale-match ambiguity близько 30-го Send.
+- Користувацькі minimum-send minutes, Busy, retry-backoff і pre-send timing не змінюються цим релізом.

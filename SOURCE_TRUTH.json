@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "product": "ChatGPT Autopilot Extension",
+  "product_version": "0.9.19",
+  "status": "AUTOMATED_SOURCE_CONVERGENCE_QUALIFIED_PENDING_PR",
+  "source_artifact": {
+    "name": "ChatGPT-Autopilot-0.9.19-SOURCE.zip",
+    "sha256": "e760a003bdfe98d59697fc99d737bd34661b2305959c657460c7c69277f59dfd",
+    "size_bytes": 2950811,
+    "canonical_drive_file_id": "1TfjcnwUwZAvH4yhc06z_282KrZ7ZDWun",
+    "recovered_library_created_at": "2026-09-14T20:30:42Z",
+    "independently_verified": true
+  },
+  "git": {
+    "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+    "convergence_branch": "source/0.9.19-canonical-convergence",
+    "git_base_sha": "d03def77cd025278105bec4407945b3fc43b1130",
+    "convergence_commit_sha": "cf3cde412edb79ed49b61881fe16d64eebd650a3",
+    "convergence_commit_semantics": "materialized exact 0.9.19 source plus repository .github metadata",
+    "repository_tree_sha_at_materialization": "59df0285745dee1438302cbd0b9959a23659fabf",
+    "pure_source_tree_sha": "c26e518510172da7d1f250b825c073315865cec9",
+    "pure_source_file_count": 318,
+    "pure_source_total_bytes": 2881837,
+    "source_inventory_sha256": "23a420407cc52e301096270754aa45c6e7df04c585ea03cb17d5aceafdbf1410",
+    "source_blob_identity_verified": "318/318"
+  },
+  "release_artifacts": {
+    "installable": {
+      "name": "ChatGPT-Autopilot-0.9.19.zip",
+      "sha256": "b96496e8b57eac1689b9fd6c2093d6aefbad8d942bff44319c0ea568c532b7be"
+    },
+    "source": {
+      "name": "ChatGPT-Autopilot-0.9.19-SOURCE.zip",
+      "sha256": "e760a003bdfe98d59697fc99d737bd34661b2305959c657460c7c69277f59dfd"
+    },
+    "chrome_web_store": {
+      "name": "ChatGPT-Autopilot-0.9.19-CWS.zip",
+      "sha256": "a70a68946fbac8fb2777d9f8a9b1b6f761018a60ce37e8c41e852e33be64632c"
+    }
+  },
+  "qualification": {
+    "node_total": {
+      "command": "npm test",
+      "passed": 947,
+      "failed": 0
+    },
+    "groups": [
+      {
+        "name": "AI / Browser Agent / Scenario / Orchestration",
+        "command": "npm run test:ai",
+        "passed": 434,
+        "failed": 0
+      },
+      {
+        "name": "Legacy AI",
+        "command": "npm run test:legacy-ai",
+        "passed": 18,
+        "failed": 0
+      },
+      {
+        "name": "Core + integration",
+        "command": "npm run test:core",
+        "passed": 274,
+        "failed": 0
+      },
+      {
+        "name": "ChatGPT interaction",
+        "command": "npm run test:interaction",
+        "passed": 118,
+        "failed": 0
+      },
+      {
+        "name": "UI/accessibility",
+        "command": "npm run test:ui",
+        "passed": 62,
+        "failed": 0
+      },
+      {
+        "name": "Release",
+        "command": "npm run test:release",
+        "passed": 14,
+        "failed": 0
+      },
+      {
+        "name": "Reliability",
+        "command": "npm run test:reliability",
+        "passed": 27,
+        "failed": 0
+      }
+    ],
+    "browser": [
+      {
+        "command": "npm run test:native-browser",
+        "status": "PASS",
+        "scope": "Chromium Browser Agent / phased interaction / Trusted Script CDP E2E"
+      },
+      {
+        "command": "npm run test:chrome-ui",
+        "status": "PASS",
+        "scope": "Chromium keyboard/mode/accessibility"
+      }
+    ],
+    "static": {
+      "javascript_syntax": {
+        "passed": 210,
+        "failed": 0
+      },
+      "json_parse": {
+        "passed": 6,
+        "failed": 0
+      },
+      "common_sensitive_prefix_scan_hits": 0
+    },
+    "stress": [
+      "8 virtual hours / 6 Ordinary Sessions PASS",
+      "2-hour / 2-minute Ordinary cadence 2/2 PASS",
+      "diagnostic-derived >200-send liveness PASS",
+      "mixed-runtime long-run PASS"
+    ],
+    "deterministic_packaging": {
+      "installable_hash_match": true,
+      "source_hash_match": true,
+      "cws_hash_match": true,
+      "source_rebuild_twice_byte_identical": true,
+      "recovered_vs_rebuilt_source_byte_identical": true
+    }
+  },
+  "capability_inventory": {
+    "deterministic_agent_boundary": "src/core/agent-io-contract.js",
+    "capability_registry": "src/core/capability-registry.js",
+    "browser_agent_manager": "src/core/browser-agent-manager.js",
+    "existing_orchestration_runtime": "src/core/orchestration-v2.js",
+    "existing_orchestration_controller": "src/core/orchestration-v2-controller.js",
+    "architecture_note": "These are existing 0.9.19 capabilities. They do not claim implementation of the newer generic N-level L1 hierarchy."
+  },
+  "qualification_flags": {
+    "RECORDED_QUALIFIED": true,
+    "MATERIALIZED_SOURCE_AVAILABLE": true,
+    "SOURCE_SHA_VERIFIED_AGAINST_BYTES": true,
+    "SOURCE_ARTIFACT_RECOVERY": "PASS",
+    "SOURCE_TREE_IDENTITY": "PASS",
+    "AUTOMATED_TESTED": true,
+    "HUMAN_TESTED": false,
+    "NVDA_VERIFIED": false,
+    "OWNER_WINDOWS_CHROME_VERIFIED": false,
+    "REAL_UKF_AIS_VERIFIED": false
+  },
+  "source_checkpoint_references": {
+    "github_issue_123": "P0 canonical source convergence",
+    "github_issue_123_recovery_comment_id": 5736498098,
+    "github_issue_122": "architecture/control authority",
+    "github_issue_124": "post-P0 implementation queue",
+    "drive_release_checkpoint": "13_RELEASE_CHECKPOINT_0.9.19",
+    "drive_source_truth_document_id": "1ok9uYQJ9O5Qp0r00Sg5FBIjRSf22RNrxQYZVGz1YG1w"
+  },
+  "timestamp_utc": "2026-09-18T21:49:41Z"
+}

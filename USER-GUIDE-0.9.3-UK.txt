@@ -1,0 +1,390 @@
+CHATGPT АВТОПІЛОТ 0.9.3 — ПОВНИЙ УКРАЇНСЬКИЙ ДОВІДНИК
+LOCAL / UNPACKED + ORCHESTRATION + OPENAI API
+
+0. ЩО ЦЕ ЗА ПАКЕТ
+
+Це локальна версія для власного використання без Chrome Web Store. Сам Autopilot усе одно є Chrome/Chromium extension, тому для роботи розширення потрібен Chrome/Chromium. «Без Store» означає: ви розпаковуєте пакет і завантажуєте папку EXTENSION через chrome://extensions у Developer mode.
+
+У FULL LOCAL bundle є:
+- EXTENSION — готове unpacked розширення;
+- AI-Gateway — локальний Windows AI Gateway для OpenAI API / Ollama / OpenAI-compatible;
+- цей український довідник.
+
+1. ТРИ ГОЛОВНІ РЕЖИМИ
+
+У верхній частині Autopilot є три вкладки:
+- Сеанси — звичайні циклічні/one-pass ChatGPT Tasks;
+- Оркестрація — один Coordinator + pool worker-чатів;
+- AI — локальний AI, OpenAI API Router та AI Manager.
+
+Клавіатура:
+- Tab / Shift+Tab — перехід між елементами;
+- Space — прапорець/кнопка;
+- Enter — кнопка або підтвердження;
+- у верхніх вкладках можна використовувати Left/Right, Home/End;
+- те саме працює у внутрішніх вкладках Оркестрації.
+
+2. ОРКЕСТРАЦІЯ — ВКЛАДКА «ОРКЕСТРИ»
+
+«Оркестри»
+Список незалежних orchestration instances. Кожен оркестр має окремі config, runtime, workers, coordinator, pause state та alarms.
+
+«Назва»
+Людська назва вибраного оркестру. Не є project_id і не бере участі в exact-once identity.
+
+«Новий оркестр»
+Створює новий окремий оркестр із безпечними defaults. Новий оркестр не повинен сам починати роботу без правильної конфігурації/запуску.
+
+«Перейменувати»
+Змінює лише display name. Не повинно змінювати project identity або tasks.
+
+«Призупинити оркестр»
+Локальна owner pause лише вибраного оркестру. Стан, workers і recovery evidence не стираються. Інші оркестри продовжують працювати.
+
+«Продовжити оркестр»
+Знімає owner pause. Повернення відбувається через safe recovery/reconciliation, а не сліпий повтор Send.
+
+«Видалити оркестр»
+Видаляє вибраний orchestra namespace. Інші оркестри не повинні змінюватися. Використовуйте лише коли цей оркестр більше не потрібен.
+
+3. ОРКЕСТРАЦІЯ — ВКЛАДКА «НАЛАШТУВАННЯ»
+
+«Увімкнути цей оркестр»
+Execution authority для вибраного orchestra config. Це не означає «створити worker просто зараз»; scheduler додатково перевіряє mode, coordinator control, concurrency, launch window, dependencies, backpressure та exact-once.
+
+ГРУПА «ПРОЄКТ І CONTROL»
+
+«Проєкт» / projectId
+Стабільна machine identity оркестру. Приклад: grant-cerv-2026 або nika-main. Використовується в durable orchestration identity.
+
+«Робочий репозиторій» / targetRepository
+Репозиторій, до якого прив’язані current V2 tasks. Для software workflow — кодовий repo. У нинішній GitHub-control архітектурі task target перевіряється fail-closed.
+
+«Control репозиторій»
+GitHub repo, де Autopilot читає machine-readable control.
+
+«Control Issue»
+Номер GitHub Issue з canonical orchestration control.
+
+«Control comment»
+0 або порожньо = автоматичний пошук canonical control comment у bounded newest-comment window. Конкретне число = explicit pin до одного comment id.
+
+«Перевірити GitHub»
+Read-only перевірка control. Не повинна створювати workers або натискати Send.
+
+ГРУПА «COORDINATOR»
+
+«Coordinator provider»
+Провайдер reasoning Coordinator. У 0.9.3 production-compatible option — ChatGPT Browser.
+
+«Worker provider»
+Провайдер worker agents. У 0.9.3 production-compatible option — ChatGPT Browser.
+
+«Coordinator URL»
+Стартова адреса Coordinator. Для current browser provider — https://chatgpt.com/. Після створення conversation Autopilot зберігає durable conversation URL.
+
+«Master prompt»
+Головна інструкція нового Coordinator generation. Тут описується роль Coordinator, project goal, правила decomposition, control contract та критерії завершення.
+
+«Tick prompt»
+Коротка інструкція наступного Coordinator turn. Default: продовжити координацію, перечитати live GitHub і прийняти наступне рішення.
+
+«Prompt version»
+Версія master prompt contract. Змінюйте, коли semantics master prompt суттєво змінено.
+
+ГРУПА «ЛОКАЛЬНІ ЛІМІТИ»
+
+«Start workers» / defaultDesiredWorkers
+Default desired concurrency. 5 означає: Coordinator/Runtime може прагнути до 5 active/reserved worker slots, але hard max та launch policy можуть дозволити менше.
+
+Default: 5.
+
+«Max active workers» / absoluteMaxWorkers
+Жорстка owner-local верхня межа. Remote control не може її перевищити.
+
+Default: 8.
+
+«Launch limit» / maxLaunchesPerWindow
+Скільки нових worker launches максимум допускається в одному launch window.
+0 = window-rate limit вимкнений навмисно.
+
+Default: 6.
+
+«Launch window, s»
+Розмір rolling window для Launch limit.
+
+Default: 300 секунд = 5 хвилин.
+Отже defaults означають максимум 6 launch starts за будь-яке rolling 5-minute window, додатково до concurrency gates.
+
+«Launch gap, s»
+Мінімальна пауза між worker launches.
+0 = окремого gap немає; інші limits все одно діють.
+
+Default: 0.
+
+«Worker probe, s»
+Як часто runtime планує перевіряти активного worker, коли потрібен completion observation.
+
+Default: 30 секунд.
+Це не означає створення нового worker кожні 30 секунд.
+
+«Watchdog, s»
+Self-healing reconciliation interval.
+
+Default: 300 секунд.
+Watchdog НЕ є spawn timer. Він перевіряє durable state, coordinator/workers, retries, alarms, control та recovery.
+
+«Coordinator turns»
+Скільки turns допускається одному Coordinator conversation generation до rotation.
+
+Default: 10.
+Після bound створюється новий coordinator generation із compact durable handoff, якщо safe rotation gates дозволяють.
+
+«Stale threshold, s»
+Мінімальний час від останнього успішного worker observation, після якого worker може стати stale candidate.
+
+Default: 3600 секунд = 1 година.
+Сам час НЕ робить worker stale. Потрібні також щонайменше два consecutive probe failures. Після цього Coordinator отримує stale-candidate evidence; replacement не робиться сліпо.
+
+4. ОРКЕСТРАЦІЯ — «ТАЙМІНГИ»
+
+«Worker pre-send, s»
+Пауза перед фізичним worker Send після підготовки target.
+Default: 8 секунд.
+
+«Worker busy-check, s»
+Пауза між перевірками, що worker/composer не зайнятий перед наступною безпечною дією.
+Default: 2 секунди.
+
+«Worker retry, s»
+Base retry backoff worker delivery path для відповідних retryable states.
+Default: 60 секунд.
+Rate-limit може встановити довший backpressure.
+
+«Coordinator pre-send, s»
+Пауза перед Coordinator Send.
+Default: 8 секунд.
+
+«Coordinator retry, s»
+Base retry backoff Coordinator delivery path.
+Default: 60 секунд.
+
+5. ОРКЕСТРАЦІЯ — «ФАЙЛ КОНФІГУРАЦІЇ»
+
+«Шаблон JSON»
+Дає strict orchestration profile template.
+
+«Імпорт JSON»
+Читає і валідовує profile. Invalid types/ranges/provider/URL/relations fail closed.
+
+«Імпортувати»
+Застосовує валідний profile як setup. Import не повинен приховано auto-start orchestration; imported config зберігається без execution start authority.
+
+«Експортувати»
+Зберігає поточну переносиму конфігурацію без API secrets.
+
+«Зберегти»
+Зберігає settings вибраного оркестру. Критичні зміни під час роботи краще робити після «Призупинити оркестр».
+
+6. ОРКЕСТРАЦІЯ — ВКЛАДКА «СТАН»
+
+«Оновити стан»
+Запускає reconciliation/status refresh. Це не команда «створи ще workers».
+
+«Аварійно зупинити вибраний оркестр»
+Відкликає future launch authority вибраного оркестру і вимикає його safe managed Core Sessions. Інші оркестри не повинні зупинятися. Unresolved send/recovery evidence не повинно стиратися сліпо.
+
+Status/runtime text
+Показує coordinator generation, turns, control revision, worker counts, capacity, launch-window use, next launch, backpressure, event queue та GitHub control status.
+
+7. LEGACY
+
+Collapsed section «Legacy» — старий Remote Dispatch. Для нової Orchestration V2 його не потрібно використовувати, якщо ви спеціально не відновлюєте старий workflow.
+
+8. AI — «ЛОКАЛЬНИЙ ШІ / МОДЕЛЬ»
+
+Цей блок напряму працює з локальним Ollama або OpenAI-compatible/LM Studio endpoint.
+
+«Увімкнути локальний ШІ» — зберігає enabled state.
+«Провайдер» — Ollama або OpenAI-compatible.
+«Адреса» — localhost endpoint.
+«Модель» — ім’я local model.
+«Тайм-аут» — максимальний час запиту.
+«Перевірити» — отримує model list із локального сервера.
+«Запустити тест» — виконує реальний локальний completion.
+
+9. AI — «AI ROUTER» І OPENAI API
+
+AI Router у 0.9.3 — не макет. Реальний маршрут:
+Options UI -> extension Core -> localhost AI Gateway -> OpenAI Responses API / Ollama / OpenAI-compatible -> результат назад в extension.
+
+OpenAI secret навмисно НЕ вставляється у Chrome extension.
+Причина: API key є секретом і не повинен зберігатися у client-side extension code/storage.
+
+Для OpenAI API:
+1. Створіть API account/project і API key на OpenAI Platform.
+2. Налаштуйте API billing окремо від ChatGPT subscription.
+3. У папці AI-Gateway запустіть «ВСТАНОВИТИ AI GATEWAY.cmd».
+4. Запустіть «НАЛАШТУВАТИ OPENAI API КЛЮЧ.ps1».
+5. Ключ вводиться приховано як SecureString і зберігається Windows DPAPI ciphertext для поточного Windows user.
+6. Запустіть Gateway.
+7. Для першої прив’язки extension запустіть «ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ.ps1».
+8. Протягом pairing window у вкладці AI натисніть «Перевірити Gateway».
+9. Після успіху натисніть «Оновити моделі» біля потрібного slot.
+
+«Gateway»
+Default: http://127.0.0.1:17621. Extension дозволяє Gateway тільки localhost/127.0.0.1.
+
+«Режим»
+- Завжди основна модель — кожен Router request іде primary slot.
+- Завжди сильна модель — кожен Router request іде strong slot.
+- Гібрид AUTO — primary працює першою; якщо вона повертає strict escalation marker, Router може викликати strong.
+- Гібрид за правилами — strong review запускається за N-request/N-minute rules із guard limits.
+
+«Основна модель» / provider
+Може бути Ollama, OpenAI API через Gateway або OpenAI-compatible.
+
+«Сильна / ескалаційна модель»
+Те саме, але призначена для складнішого reasoning/review/escalation.
+
+OpenAI model selector
+У 0.9.3 завжди показує три рекомендовані text presets:
+- gpt-5.6-sol — максимальна якість для складного reasoning/coding;
+- gpt-5.6-terra — баланс якості та вартості;
+- gpt-5.6-luna — швидка/економна для масових задач.
+
+«Оновити моделі»
+Gateway звертається до OpenAI /v1/models з вашим key і додає model IDs, які реально повертає ваш API account. Це важливіше за hardcoded list, бо доступність моделей може змінюватися.
+
+Важливо: /v1/models може повертати спеціалізовані models, не всі з них підходять для text Responses API. Для цього Router основно орієнтований на text-generation models.
+
+«Сильна кожні N запитів»
+Для hybrid-rules. 10 = кожний 10-й request може отримати strong review, якщо guards дозволяють. 0 = count-trigger вимкнений.
+
+«Сильна кожні N хв»
+Time-based strong review. 120 = strong review може стати due після 120 хвилин від baseline. 0 = time-trigger вимкнений.
+
+«Мін. пауза сильної, хв»
+Мінімальна пауза між automatic strong calls. 0 = окремого min-gap guard немає.
+
+«Макс. сильних/год»
+Hourly guard. 0 = окремого hourly cap немає.
+
+«Передавати strong handoff»
+Останній strong result може бути переданий як контекст наступному primary flow у bounded handoff.
+
+«Fallback на strong»
+Якщо primary provider/model падає і strong налаштована, Router може спробувати strong.
+
+«Зберегти primary при strong error»
+Якщо primary вже дала корисний result, але strong review впала, дозволяє не втрачати primary result.
+
+«Handoff, символів»
+Максимальний bounded context, який переноситься між primary/strong passes.
+Default: 12000.
+
+«Тайм-аут, s»
+Максимальний Router/Gateway request timeout.
+Default: 180 секунд.
+
+«Зберегти»
+Валідовує і зберігає Router settings. Якщо Router enabled, required slots повинні мати model.
+
+«Перевірити Gateway»
+Реальний localhost health/status call. Показує версію Gateway, provider readiness, число models і чи OpenAI API key налаштований. Сам secret не повертається.
+
+«Скинути лічильники»
+Скидає request/strong runtime counters та bounded hybrid context, але не видаляє API key.
+
+«Тестовий prompt» + «Запустити»
+Реальний Router request за current mode.
+
+«Запустити strong»
+Force strong slot для тесту, незалежно від ordinary route policy, але з валідованим Router/Gateway contract.
+
+10. AI — «AI MANAGER»
+
+AI Manager використовує AI Router як reasoning engine для safe management decisions над звичайними Sessions.
+
+«Увімкнути AI Manager»
+Вмикає manager decision cycle.
+
+«Автозастосування»
+Дозволяє автоматичне застосування лише підтриманих bounded safe actions. Не робить AI необмеженим виконавцем.
+
+«Аналіз кожні N Send»
+Event/count trigger.
+
+«Аналіз кожні N хв»
+Time trigger.
+
+«Аналіз завершення»
+Запускає manager consideration після completion events.
+
+«Аналіз помилок» + «Поріг помилок»
+Дає manager event після визначеної кількості помилок.
+
+«Handoff у наступний prompt»
+Manager може додати bounded single-use handoff до наступного prompt; він очищається лише після verified Send.
+
+«Restart завершених one-pass»
+Дозволяє safe manager action restart для completed one-pass Session, якщо contract це допускає.
+
+«Безпечний tuning таймінгів»
+Дозволяє лише bounded session timing tuning; не дає AI довільно переписувати prompts/URLs/tasks.
+
+«Handoff, символів» / «Контекст, символів»
+Bounds для manager decision context.
+
+«Повтор після помилки, s»
+Retry backoff AI Manager після model/gateway failure.
+
+Web-звіти:
+- «Збирати фінальні відповіді» — capture final assistant reports;
+- «Аналіз нового звіту» — manager trigger on new report;
+- «Перевірка відповіді, s» — report probe cadence;
+- «Макс. очікування, хв» — bounded report wait;
+- «Макс. звіт, символів» — report size bound.
+
+«Аналіз зараз»
+Force manager decision attempt зараз.
+
+«Скинути стан»
+Скидає manager runtime/history counters, не OpenAI key.
+
+11. ЯКУ OPENAI МОДЕЛЬ ОБРАТИ
+
+Для першого practical setup:
+- Primary = gpt-5.6-luna, якщо важливі швидкість/вартість;
+- Primary = gpt-5.6-terra, якщо хочете сильніший everyday reasoning;
+- Strong = gpt-5.6-sol для складних перевірок, архітектури, грантових reasoning tasks і recovery.
+
+Якщо не хочете hybrid — режим «Завжди сильна модель» + gpt-5.6-sol є найпростішим технічним тестом OpenAI API.
+
+12. ЩО ВЖЕ АВТОМАТИЧНО ПЕРЕВІРЕНО В 0.9.3
+
+- full functional/regression matrix;
+- orchestration default intervals and cycles;
+- watchdog not being a spawn timer;
+- coordinator turn rotation bound;
+- stale requires threshold + multiple failed probes;
+- launch-window survives backward wall-clock correction fail-closed;
+- multi-orchestra pause/resume/edit/create/switch/delete isolation in Chromium;
+- OpenAI Gateway contract uses Responses API;
+- OpenAI key is not stored in extension;
+- /v1/models dynamic model retrieval contract;
+- Chromium AI flow: preset models -> Gateway status -> DPAPI key-status projection -> model refresh -> strong Router result;
+- duplicate HTML ids forbidden by regression test;
+- native Chromium ChatGPT-like check -> insert -> prepare -> verified Send fixture;
+- keyboard/mode/accessibility Chromium smoke;
+- deterministic release/source packaging and ZIP integrity.
+
+13. ЩО ЩЕ НЕ МОЖНА НАЗВАТИ ФІЗИЧНО ПЕРЕВІРЕНИМ
+
+Автоматизовані тести не підміняють ваш реальний ПК. Поки ви особисто не виконаєте acceptance:
+- REAL_WINDOWS_OWNER_CHROME_TESTED=false;
+- OWNER_CHATGPT_ACCOUNT_TESTED=false;
+- NVDA_VERIFIED=false;
+- REAL_OPENAI_API_KEY_ACCOUNT_TESTED=false.
+
+Тобто API implementation є реальною і протестованою на protocol/E2E mock boundaries, але саме ваш секретний OpenAI key я не маю і не повинен мати. Перший реальний request із вашим API account буде owner acceptance.

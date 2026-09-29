@@ -1,0 +1,47 @@
+QA 0.9.16 — FINAL AUTOMATED QUALIFICATION
+
+Version: 0.9.16
+Date: 2026-09-14
+Status: automated release qualification PASS; physical owner Windows/NVDA/real UKF AIS acceptance is NOT claimed.
+
+EXACT NODE TEST MATRIX
+- AI / Browser Agent / Scenario / Orchestration: 418/418 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 272/272 PASS
+- ChatGPT interaction: 115/115 PASS
+- UI: 62/62 PASS
+- Release contracts: 14/14 PASS
+- Reliability constituent gates: 26/26 PASS
+- Aggregate Node tests: 925/925 PASS
+
+RELIABILITY EVIDENCE
+- 8 virtual hours / 6 Ordinary open-close Sessions with ambiguous Send, navigation faults and transient tab-close failures: PASS.
+- Exact 2-hour Ordinary / 2-minute cadence regression: 2/2 PASS, including forced stale-match ambiguity around the 30th cycle without freezing the remaining Session.
+- Mixed runtime long-run: Ordinary + Browser Agent + Scenario Work + Orchestration V2 progress together through cold restart and tab-close faults: PASS.
+- Scheduler / recovery arbiter / storage-tabs / unattended wake fuzz / exhaustive mode-strategy / agentic multi-session gates: PASS.
+
+0.9.16 VISION COMPUTER-USE EVIDENCE
+- `click_at` is accepted only on the exact model turn carrying the runtime screenshot.
+- Coordinates must be finite CSS-pixel values inside the current visible top-frame viewport.
+- Runtime probes the current live target under the point before execution and promotes a semantic actionable ancestor when available.
+- Default CONSEQUENTIAL policy requires approval for semantic consequential/submit targets and for visual-only targets whose meaning cannot be proven.
+- Coordinate approval target fingerprint is revalidated after owner approval and immediately before native CDP mouse input.
+- ALLOW_ALL remains explicit owner opt-in for fully autonomous visual coordinate work.
+- Real Chromium generic Agent E2E: semantic form actions plus visual-only canvas probe and native coordinate mouse click PASS.
+- Screenshot bytes remain ephemeral and are not persisted in Browser Agent durable state/history.
+
+BROWSER / STATIC GATES
+- Native Chromium UI + phased ChatGPT interaction + generic Browser Agent form/visual-coordinate E2E: PASS.
+- Chromium keyboard / mode / accessibility smoke: PASS.
+- JS/MJS/CJS syntax: 209/209 PASS.
+- JSON parse: 6/6 PASS.
+- Secret-prefix scan: 0 hits.
+
+ORDINARY SESSION INVARIANT
+0.9.16 does not rewrite user-selected Session timing/cadence. Seconds/minutes remain explicit owner policy. The 2-minute regression is a test fixture only, not a forced product setting.
+
+NOT CLAIMED
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+REAL_UKF_AIS_VERIFIED=false

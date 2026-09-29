@@ -1,0 +1,40 @@
+ChatGPT Автопілот 0.4.0 — AI MANAGER + WINDOWS COMPANION
+
+ГОЛОВНЕ
+- Збережено весь multi-session/autopilot runtime 0.1.15 і автономний AI Manager 0.3.0.
+- AI Router підтримує primary / strong / hybrid-auto / hybrid-rules.
+- Primary і strong мають незалежні provider/model.
+- Local Ollama, OpenAI-compatible localhost і OpenAI API проходять через локальний Gateway.
+
+НОВЕ В 0.4.0 — WINDOWS GATEWAY
+- One-click «ВСТАНОВИТИ AI GATEWAY.cmd».
+- Стабільна папка встановлення: %LOCALAPPDATA%\ChatGPT-Autopilot\AI-Gateway.
+- Portable Node.js Windows x64 downloader: pinned Node v24.15.0, SHA256 перевіряється перед розпакуванням.
+- Окремо встановлювати Node.js більше не обов'язково.
+- «ЗАПУСТИТИ GATEWAY.cmd» запускає Gateway приховано і використовує portable/system Node.
+- Автозапуск через Windows Startup shortcut.
+- OpenAI API key можна зберегти локально як Windows DPAPI ciphertext для unattended startup.
+- DPAPI key не потрапляє у Chrome state, portable profiles або diagnostic reports.
+- Stop/restart Gateway використовує власний PID-файл і перевіряє command line перед Stop-Process.
+- Gateway health показує version/PID/Node/uptime.
+- Gateway /status перевіряє готовність Ollama, OpenAI та OpenAI-compatible upstream окремо.
+
+НОВЕ В 0.4.0 — HYBRID GUARDS
+- Налаштовуваний мінімальний інтервал між автоматичними strong-pass.
+- Налаштовуваний максимум автоматичних strong-pass за годину.
+- 0 = guard вимкнений.
+- Ручний «один раз сильна модель» залишається явною ручною дією і не блокується automatic guard.
+
+НОВЕ В 0.4.0 — AI MANAGER AUDIT
+- Durable history останніх 50 AI Manager decisions.
+- Панель показує останні 20: час, trigger, route, summary, applied/skipped actions.
+- Handoff text навмисно не дублюється у decision history.
+
+ЗБЕРЕЖЕНО
+- Durable web-worker report collection після конкретного verified Send.
+- Correlation з assistant baseline конкретного Send.
+- Pending AI events/report jobs survive Chrome restart.
+- Manager failure queue + exponential backoff.
+- Single-use handoff очищається тільки після SENT_VERIFIED.
+- Rate-limit acknowledgement продовжує SAME request/SAME tab, якщо модалка зникла; configurable cooldown лише fallback.
+- Dead receiver reset/recreate, stale composer clearing, restart/network/sleep recovery.

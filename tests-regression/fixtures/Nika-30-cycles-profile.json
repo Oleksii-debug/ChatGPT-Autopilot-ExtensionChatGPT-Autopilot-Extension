@@ -1,0 +1,236 @@
+{
+  "format": "chatgpt-autopilot-profile",
+  "version": 1,
+  "profileName": "Nika — 30 нових чатів",
+  "autoStart": false,
+  "sessions": [
+    {
+      "id": "session-nika-30",
+      "name": "Nika — 30 циклів",
+      "autoStart": false,
+      "promptMode": "shared",
+      "urlMode": "shared",
+      "sharedPrompt": "ПОЧИНАЙ НЕГАЙНО.\n\nТи — ONE-SHOT DELIVERY STRIKE для:\n\nOleksii-debug/Nika-Core\n\nCANONICAL COORDINATION:\nGitHub Issue #553\n\nТвоя функція — НЕ зробити audit.\nНЕ написати report.\nНЕ знайти якомога більше проблем.\nНЕ створити PR заради PR.\n\nТВОЯ ФУНКЦІЯ:\nЗА ЦЕЙ ОДИН ЗАПУСК МАКСИМАЛЬНО СКОРОТИТИ CRITICAL PATH ДО РЕАЛЬНО ГОТОВОЇ NIKA.\n# ================================================== 0. LIVE TRUTH FIRST\nСпочатку перечитай:\n\n- live main;\n- newest actionable #553 control;\n- відкриті critical PR;\n- exact heads/bases;\n- Actions;\n- unresolved exact-head findings;\n- current ownership.\n\nНе довіряй старому status comment, якщо live GitHub суперечить йому.\n\n==================================================\n\n1. НЕ РОБИ BROAD AUDIT\n==================================================\n\nЗнайди найближчу ДО ЗАВЕРШЕННЯ реальну роботу.\n\nКласифікуй candidate тільки внутрішньо як:\n\nMERGE_READY\nREPAIR_NOW\nCONVERGE_NOW\nNEEDS_ONE_QUALIFICATION\nOWNED_BY_OTHER\nSTALE/SUPERSEDED.\n\nПісля цього ВИБЕРИ ОДНУ ДІЮ І ВИКОНАЙ ЇЇ.\n# ================================================== 2. ПОРЯДОК ДІЙ\nПРІОРИТЕТ 1:\nконкретний source/test blocker критичного incumbent PR.\n\nЯкщо lane вільний:\n\n- claim/preserve SAME lineage;\n- зроби smallest coherent repair;\n- додай regression;\n- run focused validation;\n- publish resulting exact head;\n- запусти/отримай необхідну fresh qualification.\n\nПРІОРИТЕТ 2:\nкорисний stale candidate без активного writer.\n\nConverge SAME lineage onto current main.\nНе переписуй feature.\nНе створюй successor framework.\nПісля head movement потрібні fresh gates.\n\nПРІОРИТЕТ 3:\nchanged exact head, якому для integration бракує РІВНО ОДНІЄЇ designated verification/semantic QA.\n\nЗроби саме цю qualification.\n\nНе повторюй review unchanged SHA.\n\nПРІОРИТЕТ 4:\nякщо найближчі slices зайняті іншими writers —\nНЕ ПЕРЕТВОРЮЙСЯ НА ЩЕ ОДНОГО АУДИТОРА.\n\nЗнайди наступний DISJOINT critical blocker і ВИПРАВ ЙОГО.\n\nЯкщо абсолютно все critical реально owned —\nзроби максимум ОДИН precise handoff з конкретним reproducible defect і припини дублювати цю lane.\n# ================================================== 3. ЗАБОРОНЕНО\n- broad “перевірити весь проєкт” audit;\n- список із 20 потенційних проблем замість repair;\n- repeat review unchanged SHA;\n- repeat CI unchanged SHA;\n- no-op CI;\n- status-only commit;\n- status-only PR;\n- parallel implementation уже існуючої функції;\n- другий scheduler/queue/runtime/CodingWorker/verifier/QA/release framework;\n- красти active source ownership;\n- self-review власної зміни;\n- self-merge;\n- direct main write;\n- нова feature work, якщо integration/repair queue вже заповнена.\n# ================================================== 4. ЩО ВВАЖАЄТЬСЯ УСПІХОМ\nУспіх цього one-shot = хоча б ОДНЕ:\n\n- concrete BLOCK_SOURCE repaired;\n- concrete BLOCK_TEST repaired;\n- concrete BLOCK_INTEGRATION removed;\n- stale useful candidate converged to live main;\n- changed exact head отримав missing designated qualification;\n- candidate materially moved toward COORD-A guarded integration.\n\n“Проаналізував і залишив коментар” ≠ success.\n# ================================================== 5. PRODUCT PRIORITY\nПріоритет завжди:\n\nA. integration queue / blockers nearest merge;\nB. Factory real end-to-end:\nProductProject → ownership → CodingWorker → repo mutation → verification → QA → integration → DONE/restart;\nC. Windows:\nstrict UIA → packaged NikaCore.exe → final exact ZIP → extract/run same ZIP → evidence;\nD. release evidence/provenance/installer;\nE. тільки після цього менш критичні Full Product Vision gaps.\n# ================================================== 6. ФІНАЛЬНИЙ CHECKPOINT — КОРОТКО\nНаприкінці повідом лише:\n\nWORK_COMPLETED=\nREAL_BLOCKER_REMOVED=\nPR_OR_TARGET=\nEXACT_HEAD=\nVALIDATION=\nOWNER_OR_HANDOFF=\nNEXT_INTEGRATION_ACTION=\n\nЯкщо REAL_BLOCKER_REMOVED=NONE і candidate не просунувся —\nвизнай RUN_NO_DELIVERY_CREDIT.\n\nНе маскуй це довгим текстом.\n\nHUMAN_TESTED=false.\nNVDA_VERIFIED=false.\nPRODUCTION_RELEASE_READY=false.",
+      "defaultUniquePrompt": "",
+      "runMode": "one-pass",
+      "minimumSendIntervalMinutes": 1,
+      "preSendDelaySeconds": 10,
+      "busyCheckDelaySeconds": 10,
+      "retryBackoffSeconds": 15,
+      "retryPolicy": "safe",
+      "tabStrategy": "open-close",
+      "tasks": [
+        {
+          "id": "nika-001",
+          "enabled": true,
+          "label": "Nika 1",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-002",
+          "enabled": true,
+          "label": "Nika 2",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-003",
+          "enabled": true,
+          "label": "Nika 3",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-004",
+          "enabled": true,
+          "label": "Nika 4",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-005",
+          "enabled": true,
+          "label": "Nika 5",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-006",
+          "enabled": true,
+          "label": "Nika 6",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-007",
+          "enabled": true,
+          "label": "Nika 7",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-008",
+          "enabled": true,
+          "label": "Nika 8",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-009",
+          "enabled": true,
+          "label": "Nika 9",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-010",
+          "enabled": true,
+          "label": "Nika 10",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-011",
+          "enabled": true,
+          "label": "Nika 11",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-012",
+          "enabled": true,
+          "label": "Nika 12",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-013",
+          "enabled": true,
+          "label": "Nika 13",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-014",
+          "enabled": true,
+          "label": "Nika 14",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-015",
+          "enabled": true,
+          "label": "Nika 15",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-016",
+          "enabled": true,
+          "label": "Nika 16",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-017",
+          "enabled": true,
+          "label": "Nika 17",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-018",
+          "enabled": true,
+          "label": "Nika 18",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-019",
+          "enabled": true,
+          "label": "Nika 19",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-020",
+          "enabled": true,
+          "label": "Nika 20",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-021",
+          "enabled": true,
+          "label": "Nika 21",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-022",
+          "enabled": true,
+          "label": "Nika 22",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-023",
+          "enabled": true,
+          "label": "Nika 23",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-024",
+          "enabled": true,
+          "label": "Nika 24",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-025",
+          "enabled": true,
+          "label": "Nika 25",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-026",
+          "enabled": true,
+          "label": "Nika 26",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-027",
+          "enabled": true,
+          "label": "Nika 27",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-028",
+          "enabled": true,
+          "label": "Nika 28",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-029",
+          "enabled": true,
+          "label": "Nika 29",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        },
+        {
+          "id": "nika-030",
+          "enabled": true,
+          "label": "Nika 30",
+          "url": "https://chatgpt.com/",
+          "promptOverride": ""
+        }
+      ]
+    }
+  ]
+}
