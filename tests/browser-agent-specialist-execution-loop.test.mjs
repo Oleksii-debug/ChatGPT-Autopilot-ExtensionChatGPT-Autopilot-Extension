@@ -658,11 +658,11 @@ test('owner control epoch drift revokes unprepared automatic Specialist dispatch
   assert.deepEqual((await manager.listSpecialistAutomationDispatchCandidates()).candidates, []);
 });
 
-test('automation policy revision drift revokes unprepared automatic Specialist dispatch provenance', async () => {
-  const { chrome } = chromeStorage();
+test('automation policy revision drift revokes and prunes unprepared automatic Specialist dispatch provenance', async () => {
+  const storage = chromeStorage();
   const clock = { value: Date.parse('2026-09-29T03:05:00.000Z') };
   const manager = new BrowserAgentManager({
-    chromeApi: chrome,
+    chromeApi: storage.chrome,
     routePrompt: async () => ({ text: '{}' }),
     now: () => clock.value,
   });
@@ -683,4 +683,17 @@ test('automation policy revision drift revokes unprepared automatic Specialist d
     maxConcurrentHandoffs: 0,
   });
   assert.deepEqual((await manager.listSpecialistAutomationDispatchCandidates()).candidates, []);
+  assert.equal(
+    Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey || {}).length,
+    1,
+    'revoked marker may remain inert until the next serialized automation claim',
+  );
+
+  const next = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(next.maxConcurrentHandoffs, 0);
+  assert.deepEqual(next.claimed, []);
+  assert.deepEqual(
+    Object.keys(storage.data.autopilotBrowserAgentV1.specialistAutomationClaimAdmissionsByKey || {}),
+    [],
+  );
 });
