@@ -671,6 +671,7 @@ function normalizeRuntime(raw, now) {
       }
     })
     : [];
+  let specialistProviderExecutionIntegrityFault = raw.specialistProviderExecutionIntegrityFault === true;
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
     ? raw.specialistProviderExecutions.slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS).flatMap(item => {
       try {
@@ -680,9 +681,13 @@ function normalizeRuntime(raw, now) {
         if (!assignment || !provenance
             || execution.planId !== plan.planId
             || execution.providerId !== provenance.selection.providerId
-            || execution.handoffId !== provenance.handoff.handoffId) return [];
+            || execution.handoffId !== provenance.handoff.handoffId) {
+          specialistProviderExecutionIntegrityFault = true;
+          return [];
+        }
         return [execution];
       } catch {
+        specialistProviderExecutionIntegrityFault = true;
         return [];
       }
     })
@@ -694,7 +699,11 @@ function normalizeRuntime(raw, now) {
     specialistExecutionOwnerships,
     specialistSelectionProvenance,
     specialistProviderExecutions,
-    runState,
+    specialistProviderExecutionIntegrityFault,
+    runState: specialistProviderExecutionIntegrityFault ? BrowserAgentRunState.ERROR : runState,
+    lastError: specialistProviderExecutionIntegrityFault
+      ? 'Persisted Specialist provider execution integrity fault requires explicit reconciliation before further provider effects.'
+      : clean(raw.lastError, 2000),
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
     modelCalls: Math.max(0, Number(raw.modelCalls || 0)),
@@ -1664,6 +1673,9 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
+      if (job.runtime.specialistProviderExecutionIntegrityFault === true) {
+        throw new Error('Specialist provider execution integrity fault requires explicit reconciliation');
+      }
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING
           || job.runtime.controlEpoch !== request.expectedControlEpoch) {
         throw new Error('Browser Agent controlEpoch or run state drifted before Specialist provider preparation');
@@ -2752,6 +2764,9 @@ export class BrowserAgentManager {
   async start(id, { runInitial = true } = {}) {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
+    if (current.job.runtime.specialistProviderExecutionIntegrityFault === true) {
+      throw new Error('Specialist provider execution integrity fault requires explicit reconciliation before Start');
+    }
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before Start');
     if (!(await this.requireGoalAndPermission(current.job))) return this.get(id);
     const schedule = browserAgentScheduleDecision(current.job.config, this.now());
