@@ -1,0 +1,494 @@
+export const DRIVE_FOLDER_DISPATCH_PROVIDER_V1 = 'drive-folder-dispatch-v1';
+export const DRIVE_FOLDER_DISPATCH_SCHEMA_VERSION = 1;
+export const DRIVE_FOLDER_DEFAULT_POLL_INTERVAL_MS = 3 * 60 * 1000;
+export const DRIVE_FOLDER_MIN_POLL_INTERVAL_MS = 60 * 1000;
+export const DRIVE_FOLDER_MAX_POLL_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const MAX_GENERATIONS = 1000;
+const MAX_ENTRIES = 1000;
+const MAX_PROMPT_CHARS = 200000;
+const GENERATION_PATTERN = /^generation-(\d{6,})$/u;
+
+export class DriveFolderDispatchError extends Error {
+  constructor(code, message, details = {}) {
+    super(message);
+    this.name = 'DriveFolderDispatchError';
+    this.code = code;
+    Object.assign(this, details);
+  }
+}
+
+function clean(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function requireId(value, label) {
+  const normalized = clean(String(value ?? ''));
+  if (!normalized || normalized.length > 180 || !/^[A-Za-z0-9._:@/+-]+$/u.test(normalized)) {
+    throw new DriveFolderDispatchError('INVALID_ENVELOPE', `Invalid ${label}`);
+  }
+  return normalized;
+}
+
+function requireInteger(value, label, min, max) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new DriveFolderDispatchError('INVALID_ENVELOPE', `Invalid ${label}`);
+  }
+  return parsed;
+}
+
+function normalizeRevision(value) {
+  const raw = String(value ?? '').trim();
+  if (!/^\d+$/u.test(raw) || raw.length > 128) {
+    throw new DriveFolderDispatchError('INVALID_GENERATION', 'Dispatch generation must be a bounded decimal integer.');
+  }
+  return raw.replace(/^0+(?=\d)/u, '') || '0';
+}
+
+function compareRevision(left, right) {
+  const a = normalizeRevision(left);
+  const b = normalizeRevision(right);
+  if (a.length !== b.length) return a.length < b.length ? -1 : 1;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+function parseGenerationName(name) {
+  const match = clean(name).match(GENERATION_PATTERN);
+  if (!match) return null;
+  return normalizeRevision(match[1]);
+}
+
+function normalizeGeneration(raw, index) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new DriveFolderDispatchError('INVALID_GENERATION', `Invalid generation[${index}]`);
+  }
+  const folderId = requireId(raw.folderId ?? raw.id, `generation[${index}].folderId`);
+  const name = clean(raw.name);
+  const revision = parseGenerationName(name);
+  if (revision === null) return null;
+  return { folderId, name, revision };
+}
+
+function normalizeEntry(raw, index) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new DriveFolderDispatchError('INVALID_ENTRY', `Invalid entry[${index}]`);
+  }
+  const id = requireId(raw.id, `entry[${index}].id`);
+  const name = clean(raw.name);
+  if (!name || name.length > 250) {
+    throw new DriveFolderDispatchError('INVALID_ENTRY', `Invalid entry[${index}].name`);
+  }
+  const version = normalizeRevision(raw.version ?? 0);
+  return {
+    id,
+    name,
+    version,
+    mimeType: clean(raw.mimeType),
+    size: raw.size == null ? '' : String(raw.size),
+  };
+}
+
+function entriesSignature(entries) {
+  return entries
+    .map(entry => [entry.id, entry.name, entry.version, entry.mimeType, entry.size].join('\u0000'))
+    .sort((a, b) => a.localeCompare(b))
+    .join('\u0001');
+}
+
+function generationsSignature(generations) {
+  return generations
+    .map(item => [item.folderId, item.name, item.revision].join('\u0000'))
+    .sort((a, b) => a.localeCompare(b))
+    .join('\u0001');
+}
+
+async function sha256Text(value) {
+  if (!globalThis.crypto?.subtle) {
+    throw new DriveFolderDispatchError('HASH_UNAVAILABLE', 'Web Crypto is unavailable for dispatch snapshot identity.');
+  }
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function extractGoogleDriveFolderSourceId(value) {
+  const raw = clean(String(value ?? ''));
+  if (/^[A-Za-z0-9_-]{6,256}$/u.test(raw)) return raw;
+  let url;
+  try { url = new URL(raw); } catch {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  if (url.hostname.toLowerCase() !== 'drive.google.com') {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  let id = url.pathname.match(/^\/drive\/folders\/([^/]+)/u)?.[1] || '';
+  try { id = decodeURIComponent(id); } catch { id = ''; }
+  if (!/^[A-Za-z0-9_-]{6,256}$/u.test(id)) {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  return id;
+}
+
+function parseDispatchEnvelope(rawText, {
+  groupNodeId,
+  generationRevision,
+  allowedChildIds,
+  localPromptProfilesByChild,
+  fileId,
+} = {}) {
+  if (typeof rawText !== 'string' || !rawText.trim()) {
+    throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', `Empty dispatch file ${fileId || ''}`);
+  }
+  let raw;
+  try {
+    raw = JSON.parse(rawText);
+  } catch {
+    throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', `Invalid JSON in dispatch file ${fileId || ''}`);
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', 'Dispatch envelope must be an object.');
+  }
+  const allowedFields = new Set([
+    'schema_version',
+    'parent_node_id',
+    'generation',
+    'target_child_id',
+    'prompt',
+    'prompt_profile_id',
+    'order',
+  ]);
+  const unknownFields = Object.keys(raw).filter(key => !allowedFields.has(key));
+  if (unknownFields.length) {
+    throw new DriveFolderDispatchError(
+      'INVALID_DISPATCH_FILE',
+      `Unknown dispatch envelope field: ${unknownFields[0]}`,
+    );
+  }
+  if (Number(raw.schema_version) !== DRIVE_FOLDER_DISPATCH_SCHEMA_VERSION) {
+    throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', 'Unsupported dispatch schema_version.');
+  }
+
+  const parentNodeId = requireId(raw.parent_node_id, 'parent_node_id');
+  if (parentNodeId !== groupNodeId) {
+    throw new DriveFolderDispatchError('WRONG_PARENT', `Dispatch parent ${parentNodeId} does not match ${groupNodeId}.`);
+  }
+  const generation = normalizeRevision(raw.generation);
+  if (generation !== generationRevision) {
+    throw new DriveFolderDispatchError('WRONG_GENERATION', `Dispatch generation ${generation} does not match folder generation ${generationRevision}.`);
+  }
+  const targetChildId = requireId(raw.target_child_id, 'target_child_id');
+  if (!allowedChildIds.has(targetChildId)) {
+    throw new DriveFolderDispatchError('UNKNOWN_TARGET', `Dispatch target ${targetChildId} is not an immediate child of ${groupNodeId}.`);
+  }
+
+  const hasPrompt = typeof raw.prompt === 'string' && raw.prompt.trim().length > 0;
+  const hasProfile = raw.prompt_profile_id !== undefined && raw.prompt_profile_id !== null && String(raw.prompt_profile_id).trim() !== '';
+  if (hasPrompt === hasProfile) {
+    throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', 'Dispatch must provide exactly one of prompt or prompt_profile_id.');
+  }
+
+  let promptPayload = '';
+  let promptProfileId = '';
+  if (hasPrompt) {
+    promptPayload = raw.prompt.trim();
+    if (promptPayload.length > MAX_PROMPT_CHARS) {
+      throw new DriveFolderDispatchError('PROMPT_TOO_LARGE', `Dispatch prompt exceeds ${MAX_PROMPT_CHARS} characters.`);
+    }
+  } else {
+    promptProfileId = requireId(raw.prompt_profile_id, 'prompt_profile_id');
+    const allowed = localPromptProfilesByChild.get(targetChildId);
+    if (!allowed || !allowed.has(promptProfileId)) {
+      throw new DriveFolderDispatchError('PROMPT_PROFILE_NOT_ALLOWED', `Prompt profile ${promptProfileId} is not locally allowed for ${targetChildId}.`);
+    }
+  }
+
+  const order = raw.order == null
+    ? 0
+    : requireInteger(raw.order, 'order', -1000000, 1000000);
+
+  return {
+    schemaVersion: DRIVE_FOLDER_DISPATCH_SCHEMA_VERSION,
+    fileId: requireId(fileId, 'fileId'),
+    parentNodeId,
+    generation,
+    targetChildId,
+    promptPayload,
+    promptProfileId,
+    order,
+  };
+}
+
+export class DriveFolderDispatchProviderV1 {
+  constructor({
+    listGenerations,
+    listGenerationEntries,
+    readEntryContent,
+  } = {}) {
+    if (typeof listGenerations !== 'function'
+        || typeof listGenerationEntries !== 'function'
+        || typeof readEntryContent !== 'function') {
+      throw new DriveFolderDispatchError('INVALID_READER', 'Drive folder dispatch readers are required.');
+    }
+    this.listGenerations = listGenerations;
+    this.listGenerationEntries = listGenerationEntries;
+    this.readEntryContent = readEntryContent;
+  }
+
+  async read({
+    groupNodeId,
+    maxWorkers,
+    sourceId,
+    childNodeIds,
+    childPromptProfileIds = {},
+  } = {}) {
+    const group = requireId(groupNodeId, 'groupNodeId');
+    const source = requireId(sourceId, 'sourceId');
+    const maximum = requireInteger(maxWorkers, 'maxWorkers', 0, MAX_ENTRIES);
+    const children = Array.isArray(childNodeIds)
+      ? childNodeIds.map((value, index) => requireId(value, `childNodeIds[${index}]`))
+      : (() => { throw new DriveFolderDispatchError('INVALID_CONFIG', 'childNodeIds are required.'); })();
+    if (new Set(children).size !== children.length) {
+      throw new DriveFolderDispatchError('INVALID_CONFIG', 'Duplicate childNodeIds.');
+    }
+    if (maximum > children.length) {
+      throw new DriveFolderDispatchError('INVALID_CONFIG', 'maxWorkers exceeds local child capacity.');
+    }
+    const allowedChildIds = new Set(children);
+    const localPromptProfilesByChild = new Map(children.map(childId => {
+      const raw = childPromptProfileIds?.[childId];
+      const ids = Array.isArray(raw) ? raw.map((value, index) => requireId(value, `childPromptProfileIds.${childId}[${index}]`)) : [];
+      return [childId, new Set(ids)];
+    }));
+
+    const rawGenerations = await this.listGenerations({ sourceId: source });
+    if (!Array.isArray(rawGenerations) || rawGenerations.length > MAX_GENERATIONS) {
+      throw new DriveFolderDispatchError('INVALID_GENERATION_LIST', 'Invalid Drive generation list.');
+    }
+    const generations = rawGenerations
+      .map(normalizeGeneration)
+      .filter(Boolean)
+      .sort((a, b) => compareRevision(b.revision, a.revision));
+    if (!generations.length) return { kind: 'NO_GENERATION', providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1, groupNodeId: group, sourceId: source };
+    if (new Set(generations.map(item => item.folderId)).size !== generations.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Duplicate generation folder identity in Drive root.');
+    }
+    if (new Set(generations.map(item => item.revision)).size !== generations.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Multiple Drive folders publish the same generation revision.');
+    }
+
+    const generationInventoryBefore = generationsSignature(generations);
+    const generation = generations[0];
+    const beforeRaw = await this.listGenerationEntries({ sourceId: source, generation });
+    if (!Array.isArray(beforeRaw) || beforeRaw.length > MAX_ENTRIES + 1) {
+      throw new DriveFolderDispatchError('INVALID_ENTRY_LIST', 'Invalid Drive generation entry list.');
+    }
+    const before = beforeRaw.map(normalizeEntry);
+    if (new Set(before.map(entry => entry.id)).size !== before.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_ENTRY', 'Duplicate Drive entry id in generation.');
+    }
+    const readyEntries = before.filter(entry => entry.name === 'READY');
+    if (readyEntries.length !== 1) {
+      return {
+        kind: 'NOT_READY',
+        providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1,
+        groupNodeId: group,
+        sourceId: source,
+        providerRevision: generation.revision,
+      };
+    }
+    const dispatchEntries = before.filter(entry => entry.name !== 'READY');
+    if (dispatchEntries.length > maximum) {
+      throw new DriveFolderDispatchError('OVER_CAPACITY', `Dispatch generation has ${dispatchEntries.length} files but local max is ${maximum}.`);
+    }
+
+    const parsed = [];
+    for (const entry of dispatchEntries) {
+      const content = await this.readEntryContent({ sourceId: source, generation, entry });
+      parsed.push({
+        ...parseDispatchEnvelope(content, {
+          groupNodeId: group,
+          generationRevision: generation.revision,
+          allowedChildIds,
+          localPromptProfilesByChild,
+          fileId: entry.id,
+        }),
+        fileVersion: entry.version,
+      });
+    }
+
+    const targets = parsed.map(item => item.targetChildId);
+    if (new Set(targets).size !== targets.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_TARGET', 'Dispatch generation contains duplicate target_child_id.');
+    }
+
+    const afterRaw = await this.listGenerationEntries({ sourceId: source, generation });
+    if (!Array.isArray(afterRaw) || afterRaw.length > MAX_ENTRIES + 1) {
+      throw new DriveFolderDispatchError('INVALID_ENTRY_LIST', 'Invalid Drive generation entry list after read.');
+    }
+    const after = afterRaw.map(normalizeEntry);
+    const beforeSignature = entriesSignature(before);
+    if (beforeSignature !== entriesSignature(after)) {
+      throw new DriveFolderDispatchError('UNSTABLE_GENERATION', 'Drive dispatch generation changed while being read.');
+    }
+
+    const rawGenerationsAfter = await this.listGenerations({ sourceId: source });
+    if (!Array.isArray(rawGenerationsAfter) || rawGenerationsAfter.length > MAX_GENERATIONS) {
+      throw new DriveFolderDispatchError('INVALID_GENERATION_LIST', 'Invalid Drive generation list after read.');
+    }
+    const generationsAfter = rawGenerationsAfter
+      .map(normalizeGeneration)
+      .filter(Boolean)
+      .sort((a, b) => compareRevision(b.revision, a.revision));
+    if (new Set(generationsAfter.map(item => item.folderId)).size !== generationsAfter.length
+        || new Set(generationsAfter.map(item => item.revision)).size !== generationsAfter.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Ambiguous generation identity appeared during Drive read.');
+    }
+    if (generationInventoryBefore !== generationsSignature(generationsAfter)) {
+      throw new DriveFolderDispatchError(
+        'UNSTABLE_GENERATION',
+        'Drive dispatch generation inventory changed while the selected generation was being read.',
+      );
+    }
+
+    const snapshotHash = await sha256Text([
+      source,
+      generation.revision,
+      generation.folderId,
+      beforeSignature,
+    ].join('\u0002'));
+
+    for (const item of parsed) {
+      item.dispatchIdentity = await sha256Text([
+        source,
+        generation.revision,
+        item.fileId,
+        item.fileVersion,
+        item.targetChildId,
+      ].join('\u0000'));
+    }
+    parsed.sort((a, b) => a.order - b.order || a.targetChildId.localeCompare(b.targetChildId) || a.fileId.localeCompare(b.fileId));
+    return {
+      kind: 'READY',
+      providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1,
+      groupNodeId: group,
+      sourceId: source,
+      providerRevision: generation.revision,
+      generationFolderId: generation.folderId,
+      snapshotHash,
+      dispatches: parsed,
+    };
+  }
+}
+
+
+const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
+const GOOGLE_FOLDER_MIME = 'application/vnd.google-apps.folder';
+const GOOGLE_DOC_MIME = 'application/vnd.google-apps.document';
+const DISPATCH_TEXT_MIME_TYPES = new Set([
+  'application/json',
+  'text/plain',
+  'text/markdown',
+]);
+
+function driveApiUrl(path, params = {}) {
+  const url = new URL(`${DRIVE_API_BASE}${path}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  return url.toString();
+}
+
+async function authorizedFetch(fetchFn, getAccessToken, url, options = {}) {
+  if (typeof getAccessToken !== 'function') {
+    throw new DriveFolderDispatchError('AUTH_REQUIRED', 'Google Drive access-token provider is not configured.');
+  }
+  const token = clean(await getAccessToken());
+  if (!token) throw new DriveFolderDispatchError('AUTH_REQUIRED', 'Google Drive access token is unavailable.');
+  let response;
+  try {
+    response = await fetchFn(url, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    throw new DriveFolderDispatchError('NETWORK', 'Google Drive request failed.', { retryable: true, details: error?.message || '' });
+  }
+  if (response?.ok) return response;
+  const status = Number(response?.status || 0);
+  const code = status === 401 ? 'AUTH_REQUIRED'
+    : status === 403 ? 'ACCESS_DENIED'
+      : status === 404 ? 'NOT_FOUND'
+        : 'HTTP_ERROR';
+  throw new DriveFolderDispatchError(code, `Google Drive HTTP ${status || 'error'}.`, {
+    retryable: [408, 429, 500, 502, 503, 504].includes(status),
+    status,
+  });
+}
+
+export function createGoogleDriveFolderDispatchReader({
+  folderId,
+  getAccessToken,
+  fetchFn = globalThis.fetch,
+} = {}) {
+  const sourceId = extractGoogleDriveFolderSourceId(folderId);
+  if (typeof fetchFn !== 'function') {
+    throw new DriveFolderDispatchError('INVALID_READER', 'fetch is unavailable.');
+  }
+
+  async function listChildren(parentId) {
+    const response = await authorizedFetch(
+      fetchFn,
+      getAccessToken,
+      driveApiUrl('/files', {
+        q: `'${parentId}' in parents and trashed = false`,
+        pageSize: 1000,
+        orderBy: 'name',
+        fields: 'nextPageToken,files(id,name,mimeType,version,size)',
+      }),
+    );
+    const body = await response.json();
+    if (body?.nextPageToken) {
+      throw new DriveFolderDispatchError('OVER_CAPACITY', 'Drive folder exceeds the bounded 1000-entry provider limit.');
+    }
+    return Array.isArray(body?.files) ? body.files : [];
+  }
+
+  return {
+    sourceId,
+    async listGenerations() {
+      const files = await listChildren(sourceId);
+      return files
+        .filter(item => clean(item?.mimeType) === GOOGLE_FOLDER_MIME)
+        .map(item => ({
+          id: item.id,
+          folderId: item.id,
+          name: item.name,
+        }));
+    },
+    async listGenerationEntries({ generation } = {}) {
+      const generationId = requireId(generation?.folderId, 'generation.folderId');
+      return listChildren(generationId);
+    },
+    async readEntryContent({ entry } = {}) {
+      const entryId = requireId(entry?.id, 'entry.id');
+      const mimeType = clean(entry?.mimeType);
+      let url;
+      if (mimeType === GOOGLE_DOC_MIME) {
+        url = driveApiUrl(`/files/${encodeURIComponent(entryId)}/export`, { mimeType: 'text/plain' });
+      } else if (DISPATCH_TEXT_MIME_TYPES.has(mimeType)) {
+        url = driveApiUrl(`/files/${encodeURIComponent(entryId)}`, { alt: 'media' });
+      } else {
+        throw new DriveFolderDispatchError(
+          'UNSUPPORTED_MIME',
+          `Unsupported Drive dispatch MIME type: ${mimeType || 'unknown'}.`,
+        );
+      }
+      const response = await authorizedFetch(fetchFn, getAccessToken, url);
+      const content = await response.text();
+      if (new TextEncoder().encode(content).byteLength > MAX_PROMPT_CHARS + 8192) {
+        throw new DriveFolderDispatchError('DISPATCH_TOO_LARGE', 'Drive dispatch file is too large.');
+      }
+      return content;
+    },
+  };
+}

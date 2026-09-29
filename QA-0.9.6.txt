@@ -1,0 +1,33 @@
+QA 0.9.6 — ORCHESTRATION EXACT-ONCE / CONTROL ACK HARDENING
+
+Scope:
+- duplicate Coordinator/Worker send prevention after ambiguous submit;
+- fresh-chat structural send acknowledgement;
+- exact conversation tab re-adoption after hint loss;
+- coordinator GitHub control ACK semantics based on last_control_revision;
+- regression of all existing Core/AI/Interaction/UI/Release/Reliability contracts.
+
+Owner evidence motivating this release:
+- a fresh Coordinator send produced a new conversation and user turn but was classified SEND_CLICK_UNCERTAIN, then unattended recovery re-sent the prompt;
+- coordinator later published NO_ACTION because it believed a prior ADD_TASKS revision was already dispatched even though Autopilot had not acknowledged/applied it.
+
+FINAL AUTOMATED QUALIFICATION
+- AI / Orchestration / Gateway: 277/277 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 241/241 PASS
+- ChatGPT interaction: 112/112 PASS
+- UI: 54/54 PASS
+- Release: 14/14 PASS
+- Reliability sub-runs: 2/2 + 1/1 + 6/6 + 5/5 + 7/7 + 1/1 PASS
+- TOTAL deterministic tests: 738/738 PASS
+- Native Chromium phased interaction: PASS
+- Chromium keyboard/mode/accessibility: PASS
+- 20,000 randomized unattended states: PASS
+- New targeted exact-once/ACK set: PASS (fresh structural acknowledgement, managed ambiguous hold/no resend, exact-tab re-adoption, last_control_revision ACK contract, clean different-project import creates fresh runtime)
+
+RELEASE FLAGS
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+
+The exact shipped package still requires Oleksii's physical Windows/Chrome/NVDA acceptance. Automated browser evidence must not be represented as physical NVDA acceptance.

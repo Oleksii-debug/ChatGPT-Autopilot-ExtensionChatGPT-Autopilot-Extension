@@ -1,0 +1,23 @@
+{
+  "name": "chatgpt-autopilot-extension-core",
+  "version": "0.9.19",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:ai && npm run test:legacy-ai && npm run test:core && npm run test:interaction && npm run test:ui && npm run test:release && npm run test:reliability",
+    "test:ai": "node --test tests/*.test.mjs",
+    "test:web-det": "node --test tests/deterministic-web-*.test.mjs",
+    "test:legacy-ai": "node --test tests-regression/ai-manager-static.test.mjs tests-regression/ai-manager.test.mjs",
+    "test:core": "node --test tests-regression/core/*.test.js tests-regression/integration/*.test.js",
+    "test:interaction": "node --test tests-regression/interaction/*.test.cjs",
+    "test:ui": "node --test tests-regression/ui/*.test.js",
+    "test:release": "node --test tests-regression/release/*.test.js",
+    "test:reliability": "node --test --test-force-exit tests-regression/reliability/agentic-multisession-matrix.test.js && node --test --test-force-exit tests-regression/reliability/exhaustive-mode-strategy-matrix.test.js && node --test --test-force-exit tests-regression/reliability/recovery-arbiter.test.js && node --test --test-force-exit tests-regression/reliability/scheduler.test.js && node --test --test-force-exit tests-regression/reliability/storage-tabs.test.js && node --test --test-force-exit tests-regression/reliability/unattended-wake-fuzz.test.js && node --test --test-force-exit tests-regression/reliability/diagnostic-derived-single-session-liveness.test.mjs && node --test --test-force-exit tests-regression/reliability/ordinary-night-liveness.test.mjs && node --test --test-force-exit tests-regression/reliability/two-hour-ordinary-cadence.test.mjs && node --test --test-force-exit tests-regression/reliability/mixed-runtime-longrun.test.mjs",
+    "test:chrome-ui": "node scripts/chrome-ui-accessibility-smoke.mjs",
+    "package:release": "node scripts/package-release.mjs",
+    "test:native-browser": "node scripts/native-browser-smoke.cjs",
+    "test:browser": "npm run test:native-browser && npm run test:chrome-ui",
+    "test:qualification": "npm test && npm run test:browser",
+    "package:source": "node scripts/package-source.mjs",
+    "package:store": "node scripts/package-store.mjs"
+  }
+}

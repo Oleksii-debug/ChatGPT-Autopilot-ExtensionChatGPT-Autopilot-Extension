@@ -1,0 +1,60 @@
+QA 0.9.14 — AGENT PLATFORM MVP / SECONDS + MILLION CYCLES / SCENARIO HARDENING
+
+AUTOMATED QUALIFICATION — EXACT VERSION-FROZEN SOURCE
+- AI / Browser Agent / Scenario / Orchestration: 377/377 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 272/272 PASS
+- ChatGPT interaction: 115/115 PASS
+- UI: 62/62 PASS
+- Release gates: 14/14 PASS
+- Reliability: 26/26 PASS
+- TOTAL NODE TESTS: 884/884 PASS
+
+BROWSER GATES
+- Native Chromium UI + ChatGPT phased interaction + generic Browser Agent form E2E: PASS.
+- Generic Browser Agent fixture in real Chromium proves snapshot + fill + select + check + contenteditable + legacy onclick + click/submit + post-action verification.
+- Chromium keyboard/mode/accessibility smoke: PASS.
+
+ORDINARY SESSION EVIDENCE
+- six Ordinary open-close Sessions simulate eight virtual hours with ambiguous Send/navigation faults and remain live; PASS.
+- one Ordinary Session at user-selected 2-minute cadence covers two virtual hours and reaches approximately sixty cycles; PASS.
+- injected RECOVERY_STALE_MATCH_UNPROVEN ambiguity around the 30th Send does not freeze the remaining two-hour run; PASS.
+- 20,000 randomized unattended active states retain a finite wake; PASS.
+- seconds/minutes support does not rewrite historical minute cadence values.
+- shared URL/shared prompt supports compact logical cycle counts up to 1,000,000 without materializing one million Task objects.
+
+BROWSER AGENT EVIDENCE
+- prompt-first goal with blank URL is valid; an existing owner HTTP(S) tab can be adopted without becoming extension-owned.
+- fast multi-step model/tool burst, follow-up owner instruction epoch, Pause/Stop stale-action cancellation: PASS.
+- provider failure, invalid planner JSON, stale DOM/action exception and partial batch recovery are bounded/durable: PASS.
+- cross-origin redirects/clicks transition to WAITING_PERMISSION rather than spinning: PASS.
+- token/model-call/runtime/action/cost budgets and provider usage accounting tests: PASS.
+- ONCE / CONTINUOUS / INTERVAL, start/end, daily active window and cold-restart alarm recovery: PASS.
+- extension-owned versus adopted-user tab provenance and transactional close retry: PASS.
+- alarm namespaces for Core, Browser Agent, Scenario Work and per-orchestra runtimes are disjoint: PASS.
+
+SCENARIO / ORCHESTRATION EVIDENCE
+- Scenario write-ahead semantic checkpoint before cleanup, durable cleanup obligations and restart retry: PASS.
+- owner Pause/Stop/Resume controls managed Core Sessions and stale background cycles cannot resurrect RUNNING: PASS.
+- managed Session identity is validated before restart reuse: PASS.
+- SECOND cannot depend on future FIRST; exact dependencies_consumed semantics are enforced: PASS.
+- Pair / Auditor+Group timeout and replacement stall regressions: PASS.
+- Orchestration V2 tabs.remove failure retains ownership for later retirement; adopted user tabs are never auto-closed: PASS.
+- Mixed-runtime long-run runs Ordinary + Browser Agent + Scenario Work + Orchestration V2 in one shared durable/Chrome environment with ambiguous Send, close failures and cold manager restart: PASS.
+- Mixed-load exposed and regression-locked a coordinator terminal-operation URL-rebind schema bug; terminal evidence is projected before Task rebind rather than weakening validation: PASS.
+- Explicit Stop of the final active Ordinary Session retains failed tab retirement as canonical alarm work with bounded backoff; after quiescence all owned Ordinary hints drain to zero: PASS.
+- Physical tab retirement wake is independent of ChatGPT provider rate-limit deadlines: PASS.
+
+STATIC / PRIVACY
+- JS/MJS/CJS syntax: 209/209 PASS.
+- JSON parse: 6/6 PASS.
+- secret-prefix scan: 0 hits.
+
+IMPORTANT LIMITS
+This is automated qualification only.
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+REAL_UKF_AIS_VERIFIED=false
+The Chromium Agent test uses a generic AIS-like form fixture; it is not a claim that the real UKF AIS has been physically tested.
+User-selected Session timing values are not silently rewritten by this release.

@@ -1,0 +1,13 @@
+ChatGPT Автопілот 0.9.1 — MULTI-ORCHESTRA / PHYSICAL-REPAIR CANDIDATE
+
+- One installation can own multiple isolated orchestras with independent configuration, runtime, alarms and durable state.
+- Orchestra operations: create, select, rename, local pause, edit while safely paused, resume/reconcile and delete without reinstalling the extension. Zero orchestras is valid.
+- Critical identity rebinding is fail-closed unless the orchestra is locally paused and has no unresolved Send, active Coordinator lease or live worker. Duplicate project identity is rejected.
+- Emergency STOP revokes durable enabled authority first, raw-stamps PAUSE on the selected orchestra even when runtime normalization is corrupt, preserves unresolved recovery evidence, disables managed Core Sessions and clears only that orchestra alarm.
+- Fresh-root ChatGPT Send verification is strict: operation-local appended-message proof plus root-to-exclusive-conversation transition, empty composer and generation/assistant progress. Uncertain Send adopts the observed exclusive conversation for exact-once recovery without treating URL creation as positive Send proof.
+- Orchestration control compatibility accepts ACTIVE as RUN, P0..P9 priority notation and unambiguous concurrency aliases; conflicting aliases fail closed.
+- Options status loads use an action epoch so an older in-flight read cannot repaint state after a newer orchestration action.
+- Safe owner launch policy defaults and long-run hardening are retained, including monotonic worker/event IDs, bounded lossless pending events, durable dependency completion and read-only observability.
+- Automated matrix before version bump: 712/712 PASS; native Chromium and Chrome UI/accessibility gates PASS.
+
+This remains an automated release candidate. It is not a claim of owner Windows Chrome physical acceptance or NVDA verification.

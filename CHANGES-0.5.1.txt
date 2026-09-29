@@ -1,0 +1,21 @@
+ChatGPT Автопілот 0.5.1 — UNATTENDED OPENAI-COMPATIBLE API CREDENTIAL
+
+НОВЕ
+- Generic OpenAI-compatible API key тепер може безпечно зберігатися через Windows DPAPI.
+- Новий скрипт: НАЛАШТУВАТИ OPENAI-COMPATIBLE API КЛЮЧ.ps1.
+- Новий скрипт видалення compatible credential.
+- ЗАПУСТИТИ GATEWAY.ps1 та СТАРТ GATEWAY — АВТО.ps1 автоматично підхоплюють compatible-key.dpapi.
+- Interactive LM Studio/OpenAI-compatible launcher спершу використовує saved DPAPI key; якщо його нема, лишається one-process secure prompt.
+- Меню Gateway має окремі пункти збереження/видалення compatible API key.
+
+БЕЗПЕКА
+- Plaintext compatible key не пишеться у JSON, Chrome, log або package.
+- DPAPI ciphertext прив'язаний до поточного Windows user profile.
+- BSTR zeroed після запуску; COMPATIBLE_API_KEY видаляється з PowerShell environment у finally.
+- Installer уже зберігає config/ при update, тому compatible-key.dpapi переживає оновлення Gateway.
+
+БАЗА 0.5.0 ЗБЕРЕЖЕНА
+- opt-in AI TUNE_SESSION для bounded timing settings;
+- central FIFO Gateway queue;
+- primary/strong/hybrid router;
+- web reports/handoff/recovery.

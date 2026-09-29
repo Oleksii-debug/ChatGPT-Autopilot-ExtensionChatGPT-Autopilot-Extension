@@ -1,0 +1,39 @@
+QA 0.5.0 — AI SESSION TUNING + FIFO/HYBRID BASELINE
+
+FINAL AUTOMATED MATRIX:
+- New AI / Gateway / Windows companion: 81/81 PASS.
+- Core + integration regression: 233/233 PASS.
+- ChatGPT interaction regression: 111/111 PASS.
+- UI regression: 45/45 PASS.
+- Reliability regression: 22/22 PASS.
+- Legacy AI Manager regression: 18/18 PASS.
+- Release gates: 7/7 PASS.
+- Разом автоматизованих тестів: 517/517 PASS.
+
+SESSION TUNING PROOF:
+- parser allowlists only 4 bounded timing fields and drops unknown/out-of-range fields;
+- explicit allowSessionTuning permission required; default is false;
+- successful TUNE_SESSION updates timing milliseconds + Session version;
+- prompt and task URL remain unchanged;
+- active SUBMITTING/AMBIGUOUS operation rejects tuning;
+- current send gate is never shortened when minimum interval decreases;
+- UI exposes explicit opt-in checkbox; settings persist through core commands.
+
+BASELINE PROOF PRESERVED:
+- central FIFO and bounded 429 recovery;
+- localhost Gateway Ollama [[ESCALATE]] -> strong API -> HANDOFF_NEXT E2E;
+- source completeness src/config;
+- hybrid cost guards; durable report/event/recovery queues.
+
+ADDITIONAL GATES:
+- JavaScript/MJS/CJS syntax check: PASS.
+- Product/source JSON parse: PASS.
+- deterministic extension packaging: PASS.
+- ZIP integrity/SHA256: see final SHA256SUMS.
+
+НЕ ЗАЯВЛЕНО ЯК ФІЗИЧНО ПЕРЕВІРЕНЕ:
+- реальний Windows installer/DPAPI/Startup на ПК користувача;
+- реальна Ollama/LM Studio model;
+- real API key/billing;
+- overnight physical Chrome run;
+- physical NVDA acceptance.

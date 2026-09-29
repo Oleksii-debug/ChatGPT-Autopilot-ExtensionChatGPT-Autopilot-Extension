@@ -1,0 +1,45 @@
+QA 0.9.17 — FINAL AUTOMATED QUALIFICATION
+
+Version: 0.9.17
+Date: 2026-09-14
+Status: automated release qualification PASS; physical owner Windows/NVDA/real UKF AIS acceptance is NOT claimed.
+
+EXACT NODE TEST MATRIX
+- AI / Browser Agent / Scenario / Orchestration: 430/430 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 272/272 PASS
+- ChatGPT interaction: 115/115 PASS
+- UI: 62/62 PASS
+- Release contracts: 14/14 PASS
+- Reliability constituent gates: 26/26 PASS
+- Aggregate Node tests: 937/937 PASS
+
+RELIABILITY EVIDENCE
+- 8 virtual hours / 6 Ordinary open-close Sessions with ambiguous Send, navigation faults and transient tab-close failures: PASS.
+- Exact 2-hour Ordinary / 2-minute cadence regression: 2/2 PASS, including forced stale-match ambiguity around the 30th cycle without freezing the remaining Session.
+- Mixed runtime long-run: Ordinary + Browser Agent + Scenario Work + Orchestration V2 progress together through cold restart and tab-close faults: PASS.
+- Scheduler / recovery arbiter / storage-tabs / unattended wake fuzz / exhaustive mode-strategy / agentic multi-session gates: PASS.
+
+0.9.17 COMPUTER-USE / ROUTING EVIDENCE
+- drag_at/type_at are accepted only on the exact model turn carrying the runtime screenshot and remain CSS-viewport bounded.
+- drag source/destination and typing targets are fingerprinted and revalidated before native input; target is revalidated again after chrome.debugger.attach to fail closed on viewport/target shifts.
+- Native drag uses held-button CDP movement (button=none, buttons=1) with bounded real timing.
+- type_at blocks password/file targets before Input.insertText.
+- Per-Agent AI route/provider/model override is durable and isolated from profile-wide router runtime.
+- Real Chromium E2E covers visual-only canvas coordinate click, visual drag-and-drop and coordinate editor typing.
+
+BROWSER / STATIC GATES
+- Native Chromium UI + phased ChatGPT interaction + generic Browser Agent click/drag/type E2E: PASS.
+- Chromium keyboard / mode / accessibility smoke: PASS.
+- JS/MJS/CJS syntax: 209/209 PASS.
+- JSON parse: 6/6 PASS.
+- Secret-prefix scan: 0 hits.
+
+ORDINARY SESSION INVARIANT
+0.9.17 does not rewrite user-selected Session timing/cadence. Seconds/minutes remain explicit owner policy. The 2-minute regression is a test fixture only, not a forced product setting.
+
+NOT CLAIMED
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+REAL_UKF_AIS_VERIFIED=false

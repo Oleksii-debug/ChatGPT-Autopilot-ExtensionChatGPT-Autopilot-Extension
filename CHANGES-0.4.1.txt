@@ -1,0 +1,22 @@
+ChatGPT Автопілот 0.4.1 — CENTRAL AI INFERENCE QUEUE + SOURCE COMPLETENESS
+
+НОВЕ
+- Один спільний Gateway тепер серіалізує всі /complete через центральну FIFO-чергу.
+- Це захищає локальні Ollama/LM Studio inference від одночасного запуску з кількох Chrome-профілів.
+- Черга bounded: default 32 pending, AUTOPILOT_AI_MAX_PENDING=1..256.
+- При переповненні новий запит отримує HTTP 429 / AI_INFERENCE_QUEUE_FULL; вже прийняті запити продовжують роботу.
+- /health та /status показують inferenceQueue.active, pending, maxPending.
+
+ВІДНОВЛЕНО ПІСЛЯ ОБРИВУ ПОПЕРЕДНЬОГО ЧАТУ
+- Два queue-тести: strict FIFO serialization та bounded overflow/recovery.
+- Один повний E2E: web event -> AI Manager -> real localhost HTTP Gateway -> Ollama primary -> [[ESCALATE]] -> OpenAI strong -> HANDOFF_NEXT -> next web-prompt.
+
+ВИПРАВЛЕНО
+- 0.4.0 SOURCE archive не містив src/config/, хоча фінальний extension містив його і service-worker імпортував bootstrap-profile.js.
+- 0.4.1 SOURCE включає src/config/bootstrap-profile.js та portable-profile-template.json; source regression знову самодостатній.
+
+ЗБЕРЕЖЕНО
+- Весь multi-session/runtime/rate-limit/recovery контур.
+- AI Manager durable queue/history/report collection/safe actions.
+- primary / strong / hybrid-auto / hybrid-rules.
+- Windows AI Gateway installer, portable Node, DPAPI, Startup, PID-safe lifecycle.

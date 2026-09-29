@@ -1,0 +1,35 @@
+ChatGPT Автопілот 0.9.3 — LOCAL ACCEPTANCE / OPENAI API UX / ORCHESTRATION HARDENING
+
+ЗМІНИ ВІД 0.9.2
+
+1. OpenAI API / AI Router
+- AI Router лишається реально підключеним через локальний Windows AI Gateway; OpenAI виклики йдуть через Responses API.
+- OpenAI API key не зберігається у Chrome extension. Він зберігається поза розширенням через Windows DPAPI і передається тільки локальному Gateway process.
+- Додано видимий model selector для primary і strong slots.
+- Додано рекомендовані OpenAI text models: gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna.
+- Кнопка «Оновити моделі» додає моделі, які реально повертає /v1/models для підключеного API-акаунта.
+- UI окремо показує стан OpenAI API key/Gateway і пояснює, де налаштовується ключ.
+- Chromium UI acceptance тепер перевіряє: preset models -> Gateway status -> dynamic model refresh -> real routed-command UI path.
+
+2. Оркестрація / таймінги
+- Додано owner-facing acceptance suite для default worker/coordinator intervals, watchdog semantics, coordinator rotation, stale-worker threshold і launch-window safety.
+- Виявлено і виправлено реальну регресію: після backward wall-clock correction durable launch-history міг втрачати future-relative timestamps і передчасно відкривати launch capacity.
+- Launch-history тепер fail-closed: rollback системного часу не обнуляє вже зафіксовані запуски; вони старіють лише після їх timestamp + configured launch window.
+
+3. Незмінні безпекові межі
+- Core лишається єдиним scheduler/browser Send authority.
+- Import/profile не отримує права на прихований autostart.
+- OpenAI API secret не потрапляє в extension storage, JSON export, diagnostics або release ZIP.
+- Фізичний owner Windows/Chrome/NVDA і реальний OpenAI key/account acceptance не заявляються автоматично.
+
+4. UI contract hardening
+- Виявлено pre-existing duplicate HTML id для local AI model list; дубль прибрано.
+- Додано regression-test, який вимагає унікальності всіх HTML id у shipped Options UI.
+
+5. Фінальна automated qualification
+- 728/728 functional tests PASS.
+- 188/188 JS/MJS/CJS syntax PASS.
+- 6/6 JSON PASS.
+- Native Chromium interaction smoke PASS.
+- Chromium keyboard/mode/accessibility + OpenAI model/routing smoke PASS.
+- Фізичний owner Windows/Chrome/NVDA і реальний owner OpenAI API key/account run лишаються окремою межею й не заявляються як PASS.

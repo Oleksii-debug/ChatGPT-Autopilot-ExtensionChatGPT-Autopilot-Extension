@@ -1,0 +1,43 @@
+QA 0.9.3 — LOCAL ACCEPTANCE / OPENAI API UX / ORCHESTRATION HARDENING
+
+FINAL AUTOMATED QUALIFICATION — 2026-09-12
+
+Functional matrix:
+- AI / Orchestration / Gateway: 271/271 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 239/239 PASS
+- ChatGPT interaction: 111/111 PASS
+- UI: 53/53 PASS
+- Release: 14/14 PASS
+- Reliability: 22/22 PASS
+- TOTAL: 728/728 PASS
+
+Additional gates:
+- owner-facing Orchestration intervals/cycles acceptance: PASS
+- backward wall-clock launch-window fail-closed regression: PASS
+- AI Gateway HTTP E2E with mocked OpenAI/Ollama upstreams: PASS
+- OpenAI Responses API contract: PASS
+- OpenAI /v1/models model-list contract: PASS
+- OpenAI model selector presets + dynamic-account model refresh: PASS
+- no OpenAI API secret field in extension UI/storage path: PASS
+- Chromium phased ChatGPT interaction smoke: PASS
+- Chromium Options keyboard/mode/accessibility + AI/OpenAI routing smoke: PASS
+- HTML DOM unique-id regression: PASS
+- JavaScript/MJS/CJS syntax: 188/188 PASS
+- JSON parse: 6/6 PASS
+- release sensitive-pattern scan: PASS
+- deterministic installable and SOURCE packaging: verified during final artifact build
+- fresh ZIP extraction/integrity: verified during final artifact build
+
+Known non-failing Node warning:
+- MODULE_TYPELESS_PACKAGE_JSON may be printed because source modules are validated directly by Node without package-wide type=module. It does not represent a failed functional gate.
+
+Physical boundary remains separate:
+OWNER_CHATGPT_ACCOUNT_TESTED=false
+REAL_WINDOWS_OWNER_CHROME_TESTED=false
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+REAL_OPENAI_API_KEY_ACCOUNT_TESTED=false
+
+Interpretation:
+0.9.3 is a fully automated LOCAL ACCEPTANCE candidate. It is not relabeled as physically owner-tested. A real owner Windows/Chrome/NVDA run and one real owner OpenAI API-key account run remain required before those flags may become true.

@@ -1,0 +1,16 @@
+ChatGPT Автопілот 0.7.0 — PAIRED LOCAL AI GATEWAY
+
+НОВЕ
+- Gateway більше не довіряє будь-якому chrome-extension:// origin.
+- Додано explicit 5-minute pairing window, який відкривається тільки локальним Windows-скриптом.
+- OPTIONS/preflight не може сам створити привязку.
+- Перший реальний request від валідного Chrome extension ID у pairing window зберігає origin у config\extension-origin.json.
+- Після привязки інші Chrome extension IDs отримують 403 GATEWAY_EXTENSION_NOT_PAIRED.
+- Без pairing window непривязане розширення отримує 428 GATEWAY_PAIRING_REQUIRED.
+- Пошкоджений persisted pairing state обробляється fail-closed і вимагає явного reset.
+- Local CLI/no-Origin diagnostics залишаються доступними.
+- /health і /status показують тільки безпечний extensionPairing status, без extension ID чи credentials.
+- Windows companion має окремі scripts для відкриття pairing window і reset pairing; config переживає Gateway update.
+
+БАЗА 0.6.2 ЗБЕРЕЖЕНА
+- AI Router readiness gate; local/remote OpenAI-compatible HTTPS guard; DPAPI credentials; FIFO inference queue; hybrid routing; AI Manager; opt-in TUNE_SESSION.
