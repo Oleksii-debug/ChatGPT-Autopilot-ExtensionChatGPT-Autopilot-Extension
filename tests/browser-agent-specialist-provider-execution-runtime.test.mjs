@@ -574,3 +574,66 @@ test('corrupt persisted provider execution is quarantined and cannot authorize r
   );
   assert.equal(calls, 0);
 });
+
+
+test('live PREPARED execution fences provider config mutation until external effect resolves', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let release;
+  let entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const client = {
+    async execute() {
+      entered();
+      await gate;
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  const pending = manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '77777777-7777-4777-8777-777777777777',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  await started;
+
+  const configured = providerConfig();
+  await assert.rejects(
+    () => manager.setSpecialistProviderConfig({
+      providerId: configured.providerId,
+      expectedRevision: 1,
+      kind: configured.kind,
+      config: { ...configured.config, agentProfileRevision: 2 },
+    }),
+    /bound to a live provider execution/,
+  );
+  await assert.rejects(
+    () => manager.clearSpecialistProviderConfig({
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: 1,
+    }),
+    /bound to a live provider execution/,
+  );
+
+  release();
+  const outcome = await pending;
+  assert.equal(outcome.execution.status, 'PROVIDER_SUCCEEDED');
+});
