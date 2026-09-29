@@ -30,6 +30,24 @@ function managerFor(chrome, createId = () => 'job.generated') {
   return new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => ({
+      routePoolRevision: 7,
+      routePool: [{
+        schemaVersion: 1,
+        routeId: 'route.research',
+        provider: 'ollama',
+        model: 'research-local',
+        roles: ['planner', 'verifier', 'vision'],
+        capabilityIds: ['research'],
+        priority: 10,
+        enabled: true,
+        locality: 'local',
+        costClass: 'free',
+        supportsVision: true,
+        maxWorkers: 1,
+      }],
+      ownerAllowedRouteIds: ['route.research'],
+    }),
     createId,
   });
 }
@@ -148,6 +166,10 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.deepEqual(created.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
   assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
+  assert.equal(created.job.definitionModelPolicyBinding.routePoolRevision, undefined);
+  assert.equal(created.job.definitionModelPolicyBinding.modelPolicyBinding.routePoolRevision, 7);
+  assert.deepEqual(created.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds, ['route.research']);
+  assert.equal(created.job.definitionModelPolicyBinding.providerAuthority, false);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
@@ -166,6 +188,8 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
   assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.routePoolRevision, 7);
+  assert.deepEqual(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds, ['route.research']);
 });
 
 test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
@@ -194,6 +218,20 @@ test('restart rejects a definition-bound job when its exact launch config bindin
   const restarted = managerFor(chrome);
   const loaded = await restarted.get('job.binding-missing');
   assert.equal(loaded.job, null, 'definition launch config binding must survive restart');
+});
+
+test('restart rejects a reusable Agent when its durable definition model policy binding disappears', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.model-binding-missing' }));
+
+  const [storageKey] = Object.keys(data);
+  delete data[storageKey].byId['job.model-binding-missing'].definitionModelPolicyBinding;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.model-binding-missing');
+  assert.equal(loaded.job, null, 'a reusable Agent must not reload without its durable model-policy binding');
 });
 
 test('restart rejects a selected definition when its persisted model route policy binding is missing', async () => {
@@ -437,6 +475,7 @@ test('standard Browser Agent creation carries no reusable-definition provenance'
   });
   assert.equal(created.job.definitionSelection, null);
   assert.equal(created.job.definitionScope, null);
+  assert.equal(created.job.definitionModelPolicyBinding, null);
 
   const restarted = managerFor(chrome);
   const loaded = await restarted.get('job.manual');

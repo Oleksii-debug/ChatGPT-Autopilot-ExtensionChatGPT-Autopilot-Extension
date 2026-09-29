@@ -783,6 +783,10 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       return {
         settings: normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS),
+        routePoolRevision: Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+          && state.profile.aiRoutePoolRevision > 0
+          ? state.profile.aiRoutePoolRevision
+          : 1,
         runtime: normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
       };
     }
