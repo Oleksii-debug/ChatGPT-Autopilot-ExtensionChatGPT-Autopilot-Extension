@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AgentDefinitionRegistryMutationKind,
+  createAgentDefinitionRegistryV1,
   discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
@@ -40,7 +41,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return {
+  return createAgentDefinitionRegistryV1({{
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
@@ -49,7 +50,7 @@ function registry(overrides = {}) {
       definition(),
     ],
     ...overrides,
-  };
+  });
 }
 
 function materialization(overrides = {}) {
@@ -91,6 +92,24 @@ test('registry canonicalizes reusable Agent definitions deterministically', () =
   assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
+});
+
+test('same-revision Agent registry content substitution is rejected by canonical bindingKey', () => {
+  const current = registry();
+  const forged = {
+    ...current,
+    definitions: current.definitions.map(item => (
+      item.agentDefinitionId === 'agent.research'
+        ? { ...item, instructions: 'Changed instructions without a revision bump.' }
+        : item
+    )),
+  };
+  assert.throws(
+    () => normalizeAgentDefinitionRegistryV1(forged),
+    /bindingKey is inconsistent with canonical registry content/,
+  );
+  const selected = selectAgentDefinitionV1({ registry: current, agentDefinitionId: 'agent.research' });
+  assert.equal(selected.registryBindingKey, current.bindingKey);
 });
 
 test('legacy Agent definitions remain shape-compatible when no specialist delegation profile exists', () => {
@@ -556,7 +575,7 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ revision: 4 }),
-  }), /registry identity or revision drifted/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('selection envelope cannot substitute a different definition identity or revision', () => {
@@ -1030,10 +1049,21 @@ test('reusable Agent model route policy is canonical, immutable and materializes
   });
 });
 
-test('reusable Agent model route policy rejects hidden authority and hostile descriptors', () => {
+test('reusable Agent model route policy admits canonical resilience controls but rejects hidden authority and hostile descriptors', () => {
+  const failover = normalizeAgentDefinitionV1(definition({
+    modelRoutePolicy: {
+      retryBackoffSeconds: 1,
+      circuitBreakerFailures: 1,
+      circuitBreakerSeconds: 1,
+    },
+  })).modelRoutePolicy;
+  assert.equal(failover.retryBackoffSeconds, 1);
+  assert.equal(failover.circuitBreakerFailures, 1);
+  assert.equal(failover.circuitBreakerSeconds, 1);
+
   assert.throws(() => normalizeAgentDefinitionV1(definition({
-    modelRoutePolicy: { retryBackoffSeconds: 1 },
-  })), /unknown field: retryBackoffSeconds/);
+    modelRoutePolicy: { providerApiKey: 'secret' },
+  })), /unknown field: providerApiKey/);
 
   let reads = 0;
   const policy = {};
@@ -1055,6 +1085,9 @@ test('reusable Agent model route policy rejects coercive aliases so durable byte
     { freeOnly: 1 },
     { maxInputPricePerMillionUsd: '1' },
     { maxOutputPricePerMillionUsd: -0 },
+    { retryBackoffSeconds: '60' },
+    { circuitBreakerFailures: 0 },
+    { circuitBreakerSeconds: -0 },
   ]) {
     assert.throws(
       () => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })),

@@ -2153,6 +2153,36 @@ function setAgentDefinitionFormEnabled(enabled) {
   $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
 }
 
+function syncAgentDefinitionModelRoutePolicyControls() {
+  const configured = $('agent-definition-model-route-policy-configured').checked;
+  for (const id of [
+    'agent-definition-model-route-auto-switch','agent-definition-model-route-pinned-id',
+    'agent-definition-model-route-ordered-ids','agent-definition-model-route-allow-ids',
+    'agent-definition-model-route-deny-ids','agent-definition-model-route-free-only',
+    'agent-definition-model-route-locality','agent-definition-model-route-max-input-price',
+    'agent-definition-model-route-max-output-price','agent-definition-model-route-backoff-seconds',
+    'agent-definition-model-route-circuit-failures','agent-definition-model-route-circuit-seconds',
+  ]) $(id).disabled = !configured;
+}
+
+function fillAgentDefinitionModelRoutePolicy(policy = null) {
+  const configured = Boolean(policy);
+  $('agent-definition-model-route-policy-configured').checked = configured;
+  $('agent-definition-model-route-auto-switch').checked = policy?.autoSwitch ?? true;
+  $('agent-definition-model-route-pinned-id').value = policy?.pinnedRouteId || '';
+  $('agent-definition-model-route-ordered-ids').value = agentDefinitionLines(policy?.orderedRouteIds);
+  $('agent-definition-model-route-allow-ids').value = agentDefinitionLines(policy?.allowRouteIds);
+  $('agent-definition-model-route-deny-ids').value = agentDefinitionLines(policy?.denyRouteIds);
+  $('agent-definition-model-route-free-only').checked = policy?.freeOnly === true;
+  $('agent-definition-model-route-locality').value = policy?.locality || 'any';
+  $('agent-definition-model-route-max-input-price').value = policy?.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
+  $('agent-definition-model-route-max-output-price').value = policy?.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
+  $('agent-definition-model-route-backoff-seconds').value = String(policy?.retryBackoffSeconds ?? 60);
+  $('agent-definition-model-route-circuit-failures').value = String(policy?.circuitBreakerFailures ?? 2);
+  $('agent-definition-model-route-circuit-seconds').value = String(policy?.circuitBreakerSeconds ?? 300);
+  syncAgentDefinitionModelRoutePolicyControls();
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2167,6 +2197,7 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
+  fillAgentDefinitionModelRoutePolicy(definition?.modelRoutePolicy || null);
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}.`
     : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
@@ -2194,7 +2225,7 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
   if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
@@ -2246,6 +2277,7 @@ async function createBrowserAgentFromDefinition() {
     return;
   }
 
+  let createdId = '';
   try {
     const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
       registry,
@@ -2256,22 +2288,25 @@ async function createBrowserAgentFromDefinition() {
     status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
 
     const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
-    const id = created?.job?.id || created?.selectedId;
-    if (!id) throw new Error('Core не повернув id створеного Agent job.');
+    createdId = created?.job?.id || created?.selectedId || '';
+    if (!createdId) throw new Error('Core не повернув id створеного Agent job.');
 
-    ui.selectedBrowserAgentId = id;
-    await loadBrowserAgentJobs({ selectId: id });
+    ui.selectedBrowserAgentId = createdId;
+    await loadBrowserAgentJobs({ selectId: createdId });
 
     const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
     if (runState !== 'STOPPED') {
       throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
     }
 
-    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    status.textContent = `Завдання ${createdId} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
     announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
     $('agent-job-list').focus();
   } catch (error) {
-    if (/revision drifted/i.test(String(error?.message || ''))) {
+    if (createdId) {
+      status.textContent = `Завдання ${createdId} уже створено, але UI не зміг підтвердити його поточний стан: ${error.message}. Не створюйте повторно; оновіть список Agent jobs і перевірте цей ID.`;
+      announce('Reusable Agent завдання вже створено. Потрібна повторна перевірка його стану, а не повторне створення.');
+    } else if (/revision drifted/i.test(String(error?.message || ''))) {
       await loadAgentDefinitionRegistries({
         selectRegistryId: registry.registryId,
         selectDefinitionId: definition.agentDefinitionId,
@@ -2416,6 +2451,19 @@ function agentDefinitionFormValue() {
     toolIdsText: $('agent-definition-tools').value,
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
+    modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
+    modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,
+    modelRouteOrderedRouteIdsText: $('agent-definition-model-route-ordered-ids').value,
+    modelRouteAllowRouteIdsText: $('agent-definition-model-route-allow-ids').value,
+    modelRouteDenyRouteIdsText: $('agent-definition-model-route-deny-ids').value,
+    modelRouteFreeOnly: $('agent-definition-model-route-free-only').checked,
+    modelRouteLocality: $('agent-definition-model-route-locality').value,
+    modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
+    modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
+    modelRouteRetryBackoffSeconds: $('agent-definition-model-route-backoff-seconds').value,
+    modelRouteCircuitBreakerFailures: $('agent-definition-model-route-circuit-failures').value,
+    modelRouteCircuitBreakerSeconds: $('agent-definition-model-route-circuit-seconds').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
@@ -4386,6 +4434,7 @@ $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
+$('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
