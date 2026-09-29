@@ -28,14 +28,17 @@ const CANDIDATE_KEYS = new Set([
   'schemaVersion',
   'candidateId',
   'providerId',
+  'sourceId',
   'pathKind',
   'capabilityIds',
   'enabled',
   'ready',
   'setupRequired',
   'sourceRevision',
+  'observedAt',
+  'validThrough',
 ]);
-const REQUEST_KEYS = new Set(['schemaVersion', 'requiredCapabilityIds', 'candidates']);
+const REQUEST_KEYS = new Set(['schemaVersion', 'asOf', 'requiredCapabilityIds', 'candidates']);
 const MAX_CANDIDATES = 128;
 const MAX_CAPABILITIES = 64;
 
@@ -118,6 +121,17 @@ function revision(value, label) {
   return value;
 }
 
+function timestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  return value;
+}
+
 function compareId(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -140,16 +154,22 @@ export function normalizeCapabilityPathCandidateV1(input) {
     schemaVersion: CAPABILITY_BEST_PATH_VERSION,
     candidateId: id(raw.candidateId, 'candidateId'),
     providerId: id(raw.providerId, 'providerId'),
+    sourceId: id(raw.sourceId, 'sourceId'),
     pathKind: raw.pathKind,
     capabilityIds: ids(raw.capabilityIds, 'capabilityIds'),
     enabled: bool(raw.enabled, 'enabled'),
     ready: bool(raw.ready, 'ready'),
     setupRequired: bool(raw.setupRequired, 'setupRequired'),
     sourceRevision: revision(raw.sourceRevision, 'sourceRevision'),
+    observedAt: timestamp(raw.observedAt, 'observedAt'),
+    validThrough: timestamp(raw.validThrough, 'validThrough'),
   });
 }
 
-function blockReason(candidate, required) {
+function blockReason(candidate, required, asOf) {
+  if (Date.parse(candidate.observedAt) > Date.parse(asOf)) return 'FUTURE_OBSERVATION';
+  if (Date.parse(candidate.validThrough) < Date.parse(candidate.observedAt)) return 'INVALID_VALIDITY_WINDOW';
+  if (Date.parse(candidate.validThrough) < Date.parse(asOf)) return 'STALE';
   if (!candidate.enabled) return 'DISABLED';
   const available = new Set(candidate.capabilityIds);
   if (!required.every(capabilityId => available.has(capabilityId))) return 'MISSING_CAPABILITY';
@@ -200,6 +220,7 @@ export function recommendCapabilityBestPathV1(input = {}) {
   if (raw.schemaVersion !== CAPABILITY_BEST_PATH_VERSION) {
     throw new Error('Capability best-path request schemaVersion must be numeric 1');
   }
+  const asOf = timestamp(raw.asOf, 'asOf');
   const requiredCapabilityIds = ids(raw.requiredCapabilityIds, 'requiredCapabilityIds');
   if (!requiredCapabilityIds.length) {
     throw new Error('requiredCapabilityIds must not be empty');
@@ -217,7 +238,7 @@ export function recommendCapabilityBestPathV1(input = {}) {
   const eligible = [];
   const blocked = [];
   for (const candidate of candidates) {
-    const reason = blockReason(candidate, requiredCapabilityIds);
+    const reason = blockReason(candidate, requiredCapabilityIds, asOf);
     if (reason) {
       blocked.push(freeze({ candidate, reason }));
     } else {
@@ -229,6 +250,7 @@ export function recommendCapabilityBestPathV1(input = {}) {
 
   return freeze({
     schemaVersion: CAPABILITY_BEST_PATH_VERSION,
+    asOf,
     requiredCapabilityIds,
     selected: recommendation(eligible[0] || null, requiredCapabilityIds),
     alternatives: eligible.slice(1).map(candidate => recommendation(candidate, requiredCapabilityIds)),
