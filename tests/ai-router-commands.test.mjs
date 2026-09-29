@@ -711,3 +711,40 @@ test('bounded Agent invocation requires exact durable budget owner and bounded o
   /requires bounded maxOutputTokens/u);
   assert.equal(calls, 0);
 });
+
+
+test('AI route-pool revision changes only with canonical route-pool changes', async () => {
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  const base = {
+    enabled:true,
+    mode:'primary',
+    routes:[{ routeId:'a', provider:'ollama', model:'a', roles:['planner'], priority:10 }],
+    routePolicy:{ allowRouteIds:['a'] },
+  };
+  const first = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings:base });
+  assert.equal(first.routePoolRevision, 2, 'first non-empty route pool replaces the empty default pool');
+  assert.equal((await dispatcher.execute('GET_AI_ROUTER_SETTINGS')).routePoolRevision, 2);
+
+  const policyOnly = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings:{
+    ...base,
+    routePolicy:{ allowRouteIds:['a'], freeOnly:true },
+  } });
+  assert.equal(policyOnly.routePoolRevision, 2, 'policy-only changes must not invalidate durable route-pool bindings');
+
+  const changedRoute = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings:{
+    ...base,
+    routes:[{ routeId:'a', provider:'ollama', model:'a-v2', roles:['planner'], priority:10 }],
+  } });
+  assert.equal(changedRoute.routePoolRevision, 3);
+  assert.equal((await dispatcher.execute('GET_AI_ROUTER_SETTINGS')).routePoolRevision, 3);
+});
+
+test('legacy state without route-pool revision reads as revision one and remains valid', async () => {
+  const legacy = createEmptyState(1000);
+  delete legacy.profile.aiRoutePoolRevision;
+  assert.doesNotThrow(() => validateState(legacy));
+  const repo = new MemoryRepo(legacy);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  assert.equal((await dispatcher.execute('GET_AI_ROUTER_SETTINGS')).routePoolRevision, 1);
+});
