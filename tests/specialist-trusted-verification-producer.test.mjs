@@ -239,7 +239,15 @@ test('independent resolver produces exact trusted Specialist record consumable b
       effectId: lookup.effectId,
       policyEnvelopeId: lookup.policyEnvelopeId,
       executionId: lookup.executionId,
+      registryId: lookup.registryId,
+      registryRevision: lookup.registryRevision,
+      registryBindingKey: lookup.registryBindingKey,
       providerId: lookup.providerId,
+      definitionRevision: lookup.definitionRevision,
+      requestedCapabilityIds: lookup.requestedCapabilityIds,
+      grantedToolIds: lookup.grantedToolIds,
+      selectionBindingKey: lookup.selectionBindingKey,
+      handoffBindingKey: lookup.handoffBindingKey,
       resultContractId: lookup.resultContractId,
       verificationId: lookup.verificationId,
       expectedOutcome: lookup.expectedOutcome,
@@ -251,7 +259,15 @@ test('independent resolver produces exact trusted Specialist record consumable b
       effectId: EFFECT_ID,
       policyEnvelopeId: POLICY_ID,
       executionId: LEASE_ID,
+      registryId: 'specialist-registry:default',
+      registryRevision: 1,
+      registryBindingKey: 'registry-binding:v1',
       providerId: PROVIDER_ID,
+      definitionRevision: 1,
+      requestedCapabilityIds: ['filesystem.write'],
+      grantedToolIds: [],
+      selectionBindingKey: JSON.stringify(selection()),
+      handoffBindingKey: JSON.stringify(handoff()),
       resultContractId: 'result-contract:workspace-change',
       verificationId: VERIFICATION_ID,
       expectedOutcome: 'EFFECT_VERIFIED',
@@ -598,6 +614,49 @@ test('durable selection, handoff, lease, plane, provider, and chronology drift f
       pattern,
     );
   }
+});
+
+test('handoff capability scope must exactly match admitted selection before verifier lookup', async () => {
+  let resolverCalls = 0;
+  await assert.rejects(
+    produceTrustedSpecialistExecutionVerificationRecordV1(
+      request({
+        handoff: handoff({ requestedCapabilityIds: ['filesystem.read'] }),
+      }),
+      {
+        resolveTrustedSpecialistExecutionVerification: async () => {
+          resolverCalls += 1;
+          return proof();
+        },
+      },
+    ),
+    /requestedCapabilityIds identity mismatch/,
+  );
+  assert.equal(resolverCalls, 0);
+});
+
+test('same-ID selection and handoff semantic changes produce distinct verifier lookup bindings', async () => {
+  const lookups = [];
+  const dependencies = {
+    resolveTrustedSpecialistExecutionVerification: async lookup => {
+      lookups.push(lookup);
+      return proof();
+    },
+  };
+  await produceTrustedSpecialistExecutionVerificationRecordV1(request(), dependencies);
+  await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request({
+      selection: selection({ definitionRevision: 2 }),
+      handoff: handoff({ goal: 'Produce the same requested workspace change with revised admitted semantics.' }),
+    }),
+    dependencies,
+  );
+  assert.equal(lookups.length, 2);
+  assert.notEqual(lookups[0].selectionBindingKey, lookups[1].selectionBindingKey);
+  assert.notEqual(lookups[0].handoffBindingKey, lookups[1].handoffBindingKey);
+  assert.equal(lookups[1].definitionRevision, 2);
+  assert.equal(lookups[1].handoffId, HANDOFF_ID);
+  assert.equal(lookups[1].specialistId, SPECIALIST_ID);
 });
 
 test('hostile accessors and unknown fields are rejected without executing getters', async () => {
