@@ -112,6 +112,20 @@ function requestWithLegUsage(legUsage) {
     maxWorkers: 1,
   };
   const text = 'Applied the bounded repair and produced evidence for independent verification.';
+  const reservation = {
+    reservationId: 'actor.observe:model-budget:1',
+    controlEpoch: 8,
+    modelCalls: 1,
+    inputTokens: 64,
+    outputTokens: 512,
+    totalTokens: 576,
+    estimatedCostUsd: 0.001,
+    createdAt: 1_850,
+    routeId: 'route.observe',
+    provider: 'openai',
+    model: 'agent-model',
+    callNumber: 1,
+  };
   return {
     invocationRequest: {
       selfRepairModelIntent: intent,
@@ -167,20 +181,7 @@ function requestWithLegUsage(legUsage) {
       maxOutputTokens: 512,
       currentNow: 1_800,
     },
-    providerReservation: {
-      reservationId: 'actor.observe:model-budget:1',
-      controlEpoch: 8,
-      modelCalls: 1,
-      inputTokens: 64,
-      outputTokens: 512,
-      totalTokens: 576,
-      estimatedCostUsd: 0.001,
-      createdAt: 1_850,
-      routeId: 'route.observe',
-      provider: 'openai',
-      model: 'agent-model',
-      callNumber: 1,
-    },
+    providerReservation: reservation,
     observationId: 'observation.observe.usage-binding',
     modelResult: {
       ok: true,
@@ -209,6 +210,7 @@ function requestWithLegUsage(legUsage) {
         failoverChain: [],
       },
       runtime: {},
+      providerReservation: reservation,
     },
     observedAt: '1970-01-01T00:00:01.900Z',
   };
