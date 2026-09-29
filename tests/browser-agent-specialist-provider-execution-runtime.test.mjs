@@ -545,3 +545,95 @@ test('provider execution validation preserves the asynchronous rejected-Promise 
     /requires agentId/,
   );
 });
+
+
+test('accessor-backed provider outcome is never executed and is durably reconciled', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let getterCalls = 0;
+  const client = {
+    async execute() {
+      const outcome = {
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'must-not-be-trusted',
+      };
+      Object.defineProperty(outcome, 'providerStatus', {
+        enumerable: true,
+        get() {
+          getterCalls += 1;
+          return 'finished';
+        },
+      });
+      return outcome;
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '99999999-9999-4999-8999-999999999999',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(getterCalls, 0);
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  assert.equal(result.execution.status, 'RECONCILE');
+  assert.equal(result.execution.errorCode, 'SPECIALIST_PROVIDER_INVALID_OUTCOME');
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
+});
+
+test('semantically invalid plain provider outcome is fenced into canonical reconciliation', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const client = {
+    async execute() {
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: false,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'contradictory-terminal-evidence',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  assert.equal(result.execution.status, 'RECONCILE');
+  assert.equal(result.execution.errorCode, 'SPECIALIST_PROVIDER_INVALID_OUTCOME');
+  assert.equal(result.execution.safeToRetry, false);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+});
