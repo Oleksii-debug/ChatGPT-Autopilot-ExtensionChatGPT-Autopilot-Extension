@@ -297,7 +297,7 @@ function normalizedState(input) {
     }
     if (reconciliation.resolvedAt
         && verification
-        && Date.parse(reconciliation.resolvedAt) < Date.parse(verification.verifiedAt)) {
+        && Date.parse(reconciliation.resolvedAt) + MAX_CLOCK_SKEW_MS < Date.parse(verification.verifiedAt)) {
       throw new Error('Exact-effect reconciliation cannot predate verification');
     }
   }
