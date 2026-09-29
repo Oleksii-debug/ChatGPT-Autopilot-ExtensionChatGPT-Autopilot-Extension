@@ -424,6 +424,28 @@ test('every evidence ArtifactRef must exact-match trusted artifact identity, byt
   );
 });
 
+test('one exact trusted evidence artifact may support multiple verified steps without duplicate resolution', async () => {
+  const sharedInput = compilerInput();
+  sharedInput.trace.steps[1].verificationEvidenceArtifactId = 'evidence-fetch-1';
+  sharedInput.trace.steps[1].verificationEvidenceSha256 = SHA_C;
+  let evidenceResolutions = 0;
+
+  const result = await admitTrustedRecipeCandidateV1(
+    request({ compilerInput: sharedInput }),
+    options({
+      resolveTrustedRecipeTrace: async () => sharedInput.trace,
+      resolveTrustedEvidenceArtifact: async lookup => {
+        evidenceResolutions += 1;
+        return artifactForLookup(lookup, { sha256: SHA_C });
+      },
+    }),
+  );
+
+  assert.equal(evidenceResolutions, 1);
+  assert.equal(result.evidenceArtifactRefs.length, 1);
+  assert.equal(result.evidenceArtifactRefs[0].artifactId, 'evidence-fetch-1');
+});
+
 test('secret scan is exact-subject, clean, independent and causal', async () => {
   await assert.rejects(
     () => admitTrustedRecipeCandidateV1(
