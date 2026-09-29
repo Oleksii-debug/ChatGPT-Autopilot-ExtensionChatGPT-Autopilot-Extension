@@ -42,7 +42,12 @@ function route(routeId, overrides = {}) {
   };
 }
 
-async function benchmarkBinding(routeValue, suffix = 'a', { pass = true, maxAgeMs = 60_000 } = {}) {
+async function benchmarkBinding(routeValue, suffix = 'a', {
+  pass = true,
+  maxAgeMs = 60_000,
+  startedAt = START,
+  completedAt = END,
+} = {}) {
   const routeId = routeValue.routeId;
   const suiteId = 'route-quality-' + suffix;
   const suiteRevisionId = 'suite-' + suffix;
@@ -82,8 +87,8 @@ async function benchmarkBinding(routeValue, suffix = 'a', { pass = true, maxAgeM
         suiteRevisionId,
         subjectId:routeId,
         subjectRevisionId,
-        startedAt:START,
-        completedAt:END,
+        startedAt,
+        completedAt,
         results:[structuredClone(result)],
       },
       expectedSubject:{ subjectId:routeId, subjectRevisionId },
@@ -94,8 +99,8 @@ async function benchmarkBinding(routeValue, suffix = 'a', { pass = true, maxAgeM
         subjectId:routeId,
         subjectRevisionId,
         producerInvocationId:invocationId,
-        startedAt:START,
-        completedAt:END,
+        startedAt,
+        completedAt,
         results:[structuredClone(result)],
       },
       trustedEvidenceArtifacts:[{
@@ -106,7 +111,7 @@ async function benchmarkBinding(routeValue, suffix = 'a', { pass = true, maxAgeM
         mediaType:'application/json',
         sha256:(pass ? '1' : '2').repeat(64),
         sizeBytes:1,
-        createdAt:END,
+        createdAt:completedAt,
         producerInvocationId:invocationId,
         sensitive:false,
       }],
@@ -115,10 +120,11 @@ async function benchmarkBinding(routeValue, suffix = 'a', { pass = true, maxAgeM
 }
 
 async function append(registry, routeValue, suffix, options = {}) {
+  const { registeredAt = REGISTERED, ...bindingOptions } = options;
   return putAiRouteQualityEvidenceRecordV1(registry, {
     route:routeValue,
-    benchmarkRequest:await benchmarkBinding(routeValue, suffix, options),
-    registeredAt:REGISTERED,
+    benchmarkRequest:await benchmarkBinding(routeValue, suffix, bindingOptions),
+    registeredAt,
   });
 }
 
@@ -229,6 +235,68 @@ test('latest history record is returned and an old/current route rollback cannot
     }),
     /subject revision does not match current route configuration/u,
   );
+});
+
+test('latest reader prefers newest benchmark completion over delayed registration order', async () => {
+  const routeA = route('route-a');
+  let registry = await append(
+    createAiRouteQualityEvidenceRegistryV1(),
+    routeA,
+    'newer-completion',
+    {
+      startedAt:'2026-09-27T12:00:10.000Z',
+      completedAt:'2026-09-27T12:00:11.000Z',
+      registeredAt:'2026-09-27T12:00:12.000Z',
+    },
+  );
+  registry = await append(
+    registry,
+    routeA,
+    'older-delayed',
+    {
+      startedAt:'2026-09-27T12:00:03.000Z',
+      completedAt:'2026-09-27T12:00:04.000Z',
+      registeredAt:'2026-09-27T12:00:13.000Z',
+    },
+  );
+
+  assert.deepEqual(
+    registry.records.map(item => item.runId),
+    ['run-route-a-newer-completion', 'run-route-a-older-delayed'],
+  );
+  const latest = readLatestAiRouteQualityBenchmarkRequestsV1(registry, {
+    routeIds:['route-a'],
+  });
+  assert.equal(latest.length, 1);
+  assert.equal(
+    latest[0].evaluationRequest.run.runId,
+    'run-route-a-newer-completion',
+  );
+  assert.equal(
+    latest[0].evaluationRequest.run.completedAt,
+    '2026-09-27T12:00:11.000Z',
+  );
+});
+
+test('equal benchmark completion timestamps use later registration as deterministic tie-break', async () => {
+  const routeA = route('route-a');
+  let registry = await append(
+    createAiRouteQualityEvidenceRegistryV1(),
+    routeA,
+    'tie-first',
+    { registeredAt:'2026-09-27T12:00:02.000Z' },
+  );
+  registry = await append(
+    registry,
+    routeA,
+    'tie-second',
+    { registeredAt:'2026-09-27T12:00:03.000Z' },
+  );
+
+  const latest = readLatestAiRouteQualityBenchmarkRequestsV1(registry, {
+    routeIds:['route-a'],
+  });
+  assert.equal(latest[0].evaluationRequest.run.runId, 'run-route-a-tie-second');
 });
 
 test('reader preserves requested route order while omitting routes without evidence', async () => {
