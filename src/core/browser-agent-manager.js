@@ -1628,15 +1628,19 @@ export class BrowserAgentManager {
   }
 
   async #executeClaimedSpecialistProvider(id, request) {
-    const preparedAt = specialistRequestTimestamp(
+    const livePreparedAt = new Date(this.now()).toISOString();
+    const requestedAt = specialistRequestTimestamp(
       request.at,
-      new Date(this.now()).toISOString(),
+      livePreparedAt,
       'Browser Agent Specialist provider execute at',
     );
-    // Caller-supplied audit time cannot extend a live execution lease.
-    // Use the later of the canonical request timestamp and the manager clock
-    // when deciding whether an external provider effect is still authorized.
-    const leaseAuthorityAt = new Date(Math.max(Date.parse(preparedAt), this.now())).toISOString();
+    if (requestedAt > livePreparedAt) {
+      throw new Error('Browser Agent Specialist provider execute at cannot be in the future');
+    }
+    // External-effect authority is evaluated and recorded against the live
+    // manager clock. Caller-supplied timestamps are audit input only and may
+    // neither extend a lease nor place PREPARED chronology in the future.
+    const preparedAt = livePreparedAt;
 
     let prepared = null;
     let providerRequest = null;
@@ -1652,7 +1656,7 @@ export class BrowserAgentManager {
       if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId || !assignment.leaseExpiresAt) {
         throw new Error('Specialist provider execution requires the exact current leased handoff');
       }
-      if (assignment.leaseExpiresAt <= leaseAuthorityAt) {
+      if (assignment.leaseExpiresAt <= preparedAt) {
         throw new Error('Specialist provider execution lease expired before provider preparation');
       }
       const ownership = (job.runtime.specialistExecutionOwnerships || [])
