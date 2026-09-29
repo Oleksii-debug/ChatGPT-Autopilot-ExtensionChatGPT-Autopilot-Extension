@@ -2559,8 +2559,6 @@ async function runSelectedSpecialistProviderExecution() {
     } else {
       announce(`Provider execution для ${handoff.agentId} не виконано: ${error.message}`);
     }
-  } finally {
-    if (ui.selectedBrowserAgentId === jobId) renderSpecialistProviderRuntime();
   }
 }
 
