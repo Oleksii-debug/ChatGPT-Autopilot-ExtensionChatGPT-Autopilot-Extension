@@ -310,6 +310,14 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     throw new Error('Specialist handoff cannot postdate provider execution preparation');
   }
 
+  const providerExecutionBindingKey = canonicalBindingKey(
+    providerExecution,
+    'providerExecutionBindingKey',
+  );
+  const executionOwnershipBindingKey = canonicalBindingKey(
+    ownership,
+    'executionOwnershipBindingKey',
+  );
   const selectionBindingKey = canonicalBindingKey(selection, 'selectionBindingKey');
   const handoffBindingKey = canonicalBindingKey(handoff, 'handoffBindingKey');
 
@@ -321,6 +329,8 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     effectId: ownership.effectId,
     policyEnvelopeId: ownership.policyEnvelopeId,
     executionId: ownership.leaseId,
+    executionOwnershipRevision: ownership.revision,
+    executionOwnershipBindingKey,
     ownerId: ownership.ownerId,
     ownerPlane: ownership.ownerPlane,
     registryId: selection.registryId,
@@ -328,6 +338,8 @@ export async function produceTrustedSpecialistExecutionVerificationRecordV1(
     registryBindingKey: selection.registryBindingKey,
     specialistId: selection.specialistId,
     providerId: providerExecution.providerId,
+    providerConfigRevision: providerExecution.providerConfig.revision,
+    providerExecutionBindingKey,
     definitionRevision: selection.definitionRevision,
     requestedCapabilityIds: selection.requestedCapabilityIds,
     grantedToolIds: selection.grantedToolIds,
