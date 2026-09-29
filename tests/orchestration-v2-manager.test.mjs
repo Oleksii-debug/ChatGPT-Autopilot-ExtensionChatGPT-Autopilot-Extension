@@ -854,3 +854,40 @@ test('owner-paused project identity rebind purges managed session logs and tab h
     false,
   );
 });
+
+
+test('read-only Agent tree projection exposes canonical hierarchy without mutating durable runtime', async()=>{
+  const {manager}=managerFixture();
+  await manager.create({name:'Observable',config:cfg('observable')});
+  const controller=manager.controllerFor('orch-1');
+  await controller.configureHierarchy(hierarchyGraph('observable-graph'),{nowMs:1000});
+  const before=structuredClone(await controller.runtimeRepository.load());
+
+  const result=await manager.getAgentTreeProjection('orch-1');
+  assert.equal(result.selectedId,'orch-1');
+  assert.equal(result.projection.graphId,'observable-graph');
+  assert.equal(result.projection.rows.length,1);
+  assert.equal(result.projection.rows[0].nodeId,'root');
+  assert.equal(result.projection.rows[0].role,'GLOBAL_DIRECTOR');
+  assert.match(result.projection.textLines[0],/GLOBAL_DIRECTOR/);
+  assert.equal(result.projection.readOnly,true);
+  assert.equal(result.projection.advisoryOnly,true);
+  assert.equal(result.projection.hiddenReasoningIncluded,false);
+  assert.equal(result.projection.rawTranscriptIncluded,false);
+  assert.equal(result.projection.rawPromptIncluded,false);
+  assert.equal(result.projection.executionAuthorized,false);
+  assert.equal(result.projection.policyAuthorized,false);
+  assert.equal(result.projection.schedulingAuthorized,false);
+  assert.equal(result.projection.recoveryAuthorized,false);
+
+  const after=await controller.runtimeRepository.load();
+  assert.deepEqual(after,before,'tree projection must remain a pure read over durable hierarchy state');
+});
+
+test('Agent tree projection returns null when selected orchestra has no durable hierarchy', async()=>{
+  const {manager}=managerFixture();
+  await manager.create({name:'No tree',config:cfg('no-tree')});
+  const result=await manager.getAgentTreeProjection('orch-1');
+  assert.equal(result.selectedId,'orch-1');
+  assert.equal(result.projection,null);
+});

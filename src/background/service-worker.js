@@ -58,6 +58,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_REMOTE_DISPATCH_STATUS',
   'TEST_REMOTE_DISPATCH_FEED',
   'GET_ORCHESTRATION_V2_STATUS',
+  'GET_ORCHESTRATION_V2_AGENT_TREE',
   'LIST_ORCHESTRATION_V2_ORCHESTRAS',
   'PREVIEW_ORCHESTRATION_V2_PROFILE',
   'EXPORT_ORCHESTRATION_V2_PROFILE',
@@ -552,6 +553,8 @@ export async function dispatchUiMessage(message) {
       ...(await orchestrationV2.getStatus()),
       driveOAuth: inspectChromeDriveOAuth(chrome.runtime?.getManifest?.()),
     };
+  } else if (message.command === 'GET_ORCHESTRATION_V2_AGENT_TREE') {
+    result = await orchestrationV2.getAgentTreeProjection(message.payload?.id || '');
   } else if (message.command === 'PREVIEW_ORCHESTRATION_V2_PROFILE') {
     result = { preview: await orchestrationV2.previewProfile(message.payload?.profile) };
   } else if (message.command === 'IMPORT_ORCHESTRATION_V2_PROFILE') {
