@@ -18,7 +18,7 @@ function selection(overrides = {}) {
     specialistId: 'specialist-coder',
     providerId: 'openhands',
     definitionRevision: 4,
-    executionPlane: 'CODING',
+    executionPlane: 'LOCAL',
     requestedCapabilityIds: ['code.edit'],
     grantedToolIds: ['github.write'],
     resultContractId: 'outcome-ship',
