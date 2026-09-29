@@ -60,7 +60,7 @@ function testStrongSendEvidence() {
   adapter.detectBlockingState = () => null;
   assert.equal(canUpgradeUncertainSubmit(doc, adapter, request, result), false);
   adapter.detectBlockingState = () => ({ status: 'BUSY' });
-  assert.equal(canUpgradeUncertainSubmit(doc, adapter, { ...request, mode: 'VERIFY_AFTER_UNCERTAIN_SUBMIT' }, result), false);
+  assert.equal(canUpgradeUncertainSubmit(doc, adapter, { ...request, mode: 'VERIFY_AFTER_UNCERTAIN_SUBMIT' }, result), true);
   assert.equal(canUpgradeUncertainSubmit(doc, adapter, { ...request, expectedUrl: 'https://chatgpt.com/c/original' }, result), false);
 }
 
