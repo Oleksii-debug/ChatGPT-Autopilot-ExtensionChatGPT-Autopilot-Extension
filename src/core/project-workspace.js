@@ -123,6 +123,16 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
         throw new Error('Context capsuleId cannot be reused for different content');
       }
     }
+    for (const [artifactId, previousProvenanceValue] of Object.entries(previousProject.provenanceByArtifactId)) {
+      if (!hasOwn(nextProject.provenanceByArtifactId, artifactId)) {
+        throw new Error('Project workspace update cannot remove existing artifact provenance');
+      }
+      const previousProvenance = normalizeArtifactProvenanceV1(previousProvenanceValue);
+      const nextProvenance = normalizeArtifactProvenanceV1(nextProject.provenanceByArtifactId[artifactId]);
+      if (!sameCanonicalData(previousProvenance, nextProvenance)) {
+        throw new Error('Artifact provenance identity cannot be reused for different content');
+      }
+    }
   }
 }
 
@@ -288,7 +298,14 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   const project = requireProject(workspace, normalized.projectId);
   assertProvenanceMatchesSnapshot(normalized, project.snapshot);
   const artifactId = normalized.artifactRef.artifactId;
-  if (!hasOwn(project.provenanceByArtifactId, artifactId) && Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
+  if (hasOwn(project.provenanceByArtifactId, artifactId)) {
+    const current = normalizeArtifactProvenanceV1(project.provenanceByArtifactId[artifactId]);
+    if (!sameCanonicalData(current, normalized)) {
+      throw new Error('Artifact provenance identity cannot be reused for different content');
+    }
+    return current;
+  }
+  if (Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
   setOwn(project.provenanceByArtifactId, artifactId, normalized);
   project.updatedAt = nowMs;
   return normalized;
