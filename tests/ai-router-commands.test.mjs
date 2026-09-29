@@ -1119,6 +1119,108 @@ test('internal Agent dispatcher snapshots validated vision input across async Ro
   assert.deepEqual(seen, ['data:image/png;base64,ORIGINAL']);
 });
 
+test('internal Agent dispatcher snapshots prompt and request budgets before async Router revalidation', async () => {
+  let releaseLoad;
+  let markLoadStarted;
+  const loadGate = new Promise(resolve => { releaseLoad = resolve; });
+  const loadStarted = new Promise(resolve => { markLoadStarted = resolve; });
+  class DelayedRepo extends MemoryRepo {
+    async load() {
+      markLoadStarted();
+      await loadGate;
+      return super.load();
+    }
+  }
+
+  const seen = [];
+  const repo = new DelayedRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: {
+      async run(settings, runtime, prompt, options) {
+        seen.push({
+          prompt,
+          systemPrompt: options.systemPrompt,
+          maxOutputTokens: options.maxOutputTokens,
+          maxModelCallsForRequest: options.maxModelCallsForRequest,
+        });
+        return { text:'ok', runtime };
+      },
+    },
+  });
+  const payload = {
+    prompt:'ORIGINAL_PROMPT',
+    systemPrompt:'ORIGINAL_SYSTEM',
+    maxOutputTokens:128,
+    maxModelCallsForRequest:1,
+  };
+  const pending = dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    payload,
+    {
+      agentModelOrchestratorEnvelope: envelope,
+      providerCallBudgetContext: internalAgentBudgetContext(),
+    },
+  );
+  await loadStarted;
+  payload.prompt = 'MUTATED_PROMPT';
+  payload.systemPrompt = 'MUTATED_SYSTEM';
+  payload.maxOutputTokens = 999;
+  payload.maxModelCallsForRequest = 99;
+  releaseLoad();
+  const result = await pending;
+  assert.equal(result.result.text, 'ok');
+  assert.deepEqual(seen, [{
+    prompt:'ORIGINAL_PROMPT',
+    systemPrompt:'ORIGINAL_SYSTEM',
+    maxOutputTokens:128,
+    maxModelCallsForRequest:1,
+  }]);
+});
+
+test('internal Agent dispatcher rejects accessor-backed prompt and request-budget fields without getter execution', async () => {
+  let calls = 0;
+  let reads = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  for (const field of ['prompt', 'systemPrompt', 'maxOutputTokens', 'maxModelCallsForRequest']) {
+    const payload = {
+      prompt:'agent',
+      systemPrompt:'',
+      maxOutputTokens:128,
+      maxModelCallsForRequest:1,
+    };
+    Object.defineProperty(payload, field, {
+      enumerable:true,
+      get() {
+        reads += 1;
+        return field.includes('Tokens') || field.includes('Calls') ? 128 : 'hostile';
+      },
+    });
+    await assert.rejects(
+      dispatcher.execute(
+        'RUN_AI_ROUTED_PROMPT',
+        payload,
+        {
+          agentModelOrchestratorEnvelope: envelope,
+          providerCallBudgetContext: internalAgentBudgetContext(),
+        },
+      ),
+      /enumerable own text data property|canonical bounded maxOutputTokens|maxModelCallsForRequest must be canonical/u,
+    );
+  }
+  assert.equal(reads, 0);
+  assert.equal(calls, 0);
+});
+
 test('internal Agent image boundary rejects coercive text and accessors without executing getters', async () => {
   let calls = 0;
   let reads = 0;
