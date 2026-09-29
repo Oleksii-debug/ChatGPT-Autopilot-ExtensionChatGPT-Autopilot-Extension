@@ -1165,3 +1165,33 @@ test('repository save rejects signed-zero expected revisions', async () => {
     /Invalid expected project workspace revision/,
   );
 });
+
+
+test('generic repository mutation cannot bypass immutable artifactId continuity', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const next = snapshot('project-r2', 'r1');
+      next.artifactRefs = [{
+        ...artifact(),
+        uri: 'drive://generic-bypass',
+      }];
+      workspace.projectsById['project-a'].snapshot = next;
+      workspace.projectsById['project-a'].snapshotRevisionIds.push('project-r2');
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /artifactId cannot be reused for different immutable content: build/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(durable.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+  assert.equal(durable.projectsById['project-a'].snapshot.artifactRefs[0].uri, 'drive://build');
+});
