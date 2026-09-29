@@ -247,6 +247,9 @@ export function projectSubagentContextV1(input = {}) {
     if (capsule.projectId !== parentSnapshot.projectId) {
       throw new Error('priorParentCapsule projectId mismatch');
     }
+    if (capsule.projectRevisionId !== parentSnapshot.revisionId) {
+      throw new Error('priorParentCapsule projectRevisionId mismatch');
+    }
 
     const allowedSources = new Set(envelope.sourceIds);
     const allowedArtifacts = new Set(envelope.artifactIds);
