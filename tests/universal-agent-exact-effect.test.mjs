@@ -673,6 +673,86 @@ test('VERIFIED reconciliation rejects NOT_APPLICABLE verification without mutati
   assert.equal(state.phase, ExactEffectPhase.RECONCILE);
 });
 
+
+test('restart normalization rejects forged VERIFIED or COMMITTED state without positive verification', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'restart-forge-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'restart-forge-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'restart-forge-na',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        status: 'NOT_APPLICABLE',
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+      }),
+    },
+  )).state;
+  assert.equal(state.phase, ExactEffectPhase.MANUAL_REVIEW);
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, phase: ExactEffectPhase.VERIFIED }),
+    /requires positive VERIFIED evidence/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      phase: ExactEffectPhase.COMMITTED,
+      commitId: 'forged-commit',
+    }),
+    /requires positive VERIFIED evidence/,
+  );
+
+  let verified = createExactEffectStateV1(invocation({ invocationId: 'invoke-commit-binding' }), { createdAt: AT });
+  const localEvent = (type, eventId, at, fields = {}) => ({
+    ...event(type, eventId, at, fields),
+    effectId: 'invoke-commit-binding',
+    executionId: 'invoke-commit-binding:attempt:1',
+  });
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'commit-binding-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'commit-binding-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation({ invocationId: 'invoke-commit-binding' }) },
+  )).state;
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'commit-binding-verify',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        invocationId: 'invoke-commit-binding',
+        effectId: 'invoke-commit-binding',
+        executionId: 'invoke-commit-binding:attempt:1',
+      }),
+    },
+  )).state;
+  assert.equal(verified.phase, ExactEffectPhase.VERIFIED);
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...verified, commitId: 'premature-commit-id' }),
+    /commitId is only valid for COMMITTED/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...verified, phase: ExactEffectPhase.COMMITTED }),
+    /requires commitId/,
+  );
+});
+
 test('commit is impossible without verified evidence', () => {
   let state = createExactEffectStateV1(invocation(), { createdAt: AT });
   state = reduceExactEffectV1(state, event(
