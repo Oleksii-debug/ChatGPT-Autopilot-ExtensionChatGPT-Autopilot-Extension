@@ -8,6 +8,7 @@ import {
   listStoredOutcomeContractsV1,
   normalizeOutcomeContractRegistryV1,
   resolveStoredOutcomeContractV1,
+  resolveCurrentStoredOutcomeContractV1,
   resolveCanonicalStoredOutcomeContractV1,
   updateStoredOutcomeContractV1,
 } from '../src/core/outcome-contract-control.js';
@@ -216,6 +217,66 @@ test('durable OutcomeContract registry creates, resolves, lists, updates and del
     }).revision,
     2,
     'tombstone preserves latest exact revision for verifier/recovery',
+  );
+});
+
+test('internal current resolver selects an exact project-bound revision for downstream admission without weakening public exact reads', () => {
+  const state = createEmptyState(1);
+  const first = createStoredOutcomeContractV1(state, contractV1());
+
+  assert.equal(resolveCurrentStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+  }).revision, 1);
+  assert.throws(
+    () => resolveCurrentStoredOutcomeContractV1(state, {
+      projectId: 'project-other',
+      contractId: 'outcome-1',
+    }),
+    /project binding mismatch/,
+  );
+
+  const second = nextContract(first, { desiredResult: 'Current revision selected at later admission.' });
+  updateStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 1,
+    contract: second,
+  });
+
+  const admitted = resolveCurrentStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+  });
+  assert.equal(admitted.revision, 2);
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 1,
+    }).revision,
+    1,
+    'historical exact revision remains independently resolvable after current revision advances',
+  );
+
+  deleteStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 2,
+  });
+  assert.throws(
+    () => resolveCurrentStoredOutcomeContractV1(state, {
+      projectId: 'project-1',
+      contractId: 'outcome-1',
+    }),
+    /is deleted/,
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: admitted.revision,
+    }).revision,
+    2,
+    'admitted exact revision remains recoverable after owner tombstones the current contract',
   );
 });
 
