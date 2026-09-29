@@ -243,6 +243,18 @@ function normalizedState(input) {
     };
   }
 
+  const commitId = optionalId(raw.commitId, 'commitId');
+  if ([ExactEffectPhase.VERIFIED, ExactEffectPhase.COMMITTED].includes(phase)
+      && verification?.status !== VerificationStatus.VERIFIED) {
+    throw new Error('Verified exact-effect phase requires positive VERIFIED evidence');
+  }
+  if (phase === ExactEffectPhase.COMMITTED && !commitId) {
+    throw new Error('COMMITTED exact-effect phase requires commitId');
+  }
+  if (phase !== ExactEffectPhase.COMMITTED && commitId) {
+    throw new Error('commitId is only valid for COMMITTED exact-effect phase');
+  }
+
   return freeze({
     schemaVersion: UniversalExactEffectVersion,
     effectId,
@@ -254,7 +266,7 @@ function normalizedState(input) {
     verification,
     ambiguity,
     reconciliation,
-    commitId: optionalId(raw.commitId, 'commitId'),
+    commitId,
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
     processedEventIds,
