@@ -4041,7 +4041,7 @@ export class BrowserAgentManager {
       }
       const result = await this.cycleOne(id);
       results.push(result);
-      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+      if (['COMPLETED', 'CYCLE_COMPLETED', 'SPECIALIST_REQUIRED', 'SPECIALIST_PENDING', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
       if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
         const live = await this.get(id);
         const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
