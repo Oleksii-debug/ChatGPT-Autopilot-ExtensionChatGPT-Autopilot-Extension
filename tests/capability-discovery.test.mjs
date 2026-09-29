@@ -188,6 +188,34 @@ test('stale and future provider readiness never enter executable plan', () => {
   assert.deepEqual(future.plan, []);
 });
 
+test('freshness boundary is inclusive at observedAt and validThrough', () => {
+  const observedNow = discoverCapabilityPathsV1({
+    asOf:AS_OF,
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:AS_OF,
+      validThrough:'2026-09-29T05:00:00.000Z',
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(observedNow.candidates[0].readiness, CapabilityPathReadiness.READY);
+  assert.equal(observedNow.plan.length, 1);
+
+  const expiresNow = discoverCapabilityPathsV1({
+    asOf:AS_OF,
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:'2026-09-29T04:00:00.000Z',
+      validThrough:AS_OF,
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(expiresNow.candidates[0].readiness, CapabilityPathReadiness.READY);
+  assert.equal(expiresNow.plan.length, 1);
+});
+
 test('fresh executable plan carries exact readiness source provenance', () => {
   const result = discover({
     capabilities:[capability('filesystem.read')],
