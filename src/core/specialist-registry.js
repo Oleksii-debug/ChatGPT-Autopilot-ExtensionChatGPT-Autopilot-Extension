@@ -222,7 +222,7 @@ export function discoverSpecialistsV1(input = {}) {
     .filter(item => required.every(capabilityId => item.capabilityIds.includes(capabilityId)))
     .filter(item => requiredTools.every(toolId => item.toolIds.includes(toolId)))
     .map(item => selection(registry, item, required, requiredTools));
-  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, requestedCapabilityIds:required, requestedToolIds:requiredTools, specialists});
+  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, registryBindingKey:registry.bindingKey, requestedCapabilityIds:required, requestedToolIds:requiredTools, specialists});
 }
 
 export function bindSpecialistHandoffToRegistryV1(input = {}) {
