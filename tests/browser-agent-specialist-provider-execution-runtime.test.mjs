@@ -121,6 +121,29 @@ function ownerResourceBudget(maxConcurrentAgents = 4) {
   };
 }
 
+function trustedReadinessResolver(at = T0) {
+  return {
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        registryBindingKey: selection.registryBindingKey,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        observedAt: at,
+        resolvedAt: at,
+        maxAgeMs: 5 * 60_000,
+      };
+    },
+    async assertCurrent() { return true; },
+  };
+}
+
 async function seed(manager, { claim = true } = {}) {
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const agentMutation = await manager.mutateAgentDefinitionRegistry({
@@ -193,6 +216,10 @@ async function seed(manager, { claim = true } = {}) {
     kind: configured.kind,
     config: configured.config,
   });
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: ownerResourceBudget(),
+  });
   const prepared = await manager.cycleOne('job.coder');
   assert.equal(prepared.kind, 'SPECIALIST_PENDING');
   if (!claim) return prepared.handoff.agentId;
@@ -200,6 +227,8 @@ async function seed(manager, { claim = true } = {}) {
     availableSlots: 1,
     leaseSeconds: 600,
     at: T0,
+  }, {
+    specialistProviderReadinessResolver: trustedReadinessResolver(T0),
   });
   assert.equal(claimed.claimed.length, 1);
   return claimed.claimed[0];
