@@ -46,8 +46,10 @@ import {
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
   authorizeAgentPlanSpecialistSafeRetryV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
   verifyAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
@@ -643,7 +645,7 @@ function normalizeStore(raw, now) {
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, readModelRouteContext = null, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
+  constructor({ chromeApi, routePrompt, readModelRouteContext = null, resolveTrustedExecutionVerificationRecord = null, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -654,6 +656,9 @@ export class BrowserAgentManager {
     this.chrome = chromeApi;
     this.routePrompt = routePrompt;
     this.readModelRouteContext = typeof readModelRouteContext === 'function' ? readModelRouteContext : null;
+    this.resolveTrustedExecutionVerificationRecord = typeof resolveTrustedExecutionVerificationRecord === 'function'
+      ? resolveTrustedExecutionVerificationRecord
+      : null;
     this.now = now;
     this.createId = createId;
     this.nativeCompanion = nativeCompanionClient === undefined
@@ -1026,15 +1031,23 @@ export class BrowserAgentManager {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    if (!this.resolveTrustedExecutionVerificationRecord) {
+      throw new Error('Canonical trusted execution verification resolver is unavailable');
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      });
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        { resolveTrustedExecutionVerificationRecord: this.resolveTrustedExecutionVerificationRecord },
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
@@ -1043,13 +1056,11 @@ export class BrowserAgentManager {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
-        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        verifierId: retriable.trustedVerification.verifierId,
+        verificationAuthorityId: retriable.trustedVerification.verificationAuthorityId,
+        verificationId: retriable.trustedVerification.verificationId,
+        evidenceArtifactIds: retriable.trustedVerification.evidenceArtifactIds,
+        message: 'Trusted canonical no-effect record authorized this handoff for normal bounded re-admission; no retry was dispatched.',
       });
       result = clone(retriable);
       return store;
@@ -1081,16 +1092,37 @@ export class BrowserAgentManager {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    if (!this.resolveTrustedExecutionVerificationRecord) {
+      throw new Error('Canonical trusted execution verification resolver is unavailable');
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        { resolveTrustedExecutionVerificationRecord: this.resolveTrustedExecutionVerificationRecord },
+      );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        verifierId: verified.trustedVerification.verifierId,
+        verificationAuthorityId: verified.trustedVerification.verificationAuthorityId,
+        verificationId: verified.trustedVerification.verificationId,
+        evidenceArtifactIds: verified.trustedVerification.evidenceArtifactIds,
+        message: 'Trusted canonical verification record advanced the specialist plan.',
+      });
       result = clone(verified);
       return store;
     });
