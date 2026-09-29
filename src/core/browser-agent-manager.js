@@ -482,6 +482,13 @@ function assertSelectionProvenanceRegistryCurrent(store, job, provenance) {
   });
   return { selection, handoff };
 }
+function assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission) {
+  if (!admission) throw new Error('Owner-bound Specialist claim lacks durable admission provenance');
+  return assertSelectionProvenanceRegistryCurrent(store, job, {
+    selection: admission.selection,
+    handoff: admission.handoff,
+  });
+}
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function freshStore() {
   return {
@@ -2198,15 +2205,48 @@ export class BrowserAgentManager {
     };
   }
 
-  async claimSpecialistHandoffs(id, payload = {}) {
+  async claimSpecialistHandoffs(id, payload = {}, dependencies = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist claim request');
-    const now = new Date(this.now()).toISOString();
+    const nowMs = this.now();
+    const now = new Date(nowMs).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    const readinessByAgentId = new Map();
+    if (trustedReadiness) {
+      const initial = await this.get(id);
+      if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      const admissions = normalizeSpecialistDelegationAdmissions(initial.job.runtime.specialistDelegationAdmissions);
+      const readyIds = new Set((initial.job.runtime.specialistHandoffs || [])
+        .filter(item => item?.state === 'READY')
+        .map(item => item.agentId));
+      for (const admission of admissions) {
+        if (!readyIds.has(admission.agentId)) continue;
+        const readiness = assertTrustedSpecialistReadiness(
+          await trustedReadiness.resolve(admission.selection),
+          admission.selection,
+          nowMs,
+        );
+        readinessByAgentId.set(admission.agentId, readiness);
+      }
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
       assertOwnerBoundSpecialistAdmissionProvenance(job);
+      if (job.specialistDelegationBinding?.profile?.enabled) {
+        const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+        for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          const admission = admissions.find(item => item.agentId === assignment.agentId);
+          assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission);
+          if (trustedReadiness) {
+            const readiness = admission ? readinessByAgentId.get(assignment.agentId) : null;
+            if (!readiness) throw new Error('Owner-bound Specialist claim lacks trusted provider readiness');
+            assertTrustedSpecialistReadiness(readiness, admission.selection, this.now());
+            await trustedReadiness.assertCurrent(readiness);
+          }
+        }
+      }
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
       const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
       const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
@@ -2233,8 +2273,28 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
+  async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = null) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    const readinessByAssignment = new Map();
+    if (trustedReadiness) {
+      const initial = await this.load();
+      for (const jobId of initial.order || []) {
+        const job = initial.byId?.[jobId];
+        if (!job?.runtime?.plan || !job.specialistDelegationBinding?.profile?.enabled) continue;
+        const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+        for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+          const admission = admissions.find(item => item.agentId === assignment.agentId);
+          if (!admission) throw new Error('Owner-bound Specialist cross-job claim lacks durable admission provenance');
+          const readiness = assertTrustedSpecialistReadiness(
+            await trustedReadiness.resolve(admission.selection),
+            admission.selection,
+            this.now(),
+          );
+          readinessByAssignment.set(`${jobId}:${assignment.agentId}`, readiness);
+        }
+      }
+    }
     const limit = request.maxConcurrentHandoffs;
     if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
       throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
@@ -2268,6 +2328,19 @@ export class BrowserAgentManager {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
         assertOwnerBoundSpecialistAdmissionProvenance(job);
+        if (job.specialistDelegationBinding?.profile?.enabled) {
+          const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
+          for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
+            const admission = admissions.find(item => item.agentId === assignment.agentId);
+            assertOwnerBoundSpecialistAdmissionRegistryCurrent(store, job, admission);
+            if (trustedReadiness) {
+              const readiness = readinessByAssignment.get(`${jobId}:${assignment.agentId}`);
+              if (!readiness) throw new Error('Owner-bound Specialist cross-job claim lacks trusted provider readiness');
+              assertTrustedSpecialistReadiness(readiness, admission.selection, this.now());
+              await trustedReadiness.assertCurrent(readiness);
+            }
+          }
+        }
         const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
         const boundedClaimRequest = boundSpecialistClaimRequestForJob(
