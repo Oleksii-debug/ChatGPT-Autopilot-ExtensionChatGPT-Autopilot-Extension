@@ -324,6 +324,7 @@ test('canonical arrays, duplicate identity and exact scalar representation fail 
   assert.throws(
     () => recommendCapabilityBestPathV1({
       schemaVersion: 1,
+      asOf: '2026-09-29T04:30:00.000Z',
       requiredCapabilityIds: ['repo.read'],
       candidates: sparse,
     }),
@@ -333,6 +334,7 @@ test('canonical arrays, duplicate identity and exact scalar representation fail 
   assert.throws(
     () => recommendCapabilityBestPathV1({
       schemaVersion: 1,
+      asOf: '2026-09-29T04:30:00.000Z',
       requiredCapabilityIds: ['repo.read'],
       candidates: [
         candidate({ candidateId: 'dup' }),
