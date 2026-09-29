@@ -229,13 +229,34 @@ test('selected route leg usage must exactly match canonical model result usage',
     { inputTokens: 9, outputTokens: 20, totalTokens: 30 },
     { inputTokens: 10, outputTokens: 19, totalTokens: 30 },
     { inputTokens: 10, outputTokens: 20, totalTokens: 31 },
-    null,
   ]) {
     assert.throws(
       () => projectAgentSelfRepairModelObservationV1(requestWithLegUsage(usage)),
       /usage disagrees with the selected route result/u,
     );
   }
+});
+
+test('canonical AiOrchestrator no-usage success is accepted only with zero top-level token counters', () => {
+  const canonicalNoUsage = requestWithLegUsage(null);
+  canonicalNoUsage.modelResult.usage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    modelCalls: 1,
+  };
+  const observation = projectAgentSelfRepairModelObservationV1(canonicalNoUsage);
+  assert.deepEqual(observation.data.usage, {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    modelCalls: 1,
+  });
+
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(requestWithLegUsage(null)),
+    /usage disagrees with the selected route result/u,
+  );
 });
 
 test('selected route leg usage is descriptor-safe and canonical', () => {
