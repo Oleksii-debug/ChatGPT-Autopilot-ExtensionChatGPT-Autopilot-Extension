@@ -154,7 +154,7 @@ export function validateOutcomeContractRegistryStateV1(state) {
 
 function mutableRegistry(state) {
   const normalized = normalizeOutcomeContractRegistryV1(registryInput(state));
-  const mutable = {};
+  const mutable = Object.create(null);
   for (const [contractId, entry] of Object.entries(normalized)) {
     Object.defineProperty(mutable, contractId, {
       value: structuredClone(entry),
