@@ -1046,3 +1046,47 @@ test('a rejected save does not poison the shared repository save queue', async (
   assert.equal(recovered.revision, 2);
   assert.equal(recovered.projectsById['project-a'].snapshot.revisionId, 'project-r2');
 });
+
+
+test('capsule and provenance artifact bindings reject same-hash metadata or location substitution', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+
+  const movedCapsule = capsule();
+  movedCapsule.artifactRefs = [{
+    ...artifact(),
+    uri: 'drive://different-location',
+  }];
+  assert.throws(
+    () => putProjectContextCapsule(workspace, movedCapsule, { nowMs: 3 }),
+    /artifact binding is not current: build/,
+  );
+
+  const reclassifiedProvenance = provenance();
+  reclassifiedProvenance.artifactRef = {
+    ...artifact(),
+    sensitive: true,
+  };
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, reclassifiedProvenance, { nowMs: 3 }),
+    /provenance artifact is not current: build/,
+  );
+});
+
+test('stored provenance becomes stale if a later project revision moves the artifact without changing hash or size', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
+
+  const movedSnapshot = snapshot('project-r2', 'r1');
+  movedSnapshot.artifactRefs = [{
+    ...artifact(),
+    uri: 'drive://moved-build',
+  }];
+  replaceProjectSnapshot(workspace, movedSnapshot, { nowMs: 4 });
+
+  assert.throws(
+    () => getProjectArtifactProvenance(workspace, 'project-a', 'build'),
+    /provenance artifact is not current: build/,
+  );
+});
