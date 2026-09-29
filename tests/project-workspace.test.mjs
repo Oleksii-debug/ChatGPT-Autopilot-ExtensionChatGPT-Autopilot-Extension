@@ -1295,3 +1295,30 @@ test('exact save replay accepts only the immediately preceding expected revision
     /exact replay expected revision mismatch/,
   );
 });
+
+
+test('save return values cannot alias durable storage objects', async () => {
+  const data = {};
+  const chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: data[key] }; },
+        async set(value) { Object.assign(data, value); },
+      },
+    },
+  };
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  const initial = createProjectWorkspace(1);
+  const first = await repository.save(initial);
+  first.updatedAt = 99;
+  first.revision = 99;
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
+
+  const replay = await repository.save(createProjectWorkspace(1));
+  replay.updatedAt = 77;
+  replay.revision = 77;
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
+});
