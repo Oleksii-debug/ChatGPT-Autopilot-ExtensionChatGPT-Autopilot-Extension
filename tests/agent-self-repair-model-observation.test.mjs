@@ -389,7 +389,10 @@ test('provider-result provenance compares exact raw model text without whitespac
   const exact = projectAgentSelfRepairModelObservationV1(request({
     modelResult: modelResult({ text: topLevelText }),
   }));
-  assert.match(exact.summary, /Applied the bounded repair/u);
+  assert.equal(
+    exact.summary,
+    'Applied the bounded repair and produced evidence for independent verification.',
+  );
 
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
