@@ -20,6 +20,11 @@ import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
+import {
+  OPENHANDS_CODING_PROVIDER_ID,
+  OpenHandsCodingSpecialistClient,
+} from '../core/coding-specialist-provider.js';
+import { probeOpenHandsSpecialistProviderConfigV1 } from '../core/openhands-specialist-readiness.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
@@ -74,6 +79,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
+  'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -84,6 +90,7 @@ const transport = new InteractionProviderRouter().register(AgentProviderId.CHATG
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
+const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({ fetchFn: (...args) => fetch(...args) });
 const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
@@ -216,6 +223,7 @@ const aiManager = new AiAutonomyManager({
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
+  specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient]]),
   readModelRouteContext: async () => {
     const state = await repo.load();
     const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
@@ -656,21 +664,63 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.listSpecialistProviderConfigs();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
+  } else if (message.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    const providerId = message.payload?.providerId || '';
+    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
+      throw new Error('No read-only Specialist provider probe is installed for requested provider');
+    }
+    const beforeProbe = await browserAgent.getSpecialistProviderConfig(providerId);
+    if (beforeProbe.quarantined) {
+      throw new Error('Selected Specialist provider config is quarantined as corrupt');
+    }
+    if (!beforeProbe.config) {
+      throw new Error('Selected Specialist provider is not configured by the owner');
+    }
+    const configSnapshot = JSON.stringify(beforeProbe.config);
+    const probe = await probeOpenHandsSpecialistProviderConfigV1({
+      config: beforeProbe.config.config,
+      client: openHandsSpecialistClient,
+    });
+    const afterProbe = await browserAgent.getSpecialistProviderConfig(providerId);
+    if (afterProbe.quarantined || !afterProbe.config
+        || JSON.stringify(afterProbe.config) !== configSnapshot) {
+      throw new Error('Specialist provider config changed during readiness probe');
+    }
+    result = {
+      providerId,
+      configRevision: afterProbe.config.revision,
+      observedAt: probe.observedAt,
+      providerState: probe.providerState,
+      authority: probe.authority,
+    };
   } else if (message.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.putSpecialistProviderConfig(message.payload || {});
   } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.clearSpecialistProviderConfig(message.payload || {});
   } else if (message.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER') {
+    const randomUuid = globalThis.crypto?.randomUUID;
+    if (typeof randomUuid !== 'function') {
+      throw new Error('Secure UUID generation is unavailable for Specialist provider execution');
+    }
+    const execution = structuredClone(message.payload?.execution || {});
+    delete execution.at;
+    delete execution.conversationId;
     result = await browserAgent.executeClaimedSpecialistProvider(
       message.payload?.id || '',
-      message.payload?.execution || {},
+      {
+        agentId: execution.agentId || '',
+        conversationId: randomUuid.call(globalThis.crypto).toLowerCase(),
+        expectedControlEpoch: execution.expectedControlEpoch,
+      },
     );
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
+    const delegation = structuredClone(message.payload?.delegation || {});
+    delete delegation.at;
     result = await browserAgent.prepareDefinitionSpecialistDelegation(
       message.payload?.id || '',
-      message.payload?.delegation || {},
+      delegation,
     );
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
@@ -681,9 +731,13 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'UPDATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.updateConfig(message.payload?.id || '', message.payload?.config || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
+    const handoff = structuredClone(message.payload?.handoff || {});
+    delete handoff.at;
+    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', handoff);
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
-    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
+    const claim = structuredClone(message.payload?.claim || {});
+    delete claim.at;
+    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', claim);
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
