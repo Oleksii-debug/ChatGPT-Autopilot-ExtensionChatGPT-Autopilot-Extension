@@ -95,6 +95,29 @@ test('router rejects inherited accessor-shaped transport executors without invok
   assert.equal(getterReads, 0);
 });
 
+test('router never inherits an executor from built-in prototype pollution', () => {
+  const original = Object.getOwnPropertyDescriptor(Object.prototype, 'execute');
+  let pollutionCalls = 0;
+  Object.defineProperty(Object.prototype, 'execute', {
+    configurable: true,
+    value: async () => {
+      pollutionCalls += 1;
+      return { status: 'POLLUTED' };
+    },
+  });
+
+  try {
+    assert.throws(
+      () => new InteractionProviderRouter().register(AgentProviderId.CHATGPT_BROWSER, {}),
+      /Interaction transport required/,
+    );
+    assert.equal(pollutionCalls, 0);
+  } finally {
+    if (original) Object.defineProperty(Object.prototype, 'execute', original);
+    else delete Object.prototype.execute;
+  }
+});
+
 test('router uses its validated default only when providerId is absent', async () => {
   const calls = [];
   const router = new InteractionProviderRouter().register(
