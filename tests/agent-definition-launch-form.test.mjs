@@ -12,6 +12,7 @@ function registry(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     revision: 7,
+    bindingKey: '["agent-registry",7,"fixture"]',
     definitions: [],
     ...overrides,
   };
@@ -68,6 +69,7 @@ test('launch builder binds exact live definition revisions and explicit least-au
   assert.deepEqual({ ...request }, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 7,
+    expectedRegistryBindingKey: '["agent-registry",7,"fixture"]',
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 3,
     goal: 'Compare evidence and return a verified result.',
@@ -160,6 +162,21 @@ test('launch fails closed when owner grants or requested narrowing exceed author
     definition: definition(),
     ownerPolicy: ownerPolicy(),
   }), /Requested tool narrowing exceeds the selected Agent definition authority/u);
+});
+
+test('launch request requires the exact registry content binding key', () => {
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry({ bindingKey: '  drifted  ' }),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  }), /registry bindingKey is invalid/u);
+
+  const request = buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry({ bindingKey: '["agent-registry",7,"exact"]' }),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  });
+  assert.equal(request.expectedRegistryBindingKey, '["agent-registry",7,"exact"]');
 });
 
 test('disabled, stale-representation and duplicate inputs fail before command construction', () => {
