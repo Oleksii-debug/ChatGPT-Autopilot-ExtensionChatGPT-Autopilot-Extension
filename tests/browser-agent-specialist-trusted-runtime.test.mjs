@@ -726,19 +726,16 @@ test('service-worker owns timestamps for Specialist completion and trusted verif
     const end = source.indexOf("  } else if (message.command === '", start + 1);
     assert.notEqual(end, -1, `${item.command} handler must have a bounded branch`);
     const block = source.slice(start, end);
-    assert.match(
-      block,
-      new RegExp(`const ${item.variable} = structuredClone\\\\(message\\\\.payload\\\\?\\\\.${item.payload} \\\\|\\\\| \\\\{\\\\}\\\\)`),
+    assert.ok(
+      block.includes(`const ${item.variable} = structuredClone(message.payload?.${item.payload} || {});`),
       `${item.command} must snapshot caller payload before authority filtering`,
     );
-    assert.match(
-      block,
-      new RegExp(`delete ${item.variable}\\\\.at;`),
+    assert.ok(
+      block.includes(`delete ${item.variable}.at;`),
       `${item.command} must discard caller-controlled transition time`,
     );
-    assert.match(
-      block,
-      new RegExp(`browserAgent\\\\.${item.method}\\\\(message\\\\.payload\\\\?\\\\.id \\\\|\\\\| '', ${item.variable}\\\\)`),
+    assert.ok(
+      block.includes(`browserAgent.${item.method}(message.payload?.id || '', ${item.variable})`),
       `${item.command} must invoke Core with the sanitized payload`,
     );
   }
