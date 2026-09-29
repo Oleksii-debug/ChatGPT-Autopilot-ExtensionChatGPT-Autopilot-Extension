@@ -658,6 +658,11 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
   } else if (message.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.putSpecialistProviderConfig(message.payload || {});
+  } else if (message.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER') {
+    result = await browserAgent.executeClaimedSpecialistProvider(
+      message.payload?.id || '',
+      message.payload?.execution || {},
+    );
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
