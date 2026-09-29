@@ -74,6 +74,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
+  'PREPARE_BROWSER_AGENT_SPECIALIST_PROVIDER_DISPATCH',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -658,6 +659,11 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
   } else if (message.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.putSpecialistProviderConfig(message.payload || {});
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_PROVIDER_DISPATCH') {
+    result = await browserAgent.prepareClaimedSpecialistProviderDispatch(
+      message.payload?.id || '',
+      message.payload?.dispatch || {},
+    );
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
