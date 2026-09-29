@@ -8,6 +8,7 @@ import {
   listStoredOutcomeContractsV1,
   normalizeOutcomeContractRegistryV1,
   resolveStoredOutcomeContractV1,
+  resolveCanonicalStoredOutcomeContractV1,
   updateStoredOutcomeContractV1,
 } from '../src/core/outcome-contract-control.js';
 import { createOutcomeContractV1, normalizeOutcomeContractV1 } from '../src/core/outcome-contract.js';
@@ -172,6 +173,32 @@ test('durable OutcomeContract registry creates, resolves, lists, updates and del
   });
   assert.equal(deleted.revision, 2);
   assert.deepEqual(listStoredOutcomeContractsV1(state, { projectId: 'project-1' }), []);
+});
+
+test('canonical verifier resolver matches the existing contractId/contractRevision bridge shape without dropping project binding', () => {
+  const state = createEmptyState(1);
+  const created = createStoredOutcomeContractV1(state, contractV1());
+
+  const resolved = resolveCanonicalStoredOutcomeContractV1(state, {
+    contractId: 'outcome-1',
+    contractRevision: 1,
+  });
+  assert.deepEqual(resolved, created);
+  assert.equal(resolved.projectId, 'project-1');
+  assert.equal(resolved.advisoryOnly, true);
+  assert.equal(resolved.executionAuthorized, false);
+
+  assert.equal(resolveCanonicalStoredOutcomeContractV1(state, {
+    contractId: 'outcome-missing',
+    contractRevision: 1,
+  }), null);
+  assert.throws(
+    () => resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 2,
+    }),
+    /revision binding mismatch/,
+  );
 });
 
 test('contract identity, creation time and revision progression are immutable under update', () => {
