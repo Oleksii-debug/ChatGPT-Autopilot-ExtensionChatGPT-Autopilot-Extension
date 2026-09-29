@@ -109,6 +109,73 @@ test('isolated routed prompt applies per-Agent override without mutating global 
   assert.deepEqual(after.runtime, before.runtime, 'isolated Agent route must not mutate profile-wide router runtime');
 });
 
+test('isolated Agent router override snapshots nested policy before asynchronous settings load', async () => {
+  const repo = new MemoryRepo();
+  const seen = [];
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: {
+      async run(settings, runtime) {
+        seen.push(structuredClone(settings));
+        return {
+          text: 'isolated',
+          route: 'primary',
+          trigger: 'primary-only',
+          primary: { provider: 'ollama', model: 'model-a', text: 'isolated' },
+          strong: null,
+          runtime: { ...runtime, requestCount: runtime.requestCount + 1, primaryCount: runtime.primaryCount + 1 },
+        };
+      },
+    },
+  });
+
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled: true,
+    mode: 'primary',
+    routes: [
+      { routeId: 'route-a', provider: 'ollama', model: 'model-a', priority: 10 },
+      { routeId: 'route-b', provider: 'ollama', model: 'model-b', priority: 20 },
+    ],
+    routePolicy: { allowRouteIds: ['route-a', 'route-b'] },
+  } });
+
+  const originalLoad = repo.load.bind(repo);
+  let releaseLoad;
+  let markLoadEntered;
+  const loadGate = new Promise(resolve => { releaseLoad = resolve; });
+  const loadEntered = new Promise(resolve => { markLoadEntered = resolve; });
+  repo.load = async () => {
+    markLoadEntered();
+    await loadGate;
+    return originalLoad();
+  };
+
+  const routePolicy = {
+    allowRouteIds: ['route-a'],
+    orderedRouteIds: ['route-a'],
+    freeOnly: true,
+  };
+  const routerOverride = { routePolicy };
+  const pending = dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt: 'agent task',
+    isolatedRuntime: true,
+    routerOverride,
+  });
+
+  await loadEntered;
+  routePolicy.allowRouteIds[0] = 'route-b';
+  routePolicy.orderedRouteIds[0] = 'route-b';
+  routePolicy.freeOnly = false;
+  routerOverride.routePolicy = { allowRouteIds: ['route-b'] };
+  releaseLoad();
+
+  const result = await pending;
+  assert.equal(result.result.text, 'isolated');
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].routePolicy.allowRouteIds, ['route-a']);
+  assert.deepEqual(seen[0].routePolicy.orderedRouteIds, ['route-a']);
+  assert.equal(seen[0].routePolicy.freeOnly, true);
+});
+
 test('disabled AI router may persist an incomplete model draft', async () => {
   const repo = new MemoryRepo();
   const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
