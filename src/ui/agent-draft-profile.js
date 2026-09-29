@@ -38,7 +38,13 @@ const STRING_POLICY_KEYS = new Set([
 ]);
 const ARRAY_POLICY_KEYS = new Set(['siteRules', 'acceptanceCriteria']);
 
-function dataRecord(value, allowedKeys, label) {
+const REPEAT_MODES = new Set(['ONCE', 'CONTINUOUS', 'INTERVAL']);
+const APPROVAL_MODES = new Set(['CONSEQUENTIAL', 'ALLOW_ALL']);
+const POLICY_DECISIONS = new Set(['ALLOW', 'ASK', 'DENY', 'INHERIT']);
+const AI_ROUTING_MODES = new Set(['inherit', 'primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
+const AI_PROVIDERS = new Set(['inherit', 'ollama', 'openai', 'openai-compatible']);
+
+function dataRecord(value, allowedKeys, label, unknownFieldMessage = '') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} має бути JSON-об’єктом.`);
   }
@@ -50,6 +56,7 @@ function dataRecord(value, allowedKeys, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      if (unknownFieldMessage) throw new Error(unknownFieldMessage);
       throw new Error(`${label} містить невідоме поле: ${String(key)}`);
     }
     const descriptor = descriptors[key];
@@ -128,6 +135,10 @@ function snapshotJsonValue(value, label, state = { nodes: 0 }, depth = 0) {
   return out;
 }
 
+function assertCanonicalEnum(value, allowed, label) {
+  if (!allowed.has(value)) throw new Error(`${label} має канонічне непідтримуване значення.`);
+}
+
 function assertExactPolicyValueType(key, value) {
   if (BOOLEAN_POLICY_KEYS.has(key) && typeof value !== 'boolean') {
     throw new Error(`Політика Agent.${key} має бути boolean.`);
@@ -142,10 +153,54 @@ function assertExactPolicyValueType(key, value) {
   if (ARRAY_POLICY_KEYS.has(key) && !Array.isArray(value)) {
     throw new Error(`Політика Agent.${key} має бути масивом.`);
   }
+
+  if (key === 'repeatMode') assertCanonicalEnum(value, REPEAT_MODES, 'Політика Agent.repeatMode');
+  if (key === 'approvalMode') assertCanonicalEnum(value, APPROVAL_MODES, 'Політика Agent.approvalMode');
+  if (key === 'credentialDecision') {
+    assertCanonicalEnum(value, POLICY_DECISIONS, 'Політика Agent.credentialDecision');
+  }
+  if (key === 'aiRoutingMode') assertCanonicalEnum(value, AI_ROUTING_MODES, 'Політика Agent.aiRoutingMode');
+  if (key === 'aiPrimaryProvider' || key === 'aiStrongProvider') {
+    assertCanonicalEnum(value, AI_PROVIDERS, `Політика Agent.${key}`);
+  }
+}
+
+function assertCanonicalSiteRules(siteRules) {
+  for (let ruleIndex = 0; ruleIndex < siteRules.length; ruleIndex += 1) {
+    const rule = siteRules[ruleIndex];
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
+      throw new Error(`Політика Agent.siteRules[${ruleIndex}] має бути JSON-об’єктом.`);
+    }
+    if (Object.hasOwn(rule, 'defaultDecision')) {
+      assertCanonicalEnum(
+        rule.defaultDecision,
+        POLICY_DECISIONS,
+        `Політика Agent.siteRules[${ruleIndex}].defaultDecision`,
+      );
+    }
+    if (Object.hasOwn(rule, 'actionDecisions')) {
+      const decisions = rule.actionDecisions;
+      if (!decisions || typeof decisions !== 'object' || Array.isArray(decisions)) {
+        throw new Error(`Політика Agent.siteRules[${ruleIndex}].actionDecisions має бути JSON-об’єктом.`);
+      }
+      for (const [action, decision] of Object.entries(decisions)) {
+        assertCanonicalEnum(
+          decision,
+          POLICY_DECISIONS,
+          `Політика Agent.siteRules[${ruleIndex}].actionDecisions.${action}`,
+        );
+      }
+    }
+  }
 }
 
 function snapshotPolicy(input) {
-  const raw = dataRecord(input, POLICY_KEYS, 'Політика Agent');
+  const raw = dataRecord(
+    input,
+    POLICY_KEYS,
+    'Політика Agent',
+    'Невідоме поле політики Agent; credentials та стан виконання не імпортуються.',
+  );
   const out = {};
   const state = { nodes: 0 };
   for (const key of POLICY_KEYS) {
@@ -153,6 +208,7 @@ function snapshotPolicy(input) {
     assertExactPolicyValueType(key, raw[key]);
     out[key] = snapshotJsonValue(raw[key], `Політика Agent.${key}`, state);
   }
+  if (Object.hasOwn(out, 'siteRules')) assertCanonicalSiteRules(out.siteRules);
   return out;
 }
 
