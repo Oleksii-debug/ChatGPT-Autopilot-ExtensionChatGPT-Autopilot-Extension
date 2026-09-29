@@ -233,6 +233,30 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
         || nextRevisionIds[nextRevisionIds.length - 1] !== nextSnapshot.revisionId) {
       throw new Error('Project snapshot advance must append exactly one revisionId');
     }
+
+    const previousArtifacts = new Map(
+      previousSnapshot.artifactRefs.map(ref => [ref.artifactId, ref]),
+    );
+    for (const nextArtifact of nextSnapshot.artifactRefs) {
+      const previousArtifact = previousArtifacts.get(nextArtifact.artifactId);
+      if (previousArtifact
+          && artifactIdentity(previousArtifact) !== artifactIdentity(nextArtifact)) {
+        throw new Error(
+          `Project artifactId cannot be reused for different immutable content: ${nextArtifact.artifactId}`,
+        );
+      }
+      if (hasOwn(previousProject.provenanceByArtifactId, nextArtifact.artifactId)) {
+        const priorProvenance = normalizeArtifactProvenanceV1(
+          previousProject.provenanceByArtifactId[nextArtifact.artifactId],
+        );
+        if (artifactIdentity(priorProvenance.artifactRef) !== artifactIdentity(nextArtifact)) {
+          throw new Error(
+            `Project artifactId cannot be rebound after durable provenance: ${nextArtifact.artifactId}`,
+          );
+        }
+      }
+    }
+
     for (const [capsuleId, previousCapsuleValue] of Object.entries(previousProject.capsulesById)) {
       if (!hasOwn(nextProject.capsulesById, capsuleId)) {
         throw new Error('Project workspace update cannot remove an existing context capsule');
@@ -302,7 +326,7 @@ export function createProjectWorkspace(nowMs = Date.now()) {
 export function validateProjectWorkspace(workspace) {
   const raw = strictDataRecord(workspace, WORKSPACE_KEYS, 'project workspace');
   if (raw.schemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION) throw new Error('Unsupported project workspace schema');
-  if (!Number.isInteger(raw.revision) || Object.is(raw.revision, -0) || raw.revision < 0) {
+  if (!Number.isSafeInteger(raw.revision) || Object.is(raw.revision, -0) || raw.revision < 0) {
     throw new Error('Invalid project workspace revision');
   }
   const createdAt = timestamp(raw.createdAt, 'project workspace createdAt');
@@ -397,6 +421,23 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   if (revisionIds.length >= MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
     throw new Error('Project workspace snapshot revision history limit exceeded');
   }
+
+  const currentArtifacts = new Map(current.artifactRefs.map(ref => [ref.artifactId, ref]));
+  for (const nextArtifact of normalized.artifactRefs) {
+    const currentArtifact = currentArtifacts.get(nextArtifact.artifactId);
+    if (currentArtifact && artifactIdentity(currentArtifact) !== artifactIdentity(nextArtifact)) {
+      throw new Error(`Project artifactId cannot be reused for different immutable content: ${nextArtifact.artifactId}`);
+    }
+    if (hasOwn(project.provenanceByArtifactId, nextArtifact.artifactId)) {
+      const priorProvenance = normalizeArtifactProvenanceV1(
+        project.provenanceByArtifactId[nextArtifact.artifactId],
+      );
+      if (artifactIdentity(priorProvenance.artifactRef) !== artifactIdentity(nextArtifact)) {
+        throw new Error(`Project artifactId cannot be rebound after durable provenance: ${nextArtifact.artifactId}`);
+      }
+    }
+  }
+
   project.snapshotRevisionIds = [...revisionIds, normalized.revisionId];
   project.snapshot = normalized;
   project.updatedAt = nowMs;
@@ -516,9 +557,10 @@ export class ProjectWorkspaceRepository {
   async load({ emptyNowMs = Date.now() } = {}) {
     timestamp(emptyNowMs, 'project workspace emptyNowMs');
     const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
-    const workspace = record[PROJECT_WORKSPACE_STORAGE_KEY] === undefined
-      ? createProjectWorkspace(emptyNowMs)
-      : record[PROJECT_WORKSPACE_STORAGE_KEY];
+    const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
+    if (durableRaw === undefined) return createProjectWorkspace(emptyNowMs);
+    validateProjectWorkspace(durableRaw);
+    const workspace = structuredClone(durableRaw);
     return validateProjectWorkspace(workspace);
   }
 
@@ -529,7 +571,7 @@ export class ProjectWorkspaceRepository {
     const candidate = structuredClone(workspace);
     validateProjectWorkspace(candidate);
     if (expectedPreviousRevision !== null
-        && (!Number.isInteger(expectedPreviousRevision)
+        && (!Number.isSafeInteger(expectedPreviousRevision)
           || Object.is(expectedPreviousRevision, -0)
           || expectedPreviousRevision < 0)) {
       throw new Error('Invalid expected project workspace revision');
@@ -561,7 +603,11 @@ export class ProjectWorkspaceRepository {
         // previous expected revision because the original write may have
         // committed before its acknowledgement was lost.
         if (candidate.revision === durable.revision && sameCanonicalData(candidate, durable)) {
-          return durable;
+          if (expectedRevision !== null
+              && (durable.revision < 1 || expectedRevision !== durable.revision - 1)) {
+            throw new Error('Project workspace exact replay expected revision mismatch');
+          }
+          return structuredClone(durable);
         }
         if (expectedRevision !== null && durable.revision !== expectedRevision) {
           throw new Error('Project workspace durable revision changed before save');
@@ -572,7 +618,9 @@ export class ProjectWorkspaceRepository {
         assertSnapshotRevisionContinuity(durable, candidate);
       }
 
-      await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: candidate });
+      await this.chrome.storage.local.set({
+        [PROJECT_WORKSPACE_STORAGE_KEY]: structuredClone(candidate),
+      });
       return candidate;
     });
     PROJECT_WORKSPACE_SAVE_QUEUES.set(queueKey, task.catch(() => undefined));
@@ -597,6 +645,9 @@ export class ProjectWorkspaceRepository {
       }
       const draft = structuredClone(current);
       const next = await mutator(draft) || draft;
+      // Validate the caller-returned object before writing repository-owned
+      // revision/timestamp fields so hostile setters cannot execute first.
+      validateProjectWorkspace(next);
       next.revision = current.revision + 1;
       next.updatedAt = nowMs;
       validateProjectWorkspace(next);

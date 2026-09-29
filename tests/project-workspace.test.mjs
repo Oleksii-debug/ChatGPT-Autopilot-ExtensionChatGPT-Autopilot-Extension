@@ -1074,21 +1074,44 @@ test('capsule and provenance artifact bindings reject same-hash metadata or loca
   );
 });
 
-test('stored provenance becomes stale if a later project revision moves the artifact without changing hash or size', () => {
+test('project revisions cannot rebind one immutable artifactId to another ArtifactRef identity', () => {
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
-  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
 
   const movedSnapshot = snapshot('project-r2', 'r1');
   movedSnapshot.artifactRefs = [{
     ...artifact(),
     uri: 'drive://moved-build',
   }];
-  replaceProjectSnapshot(workspace, movedSnapshot, { nowMs: 4 });
-
   assert.throws(
-    () => getProjectArtifactProvenance(workspace, 'project-a', 'build'),
-    /provenance artifact is not current: build/,
+    () => replaceProjectSnapshot(workspace, movedSnapshot, { nowMs: 4 }),
+    /artifactId cannot be reused for different immutable content: build/,
+  );
+
+  const unchangedArtifact = snapshot('project-r2', 'r1');
+  assert.doesNotThrow(
+    () => replaceProjectSnapshot(workspace, unchangedArtifact, { nowMs: 4 }),
+  );
+  assert.equal(workspace.projectsById['project-a'].snapshot.revisionId, 'project-r2');
+});
+
+test('durable provenance prevents later resurrection of a removed artifactId with different identity', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
+
+  const withoutBuild = snapshot('project-r2', 'r1');
+  withoutBuild.artifactRefs = [];
+  replaceProjectSnapshot(workspace, withoutBuild, { nowMs: 4 });
+
+  const resurrected = snapshot('project-r3', 'r1');
+  resurrected.artifactRefs = [{
+    ...artifact(),
+    uri: 'drive://different-build',
+  }];
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, resurrected, { nowMs: 5 }),
+    /artifactId cannot be rebound after durable provenance: build/,
   );
 });
 
@@ -1141,4 +1164,161 @@ test('repository save rejects signed-zero expected revisions', async () => {
     repository.save(createProjectWorkspace(1), { expectedPreviousRevision: -0 }),
     /Invalid expected project workspace revision/,
   );
+});
+
+
+test('generic repository mutation cannot bypass immutable artifactId continuity', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const next = snapshot('project-r2', 'r1');
+      next.artifactRefs = [{
+        ...artifact(),
+        uri: 'drive://generic-bypass',
+      }];
+      workspace.projectsById['project-a'].snapshot = next;
+      workspace.projectsById['project-a'].snapshotRevisionIds.push('project-r2');
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /artifactId cannot be reused for different immutable content: build/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(durable.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+  assert.equal(durable.projectsById['project-a'].snapshot.artifactRefs[0].uri, 'drive://build');
+});
+
+
+test('repository update rejects accessor-backed mutator results before owner field writes', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  let setterCalls = 0;
+
+  await assert.rejects(
+    repository.update(() => {
+      const hostile = createProjectWorkspace(1);
+      Object.defineProperty(hostile, 'revision', {
+        enumerable: true,
+        configurable: true,
+        get() {
+          return 0;
+        },
+        set() {
+          setterCalls += 1;
+        },
+      });
+      return hostile;
+    }, { nowMs: 2 }),
+    /fields must be enumerable own data properties/,
+  );
+
+  assert.equal(setterCalls, 0);
+  const durable = await repository.load({ emptyNowMs: 2 });
+  assert.equal(durable.revision, 0);
+});
+
+
+test('repository load returns a detached durable snapshot when storage returns the same object reference', async () => {
+  const stored = createProjectWorkspace(1);
+  addProjectSnapshot(stored, snapshot(), { nowMs: 2 });
+  stored.revision = 1;
+  stored.updatedAt = 2;
+  const data = { [PROJECT_WORKSPACE_STORAGE_KEY]: stored };
+  const chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: data[key] }; },
+        async set(value) { Object.assign(data, value); },
+      },
+    },
+  };
+  const repository = new ProjectWorkspaceRepository(chrome);
+  const loaded = await repository.load();
+  loaded.projectsById['project-a'].snapshot.title = 'caller mutation';
+  loaded.revision = 99;
+
+  const again = await repository.load();
+  assert.equal(again.revision, 1);
+  assert.equal(again.projectsById['project-a'].snapshot.title, 'Project A');
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 1);
+});
+
+test('workspace revision and expected revision reject unsafe integers', async () => {
+  const unsafe = createProjectWorkspace(1);
+  unsafe.revision = Number.MAX_SAFE_INTEGER + 1;
+  assert.throws(
+    () => validateProjectWorkspace(unsafe),
+    /Invalid project workspace revision/,
+  );
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(createProjectWorkspace(1), {
+      expectedPreviousRevision: Number.MAX_SAFE_INTEGER + 1,
+    }),
+    /Invalid expected project workspace revision/,
+  );
+});
+
+test('exact save replay accepts only the immediately preceding expected revision', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const current = await repository.load();
+  const next = structuredClone(current);
+  replaceProjectSnapshot(next, snapshot('project-r2', 'r2'), { nowMs: 3 });
+  next.revision = 2;
+  next.updatedAt = 3;
+  await repository.save(next, { expectedPreviousRevision: 1 });
+
+  await assert.doesNotReject(
+    repository.save(next, { expectedPreviousRevision: 1 }),
+  );
+  await assert.rejects(
+    repository.save(next, { expectedPreviousRevision: 0 }),
+    /exact replay expected revision mismatch/,
+  );
+  await assert.rejects(
+    repository.save(next, { expectedPreviousRevision: 2 }),
+    /exact replay expected revision mismatch/,
+  );
+});
+
+
+test('save return values cannot alias durable storage objects', async () => {
+  const data = {};
+  const chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: data[key] }; },
+        async set(value) { Object.assign(data, value); },
+      },
+    },
+  };
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  const initial = createProjectWorkspace(1);
+  const first = await repository.save(initial);
+  first.updatedAt = 99;
+  first.revision = 99;
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
+
+  const replay = await repository.save(createProjectWorkspace(1));
+  replay.updatedAt = 77;
+  replay.revision = 77;
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
 });
