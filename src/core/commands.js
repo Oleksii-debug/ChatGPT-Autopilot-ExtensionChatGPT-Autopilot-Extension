@@ -803,11 +803,18 @@ export class CoreCommandDispatcher {
       if (Object.hasOwn(payload, 'agentModelOrchestratorEnvelope')) {
         throw new Error('Agent model orchestrator envelope is internal-only');
       }
-      const internalEnvelope = internal?.agentModelOrchestratorEnvelope === undefined
+      const internalEnvelopeDescriptor = internal == null
+        ? undefined
+        : Object.getOwnPropertyDescriptor(Object(internal), 'agentModelOrchestratorEnvelope');
+      if (internalEnvelopeDescriptor
+          && (internalEnvelopeDescriptor.enumerable !== true
+            || !Object.hasOwn(internalEnvelopeDescriptor, 'value'))) {
+        throw new Error('Agent model orchestrator envelope must be an enumerable own data property');
+      }
+      const internalEnvelopeValue = internalEnvelopeDescriptor?.value;
+      const internalEnvelope = internalEnvelopeValue === undefined
         ? null
-        : normalizeBoundAgentModelOrchestratorEnvelopeV1(
-          internal.agentModelOrchestratorEnvelope,
-        );
+        : normalizeBoundAgentModelOrchestratorEnvelopeV1(internalEnvelopeValue);
       let internalImageDataUrl = '';
       let internalPrompt = '';
       let internalSystemPrompt = '';
@@ -877,9 +884,21 @@ export class CoreCommandDispatcher {
         }
         internalImageDataUrl = imageDataUrl;
       }
+      let internalProviderBudgetContext = null;
+      if (internalEnvelope) {
+        const budgetDescriptor = internal == null
+          ? undefined
+          : Object.getOwnPropertyDescriptor(Object(internal), 'providerCallBudgetContext');
+        if (!budgetDescriptor
+            || budgetDescriptor.enumerable !== true
+            || !Object.hasOwn(budgetDescriptor, 'value')) {
+          throw new Error('Agent model provider budget context must be an enumerable own data property');
+        }
+        internalProviderBudgetContext = budgetDescriptor.value;
+      }
       const providerCallBudgetContext = internalEnvelope
         ? normalizeInternalAgentProviderBudgetContext(
-          internal?.providerCallBudgetContext,
+          internalProviderBudgetContext,
           internalEnvelope.jobId,
         )
         : internal?.providerCallBudgetContext || null;
