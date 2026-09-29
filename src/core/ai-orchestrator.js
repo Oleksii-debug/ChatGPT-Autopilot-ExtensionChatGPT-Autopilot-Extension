@@ -531,7 +531,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (nonProviderRouteFailures.has(error) || error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY MODEL FAILED. Continue the original task directly.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
@@ -548,7 +548,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (nonProviderRouteFailures.has(error) || error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY/LOCAL MODEL FAILED BEFORE PRODUCING A HANDOFF. Complete the original task.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
