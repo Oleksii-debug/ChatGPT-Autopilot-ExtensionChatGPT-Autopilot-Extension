@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
+import { BROWSER_AGENT_STORAGE_KEY } from '../src/core/browser-agent.js';
 import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 import { SpecialistRegistryMutationKind } from '../src/core/specialist-registry.js';
 import {
@@ -1051,4 +1052,47 @@ test('bounded provider execution history retains the newest PREPARED record befo
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 128);
   assert.ok(durable.providerExecutions.some(item => item.conversationId === currentConversationId));
+});
+
+
+test('restart retention keeps the newest 128 provider execution records', async () => {
+  const { chrome } = chromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+    specialistProviderClients: new Map(),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  const store = await manager.load();
+
+  store.byId['job.coder'].runtime.specialistProviderExecutions = Array.from({ length: 130 }, (_, index) =>
+    createSpecialistProviderExecutionV1({
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: `lease:${index}`,
+      leaseUntil: assignment.leaseExpiresAt,
+      conversationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      providerConfig: providerConfig(),
+      at: T0,
+    }));
+  await chrome.storage.local.set({ [BROWSER_AGENT_STORAGE_KEY]: store });
+
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+    specialistProviderClients: new Map(),
+  });
+  const durable = await restarted.listSpecialistHandoffs('job.coder');
+
+  assert.equal(durable.providerExecutions.length, 128);
+  assert.equal(durable.providerExecutions[0].leaseId, 'lease:2');
+  assert.equal(durable.providerExecutions.at(-1).leaseId, 'lease:129');
 });
