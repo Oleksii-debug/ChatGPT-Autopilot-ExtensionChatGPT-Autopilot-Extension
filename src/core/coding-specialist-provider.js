@@ -651,6 +651,7 @@ export class OpenHandsCodingSpecialistClient {
     }
 
     let stableTerminal = '';
+    let stableTerminalProviderUpdatedAt = '';
     let stableTerminalCount = 0;
     let last = conversation;
 
@@ -659,10 +660,14 @@ export class OpenHandsCodingSpecialistClient {
       if (TERMINAL.has(status)) {
         if (!last.observedAt) {
           stableTerminal = '';
+          stableTerminalProviderUpdatedAt = '';
           stableTerminalCount = 0;
-        } else if (status === stableTerminal) stableTerminalCount += 1;
-        else {
+        } else if (status === stableTerminal
+            && last.providerUpdatedAt === stableTerminalProviderUpdatedAt) {
+          stableTerminalCount += 1;
+        } else {
           stableTerminal = status;
+          stableTerminalProviderUpdatedAt = last.providerUpdatedAt;
           stableTerminalCount = 1;
         }
         if (last.observedAt && stableTerminalCount >= 2) {
@@ -692,6 +697,7 @@ export class OpenHandsCodingSpecialistClient {
         }
       } else {
         stableTerminal = '';
+        stableTerminalProviderUpdatedAt = '';
         stableTerminalCount = 0;
         if (MANUAL.has(status) && last.observedAt) {
           return deepFreeze({
