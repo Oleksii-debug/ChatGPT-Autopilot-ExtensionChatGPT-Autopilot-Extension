@@ -1318,3 +1318,79 @@ test('owner drift during durable PREPARED recovery records reconciliation rather
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
 });
+
+test('owner policy drift during readiness blocks fresh automatic provider preparation', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = {
+    async execute() {
+      calls += 1;
+      throw new Error('revoked automation policy must stop before provider dispatch');
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  await manager.setSpecialistAutomationPolicy({
+    expectedRevision: 0,
+    enabled: true,
+    maxConcurrentHandoffs: 1,
+  });
+  clock.value = Date.parse(T1);
+
+  let changed = false;
+  const resolver = {
+    async resolve(selection) {
+      if (!changed) {
+        changed = true;
+        clock.value += 1_000;
+        await manager.setSpecialistAutomationPolicy({
+          expectedRevision: 1,
+          enabled: false,
+          maxConcurrentHandoffs: 0,
+        });
+      }
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: new Date(clock.value).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() {},
+  };
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProviderFromAutomationPolicy(
+      'job.coder',
+      {
+        agentId,
+        conversationId: '71717171-7171-4717-8717-717171717171',
+        expectedControlEpoch: 0,
+        at: T1,
+      },
+      { specialistProviderReadinessResolver: resolver },
+    ),
+    /automation policy drifted before provider preparation/,
+  );
+  assert.equal(calls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+  assert.equal(durable.handoffs[0].state, 'LEASED');
+  assert.equal(durable.executionOwnerships[0].state, 'OWNED');
+  const policy = await manager.getSpecialistAutomationPolicy();
+  assert.equal(policy.policy.enabled, false);
+  assert.equal(policy.policy.maxConcurrentHandoffs, 0);
+});

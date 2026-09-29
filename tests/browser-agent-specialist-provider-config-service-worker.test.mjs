@@ -85,7 +85,11 @@ test('RUN command uses one injected trusted OpenHands client and never grants co
     /} else if \(message\.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,
   );
   assert.ok(branch, 'RUN Specialist provider command must remain structurally identifiable');
-  assert.match(branch[1], /globalThis\.crypto\?\.randomUUID/);
+  assert.match(
+    source,
+    /function createSpecialistConversationId\(\)[\s\S]*?globalThis\.crypto\?\.randomUUID[\s\S]*?randomUuid\.call\(globalThis\.crypto\)\.toLowerCase\(\)/,
+  );
+  assert.match(branch[1], /createSpecialistConversationId\(\)/);
   assert.match(branch[1], /browserAgent\.executeClaimedSpecialistProvider/);
   assert.doesNotMatch(branch[1], /message\.payload\?\.conversationId/);
   assert.doesNotMatch(branch[1], /completeSpecialistHandoff/);
