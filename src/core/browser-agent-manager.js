@@ -557,6 +557,19 @@ function specialistDelegationAdmissionKey(proposal) {
   return key;
 }
 
+function assertOwnerBoundSpecialistAdmissionProvenance(job) {
+  if (!job?.specialistDelegationBinding?.profile?.enabled) return;
+  const assignments = Array.isArray(job.runtime?.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+  if (!assignments.length) return;
+  const admissions = normalizeSpecialistDelegationAdmissions(job.runtime?.specialistDelegationAdmissions);
+  const admittedIds = new Set(admissions.map(item => item.agentId));
+  for (const assignment of assignments) {
+    if (!assignment?.agentId || !admittedIds.has(assignment.agentId)) {
+      throw new Error('Owner-bound specialist handoff lacks durable admission provenance');
+    }
+  }
+}
+
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
   const profile = job?.specialistDelegationBinding?.profile;
   if (!profile?.enabled) return request;
@@ -1384,6 +1397,7 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      assertOwnerBoundSpecialistAdmissionProvenance(job);
       const currentOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
       const capacityObligations = currentOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
       const boundedRequest = boundSpecialistClaimRequestForJob(job, { ...request, at }, capacityObligations);
@@ -1444,6 +1458,7 @@ export class BrowserAgentManager {
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
+        assertOwnerBoundSpecialistAdmissionProvenance(job);
         const currentJobOwnerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const jobCapacityObligations = currentJobOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
         const boundedClaimRequest = boundSpecialistClaimRequestForJob(
@@ -3409,6 +3424,18 @@ export class BrowserAgentManager {
     const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
     if (externalNode) {
       const existingHandoff = (current.job.runtime.specialistHandoffs || []).find(item => item?.agentId === specialistAssignmentIdForPlanNodeV1(current.job.runtime.plan.planId, externalNode.nodeId));
+      if (existingHandoff && current.job.specialistDelegationBinding?.profile?.enabled === true) {
+        try {
+          assertOwnerBoundSpecialistAdmissionProvenance(current.job);
+        } catch (error) {
+          return this.recordRecoverableFailure(id, current.job.runtime.controlEpoch, {
+            type: 'planning',
+            error,
+            retryMs: 5000,
+            maxConsecutive: 4,
+          });
+        }
+      }
       if (!existingHandoff && current.job.specialistDelegationBinding?.profile?.enabled === true) {
         const epoch = current.job.runtime.controlEpoch;
         try {
