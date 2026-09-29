@@ -86,8 +86,19 @@ function ownData(input, key, label) {
   return { present:true, value:descriptor.value };
 }
 
-function routeIdsFromLines(value, label) {
-  return listFromLines(value ?? '', label, { maxItems:32, itemMax:180, identity:true });
+function routeIdsFromLines(value, label, { preserveOrder = false } = {}) {
+  if (typeof value !== 'string') throw new Error(label + ' має бути текстом.');
+  const values = [];
+  const seen = new Set();
+  for (const raw of value.replace(/\r\n?/g, '\n').split('\n')) {
+    if (raw === '') continue;
+    const item = parseCanonicalAgentIdentity(raw, label);
+    if (seen.has(item)) throw new Error(label + ' містить дублікат: ' + item);
+    seen.add(item);
+    values.push(item);
+    if (values.length > 32) throw new Error(label + ' містить забагато значень.');
+  }
+  return preserveOrder ? values : values.sort((a,b)=>a<b?-1:a>b?1:0);
 }
 
 export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { persistedPolicy = null } = {}) {
@@ -111,16 +122,16 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
   const policy = normalizeAiRoutePolicy({
     autoSwitch,
     pinnedRouteId: pinned,
-    orderedRouteIds: routeIdsFromLines(read('modelRouteOrderedRouteIdsText', ''), 'Ordered model route ID'),
+    orderedRouteIds: routeIdsFromLines(read('modelRouteOrderedRouteIdsText', ''), 'Ordered model route ID', { preserveOrder:true }),
     allowRouteIds: routeIdsFromLines(read('modelRouteAllowRouteIdsText', ''), 'Allowed model route ID'),
     denyRouteIds: routeIdsFromLines(read('modelRouteDenyRouteIdsText', ''), 'Denied model route ID'),
     freeOnly,
     locality,
     maxInputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxInputPriceText', ''), 'Максимальна input-ціна'),
     maxOutputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxOutputPriceText', ''), 'Максимальна output-ціна'),
-    retryBackoffSeconds: exactIntegerText(String(read('modelRouteRetryBackoffSeconds', '60')), 'Retry backoff', { min:1, max:86400 }),
-    circuitBreakerFailures: exactIntegerText(String(read('modelRouteCircuitBreakerFailures', '2')), 'Circuit breaker failures', { min:1, max:100 }),
-    circuitBreakerSeconds: exactIntegerText(String(read('modelRouteCircuitBreakerSeconds', '300')), 'Circuit breaker seconds', { min:1, max:86400 }),
+    retryBackoffSeconds: exactIntegerText(read('modelRouteRetryBackoffSeconds', '60'), 'Retry backoff', { min:1, max:86400 }),
+    circuitBreakerFailures: exactIntegerText(read('modelRouteCircuitBreakerFailures', '2'), 'Circuit breaker failures', { min:1, max:100 }),
+    circuitBreakerSeconds: exactIntegerText(read('modelRouteCircuitBreakerSeconds', '300'), 'Circuit breaker seconds', { min:1, max:86400 }),
   });
   if (policy.allowRouteIds.length) {
     const allow = new Set(policy.allowRouteIds);
