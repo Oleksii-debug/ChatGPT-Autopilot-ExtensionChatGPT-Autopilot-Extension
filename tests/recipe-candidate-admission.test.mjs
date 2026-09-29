@@ -427,6 +427,27 @@ test('every evidence ArtifactRef must exact-match trusted artifact identity, byt
   );
 });
 
+test('evidence resolver URI and media metadata do not escape the trust boundary', async () => {
+  const secret = 'TOP_SECRET_URI_SENTINEL';
+  const result = await prepareTrustedRecipeCandidateAdmissionV1(
+    request(),
+    options({
+      resolveTrustedEvidenceArtifact: async lookup => artifactForLookup(lookup, {
+        uri: 'https://example.invalid/evidence?token=' + secret,
+        mediaType: 'application/x-secret-bearing-metadata',
+      }),
+    }),
+  );
+
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes(secret), false);
+  assert.equal(serialized.includes('application/x-secret-bearing-metadata'), false);
+  assert.deepEqual(
+    Object.keys(result.evidenceBindings[0]).sort(),
+    ['artifactId', 'createdAt', 'sensitive', 'sha256'],
+  );
+});
+
 test('one exact trusted evidence artifact may support multiple verified steps without duplicate resolution', async () => {
   const sharedInput = compilerInput();
   sharedInput.trace.steps[1].verificationEvidenceArtifactId = 'evidence-fetch-1';
@@ -445,8 +466,8 @@ test('one exact trusted evidence artifact may support multiple verified steps wi
   );
 
   assert.equal(evidenceResolutions, 1);
-  assert.equal(result.evidenceArtifactRefs.length, 1);
-  assert.equal(result.evidenceArtifactRefs[0].artifactId, 'evidence-fetch-1');
+  assert.equal(result.evidenceBindings.length, 1);
+  assert.equal(result.evidenceBindings[0].artifactId, 'evidence-fetch-1');
 });
 
 test('secret scan is exact-subject, clean, independent and causal', async () => {
