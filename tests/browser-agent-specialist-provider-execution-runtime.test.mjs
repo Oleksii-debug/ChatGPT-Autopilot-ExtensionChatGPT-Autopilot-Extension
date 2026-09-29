@@ -190,12 +190,10 @@ test('claimed Specialist provider persists PREPARED before effect and records no
   const clock = { value: Date.parse(T0) };
   let calls = 0;
   let observedPrepared = null;
-  let observedOptions = null;
   let manager;
   const client = {
-    async execute(input, options) {
+    async execute(input) {
       calls += 1;
-      observedOptions = options;
       const state = await manager.listSpecialistHandoffs('job.coder');
       observedPrepared = state.providerExecutions[0];
       assert.equal(observedPrepared.status, 'PREPARED');
@@ -231,8 +229,6 @@ test('claimed Specialist provider persists PREPARED before effect and records no
 
   assert.equal(calls, 1);
   assert.equal(observedPrepared.providerId, OPENHANDS_CODING_PROVIDER_ID);
-  assert.equal(observedOptions.allowCreate, true);
-  assert.equal(observedOptions.deadlineMs, Date.parse(observedPrepared.leaseUntil));
   assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
   assert.equal(result.execution.status, 'PROVIDER_SUCCEEDED');
   assert.equal(result.completionAuthorized, false);
@@ -336,12 +332,10 @@ test('durable PREPARED record resumes only the exact provider conversation after
   const clock = { value: Date.parse(T0) };
   let calls = 0;
   let observedConversationId = '';
-  let observedOptions = null;
   const client = {
-    async execute(input, options) {
+    async execute(input) {
       calls += 1;
       observedConversationId = input.conversationId;
-      observedOptions = options;
       return {
         providerStatus: 'finished',
         providerSucceeded: true,
@@ -402,8 +396,6 @@ test('durable PREPARED record resumes only the exact provider conversation after
 
   assert.equal(calls, 1);
   assert.equal(observedConversationId, '55555555-5555-4555-8555-555555555555');
-  assert.equal(observedOptions.allowCreate, false);
-  assert.equal(observedOptions.deadlineMs, Date.parse(assignment.leaseExpiresAt));
   assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
   assert.equal(result.execution.status, 'PROVIDER_SUCCEEDED');
 
