@@ -1793,11 +1793,30 @@ export class BrowserAgentManager {
     }
 
     let rawOutcome = null;
+    let providerOutcome = null;
     let providerError = null;
+    const invalidProviderOutcome = () => new OpenHandsCodingSpecialistError(
+      'Specialist provider returned an invalid outcome after dispatch',
+      {
+        code: 'SPECIALIST_PROVIDER_INVALID_OUTCOME',
+        conversationId: prepared.conversationId,
+        effectMayHaveOccurred: true,
+        reconciliationRequired: true,
+        safeToRetry: false,
+      },
+    );
     try {
       rawOutcome = await providerRequest.client.execute(providerRequest.input);
     } catch (error) {
       providerError = error;
+    }
+    if (!providerError) {
+      try {
+        providerOutcome = snapshotOwnDataRequest(rawOutcome, 'Specialist provider outcome');
+        if (Object.keys(providerOutcome).length > 64) throw new Error('Specialist provider outcome contains too many fields');
+      } catch {
+        providerError = invalidProviderOutcome();
+      }
     }
 
     const observedAt = new Date(this.now()).toISOString();
@@ -1837,18 +1856,32 @@ export class BrowserAgentManager {
           at: observedAt,
         });
       } else {
-        outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
-          providerStatus: rawOutcome.providerStatus,
-          providerSucceeded: rawOutcome.providerSucceeded === true,
-          manualReviewRequired: rawOutcome.manualReviewRequired === true,
-          reconciliationRequired: rawOutcome.reconciliationRequired === true,
-          safeToRetry: rawOutcome.safeToRetry === true,
-          effectEvidence: rawOutcome.effectEvidence || '',
-          errorCode: '',
-          providerUpdatedAt: rawOutcome.providerUpdatedAt || '',
-          providerObservedAt: rawOutcome.providerObservedAt || '',
-          at: observedAt,
-        });
+        try {
+          outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
+            providerStatus: providerOutcome.providerStatus,
+            providerSucceeded: providerOutcome.providerSucceeded === true,
+            manualReviewRequired: providerOutcome.manualReviewRequired === true,
+            reconciliationRequired: providerOutcome.reconciliationRequired === true,
+            safeToRetry: providerOutcome.safeToRetry === true,
+            effectEvidence: providerOutcome.effectEvidence || '',
+            errorCode: '',
+            providerUpdatedAt: providerOutcome.providerUpdatedAt || '',
+            providerObservedAt: providerOutcome.providerObservedAt || '',
+            at: observedAt,
+          });
+        } catch {
+          providerError = invalidProviderOutcome();
+          outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
+            providerStatus: '',
+            providerSucceeded: false,
+            manualReviewRequired: false,
+            reconciliationRequired: true,
+            safeToRetry: false,
+            effectEvidence: '',
+            errorCode: providerError.code,
+            at: observedAt,
+          });
+        }
       }
       job.runtime.specialistProviderExecutions = executions.map((item, itemIndex) =>
         itemIndex === index ? outcome : item);
