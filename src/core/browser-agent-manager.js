@@ -102,6 +102,7 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
+const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const SPECIALIST_READINESS_DEPENDENCY_KEYS = new Set(['specialistProviderReadinessResolver']);
@@ -219,14 +220,14 @@ function storedSpecialistRegistryMapDescriptors(raw) {
       : [];
   });
 }
-function storedSpecialistProviderConfigMapDescriptors(raw) {
+function storedSpecialistProviderConfigMapDescriptors(raw, maxEntries = MAX_SPECIALIST_PROVIDER_CONFIGS) {
   if (raw === undefined) return [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
   const prototype = Object.getPrototypeOf(raw);
   if (prototype !== Object.prototype && prototype !== null) return [];
   const descriptors = Object.getOwnPropertyDescriptors(raw);
   const keys = Reflect.ownKeys(descriptors);
-  if (keys.length > MAX_SPECIALIST_PROVIDER_CONFIGS || keys.some(key => typeof key !== 'string')) return [];
+  if (keys.length > maxEntries || keys.some(key => typeof key !== 'string')) return [];
   return keys.sort().flatMap(key => {
     const descriptor = descriptors[key];
     return descriptor && descriptor.enumerable === true && Object.hasOwn(descriptor, 'value')
@@ -382,10 +383,10 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
   const configs = Object.create(null);
   const revisions = Object.create(null);
   const quarantine = Object.create(null);
-  for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawQuarantine)) {
+  for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawQuarantine, MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES)) {
     try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
   }
-  for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawRevisions)) {
+  for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawRevisions, MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES)) {
     try {
       const providerId = canonicalSpecialistProviderIdV1(key);
       if (!Number.isSafeInteger(value) || value < 1 || Object.is(value, -0)) {
@@ -1416,7 +1417,11 @@ export class BrowserAgentManager {
       const revisions = store.specialistProviderConfigRevisionById
         || (store.specialistProviderConfigRevisionById = Object.create(null));
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      const hasDurableIdentity = Object.hasOwn(revisions, providerId);
       const currentRevision = Number(revisions[providerId] || current?.revision || 0);
+      if (!hasDurableIdentity && Object.keys(revisions).length >= MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES) {
+        throw new Error('Specialist provider config durable identity capacity is exhausted');
+      }
       if (currentRevision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before update');
       }
