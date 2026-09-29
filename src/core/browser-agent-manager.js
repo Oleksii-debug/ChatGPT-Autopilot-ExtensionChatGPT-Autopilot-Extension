@@ -3340,28 +3340,44 @@ export class BrowserAgentManager {
     if (externalNode) {
       const existingHandoff = (current.job.runtime.specialistHandoffs || []).find(item => item?.agentId === specialistAssignmentIdForPlanNodeV1(current.job.runtime.plan.planId, externalNode.nodeId));
       if (!existingHandoff && current.job.specialistDelegationBinding?.profile?.enabled === true) {
-        const binding = normalizeAgentSpecialistDelegationBindingV1(current.job.specialistDelegationBinding);
-        const registryState = await this.getSpecialistRegistry(binding.profile.registryId);
-        if (!registryState.registry) {
-          throw new Error(registryState.quarantined
-            ? 'Specialist registry is quarantined and unavailable for automatic delegation'
-            : 'Specialist registry not found for automatic delegation');
+        const epoch = current.job.runtime.controlEpoch;
+        try {
+          const binding = normalizeAgentSpecialistDelegationBindingV1(current.job.specialistDelegationBinding);
+          const registryState = await this.getSpecialistRegistry(binding.profile.registryId);
+          if (!registryState.registry) {
+            throw new Error(registryState.quarantined
+              ? 'Specialist registry is quarantined and unavailable for automatic delegation'
+              : 'Specialist registry not found for automatic delegation');
+          }
+          const prepared = await this.prepareDefinitionSpecialistDelegation(id, {
+            expectedRegistryRevision: registryState.registry.revision,
+            expectedPlanRevision: current.job.runtime.plan.revision,
+            expectedControlEpoch: epoch,
+            nodeId: externalNode.nodeId,
+            at: new Date(now).toISOString(),
+          });
+          return {
+            kind: 'SPECIALIST_PENDING',
+            node: clone(externalNode),
+            handoff: clone(prepared.assignment),
+            executionOwnership: clone(prepared.executionOwnership),
+            automaticallyPrepared: true,
+            reused: prepared.reused === true,
+          };
+        } catch (error) {
+          const live = await this.get(id);
+          if (!live.job
+              || live.job.runtime.runState !== BrowserAgentRunState.RUNNING
+              || live.job.runtime.controlEpoch !== epoch) {
+            return { kind: 'CANCELLED_BY_OWNER' };
+          }
+          return this.recordRecoverableFailure(id, epoch, {
+            type: 'planning',
+            error,
+            retryMs: 5000,
+            maxConsecutive: 4,
+          });
         }
-        const prepared = await this.prepareDefinitionSpecialistDelegation(id, {
-          expectedRegistryRevision: registryState.registry.revision,
-          expectedPlanRevision: current.job.runtime.plan.revision,
-          expectedControlEpoch: current.job.runtime.controlEpoch,
-          nodeId: externalNode.nodeId,
-          at: new Date(now).toISOString(),
-        });
-        return {
-          kind: 'SPECIALIST_PENDING',
-          node: clone(externalNode),
-          handoff: clone(prepared.assignment),
-          executionOwnership: clone(prepared.executionOwnership),
-          automaticallyPrepared: true,
-          reused: prepared.reused === true,
-        };
       }
       await this.update(store => {
         const job = store.byId[id];
