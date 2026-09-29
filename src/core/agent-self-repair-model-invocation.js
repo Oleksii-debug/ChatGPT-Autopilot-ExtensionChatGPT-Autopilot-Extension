@@ -1,8 +1,10 @@
 import { CoreCommand } from '../shared/protocol.js';
 import {
-  AgentSelfRepairWorkKind,
   normalizeAgentSelfRepairModelIntentV1,
 } from './agent-self-repair-model-binding.js';
+import {
+  AgentSelfRepairWorkKind,
+} from './agent-self-repair-bridge.js';
 import {
   normalizeBoundAgentModelOrchestratorEnvelopeV1,
 } from './agent-model-orchestrator-envelope.js';
