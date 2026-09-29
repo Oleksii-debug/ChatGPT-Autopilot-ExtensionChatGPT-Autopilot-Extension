@@ -134,7 +134,7 @@ async function fixture(){
     runtime.hierarchy={schemaVersion:1,graph:g,state:prepared.runtime};
     return runtime;
   });
-  return {chrome,core,manager,prepared,canonicalTaskEnvelope,setNow:value=>{nowMs=value;}};
+  return {chrome,core,manager,g,prepared,canonicalTaskEnvelope,setNow:value=>{nowMs=value;}};
 }
 
 test('orchestration owner derives and persists activation binding from latest durable hierarchy',async()=>{
@@ -181,6 +181,68 @@ test('orchestration owner derives and persists activation binding from latest du
       .subagentTaskActivationBindingRegistry.revision,
     1,
   );
+});
+
+test('recovery binding inherits exact durable WORK task identity and rejects caller task drift',async()=>{
+  const {chrome,manager,g,prepared,canonicalTaskEnvelope,setNow}=await fixture();
+  const workRequest={
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:prepared.actions[0],
+    invocationId:'invocation-child-1',
+  };
+  const work=await manager.registerSubagentTaskActivationBinding(workRequest,'orch-1');
+  assert.equal(work.revision,1);
+
+  const confirmed=reduceOrchestrationHierarchyEvent(
+    g,prepared.runtime,{
+      type:OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId:'confirm-child-before-recovery',controlEpoch:7,nodeId:'child-1',generation:1,
+      activationId:'child-activation-1',effectRef:'effect://child-1',
+    },Date.parse(T2)+1,
+  );
+  const recovered=reduceOrchestrationHierarchyEvent(
+    g,confirmed.runtime,{
+      type:OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+      eventId:'recover-child',controlEpoch:7,nodeId:'child-1',generation:1,newGeneration:2,
+      activationId:'child-recovery-2',
+    },Date.parse(T2)+2,
+  );
+  const recoveryAction=recovered.actions.find(action => (
+    action.activationId==='child-recovery-2'
+    && action.purpose===OrchestrationActivationPurpose.RECOVERY
+  ));
+  assert.ok(recoveryAction);
+  assert.equal(recoveryAction.providerDispatchIdentity,'');
+  await manager.controllerFor('orch-1').runtimeRepository.update(runtime=>{
+    runtime.hierarchy={schemaVersion:1,graph:g,state:recovered.runtime};
+    return runtime;
+  });
+  setNow(Date.parse(T2)+3);
+
+  const substituted=structuredClone(canonicalTaskEnvelope);
+  substituted.objective += ' recovery drift';
+  await assert.rejects(
+    ()=>manager.registerSubagentTaskActivationBinding({
+      taskEnvelope:substituted,
+      activationAction:recoveryAction,
+      invocationId:'invocation-recovery-2',
+    },'orch-1'),
+    /requires prior durable WORK task dispatch identity/u,
+  );
+  assert.equal(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1']
+      .subagentTaskActivationBindingRegistry.revision,
+    1,
+  );
+
+  const recovery=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:recoveryAction,
+    invocationId:'invocation-recovery-2',
+  },'orch-1');
+  assert.equal(recovery.revision,2);
+  assert.equal(recovery.binding.activationPurpose,OrchestrationActivationPurpose.RECOVERY);
+  assert.equal(recovery.binding.taskDispatchIdentity,work.binding.taskDispatchIdentity);
 });
 
 test('binding owner rejects forged activation, cross-project task and caller authority fields without mutation',async()=>{
