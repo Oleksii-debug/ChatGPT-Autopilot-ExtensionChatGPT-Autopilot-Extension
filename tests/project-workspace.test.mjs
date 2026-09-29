@@ -502,7 +502,7 @@ test('context capsule identity is idempotent-only and cannot be substituted unde
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
   const first = putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
   const replay = putProjectContextCapsule(workspace, capsule(), { nowMs: 50 });
-  assert.equal(replay, first);
+  assert.deepEqual(replay, first);
   assert.equal(workspace.projectsById['project-a'].updatedAt, 3);
 
   assert.throws(
@@ -557,7 +557,7 @@ test('artifact provenance identity is immutable under its durable artifact key',
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
   const first = putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
   const replay = putProjectArtifactProvenance(workspace, provenance(), { nowMs: 50 });
-  assert.equal(replay, first);
+  assert.deepEqual(replay, first);
   assert.equal(workspace.projectsById['project-a'].updatedAt, 3);
 
   assert.throws(
