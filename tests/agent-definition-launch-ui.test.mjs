@@ -113,3 +113,13 @@ test('launch scope prefill cache is bound to exact registry and definition prove
     'prefill cache key must change when registry identity, revision or content binding changes even if definition ID/revision are reused',
   );
 });
+
+test('post-create verification failure preserves the durable job identity and forbids blind retry messaging', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /let createdId = ''/u);
+  assert.match(body, /createdId = created\?\.job\?\.id \|\| created\?\.selectedId \|\| ''/u);
+  assert.match(body, /if \(createdId\)/u);
+  assert.match(body, /уже створено/u);
+  assert.match(body, /Не створюйте повторно/u);
+  assert.match(body, /оновіть список Agent jobs/u);
+});
