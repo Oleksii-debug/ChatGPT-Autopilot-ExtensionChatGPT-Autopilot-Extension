@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  normalizeSpecialistOutcomeContractAdmissionV1,
   prepareSpecialistOutcomeContractAdmissionV1,
+  verifySpecialistOutcomeContractAdmissionV1,
 } from '../src/core/specialist-outcome-contract-admission.js';
 import {
   createOutcomeContractV1,
@@ -71,6 +73,15 @@ function outcomeContract({ revision = 3, projectId = 'project-1', contractId = '
   return revision === 1 ? first : normalizeOutcomeContractV1({ ...first, revision });
 }
 
+async function preparedAdmission(contract = outcomeContract({ revision: 3 })) {
+  return prepareSpecialistOutcomeContractAdmissionV1({
+    projectId: 'project-1',
+    selection: selection(),
+  }, {
+    resolveCurrentOutcomeContract: async () => contract,
+  });
+}
+
 test('freezes Specialist resultContractId to exact current canonical OutcomeContract revision', async () => {
   const contract = outcomeContract({ revision: 3 });
   let lookup = null;
@@ -98,6 +109,7 @@ test('freezes Specialist resultContractId to exact current canonical OutcomeCont
   assert.equal(admission.completionAuthorized, false);
   assert.equal(Object.isFrozen(admission), true);
   assert.equal(Object.isFrozen(admission.requestedCapabilityIds), true);
+  assert.deepEqual(normalizeSpecialistOutcomeContractAdmissionV1(admission), admission);
 });
 
 test('rejects resolver identity drift instead of accepting mutable resultContractId semantics', async () => {
@@ -149,6 +161,88 @@ test('snapshots selection before async resolution so caller mutation cannot rebi
   assert.equal(admission.registryRevision, 7);
 });
 
+test('revalidates persisted admission against exact historical canonical contract after restart', async () => {
+  const contract = outcomeContract({ revision: 3 });
+  const admission = await preparedAdmission(contract);
+  let lookup = null;
+  const verified = await verifySpecialistOutcomeContractAdmissionV1({
+    admission,
+    selection: selection(),
+  }, {
+    resolveCanonicalOutcomeContract: async value => {
+      lookup = value;
+      return contract;
+    },
+  });
+
+  assert.deepEqual(lookup, { contractId: 'outcome-ship', contractRevision: 3 });
+  assert.equal(Object.isFrozen(lookup), true);
+  assert.deepEqual(verified, admission);
+});
+
+test('historical recovery rejects admission revision, selection and contract semantic drift', async () => {
+  const contract = outcomeContract({ revision: 3 });
+  const admission = await preparedAdmission(contract);
+
+  const revisionDrift = { ...admission, resultContractRevision: 4 };
+  await assert.rejects(
+    verifySpecialistOutcomeContractAdmissionV1({
+      admission: revisionDrift,
+      selection: selection(),
+    }, {
+      resolveCanonicalOutcomeContract: async () => outcomeContract({ revision: 4 }),
+    }),
+    /semantics drifted from persisted Specialist admission/,
+  );
+
+  await assert.rejects(
+    verifySpecialistOutcomeContractAdmissionV1({
+      admission,
+      selection: selection({ definitionRevision: 5 }),
+    }, {
+      resolveCanonicalOutcomeContract: async () => contract,
+    }),
+    /selection drifted from persisted OutcomeContract admission/,
+  );
+
+  const semanticDrift = normalizeOutcomeContractV1({
+    ...contract,
+    desiredResult: 'A different result under the same contract identity and revision.',
+  });
+  await assert.rejects(
+    verifySpecialistOutcomeContractAdmissionV1({
+      admission,
+      selection: selection(),
+    }, {
+      resolveCanonicalOutcomeContract: async () => semanticDrift,
+    }),
+    /semantics drifted from persisted Specialist admission/,
+  );
+});
+
+test('persisted admission authority widening and valid-shaped binding tampering fail closed', async () => {
+  const contract = outcomeContract({ revision: 3 });
+  const admission = await preparedAdmission(contract);
+
+  assert.throws(
+    () => normalizeSpecialistOutcomeContractAdmissionV1({
+      ...admission,
+      verificationAuthorized: true,
+    }),
+    /cannot grant authority/,
+  );
+
+  await assert.rejects(
+    verifySpecialistOutcomeContractAdmissionV1({
+      admission: { ...admission, bindingKey: 'sha256:' + '0'.repeat(64) },
+      selection: selection(),
+    }, {
+      resolveCanonicalOutcomeContract: async () => contract,
+    }),
+    /admission binding is invalid/,
+  );
+});
+
 test('fails closed on accessor, unknown dependency and malformed resolver output boundaries', async () => {
   let reads = 0;
   const accessorRequest = { selection: selection() };
@@ -191,4 +285,25 @@ test('fails closed on accessor, unknown dependency and malformed resolver output
     }),
     /OutcomeContractV1 must provide schemaVersion|Unsupported OutcomeContractV1 schemaVersion/,
   );
+
+  const admission = await preparedAdmission();
+  let admissionReads = 0;
+  const hostileAdmission = { ...admission };
+  Object.defineProperty(hostileAdmission, 'resultContractRevision', {
+    enumerable: true,
+    get() {
+      admissionReads += 1;
+      return 3;
+    },
+  });
+  await assert.rejects(
+    verifySpecialistOutcomeContractAdmissionV1({
+      admission: hostileAdmission,
+      selection: selection(),
+    }, {
+      resolveCanonicalOutcomeContract: async () => outcomeContract(),
+    }),
+    /enumerable own data property/,
+  );
+  assert.equal(admissionReads, 0);
 });
