@@ -376,3 +376,25 @@ test('projected child snapshot prevents compiler reuse of cached fragments bound
   assert.deepEqual(plan.staleFragments[0].staleSourceIds, ['source.secret']);
   assert.equal(JSON.stringify(plan).includes(secretSummary), false);
 });
+
+
+test('unused tool descriptor objects are never traversed by context projection', () => {
+  let reads = 0;
+  const hostileDescriptor = {};
+  Object.defineProperty(hostileDescriptor, 'providerId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      throw new Error('tool descriptor getter must not execute');
+    },
+  });
+
+  const result = projectSubagentContextV1(request({
+    authorityEnvelope: envelope({ toolDescriptors: [hostileDescriptor] }),
+    priorParentCapsule: null,
+  }));
+
+  assert.equal(reads, 0);
+  assert.deepEqual(result.projectedSnapshot.sourceRefs.map(item => item.sourceId), ['source.allowed']);
+});
