@@ -152,7 +152,7 @@ function optionalIds(record, key, label, max = MAX_ROUTES) {
 function optionalBoolean(record, key, defaultValue, label) {
   const value = own(record, key);
   if (value === undefined) return defaultValue;
-  if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
+  if (typeof value !== 'boolean') throw new Error(`${label} is invalid: must be boolean`);
   return value;
 }
 
