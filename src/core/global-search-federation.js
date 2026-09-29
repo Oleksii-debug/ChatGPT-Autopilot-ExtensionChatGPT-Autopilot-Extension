@@ -59,27 +59,39 @@ function snapshotRecord(value, allowed, label) {
 }
 
 function denseArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  const length = lengthDescriptor?.value;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(length)
+      || length < 0
+      || length > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+
   const allowedKeys = new Set(['length']);
-  for (let index = 0; index < value.length; index += 1) allowedKeys.add(String(index));
-  for (const key of Reflect.ownKeys(value)) {
+  for (let index = 0; index < length; index += 1) allowedKeys.add(String(index));
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowedKeys.has(key)) {
       throw new Error(`${label} contains non-canonical array property: ${String(key)}`);
     }
   }
-  const out = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label}[${index}] must be an enumerable own data property`);
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
-
 function version(value, label) {
   if (typeof value !== 'number' || !Number.isInteger(value) || value !== GlobalSearchFederationVersion) {
     throw new Error(`Unsupported ${label} schemaVersion`);
