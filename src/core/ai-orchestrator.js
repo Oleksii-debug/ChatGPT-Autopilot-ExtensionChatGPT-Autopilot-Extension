@@ -112,10 +112,20 @@ function snapshotProviderReservationReceipt(value) {
   return Object.freeze(snapshot);
 }
 
-function assertProviderReservationSettlement(value) {
-  if (value == null || (typeof value !== 'object' && typeof value !== 'function')) return;
+function assertProviderReservationSettlement(value, { required = false } = {}) {
+  if (value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+    if (!required) return;
+    const error = new Error('AI provider-call lifecycle did not return durable settlement evidence');
+    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
+    throw error;
+  }
   const descriptor = Object.getOwnPropertyDescriptor(value, 'settled');
-  if (!descriptor) return;
+  if (!descriptor) {
+    if (!required) return;
+    const error = new Error('AI provider-call lifecycle did not return durable settlement evidence');
+    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
+    throw error;
+  }
   if (!Object.hasOwn(descriptor, 'value')) {
     const error = new Error('AI provider-call lifecycle settlement status must be an own data property');
     error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
@@ -410,7 +420,9 @@ export class AiOrchestrator {
               ok: false,
               error,
             });
-            assertProviderReservationSettlement(settlement);
+            assertProviderReservationSettlement(settlement, {
+              required: providerCallBudgetContext?.kind === 'browser-agent',
+            });
           } catch (settlementError) {
             throw attachNonProviderFailureRuntime(settlementError);
           }
@@ -426,7 +438,9 @@ export class AiOrchestrator {
             ok: true,
             result: value,
           });
-          assertProviderReservationSettlement(settlement);
+          assertProviderReservationSettlement(settlement, {
+              required: providerCallBudgetContext?.kind === 'browser-agent',
+            });
         } catch (settlementError) {
           throw attachNonProviderFailureRuntime(settlementError);
         }
