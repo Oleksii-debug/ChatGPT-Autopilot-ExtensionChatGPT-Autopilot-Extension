@@ -290,7 +290,7 @@ test('independent resolver produces exact trusted Specialist record consumable b
       executionOwnershipBindingKey: await sha256BindingKey(ownership()),
       registryId: 'specialist-registry:default',
       registryRevision: 1,
-      registryBindingKey: 'registry-binding:v1',
+      registryBindingKey: await sha256BindingKey(selection().registryBindingKey),
       providerId: PROVIDER_ID,
       providerConfigRevision: 1,
       providerExecutionBindingKey: await sha256BindingKey(providerExecution()),
@@ -743,9 +743,11 @@ test('untrusted provider and handoff narrative is bound by digest but never disc
 
   const providerSentinel = 'UNTRUSTED_PROVIDER_SENTINEL_DO_NOT_EXECUTE';
   const handoffSentinel = 'UNTRUSTED_HANDOFF_SENTINEL_DO_NOT_EXECUTE';
+  const registrySentinel = 'UNTRUSTED_REGISTRY_SENTINEL_DO_NOT_EXECUTE';
   await produceTrustedSpecialistExecutionVerificationRecordV1(
     request({
       providerExecution: providerExecution({ effectEvidence: providerSentinel }),
+      selection: selection({ registryBindingKey: registrySentinel }),
       handoff: handoff({ goal: handoffSentinel }),
     }),
     {
@@ -766,9 +768,18 @@ test('untrusted provider and handoff narrative is bound by digest but never disc
     baselineLookups[0].handoffBindingKey,
     changedLookups[0].handoffBindingKey,
   );
+  assert.notEqual(
+    baselineLookups[0].registryBindingKey,
+    changedLookups[0].registryBindingKey,
+  );
+  assert.notEqual(
+    baselineLookups[0].selectionBindingKey,
+    changedLookups[0].selectionBindingKey,
+  );
   const exposed = JSON.stringify(changedLookups[0]);
   assert.equal(exposed.includes(providerSentinel), false);
   assert.equal(exposed.includes(handoffSentinel), false);
+  assert.equal(exposed.includes(registrySentinel), false);
   assert.equal(Object.hasOwn(changedLookups[0], 'providerEffectEvidence'), false);
 });
 
