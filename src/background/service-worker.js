@@ -72,6 +72,8 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
+  'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
+  'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -650,6 +652,12 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createSpecialistRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
+  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
+    result = await browserAgent.listSpecialistProviderConfigs();
+  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
+  } else if (message.command === 'PUT_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.putSpecialistProviderConfig(message.payload || {});
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
