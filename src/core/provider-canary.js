@@ -1,5 +1,6 @@
 import {
   ProviderHealthStatus,
+  assessProviderReadinessFreshnessV1,
   normalizeProviderReadinessV1,
 } from './capability-discovery.js';
 
@@ -441,6 +442,7 @@ export function evaluateProviderCanariesV1(input) {
   const asOf = canonicalTimestamp(raw.asOf, 'asOf');
   const asOfMs = Date.parse(asOf);
   const currentReadiness = normalizeProviderReadinessV1(raw.currentReadiness);
+  const currentReadinessFreshness = assessProviderReadinessFreshnessV1(currentReadiness, asOf);
   const definitions = normalizeDefinitions(raw.definitions);
   const observations = normalizeObservations(raw.observations);
 
@@ -459,7 +461,10 @@ export function evaluateProviderCanariesV1(input) {
 
   const evaluations = definitions.map(definition =>
     evaluateCanary(definition, observations, asOfMs));
-  const health = aggregateHealth(evaluations);
+  const evaluatedHealth = aggregateHealth(evaluations);
+  const health = currentReadinessFreshness.fresh
+    ? evaluatedHealth
+    : ProviderHealthStatus.UNKNOWN;
   const relevant = evaluations.filter(item => item.critical).length
     ? evaluations.filter(item => item.critical)
     : evaluations;
@@ -482,7 +487,9 @@ export function evaluateProviderCanariesV1(input) {
     authenticated: currentReadiness.authenticated,
     pathKind: currentReadiness.pathKind,
     latencyMs,
-    reasonCode: aggregateReason(health),
+    reasonCode: currentReadinessFreshness.fresh
+      ? aggregateReason(health)
+      : currentReadinessFreshness.reasonCode,
   });
 
   const unavailableOrUnknown = health === ProviderHealthStatus.UNAVAILABLE
