@@ -59,13 +59,13 @@ export function createAiRouteQualityCoreEvidenceReaderV1(options) {
     throw new Error('AiRouteQualityCoreEvidenceReaderV1 repository.load must be a function');
   }
 
-  const readBenchmarkRequests = async ({ routeIds } = {}) => {
+  const readBenchmarkRequests = async (input = {}) => {
     const state = await repository.load();
     const persisted = state?.profile?.aiRouteQualityEvidenceRegistry;
     const registry = persisted === undefined
       ? createAiRouteQualityEvidenceRegistryV1()
       : normalizeAiRouteQualityEvidenceRegistryV1(persisted);
-    return readLatestAiRouteQualityBenchmarkRequestsV1(registry, { routeIds });
+    return readLatestAiRouteQualityBenchmarkRequestsV1(registry, input);
   };
 
   Object.defineProperty(readBenchmarkRequests, 'authority', {
