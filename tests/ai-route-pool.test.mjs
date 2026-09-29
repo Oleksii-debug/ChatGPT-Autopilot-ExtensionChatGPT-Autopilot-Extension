@@ -789,3 +789,42 @@ test('optional route and policy ID collections reject present falsy aliases whil
     }
   }
 });
+
+test('route selection capability requirements reject present falsy aliases while preserving the default', () => {
+  const routesWithCapability = normalizeAiRoutePool([{
+    routeId:'selection-capability-exact',
+    provider:'ollama',
+    model:'local',
+    roles:['planner'],
+    capabilityIds:['filesystem.read'],
+  }]);
+
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, capabilityIds:undefined, now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:routesWithCapability, policy:{}, capabilityIds:['filesystem.read'], now:1000 })
+      .candidates.map(route => route.routeId),
+    ['selection-capability-exact'],
+  );
+
+  for (const invalid of [false, 0, '', null]) {
+    assert.throws(
+      () => selectAiRouteCandidates({
+        routes:routesWithCapability,
+        policy:{},
+        capabilityIds:invalid,
+        now:1000,
+      }),
+      /AI route requested capabilityIds must be a bounded array/u,
+      `capabilityIds=${String(invalid)}`,
+    );
+  }
+});

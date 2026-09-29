@@ -342,7 +342,7 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const normalizedRole = clean(role, 40);
   if (!ROLES.has(normalizedRole)) throw new Error('AI route requested role is invalid');
-  const capabilities = ids(capabilityIds || [], 'AI route requested capabilityIds', 64);
+  const capabilities = ids(capabilityIds, 'AI route requested capabilityIds', 64);
   const states = normalizeAiRouteStates(routeStates, pool);
   const selectionNow = stateInteger(now, 'AI route selection now');
   const allow = new Set(normalizedPolicy.allowRouteIds);
