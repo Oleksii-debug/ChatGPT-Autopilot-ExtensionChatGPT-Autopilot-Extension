@@ -69,6 +69,51 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
 
 const clean = value => typeof value === 'string' ? value.trim() : '';
 
+const MAX_PROVIDER_RESERVATION_RECEIPT_FIELDS = 32;
+const MAX_PROVIDER_RESERVATION_RECEIPT_TEXT = 10_000;
+
+function snapshotProviderReservationReceipt(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('AI provider-call lifecycle reservation must be a plain data object');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('AI provider-call lifecycle reservation must be a plain data object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length < 1 || keys.length > MAX_PROVIDER_RESERVATION_RECEIPT_FIELDS) {
+    throw new Error('AI provider-call lifecycle reservation has an invalid field count');
+  }
+  const snapshot = Object.create(null);
+  for (const key of keys) {
+    if (typeof key !== 'string') {
+      throw new Error('AI provider-call lifecycle reservation contains a symbol field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`AI provider-call lifecycle reservation.${key} must be an enumerable own data property`);
+    }
+    const item = descriptor.value;
+    if (item !== null && !['string', 'number', 'boolean'].includes(typeof item)) {
+      throw new Error(`AI provider-call lifecycle reservation.${key} must be scalar data`);
+    }
+    if (typeof item === 'number' && !Number.isFinite(item)) {
+      throw new Error(`AI provider-call lifecycle reservation.${key} must be finite`);
+    }
+    if (typeof item === 'string' && item.length > MAX_PROVIDER_RESERVATION_RECEIPT_TEXT) {
+      throw new Error(`AI provider-call lifecycle reservation.${key} is too long`);
+    }
+    snapshot[key] = item;
+  }
+  if (typeof snapshot.reservationId !== 'string'
+      || !snapshot.reservationId.trim()
+      || snapshot.reservationId !== snapshot.reservationId.trim()) {
+    throw new Error('AI provider-call lifecycle did not admit a canonical durable budget reservation');
+  }
+  return Object.freeze(snapshot);
+}
+
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
   const model = clean(raw?.model);
@@ -308,8 +353,9 @@ export class AiOrchestrator {
       });
       let reservation = null;
       if (lifecycle) {
+        let admittedReservation;
         try {
-          reservation = await lifecycle.beforeProviderCall({
+          admittedReservation = await lifecycle.beforeProviderCall({
             context: providerCallBudgetContext,
             route: routeIdentity,
             prompt: callPrompt,
@@ -320,13 +366,10 @@ export class AiOrchestrator {
         } catch (error) {
           throw attachNonProviderFailureRuntime(error);
         }
-        if (!reservation
-            || typeof reservation !== 'object'
-            || Array.isArray(reservation)
-            || typeof reservation.reservationId !== 'string'
-            || !reservation.reservationId.trim()) {
-          const error = new Error('AI provider-call lifecycle did not admit a durable budget reservation');
-          error.code = 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
+        try {
+          reservation = snapshotProviderReservationReceipt(admittedReservation);
+        } catch (error) {
+          error.code = error.code || 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
           throw attachNonProviderFailureRuntime(error);
         }
       }
@@ -373,13 +416,25 @@ export class AiOrchestrator {
           throw attachNonProviderFailureRuntime(settlementError);
         }
       }
-      return value;
+      return Object.freeze({
+        value,
+        providerReservation: reservation,
+      });
     };
     const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
       const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));
       if (!settings.routes.length) {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
-        return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
+        const admitted = await invoke(
+          { routeId:'', provider:slot.provider, model:slot.model, endpointId:'' },
+          callPrompt,
+          callSystem,
+          bounded,
+        );
+        return {
+          ...admitted.value,
+          ...(admitted.providerReservation ? { providerReservation: admitted.providerReservation } : {}),
+        };
       }
       const requiresVision = Boolean(clean(imageDataUrl));
       const selectCurrentCandidates = (selectionNow) => selectAiRouteCandidates({
@@ -456,11 +511,16 @@ export class AiOrchestrator {
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
           const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
-          const value = await invoke(route, routePrompt, routeSystem, bounded);
+          const admitted = await invoke(route, routePrompt, routeSystem, bounded);
+          const value = admitted.value;
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           selectedRouteId = route.routeId;
           routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
-          return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
+          return {
+            ...value,
+            ...(admitted.providerReservation ? { providerReservation: admitted.providerReservation } : {}),
+            routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' },
+          };
         } catch (error) {
           if (error && (typeof error === 'object' || typeof error === 'function')
               && nonProviderRouteFailures.has(error)) {
@@ -626,6 +686,9 @@ export class AiOrchestrator {
       primaryError,
       strongError,
       routing: { selectedRouteId:finalResult?.routeSelection?.routeId || '', reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'), failoverChain:structuredClone(routeAttempts) },
+      ...(finalResult?.providerReservation
+        ? { providerReservation: structuredClone(finalResult.providerReservation) }
+        : {}),
       runtime: nextRuntime,
     };
   }
