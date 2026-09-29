@@ -2225,7 +2225,7 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
   if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
@@ -2277,6 +2277,7 @@ async function createBrowserAgentFromDefinition() {
     return;
   }
 
+  let createdId = '';
   try {
     const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
       registry,
@@ -2287,22 +2288,25 @@ async function createBrowserAgentFromDefinition() {
     status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
 
     const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
-    const id = created?.job?.id || created?.selectedId;
-    if (!id) throw new Error('Core не повернув id створеного Agent job.');
+    createdId = created?.job?.id || created?.selectedId || '';
+    if (!createdId) throw new Error('Core не повернув id створеного Agent job.');
 
-    ui.selectedBrowserAgentId = id;
-    await loadBrowserAgentJobs({ selectId: id });
+    ui.selectedBrowserAgentId = createdId;
+    await loadBrowserAgentJobs({ selectId: createdId });
 
     const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
     if (runState !== 'STOPPED') {
       throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
     }
 
-    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    status.textContent = `Завдання ${createdId} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
     announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
     $('agent-job-list').focus();
   } catch (error) {
-    if (/revision drifted/i.test(String(error?.message || ''))) {
+    if (createdId) {
+      status.textContent = `Завдання ${createdId} уже створено, але UI не зміг підтвердити його поточний стан: ${error.message}. Не створюйте повторно; оновіть список Agent jobs і перевірте цей ID.`;
+      announce('Reusable Agent завдання вже створено. Потрібна повторна перевірка його стану, а не повторне створення.');
+    } else if (/revision drifted/i.test(String(error?.message || ''))) {
       await loadAgentDefinitionRegistries({
         selectRegistryId: registry.registryId,
         selectDefinitionId: definition.agentDefinitionId,
