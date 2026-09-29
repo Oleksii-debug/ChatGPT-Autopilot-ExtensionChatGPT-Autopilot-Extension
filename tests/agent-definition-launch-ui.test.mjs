@@ -59,6 +59,12 @@ test('definition launch uses the canonical create command and never auto-starts 
   assert.match(body, /loadBrowserAgentJobs\(\{ selectId: id \}\)/u);
 });
 
+test('definition launch request carries exact registry content binding to Core', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /buildAgentDefinitionLaunchRequestV1/u);
+  assert.match(options, /expectedRegistryBindingKey/u);
+});
+
 test('definition launch reads owner budget from the visible canonical Agent budget controls only', () => {
   const start = options.indexOf('function browserAgentOwnerBudgetPolicyFromForm()');
   const end = options.indexOf('\nfunction agentDefinitionLaunchFormValue()', start);
@@ -103,7 +109,7 @@ test('launch scope prefill cache is bound to exact registry and definition prove
 
   assert.match(
     body,
-    /selectedAgentDefinitionRegistry\.registryId.*selectedAgentDefinitionRegistry\.revision.*agentDefinitionId.*definitionRevision/su,
-    'prefill cache key must change when registry identity or revision changes even if definition ID/revision are reused',
+    /selectedAgentDefinitionRegistry\.registryId.*selectedAgentDefinitionRegistry\.revision.*selectedAgentDefinitionRegistry\.bindingKey.*agentDefinitionId.*definitionRevision/su,
+    'prefill cache key must change when registry identity, revision or content binding changes even if definition ID/revision are reused',
   );
 });
