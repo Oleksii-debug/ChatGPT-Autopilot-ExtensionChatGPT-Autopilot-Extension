@@ -239,10 +239,14 @@ test('independent resolver produces exact trusted Specialist record consumable b
       effectId: lookup.effectId,
       policyEnvelopeId: lookup.policyEnvelopeId,
       executionId: lookup.executionId,
+      executionOwnershipRevision: lookup.executionOwnershipRevision,
+      executionOwnershipBindingKey: lookup.executionOwnershipBindingKey,
       registryId: lookup.registryId,
       registryRevision: lookup.registryRevision,
       registryBindingKey: lookup.registryBindingKey,
       providerId: lookup.providerId,
+      providerConfigRevision: lookup.providerConfigRevision,
+      providerExecutionBindingKey: lookup.providerExecutionBindingKey,
       definitionRevision: lookup.definitionRevision,
       requestedCapabilityIds: lookup.requestedCapabilityIds,
       grantedToolIds: lookup.grantedToolIds,
@@ -259,10 +263,14 @@ test('independent resolver produces exact trusted Specialist record consumable b
       effectId: EFFECT_ID,
       policyEnvelopeId: POLICY_ID,
       executionId: LEASE_ID,
+      executionOwnershipRevision: 2,
+      executionOwnershipBindingKey: JSON.stringify(ownership()),
       registryId: 'specialist-registry:default',
       registryRevision: 1,
       registryBindingKey: 'registry-binding:v1',
       providerId: PROVIDER_ID,
+      providerConfigRevision: 1,
+      providerExecutionBindingKey: JSON.stringify(providerExecution()),
       definitionRevision: 1,
       requestedCapabilityIds: ['filesystem.write'],
       grantedToolIds: [],
@@ -657,6 +665,44 @@ test('same-ID selection and handoff semantic changes produce distinct verifier l
   assert.equal(lookups[1].definitionRevision, 2);
   assert.equal(lookups[1].handoffId, HANDOFF_ID);
   assert.equal(lookups[1].specialistId, SPECIALIST_ID);
+});
+
+test('same-ID provider execution and ownership semantic changes produce distinct verifier lookup bindings', async () => {
+  const lookups = [];
+  const dependencies = {
+    resolveTrustedSpecialistExecutionVerification: async lookup => {
+      lookups.push(lookup);
+      return proof();
+    },
+  };
+  await produceTrustedSpecialistExecutionVerificationRecordV1(request(), dependencies);
+
+  const configRevision2 = providerConfig();
+  configRevision2.revision = 2;
+  configRevision2.updatedAt = T1;
+  await produceTrustedSpecialistExecutionVerificationRecordV1(
+    request({
+      providerExecution: providerExecution({
+        providerConfig: configRevision2,
+      }),
+      executionOwnership: ownership({ revision: 3 }),
+    }),
+    dependencies,
+  );
+
+  assert.equal(lookups.length, 2);
+  assert.notEqual(
+    lookups[0].providerExecutionBindingKey,
+    lookups[1].providerExecutionBindingKey,
+  );
+  assert.notEqual(
+    lookups[0].executionOwnershipBindingKey,
+    lookups[1].executionOwnershipBindingKey,
+  );
+  assert.equal(lookups[1].providerConfigRevision, 2);
+  assert.equal(lookups[1].executionOwnershipRevision, 3);
+  assert.equal(lookups[1].executionId, LEASE_ID);
+  assert.equal(lookups[1].providerId, PROVIDER_ID);
 });
 
 test('hostile accessors and unknown fields are rejected without executing getters', async () => {
