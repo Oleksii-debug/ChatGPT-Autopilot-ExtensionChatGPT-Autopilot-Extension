@@ -1812,7 +1812,7 @@ export class BrowserAgentManager {
 
     let prepared = null;
     let providerRequest = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING
