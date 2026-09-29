@@ -2,6 +2,7 @@ import {
   normalizeContextCapsuleV1,
   normalizeProjectSnapshotV1,
 } from './project-context-artifact.js';
+import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
 
 export const SUBAGENT_CONTEXT_PROJECTION_VERSION = 1;
 
@@ -305,5 +306,134 @@ export function projectSubagentContextV1(input = {}) {
     credentialAuthority: false,
     policyAuthority: false,
     sourceTrust: 'CALLER_BOUND_NOT_AUTHENTICATED',
+  });
+}
+
+
+const TASK_CONTEXT_REQUEST_KEYS = new Set([
+  'schemaVersion',
+  'authorityEnvelope',
+  'taskEnvelope',
+  'expectedParentAgentId',
+  'expectedChildAgentId',
+  'expectedTaskId',
+  'expectedProjectRevisionId',
+  'parentProjectSnapshot',
+  'priorParentCapsule',
+]);
+
+function sameTaskArtifactIdentity(left, right) {
+  return left.schemaVersion === right.schemaVersion
+    && left.artifactId === right.artifactId
+    && left.kind === right.kind
+    && left.uri === right.uri
+    && left.mediaType === right.mediaType
+    && left.sha256 === right.sha256
+    && left.sizeBytes === right.sizeBytes
+    && left.createdAt === right.createdAt
+    && left.producerInvocationId === right.producerInvocationId
+    && left.sensitive === right.sensitive;
+}
+
+/**
+ * Bind child-visible Project context to the exact immutable inputs of one
+ * canonical SubagentTaskEnvelopeV1 before applying the ordinary least-authority
+ * projection.
+ *
+ * This is still pure and non-authorizing. The task envelope itself explicitly
+ * carries UNVERIFIED_INPUT provenance and requires trusted runtime resolution.
+ * This adapter only prevents an already-authorized child from seeing sources or
+ * artifacts that are outside the exact task input set.
+ */
+export function projectSubagentTaskContextV1(input = {}) {
+  const request = strictRecord(
+    input,
+    TASK_CONTEXT_REQUEST_KEYS,
+    'SubagentTaskContextProjectionRequestV1',
+  );
+  if (own(request, 'schemaVersion') !== SUBAGENT_CONTEXT_PROJECTION_VERSION) {
+    throw new Error('Unsupported SubagentTaskContextProjectionRequestV1 schemaVersion');
+  }
+
+  const envelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const task = normalizeSubagentTaskEnvelopeV1(own(request, 'taskEnvelope'));
+  const expectedParentAgentId = exactId(
+    own(request, 'expectedParentAgentId'),
+    'expectedParentAgentId',
+  );
+  const expectedChildAgentId = exactId(
+    own(request, 'expectedChildAgentId'),
+    'expectedChildAgentId',
+  );
+  const expectedTaskId = exactId(own(request, 'expectedTaskId'), 'expectedTaskId');
+
+  if (task.projectId !== envelope.projectId) {
+    throw new Error('Subagent task projectId does not match authority envelope');
+  }
+  if (task.parentAgentId !== envelope.parentAgentId
+      || task.parentAgentId !== expectedParentAgentId) {
+    throw new Error('Subagent task parentAgentId binding mismatch');
+  }
+  if (task.childAgentId !== envelope.childAgentId
+      || task.childAgentId !== expectedChildAgentId) {
+    throw new Error('Subagent task childAgentId binding mismatch');
+  }
+  if (task.taskId !== envelope.taskId || task.taskId !== expectedTaskId) {
+    throw new Error('Subagent task taskId binding mismatch');
+  }
+
+  const allowedSourceIds = new Set(envelope.sourceIds);
+  const allowedArtifactIds = new Set(envelope.artifactIds);
+  const taskSourceIds = task.inputSourceRefs.map(ref => ref.sourceId);
+  const taskArtifactIds = task.inputArtifactRefs.map(ref => ref.artifactId);
+
+  for (const sourceId of taskSourceIds) {
+    if (!allowedSourceIds.has(sourceId)) {
+      throw new Error(`Subagent task source is outside child authority: ${sourceId}`);
+    }
+  }
+  for (const artifactId of taskArtifactIds) {
+    if (!allowedArtifactIds.has(artifactId)) {
+      throw new Error(`Subagent task artifact is outside child authority: ${artifactId}`);
+    }
+  }
+
+  const parentSnapshot = normalizeProjectSnapshotV1(
+    own(request, 'parentProjectSnapshot'),
+  );
+  const sourceById = new Map(parentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
+  const artifactById = new Map(parentSnapshot.artifactRefs.map(artifact => [artifact.artifactId, artifact]));
+
+  for (const taskSource of task.inputSourceRefs) {
+    const current = sourceById.get(taskSource.sourceId);
+    if (!current
+        || current.revisionId !== taskSource.revisionId
+        || current.uri !== taskSource.location) {
+      throw new Error(`Subagent task source identity is stale or mismatched: ${taskSource.sourceId}`);
+    }
+  }
+  for (const taskArtifact of task.inputArtifactRefs) {
+    const current = artifactById.get(taskArtifact.artifactId);
+    if (!current || !sameTaskArtifactIdentity(current, taskArtifact)) {
+      throw new Error(`Subagent task artifact identity is stale or mismatched: ${taskArtifact.artifactId}`);
+    }
+  }
+
+  const narrowedEnvelope = {
+    ...envelope,
+    sourceIds: taskSourceIds,
+    artifactIds: taskArtifactIds,
+    toolDescriptors: [],
+  };
+
+  return projectSubagentContextV1({
+    schemaVersion: SUBAGENT_CONTEXT_PROJECTION_VERSION,
+    authorityEnvelope: narrowedEnvelope,
+    expectedParentAgentId,
+    expectedChildAgentId,
+    expectedTaskId,
+    expectedProjectRevisionId: own(request, 'expectedProjectRevisionId'),
+    parentProjectSnapshot: parentSnapshot,
+    priorParentCapsule: own(request, 'priorParentCapsule'),
   });
 }
