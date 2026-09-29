@@ -1213,6 +1213,60 @@ test('nested reconciliation outcome uses exact enum representation and strict da
   );
 });
 
+test('restart normalization rejects partial or time-inconsistent recovery metadata', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'metadata-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'metadata-ambiguity',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      ambiguity: { ...state.ambiguity, declaredAt: '' },
+    }),
+    /ambiguity metadata is incomplete/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      ambiguity: { ...state.ambiguity, declaredAt: '2026-09-19T12:00:03.000Z' },
+    }),
+    /ambiguity chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      reconciliation: {
+        outcome: ReconciliationOutcome.MANUAL_REVIEW,
+        reasonCode: '',
+        summary: 'caller-shaped partial recovery',
+        resolvedAt: '2026-09-19T12:00:02.000Z',
+      },
+    }),
+    /reconciliation metadata is incomplete/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      reconciliation: {
+        outcome: ReconciliationOutcome.MANUAL_REVIEW,
+        reasonCode: 'UNRESOLVED',
+        summary: '',
+        resolvedAt: '2026-09-19T12:00:03.000Z',
+      },
+    }),
+    /reconciliation chronology is invalid/,
+  );
+});
+
 test('null-prototype durable state and event records remain supported', () => {
   const state = createExactEffectStateV1(invocation(), { createdAt: AT });
   const nullState = Object.assign(Object.create(null), JSON.parse(JSON.stringify(state)));
