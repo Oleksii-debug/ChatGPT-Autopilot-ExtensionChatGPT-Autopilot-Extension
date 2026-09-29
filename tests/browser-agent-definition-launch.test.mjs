@@ -235,15 +235,15 @@ test('launch requires exact live registry and definition revisions at the serial
     () => manager.createFromAgentDefinition(launchRequest()),
     /registry revision drifted before launch/,
   );
+  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
     () => manager.createFromAgentDefinition(launchRequest({
       expectedRegistryRevision: 3,
+      expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
       expectedDefinitionRevision: 1,
     })),
     /definition revision drifted before launch/,
   );
-
-  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   const current = await manager.createFromAgentDefinition(launchRequest({
     expectedRegistryRevision: 3,
     expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
@@ -320,8 +320,11 @@ test('disabled definitions and duplicate job identity fail closed', async () => 
   const firstStore = makeChromeStorage();
   const disabledManager = managerFor(firstStore.chrome);
   await seedRegistry(disabledManager, definition({ enabled: false }));
+  const disabledRegistry = await disabledManager.getAgentDefinitionRegistry('agents:project-1');
   await assert.rejects(
-    () => disabledManager.createFromAgentDefinition(launchRequest()),
+    () => disabledManager.createFromAgentDefinition(launchRequest({
+      expectedRegistryBindingKey: disabledRegistry.registry.bindingKey,
+    })),
     /missing or disabled/,
   );
 
