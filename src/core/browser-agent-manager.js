@@ -1870,7 +1870,6 @@ export class BrowserAgentManager {
       'specialist-provider',
       id,
       request.agentId,
-      request.conversationId,
       request.expectedControlEpoch,
     ]);
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
