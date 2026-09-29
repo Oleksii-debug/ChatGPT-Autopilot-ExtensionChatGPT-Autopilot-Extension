@@ -840,3 +840,45 @@ test('semantically invalid plain provider outcome is fenced into canonical recon
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
 });
+
+
+test('retryable pre-effect provider failure enters canonical reconciliation before any retry', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const client = {
+    async execute() {
+      throw new OpenHandsCodingSpecialistError('provider unavailable before effect', {
+        code: 'OPENHANDS_PROVIDER_UNAVAILABLE',
+        conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        effectMayHaveOccurred: false,
+        reconciliationRequired: false,
+        safeToRetry: true,
+      });
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_FAILURE');
+  assert.equal(result.execution.status, 'RETRYABLE_FAILURE');
+  assert.equal(result.execution.safeToRetry, true);
+  assert.equal(result.execution.reconciliationRequired, false);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
+  assert.equal(durable.handoffs[0].state, 'LEASED');
+});
