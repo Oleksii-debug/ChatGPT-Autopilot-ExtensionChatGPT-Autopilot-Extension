@@ -530,3 +530,47 @@ test('future caller timestamp is rejected before durable PREPARED or provider ef
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 0);
 });
+
+
+test('corrupt persisted provider execution is quarantined and cannot authorize redispatch after restart', async () => {
+  const storage = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  let manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  storage.data.autopilotBrowserAgentV1.byId['job.coder'].runtime.specialistProviderExecutions = [{
+    schemaVersion: 1,
+    planId: 'plan:job.coder',
+    nodeId: 'local:code',
+    agentId,
+    handoffId: 'tampered:handoff',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    leaseId: 'tampered:lease',
+  }];
+  manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+
+  const state = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(state.providerExecutions.length, 0);
+  assert.equal(state.providerExecutionQuarantined, true);
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '66666666-6666-4666-8666-666666666666',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /quarantined as corrupt/,
+  );
+  assert.equal(calls, 0);
+});
