@@ -106,11 +106,22 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
     if (!hasOwn(nextWorkspace.projectsById, projectId)) {
       throw new Error('Project workspace update cannot remove an existing project');
     }
+    const nextProject = nextWorkspace.projectsById[projectId];
     const previousSnapshot = normalizeProjectSnapshotV1(previousProject.snapshot);
-    const nextSnapshot = normalizeProjectSnapshotV1(nextWorkspace.projectsById[projectId].snapshot);
+    const nextSnapshot = normalizeProjectSnapshotV1(nextProject.snapshot);
     if (previousSnapshot.revisionId === nextSnapshot.revisionId
         && !sameCanonicalData(previousSnapshot, nextSnapshot)) {
       throw new Error('Project snapshot revisionId cannot be reused for different content');
+    }
+    for (const [capsuleId, previousCapsuleValue] of Object.entries(previousProject.capsulesById)) {
+      if (!hasOwn(nextProject.capsulesById, capsuleId)) {
+        throw new Error('Project workspace update cannot remove an existing context capsule');
+      }
+      const previousCapsule = normalizeContextCapsuleV1(previousCapsuleValue);
+      const nextCapsule = normalizeContextCapsuleV1(nextProject.capsulesById[capsuleId]);
+      if (!sameCanonicalData(previousCapsule, nextCapsule)) {
+        throw new Error('Context capsuleId cannot be reused for different content');
+      }
     }
   }
 }
@@ -258,7 +269,14 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
   assertCapsuleMatchesSnapshot(normalized, project.snapshot);
-  if (!hasOwn(project.capsulesById, normalized.capsuleId) && Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
+  if (hasOwn(project.capsulesById, normalized.capsuleId)) {
+    const current = normalizeContextCapsuleV1(project.capsulesById[normalized.capsuleId]);
+    if (!sameCanonicalData(current, normalized)) {
+      throw new Error('Context capsuleId cannot be reused for different content');
+    }
+    return current;
+  }
+  if (Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
   setOwn(project.capsulesById, normalized.capsuleId, normalized);
   project.updatedAt = nowMs;
   return normalized;
