@@ -167,9 +167,11 @@ export function normalizeAiRoutePool(raw = []) {
     if (!model) throw new Error('AI route model is required');
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
-    const locality = clean(own(item, 'locality') || (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE), 20);
+    const localityValue = own(item, 'locality');
+    const locality = clean(localityValue === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : localityValue, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
-    const costClass = clean(own(item, 'costClass') || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN), 20);
+    const costClassValue = own(item, 'costClass');
+    const costClass = clean(costClassValue === undefined ? (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : costClassValue, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
@@ -203,7 +205,8 @@ export function normalizeAiRoutePool(raw = []) {
 export function normalizeAiRoutePolicy(raw = {}) {
   if (raw == null) raw = {};
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
-  const locality = clean(own(source, 'locality') || DEFAULT_AI_ROUTE_POLICY.locality, 20);
+  const localityValue = own(source, 'locality');
+  const locality = clean(localityValue === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : localityValue, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
     autoSwitch: optionalBoolean(source, 'autoSwitch', true, 'AI route autoSwitch'),
@@ -224,7 +227,8 @@ export function normalizeAiRoutePolicy(raw = {}) {
 export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   if (raw == null) raw = {};
   const policy = dataRecord(raw, new Set(['allocationMode','minWorkers','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
-  const allocationMode = clean(own(policy, 'allocationMode') || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
+  const allocationModeValue = own(policy, 'allocationMode');
+  const allocationMode = clean(allocationModeValue === undefined ? DEFAULT_AI_WORKER_POLICY.allocationMode : allocationModeValue, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
   const maxParallelWorkers = strictInteger(own(policy, 'maxParallelWorkers') ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
   const minWorkers = strictInteger(own(policy, 'minWorkers') ?? DEFAULT_AI_WORKER_POLICY.minWorkers, 'AI worker minWorkers', 1, maxParallelWorkers);
