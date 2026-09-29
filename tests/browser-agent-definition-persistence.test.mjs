@@ -30,6 +30,15 @@ function managerFor(chrome) {
   return new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
 }
 
+async function mutateDefinitionRegistry(manager, input) {
+  const live = await manager.getAgentDefinitionRegistry(input.registryId);
+  if (!live.registry) throw new Error('test registry must exist before mutation');
+  return manager.mutateAgentDefinitionRegistry({
+    ...input,
+    expectedRegistryBindingKey: live.registry.bindingKey,
+  });
+}
+
 function definition(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -54,7 +63,7 @@ test('Agent definition registries persist through the existing Browser Agent sto
   const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   assert.equal(created.registry.revision, 1);
 
-  const mutation = await manager.mutateAgentDefinitionRegistry({
+  const mutation = await mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
@@ -76,13 +85,13 @@ test('persisted definition mutations enforce registry CAS at the actual serializ
   const manager = managerFor(chrome);
   await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
 
-  const first = manager.mutateAgentDefinitionRegistry({
+  const first = mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition({ agentDefinitionId: 'agent.a', label: 'Agent A', tags: ['a'] }),
   });
-  const second = manager.mutateAgentDefinitionRegistry({
+  const second = mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
@@ -102,13 +111,13 @@ test('definition revision CAS survives persistence and rejects stale updates', a
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
-  await manager.mutateAgentDefinitionRegistry({
+  await mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition(),
   });
-  const updated = await manager.mutateAgentDefinitionRegistry({
+  const updated = await mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
@@ -118,7 +127,7 @@ test('definition revision CAS survives persistence and rejects stale updates', a
   });
   assert.equal(updated.nextRegistryRevision, 3);
 
-  await assert.rejects(() => manager.mutateAgentDefinitionRegistry({
+  await assert.rejects(() => mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
@@ -126,6 +135,33 @@ test('definition revision CAS survives persistence and rejects stale updates', a
     expectedDefinitionRevision: 1,
     definition: definition({ label: 'Stale edit', definitionRevision: 2 }),
   }), /definition revision drifted/);
+});
+
+test('persisted definition mutations reject stale same-revision registry binding keys', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:binding-cas' });
+  const staleBindingKey = created.registry.bindingKey;
+
+  await manager.mutateAgentDefinitionRegistry({
+    registryId: 'agents:binding-cas',
+    expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: staleBindingKey,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: definition({ agentDefinitionId: 'agent.first', label: 'First Agent', tags: ['first'] }),
+  });
+
+  const live = await manager.getAgentDefinitionRegistry('agents:binding-cas');
+  await assert.rejects(
+    () => manager.mutateAgentDefinitionRegistry({
+      registryId: 'agents:binding-cas',
+      expectedRegistryRevision: live.registry.revision,
+      expectedRegistryBindingKey: staleBindingKey,
+      kind: AgentDefinitionRegistryMutationKind.CREATE,
+      definition: definition({ agentDefinitionId: 'agent.second', label: 'Second Agent', tags: ['second'] }),
+    }),
+    /bindingKey drifted before mutation/,
+  );
 });
 
 test('definition persistence boundaries are descriptor-safe, exact-shape and zero-getter', async () => {
@@ -141,7 +177,7 @@ test('definition persistence boundaries are descriptor-safe, exact-shape and zer
   assert.equal(reads, 0);
 
   await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
-  await assert.rejects(() => manager.mutateAgentDefinitionRegistry({
+  await assert.rejects(() => mutateDefinitionRegistry(manager, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
@@ -216,7 +252,7 @@ test('Agent definition registry identity is prototype-safe for valid Object prot
     /already exists/,
   );
 
-  const mutation = await manager.mutateAgentDefinitionRegistry({
+  const mutation = await mutateDefinitionRegistry(manager, {
     registryId: 'constructor',
     expectedRegistryRevision: 1,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
