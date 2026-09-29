@@ -1002,6 +1002,169 @@ test('internal Agent envelope cannot be mixed with caller Router or role aliases
   }
 });
 
+test('internal Agent envelope rejects image input that does not match durable vision intent before provider use', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const nonVision = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(nonVision.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(nonVision.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', maxOutputTokens:128, imageDataUrl:'data:image/png;base64,AAAA' },
+      {
+        agentModelOrchestratorEnvelope: nonVision,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /image input does not match durable requiresVision intent/u,
+  );
+
+  const vision = internalAgentEnvelope({ requiresVision:true });
+  vision.settings.routes[0].supportsVision = true;
+  repo.state.profile.aiRouter = structuredClone(vision.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(vision.runtime);
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', maxOutputTokens:128 },
+      {
+        agentModelOrchestratorEnvelope: vision,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /image input does not match durable requiresVision intent/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent envelope preserves exact canonical vision input into AiOrchestrator', async () => {
+  const seen = [];
+  const repo = new MemoryRepo();
+  const vision = internalAgentEnvelope({ requiresVision:true });
+  vision.settings.routes[0].supportsVision = true;
+  repo.state.profile.aiRouter = structuredClone(vision.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(vision.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: {
+      async run(settings, runtime, prompt, options) {
+        seen.push(structuredClone(options));
+        return { text:'ok', runtime };
+      },
+    },
+  });
+  const imageDataUrl = 'data:image/png;base64,AAAA';
+  const result = await dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    { prompt:'agent', maxOutputTokens:128, imageDataUrl },
+    {
+      agentModelOrchestratorEnvelope: vision,
+      providerCallBudgetContext: internalAgentBudgetContext(),
+    },
+  );
+  assert.equal(result.result.text, 'ok');
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].imageDataUrl, imageDataUrl);
+});
+
+test('internal Agent dispatcher snapshots validated vision input across async Router revalidation', async () => {
+  let releaseLoad;
+  let markLoadStarted;
+  const loadGate = new Promise(resolve => { releaseLoad = resolve; });
+  const loadStarted = new Promise(resolve => { markLoadStarted = resolve; });
+  class DelayedRepo extends MemoryRepo {
+    async load() {
+      markLoadStarted();
+      await loadGate;
+      return super.load();
+    }
+  }
+
+  const seen = [];
+  const repo = new DelayedRepo();
+  const vision = internalAgentEnvelope({ requiresVision:true });
+  vision.settings.routes[0].supportsVision = true;
+  repo.state.profile.aiRouter = structuredClone(vision.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(vision.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: {
+      async run(settings, runtime, prompt, options) {
+        seen.push(options.imageDataUrl);
+        return { text:'ok', runtime };
+      },
+    },
+  });
+  const payload = {
+    prompt:'agent',
+    maxOutputTokens:128,
+    imageDataUrl:'data:image/png;base64,ORIGINAL',
+  };
+  const pending = dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    payload,
+    {
+      agentModelOrchestratorEnvelope: vision,
+      providerCallBudgetContext: internalAgentBudgetContext(),
+    },
+  );
+  await loadStarted;
+  payload.imageDataUrl = 'data:image/png;base64,MUTATED';
+  releaseLoad();
+  const result = await pending;
+  assert.equal(result.result.text, 'ok');
+  assert.deepEqual(seen, ['data:image/png;base64,ORIGINAL']);
+});
+
+test('internal Agent image boundary rejects coercive text and accessors without executing getters', async () => {
+  let calls = 0;
+  let reads = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt:'agent', maxOutputTokens:128, imageDataUrl:' data:image/png;base64,AAAA ' },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /imageDataUrl must already be canonical text/u,
+  );
+
+  const payload = { prompt:'agent', maxOutputTokens:128 };
+  Object.defineProperty(payload, 'imageDataUrl', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'data:image/png;base64,AAAA';
+    },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      payload,
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /imageDataUrl must be an enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+  assert.equal(calls, 0);
+});
+
 test('internal Agent envelope authority widening fails before model invocation', async () => {
   let calls = 0;
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
