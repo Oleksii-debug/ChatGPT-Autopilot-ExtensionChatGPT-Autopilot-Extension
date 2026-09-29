@@ -437,3 +437,250 @@ export function projectSubagentTaskContextV1(input = {}) {
     priorParentCapsule: own(request, 'priorParentCapsule'),
   });
 }
+
+
+const DURABLE_TASK_CONTEXT_REQUEST_KEYS = new Set([
+  'schemaVersion',
+  'authorityEnvelope',
+  'taskEnvelope',
+  'expectedParentAgentId',
+  'expectedChildAgentId',
+  'expectedTaskId',
+  'expectedProjectRevisionId',
+  'capsuleId',
+]);
+const DURABLE_CONTEXT_RESOLUTION_KEYS = new Set([
+  'schemaVersion',
+  'workspaceRevision',
+  'projectId',
+  'projectRevisionId',
+  'snapshot',
+  'capsule',
+  'ownerStateSource',
+  'sourceAuthorityAuthenticated',
+  'retrievalAuthorized',
+  'executionAuthorized',
+  'mutationAuthorized',
+  'policyAuthority',
+]);
+
+function nonNegativeRevision(value, label) {
+  if (!Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
+    throw new Error(`${label} must be a non-negative safe integer`);
+  }
+  return value;
+}
+
+function normalizeDurableProjectContextResolutionV1(value, expected) {
+  const raw = strictRecord(
+    value,
+    DURABLE_CONTEXT_RESOLUTION_KEYS,
+    'ProjectWorkspaceContextResolutionV1',
+  );
+  if (own(raw, 'schemaVersion') !== 1) {
+    throw new Error('Unsupported ProjectWorkspaceContextResolutionV1 schemaVersion');
+  }
+
+  const workspaceRevision = nonNegativeRevision(
+    own(raw, 'workspaceRevision'),
+    'ProjectWorkspaceContextResolutionV1.workspaceRevision',
+  );
+  const projectId = exactId(
+    own(raw, 'projectId'),
+    'ProjectWorkspaceContextResolutionV1.projectId',
+  );
+  const projectRevisionId = exactId(
+    own(raw, 'projectRevisionId'),
+    'ProjectWorkspaceContextResolutionV1.projectRevisionId',
+  );
+  if (projectId !== expected.projectId) {
+    throw new Error('Durable Project context projectId binding mismatch');
+  }
+  if (projectRevisionId !== expected.expectedProjectRevisionId) {
+    throw new Error('Durable Project context revision binding mismatch');
+  }
+
+  const snapshot = normalizeProjectSnapshotV1(own(raw, 'snapshot'));
+  if (snapshot.projectId !== projectId || snapshot.revisionId !== projectRevisionId) {
+    throw new Error('Durable Project context snapshot binding mismatch');
+  }
+
+  let capsule = null;
+  const rawCapsule = own(raw, 'capsule');
+  if (rawCapsule != null) {
+    capsule = normalizeContextCapsuleV1(rawCapsule);
+    if (capsule.projectId !== projectId
+        || capsule.projectRevisionId !== projectRevisionId) {
+      throw new Error('Durable Project context capsule binding mismatch');
+    }
+  }
+  if (expected.capsuleId) {
+    if (!capsule || capsule.capsuleId !== expected.capsuleId) {
+      throw new Error('Durable Project context capsuleId binding mismatch');
+    }
+  } else if (capsule !== null) {
+    throw new Error('Durable Project context returned an unrequested capsule');
+  }
+
+  if (own(raw, 'ownerStateSource') !== 'DURABLE_PROJECT_WORKSPACE') {
+    throw new Error('Durable Project context ownerStateSource is not canonical');
+  }
+  exactFalse(
+    own(raw, 'sourceAuthorityAuthenticated'),
+    'ProjectWorkspaceContextResolutionV1.sourceAuthorityAuthenticated',
+  );
+  exactFalse(
+    own(raw, 'retrievalAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.retrievalAuthorized',
+  );
+  exactFalse(
+    own(raw, 'executionAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.executionAuthorized',
+  );
+  exactFalse(
+    own(raw, 'mutationAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.mutationAuthorized',
+  );
+  exactFalse(
+    own(raw, 'policyAuthority'),
+    'ProjectWorkspaceContextResolutionV1.policyAuthority',
+  );
+
+  return deepFreeze({
+    schemaVersion: 1,
+    workspaceRevision,
+    projectId,
+    projectRevisionId,
+    snapshot,
+    capsule,
+    ownerStateSource: 'DURABLE_PROJECT_WORKSPACE',
+    sourceAuthorityAuthenticated: false,
+    retrievalAuthorized: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    policyAuthority: false,
+  });
+}
+
+/**
+ * Resolve the exact parent Project context from the owner-injected canonical
+ * ProjectWorkspace resolver before projecting task-bound child-visible data.
+ *
+ * The resolver is a dependency, not a new persistence authority. Production
+ * wiring must supply ProjectWorkspaceRepository.resolveContext (or an
+ * equivalent canonical owner boundary). Resolver output is revalidated and may
+ * not grant retrieval, execution, mutation, policy, or source-authentication
+ * authority.
+ *
+ * Caller-controlled envelopes/tasks are normalized before the first await so an
+ * in-flight caller cannot swap identity, task inputs, or the requested Project
+ * revision while durable owner state is being resolved.
+ */
+export async function projectDurableSubagentTaskContextV1(
+  input = {},
+  resolveProjectContext,
+) {
+  if (typeof resolveProjectContext !== 'function') {
+    throw new Error('A canonical ProjectWorkspace context resolver is required');
+  }
+
+  const request = strictRecord(
+    input,
+    DURABLE_TASK_CONTEXT_REQUEST_KEYS,
+    'DurableSubagentTaskContextRequestV1',
+  );
+  if (own(request, 'schemaVersion') !== SUBAGENT_CONTEXT_PROJECTION_VERSION) {
+    throw new Error('Unsupported DurableSubagentTaskContextRequestV1 schemaVersion');
+  }
+
+  const normalizedEnvelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const authorityEnvelope = deepFreeze({
+    ...normalizedEnvelope,
+    toolDescriptors: [],
+  });
+  const taskEnvelope = deepFreeze(
+    normalizeSubagentTaskEnvelopeV1(own(request, 'taskEnvelope')),
+  );
+  const expectedParentAgentId = exactId(
+    own(request, 'expectedParentAgentId'),
+    'expectedParentAgentId',
+  );
+  const expectedChildAgentId = exactId(
+    own(request, 'expectedChildAgentId'),
+    'expectedChildAgentId',
+  );
+  const expectedTaskId = exactId(
+    own(request, 'expectedTaskId'),
+    'expectedTaskId',
+  );
+  const expectedProjectRevisionId = exactId(
+    own(request, 'expectedProjectRevisionId'),
+    'expectedProjectRevisionId',
+  );
+
+  if (taskEnvelope.projectId !== authorityEnvelope.projectId) {
+    throw new Error('Subagent task projectId does not match authority envelope');
+  }
+  if (taskEnvelope.parentAgentId !== authorityEnvelope.parentAgentId
+      || taskEnvelope.parentAgentId !== expectedParentAgentId) {
+    throw new Error('Subagent task parentAgentId binding mismatch');
+  }
+  if (taskEnvelope.childAgentId !== authorityEnvelope.childAgentId
+      || taskEnvelope.childAgentId !== expectedChildAgentId) {
+    throw new Error('Subagent task childAgentId binding mismatch');
+  }
+  if (taskEnvelope.taskId !== authorityEnvelope.taskId
+      || taskEnvelope.taskId !== expectedTaskId) {
+    throw new Error('Subagent task taskId binding mismatch');
+  }
+
+  const allowedSourceIds = new Set(authorityEnvelope.sourceIds);
+  const allowedArtifactIds = new Set(authorityEnvelope.artifactIds);
+  for (const sourceRef of taskEnvelope.inputSourceRefs) {
+    if (!allowedSourceIds.has(sourceRef.sourceId)) {
+      throw new Error(`Subagent task source is outside child authority: ${sourceRef.sourceId}`);
+    }
+  }
+  for (const artifactRef of taskEnvelope.inputArtifactRefs) {
+    if (!allowedArtifactIds.has(artifactRef.artifactId)) {
+      throw new Error(`Subagent task artifact is outside child authority: ${artifactRef.artifactId}`);
+    }
+  }
+
+  const resolverRequest = {
+    projectId: authorityEnvelope.projectId,
+    expectedProjectRevisionId,
+  };
+  if (Object.hasOwn(request, 'capsuleId')) {
+    resolverRequest.capsuleId = exactId(own(request, 'capsuleId'), 'capsuleId');
+  }
+  deepFreeze(resolverRequest);
+
+  const resolvedRaw = await resolveProjectContext(resolverRequest);
+  const resolved = normalizeDurableProjectContextResolutionV1(
+    resolvedRaw,
+    resolverRequest,
+  );
+
+  const projected = projectSubagentTaskContextV1({
+    schemaVersion: SUBAGENT_CONTEXT_PROJECTION_VERSION,
+    authorityEnvelope,
+    taskEnvelope,
+    expectedParentAgentId,
+    expectedChildAgentId,
+    expectedTaskId,
+    expectedProjectRevisionId,
+    parentProjectSnapshot: resolved.snapshot,
+    priorParentCapsule: resolved.capsule,
+  });
+
+  return deepFreeze({
+    ...projected,
+    workspaceRevision: resolved.workspaceRevision,
+    ownerStateSource: resolved.ownerStateSource,
+    sourceAuthorityAuthenticated: false,
+    sourceTrust: 'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED',
+  });
+}
