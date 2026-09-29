@@ -451,16 +451,22 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
   if (rawRevisions && typeof rawRevisions === 'object' && !Array.isArray(rawRevisions)) {
     const descriptors = Object.getOwnPropertyDescriptors(rawRevisions);
     for (const key of Object.keys(descriptors).sort().slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+      let providerId = '';
       try {
+        providerId = canonicalSpecialistProviderIdV1(key);
         const descriptor = descriptors[key];
-        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) continue;
-        const providerId = canonicalSpecialistProviderIdV1(key);
-        const revision = descriptor.value;
-        if (typeof revision === 'number' && Number.isSafeInteger(revision)
-            && !Object.is(revision, -0) && revision >= 1) {
-          revisions[providerId] = revision;
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+          throw new Error('Specialist provider revision entry must be an enumerable data property');
         }
-      } catch {}
+        const revision = descriptor.value;
+        if (typeof revision !== 'number' || !Number.isSafeInteger(revision)
+            || Object.is(revision, -0) || revision < 1) {
+          throw new Error('Specialist provider durable revision must be a positive safe integer');
+        }
+        revisions[providerId] = revision;
+      } catch {
+        if (providerId) quarantine[providerId] = true;
+      }
     }
   }
   if (!rawConfigs || typeof rawConfigs !== 'object' || Array.isArray(rawConfigs)) {
@@ -478,8 +484,8 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
       if (config.providerId !== providerId) throw new Error('Specialist provider config key drifted from providerId');
       if (Object.hasOwn(quarantine, providerId)) continue;
       const recordedRevision = revisions[providerId] || config.revision;
-      if (recordedRevision < config.revision) {
-        throw new Error('Specialist provider durable revision trails active config revision');
+      if (recordedRevision !== config.revision) {
+        throw new Error('Specialist provider durable revision drifted from active config revision');
       }
       revisions[providerId] = recordedRevision;
       configs[providerId] = config;
