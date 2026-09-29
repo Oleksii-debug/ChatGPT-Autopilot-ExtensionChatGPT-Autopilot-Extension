@@ -354,6 +354,10 @@ test('Agent model-policy UI uses persistent native labels and removes inactive s
       id + ' needs an explicit native label',
     );
   }
+  assert.match(
+    html,
+    /agent-definition-model-route-policy-configured" type="checkbox">Зберігати окрему Router policy[^<]*Якщо вимкнено — успадковувати глобальну Router policy/u,
+  );
   assert.match(html, /Збереження policy не вибирає модель, не запускає provider і не запускає Agent/u);
   assert.match(
     source,
