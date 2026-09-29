@@ -437,3 +437,43 @@ test('owner-bound claim fails closed when trusted readiness becomes stale before
   assert.equal(persisted.handoffs[0].state, 'READY');
   assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
 });
+
+
+test('registry drift after admission blocks owner-bound claim before lease authority is acquired', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  await manager.mutateSpecialistRegistry({
+    registryId: 'specialists:project-1',
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedRegistryBindingKey: registry.nextRegistry.bindingKey,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: specialistDefinition.specialistId,
+    expectedDefinitionRevision: 1,
+    definition: {
+      ...specialistDefinition,
+      enabled: false,
+      definitionRevision: 2,
+    },
+  });
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }),
+    /registry drifted after durable admission|selection registry identity, revision or bindingKey drifted/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
