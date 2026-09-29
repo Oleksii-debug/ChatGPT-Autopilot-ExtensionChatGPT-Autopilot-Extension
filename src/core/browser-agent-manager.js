@@ -102,6 +102,7 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
+const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
@@ -839,7 +840,7 @@ function normalizeRuntime(raw, now) {
   const specialistDelegationAdmissions = normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions);
   let specialistProviderExecutionQuarantined = raw.specialistProviderExecutionQuarantined === true;
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
-    ? raw.specialistProviderExecutions.slice(0, 128).flatMap(item => {
+    ? raw.specialistProviderExecutions.slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS).flatMap(item => {
       try {
         const execution = normalizeSpecialistProviderExecutionV1(item);
         const assignment = specialistHandoffs.find(candidate => candidate?.agentId === execution.agentId);
@@ -1791,28 +1792,44 @@ export class BrowserAgentManager {
   }
 
   executeClaimedSpecialistProvider(id, payload = {}, dependencies = null) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      SPECIALIST_PROVIDER_EXECUTE_KEYS,
-      'Browser Agent Specialist provider execute request',
-    );
-    for (const key of ['agentId', 'conversationId', 'expectedControlEpoch']) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider execute request requires ${key}`);
+    let request;
+    try {
+      request = snapshotExactOwnDataRequest(
+        payload,
+        SPECIALIST_PROVIDER_EXECUTE_KEYS,
+        'Browser Agent Specialist provider execute request',
+      );
+      for (const key of ['agentId', 'conversationId', 'expectedControlEpoch']) {
+        if (!Object.hasOwn(request, key)) {
+          throw new Error(`Browser Agent Specialist provider execute request requires ${key}`);
+        }
       }
+      if (typeof request.agentId !== 'string' || !request.agentId) {
+        throw new Error('Browser Agent Specialist provider execute agentId must be exact text');
+      }
+      if (typeof request.conversationId !== 'string' || !request.conversationId) {
+        throw new Error('Browser Agent Specialist provider execute conversationId must be exact text');
+      }
+      if (!Number.isSafeInteger(request.expectedControlEpoch)
+          || request.expectedControlEpoch < 0
+          || Object.is(request.expectedControlEpoch, -0)) {
+        throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
+      }
+      const admittedAt = new Date(this.now()).toISOString();
+      const requestedAt = specialistRequestTimestamp(request.at, admittedAt, 'Browser Agent Specialist provider execute at');
+      if (requestedAt > admittedAt) {
+        throw new Error('Browser Agent Specialist provider execute at cannot be in the future');
+      }
+    } catch (error) {
+      return Promise.reject(error);
     }
-    if (typeof request.agentId !== 'string' || !request.agentId) {
-      throw new Error('Browser Agent Specialist provider execute agentId must be exact text');
-    }
-    if (typeof request.conversationId !== 'string' || !request.conversationId) {
-      throw new Error('Browser Agent Specialist provider execute conversationId must be exact text');
-    }
-    if (!Number.isSafeInteger(request.expectedControlEpoch)
-        || request.expectedControlEpoch < 0
-        || Object.is(request.expectedControlEpoch, -0)) {
-      throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
-    }
-    const inFlightKey = `specialist-provider:${id}:${request.agentId}:${request.conversationId}:${request.expectedControlEpoch}`;
+    const inFlightKey = JSON.stringify([
+      'specialist-provider',
+      id,
+      request.agentId,
+      request.conversationId,
+      request.expectedControlEpoch,
+    ]);
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
     const operation = this.#executeClaimedSpecialistProvider(id, request, dependencies)
       .finally(() => this.inFlight.delete(inFlightKey));
@@ -1837,15 +1854,10 @@ export class BrowserAgentManager {
         this.now(),
       );
     }
-    const preparedAt = specialistRequestTimestamp(
-      request.at,
-      new Date(this.now()).toISOString(),
-      'Browser Agent Specialist provider execute at',
-    );
-
     let prepared = null;
     let providerRequest = null;
     await this.update(async store => {
+      const preparedAt = new Date(this.now()).toISOString();
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING
@@ -1905,13 +1917,11 @@ export class BrowserAgentManager {
       const executions = Array.isArray(job.runtime.specialistProviderExecutions)
         ? job.runtime.specialistProviderExecutions
         : [];
-      const existing = executions.find(item => item?.agentId === request.agentId);
+      const existing = executions.find(item =>
+        item?.agentId === request.agentId && item?.leaseId === assignment.leaseId);
       if (existing) {
-        const canonical = normalizeSpecialistProviderExecutionV1(existing);
-        if (canonical.leaseId === assignment.leaseId) {
-          throw new Error('Existing Specialist provider execution requires reconciliation before redispatch');
-        }
-        throw new Error('Specialist provider execution already exists for this assignment identity');
+        normalizeSpecialistProviderExecutionV1(existing);
+        throw new Error('Existing Specialist provider execution requires reconciliation before redispatch');
       }
 
       prepared = createSpecialistProviderExecutionV1({
@@ -1926,7 +1936,7 @@ export class BrowserAgentManager {
         providerConfig: normalizedProviderConfig,
         at: preparedAt,
       });
-      job.runtime.specialistProviderExecutions = [...executions, prepared];
+      job.runtime.specialistProviderExecutions = [...executions, prepared].slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS);
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
@@ -1974,6 +1984,18 @@ export class BrowserAgentManager {
           at: cancelledAt,
         });
         job.runtime.specialistProviderExecutions = executions.map((item, index2) => index2 === index ? cancelled : item);
+        const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+        const ownershipIndex = ownerships.findIndex(item =>
+          item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+        if (ownershipIndex < 0) {
+          throw new Error('Cancelled Specialist provider dispatch lacks exact execution ownership');
+        }
+        ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
+          leaseId: prepared.leaseId,
+          reason: 'Provider effect was not dispatched after owner control changed; trusted NO_EFFECT verification is required before retry.',
+          at: cancelledAt,
+        });
+        job.runtime.specialistExecutionOwnerships = ownerships;
         job.runtime.updatedAt = this.now();
         appendHistory(job.runtime, {
           at: this.now(),
@@ -1988,11 +2010,30 @@ export class BrowserAgentManager {
     }
 
     let rawOutcome = null;
+    let providerOutcome = null;
     let providerError = null;
+    const invalidProviderOutcome = () => new OpenHandsCodingSpecialistError(
+      'Specialist provider returned an invalid outcome after dispatch',
+      {
+        code: 'SPECIALIST_PROVIDER_INVALID_OUTCOME',
+        conversationId: prepared.conversationId,
+        effectMayHaveOccurred: true,
+        reconciliationRequired: true,
+        safeToRetry: false,
+      },
+    );
     try {
       rawOutcome = await providerRequest.client.execute(providerRequest.input);
     } catch (error) {
       providerError = error;
+    }
+    if (!providerError) {
+      try {
+        providerOutcome = snapshotOwnDataRequest(rawOutcome, 'Specialist provider outcome');
+        if (Object.keys(providerOutcome).length > 64) throw new Error('Specialist provider outcome contains too many fields');
+      } catch {
+        providerError = invalidProviderOutcome();
+      }
     }
 
     const observedAt = new Date(this.now()).toISOString();
@@ -2028,32 +2069,49 @@ export class BrowserAgentManager {
           at: observedAt,
         });
       } else {
-        outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
-          providerStatus: rawOutcome.providerStatus,
-          providerSucceeded: rawOutcome.providerSucceeded === true,
-          manualReviewRequired: rawOutcome.manualReviewRequired === true,
-          reconciliationRequired: rawOutcome.reconciliationRequired === true,
-          safeToRetry: rawOutcome.safeToRetry === true,
-          effectEvidence: rawOutcome.effectEvidence || '',
-          errorCode: '',
-          providerUpdatedAt: rawOutcome.providerUpdatedAt || '',
-          providerObservedAt: rawOutcome.providerObservedAt || '',
-          at: observedAt,
-        });
+        try {
+          outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
+            providerStatus: providerOutcome.providerStatus,
+            providerSucceeded: providerOutcome.providerSucceeded === true,
+            manualReviewRequired: providerOutcome.manualReviewRequired === true,
+            reconciliationRequired: providerOutcome.reconciliationRequired === true,
+            safeToRetry: providerOutcome.safeToRetry === true,
+            effectEvidence: providerOutcome.effectEvidence || '',
+            errorCode: '',
+            providerUpdatedAt: providerOutcome.providerUpdatedAt || '',
+            providerObservedAt: providerOutcome.providerObservedAt || '',
+            at: observedAt,
+          });
+        } catch {
+          providerError = invalidProviderOutcome();
+          outcome = recordSpecialistProviderExecutionOutcomeV1(currentExecution, {
+            providerStatus: '',
+            providerSucceeded: false,
+            manualReviewRequired: false,
+            reconciliationRequired: true,
+            safeToRetry: false,
+            effectEvidence: '',
+            errorCode: providerError.code,
+            at: observedAt,
+          });
+        }
       }
       job.runtime.specialistProviderExecutions = executions.map((item, index2) => index2 === index ? outcome : item);
-      if (outcome.reconciliationRequired || outcome.manualReviewRequired) {
+      if (outcome.reconciliationRequired || outcome.manualReviewRequired || outcome.safeToRetry) {
         const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const ownershipIndex = ownerships.findIndex(item =>
           item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
         if (ownershipIndex < 0) {
-          throw new Error('Specialist provider ambiguous outcome lacks exact execution ownership');
+          throw new Error('Specialist provider nonterminal outcome lacks exact execution ownership');
         }
+        const reason = outcome.reconciliationRequired
+          ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
+          : outcome.manualReviewRequired
+            ? `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`
+            : `Specialist provider reported retryable no-effect failure: ${outcome.errorCode || 'trusted NO_EFFECT verification required'}`;
         ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
           leaseId: prepared.leaseId,
-          reason: outcome.reconciliationRequired
-            ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
-            : `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`,
+          reason,
           at: observedAt,
         });
         job.runtime.specialistExecutionOwnerships = ownerships;
