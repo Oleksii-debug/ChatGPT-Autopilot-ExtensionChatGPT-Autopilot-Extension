@@ -79,22 +79,57 @@ function sourceIdentity(source) {
 }
 
 function snapshotRevisionHistory(project, snapshot) {
-  const raw = project.snapshotRevisionIds;
-  if (raw === undefined) return [snapshot.revisionId];
-  if (!Array.isArray(raw)) throw new Error('Project workspace snapshotRevisionIds must be an array');
-  if (raw.length < 1 || raw.length > MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
+  const field = Object.getOwnPropertyDescriptor(project, 'snapshotRevisionIds');
+  if (!field) return [snapshot.revisionId];
+  if (field.enumerable !== true || !hasOwn(field, 'value')) {
+    throw new Error('Project workspace snapshotRevisionIds must be an enumerable own data property');
+  }
+  const raw = field.value;
+  if (!Array.isArray(raw) || Object.getPrototypeOf(raw) !== Array.prototype) {
+    throw new Error('Project workspace snapshotRevisionIds must be a canonical array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length)
+      || Object.is(length, -0)
+      || length < 1
+      || length > MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
     throw new Error('Project workspace snapshot revision history limit exceeded');
   }
+  const values = new Array(length);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
+      throw new Error('Project workspace snapshotRevisionIds contains non-index field');
+    }
+    const index = Number(key);
+    const descriptor = descriptors[key];
+    if (!Number.isSafeInteger(index)
+        || index < 0
+        || index >= length
+        || String(index) !== key
+        || !descriptor
+        || descriptor.enumerable !== true
+        || !hasOwn(descriptor, 'value')) {
+      throw new Error('Project workspace snapshotRevisionIds must contain dense enumerable data entries');
+    }
+    values[index] = descriptor.value;
+  }
+  for (let index = 0; index < length; index += 1) {
+    if (!hasOwn(descriptors, String(index))) {
+      throw new Error('Project workspace snapshotRevisionIds must be dense');
+    }
+  }
   const seen = new Set();
-  for (const value of raw) {
+  for (const value of values) {
     const revisionId = workspaceId(value, 'snapshotRevisionId');
     if (seen.has(revisionId)) throw new Error('Project workspace snapshot revision history contains duplicate revisionId');
     seen.add(revisionId);
   }
-  if (raw[raw.length - 1] !== snapshot.revisionId) {
+  if (values[values.length - 1] !== snapshot.revisionId) {
     throw new Error('Project workspace snapshot revision history does not end at current snapshot');
   }
-  return raw;
+  return values;
 }
 
 function sameCanonicalData(left, right) {
