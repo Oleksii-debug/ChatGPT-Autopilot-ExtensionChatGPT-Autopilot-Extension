@@ -294,3 +294,56 @@ test('owner-bound delegation profile caps lease inside product-wide claim author
   const persisted = await manager.listSpecialistHandoffs('job.research');
   assert.equal(persisted.handoffs[0].leaseExpiresAt, '2026-09-29T03:16:00.000Z');
 });
+
+
+test('owner-bound maxConcurrentHandoffs caps a wider legacy claim', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+
+  await manager.update(store => {
+    const job = store.byId['job.research'];
+    const first = job.runtime.plan.nodes[0];
+    job.runtime.plan = {
+      ...job.runtime.plan,
+      nodes: [
+        first,
+        {
+          ...first,
+          nodeId: 'local:research-2',
+          title: 'Specialist research 2',
+          objective: 'Research bounded evidence 2.',
+          conflictKeys: ['artifact:research-2'],
+        },
+        {
+          ...first,
+          nodeId: 'local:research-3',
+          title: 'Specialist research 3',
+          objective: 'Research bounded evidence 3.',
+          conflictKeys: ['artifact:research-3'],
+        },
+      ],
+    };
+    return store;
+  });
+
+  for (const nodeId of ['local:research', 'local:research-2', 'local:research-3']) {
+    await manager.prepareDefinitionSpecialistDelegation('job.research', {
+      expectedRegistryRevision: registry.nextRegistryRevision,
+      expectedPlanRevision: 4,
+      nodeId,
+      at: '2026-09-29T03:05:00.000Z',
+    });
+  }
+
+  const claimed = await manager.claimSpecialistHandoffs('job.research', {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 2);
+  assert.equal(claimed.assignments.filter(item => item.state === 'LEASED').length, 2);
+  assert.equal(claimed.assignments.filter(item => item.state === 'READY').length, 1);
+});
