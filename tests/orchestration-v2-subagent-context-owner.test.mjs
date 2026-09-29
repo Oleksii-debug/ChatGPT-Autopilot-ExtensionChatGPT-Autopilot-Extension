@@ -330,6 +330,7 @@ test('orchestration owner resolves exact durable task binding before projecting 
   assert.equal(result.generation, 1);
   assert.equal(result.activationPurpose, OrchestrationActivationPurpose.WORK);
   assert.equal(result.providerId, 'provider.main');
+  assert.equal(result.authorityEnvelopeIdentity, task.authorityEnvelopeIdentity);
   assert.equal(result.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
   assert.equal(result.parentProjectRevisionId, 'project-r2');
   assert.equal(result.sourceTrust, 'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED');
@@ -362,7 +363,7 @@ test('durable child context uses persisted authority provenance and rejects prov
       invocationId: 'invocation-child-1',
       authorityEnvelope: authorityEnvelope({ providerId: 'provider.other' }),
     }, 'orch-1'),
-    /authority provenance collision/,
+    /authority envelope does not match task identity/,
   );
   assert.deepEqual(
     chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
@@ -462,7 +463,7 @@ test('orchestration owner context request rejects authority aliases and accessor
 });
 
 
-test('durable context rejects substituted least-authority envelope before Project workspace lookup', async () => {
+test('durable context rejects corrupted persisted authority provenance before Project workspace lookup', async () => {
   let resolverCalls = 0;
   const projectWorkspaceRepository = {
     async resolveContext() {
@@ -470,18 +471,35 @@ test('durable context rejects substituted least-authority envelope before Projec
       throw new Error('workspace resolver must not be reached for authority substitution');
     },
   };
-  const { manager, task, registered } = await fixture({ projectWorkspaceRepository });
-  const substitutedAuthority = authorityEnvelope({
-    capabilityIds: ['cap.read', 'cap.extra'],
-  });
+  const { chrome, manager, task, registered } = await fixture({ projectWorkspaceRepository });
+  const registry = chrome.data['autopilotOrchestrationV2Runtime:orch-1']
+    .subagentTaskActivationBindingRegistry;
+  registry.records[0].authorityEnvelope.capabilityIds = ['cap.extra', 'cap.read'];
+
   await assert.rejects(
     () => manager.resolveDurableSubagentTaskContext(
-      contextRequest(task, registered.binding.bindingId, {
-        authorityEnvelope: substitutedAuthority,
-      }),
+      contextRequest(task, registered.binding.bindingId),
       'orch-1',
     ),
-    /authority envelope does not match task activation identity/u,
+    /durable subagent authority provenance does not match task identity/u,
   );
   assert.equal(resolverCalls, 0);
+});
+
+
+test('durable authority provenance survives manager restart without caller envelope input', async () => {
+  const { chrome, manager, task, registered } = await fixture();
+  const restarted = new OrchestrationV2Manager({
+    coreRepository: manager.coreRepository,
+    chromeApi: chrome,
+    projectWorkspaceRepository: new ProjectWorkspaceRepository(chrome),
+    createId: () => 'unused',
+    now: () => Date.parse(T2) + 60_000,
+  });
+  const result = await restarted.resolveDurableSubagentTaskContext(
+    contextRequest(task, registered.binding.bindingId),
+    'orch-1',
+  );
+  assert.equal(result.providerId, 'provider.main');
+  assert.equal(result.authorityEnvelopeIdentity, task.authorityEnvelopeIdentity);
 });
