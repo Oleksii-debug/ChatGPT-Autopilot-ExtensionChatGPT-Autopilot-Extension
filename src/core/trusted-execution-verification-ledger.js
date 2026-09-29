@@ -74,6 +74,26 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
+function assertIntrinsicRecordChronology(record) {
+  const verifiedAt = Date.parse(record.verification.verifiedAt);
+  const recordedAt = Date.parse(record.recordedAt);
+  const validThrough = Date.parse(record.validThrough);
+  if (recordedAt < verifiedAt) {
+    throw new Error('Trusted execution verification record predates its verification');
+  }
+  if (validThrough < recordedAt) {
+    throw new Error('Trusted execution verification record validity interval is invalid');
+  }
+  for (const artifact of record.evidenceArtifacts) {
+    if (Date.parse(artifact.createdAt) > verifiedAt) {
+      throw new Error(
+        `Trusted execution verification evidence postdates verification: ${artifact.artifactId}`,
+      );
+    }
+  }
+  return record;
+}
+
 function denseRecords(value) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error('Trusted execution verification ledger records must be a bounded plain array');
@@ -104,26 +124,6 @@ function denseRecords(value) {
     );
   }
   return records;
-}
-
-function assertIntrinsicRecordChronology(record) {
-  const verifiedAt = Date.parse(record.verification.verifiedAt);
-  const recordedAt = Date.parse(record.recordedAt);
-  const validThrough = Date.parse(record.validThrough);
-  if (recordedAt < verifiedAt) {
-    throw new Error('Trusted execution verification record predates its verification');
-  }
-  if (validThrough < recordedAt) {
-    throw new Error('Trusted execution verification record validity interval is invalid');
-  }
-  for (const artifact of record.evidenceArtifacts) {
-    if (Date.parse(artifact.createdAt) > verifiedAt) {
-      throw new Error(
-        `Trusted execution verification evidence postdates verification: ${artifact.artifactId}`,
-      );
-    }
-  }
-  return record;
 }
 
 function canonicalJson(value) {
@@ -210,12 +210,15 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
   if (raw.schemaVersion !== TRUSTED_EXECUTION_VERIFICATION_LEDGER_VERSION) {
     throw new Error('Unsupported trusted execution verification ledger schemaVersion');
   }
+
   const records = denseRecords(raw.records);
-  if (raw.revision !== records.length) {
+  const revision = exactRevision(raw.revision);
+  if (revision !== records.length) {
     throw new Error(
       'Trusted execution verification ledger revision must exactly match append history',
     );
   }
+
   const recordIds = new Set();
   const verificationIds = new Set();
   const executionVerificationKeys = new Set();
@@ -225,6 +228,7 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
       throw new Error(`Duplicate trusted execution verification recordId: ${record.recordId}`);
     }
     recordIds.add(record.recordId);
+
     const verificationId = record.verification.verificationId;
     if (verificationIds.has(verificationId)) {
       throw new Error(
@@ -232,6 +236,7 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
       );
     }
     verificationIds.add(verificationId);
+
     const executionKey = [
       record.taskId,
       record.planId,
@@ -254,16 +259,16 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
     }
     executionVerificationKeys.add(bindingKey);
   }
+
   return deepFreeze({
     schemaVersion: TRUSTED_EXECUTION_VERIFICATION_LEDGER_VERSION,
-    revision: exactRevision(raw.revision),
+    revision,
     records,
   });
 }
 
 export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordInput) {
   const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
-  const canonicalInputLedger = Object.isFrozen(ledgerInput) ? ledgerInput : null;
   const record = assertIntrinsicRecordChronology(
     normalizeTrustedExecutionVerificationRecordV1(recordInput),
   );
@@ -273,7 +278,7 @@ export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordIn
     if (!sameCanonicalRecord(byRecordId, record)) {
       throw new Error('Trusted execution verification recordId is append-only and cannot be rewritten');
     }
-    return canonicalInputLedger || ledger;
+    return ledger;
   }
 
   const verificationId = record.verification.verificationId;
@@ -286,7 +291,7 @@ export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordIn
         'Trusted execution verification verificationId is append-only and cannot be rebound',
       );
     }
-    return canonicalInputLedger || ledger;
+    return ledger;
   }
 
   if (ledger.records.length >= MAX_TRUSTED_EXECUTION_VERIFICATION_RECORDS) {
@@ -347,7 +352,7 @@ export class TrustedExecutionVerificationLedgerRepository {
     const operation = this.updateQueue.then(async () => {
       const current = await this.load();
       const next = appendTrustedExecutionVerificationRecordV1(current, recordInput);
-      if (next !== current) await this.save(next);
+      if (next.revision !== current.revision) await this.save(next);
       return next;
     });
     this.updateQueue = operation.catch(() => undefined);
