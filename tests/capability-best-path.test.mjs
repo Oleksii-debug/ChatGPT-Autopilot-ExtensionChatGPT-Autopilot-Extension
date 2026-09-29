@@ -16,23 +16,30 @@ function candidate({
   ready = true,
   setupRequired = false,
   sourceRevision = 1,
+  sourceId = 'inventory.local',
+  observedAt = '2026-09-29T04:00:00.000Z',
+  validThrough = '2026-09-29T05:00:00.000Z',
 } = {}) {
   return {
     schemaVersion: 1,
     candidateId,
     providerId,
+    sourceId,
     pathKind,
     capabilityIds,
     enabled,
     ready,
     setupRequired,
     sourceRevision,
+    observedAt,
+    validThrough,
   };
 }
 
 test('best path prefers deterministic path classes and never grants authority', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read'],
     candidates: [
       candidate({ candidateId: 'vision', pathKind: CapabilityPathKind.VISION }),
@@ -62,6 +69,7 @@ test('best path prefers deterministic path classes and never grants authority', 
 test('unready, disabled, setup-required and capability-incomplete candidates cannot win', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read', 'repo.write'],
     candidates: [
       candidate({
@@ -110,6 +118,7 @@ test('unready, disabled, setup-required and capability-incomplete candidates can
 test('ranking is deterministic and uses least surplus within the same path kind', () => {
   const first = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read'],
     candidates: [
       candidate({
@@ -134,6 +143,7 @@ test('ranking is deterministic and uses least surplus within the same path kind'
   });
   const second = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read'],
     candidates: [
       candidate({
@@ -166,6 +176,7 @@ test('ranking is deterministic and uses least surplus within the same path kind'
 test('setup-required API remains blocked instead of silently outranking a ready fallback', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['mail.read'],
     candidates: [
       candidate({
@@ -190,9 +201,65 @@ test('setup-required API remains blocked instead of silently outranking a ready 
   assert.equal(result.authority.authenticationAuthorized, false);
 });
 
+test('stale and future readiness observations cannot win recommendation', () => {
+  const result = recommendCapabilityBestPathV1({
+    schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
+    requiredCapabilityIds: ['repo.read'],
+    candidates: [
+      candidate({
+        candidateId: 'api-stale',
+        pathKind: CapabilityPathKind.API,
+        observedAt: '2026-09-29T03:00:00.000Z',
+        validThrough: '2026-09-29T04:00:00.000Z',
+      }),
+      candidate({
+        candidateId: 'cli-future',
+        pathKind: CapabilityPathKind.CLI,
+        observedAt: '2026-09-29T04:45:00.000Z',
+        validThrough: '2026-09-29T05:00:00.000Z',
+      }),
+      candidate({
+        candidateId: 'uia-current',
+        pathKind: CapabilityPathKind.UIA,
+      }),
+    ],
+  });
+
+  assert.equal(result.selected.candidate.candidateId, 'uia-current');
+  assert.equal(result.asOf, '2026-09-29T04:30:00.000Z');
+  assert.deepEqual(
+    Object.fromEntries(result.blocked.map(item => [item.candidate.candidateId, item.reason])),
+    {
+      'api-stale': 'STALE',
+      'cli-future': 'FUTURE_OBSERVATION',
+    },
+  );
+  assert.equal(result.selected.candidate.sourceId, 'inventory.local');
+  assert.equal(result.selected.candidate.sourceRevision, 1);
+});
+
+test('invalid candidate validity window is blocked rather than treated as readiness', () => {
+  const result = recommendCapabilityBestPathV1({
+    schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
+    requiredCapabilityIds: ['repo.read'],
+    candidates: [
+      candidate({
+        candidateId: 'api-invalid-window',
+        observedAt: '2026-09-29T04:20:00.000Z',
+        validThrough: '2026-09-29T04:10:00.000Z',
+      }),
+    ],
+  });
+  assert.equal(result.selected, null);
+  assert.equal(result.blocked[0].reason, 'INVALID_VALIDITY_WINDOW');
+});
+
 test('no eligible candidate returns null selected without manufacturing permission', () => {
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['calendar.write'],
     candidates: [
       candidate({
@@ -225,6 +292,7 @@ test('candidate and request admission reject unknown/accessor authority without 
 
   const request = {
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read'],
     candidates: [candidate({ candidateId: 'safe' })],
   };
@@ -290,6 +358,7 @@ test('normalized output is deeply frozen and independent of caller mutation', ()
   });
   const result = recommendCapabilityBestPathV1({
     schemaVersion: 1,
+    asOf: '2026-09-29T04:30:00.000Z',
     requiredCapabilityIds: ['repo.read'],
     candidates: [raw],
   });
