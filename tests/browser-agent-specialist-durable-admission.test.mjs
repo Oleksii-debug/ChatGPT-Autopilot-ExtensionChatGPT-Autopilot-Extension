@@ -128,8 +128,8 @@ async function setup(manager) {
 }
 
 test('automatic Agent delegation consumes the canonical durable Specialist registry and persists one idempotent handoff', async () => {
-  const { chrome } = chromeStorage();
-  const manager = managerFor(chrome);
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
   const registry = await setup(manager);
 
   const request = {
@@ -149,6 +149,12 @@ test('automatic Agent delegation consumes the canonical durable Specialist regis
   const persisted = await manager.listSpecialistHandoffs('job.research');
   assert.equal(persisted.handoffs.length, 1);
   assert.equal(persisted.executionOwnerships.length, 1);
+  const admissions = storage.data.autopilotBrowserAgentV1.byId['job.research'].runtime.specialistDelegationAdmissions;
+  assert.equal(admissions.length, 1);
+  assert.equal(admissions[0].agentId, first.assignment.agentId);
+  assert.equal(admissions[0].selection.specialistId, 'specialist.research.local');
+  assert.equal(admissions[0].selection.providerId, 'provider.local');
+  assert.equal(admissions[0].selection.registryId, 'specialists:project-1');
 });
 
 test('caller cannot inject a Specialist registry and durable registry revision drift fails closed', async () => {
