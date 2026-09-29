@@ -189,8 +189,14 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     requestedToolIds,
   };
 
+  if (request.projectId && !ID.test(request.projectId)) {
+    throw new Error('Project ID must be a canonical identity');
+  }
   const jobId = boundedText(raw.jobId || '', 'Job ID', 128, { optional: true });
-  if (jobId) request.jobId = jobId;
+  if (jobId) {
+    if (!ID.test(jobId)) throw new Error('Job ID must be a canonical identity');
+    request.jobId = jobId;
+  }
 
   return Object.freeze(request);
 }
