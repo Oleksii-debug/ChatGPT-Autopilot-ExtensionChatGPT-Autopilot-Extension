@@ -1287,19 +1287,25 @@ test('owner drift during durable PREPARED recovery records reconciliation rather
   });
   clock.value = Date.parse(T1);
 
-  const operation = manager.executeClaimedSpecialistProvider('job.coder', {
+  const originalGet = manager.get.bind(manager);
+  let injectedOwnerDrift = false;
+  manager.get = async (...args) => {
+    if (!injectedOwnerDrift) {
+      injectedOwnerDrift = true;
+      await manager.update(store => {
+        store.byId['job.coder'].runtime.controlEpoch += 1;
+        store.byId['job.coder'].runtime.runState = 'PAUSED';
+        return store;
+      });
+    }
+    return originalGet(...args);
+  };
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
     agentId,
     conversationId: '70707070-7070-4707-8707-707070707070',
     expectedControlEpoch: 0,
     at: T1,
   });
-  await Promise.resolve();
-  await manager.update(store => {
-    store.byId['job.coder'].runtime.controlEpoch += 1;
-    store.byId['job.coder'].runtime.runState = 'PAUSED';
-    return store;
-  });
-  const result = await operation;
   assert.equal(result.kind, 'SPECIALIST_PROVIDER_NOT_DISPATCHED');
   assert.equal(result.execution.status, 'RECONCILE');
   assert.equal(result.execution.safeToRetry, false);
