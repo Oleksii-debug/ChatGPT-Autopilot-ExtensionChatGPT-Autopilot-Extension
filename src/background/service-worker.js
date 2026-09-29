@@ -746,9 +746,11 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
+    const delegation = structuredClone(message.payload?.delegation || {});
+    delete delegation.at;
     result = await browserAgent.prepareDefinitionSpecialistDelegation(
       message.payload?.id || '',
-      message.payload?.delegation || {},
+      delegation,
     );
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
@@ -759,11 +761,15 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'UPDATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.updateConfig(message.payload?.id || '', message.payload?.config || {});
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
+    const handoff = structuredClone(message.payload?.handoff || {});
+    delete handoff.at;
+    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', handoff);
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
+    const claim = structuredClone(message.payload?.claim || {});
+    delete claim.at;
     result = await browserAgent.claimSpecialistHandoffs(
       message.payload?.id || '',
-      message.payload?.claim || {},
+      claim,
       { specialistProviderReadinessResolver },
     );
   } else if (message.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION') {
