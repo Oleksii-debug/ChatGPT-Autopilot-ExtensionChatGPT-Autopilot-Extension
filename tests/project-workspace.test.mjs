@@ -495,3 +495,58 @@ test('repository context resolver supports an exact snapshot-only request with c
   assert.equal(resolved.capsule, null);
   assert.equal(resolved.workspaceRevision, 1);
 });
+
+
+test('context capsule identity is idempotent-only and cannot be substituted under the same durable id', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const first = putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+  const replay = putProjectContextCapsule(workspace, capsule(), { nowMs: 50 });
+  assert.equal(replay, first);
+  assert.equal(workspace.projectsById['project-a'].updatedAt, 3);
+
+  assert.throws(
+    () => putProjectContextCapsule(workspace, {
+      ...capsule(),
+      summary: 'Substituted durable child context.',
+    }, { nowMs: 51 }),
+    /capsuleId cannot be reused for different content/,
+  );
+  assert.equal(
+    workspace.projectsById['project-a'].capsulesById['capsule-1'].summary,
+    'Current state.',
+  );
+});
+
+test('canonical repository update cannot delete or substitute an existing durable context capsule', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      delete workspace.projectsById['project-a'].capsulesById['capsule-1'];
+      return workspace;
+    }, { nowMs: 4 }),
+    /cannot remove an existing context capsule/,
+  );
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].capsulesById['capsule-1'] = {
+        ...workspace.projectsById['project-a'].capsulesById['capsule-1'],
+        summary: 'Substituted through generic update.',
+      };
+      return workspace;
+    }, { nowMs: 5 }),
+    /capsuleId cannot be reused for different content/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.projectsById['project-a'].capsulesById['capsule-1'].summary, 'Current state.');
+});
