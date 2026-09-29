@@ -312,7 +312,40 @@ test('orchestration owner refuses activation bindings without an authority-bound
       taskEnvelope: unbound,
       activationAction: prepared.actions[0],
       invocationId: 'invocation-unbound',
+      authorityEnvelope: authorityEnvelope(),
     }, 'orch-1'),
     /requires task-bound authority envelope identity/u,
   );
+});
+
+
+test('registration requires durable authority provenance before owner-state mutation', async () => {
+  const { chrome, manager, prepared, canonicalTaskEnvelope } = await fixture();
+  const before = structuredClone(chrome.data['autopilotOrchestrationV2Runtime:orch-1']);
+  await assert.rejects(
+    () => manager.registerSubagentTaskActivationBinding({
+      taskEnvelope: canonicalTaskEnvelope,
+      activationAction: prepared.actions[0],
+      invocationId: 'invocation-no-authority',
+    }, 'orch-1'),
+    /missing field: authorityEnvelope/u,
+  );
+  assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'], before);
+});
+
+test('registration rejects authority-envelope identity substitution before owner-state mutation', async () => {
+  const { chrome, manager, prepared, canonicalTaskEnvelope } = await fixture();
+  const before = structuredClone(chrome.data['autopilotOrchestrationV2Runtime:orch-1']);
+  const substituted = authorityEnvelope();
+  substituted.providerId = 'provider.other';
+  await assert.rejects(
+    () => manager.registerSubagentTaskActivationBinding({
+      taskEnvelope: canonicalTaskEnvelope,
+      activationAction: prepared.actions[0],
+      invocationId: 'invocation-provider-substitution',
+      authorityEnvelope: substituted,
+    }, 'orch-1'),
+    /authority envelope does not match task identity/u,
+  );
+  assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'], before);
 });
