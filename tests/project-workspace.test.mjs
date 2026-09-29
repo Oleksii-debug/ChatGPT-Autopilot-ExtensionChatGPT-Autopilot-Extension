@@ -409,3 +409,30 @@ test('durable workspace resolution composes with least-authority child projectio
     'parent project title must not cross the child context boundary',
   );
 });
+
+
+test('canonical repository update rejects same-revision snapshot substitution without durable advance', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].snapshot = {
+        ...workspace.projectsById['project-a'].snapshot,
+        title: 'Substituted through generic update',
+      };
+      return workspace;
+    }, { nowMs: 3 }),
+    /revisionId cannot be reused for different content/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.updatedAt, 2);
+  assert.equal(restored.projectsById['project-a'].snapshot.title, 'Project A');
+  assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
+});
