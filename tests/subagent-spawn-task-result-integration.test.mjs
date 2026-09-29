@@ -16,6 +16,7 @@ import {
   validateOrchestrationHierarchyRuntimeV1,
 } from '../src/core/orchestration-hierarchy.js';
 import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
+import { projectSubagentTaskContextV1 } from '../src/core/subagent-context-projection.js';
 import { createSubagentResultEnvelopeV1 } from '../src/core/subagent-result-envelope.js';
 import {
   SubagentResultReconciliationDecision,
@@ -607,4 +608,65 @@ test('trusted dynamic child result reaches canonical parent reconciliation end t
     terminal.runtime.nodesById[CHILD_ID].lastTerminalStatus,
     'COMPLETED',
   );
+});
+
+
+test('canonical spawn authority and canonical task envelope compose into task-bound Project context', () => {
+  const spawn = spawnTask();
+  assert.equal(spawn.decision, 'ALLOW');
+
+  const authorityEnvelope = spawn.authorityBindings[0].authorityEnvelope;
+  const taskEnvelope = spawn.taskBindings[0].taskEnvelope;
+  const inputArtifact = artifactRef('artifact.input', { sha256: '1'.repeat(64) });
+
+  const projected = projectSubagentTaskContextV1({
+    schemaVersion: 1,
+    authorityEnvelope,
+    taskEnvelope,
+    expectedParentAgentId: 'root',
+    expectedChildAgentId: CHILD_ID,
+    expectedTaskId: 'task.e2e',
+    expectedProjectRevisionId: 'project-revision.e2e',
+    parentProjectSnapshot: {
+      schemaVersion: 1,
+      projectId: 'project.e2e',
+      revisionId: 'project-revision.e2e',
+      title: 'Parent-only title must not cross into child context.',
+      sourceRefs: [{
+        schemaVersion: 1,
+        sourceId: 'source.repo',
+        projectId: 'project.e2e',
+        kind: 'document',
+        uri: 'project://source.repo',
+        revisionId: 'rev-1',
+        contentSha256: '4'.repeat(64),
+        observedAt: T0,
+        authority: 'CANONICAL',
+        metadata: {},
+      }],
+      artifactRefs: [inputArtifact],
+      createdAt: T0,
+    },
+    priorParentCapsule: null,
+  });
+
+  assert.equal(projected.parentAgentId, 'root');
+  assert.equal(projected.childAgentId, CHILD_ID);
+  assert.equal(projected.taskId, 'task.e2e');
+  assert.deepEqual(
+    projected.projectedSnapshot.sourceRefs.map(item => item.sourceId),
+    ['source.repo'],
+  );
+  assert.deepEqual(
+    projected.projectedSnapshot.artifactRefs.map(item => item.artifactId),
+    ['artifact.input'],
+  );
+  assert.equal(
+    JSON.stringify(projected).includes('Parent-only title must not cross'),
+    false,
+  );
+  assert.equal(projected.sourceTrust, 'CALLER_BOUND_NOT_AUTHENTICATED');
+  assert.equal(projected.retrievalAuthorized, false);
+  assert.equal(projected.executionAuthorized, false);
+  assert.equal(projected.policyAuthority, false);
 });
