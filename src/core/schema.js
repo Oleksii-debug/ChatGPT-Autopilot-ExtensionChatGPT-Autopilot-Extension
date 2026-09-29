@@ -4,6 +4,10 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import {
+  createTrustedOutcomeVerificationLedgerV1,
+  validateTrustedOutcomeVerificationLedgerStateV1,
+} from './trusted-outcome-verification-ledger.js';
 import { validateOutcomeContractRegistryV1 } from './outcome-contract-control.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
@@ -71,6 +75,7 @@ export function createEmptyState(now = Date.now()) {
     diagnostics: [],
     migrationHistory: [],
     outcomeContractsById: {},
+    trustedOutcomeVerificationLedger: structuredClone(createTrustedOutcomeVerificationLedgerV1()),
   };
 }
 
@@ -348,6 +353,7 @@ export function validateState(state) {
   }
   if (!Array.isArray(state.migrationHistory)) throw new Error('Invalid migrationHistory');
   if (state.outcomeContractsById !== undefined) validateOutcomeContractRegistryV1(state.outcomeContractsById);
+  validateTrustedOutcomeVerificationLedgerStateV1(state);
 
   const sessionIds = Object.keys(state.sessionsById);
   if (sessionIds.length !== state.sessionOrder.length || sessionIds.some(id => !state.sessionOrder.includes(id))) {

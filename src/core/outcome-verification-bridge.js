@@ -271,7 +271,7 @@ function normalizeTrustedEvidenceArtifacts(value, verification) {
   return byId;
 }
 
-function normalizeTrustedVerificationRecord(input) {
+export function normalizeTrustedOutcomeVerificationRecordV1(input) {
   const raw = record(input, 'TrustedVerificationRecordV1');
   exactKeys(raw, TRUSTED_RECORD_KEYS, 'TrustedVerificationRecordV1');
   if (raw.schemaVersion !== OUTCOME_VERIFICATION_BRIDGE_VERSION) {
@@ -518,7 +518,7 @@ export async function adjudicateOutcomeVerificationV1(
           + row.verificationId,
       );
     }
-    const trustedRecord = normalizeTrustedVerificationRecord(rawTrustedRecord);
+    const trustedRecord = normalizeTrustedOutcomeVerificationRecordV1(rawTrustedRecord);
     if (trustedRecord.verification.verificationId !== row.verificationId) {
       throw new Error('Trusted verification record verificationId is mismatched');
     }

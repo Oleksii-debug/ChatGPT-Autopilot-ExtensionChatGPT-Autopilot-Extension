@@ -23,6 +23,9 @@ const DIMENSIONS = Object.freeze([
 
 const LIMIT_KEYS = new Set(DIMENSIONS.map(dimension => `max${dimension[0].toUpperCase()}${dimension.slice(1)}`));
 const USAGE_KEYS = new Set(DIMENSIONS);
+const EVALUATION_REQUEST_KEYS = new Set(['budget', 'usage', 'request']);
+const CHILD_BUDGET_REQUEST_KEYS = new Set(['parentBudget', 'parentUsage', 'requestedBudget']);
+const USAGE_NORMALIZATION_OPTION_KEYS = new Set(['label']);
 const MAX_BY_DIMENSION = Object.freeze({
   concurrentAgents: 100_000,
   childAgents: 100_000,
@@ -37,14 +40,17 @@ function object(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be own data properties`);
     }
+    snapshot[key] = descriptor.value;
   }
-  return value;
+  return snapshot;
 }
 
 function exact(raw, allowed, label) {
@@ -53,9 +59,23 @@ function exact(raw, allowed, label) {
   }
 }
 
+function record(value, allowed, label) {
+  const raw = object(value, label);
+  exact(raw, allowed, label);
+  return raw;
+}
+
 function own(raw, key) {
   if (!Object.hasOwn(raw, key)) return undefined;
   return Object.getOwnPropertyDescriptor(raw, key).value;
+}
+
+function exactLabel(value, fallback) {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 200) {
+    throw new Error('Resource usage normalization label is invalid');
+  }
+  return value;
 }
 
 function boundedInteger(value, label, max, fallback = 0) {
@@ -81,8 +101,7 @@ function limitKey(dimension) {
 }
 
 export function normalizeResourceBudgetV1(input = {}) {
-  const raw = object(input, 'ResourceBudgetV1');
-  exact(raw, LIMIT_KEYS, 'ResourceBudgetV1');
+  const raw = record(input, LIMIT_KEYS, 'ResourceBudgetV1');
   const entries = [];
   for (const dimension of DIMENSIONS) {
     const key = limitKey(dimension);
@@ -91,9 +110,14 @@ export function normalizeResourceBudgetV1(input = {}) {
   return frozen(Object.fromEntries(entries));
 }
 
-export function normalizeResourceUsageV1(input = {}, { label = 'ResourceUsageV1' } = {}) {
-  const raw = object(input, label);
-  exact(raw, USAGE_KEYS, label);
+export function normalizeResourceUsageV1(input = {}, options = {}) {
+  const optionRecord = record(
+    options,
+    USAGE_NORMALIZATION_OPTION_KEYS,
+    'Resource usage normalization options',
+  );
+  const label = exactLabel(own(optionRecord, 'label'), 'ResourceUsageV1');
+  const raw = record(input, USAGE_KEYS, label);
   const entries = [];
   for (const dimension of DIMENSIONS) {
     entries.push([dimension, boundedInteger(own(raw, dimension), `${label} ${dimension}`, MAX_BY_DIMENSION[dimension])]);
@@ -112,10 +136,17 @@ export function remainingResourceBudgetV1(budgetInput, usageInput = {}) {
   return frozen(Object.fromEntries(entries));
 }
 
-export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = {}) {
+export function evaluateResourceBudgetV1(input = {}) {
+  const raw = record(input, EVALUATION_REQUEST_KEYS, 'Resource budget evaluation request');
+  const budget = own(raw, 'budget');
+  const usage = own(raw, 'usage');
+  const request = own(raw, 'request');
   const normalizedBudget = normalizeResourceBudgetV1(budget);
-  const normalizedUsage = normalizeResourceUsageV1(usage);
-  const normalizedRequest = normalizeResourceUsageV1(request, { label: 'ResourceRequestV1' });
+  const normalizedUsage = normalizeResourceUsageV1(usage === undefined ? {} : usage);
+  const normalizedRequest = normalizeResourceUsageV1(
+    request === undefined ? {} : request,
+    { label: 'ResourceRequestV1' },
+  );
   const exceeded = [];
   const projectedEntries = [];
   const remainingEntries = [];
@@ -145,8 +176,15 @@ export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = 
  * Narrows a requested child budget to the parent's currently remaining
  * envelope. This never expands authority and performs no reservation itself.
  */
-export function deriveChildResourceBudgetV1({ parentBudget, parentUsage = {}, requestedBudget } = {}) {
-  const remaining = remainingResourceBudgetV1(parentBudget, parentUsage);
+export function deriveChildResourceBudgetV1(input = {}) {
+  const raw = record(input, CHILD_BUDGET_REQUEST_KEYS, 'Child resource budget request');
+  const parentBudget = own(raw, 'parentBudget');
+  const parentUsage = own(raw, 'parentUsage');
+  const requestedBudget = own(raw, 'requestedBudget');
+  const remaining = remainingResourceBudgetV1(
+    parentBudget,
+    parentUsage === undefined ? {} : parentUsage,
+  );
   const requested = normalizeResourceBudgetV1(requestedBudget);
   const entries = [];
   for (const dimension of DIMENSIONS) {
