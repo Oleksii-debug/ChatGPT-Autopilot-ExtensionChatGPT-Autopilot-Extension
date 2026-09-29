@@ -32,6 +32,12 @@ export const AGENT_SELF_REPAIR_MODEL_INVOCATION_AUTHORITY = Object.freeze({
 const INPUT_KEYS = new Set([
   'selfRepairModelIntent',
   'currentSelfRepairModelBindingKey',
+  'currentProjectId',
+  'currentDefinitionModelPolicyBindingKey',
+  'currentModelPolicyBindingKey',
+  'currentParentModelPolicyBindingKey',
+  'currentRoutePoolRevision',
+  'currentSelfRepairDispatchRouteId',
   'orchestratorEnvelope',
   'providerCallBudgetContext',
   'prompt',
@@ -76,6 +82,16 @@ function exactBindingKey(value, label) {
       || value.length < 1
       || value.length > 100_000
       || value !== value.trim()) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function exactId(value, label) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > 180) {
     throw new Error(label + ' is invalid');
   }
   return value;
@@ -182,6 +198,33 @@ export function prepareBoundAgentSelfRepairModelInvocationV1(input) {
   const envelope = normalizeBoundAgentModelOrchestratorEnvelopeV1(
     raw.orchestratorEnvelope,
   );
+  const currentProjectId = exactId(raw.currentProjectId, 'currentProjectId');
+  const currentDefinitionModelPolicyBindingKey = exactBindingKey(
+    raw.currentDefinitionModelPolicyBindingKey,
+    'currentDefinitionModelPolicyBindingKey',
+  );
+  const currentModelPolicyBindingKey = exactBindingKey(
+    raw.currentModelPolicyBindingKey,
+    'currentModelPolicyBindingKey',
+  );
+  const currentRoutePoolRevision = exactPositiveInteger(
+    raw.currentRoutePoolRevision,
+    'currentRoutePoolRevision',
+  );
+  const currentSelfRepairDispatchRouteId = exactId(
+    raw.currentSelfRepairDispatchRouteId,
+    'currentSelfRepairDispatchRouteId',
+  );
+  const currentParentModelPolicyBindingKey = Object.hasOwn(
+    raw,
+    'currentParentModelPolicyBindingKey',
+  )
+    ? exactBindingKey(
+      raw.currentParentModelPolicyBindingKey,
+      'currentParentModelPolicyBindingKey',
+    )
+    : null;
+
   if (envelope.jobId !== intent.ownerId) {
     throw new Error('Agent self-repair orchestrator envelope owner drifted from current work owner');
   }
@@ -189,6 +232,22 @@ export function prepareBoundAgentSelfRepairModelInvocationV1(input) {
       || envelope.requiresVision !== intent.routeIntent.requiresVision
       || !sameCanonicalIds(envelope.capabilityIds, intent.routeIntent.capabilityIds)) {
     throw new Error('Agent self-repair orchestrator envelope drifted from durable route intent');
+  }
+  if (envelope.projectId !== currentProjectId) {
+    throw new Error('Agent self-repair orchestrator envelope Project identity is stale');
+  }
+  if (envelope.definitionModelPolicyBindingKey !== currentDefinitionModelPolicyBindingKey
+      || envelope.modelPolicyBindingKey !== currentModelPolicyBindingKey) {
+    throw new Error('Agent self-repair orchestrator envelope model-policy provenance is stale');
+  }
+  if (envelope.routePoolRevision !== currentRoutePoolRevision) {
+    throw new Error('Agent self-repair orchestrator envelope route-pool revision is stale');
+  }
+  if (envelope.routeId !== currentSelfRepairDispatchRouteId) {
+    throw new Error('Agent self-repair orchestrator envelope route drifted from current dispatch');
+  }
+  if ((envelope.parentModelPolicyBindingKey ?? null) !== currentParentModelPolicyBindingKey) {
+    throw new Error('Agent self-repair orchestrator envelope parent policy provenance is stale');
   }
 
   const currentNow = exactTimestamp(raw.currentNow, 'currentNow');
