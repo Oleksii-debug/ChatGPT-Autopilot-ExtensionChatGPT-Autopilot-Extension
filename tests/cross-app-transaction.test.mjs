@@ -605,3 +605,36 @@ test('exact-effect state timestamps preserve causal order before projection', as
     /updatedAt cannot predate createdAt/,
   );
 });
+
+
+test('rejects negative-zero aliases in transaction invocation fingerprints and exact-effect attempts', async () => {
+  const positiveZero = invocation('invoke-positive-zero', 'github', 'github.mutate', {
+    arguments: { amount: 0, nested: [0] },
+  });
+  await assert.doesNotReject(
+    () => createCrossAppInvocationFingerprintV1(positiveZero),
+  );
+
+  const negativeZero = invocation('invoke-negative-zero', 'github', 'github.mutate', {
+    arguments: { amount: 0, nested: [-0] },
+  });
+  await assert.rejects(
+    () => createCrossAppInvocationFingerprintV1(negativeZero),
+    /negative zero/u,
+  );
+
+  const negativeAttemptState = {
+    ...exactEffectState(INV_RELEASE, 'PREPARED'),
+    attempt: -0,
+  };
+  const resolver = {
+    async loadExactEffectState(invocationId) {
+      return invocationId === INV_RELEASE.invocationId ? negativeAttemptState : null;
+    },
+  };
+
+  await assert.rejects(
+    () => projectCrossAppTransactionV1(transaction(), resolver),
+    /attempt is invalid/u,
+  );
+});

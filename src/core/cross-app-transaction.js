@@ -145,7 +145,8 @@ function canonicalJson(value, label, depth = 0) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
-    return Object.is(value, -0) ? 0 : value;
+    if (Object.is(value, -0)) throw new Error(`${label} contains negative zero`);
+    return value;
   }
   if (Array.isArray(value)) {
     const items = denseArray(value, label, 4096);
@@ -383,7 +384,11 @@ async function assertExactEffectEnvelope(input, label, cryptoApi) {
   if (typeof input.phase !== 'string' || !Object.values(ExactEffectPhase).includes(input.phase)) {
     throw new Error(`${label}.phase is invalid`);
   }
-  if (typeof input.attempt !== 'number' || !Number.isInteger(input.attempt) || input.attempt < 0 || input.attempt > 64) {
+  if (typeof input.attempt !== 'number'
+      || !Number.isInteger(input.attempt)
+      || Object.is(input.attempt, -0)
+      || input.attempt < 0
+      || input.attempt > 64) {
     throw new Error(`${label}.attempt is invalid`);
   }
   if (typeof input.executionId !== 'string') throw new Error(`${label}.executionId must be text`);
