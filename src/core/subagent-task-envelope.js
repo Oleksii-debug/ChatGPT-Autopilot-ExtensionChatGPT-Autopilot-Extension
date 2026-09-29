@@ -10,12 +10,14 @@ export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
+const AUTHORITY_ENVELOPE_IDENTITY = /^subagent-authority:[a-f0-9]{64}$/u;
 const MAX_REFS = 256;
 const INPUT_KEYS = new Set([
   'envelopeId',
   'projectId',
   'parentAgentId',
   'childAgentId',
+  'authorityEnvelopeIdentity',
   'plan',
   'nodeId',
   'inputSourceIds',
@@ -29,6 +31,7 @@ const ENVELOPE_KEYS = new Set([
   'projectId',
   'parentAgentId',
   'childAgentId',
+  'authorityEnvelopeIdentity',
   'taskId',
   'planId',
   'planRevision',
@@ -105,6 +108,13 @@ function id(value, label) {
 function sha256(value, label) {
   if (typeof value !== 'string' || !SHA256.test(value)) {
     throw new Error(label + ' must be an exact lowercase SHA-256 digest');
+  }
+  return value;
+}
+
+function authorityEnvelopeIdentity(value, label) {
+  if (typeof value !== 'string' || !AUTHORITY_ENVELOPE_IDENTITY.test(value)) {
+    throw new Error(label + ' must be an exact subagent authority-envelope identity');
   }
   return value;
 }
@@ -336,6 +346,14 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
     projectId: id(own(raw, 'projectId', 'SubagentTaskEnvelopeV1'), 'projectId'),
     parentAgentId,
     childAgentId,
+    ...(Object.hasOwn(raw, 'authorityEnvelopeIdentity')
+      ? {
+          authorityEnvelopeIdentity: authorityEnvelopeIdentity(
+            raw.authorityEnvelopeIdentity,
+            'authorityEnvelopeIdentity',
+          ),
+        }
+      : {}),
     taskId: id(own(raw, 'taskId', 'SubagentTaskEnvelopeV1'), 'taskId'),
     planId: id(own(raw, 'planId', 'SubagentTaskEnvelopeV1'), 'planId'),
     planRevision: integer(own(raw, 'planRevision', 'SubagentTaskEnvelopeV1'), 'planRevision', 1),
@@ -464,6 +482,14 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
     projectId,
     parentAgentId,
     childAgentId,
+    ...(Object.hasOwn(raw, 'authorityEnvelopeIdentity')
+      ? {
+          authorityEnvelopeIdentity: authorityEnvelopeIdentity(
+            raw.authorityEnvelopeIdentity,
+            'authorityEnvelopeIdentity',
+          ),
+        }
+      : {}),
     taskId: node.nodeId,
     planId: plan.planId,
     planRevision: plan.revision,

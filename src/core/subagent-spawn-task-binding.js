@@ -7,6 +7,7 @@ import {
   deriveSubagentTaskDispatchIdentityV1,
   normalizeSubagentTaskEnvelopeV1,
 } from './subagent-task-envelope.js';
+import { deriveSubagentAuthorityEnvelopeIdentityV1 } from './subagent-authority-envelope.js';
 
 export const SUBAGENT_SPAWN_TASK_BINDING_VERSION = 1;
 
@@ -280,6 +281,9 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
         projectId: authority.projectId,
         parentAgentId: authority.parentNodeId,
         childAgentId: binding.childNodeId,
+        authorityEnvelopeIdentity: deriveSubagentAuthorityEnvelopeIdentityV1(
+          binding.authorityEnvelope,
+        ),
         plan: own(request, 'plan', 'SubagentSpawnTaskBindingRequestV1'),
         nodeId: binding.taskId,
         inputSourceIds: own(spec.raw, 'inputSourceIds', 'taskEnvelopeSpec'),

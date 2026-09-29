@@ -19,6 +19,7 @@ import {
   resolveSubagentTaskActivationEvidenceV1,
 } from './subagent-task-activation-binding-registry.js';
 import { deriveSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
+import { deriveSubagentAuthorityEnvelopeIdentityV1 } from './subagent-authority-envelope.js';
 import {
   deriveSubagentTaskDispatchIdentityV1,
   normalizeSubagentTaskEnvelopeV1,
@@ -670,6 +671,10 @@ export class OrchestrationV2Manager {
    */
   async registerSubagentTaskActivationBinding(input = {}, id = '') {
     const request = snapshotSubagentBindingRegistration(input);
+    const taskEnvelope = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
+    if (!taskEnvelope.authorityEnvelopeIdentity) {
+      throw new Error('Subagent activation binding requires task-bound authority envelope identity');
+    }
     const ownerBoundAt = new Date(this.now()).toISOString();
 
     const meta = await this.loadMeta();
@@ -684,7 +689,7 @@ export class OrchestrationV2Manager {
         throw new Error('Durable orchestration hierarchy is required for subagent activation binding');
       }
       const derived = deriveSubagentTaskActivationBindingV1({
-        taskEnvelope: request.taskEnvelope,
+        taskEnvelope,
         graph: hierarchy.graph,
         runtime: hierarchy.state,
         activationAction: request.activationAction,
@@ -759,6 +764,15 @@ export class OrchestrationV2Manager {
   async resolveDurableSubagentTaskContext(input = {}, id = '') {
     const request = snapshotSubagentContextResolution(input);
     const task = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
+    if (!task.authorityEnvelopeIdentity) {
+      throw new Error('Durable subagent context requires task-bound authority envelope identity');
+    }
+    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
+      request.authorityEnvelope,
+    );
+    if (authorityEnvelopeIdentity !== task.authorityEnvelopeIdentity) {
+      throw new Error('Subagent authority envelope does not match task activation identity');
+    }
     const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
     const bindingLookup = plainSubagentBindingLookup({
       bindingId: request.bindingId,
@@ -808,6 +822,7 @@ export class OrchestrationV2Manager {
       orchestraId,
       bindingId: binding.bindingId,
       taskDispatchIdentity,
+      authorityEnvelopeIdentity,
       activationId: binding.activationId,
       generation: binding.generation,
       activationPurpose: binding.activationPurpose,
