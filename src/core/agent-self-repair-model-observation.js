@@ -114,11 +114,10 @@ function modelOutputText(value) {
   if (typeof value !== 'string' || value.length > MAX_MODEL_OUTPUT_TEXT) {
     throw new Error('Agent self-repair model output text is invalid or too large');
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
+  if (!value.trim()) {
     throw new Error('Agent self-repair model output text must not be empty');
   }
-  return trimmed;
+  return value;
 }
 
 function safeCounter(value, label) {
