@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   RecipeCandidateAdmissionStatus,
-  admitTrustedRecipeCandidateV1,
+  prepareTrustedRecipeCandidateAdmissionV1,
 } from '../src/core/recipe-candidate-admission.js';
 import {
   RecipeParameterKind,
@@ -166,7 +166,7 @@ function options(overrides = {}) {
 
 test('admits an independently bound compiler candidate as one exact registry extension without execution authority', async () => {
   const lookups = { trace: [], sources: [], evidence: [], scan: [] };
-  const result = await admitTrustedRecipeCandidateV1(request(), options({
+  const result = await prepareTrustedRecipeCandidateAdmissionV1(request(), options({
     resolveTrustedRecipeTrace: async lookup => {
       lookups.trace.push(lookup);
       return trace();
@@ -197,7 +197,7 @@ test('admits an independently bound compiler candidate as one exact registry ext
     },
   }));
 
-  assert.equal(result.status, RecipeCandidateAdmissionStatus.CANDIDATE_ADMITTED);
+  assert.equal(result.status, RecipeCandidateAdmissionStatus.READY_FOR_REGISTRY_CAS);
   assert.equal(result.previousRegistryRevision, 1);
   assert.equal(result.nextRegistryRevision, 2);
   assert.equal(result.nextRegistry.revision, 2);
@@ -211,13 +211,16 @@ test('admits an independently bound compiler candidate as one exact registry ext
   assert.equal(result.sourceTrust, 'TRUSTED_RESOLVER');
   assert.equal(result.evidenceTrust, 'TRUSTED_ARTIFACT_REFS');
   assert.equal(result.secretScanTrust, 'TRUSTED_RESOLVER');
-  assert.equal(result.registryAdmissionAuthorized, true);
+  assert.equal(result.registryAdmissionReady, true);
+  assert.equal(result.registryAdmissionAuthorized, false);
+  assert.equal(result.registryPersistenceAuthorized, false);
   assert.equal(result.replayAuthorized, false);
   assert.equal(result.promotionAuthorized, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.permissionGranted, false);
   assert.equal(result.policyDecisionGranted, false);
   assert.equal(result.exactEffectAuthorized, false);
+  assert.equal(result.requiresCanonicalRegistryCompareAndSwap, true);
   assert.equal(result.requiresTrustedReplayEvaluation, true);
   assert.equal(result.requiresCanonicalPolicyDecision, true);
   assert.equal(result.requiresCanonicalExactEffect, true);
@@ -269,7 +272,7 @@ test('stale or foreign registry expectation fails before any trusted resolver is
   });
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({ expectedRegistryRevision: 2 }),
       deps,
     ),
@@ -278,7 +281,7 @@ test('stale or foreign registry expectation fails before any trusted resolver is
   assert.equal(calls, 0);
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({ expectedRegistryId: 'foreign-registry' }),
       deps,
     ),
@@ -292,7 +295,7 @@ test('caller-declared VERIFIED is insufficient when trusted trace content differ
   changed.steps[0].verificationEvidenceSha256 = SHA_D;
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({ resolveTrustedRecipeTrace: async () => changed }),
     ),
@@ -313,7 +316,7 @@ test('trusted trace resolver output remains descriptor-safe and cannot smuggle a
   });
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({ resolveTrustedRecipeTrace: async () => hostile }),
     ),
@@ -324,7 +327,7 @@ test('trusted trace resolver output remains descriptor-safe and cannot smuggle a
   const aliased = trace();
   aliased.permissionGranted = true;
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({ resolveTrustedRecipeTrace: async () => aliased }),
     ),
@@ -334,7 +337,7 @@ test('trusted trace resolver output remains descriptor-safe and cannot smuggle a
 
 test('original Recipe sources require exact canonical identity, revision and bytes before admission', async () => {
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedRecipeSourceBinding: async lookup => ({
@@ -348,7 +351,7 @@ test('original Recipe sources require exact canonical identity, revision and byt
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedRecipeSourceBinding: async lookup => ({
@@ -363,7 +366,7 @@ test('original Recipe sources require exact canonical identity, revision and byt
 
   let reads = 0;
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedRecipeSourceBinding: async lookup => {
@@ -391,7 +394,7 @@ test('original Recipe sources require exact canonical identity, revision and byt
 
 test('every evidence ArtifactRef must exact-match trusted artifact identity, bytes and chronology', async () => {
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedEvidenceArtifact: async lookup =>
@@ -402,7 +405,7 @@ test('every evidence ArtifactRef must exact-match trusted artifact identity, byt
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedEvidenceArtifact: async lookup =>
@@ -413,7 +416,7 @@ test('every evidence ArtifactRef must exact-match trusted artifact identity, byt
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedEvidenceArtifact: async lookup =>
@@ -430,7 +433,7 @@ test('one exact trusted evidence artifact may support multiple verified steps wi
   sharedInput.trace.steps[1].verificationEvidenceSha256 = SHA_C;
   let evidenceResolutions = 0;
 
-  const result = await admitTrustedRecipeCandidateV1(
+  const result = await prepareTrustedRecipeCandidateAdmissionV1(
     request({ compilerInput: sharedInput }),
     options({
       resolveTrustedRecipeTrace: async () => sharedInput.trace,
@@ -448,7 +451,7 @@ test('one exact trusted evidence artifact may support multiple verified steps wi
 
 test('secret scan is exact-subject, clean, independent and causal', async () => {
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedSecretScan: async () => ({
@@ -466,7 +469,7 @@ test('secret scan is exact-subject, clean, independent and causal', async () => 
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedSecretScan: async lookup => ({
@@ -484,7 +487,7 @@ test('secret scan is exact-subject, clean, independent and causal', async () => 
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedSecretScan: async lookup => ({
@@ -502,7 +505,7 @@ test('secret scan is exact-subject, clean, independent and causal', async () => 
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request(),
       options({
         resolveTrustedSecretScan: async lookup => ({
@@ -550,7 +553,7 @@ test('candidate must append exactly one version to the current immutable Recipe 
     admittedAt: '2026-09-25T06:22:00.000Z',
   });
 
-  const result = await admitTrustedRecipeCandidateV1(v2Request, options({
+  const result = await prepareTrustedRecipeCandidateAdmissionV1(v2Request, options({
     recipeRegistry: registry,
     resolveTrustedRecipeTrace: async () => trustedVersion2Trace,
     resolveTrustedEvidenceArtifact: async lookup => artifactForLookup(
@@ -579,7 +582,7 @@ test('candidate must append exactly one version to the current immutable Recipe 
     trace: trustedVersion2Trace,
   });
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({
         expectedRegistryRevision: 7,
         compilerInput: skipped,
@@ -607,7 +610,7 @@ test('nested compiler input accessors are rejected by the canonical compiler wit
   });
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({ compilerInput: nested }),
       options(),
     ),
@@ -628,7 +631,7 @@ test('request and trusted result boundaries reject authority aliases/accessors w
     },
   });
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(hostile, options()),
+    () => prepareTrustedRecipeCandidateAdmissionV1(hostile, options()),
     /enumerable own data property/u,
   );
   assert.equal(reads, 0);
@@ -636,7 +639,7 @@ test('request and trusted result boundaries reject authority aliases/accessors w
   const aliased = request();
   aliased.executionAuthorized = true;
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(aliased, options()),
+    () => prepareTrustedRecipeCandidateAdmissionV1(aliased, options()),
     /unknown field: executionAuthorized/u,
   );
 
@@ -663,7 +666,7 @@ test('request and trusted result boundaries reject authority aliases/accessors w
     },
   });
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(request(), hostileScanOptions),
+    () => prepareTrustedRecipeCandidateAdmissionV1(request(), hostileScanOptions),
     /enumerable own data property/u,
   );
   assert.equal(reads, 0);
@@ -671,7 +674,7 @@ test('request and trusted result boundaries reject authority aliases/accessors w
 
 test('admission chronology fails closed before registry mutation', async () => {
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({ admittedAt: '2026-09-25T05:59:59.000Z' }),
       options(),
     ),
@@ -679,7 +682,7 @@ test('admission chronology fails closed before registry mutation', async () => {
   );
 
   await assert.rejects(
-    () => admitTrustedRecipeCandidateV1(
+    () => prepareTrustedRecipeCandidateAdmissionV1(
       request({ admittedAt: '2026-09-25T06:10:29.000Z' }),
       options(),
     ),
