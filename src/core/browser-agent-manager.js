@@ -73,6 +73,7 @@ import {
   materializeBoundAgentSpecialistDelegationIntentV1,
   normalizeAgentSpecialistDelegationBindingV1,
 } from './agent-specialist-delegation-profile.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -1157,6 +1158,103 @@ export class BrowserAgentManager {
         ? { parentInvocationId: request.parentInvocationId }
         : {}),
     }));
+  }
+
+  async prepareDefinitionSpecialistDelegation(id, payload = {}) {
+    const allowed = new Set(['registry','expectedRegistryRevision','expectedPlanRevision','nodeId','at','childBudget','parentInvocationId']);
+    const request = snapshotExactOwnDataRequest(payload, allowed, 'Browser Agent definition specialist delegation request');
+    for (const key of ['registry','expectedRegistryRevision','expectedPlanRevision','nodeId']) {
+      if (!Object.hasOwn(request, key)) throw new Error(`Browser Agent definition specialist delegation request requires ${key}`);
+    }
+    const registry = normalizeSpecialistRegistryV1(request.registry);
+    if (Object.hasOwn(request, 'childBudget')) {
+      request.childBudget = snapshotAgentDefinitionLaunchRecord(request.childBudget, 'Browser Agent definition specialist delegation childBudget', 3);
+    }
+    if (Object.hasOwn(request, 'parentInvocationId') && typeof request.parentInvocationId !== 'string') {
+      throw new Error('Browser Agent definition specialist delegation parentInvocationId must be exact text');
+    }
+    const at = specialistRequestTimestamp(request.at, new Date(this.now()).toISOString(), 'Browser Agent definition specialist delegation at');
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
+      if (!job.definitionSelection || !job.specialistDelegationBinding || !job.definitionScope) {
+        throw new Error('Browser Agent job has no durable Agent-definition specialist delegation authority');
+      }
+      if (!job.config?.projectId) throw new Error('Browser Agent definition specialist delegation requires a Project-bound job');
+      if (!job.runtime?.plan) throw new Error('Browser Agent has no durable plan for specialist delegation');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.jobId !== job.id) throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      const intent = materializeBoundAgentSpecialistDelegationIntentV1({
+        binding: job.specialistDelegationBinding,
+        jobId: job.id,
+        projectId: job.config.projectId,
+        agentDefinitionRegistryId: job.definitionSelection.registryId,
+        agentDefinitionRegistryRevision: job.definitionSelection.registryRevision,
+        agentDefinitionId: job.definitionSelection.agentDefinitionId,
+        definitionRevision: job.definitionSelection.definitionRevision,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedPlanRevision: request.expectedPlanRevision,
+        nodeId: request.nodeId,
+        at,
+        ...(Object.hasOwn(request, 'childBudget') ? { childBudget: request.childBudget } : {}),
+        ...(Object.hasOwn(request, 'parentInvocationId') ? { parentInvocationId: request.parentInvocationId } : {}),
+      });
+      if (registry.registryId !== intent.request.registryId || registry.revision !== intent.request.expectedRegistryRevision) {
+        throw new Error('Specialist registry identity or revision drifted before durable delegation');
+      }
+      if (plan.revision !== intent.request.expectedPlanRevision) throw new Error('Browser Agent AgentPlan revision drifted before durable delegation');
+      if (!plan.nodes.some(node => node.nodeId === intent.request.nodeId)) throw new Error('Browser Agent AgentPlan node not found before durable delegation');
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        plan,
+        expectedPlanRevision: intent.request.expectedPlanRevision,
+        nodeId: intent.request.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: intent.request.requiredCapabilityIds,
+        requiredToolIds: intent.request.requiredToolIds,
+        policyEnvelopeId: intent.request.policyEnvelopeId,
+        deadlineAt: intent.request.deadlineAt,
+        priority: intent.request.priority,
+        ...(Object.hasOwn(intent.request, 'childBudget') ? { childBudget: intent.request.childBudget } : {}),
+        ...(intent.request.parentInvocationId ? { parentInvocationId: intent.request.parentInvocationId } : {}),
+        at,
+      });
+      const assignment = proposal.preview.assignment;
+      const executionOwnership = proposal.preview.executionOwnership;
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const existing = handoffs.find(item => item?.agentId === assignment.agentId);
+      if (existing) {
+        const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
+        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
+        if (JSON.stringify(existing) !== JSON.stringify(assignment)
+            || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
+          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+        }
+        result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
+        return store;
+      }
+      job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'agent-definition-specialist-delegation-prepared',
+        nodeId: proposal.nodeId,
+        agentId: assignment.agentId,
+        specialistId: proposal.selection.specialistId,
+        specialistRegistryId: proposal.registryId,
+        specialistRegistryRevision: proposal.registryRevision,
+        message: 'Owner-bound reusable Agent profile selected the least-authority eligible specialist; execution remains unclaimed.',
+      });
+      result = { proposal: clone(proposal), assignment: clone(assignment), executionOwnership: clone(executionOwnership), reused: false };
+      return store;
+    });
+    return result;
   }
 
   async listSpecialistHandoffs(id = '') {
