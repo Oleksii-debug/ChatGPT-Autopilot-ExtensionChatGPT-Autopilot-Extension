@@ -333,3 +333,107 @@ test('product-wide claim fails closed when an owner-bound handoff lost admission
     /lacks durable admission provenance/,
   );
 });
+
+
+test('owner-bound claim requires trusted executable readiness on the product dependency path', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  const claim = {
+    availableSlots: 1,
+    maxChildrenPerAgent: 1,
+    maxDepth: 2,
+    leaseSeconds: 600,
+    at: '2026-09-29T03:06:00.000Z',
+  };
+  const readiness = executable => ({
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: new Date(Date.now()).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() { return true; },
+  });
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', claim, {
+      specialistProviderReadinessResolver: readiness(false),
+    }),
+    /not currently executable/,
+  );
+  let persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+
+  let currentChecks = 0;
+  const resolver = readiness(true);
+  resolver.assertCurrent = async () => { currentChecks += 1; return true; };
+  const claimed = await manager.claimSpecialistHandoffs('job.research', claim, {
+    specialistProviderReadinessResolver: resolver,
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(currentChecks, 1);
+  persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'LEASED');
+  assert.equal(persisted.executionOwnerships[0].state, 'OWNED');
+});
+
+test('owner-bound claim fails closed when trusted readiness becomes stale before serialized claim', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+  const resolver = {
+    async resolve(selection) {
+      return {
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        executable: true,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        resolvedAt: new Date(Date.now()).toISOString(),
+        maxAgeMs: 60_000,
+      };
+    },
+    async assertCurrent() { throw new Error('Specialist provider config changed after readiness probe'); },
+  };
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }, { specialistProviderReadinessResolver: resolver }),
+    /config changed after readiness probe/,
+  );
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
