@@ -1437,3 +1437,35 @@ test('durable workspace millisecond timestamps reject signed zero, fractions and
     /Invalid project workspace update nowMs/,
   );
 });
+
+
+test('project workspace mutation helpers reject noncanonical timestamps before mutating durable draft state', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const before = structuredClone(workspace.projectsById['project-a']);
+
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 2.5 }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectContextCapsule(workspace, capsule(), { nowMs: -0 }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, provenance(), {
+      nowMs: Number.MAX_SAFE_INTEGER + 1,
+    }),
+    /Invalid project workspace project updatedAt/,
+  );
+  assert.deepEqual(workspace.projectsById['project-a'], before);
+
+  assert.throws(
+    () => addProjectSnapshot(createProjectWorkspace(1), snapshot(), { nowMs: 1.25 }),
+    /Invalid project workspace project createdAt/,
+  );
+});
