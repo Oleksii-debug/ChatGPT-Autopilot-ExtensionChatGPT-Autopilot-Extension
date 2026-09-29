@@ -366,14 +366,18 @@ async function createOrchestrationV2Orchestra() {
   finally { setOrchestrationV2Busy(false); }
 }
 async function selectOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
+  const epoch = beginOrchestrationV2Action();
   const id = $('orchestration-v2-orchestra-list').value;
   if (!id) return;
   try {
-    renderOrchestrationV2Status(await core('SELECT_ORCHESTRATION_V2_ORCHESTRA', { id }));
-    await loadOrchestrationV2AgentTree({ epoch: orchestrationV2ActionEpoch });
+    const data = await core('SELECT_ORCHESTRATION_V2_ORCHESTRA', { id });
+    if (epoch !== orchestrationV2ActionEpoch) return;
+    renderOrchestrationV2Status(data);
+    await loadOrchestrationV2AgentTree({ epoch });
+  } catch (error) {
+    if (epoch !== orchestrationV2ActionEpoch) return;
+    $('orchestration-v2-orchestra-summary').textContent = `Не вдалося вибрати оркестр: ${error.message}`;
   }
-  catch (error) { $('orchestration-v2-orchestra-summary').textContent = `Не вдалося вибрати оркестр: ${error.message}`; }
 }
 async function renameOrchestrationV2Orchestra() {
   beginOrchestrationV2Action();

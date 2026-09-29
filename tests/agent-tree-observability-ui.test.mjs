@@ -58,3 +58,21 @@ test('Agent tree command is in the read-only command set and dispatches only to 
   assert.match(branch, /getAgentTreeProjection/u);
   assert.doesNotMatch(branch, /start\(|resume\(|cycle\(|dispatchHierarchyEvent|recoverHierarchyNode|updateConfig/u);
 });
+
+
+test('orchestra selection rejects stale async responses before status or Agent tree render', () => {
+  const select = functionBody(options, 'selectOrchestrationV2Orchestra');
+  assert.match(select, /const epoch = beginOrchestrationV2Action\(\)/u);
+  const awaitIndex = select.indexOf("await core('SELECT_ORCHESTRATION_V2_ORCHESTRA'");
+  const fenceIndex = select.indexOf('if (epoch !== orchestrationV2ActionEpoch) return;', awaitIndex);
+  const renderIndex = select.indexOf('renderOrchestrationV2Status(data)', fenceIndex);
+  assert.ok(awaitIndex >= 0 && fenceIndex > awaitIndex && renderIndex > fenceIndex,
+    'stale selection must be rejected before rendering status');
+  assert.match(select, /loadOrchestrationV2AgentTree\(\{ epoch \}\)/u);
+  const catchIndex = select.indexOf('catch (error)');
+  assert.ok(catchIndex > renderIndex, 'selection handler must have a guarded error path');
+  assert.match(
+    select.slice(catchIndex),
+    /if \(epoch !== orchestrationV2ActionEpoch\) return;[\s\S]*?Не вдалося вибрати оркестр/u,
+  );
+});
