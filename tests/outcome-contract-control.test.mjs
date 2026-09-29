@@ -410,6 +410,28 @@ test('existing independent Outcome verifier consumes the durable canonical resol
   assert.equal(result.verificationAuthorityMinted, false);
 });
 
+test('contract registry stores prototype-shaped ids as data without prototype mutation', () => {
+  const state = createEmptyState(1);
+  const created = createStoredOutcomeContractV1(state, contractV1({ contractId: '__proto__' }));
+  assert.equal(created.contractId, '__proto__');
+  assert.equal(Object.getPrototypeOf(state.outcomeContractsById), null);
+  assert.equal(Object.hasOwn(state.outcomeContractsById, '__proto__'), true);
+
+  const exact = resolveCurrentStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: '__proto__',
+  });
+  assert.equal(exact.contractId, '__proto__');
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: '__proto__',
+      contractRevision: 1,
+    }).contractId,
+    '__proto__',
+  );
+  assert.equal(validateState(state), state);
+});
+
 test('contract identity, creation time and revision progression are immutable under update', () => {
   const state = createEmptyState(1);
   const current = createStoredOutcomeContractV1(state, contractV1());
