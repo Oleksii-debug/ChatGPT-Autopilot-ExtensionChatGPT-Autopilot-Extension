@@ -217,6 +217,17 @@ function request(overrides = {}) {
   };
 }
 
+async function sha256BindingKey(value) {
+  const digest = await globalThis.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify(value)),
+  );
+  return 'sha256:' + Array.from(
+    new Uint8Array(digest),
+    byte => byte.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
 test('independent resolver produces exact trusted Specialist record consumable by execution ownership', async () => {
   let lookup;
   const produced = await produceTrustedSpecialistExecutionVerificationRecordV1(
@@ -231,6 +242,18 @@ test('independent resolver produces exact trusted Specialist record consumable b
 
   assert.equal(Object.isFrozen(lookup), true);
   assert.equal(Object.isFrozen(lookup.resultArtifactIds), true);
+  for (const key of [
+    'providerExecutionBindingKey',
+    'executionOwnershipBindingKey',
+    'selectionBindingKey',
+    'handoffBindingKey',
+  ]) {
+    assert.match(lookup[key], /^sha256:[0-9a-f]{64}$/u);
+  }
+  const serializedLookup = JSON.stringify(lookup);
+  assert.equal(serializedLookup.includes(providerExecution().effectEvidence), false);
+  assert.equal(serializedLookup.includes(handoff().goal), false);
+  assert.equal(Object.hasOwn(lookup, 'providerEffectEvidence'), false);
   assert.deepEqual(
     {
       taskId: lookup.taskId,
@@ -264,18 +287,18 @@ test('independent resolver produces exact trusted Specialist record consumable b
       policyEnvelopeId: POLICY_ID,
       executionId: LEASE_ID,
       executionOwnershipRevision: 2,
-      executionOwnershipBindingKey: JSON.stringify(ownership()),
+      executionOwnershipBindingKey: await sha256BindingKey(ownership()),
       registryId: 'specialist-registry:default',
       registryRevision: 1,
       registryBindingKey: 'registry-binding:v1',
       providerId: PROVIDER_ID,
       providerConfigRevision: 1,
-      providerExecutionBindingKey: JSON.stringify(providerExecution()),
+      providerExecutionBindingKey: await sha256BindingKey(providerExecution()),
       definitionRevision: 1,
       requestedCapabilityIds: ['filesystem.write'],
       grantedToolIds: [],
-      selectionBindingKey: JSON.stringify(selection()),
-      handoffBindingKey: JSON.stringify(handoff()),
+      selectionBindingKey: await sha256BindingKey(selection()),
+      handoffBindingKey: await sha256BindingKey(handoff()),
       resultContractId: 'result-contract:workspace-change',
       verificationId: VERIFICATION_ID,
       expectedOutcome: 'EFFECT_VERIFIED',
