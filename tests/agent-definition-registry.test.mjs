@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AgentDefinitionRegistryMutationKind,
+  createAgentDefinitionRegistryV1,
   discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
@@ -40,7 +41,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return {
+  return createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
@@ -49,7 +50,7 @@ function registry(overrides = {}) {
       definition(),
     ],
     ...overrides,
-  };
+  });
 }
 
 function materialization(overrides = {}) {
@@ -91,6 +92,24 @@ test('registry canonicalizes reusable Agent definitions deterministically', () =
   assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
+});
+
+test('same-revision Agent registry content substitution is rejected by canonical bindingKey', () => {
+  const current = registry();
+  const forged = {
+    ...current,
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ instructions: 'Changed instructions without a revision bump.' }),
+    ],
+  };
+  assert.throws(
+    () => normalizeAgentDefinitionRegistryV1(forged),
+    /bindingKey is inconsistent with canonical registry content/,
+  );
+
+  const selected = selectAgentDefinitionV1({ registry: current, agentDefinitionId: 'agent.research' });
+  assert.equal(selected.registryBindingKey, current.bindingKey);
 });
 
 test('legacy Agent definitions remain shape-compatible when no specialist delegation profile exists', () => {
@@ -556,7 +575,7 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ revision: 4 }),
-  }), /registry identity or revision drifted/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('selection envelope cannot substitute a different definition identity or revision', () => {
