@@ -241,7 +241,7 @@ export function normalizeAgentModelRoutePolicyV1(input) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
     }
   }
-  return freeze({
+  const out = {
     autoSwitch: normalized.autoSwitch,
     pinnedRouteId: normalized.pinnedRouteId,
     orderedRouteIds: [...normalized.orderedRouteIds],
@@ -251,10 +251,20 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds: normalized.retryBackoffSeconds,
-    circuitBreakerFailures: normalized.circuitBreakerFailures,
-    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
-  });
+  };
+  // These failover controls were added after the original durable
+  // AgentDefinitionV1 policy shape. Preserve omission for legacy/partial
+  // definitions so a child Agent can inherit stricter parent failover
+  // constraints instead of silently materializing global Router defaults.
+  // Owner UI writes all three explicitly for newly configured full policies.
+  for (const key of [
+    'retryBackoffSeconds',
+    'circuitBreakerFailures',
+    'circuitBreakerSeconds',
+  ]) {
+    if (Object.hasOwn(raw, key)) out[key] = normalized[key];
+  }
+  return freeze(out);
 }
 
 function normalizeOwnerBudget(input) {
