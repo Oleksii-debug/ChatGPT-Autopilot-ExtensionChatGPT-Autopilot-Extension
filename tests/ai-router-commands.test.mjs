@@ -956,7 +956,11 @@ test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-r
   assert.equal(seen[0].options.strongTaskRole, 'coder');
   assert.deepEqual(seen[0].options.capabilityIds, ['cap.reason']);
   assert.equal(seen[0].options.forceStrong, false);
-  assert.deepEqual(seen[0].options.providerCallBudgetContext, { jobId: 'agent.job.1' });
+  assert.deepEqual(seen[0].options.providerCallBudgetContext, {
+    kind: 'browser-agent',
+    jobId: 'agent.job.1',
+    controlEpoch: 7,
+  });
   assert.deepEqual(repo.state.profile.aiRouter, before);
   assert.deepEqual(repo.state.profile.aiRouterRuntime, beforeRuntime);
 });
