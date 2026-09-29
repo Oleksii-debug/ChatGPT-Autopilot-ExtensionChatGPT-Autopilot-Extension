@@ -33,7 +33,9 @@ const CANDIDATE_KEYS = new Set([
   'capabilityIds',
   'enabled',
   'ready',
-  'setupRequired',
+  'installationRequired',
+  'authenticationRequired',
+  'configurationRequired',
   'sourceRevision',
   'observedAt',
   'validThrough',
@@ -164,7 +166,9 @@ export function normalizeCapabilityPathCandidateV1(input) {
     capabilityIds: ids(raw.capabilityIds, 'capabilityIds'),
     enabled: bool(raw.enabled, 'enabled'),
     ready: bool(raw.ready, 'ready'),
-    setupRequired: bool(raw.setupRequired, 'setupRequired'),
+    installationRequired: bool(raw.installationRequired, 'installationRequired'),
+    authenticationRequired: bool(raw.authenticationRequired, 'authenticationRequired'),
+    configurationRequired: bool(raw.configurationRequired, 'configurationRequired'),
     sourceRevision: revision(raw.sourceRevision, 'sourceRevision'),
     observedAt,
     validThrough,
@@ -177,7 +181,9 @@ function blockReason(candidate, required, asOf) {
   if (!candidate.enabled) return 'DISABLED';
   const available = new Set(candidate.capabilityIds);
   if (!required.every(capabilityId => available.has(capabilityId))) return 'MISSING_CAPABILITY';
-  if (candidate.setupRequired) return 'SETUP_REQUIRED';
+  if (candidate.installationRequired) return 'INSTALLATION_REQUIRED';
+  if (candidate.authenticationRequired) return 'AUTHENTICATION_REQUIRED';
+  if (candidate.configurationRequired) return 'CONFIGURATION_REQUIRED';
   if (!candidate.ready) return 'NOT_READY';
   return '';
 }
