@@ -426,8 +426,8 @@ test('owner-bound claim fails closed when trusted readiness becomes stale before
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
-        observedAt: new Date(Date.now()).toISOString(),
-        resolvedAt: new Date(Date.now()).toISOString(),
+        observedAt: '2026-09-29T03:06:00.000Z',
+        resolvedAt: '2026-09-29T03:06:00.000Z',
         maxAgeMs: 60_000,
       };
     },
