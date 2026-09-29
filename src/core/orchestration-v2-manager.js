@@ -16,6 +16,7 @@ import {
   normalizeSubagentTaskActivationBindingRegistryV1,
   putSubagentTaskActivationBindingV1,
   resolveSubagentTaskActivationBindingV1,
+  resolveSubagentTaskActivationEvidenceV1,
 } from './subagent-task-activation-binding-registry.js';
 import { deriveSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
 import {
@@ -32,10 +33,19 @@ const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPha
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
 const SUBAGENT_BINDING_LOOKUP_KEYS = new Set(['bindingId']);
-const SUBAGENT_BINDING_REGISTRATION_KEYS = new Set(['taskEnvelope', 'activationAction', 'invocationId']);
+const SUBAGENT_BINDING_REGISTRATION_KEYS = new Set([
+  'taskEnvelope',
+  'activationAction',
+  'invocationId',
+  'authorityEnvelope',
+]);
+const SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS = new Set([
+  'taskEnvelope',
+  'activationAction',
+  'invocationId',
+]);
 const SUBAGENT_CONTEXT_RESOLUTION_KEYS = new Set([
   'bindingId',
-  'authorityEnvelope',
   'taskEnvelope',
   'expectedProjectRevisionId',
   'capsuleId',
@@ -133,7 +143,7 @@ function snapshotSubagentBindingRegistration(value) {
       throw new Error('Subagent activation-binding registration contains unknown field: ' + key);
     }
   }
-  for (const key of SUBAGENT_BINDING_REGISTRATION_KEYS) {
+  for (const key of SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS) {
     if (!Object.hasOwn(snapshot, key)) {
       throw new Error('Subagent activation-binding registration is missing field: ' + key);
     }
@@ -151,7 +161,7 @@ function snapshotSubagentContextResolution(value) {
       throw new Error('Subagent durable-context resolution contains unknown field: ' + key);
     }
   }
-  for (const key of ['bindingId', 'authorityEnvelope', 'taskEnvelope', 'expectedProjectRevisionId']) {
+  for (const key of ['bindingId', 'taskEnvelope', 'expectedProjectRevisionId']) {
     if (!Object.hasOwn(snapshot, key)) {
       throw new Error('Subagent durable-context resolution is missing field: ' + key);
     }
@@ -686,23 +696,19 @@ export class OrchestrationV2Manager {
       }
 
       const registry = storedSubagentTaskActivationBindingRegistry(current);
-      const existing = resolveSubagentTaskActivationBindingV1(
-        registry,
-        { bindingId: derived.bindingId },
-      );
-      if (existing) {
-        if (!sameBindingIdentity(existing, derived)) {
-          throw new Error('Divergent subagent activation binding replay');
-        }
-        persistedBinding = existing;
-        return current;
+      const putRequest = { binding: derived, registeredAt: ownerBoundAt };
+      if (Object.hasOwn(request, 'authorityEnvelope')) {
+        putRequest.authorityEnvelope = request.authorityEnvelope;
       }
-
       current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
         registry,
-        { binding: derived, registeredAt: ownerBoundAt },
+        putRequest,
       );
-      persistedBinding = derived;
+      const evidence = resolveSubagentTaskActivationEvidenceV1(
+        current.subagentTaskActivationBindingRegistry,
+        { bindingId: derived.bindingId },
+      );
+      persistedBinding = evidence?.binding ?? null;
       return current;
     });
 
@@ -768,11 +774,15 @@ export class OrchestrationV2Manager {
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
     const controller = this.controllerFor(orchestraId);
     const runtime = await controller.runtimeRepository.load();
-    const binding = resolveSubagentTaskActivationBindingV1(
+    const evidence = resolveSubagentTaskActivationEvidenceV1(
       storedSubagentTaskActivationBindingRegistry(runtime),
       bindingLookup,
     );
+    const binding = evidence?.binding ?? null;
     if (!binding) throw new Error('Durable subagent activation binding not found');
+    if (!evidence.authorityEnvelope) {
+      throw new Error('Durable subagent activation binding lacks authority provenance');
+    }
     if (binding.projectId !== runtime.projectId) {
       throw new Error('Durable subagent activation binding crosses orchestra project authority');
     }
@@ -780,7 +790,7 @@ export class OrchestrationV2Manager {
     assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding);
     const contextRequest = {
       schemaVersion: 1,
-      authorityEnvelope: request.authorityEnvelope,
+      authorityEnvelope: evidence.authorityEnvelope,
       taskEnvelope: task,
       expectedParentAgentId: binding.parentAgentId,
       expectedChildAgentId: binding.childAgentId,

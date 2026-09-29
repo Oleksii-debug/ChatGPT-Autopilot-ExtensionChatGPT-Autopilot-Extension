@@ -284,16 +284,16 @@ async function fixture({ projectWorkspaceRepository = null } = {}) {
     taskEnvelope: task,
     activationAction: prepared.actions[0],
     invocationId: 'invocation-child-1',
+    authorityEnvelope: authorityEnvelope(),
   }, 'orch-1');
 
-  return { chrome, manager, task, registered };
+  return { chrome, manager, task, registered, prepared };
 }
 
 function contextRequest(task, bindingId, overrides = {}) {
   return {
     bindingId,
     taskEnvelope: task,
-    authorityEnvelope: authorityEnvelope(),
     expectedProjectRevisionId: 'project-r2',
     capsuleId: 'capsule.parent',
     ...overrides,
@@ -313,6 +313,7 @@ test('orchestration owner resolves exact durable task binding before projecting 
   assert.equal(result.activationId, 'child-activation-1');
   assert.equal(result.generation, 1);
   assert.equal(result.activationPurpose, OrchestrationActivationPurpose.WORK);
+  assert.equal(result.providerId, 'provider.main');
   assert.equal(result.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
   assert.equal(result.parentProjectRevisionId, 'project-r2');
   assert.equal(result.sourceTrust, 'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED');
@@ -330,6 +331,40 @@ test('orchestration owner resolves exact durable task binding before projecting 
   assert.equal(result.credentialAuthority, false);
   assert.equal(result.policyAuthority, false);
   assert.equal(Object.isFrozen(result), true);
+});
+
+test('durable child context uses persisted authority provenance and rejects provider substitution', async () => {
+  const { chrome, manager, task, registered, prepared } = await fixture();
+  const before = structuredClone(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
+  );
+
+  await assert.rejects(
+    () => manager.registerSubagentTaskActivationBinding({
+      taskEnvelope: task,
+      activationAction: prepared.actions[0],
+      invocationId: 'invocation-child-1',
+      authorityEnvelope: authorityEnvelope({ providerId: 'provider.other' }),
+    }, 'orch-1'),
+    /authority provenance collision/,
+  );
+  assert.deepEqual(
+    chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
+    before,
+  );
+
+  const forgedContext = contextRequest(task, registered.binding.bindingId);
+  forgedContext.authorityEnvelope = authorityEnvelope({ providerId: 'provider.other' });
+  await assert.rejects(
+    () => manager.resolveDurableSubagentTaskContext(forgedContext, 'orch-1'),
+    /unknown field: authorityEnvelope/,
+  );
+
+  const durable = await manager.resolveDurableSubagentTaskContext(
+    contextRequest(task, registered.binding.bindingId),
+    'orch-1',
+  );
+  assert.equal(durable.providerId, 'provider.main');
 });
 
 test('orchestration owner rejects task semantic substitution against durable activation evidence', async () => {

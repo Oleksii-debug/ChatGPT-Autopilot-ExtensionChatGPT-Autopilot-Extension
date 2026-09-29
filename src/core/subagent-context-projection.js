@@ -144,7 +144,7 @@ function sameArtifactIdentity(left, right) {
     && left.sensitive === right.sensitive;
 }
 
-function normalizeAllowedEnvelope(input) {
+export function normalizeAllowedSubagentAuthorityEnvelopeV1(input) {
   const raw = strictRecord(input, ENVELOPE_KEYS, 'SubagentAuthorityEnvelopeV1');
   if (raw.schemaVersion !== 1) throw new Error('Unsupported SubagentAuthorityEnvelopeV1 schemaVersion');
   if (raw.decision !== 'ALLOW' || raw.reasonCode !== 'LEAST_AUTHORITY_DERIVED') {
@@ -164,6 +164,10 @@ function normalizeAllowedEnvelope(input) {
     sourceIds: idList(raw.sourceIds, 'authorityEnvelope.sourceIds'),
     artifactIds: idList(raw.artifactIds, 'authorityEnvelope.artifactIds'),
     toolIds: idList(raw.toolIds, 'authorityEnvelope.toolIds'),
+    // Durable child-context provenance never carries executable descriptors.
+    // Keep the field canonical so the normalized envelope can be revalidated
+    // after persistence without minting tool execution authority.
+    toolDescriptors: [],
     executionAuthority: exactFalse(raw.executionAuthority, 'authorityEnvelope.executionAuthority'),
     credentialAuthority: exactFalse(raw.credentialAuthority, 'authorityEnvelope.credentialAuthority'),
     policyAuthority: exactFalse(raw.policyAuthority, 'authorityEnvelope.policyAuthority'),
@@ -193,7 +197,7 @@ export function projectSubagentContextV1(input = {}) {
     throw new Error('Unsupported SubagentContextProjectionRequestV1 schemaVersion');
   }
 
-  const envelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const envelope = normalizeAllowedSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
   const expectedParentAgentId = exactId(
     own(request, 'expectedParentAgentId'),
     'expectedParentAgentId',
@@ -355,7 +359,7 @@ export function projectSubagentTaskContextV1(input = {}) {
     throw new Error('Unsupported SubagentTaskContextProjectionRequestV1 schemaVersion');
   }
 
-  const envelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const envelope = normalizeAllowedSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
   const task = normalizeSubagentTaskEnvelopeV1(own(request, 'taskEnvelope'));
   const expectedParentAgentId = exactId(
     own(request, 'expectedParentAgentId'),
@@ -596,7 +600,7 @@ export async function projectDurableSubagentTaskContextV1(
     throw new Error('Unsupported DurableSubagentTaskContextRequestV1 schemaVersion');
   }
 
-  const normalizedEnvelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const normalizedEnvelope = normalizeAllowedSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
   const authorityEnvelope = deepFreeze({
     ...normalizedEnvelope,
     toolDescriptors: [],
