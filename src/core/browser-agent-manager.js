@@ -99,6 +99,7 @@ const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 128;
 const SPECIALIST_PROVIDER_CONFIG_PUT_KEYS = new Set(['providerConfig', 'expectedRevision']);
+const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
@@ -429,20 +430,37 @@ function freshStore() {
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
     specialistProviderConfigsById: Object.create(null),
+    specialistProviderConfigRevisionById: Object.create(null),
     specialistProviderConfigQuarantineById: Object.create(null),
   };
 }
 
-function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
+function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevisions, rawQuarantine) {
   const configs = Object.create(null);
+  const revisions = Object.create(null);
   const quarantine = Object.create(null);
   if (rawQuarantine && typeof rawQuarantine === 'object' && !Array.isArray(rawQuarantine)) {
     for (const key of Object.keys(rawQuarantine).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
       try { quarantine[canonicalSpecialistProviderIdV1(key)] = true; } catch {}
     }
   }
+  if (rawRevisions && typeof rawRevisions === 'object' && !Array.isArray(rawRevisions)) {
+    const descriptors = Object.getOwnPropertyDescriptors(rawRevisions);
+    for (const key of Object.keys(descriptors).sort().slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+      try {
+        const descriptor = descriptors[key];
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) continue;
+        const providerId = canonicalSpecialistProviderIdV1(key);
+        const revision = descriptor.value;
+        if (typeof revision === 'number' && Number.isSafeInteger(revision)
+            && !Object.is(revision, -0) && revision >= 1) {
+          revisions[providerId] = revision;
+        }
+      } catch {}
+    }
+  }
   if (!rawConfigs || typeof rawConfigs !== 'object' || Array.isArray(rawConfigs)) {
-    return { configs, quarantine };
+    return { configs, revisions, quarantine };
   }
   const descriptors = Object.getOwnPropertyDescriptors(rawConfigs);
   for (const key of Object.keys(descriptors).sort().slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
@@ -455,12 +473,17 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuaranti
       const config = normalizeSpecialistProviderConfigV1(descriptor.value);
       if (config.providerId !== providerId) throw new Error('Specialist provider config key drifted from providerId');
       if (Object.hasOwn(quarantine, providerId)) continue;
+      const recordedRevision = revisions[providerId] || config.revision;
+      if (recordedRevision < config.revision) {
+        throw new Error('Specialist provider durable revision trails active config revision');
+      }
+      revisions[providerId] = recordedRevision;
       configs[providerId] = config;
     } catch {
       try { quarantine[canonicalSpecialistProviderIdV1(key)] = true; } catch {}
     }
   }
-  return { configs, quarantine };
+  return { configs, revisions, quarantine };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
@@ -820,9 +843,11 @@ function normalizeStore(raw, now) {
   out.specialistRegistryQuarantineById = specialistState.quarantine;
   const specialistProviderConfigState = normalizePersistedSpecialistProviderConfigState(
     raw.specialistProviderConfigsById,
+    raw.specialistProviderConfigRevisionById,
     raw.specialistProviderConfigQuarantineById,
   );
   out.specialistProviderConfigsById = specialistProviderConfigState.configs;
+  out.specialistProviderConfigRevisionById = specialistProviderConfigState.revisions;
   out.specialistProviderConfigQuarantineById = specialistProviderConfigState.quarantine;
   return out;
 }
@@ -1064,7 +1089,11 @@ export class BrowserAgentManager {
       .sort()
       .map(providerId => clone(store.specialistProviderConfigsById[providerId]));
     const quarantinedProviderIds = Object.keys(store.specialistProviderConfigQuarantineById || {}).sort();
-    return { configs, quarantinedProviderIds };
+    return {
+      configs,
+      revisions: clone(store.specialistProviderConfigRevisionById || {}),
+      quarantinedProviderIds,
+    };
   }
 
   async getSpecialistProviderConfig(providerId) {
@@ -1075,6 +1104,7 @@ export class BrowserAgentManager {
     const providerConfig = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
     return {
       providerConfig: providerConfig ? clone(providerConfig) : null,
+      revision: Number(store.specialistProviderConfigRevisionById?.[canonicalId] || providerConfig?.revision || 0),
       quarantined: !providerConfig && Object.hasOwn(quarantine, canonicalId),
     };
   }
@@ -1104,8 +1134,10 @@ export class BrowserAgentManager {
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
       }
+      const revisions = store.specialistProviderConfigRevisionById
+        || (store.specialistProviderConfigRevisionById = Object.create(null));
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
-      const currentRevision = current?.revision || 0;
+      const currentRevision = Number(revisions[providerId] || current?.revision || 0);
       if (currentRevision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before persistence');
       }
@@ -1120,10 +1152,52 @@ export class BrowserAgentManager {
         throw new Error('Specialist provider config updatedAt cannot move backwards');
       }
       configs[providerId] = providerConfig;
+      revisions[providerId] = providerConfig.revision;
       committed = providerConfig;
       return store;
     });
-    return { providerConfig: clone(committed) };
+    return { providerConfig: clone(committed), revision: committed.revision };
+  }
+
+  async clearSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS,
+      'Browser Agent Specialist provider config clear request',
+    );
+    if (!Object.hasOwn(request, 'providerId') || !Object.hasOwn(request, 'expectedRevision')) {
+      throw new Error('Browser Agent Specialist provider config clear request requires providerId and expectedRevision');
+    }
+    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
+    const expectedRevision = request.expectedRevision;
+    if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision)
+        || Object.is(expectedRevision, -0) || expectedRevision < 1) {
+      throw new Error('Browser Agent Specialist provider config clear expectedRevision must be a positive safe integer');
+    }
+    let nextRevision = 0;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById || Object.create(null);
+      const revisions = store.specialistProviderConfigRevisionById
+        || (store.specialistProviderConfigRevisionById = Object.create(null));
+      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and cannot be cleared');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      if (!current) throw new Error('Specialist provider config is not configured');
+      const currentRevision = Number(revisions[providerId] || current.revision);
+      if (currentRevision !== expectedRevision || current.revision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before clear');
+      }
+      nextRevision = currentRevision + 1;
+      if (!Number.isSafeInteger(nextRevision)) {
+        throw new Error('Specialist provider config revision exceeds exact durable-state range');
+      }
+      delete configs[providerId];
+      revisions[providerId] = nextRevision;
+      return store;
+    });
+    return { providerId, cleared: true, revision: nextRevision };
   }
 
   async listSpecialistRegistries() {
