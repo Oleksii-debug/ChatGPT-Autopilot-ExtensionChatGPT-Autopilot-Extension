@@ -26,7 +26,7 @@ const managerFor = chrome => new BrowserAgentManager({
   now: () => Date.parse('2026-09-29T03:05:00.000Z'),
 });
 
-function definition({ delegation = true } = {}) {
+function definition({ delegation = true, maxConcurrentHandoffs = 2, leaseSeconds = 600 } = {}) {
   return {
     schemaVersion: 1,
     agentDefinitionId: delegation ? 'agent.research' : 'agent.manual',
@@ -47,8 +47,8 @@ function definition({ delegation = true } = {}) {
         requiredToolIds: ['browser.read'],
         policyEnvelopeId: 'policy:research',
         deadlineSeconds: 900,
-        maxConcurrentHandoffs: 2,
-        leaseSeconds: 600,
+        maxConcurrentHandoffs,
+        leaseSeconds,
         priority: 7,
         enabled: true,
       },
@@ -72,8 +72,13 @@ const specialist = {
   definitionRevision: 1,
 };
 
-async function seed(manager, { delegation = true, createRegistry = delegation } = {}) {
-  const agent = definition({ delegation });
+async function seed(manager, {
+  delegation = true,
+  createRegistry = delegation,
+  maxConcurrentHandoffs = 2,
+  leaseSeconds = 600,
+} = {}) {
+  const agent = definition({ delegation, maxConcurrentHandoffs, leaseSeconds });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
@@ -274,4 +279,87 @@ test('persistent automatic Specialist admission failure reaches the existing ter
   assert.equal(current.job.runtime.runState, 'ERROR');
   assert.equal(current.job.runtime.nextWakeAt, 0);
   assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
+});
+
+
+test('durable reusable-Agent profile caps per-job Specialist lease duration at claim time', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { leaseSeconds: 600 });
+
+  const prepared = await manager.cycleOne(id);
+  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+
+  const claimed = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(claimed.assignments[0].leaseExpiresAt, '2026-09-29T03:16:00.000Z');
+});
+
+test('durable reusable-Agent zero Specialist capacity prevents per-job claim widening', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { maxConcurrentHandoffs: 0 });
+
+  const prepared = await manager.cycleOne(id);
+  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+
+  const claimed = await manager.claimSpecialistHandoffs(id, {
+    availableSlots: 10,
+    maxChildrenPerAgent: 10,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(claimed.claimed, []);
+  assert.equal(claimed.assignments[0].state, 'READY');
+  assert.equal(claimed.executionOwnerships[0].state, 'UNOWNED');
+});
+
+test('cross-job claim cannot widen durable Agent zero capacity', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { maxConcurrentHandoffs: 0 });
+
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs: 32,
+    maxChildrenPerAgent: 32,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.deepEqual(claimed.claimed, []);
+  assert.equal(claimed.remainingSlots, 32);
+
+  const persisted = await manager.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'UNOWNED');
+});
+
+test('cross-job claim caps lease duration by each durable Agent profile', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { maxConcurrentHandoffs: 2, leaseSeconds: 300 });
+
+  assert.equal((await manager.cycleOne(id)).kind, 'SPECIALIST_PENDING');
+
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs: 32,
+    maxChildrenPerAgent: 32,
+    maxDepth: 2,
+    leaseSeconds: 3600,
+    at: '2026-09-29T03:06:00.000Z',
+  });
+  assert.equal(claimed.claimed.length, 1);
+
+  const persisted = await manager.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs[0].leaseExpiresAt, '2026-09-29T03:11:00.000Z');
+  assert.equal(persisted.executionOwnerships[0].state, 'OWNED');
 });
