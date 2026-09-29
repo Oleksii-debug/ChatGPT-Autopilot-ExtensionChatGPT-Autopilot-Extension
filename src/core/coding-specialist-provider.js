@@ -595,15 +595,35 @@ export class OpenHandsCodingSpecialistClient {
     }
   }
 
-  async execute(preparedInput) {
+  async execute(preparedInput, {
+    allowCreate = true,
+    deadlineMs = null,
+  } = {}) {
     const prepared = prepareOpenHandsCodingSpecialistV1(preparedInput);
-    const deadline = this.nowFn() + prepared.executionSeconds * 1000;
+    if (typeof allowCreate !== 'boolean') throw new Error('OpenHands allowCreate must be boolean');
+    const naturalDeadline = this.nowFn() + prepared.executionSeconds * 1000;
+    const deadline = deadlineMs == null
+      ? naturalDeadline
+      : Math.min(naturalDeadline, Number(deadlineMs));
+    if (!Number.isFinite(deadline)) throw new Error('OpenHands deadlineMs must be finite');
     const probe = await this.probe(prepared, { deadlineMs: deadline });
     let conversation = await this.getConversation(prepared, {
       allowNotFound: true,
       deadlineMs: deadline,
     });
     let created = false;
+    if (!conversation && !allowCreate) {
+      throw new OpenHandsCodingSpecialistError(
+        'Durable PREPARED recovery could not attach to the existing OpenHands conversation',
+        {
+          code: 'OPENHANDS_PREPARED_RECOVERY_ABSENT',
+          conversationId: prepared.conversationId,
+          effectMayHaveOccurred: true,
+          reconciliationRequired: true,
+          safeToRetry: false,
+        },
+      );
+    }
     if (!conversation) {
       let createdInfo;
       try {
