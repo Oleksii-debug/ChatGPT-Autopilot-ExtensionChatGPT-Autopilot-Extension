@@ -11,3 +11,16 @@ FROZEN CHANGELOG — 2026-09-14
 - Старі tests, що вимагали ще один browser VERIFY уже ПІСЛЯ простроченого bounded deadline, оновлені до нового сильнішого контракту: після deadline liveness не залежить від здорової evidence tab або content script.
 - 0.9.18 Trusted Script / Browser Agent / Scenario Work / Orchestration V2 функції збережені без відкату.
 - User-selected Session timing/cadence не переписується. Seconds/minutes лишаються owner policy; 2-minute cadence у regression tests є лише fixture.
+
+CONTINUATION — 2026-09-29 — LIVE SEND / HIGH EFFORT / MASS-SEND RECOVERY
+
+- Опрацьовано три живі діагностичні звіти з Drive та відтворено головний шаблон збою: фізичний Send уже створював нову /c/<conversation>, очищав composer і запускав генерацію (STOP_CONTROL_VISIBLE), але прихована ChatGPT Work вкладка інколи не рендерила щойно надіслане user-message у DOM. Через це успішне надсилання помилково лишалося SUBMISSION_UNCERTAIN і сесія надовго блокувала наступні цикли.
+- Додано окремий live-send compatibility layer поверх чинного interaction adapter без повторної реалізації основної Send-машини. Він може підвищити вже невизначений результат до SENT_VERIFIED лише за одночасної сильної трійки доказів: правильна conversation route, порожній composer після спроби Send та активна генерація ChatGPT.
+- Той самий сильний доказ дозволено під час VERIFY_AFTER_UNCERTAIN_SUBMIT, тому успішний фізичний Send більше не повинен годинами залишатися в RECOVERY_TEXT_ACK_PENDING лише через відсутній DOM-текст повідомлення.
+- Захист від подвійного Send не послаблено: compatibility layer не клацає Send повторно та не створює нової submit-спроби; він лише класифікує вже виконану фізичну спробу за післядією.
+- Перед реальною submit-спробою додано best-effort вибір рівня зусиль High. Якщо High або Extra High уже активний, селектор не чіпається. Інакше виконується максимум 2 спроби; після двох невдач або помилки промт усе одно надсилається, щоб вибір рівня ніколи не міг заблокувати автопілот.
+- Перевірено шлях інтервалу спрощеної/звичайної Session: 2 minutes перетворюються рівно на 120000 ms; після SENT_VERIFIED scheduler ставить nextAllowedSendAt = verifiedSendTime + minimumSendIntervalMs. Отже діагностована нестача масових надсилань була не помилкою множення двох хвилин, а переважно наслідком невизнаних успішних Send та recovery-stall.
+- Розширено interaction regressions: позитивне підтвердження hidden-Work Send, verification-only recovery, неправильна conversation route, непорожній composer, відсутність active-generation evidence, High already selected, успішний High та обов'язкове продовження після двох невдалих спроб.
+- Release workflow розкладено на окремі qualification suites, щоб наступне падіння CI показувало точний клас тестів замість непрозорого загального npm test timeout/failure.
+- Windows release-package gate вже підтвердив можливість детермінованого ZIP-пакування цієї лінії змін; остаточний кандидат має братися лише з найновішого зеленого head цієї гілки після всіх qualification suites.
+- Окремо виявлено сценарний ризик Chrome discarded/frozen tabs: поточна readiness-логіка може до 90 секунд чекати формально правильну, але вивантажену вкладку. Цей пункт позначено для bounded one-time wake/reload hardening; до внесення і тестування його не слід вважати закритим.
