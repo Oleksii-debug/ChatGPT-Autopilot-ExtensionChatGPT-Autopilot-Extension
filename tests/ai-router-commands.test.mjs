@@ -1123,6 +1123,39 @@ test('internal Agent dispatcher rejects accessor-backed prompt and request-budge
   assert.equal(calls, 0);
 });
 
+test('internal Agent invocation requires a positive explicit request-level model-call ceiling', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  for (const value of [undefined, 0, -0]) {
+    const payload = {
+      prompt: 'agent',
+      systemPrompt: '',
+      maxOutputTokens: 128,
+    };
+    if (value !== undefined) payload.maxModelCallsForRequest = value;
+    await assert.rejects(
+      dispatcher.execute(
+        'RUN_AI_ROUTED_PROMPT',
+        payload,
+        {
+          agentModelOrchestratorEnvelope: envelope,
+          providerCallBudgetContext: internalAgentBudgetContext(),
+        },
+      ),
+      /requires canonical bounded maxModelCallsForRequest/u,
+    );
+  }
+
+  assert.equal(calls, 0);
+});
+
 test('internal Agent image boundary rejects coercive text and accessors without executing getters', async () => {
   let calls = 0;
   let reads = 0;
