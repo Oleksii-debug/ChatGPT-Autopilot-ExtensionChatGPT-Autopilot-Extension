@@ -121,7 +121,7 @@ function normalizeRequest(input) {
   if (raw.schemaVersion !== RECIPE_CANDIDATE_ADMISSION_VERSION) {
     throw new Error('Unsupported RecipeCandidateAdmissionRequestV1 schemaVersion');
   }
-  return freezeDeep({
+  return Object.freeze({
     schemaVersion: RECIPE_CANDIDATE_ADMISSION_VERSION,
     admissionId: exactId(raw.admissionId, 'admissionId'),
     expectedRegistryId: exactId(raw.expectedRegistryId, 'expectedRegistryId'),
@@ -129,6 +129,8 @@ function normalizeRequest(input) {
       raw.expectedRegistryRevision,
       'expectedRegistryRevision',
     ),
+    // Deliberately do not traverse untrusted compilerInput here. The canonical
+    // compiler owns its descriptor-safe deep admission boundary.
     compilerInput: raw.compilerInput,
     admittedAt: exactTimestamp(raw.admittedAt, 'admittedAt'),
   });
