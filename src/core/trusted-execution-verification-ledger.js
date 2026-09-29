@@ -211,9 +211,15 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
     throw new Error('Unsupported trusted execution verification ledger schemaVersion');
   }
   const records = denseRecords(raw.records);
+  if (raw.revision !== records.length) {
+    throw new Error(
+      'Trusted execution verification ledger revision must exactly match append history',
+    );
+  }
   const recordIds = new Set();
   const verificationIds = new Set();
   const executionVerificationKeys = new Set();
+  const executionOutcomes = new Map();
   for (const record of records) {
     if (recordIds.has(record.recordId)) {
       throw new Error(`Duplicate trusted execution verification recordId: ${record.recordId}`);
@@ -226,15 +232,23 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
       );
     }
     verificationIds.add(verificationId);
-    const bindingKey = [
+    const executionKey = [
       record.taskId,
       record.planId,
       record.nodeId,
       record.effectId,
       record.policyEnvelopeId,
       record.executionId,
-      verificationId,
     ].join('\u001f');
+    const existingOutcome = executionOutcomes.get(executionKey);
+    if (existingOutcome && existingOutcome !== record.outcome) {
+      throw new Error(
+        'Trusted execution verification ledger contains contradictory outcomes for one execution',
+      );
+    }
+    executionOutcomes.set(executionKey, record.outcome);
+
+    const bindingKey = [executionKey, verificationId].join('\u001f');
     if (executionVerificationKeys.has(bindingKey)) {
       throw new Error('Duplicate trusted execution verification binding');
     }
