@@ -213,3 +213,28 @@ test('automatic Specialist prepare is cancelled when owner control changes after
   const current = await manager.get(id);
   assert.equal(current.job.runtime.runState, 'PAUSED');
 });
+
+
+test('runBurst stops after one automatic Specialist boundary instead of busy-looping', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+
+  const burst = await manager.runBurst(id, { maxCycles: 25, maxWallMs: 25000 });
+  assert.equal(burst.kind, 'BURST');
+  assert.equal(burst.cycles, 1);
+  assert.equal(burst.results[0].kind, 'SPECIALIST_PENDING');
+  assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 1);
+});
+
+test('runBurst stops after one explicit Specialist-required boundary for unbound jobs', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { delegation: false });
+
+  const burst = await manager.runBurst(id, { maxCycles: 25, maxWallMs: 25000 });
+  assert.equal(burst.kind, 'BURST');
+  assert.equal(burst.cycles, 1);
+  assert.equal(burst.results[0].kind, 'SPECIALIST_REQUIRED');
+  assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
+});
