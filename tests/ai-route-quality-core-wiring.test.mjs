@@ -201,6 +201,34 @@ test('Core evidence reader validates persisted registry even behind a noncanonic
   );
 });
 
+test('Core evidence reader request boundary rejects accessors without executing getter code', async () => {
+  let reads = 0;
+  let loads = 0;
+  const repository = {
+    async load() {
+      loads += 1;
+      return createEmptyState(1);
+    },
+  };
+  const read = createAiRouteQualityCoreEvidenceReaderV1({ repository });
+  const hostile = {};
+  Object.defineProperty(hostile, 'routeIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ['route-a'];
+    },
+  });
+
+  await assert.rejects(
+    read(hostile),
+    /enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+  assert.equal(loads, 1);
+});
+
 test('Core evidence reader factory rejects extra authority surfaces', () => {
   assert.throws(
     () => createAiRouteQualityCoreEvidenceReaderV1({
