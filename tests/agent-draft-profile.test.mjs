@@ -395,3 +395,50 @@ test('Agent draft rejects schedule chronology inversion before normalization', (
     /пізніше scheduleStartAt/,
   );
 });
+
+
+test('Agent draft rejects startUrl secrets and lossy URL aliases', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити URL',
+  };
+  const invalid = [
+    [' https://example.com/', /канонічним URL/],
+    ['https://user:secret@example.com/', /credentials/],
+    ['https://example.com/page#secret-state', /fragment/],
+    ['file:///tmp/private', /HTTP\(S\)/],
+    ['not a url', /валідним HTTP\(S\) URL/],
+  ];
+  for (const [startUrl, pattern] of invalid) {
+    assert.throws(
+      () => parseAgentDraftProfile({ ...base, policy: { startUrl } }),
+      pattern,
+      startUrl,
+    );
+  }
+  const draft = parseAgentDraftProfile({ ...base, policy: { startUrl: 'https://example.com/path' } });
+  assert.equal(draft.policy.startUrl, 'https://example.com/path');
+});
+
+test('Agent draft requires exact and complete active-window identities', () => {
+  const base = {
+    format: 'chatgpt-autopilot-agent-draft',
+    version: 1,
+    goal: 'Перевірити вікно',
+  };
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { activeWindowStart: ' 09:00', activeWindowEnd: '17:00' } }),
+    /HH:MM/,
+  );
+  assert.throws(
+    () => parseAgentDraftProfile({ ...base, policy: { activeWindowStart: '09:00' } }),
+    /start, і end/,
+  );
+  const draft = parseAgentDraftProfile({
+    ...base,
+    policy: { activeWindowStart: '09:00', activeWindowEnd: '17:00' },
+  });
+  assert.equal(draft.policy.activeWindowStart, '09:00');
+  assert.equal(draft.policy.activeWindowEnd, '17:00');
+});
