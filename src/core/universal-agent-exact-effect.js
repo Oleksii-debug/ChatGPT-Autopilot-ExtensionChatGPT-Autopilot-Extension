@@ -245,6 +245,17 @@ function normalizedState(input) {
         ? ''
         : timestamp(value.declaredAt, 'ambiguity.declaredAt'),
     };
+    const hasAmbiguityMetadata = Boolean(
+      ambiguity.reasonCode || ambiguity.summary || ambiguity.declaredAt,
+    );
+    if (hasAmbiguityMetadata && (!ambiguity.reasonCode || !ambiguity.declaredAt)) {
+      throw new Error('Exact-effect ambiguity metadata is incomplete');
+    }
+    if (ambiguity.declaredAt
+        && (Date.parse(ambiguity.declaredAt) < Date.parse(createdAt)
+          || Date.parse(ambiguity.declaredAt) > Date.parse(updatedAt))) {
+      throw new Error('Exact-effect ambiguity chronology is invalid');
+    }
   }
 
   let reconciliation = freshReconciliation();
@@ -266,6 +277,28 @@ function normalizedState(input) {
         ? ''
         : timestamp(value.resolvedAt, 'reconciliation.resolvedAt'),
     };
+    const hasReconciliationMetadata = Boolean(
+      reconciliation.outcome
+      || reconciliation.reasonCode
+      || reconciliation.summary
+      || reconciliation.resolvedAt
+    );
+    if (hasReconciliationMetadata
+        && (!reconciliation.outcome
+          || !reconciliation.reasonCode
+          || !reconciliation.resolvedAt)) {
+      throw new Error('Exact-effect reconciliation metadata is incomplete');
+    }
+    if (reconciliation.resolvedAt
+        && (Date.parse(reconciliation.resolvedAt) < Date.parse(createdAt)
+          || Date.parse(reconciliation.resolvedAt) > Date.parse(updatedAt))) {
+      throw new Error('Exact-effect reconciliation chronology is invalid');
+    }
+    if (reconciliation.resolvedAt
+        && verification
+        && Date.parse(reconciliation.resolvedAt) < Date.parse(verification.verifiedAt)) {
+      throw new Error('Exact-effect reconciliation cannot predate verification');
+    }
   }
 
   const commitId = optionalId(raw.commitId, 'commitId');
