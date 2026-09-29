@@ -17,6 +17,7 @@ import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRoute
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 import { createStoredOutcomeContractV1, deleteStoredOutcomeContractV1, listStoredOutcomeContractsV1, resolveStoredOutcomeContractV1, updateStoredOutcomeContractV1 } from './outcome-contract-control.js';
+import { normalizeOutcomeContractV1 } from './outcome-contract.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -730,9 +731,10 @@ export class CoreCommandDispatcher {
         OUTCOME_CREATE_PAYLOAD_KEYS,
         'OutcomeContract CREATE command payload',
       );
+      const canonicalContract = normalizeOutcomeContractV1(exactPayload.contract);
       let created;
       await this.repo.update(draft => {
-        created = createStoredOutcomeContractV1(draft, exactPayload.contract);
+        created = createStoredOutcomeContractV1(draft, canonicalContract);
         return draft;
       });
       return { contract: structuredClone(created) };
@@ -743,13 +745,14 @@ export class CoreCommandDispatcher {
         OUTCOME_UPDATE_PAYLOAD_KEYS,
         'OutcomeContract UPDATE command payload',
       );
+      const canonicalContract = normalizeOutcomeContractV1(exactPayload.contract);
       let updated;
       await this.repo.update(draft => {
         updated = updateStoredOutcomeContractV1(draft, {
           projectId: exactPayload.projectId,
           contractId: exactPayload.contractId,
           expectedRevision: exactPayload.expectedRevision,
-          contract: exactPayload.contract,
+          contract: canonicalContract,
         });
         return draft;
       });
