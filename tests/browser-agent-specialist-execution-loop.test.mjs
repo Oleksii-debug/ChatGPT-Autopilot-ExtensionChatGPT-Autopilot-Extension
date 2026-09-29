@@ -72,7 +72,7 @@ const specialist = {
   definitionRevision: 1,
 };
 
-async function seed(manager, { delegation = true } = {}) {
+async function seed(manager, { delegation = true, createRegistry = delegation } = {}) {
   const agent = definition({ delegation });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
@@ -133,7 +133,7 @@ async function seed(manager, { delegation = true } = {}) {
     return store;
   });
 
-  if (delegation) {
+  if (createRegistry) {
     const registries = await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
     await manager.mutateSpecialistRegistry({
       registryId: 'specialists:project-1',
@@ -202,10 +202,8 @@ test('automatic Specialist prepare is cancelled when owner control changes after
     return result;
   };
 
-  await assert.rejects(
-    () => manager.cycleOne(id),
-    /controlEpoch or run state drifted/,
-  );
+  const cancelled = await manager.cycleOne(id);
+  assert.equal(cancelled.kind, 'CANCELLED_BY_OWNER');
 
   const persisted = await manager.listSpecialistHandoffs(id);
   assert.equal(persisted.handoffs.length, 0);
@@ -236,5 +234,44 @@ test('runBurst stops after one explicit Specialist-required boundary for unbound
   assert.equal(burst.kind, 'BURST');
   assert.equal(burst.cycles, 1);
   assert.equal(burst.results[0].kind, 'SPECIALIST_REQUIRED');
+  assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
+});
+
+
+test('missing durable Specialist registry uses bounded planning backoff instead of uncaught loop failure', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { delegation: true, createRegistry: false });
+
+  const burst = await manager.runBurst(id, { maxCycles: 25, maxWallMs: 25000 });
+  assert.equal(burst.kind, 'BURST');
+  assert.equal(burst.cycles, 1);
+  assert.equal(burst.results[0].kind, 'PLANNING_RETRY');
+  assert.match(burst.results[0].error, /Specialist registry not found/);
+
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.runState, 'RUNNING');
+  assert.match(current.job.runtime.lastError, /Specialist registry not found/);
+  assert.ok(current.job.runtime.nextWakeAt > Date.parse('2026-09-29T03:05:00.000Z'));
+  assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
+});
+
+test('persistent automatic Specialist admission failure reaches the existing terminal ERROR fence', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager, { delegation: true, createRegistry: false });
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const retry = await manager.cycleOne(id);
+    assert.equal(retry.kind, 'PLANNING_RETRY');
+    assert.equal(retry.consecutive, attempt);
+  }
+  const terminal = await manager.cycleOne(id);
+  assert.equal(terminal.kind, 'ERROR');
+  assert.equal(terminal.consecutive, 4);
+
+  const current = await manager.get(id);
+  assert.equal(current.job.runtime.runState, 'ERROR');
+  assert.equal(current.job.runtime.nextWakeAt, 0);
   assert.equal((await manager.listSpecialistHandoffs(id)).handoffs.length, 0);
 });
