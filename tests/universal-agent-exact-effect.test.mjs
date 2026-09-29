@@ -753,6 +753,42 @@ test('restart normalization rejects forged VERIFIED or COMMITTED state without p
   );
 });
 
+
+test('restart normalization rejects forged executable phases without canonical retry proof', () => {
+  const prepared = createExactEffectStateV1(invocation(), { createdAt: AT });
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...prepared,
+      phase: ExactEffectPhase.PREPARED,
+      attempt: 1,
+      executionId: 'invoke-1:attempt:1',
+    }),
+    /PREPARED exact-effect phase must be pristine/,
+  );
+
+  let reconcile = reduceExactEffectV1(prepared, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'forged-safe-retry-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  reconcile = reduceExactEffectV1(reconcile, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'forged-safe-retry-ambiguity',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+  assert.equal(reconcile.phase, ExactEffectPhase.RECONCILE);
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...reconcile,
+      phase: ExactEffectPhase.SAFE_RETRY,
+    }),
+    /SAFE_RETRY exact-effect phase requires failed no-effect verification/,
+  );
+  assert.equal(exactEffectCanExecuteV1(reconcile), false);
+});
+
 test('commit is impossible without verified evidence', () => {
   let state = createExactEffectStateV1(invocation(), { createdAt: AT });
   state = reduceExactEffectV1(state, event(
