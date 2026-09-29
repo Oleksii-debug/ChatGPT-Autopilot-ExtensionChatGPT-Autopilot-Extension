@@ -537,6 +537,8 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (error && (typeof error === 'object' || typeof error === 'function')
+            && nonProviderRouteFailures.has(error)) throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -555,6 +557,8 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (error && (typeof error === 'object' || typeof error === 'function')
+            && nonProviderRouteFailures.has(error)) throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -578,6 +582,8 @@ export class AiOrchestrator {
             try {
               strongResult = await tryStrong(handoff, clean(systemPrompt), requestedTrigger);
             } catch (error) {
+              if (error && (typeof error === 'object' || typeof error === 'function')
+                  && nonProviderRouteFailures.has(error)) throw error;
               if (!settings.keepPrimaryIfStrongFails) throw error;
               trigger = `${requestedTrigger}-strong-failed-primary-used`;
             }
