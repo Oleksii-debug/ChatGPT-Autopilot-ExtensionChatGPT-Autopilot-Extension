@@ -386,8 +386,14 @@ test('durable PREPARED record resumes only the exact provider conversation after
     return store;
   });
   clock.value = Date.parse(T1);
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
 
-  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+  const result = await restarted.executeClaimedSpecialistProvider('job.coder', {
     agentId,
     conversationId: '55555555-5555-4555-8555-555555555555',
     expectedControlEpoch: 0,
@@ -399,10 +405,10 @@ test('durable PREPARED record resumes only the exact provider conversation after
   assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
   assert.equal(result.execution.status, 'PROVIDER_SUCCEEDED');
 
-  const durable = await manager.listSpecialistHandoffs('job.coder');
+  const durable = await restarted.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 1);
   assert.equal(durable.providerExecutions[0].status, 'PROVIDER_SUCCEEDED');
-  const history = (await manager.get('job.coder')).job.runtime.history;
+  const history = (await restarted.get('job.coder')).job.runtime.history;
   assert.ok(history.some(item => item.type === 'specialist-provider-execution-resumed'));
 });
 
