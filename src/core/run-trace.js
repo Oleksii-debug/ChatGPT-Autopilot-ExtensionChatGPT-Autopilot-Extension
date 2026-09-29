@@ -306,10 +306,12 @@ function validateGraph(events, observedThrough) {
 }
 
 function causalOrder(events, byId) {
-  const sorted = [...events].sort((left, right) => (
-    compare(left.occurredAt, right.occurredAt)
-    || compare(left.eventId, right.eventId)
-  ));
+  const sorted = [...events].sort((left, right) => {
+    const leftMs = Date.parse(left.occurredAt);
+    const rightMs = Date.parse(right.occurredAt);
+    return (leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0)
+      || compare(left.eventId, right.eventId);
+  });
   const emitted = new Set();
   const out = [];
   function emit(event) {
