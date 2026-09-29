@@ -12,7 +12,7 @@ function registry(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     revision: 7,
-    bindingKey: 'registry-binding-7',
+    bindingKey: '["agent-registry",7,"fixture"]',
     definitions: [],
     ...overrides,
   };
@@ -69,7 +69,7 @@ test('launch builder binds exact live definition revisions and explicit least-au
   assert.deepEqual({ ...request }, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 7,
-    expectedRegistryBindingKey: 'registry-binding-7',
+    expectedRegistryBindingKey: '["agent-registry",7,"fixture"]',
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 3,
     goal: 'Compare evidence and return a verified result.',
@@ -98,14 +98,6 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
   assert.equal(request.goal, 'Owner task');
   assert.equal(request.projectId, 'project-1');
   assert.equal(request.jobId, 'job.research-1');
-});
-
-test('launch requires the exact durable registry content binding', () => {
-  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
-    registry: registry({ bindingKey: '' }),
-    definition: definition(),
-    ownerPolicy: ownerPolicy(),
-  }), /registry bindingKey is required/u);
 });
 
 test('Project and Job identity aliases fail locally before Core mutation', () => {
@@ -170,6 +162,21 @@ test('launch fails closed when owner grants or requested narrowing exceed author
     definition: definition(),
     ownerPolicy: ownerPolicy(),
   }), /Requested tool narrowing exceeds the selected Agent definition authority/u);
+});
+
+test('launch request requires the exact registry content binding key', () => {
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry({ bindingKey: '  drifted  ' }),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  }), /registry bindingKey is invalid/u);
+
+  const request = buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry({ bindingKey: '["agent-registry",7,"exact"]' }),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  });
+  assert.equal(request.expectedRegistryBindingKey, '["agent-registry",7,"exact"]');
 });
 
 test('disabled, stale-representation and duplicate inputs fail before command construction', () => {

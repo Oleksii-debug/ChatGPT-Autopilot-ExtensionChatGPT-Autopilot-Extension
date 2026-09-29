@@ -40,6 +40,13 @@ function exactPositiveInteger(value, label) {
   return value;
 }
 
+function exactRegistryBindingKey(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 200_000) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
 function boundedText(value, label, max, { optional = false } = {}) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   const text = value.trim();
@@ -144,11 +151,9 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     registryRaw.revision,
     'Agent definition registry revision',
   );
-
-  const expectedRegistryBindingKey = boundedText(
+  const expectedRegistryBindingKey = exactRegistryBindingKey(
     registryRaw.bindingKey,
     'Agent definition registry bindingKey',
-    200000,
   );
 
   const agentDefinitionId = boundedText(

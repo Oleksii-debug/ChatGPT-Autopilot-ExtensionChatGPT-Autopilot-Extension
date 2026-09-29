@@ -2278,6 +2278,7 @@ async function createBrowserAgentFromDefinition() {
   }
 
   let createdId = '';
+  let createAcknowledged = false;
   try {
     const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
       registry,
@@ -2288,8 +2289,9 @@ async function createBrowserAgentFromDefinition() {
     status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
 
     const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
+    createAcknowledged = true;
     createdId = created?.job?.id || created?.selectedId || '';
-    if (!createdId) throw new Error('Core не повернув id створеного Agent job.');
+    if (!createdId) throw new Error('Core підтвердив create, але не повернув id створеного Agent job.');
 
     ui.selectedBrowserAgentId = createdId;
     await loadBrowserAgentJobs({ selectId: createdId });
@@ -2303,9 +2305,11 @@ async function createBrowserAgentFromDefinition() {
     announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
     $('agent-job-list').focus();
   } catch (error) {
-    if (createdId) {
-      status.textContent = `Завдання ${createdId} уже створено, але UI не зміг підтвердити його поточний стан: ${error.message}. Не створюйте повторно; оновіть список Agent jobs і перевірте цей ID.`;
-      announce('Reusable Agent завдання вже створено. Потрібна повторна перевірка його стану, а не повторне створення.');
+    if (createAcknowledged) {
+      const identity = createdId ? `Завдання ${createdId}` : 'Create-виклик';
+      const reconcile = createdId ? `перевірте цей ID ${createdId}` : 'оновіть список Agent jobs і знайдіть нове завдання перед будь-якою повторною спробою';
+      status.textContent = `${identity} уже підтверджено Core, але UI не зміг підтвердити durable результат: ${error.message}. Не створюйте повторно; ${reconcile}.`;
+      announce('Reusable Agent create уже підтверджено Core. Потрібна reconciliation-перевірка, а не повторне створення.');
     } else if (/revision drifted/i.test(String(error?.message || ''))) {
       await loadAgentDefinitionRegistries({
         selectRegistryId: registry.registryId,
