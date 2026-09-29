@@ -194,6 +194,16 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   };
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
+    mode: 'primary',
+    primary: { provider: route.provider, model: route.model },
+    strong: { provider: route.provider, model: route.model },
+    strongEveryNRequests: 0,
+    strongEveryMinutes: 0,
+    strongMinGapMinutes: 0,
+    strongMaxPerHour: 0,
+    carryStrongResultToPrimary: false,
+    fallbackToStrongOnPrimaryError: false,
+    keepPrimaryIfStrongFails: true,
     routes: [route],
     workerPolicy: scopedWorkerPolicy,
     routePolicy: {
@@ -319,6 +329,20 @@ export function normalizeBoundAgentModelOrchestratorEnvelopeV1(value) {
       || settings.routePolicy.allowRouteIds[0] !== routeId
       || settings.routePolicy.denyRouteIds.includes(routeId)) {
     throw new Error('orchestrator envelope route scope is invalid');
+  }
+  if (settings.mode !== 'primary'
+      || settings.primary.provider !== route.provider
+      || settings.primary.model !== route.model
+      || settings.strong.provider !== route.provider
+      || settings.strong.model !== route.model
+      || settings.strongEveryNRequests !== 0
+      || settings.strongEveryMinutes !== 0
+      || settings.strongMinGapMinutes !== 0
+      || settings.strongMaxPerHour !== 0
+      || settings.carryStrongResultToPrimary !== false
+      || settings.fallbackToStrongOnPrimaryError !== false
+      || settings.keepPrimaryIfStrongFails !== true) {
+    throw new Error('orchestrator envelope provider-call scope is invalid');
   }
   for (const runtimeRouteId of Object.keys(runtime.routeStates || {})) {
     if (runtimeRouteId !== routeId) {
