@@ -54,6 +54,7 @@ import {
   ExecutionOwnershipState,
   normalizeExecutionOwnershipV1,
   requireExecutionReconciliationV1,
+  recoverExpiredExecutionOwnershipV1,
 } from './execution-plane-ownership.js';
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
@@ -1898,6 +1899,7 @@ export class BrowserAgentManager {
     }
     let prepared = null;
     let providerRequest = null;
+    let resumedPrepared = false;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
@@ -1964,8 +1966,34 @@ export class BrowserAgentManager {
       const existing = executions.find(item =>
         item?.agentId === request.agentId && item?.leaseId === assignment.leaseId);
       if (existing) {
-        normalizeSpecialistProviderExecutionV1(existing);
-        throw new Error('Existing Specialist provider execution requires reconciliation before redispatch');
+        const durable = normalizeSpecialistProviderExecutionV1(existing);
+        const exactPreparedIdentity = durable.status === SpecialistProviderExecutionStatus.PREPARED
+          && durable.planId === plan.planId
+          && durable.nodeId === node.nodeId
+          && durable.agentId === assignment.agentId
+          && durable.handoffId === handoff.handoffId
+          && durable.providerId === providerId
+          && durable.leaseId === assignment.leaseId
+          && durable.leaseUntil === assignment.leaseExpiresAt
+          && JSON.stringify(durable.providerConfig) === JSON.stringify(normalizedProviderConfig);
+        if (!exactPreparedIdentity) {
+          throw new Error('Existing Specialist provider execution requires reconciliation before redispatch');
+        }
+        prepared = durable;
+        resumedPrepared = true;
+        providerRequest = {
+          client: providerClient,
+          input: {
+            handoff,
+            grantedCapabilityIds: selection.requestedCapabilityIds,
+            config: normalizedProviderConfig.config,
+            conversationId: durable.conversationId,
+          },
+        };
+        return store;
+      }
+      if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
+        throw new Error('Specialist provider execution history capacity exhausted; preserve and reconcile durable attempt evidence before further dispatch');
       }
 
       prepared = createSpecialistProviderExecutionV1({
@@ -1980,7 +2008,7 @@ export class BrowserAgentManager {
         providerConfig: normalizedProviderConfig,
         at: preparedAt,
       });
-      job.runtime.specialistProviderExecutions = [...executions, prepared].slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS);
+      job.runtime.specialistProviderExecutions = [...executions, prepared];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
@@ -2021,24 +2049,38 @@ export class BrowserAgentManager {
           providerStatus: '',
           providerSucceeded: false,
           manualReviewRequired: false,
-          reconciliationRequired: false,
-          safeToRetry: true,
+          reconciliationRequired: resumedPrepared,
+          safeToRetry: !resumedPrepared,
           effectEvidence: '',
-          errorCode: 'OWNER_CONTROL_CHANGED_BEFORE_PROVIDER_DISPATCH',
+          errorCode: resumedPrepared
+            ? 'OWNER_CONTROL_CHANGED_DURING_PREPARED_RECOVERY'
+            : 'OWNER_CONTROL_CHANGED_BEFORE_PROVIDER_DISPATCH',
           at: cancelledAt,
         });
         job.runtime.specialistProviderExecutions = executions.map((item, index2) => index2 === index ? cancelled : item);
         const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const ownershipIndex = ownerships.findIndex(item =>
-          item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+          item.ownerId === prepared.agentId
+          && item.leaseId === prepared.leaseId
+          && item.nodeId === prepared.nodeId);
         if (ownershipIndex < 0) {
           throw new Error('Cancelled Specialist provider dispatch lacks exact execution ownership');
         }
-        ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
-          leaseId: prepared.leaseId,
-          reason: 'Provider effect was not dispatched after owner control changed; trusted NO_EFFECT verification is required before retry.',
-          at: cancelledAt,
-        });
+        const cancelReason = resumedPrepared
+          ? 'Owner control changed while recovering a durable PREPARED provider execution with ambiguous prior effect.'
+          : 'Provider effect was not dispatched after owner control changed; trusted NO_EFFECT verification is required before retry.';
+        const currentOwnership = ownerships[ownershipIndex];
+        ownerships[ownershipIndex] = currentOwnership.state === ExecutionOwnershipState.RECONCILE
+          || Date.parse(cancelledAt) <= Date.parse(currentOwnership.leaseUntil)
+          ? requireExecutionReconciliationV1(currentOwnership, {
+            leaseId: prepared.leaseId,
+            reason: cancelReason,
+            at: cancelledAt,
+          })
+          : recoverExpiredExecutionOwnershipV1(currentOwnership, {
+            reason: cancelReason,
+            at: cancelledAt,
+          });
         job.runtime.specialistExecutionOwnerships = ownerships;
         job.runtime.updatedAt = this.now();
         appendHistory(job.runtime, {
@@ -2067,7 +2109,10 @@ export class BrowserAgentManager {
       },
     );
     try {
-      rawOutcome = await providerRequest.client.execute(providerRequest.input);
+      rawOutcome = await providerRequest.client.execute(providerRequest.input, {
+        allowCreate: !resumedPrepared,
+        deadlineMs: Date.parse(prepared.leaseUntil),
+      });
     } catch (error) {
       providerError = error;
     }
@@ -2144,7 +2189,9 @@ export class BrowserAgentManager {
       if (outcome.reconciliationRequired || outcome.manualReviewRequired || outcome.safeToRetry) {
         const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const ownershipIndex = ownerships.findIndex(item =>
-          item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+          item.ownerId === prepared.agentId
+          && item.leaseId === prepared.leaseId
+          && item.nodeId === prepared.nodeId);
         if (ownershipIndex < 0) {
           throw new Error('Specialist provider nonterminal outcome lacks exact execution ownership');
         }
@@ -2153,11 +2200,18 @@ export class BrowserAgentManager {
           : outcome.manualReviewRequired
             ? `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`
             : `Specialist provider reported retryable no-effect failure: ${outcome.errorCode || 'trusted NO_EFFECT verification required'}`;
-        ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
-          leaseId: prepared.leaseId,
-          reason,
-          at: observedAt,
-        });
+        const currentOwnership = ownerships[ownershipIndex];
+        ownerships[ownershipIndex] = currentOwnership.state === ExecutionOwnershipState.RECONCILE
+          || Date.parse(observedAt) <= Date.parse(currentOwnership.leaseUntil)
+          ? requireExecutionReconciliationV1(currentOwnership, {
+            leaseId: prepared.leaseId,
+            reason,
+            at: observedAt,
+          })
+          : recoverExpiredExecutionOwnershipV1(currentOwnership, {
+            reason,
+            at: observedAt,
+          });
         job.runtime.specialistExecutionOwnerships = ownerships;
       }
       job.runtime.updatedAt = this.now();
