@@ -85,6 +85,7 @@ import {
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
 import {
+  SpecialistProviderExecutionStatus,
   createSpecialistProviderExecutionV1,
   normalizeSpecialistProviderExecutionV1,
   recordSpecialistProviderExecutionOutcomeV1,
@@ -376,23 +377,55 @@ function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine)
   }
   return { registries, quarantine };
 }
-function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
+function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevisions, rawQuarantine) {
   const configs = Object.create(null);
+  const revisions = Object.create(null);
   const quarantine = Object.create(null);
   for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawQuarantine)) {
     try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+  }
+  for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawRevisions)) {
+    try {
+      const providerId = canonicalSpecialistProviderIdV1(key);
+      if (!Number.isSafeInteger(value) || value < 1 || Object.is(value, -0)) {
+        throw new Error('Stored Specialist provider config revision is invalid');
+      }
+      revisions[providerId] = value;
+    } catch {
+      try { quarantine[key] = true; } catch { /* impossible */ }
+    }
   }
   for (const [key, value] of storedSpecialistProviderConfigMapDescriptors(rawConfigs)) {
     try {
       const config = normalizeSpecialistProviderConfigV1(value);
       if (config.providerId !== key) throw new Error('Stored Specialist provider config identity drift');
+      const durableRevision = revisions[key] ?? config.revision;
+      if (durableRevision !== config.revision) {
+        throw new Error('Stored Specialist provider config revision drift');
+      }
       configs[key] = config;
+      revisions[key] = durableRevision;
       delete quarantine[key];
     } catch {
       try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
     }
   }
-  return { configs, quarantine };
+  return { configs, revisions, quarantine };
+}
+
+function specialistProviderConfigHasLiveExecution(store, providerId, at) {
+  const atMs = Date.parse(at);
+  for (const jobId of store.order || []) {
+    const executions = store.byId?.[jobId]?.runtime?.specialistProviderExecutions || [];
+    for (const item of executions) {
+      let execution;
+      try { execution = normalizeSpecialistProviderExecutionV1(item); } catch { return true; }
+      if (execution.providerId !== providerId) continue;
+      if (![SpecialistProviderExecutionStatus.PREPARED, SpecialistProviderExecutionStatus.RECONCILE, SpecialistProviderExecutionStatus.MANUAL_REVIEW].includes(execution.status)) continue;
+      if (!Number.isFinite(atMs) || Date.parse(execution.leaseUntil) > atMs) return true;
+    }
+  }
+  return false;
 }
 function nonNegativeSafeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
@@ -466,6 +499,7 @@ function freshStore() {
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
     specialistProviderConfigsById: Object.create(null),
+    specialistProviderConfigRevisionById: Object.create(null),
     specialistProviderConfigQuarantineById: Object.create(null),
   };
 }
@@ -968,9 +1002,11 @@ function normalizeStore(raw, now) {
   out.specialistRegistryQuarantineById = specialistState.quarantine;
   const providerConfigState = normalizePersistedSpecialistProviderConfigState(
     raw.specialistProviderConfigsById,
+    raw.specialistProviderConfigRevisionById,
     raw.specialistProviderConfigQuarantineById,
   );
   out.specialistProviderConfigsById = providerConfigState.configs;
+  out.specialistProviderConfigRevisionById = providerConfigState.revisions;
   out.specialistProviderConfigQuarantineById = providerConfigState.quarantine;
   return out;
 }
@@ -1316,6 +1352,7 @@ export class BrowserAgentManager {
     const config = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
     return {
       config: config ? clone(config) : null,
+      revision: Number(store.specialistProviderConfigRevisionById?.[canonicalId] || config?.revision || 0),
       quarantined: !config && Object.hasOwn(quarantine, canonicalId),
     };
   }
@@ -1352,10 +1389,15 @@ export class BrowserAgentManager {
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
       }
+      const revisions = store.specialistProviderConfigRevisionById
+        || (store.specialistProviderConfigRevisionById = Object.create(null));
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
-      const currentRevision = current?.revision || 0;
+      const currentRevision = Number(revisions[providerId] || current?.revision || 0);
       if (currentRevision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before update');
+      }
+      if (specialistProviderConfigHasLiveExecution(store, providerId, new Date(this.now()).toISOString())) {
+        throw new Error('Specialist provider config is bound to a live provider execution');
       }
       if (!current && Object.keys(configs).length >= MAX_SPECIALIST_PROVIDER_CONFIGS) {
         throw new Error('Specialist provider config capacity is exhausted');
@@ -1371,6 +1413,7 @@ export class BrowserAgentManager {
         updatedAt: new Date(this.now()).toISOString(),
       });
       configs[providerId] = committed;
+      revisions[providerId] = committed.revision;
       return store;
     });
     return { config: clone(committed) };
@@ -1399,21 +1442,27 @@ export class BrowserAgentManager {
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and requires explicit storage recovery');
       }
+      const revisions = store.specialistProviderConfigRevisionById
+        || (store.specialistProviderConfigRevisionById = Object.create(null));
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
-      if (!current) {
-        if (expectedRevision !== 0) {
-          throw new Error('Specialist provider config revision drifted before clear');
-        }
-        return store;
-      }
-      if (current.revision !== expectedRevision) {
+      const currentRevision = Number(revisions[providerId] || current?.revision || 0);
+      if (currentRevision !== expectedRevision) {
         throw new Error('Specialist provider config revision drifted before clear');
       }
+      if (!current) return store;
+      if (specialistProviderConfigHasLiveExecution(store, providerId, new Date(this.now()).toISOString())) {
+        throw new Error('Specialist provider config is bound to a live provider execution');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Specialist provider config revision cannot advance');
+      }
       delete configs[providerId];
+      revisions[providerId] = currentRevision + 1;
       cleared = true;
       return store;
     });
-    return { providerId, cleared };
+    const state = await this.getSpecialistProviderConfig(providerId);
+    return { providerId, cleared, revision: state.revision };
   }
 
   /**
