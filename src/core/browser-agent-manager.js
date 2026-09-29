@@ -40,7 +40,7 @@ import {
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
-import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
+import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
@@ -62,6 +62,10 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import {
+  materializeBoundAgentSpecialistDelegationIntentV1,
+  normalizeAgentSpecialistDelegationBindingV1,
+} from './agent-specialist-delegation-profile.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -80,6 +84,10 @@ const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
+const AGENT_DEFINITION_SPECIALIST_INTENT_KEYS = new Set([
+  'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId', 'at',
+  'childBudget', 'parentInvocationId',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -366,6 +374,46 @@ function normalizePersistedDefinitionConfigBindingKey(raw, selection, config) {
   }
   return raw;
 }
+function normalizePersistedAgentSpecialistDelegationBinding(raw, selection, scope, config) {
+  const profile = selection?.definition && Object.hasOwn(selection.definition, 'specialistDelegationProfile')
+    ? selection.definition.specialistDelegationProfile
+    : undefined;
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent specialist delegation binding requires persisted selection provenance');
+  }
+  if (profile == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent specialist delegation binding exists without a selected definition profile');
+  }
+  if (raw == null) {
+    throw new Error('Browser Agent selected definition delegation profile requires persisted specialist binding');
+  }
+  const binding = normalizeAgentSpecialistDelegationBindingV1(raw);
+  if (binding.jobId !== config.id
+      || binding.projectId !== (config.projectId || '')
+      || binding.registryId !== selection.registryId
+      || binding.registryRevision !== selection.registryRevision
+      || binding.agentDefinitionId !== selection.agentDefinitionId
+      || binding.definitionRevision !== selection.definitionRevision) {
+    throw new Error('Browser Agent specialist delegation binding provenance drifted from selected definition');
+  }
+  if (JSON.stringify(binding.profile) !== JSON.stringify(profile)) {
+    throw new Error('Browser Agent specialist delegation binding profile drifted from selected definition');
+  }
+  if (!scope) {
+    throw new Error('Browser Agent specialist delegation binding requires persisted definition scope');
+  }
+  const capabilities = new Set(scope.capabilityIds || []);
+  const tools = new Set(scope.toolIds || []);
+  if (binding.profile.requiredCapabilityIds.some(item => !capabilities.has(item))) {
+    throw new Error('Browser Agent specialist delegation binding capability scope exceeds persisted definition scope');
+  }
+  if (binding.profile.requiredToolIds.some(item => !tools.has(item))) {
+    throw new Error('Browser Agent specialist delegation binding tool scope exceeds persisted definition scope');
+  }
+  return binding;
+}
 function normalizePersistedDefinitionRouterOverride(raw, selection) {
   if (raw == null) {
     if (selection?.definition?.modelRoutePolicy) {
@@ -588,6 +636,12 @@ function normalizeStore(raw, now) {
         definitionSelection,
         config,
       );
+      const specialistDelegationBinding = normalizePersistedAgentSpecialistDelegationBinding(
+        raw.byId[id].specialistDelegationBinding,
+        definitionSelection,
+        definitionScope,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -596,6 +650,7 @@ function normalizeStore(raw, now) {
         definitionScope,
         definitionRouterOverride,
         definitionConfigBindingKey: definitionConfigBindingKeyValue,
+        specialistDelegationBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -852,6 +907,92 @@ export class BrowserAgentManager {
       projectId,
       planId,
     });
+  }
+
+  async materializeDefinitionSpecialistDelegationIntent(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      AGENT_DEFINITION_SPECIALIST_INTENT_KEYS,
+      'Browser Agent definition specialist delegation intent request',
+    );
+    for (const key of ['expectedRegistryRevision', 'expectedPlanRevision', 'nodeId']) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent definition specialist delegation intent request requires ${key}`);
+      }
+    }
+    if (Object.hasOwn(request, 'childBudget')) {
+      request.childBudget = snapshotAgentDefinitionLaunchRecord(
+        request.childBudget,
+        'Browser Agent definition specialist delegation childBudget',
+        3,
+      );
+    }
+    if (Object.hasOwn(request, 'parentInvocationId')) {
+      const parentInvocationId = request.parentInvocationId;
+      if (typeof parentInvocationId !== 'string') {
+        throw new Error('Browser Agent definition specialist delegation parentInvocationId must be exact text');
+      }
+      request.parentInvocationId = parentInvocationId;
+    }
+
+    const current = await this.get(id);
+    const job = current.job;
+    if (!job) throw new Error('Browser Agent job not found');
+    if (!job.definitionSelection || !job.specialistDelegationBinding) {
+      throw new Error('Browser Agent job has no durable Agent-definition specialist delegation binding');
+    }
+    if (!job.definitionScope) {
+      throw new Error('Browser Agent job has no durable Agent-definition scope');
+    }
+    if (!job.config?.projectId) {
+      throw new Error('Browser Agent definition specialist delegation requires a Project-bound job');
+    }
+    if (!job.runtime?.plan) {
+      throw new Error('Browser Agent has no durable plan for specialist delegation');
+    }
+
+    const plan = normalizeAgentPlanV1(job.runtime.plan);
+    if (plan.jobId !== job.id) {
+      throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+    }
+    if (plan.revision !== request.expectedPlanRevision) {
+      throw new Error('Browser Agent AgentPlan revision drifted before specialist delegation intent materialization');
+    }
+    const node = plan.nodes.find(candidate => candidate.nodeId === request.nodeId);
+    if (!node) {
+      throw new Error('Browser Agent AgentPlan node not found for specialist delegation intent');
+    }
+    if (node.state !== AgentPlanNodeState.READY) {
+      throw new Error('Browser Agent AgentPlan node must be READY for specialist delegation intent');
+    }
+    if (![AgentExecutionPlane.LOCAL, AgentExecutionPlane.CLOUD, AgentExecutionPlane.REMOTE].includes(node.executionPlane)) {
+      throw new Error('Browser Agent specialist delegation intent requires LOCAL, CLOUD or REMOTE AgentPlan node');
+    }
+
+    const at = specialistRequestTimestamp(
+      request.at,
+      new Date(this.now()).toISOString(),
+      'Browser Agent definition specialist delegation at',
+    );
+    return clone(materializeBoundAgentSpecialistDelegationIntentV1({
+      binding: job.specialistDelegationBinding,
+      jobId: job.id,
+      projectId: job.config.projectId,
+      agentDefinitionRegistryId: job.definitionSelection.registryId,
+      agentDefinitionRegistryRevision: job.definitionSelection.registryRevision,
+      agentDefinitionId: job.definitionSelection.agentDefinitionId,
+      definitionRevision: job.definitionSelection.definitionRevision,
+      parentCapabilityIds: job.definitionScope.capabilityIds,
+      parentToolIds: job.definitionScope.toolIds,
+      expectedRegistryRevision: request.expectedRegistryRevision,
+      expectedPlanRevision: request.expectedPlanRevision,
+      nodeId: request.nodeId,
+      at,
+      ...(Object.hasOwn(request, 'childBudget') ? { childBudget: request.childBudget } : {}),
+      ...(Object.hasOwn(request, 'parentInvocationId')
+        ? { parentInvocationId: request.parentInvocationId }
+        : {}),
+    }));
   }
 
   async listSpecialistHandoffs(id = '') {
@@ -1170,6 +1311,9 @@ export class BrowserAgentManager {
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
+        specialistDelegationBinding: materialized.specialistDelegationBinding
+          ? clone(materialized.specialistDelegationBinding)
+          : null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1232,6 +1376,7 @@ export class BrowserAgentManager {
         definitionScope: null,
         definitionRouterOverride: null,
         definitionConfigBindingKey: null,
+        specialistDelegationBinding: null,
         createdAt: now,
         updatedAt: now,
       };
