@@ -1433,3 +1433,71 @@ test('expired PREPARED recovery owner drift still enters reconciliation', async 
   assert.equal(durable.executionOwnerships[0].leaseId, assignment.leaseId);
 });
 
+
+
+test('corrupt durable provider execution fails closed across restart and Start', async () => {
+  const { chrome } = chromeStorage();
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  const valid = createSpecialistProviderExecutionV1({
+    planId: 'plan:job.coder',
+    nodeId: 'local:code',
+    agentId,
+    handoffId: provenance.handoff.handoffId,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    leaseId: assignment.leaseId,
+    leaseUntil: assignment.leaseExpiresAt,
+    conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    providerConfig: providerConfig(),
+    at: T0,
+  });
+  const corrupt = structuredClone(valid);
+  corrupt.providerConfig.revision = 'corrupt';
+
+  const store = await manager.load();
+  store.byId['job.coder'].runtime.specialistProviderExecutions = [corrupt];
+  await chrome.storage.local.set({ [BROWSER_AGENT_STORAGE_KEY]: store });
+
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T1),
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+
+  const afterRestart = await restarted.get('job.coder');
+  assert.equal(afterRestart.job.runtime.specialistProviderExecutionIntegrityFault, true);
+  assert.equal(afterRestart.job.runtime.runState, 'ERROR');
+  assert.match(afterRestart.job.runtime.lastError, /execution integrity fault/);
+  assert.equal(afterRestart.job.runtime.specialistProviderExecutions.length, 0);
+
+  await assert.rejects(
+    () => restarted.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /execution integrity fault requires explicit reconciliation/,
+  );
+  assert.equal(calls, 0);
+
+  await assert.rejects(
+    () => restarted.start('job.coder', { runInitial: false }),
+    /execution integrity fault requires explicit reconciliation before Start/,
+  );
+  assert.equal(calls, 0);
+  const final = await restarted.get('job.coder');
+  assert.equal(final.job.runtime.specialistProviderExecutionIntegrityFault, true);
+  assert.equal(final.job.runtime.runState, 'ERROR');
+});
