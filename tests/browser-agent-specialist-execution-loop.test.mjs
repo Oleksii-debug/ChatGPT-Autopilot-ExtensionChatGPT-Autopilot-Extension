@@ -8,6 +8,7 @@ import { SpecialistRegistryMutationKind } from '../src/core/specialist-registry.
 function chromeStorage() {
   const data = Object.create(null);
   return {
+    data,
     chrome: {
       storage: { local: {
         async get(key) { return { [key]: structuredClone(data[key]) }; },
@@ -415,14 +416,12 @@ test('existing owned Specialist work consumes durable Agent profile capacity bef
   assert.equal(first.claimed.length, 1);
   assert.equal(first.executionOwnerships.filter(item => item.state === 'OWNED').length, 1);
 
-  const preparedSecond = await manager.prepareSpecialistHandoff(id, {
+  const current = await manager.get(id);
+  const liveRegistry = await manager.getSpecialistRegistry('specialists:project-1');
+  const preparedSecond = await manager.prepareDefinitionSpecialistDelegation(id, {
+    expectedRegistryRevision: liveRegistry.registry.revision,
+    expectedPlanRevision: current.job.runtime.plan.revision,
     nodeId: 'local:research-2',
-    specialistId: 'specialist.research.local',
-    requestedCapabilityIds: ['research'],
-    parentCapabilityIds: ['research'],
-    policyEnvelopeId: 'policy:research',
-    deadlineAt: '2026-09-29T03:20:00.000Z',
-    priority: 7,
     at: '2026-09-29T03:07:00.000Z',
   });
   assert.equal(preparedSecond.reused, false);

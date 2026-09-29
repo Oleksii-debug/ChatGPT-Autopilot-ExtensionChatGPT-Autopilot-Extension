@@ -63,6 +63,18 @@ const specialistDefinition = {
 };
 
 async function setup(manager) {
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: {
+      maxConcurrentAgents: 4,
+      maxChildAgents: 16,
+      maxModelCalls: 100,
+      maxModelInputTokens: 100000,
+      maxModelOutputTokens: 100000,
+      maxRuntimeSeconds: 3600,
+      maxCostUsdMicros: 5000000,
+    },
+  });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
@@ -337,7 +349,12 @@ test('product-wide claim fails closed when an owner-bound handoff lost admission
 
 test('owner-bound claim requires trusted executable readiness on the product dependency path', async () => {
   const storage = chromeStorage();
-  const manager = managerFor(storage.chrome);
+  const clock = { value: Date.parse('2026-09-29T03:05:00.000Z') };
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+  });
   const registry = await setup(manager);
   await manager.prepareDefinitionSpecialistDelegation('job.research', {
     expectedRegistryRevision: registry.nextRegistryRevision,
@@ -346,6 +363,7 @@ test('owner-bound claim requires trusted executable readiness on the product dep
     at: '2026-09-29T03:05:00.000Z',
   });
 
+  clock.value = Date.parse('2026-09-29T03:06:00.000Z');
   const claim = {
     availableSlots: 1,
     maxChildrenPerAgent: 1,
@@ -366,8 +384,8 @@ test('owner-bound claim requires trusted executable readiness on the product dep
         executable,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
-        observedAt: new Date(Date.now()).toISOString(),
-        resolvedAt: new Date(Date.now()).toISOString(),
+        observedAt: new Date(clock.value).toISOString(),
+        resolvedAt: new Date(clock.value).toISOString(),
         maxAgeMs: 60_000,
       };
     },
@@ -399,7 +417,11 @@ test('owner-bound claim requires trusted executable readiness on the product dep
 
 test('owner-bound claim fails closed when trusted readiness becomes stale before serialized claim', async () => {
   const storage = chromeStorage();
-  const manager = managerFor(storage.chrome);
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse('2026-09-29T03:06:00.000Z'),
+  });
   const registry = await setup(manager);
   await manager.prepareDefinitionSpecialistDelegation('job.research', {
     expectedRegistryRevision: registry.nextRegistryRevision,
@@ -420,8 +442,8 @@ test('owner-bound claim fails closed when trusted readiness becomes stale before
         executable: true,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
-        observedAt: new Date(Date.now()).toISOString(),
-        resolvedAt: new Date(Date.now()).toISOString(),
+        observedAt: '2026-09-29T03:06:00.000Z',
+        resolvedAt: '2026-09-29T03:06:00.000Z',
         maxAgeMs: 60_000,
       };
     },

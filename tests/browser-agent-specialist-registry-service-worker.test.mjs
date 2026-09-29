@@ -48,6 +48,6 @@ test('definition-bound Specialist admission command remains mutation-only and de
 
   assert.match(
     source,
-    /message\.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION'[\s\S]*?browserAgent\.prepareDefinitionSpecialistDelegation\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.delegation \|\| \{\}[\s\S]*?\)/,
+    /message\.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION'[\s\S]*?const delegation = structuredClone\(message\.payload\?\.delegation \|\| \{\}\)[\s\S]*?delete delegation\.at[\s\S]*?browserAgent\.prepareDefinitionSpecialistDelegation\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?delegation[\s\S]*?\)/,
   );
 });
