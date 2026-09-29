@@ -41,7 +41,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return createAgentDefinitionRegistryV1({{
+  return createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
