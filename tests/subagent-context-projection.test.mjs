@@ -119,6 +119,7 @@ function request(overrides = {}) {
     expectedParentAgentId: 'agent.parent',
     expectedChildAgentId: 'agent.child',
     expectedTaskId: 'task.child',
+    expectedProjectRevisionId: 'project-r2',
     parentProjectSnapshot: snapshot(),
     priorParentCapsule: capsule(),
     ...overrides,
@@ -220,6 +221,10 @@ test('caller binds exact parent child and task identities before projection', ()
   assert.throws(
     () => projectSubagentContextV1(request({ expectedTaskId: 'task.other' })),
     /taskId binding mismatch/,
+  );
+  assert.throws(
+    () => projectSubagentContextV1(request({ expectedProjectRevisionId: 'project-r1' })),
+    /project snapshot revision binding mismatch/i,
   );
   assert.throws(
     () => projectSubagentContextV1(request({
