@@ -518,11 +518,14 @@ export class ProjectWorkspaceRepository {
         }
       } else {
         const durable = validateProjectWorkspace(durableRaw);
-        if (expectedRevision !== null && durable.revision !== expectedRevision) {
-          throw new Error('Project workspace durable revision changed before save');
-        }
+        // Exact replay is recovery-safe even when the caller still carries the
+        // previous expected revision because the original write may have
+        // committed before its acknowledgement was lost.
         if (candidate.revision === durable.revision && sameCanonicalData(candidate, durable)) {
           return durable;
+        }
+        if (expectedRevision !== null && durable.revision !== expectedRevision) {
+          throw new Error('Project workspace durable revision changed before save');
         }
         if (candidate.revision !== durable.revision + 1) {
           throw new Error('Project workspace revision must advance exactly once');
