@@ -272,7 +272,10 @@ export class OrchestrationV2Manager {
     this.fetchFn = fetchFn;
     this.collectAssistantReport = collectAssistantReport;
     this.resolveHierarchyProvider = typeof resolveHierarchyProvider === 'function' ? resolveHierarchyProvider : null;
-    this.projectWorkspaceRepository = new ProjectWorkspaceRepository(chromeApi);
+    this.projectWorkspaceRepository = projectWorkspaceRepository || new ProjectWorkspaceRepository(chromeApi);
+    if (typeof this.projectWorkspaceRepository?.resolveContext !== 'function') {
+      throw new Error('Project Workspace context resolver dependency is required');
+    }
     this.now = now;
     this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     this.controllers = new Map();
@@ -741,79 +744,6 @@ export class OrchestrationV2Manager {
 
 
   /**
-   * Resolve task-visible Project context only after the exact immutable task
-   * envelope has been bound to an append-only canonical activation record.
-   *
-   * The task body remains caller-shaped input, but its full normalized content
-   * fingerprint and plan/outcome/agent identities must match durable owner state.
-   * Project bytes then come only from ProjectWorkspaceRepository.resolveContext.
-   * This method grants no retrieval, execution, mutation, credential, policy,
-   * scheduling, verification, or completion authority.
-   */
-  async resolveBoundSubagentTaskContext(input = {}, id = '') {
-    const request = snapshotSubagentContextResolution(input);
-    const task = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
-    const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
-
-    const bindingLookup = plainSubagentBindingLookup({
-      bindingId: request.bindingId,
-    }, 'Subagent durable-context binding lookup');
-    // Validate the lookup identity before the first owner-state await.
-    resolveSubagentTaskActivationBindingV1(
-      createSubagentTaskActivationBindingRegistryV1(),
-      bindingLookup,
-    );
-
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
-
-    const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
-    const binding = resolveSubagentTaskActivationBindingV1(
-      storedSubagentTaskActivationBindingRegistry(runtime),
-      bindingLookup,
-    );
-    if (!binding) throw new Error('Durable subagent task activation binding not found');
-    if (binding.projectId !== runtime.projectId) {
-      throw new Error('Durable subagent activation binding crosses orchestra project authority');
-    }
-    assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding);
-
-    const projectionRequest = {
-      schemaVersion: 1,
-      authorityEnvelope: request.authorityEnvelope,
-      taskEnvelope: task,
-      expectedParentAgentId: binding.parentAgentId,
-      expectedChildAgentId: binding.childAgentId,
-      expectedTaskId: binding.taskId,
-      expectedProjectRevisionId: request.expectedProjectRevisionId,
-    };
-    if (Object.hasOwn(request, 'capsuleId')) {
-      projectionRequest.capsuleId = request.capsuleId;
-    }
-
-    const context = await projectDurableSubagentTaskContextV1(
-      projectionRequest,
-      lookup => this.projectWorkspaceRepository.resolveContext(lookup),
-    );
-
-    return Object.freeze({
-      orchestraId,
-      bindingId: binding.bindingId,
-      taskDispatchIdentity: binding.taskDispatchIdentity,
-      context,
-      retrievalAuthorized: false,
-      executionAuthorized: false,
-      mutationAuthorized: false,
-      credentialAuthority: false,
-      policyAuthority: false,
-      schedulingAuthority: false,
-      verificationAuthority: false,
-      completionAuthority: false,
-    });
-  }
-
-  /**
    * Resolve one child-visible Project context only after proving that the caller's
    * task envelope is the exact task already bound into durable orchestration
    * activation evidence. Project bytes then come from the existing canonical
@@ -823,6 +753,15 @@ export class OrchestrationV2Manager {
   async resolveDurableSubagentTaskContext(input = {}, id = '') {
     const request = snapshotSubagentContextResolution(input);
     const task = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
+    const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
+    const bindingLookup = plainSubagentBindingLookup({
+      bindingId: request.bindingId,
+    }, 'Subagent durable-context binding lookup');
+    // Reject malformed lookup identities before any durable owner-state await.
+    resolveSubagentTaskActivationBindingV1(
+      createSubagentTaskActivationBindingRegistryV1(),
+      bindingLookup,
+    );
 
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
@@ -831,14 +770,14 @@ export class OrchestrationV2Manager {
     const runtime = await controller.runtimeRepository.load();
     const binding = resolveSubagentTaskActivationBindingV1(
       storedSubagentTaskActivationBindingRegistry(runtime),
-      { bindingId: request.bindingId },
+      bindingLookup,
     );
     if (!binding) throw new Error('Durable subagent activation binding not found');
     if (binding.projectId !== runtime.projectId) {
       throw new Error('Durable subagent activation binding crosses orchestra project authority');
     }
 
-    const taskDispatchIdentity = assertTaskMatchesDurableSubagentBinding(task, binding);
+    assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding);
     const contextRequest = {
       schemaVersion: 1,
       authorityEnvelope: request.authorityEnvelope,
