@@ -51,6 +51,7 @@ const ui = {
   agentDefinitionMode: 'none',
   agentDefinitionQuarantineCount: 0,
   agentDefinitionLaunchDefinitionId: '',
+  ownerResourceBudgetState: null,
   specialistAutomationPolicy: null,
   specialistAutomationPolicyRevision: 0,
   specialistAutomationPolicyQuarantined: false,
@@ -2840,24 +2841,21 @@ function renderSpecialistAutomationPolicy() {
   const policy = ui.specialistAutomationPolicy;
   const quarantined = ui.specialistAutomationPolicyQuarantined === true;
   const enabled = $('agent-specialist-automation-enabled');
-  const capacity = $('agent-specialist-automation-capacity');
   const save = $('agent-specialist-automation-save-button');
   const clear = $('agent-specialist-automation-clear-button');
   const status = $('agent-specialist-automation-status');
 
   enabled.checked = policy?.enabled === true;
-  capacity.value = String(policy?.maxConcurrentHandoffs ?? 0);
   enabled.disabled = quarantined;
-  capacity.disabled = quarantined;
   save.disabled = quarantined;
   clear.disabled = quarantined || !policy;
 
   if (quarantined) {
-    status.textContent = `Specialist automation policy revision ${ui.specialistAutomationPolicyRevision} пошкоджена й заблокована fail-closed. Нові automatic claims не запускаються; потрібне явне відновлення durable storage.`;
+    status.textContent = 'Specialist automation policy у карантині як пошкоджена; automatic claim/provider dispatch вимкнено.';
   } else if (!policy) {
     status.textContent = `Specialist automation policy не задана. Automatic claim/provider dispatch вимкнено. Durable revision: ${ui.specialistAutomationPolicyRevision}.`;
   } else {
-    status.textContent = `Specialist automation policy revision ${policy.revision}: ${policy.enabled ? 'увімкнено' : 'вимкнено'}, product-wide capacity ${policy.maxConcurrentHandoffs}.`;
+    status.textContent = `Specialist automation policy revision ${policy.revision}: ${policy.enabled ? 'увімкнено' : 'вимкнено'}. Product-wide capacity визначає ResourceBudgetV1.`;
   }
 }
 
@@ -2874,19 +2872,12 @@ async function loadSpecialistAutomationPolicy() {
 }
 
 async function saveSpecialistAutomationPolicy() {
-  const capacity = Number($('agent-specialist-automation-capacity').value);
-  if (!Number.isSafeInteger(capacity) || capacity < 0 || capacity > 256) {
-    $('agent-specialist-automation-status').textContent = 'Введіть ціле product-wide значення від 0 до 256.';
-    $('agent-specialist-automation-capacity').focus();
-    return;
-  }
   const button = $('agent-specialist-automation-save-button');
   try {
     button.disabled = true;
     const result = await core('SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY', {
       expectedRevision: ui.specialistAutomationPolicyRevision,
       enabled: $('agent-specialist-automation-enabled').checked,
-      maxConcurrentHandoffs: capacity,
     });
     ui.specialistAutomationPolicy = result?.policy || null;
     ui.specialistAutomationPolicyRevision = Number(result?.policy?.revision || ui.specialistAutomationPolicyRevision);
@@ -2925,6 +2916,77 @@ async function clearSpecialistAutomationPolicy() {
     }
   } finally {
     renderSpecialistAutomationPolicy();
+  }
+}
+
+async function loadBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  try {
+    const state = await core('GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET');
+    ui.ownerResourceBudgetState = state;
+    input.value = String(state?.budget?.maxConcurrentAgents ?? 0);
+    const quarantined = state?.quarantined === true;
+    input.disabled = quarantined;
+    saveButton.disabled = quarantined;
+    status.textContent = quarantined
+      ? `ResourceBudgetV1 у карантині як пошкоджений; нова Specialist capacity закрита. Revision ${state?.revision ?? 0}.`
+      : `Глобальна Specialist capacity: ${state?.budget?.maxConcurrentAgents ?? 0}; revision ${state?.revision ?? 0}.`;
+  } catch (error) {
+    ui.ownerResourceBudgetState = null;
+    input.disabled = true;
+    saveButton.disabled = true;
+    status.textContent = `Не вдалося завантажити глобальний ResourceBudgetV1: ${error.message}`;
+  }
+}
+
+async function saveBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  const state = ui.ownerResourceBudgetState;
+  if (!state || state.quarantined === true) {
+    status.textContent = 'ResourceBudgetV1 недоступний для безпечного збереження; спочатку перечитайте стан.';
+    return;
+  }
+  let maxConcurrentAgents;
+  try {
+    maxConcurrentAgents = parseStrictBoundedInteger(input.value, {
+      min: 0,
+      max: 256,
+      label: 'Глобальна Specialist capacity',
+    });
+  } catch (error) {
+    status.textContent = error.message;
+    input.focus();
+    return;
+  }
+  input.disabled = true;
+  saveButton.disabled = true;
+  status.textContent = 'Зберігаю глобальну Specialist capacity…';
+  try {
+    const committed = await core('SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET', {
+      expectedRevision: state.revision,
+      budget: {
+        ...(state.budget || {}),
+        maxConcurrentAgents,
+      },
+    });
+    ui.ownerResourceBudgetState = committed;
+    input.value = String(committed?.budget?.maxConcurrentAgents ?? 0);
+    status.textContent = `Збережено глобальну Specialist capacity ${committed?.budget?.maxConcurrentAgents ?? 0}; revision ${committed?.revision ?? 0}.`;
+    announce('Глобальну Specialist capacity збережено.');
+  } catch (error) {
+    await loadBrowserAgentOwnerResourceBudget();
+    status.textContent = `Глобальну capacity не збережено: ${error.message}. Поточний стан перечитано.`;
+    announce('Глобальну Specialist capacity не збережено.');
+    return;
+  } finally {
+    if (ui.ownerResourceBudgetState && ui.ownerResourceBudgetState.quarantined !== true) {
+      input.disabled = false;
+      saveButton.disabled = false;
+    }
   }
 }
 
@@ -4740,6 +4802,7 @@ $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgen
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
+$('agent-owner-resource-budget-save-button').addEventListener('click', saveBrowserAgentOwnerResourceBudget);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));

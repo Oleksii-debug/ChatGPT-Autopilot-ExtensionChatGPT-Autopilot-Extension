@@ -82,6 +82,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY',
+  'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
@@ -778,6 +779,10 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.setSpecialistAutomationPolicy(message.payload || {});
   } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
     result = await browserAgent.clearSpecialistAutomationPolicy(message.payload || {});
+  } else if (message.command === 'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.getOwnerResourceBudget();
+  } else if (message.command === 'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.setOwnerResourceBudget(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
     result = await browserAgent.listSpecialistProviderConfigs();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
