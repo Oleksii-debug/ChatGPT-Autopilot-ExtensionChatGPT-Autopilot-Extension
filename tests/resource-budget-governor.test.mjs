@@ -229,3 +229,95 @@ test('rejects accessor-backed, hidden and symbol fields without executing getter
   symbolUsage[Symbol('usage')] = 1;
   assert.throws(() => normalizeResourceUsageV1(symbolUsage), /symbol field/);
 });
+
+
+test('resource evaluation snapshots the outer envelope before any getter can run', () => {
+  let reads = 0;
+  const input = {
+    budget: { maxModelCalls: 1 },
+    usage: {},
+    request: { modelCalls: 1 },
+  };
+  Object.defineProperty(input, 'request', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return { modelCalls: 1 };
+    },
+  });
+  assert.throws(
+    () => evaluateResourceBudgetV1(input),
+    /Resource budget evaluation request fields must be own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const hidden = { budget: { maxModelCalls: 1 } };
+  Object.defineProperty(hidden, 'authorityBypass', {
+    enumerable: false,
+    value: true,
+  });
+  assert.throws(
+    () => evaluateResourceBudgetV1(hidden),
+    /unknown field: authorityBypass/,
+  );
+});
+
+test('resource record normalization snapshots descriptor values exactly once', () => {
+  let descriptorReads = 0;
+  const target = { maxModelCalls: 1 };
+  const proxy = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
+      if (key === 'maxModelCalls' && descriptor) {
+        descriptorReads += 1;
+        return {
+          ...descriptor,
+          value: descriptorReads === 1 ? 1 : 999,
+        };
+      }
+      return descriptor;
+    },
+  });
+  const normalized = normalizeResourceBudgetV1(proxy);
+  assert.equal(normalized.maxModelCalls, 1);
+  assert.equal(descriptorReads, 1);
+});
+
+test('usage normalization options and child-budget envelopes reject accessor authority before reads', () => {
+  let optionReads = 0;
+  const options = {};
+  Object.defineProperty(options, 'label', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      optionReads += 1;
+      return 'ResourceRequestV1';
+    },
+  });
+  assert.throws(
+    () => normalizeResourceUsageV1({}, options),
+    /Resource usage normalization options fields must be own data properties/,
+  );
+  assert.equal(optionReads, 0);
+
+  let childReads = 0;
+  const child = {
+    parentBudget: budget,
+    parentUsage: usage,
+    requestedBudget: budget,
+  };
+  Object.defineProperty(child, 'requestedBudget', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      childReads += 1;
+      return budget;
+    },
+  });
+  assert.throws(
+    () => deriveChildResourceBudgetV1(child),
+    /Child resource budget request fields must be own data properties/,
+  );
+  assert.equal(childReads, 0);
+});
