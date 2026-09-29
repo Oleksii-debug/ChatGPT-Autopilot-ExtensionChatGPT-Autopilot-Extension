@@ -4,6 +4,7 @@ import {
   PROJECT_WORKSPACE_STORAGE_KEY,
   ProjectWorkspaceRepository,
   addProjectSnapshot,
+  createProjectRecord,
   createProjectWorkspace,
   getProjectArtifactProvenance,
   projectCurrentState,
