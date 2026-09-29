@@ -33,6 +33,9 @@ function bindingKey(value) {
     value.nodeId,
     value.ownerId,
     value.executionPlane,
+    value.workTitle ?? null,
+    value.workObjective ?? null,
+    value.workAcceptanceCriteria ?? null,
     [
       value.workBudget.maxModelCalls,
       value.workBudget.maxRuntimeSeconds,
@@ -69,6 +72,9 @@ function repairIntent() {
     nodeId: 'repair-node',
     ownerId: 'repair-actor',
     executionPlane: 'LOCAL',
+    workTitle: 'Repair failed output',
+    workObjective: 'Apply the bounded repair',
+    workAcceptanceCriteria: ['Repair artifact materialized'],
     workBudget: {
       maxModelCalls: 1,
       maxRuntimeSeconds: 120,
@@ -179,8 +185,6 @@ test('self-repair invocation exposes the exact provider-budget owner as jobId wh
       jobId: intent.ownerId,
       controlEpoch: 1,
     },
-    prompt: 'Repair the failed node.',
-    systemPrompt: '',
     maxOutputTokens: 128,
     currentNow: 300,
   });
