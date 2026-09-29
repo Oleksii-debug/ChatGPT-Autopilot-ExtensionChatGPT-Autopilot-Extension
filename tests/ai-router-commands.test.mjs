@@ -510,12 +510,6 @@ test('Agent runtime route policy rejects coercive aliases before provider I/O', 
     { locality:' local ' },
     { maxInputPricePerMillionUsd:'0' },
     { maxOutputPricePerMillionUsd:-0 },
-    { retryBackoffSeconds:'120' },
-    { retryBackoffSeconds:-0 },
-    { circuitBreakerFailures:'2' },
-    { circuitBreakerFailures:-0 },
-    { circuitBreakerSeconds:'600' },
-    { circuitBreakerSeconds:-0 },
     { allowRouteIds:[' local '] },
   ]) {
     await assert.rejects(

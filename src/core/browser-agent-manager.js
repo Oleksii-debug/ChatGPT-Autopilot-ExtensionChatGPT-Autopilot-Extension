@@ -264,7 +264,12 @@ function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   }
   for (const [key, value] of storedAgentDefinitionMapDescriptors(rawRegistries)) {
     try {
-      const registry = normalizeAgentDefinitionRegistryV1(value);
+      const descriptors = value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.getOwnPropertyDescriptors(value)
+        : null;
+      const registry = descriptors && !Object.hasOwn(descriptors, 'bindingKey')
+        ? createAgentDefinitionRegistryV1(value)
+        : normalizeAgentDefinitionRegistryV1(value);
       if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
       registries[key] = registry;
       delete quarantine[key];

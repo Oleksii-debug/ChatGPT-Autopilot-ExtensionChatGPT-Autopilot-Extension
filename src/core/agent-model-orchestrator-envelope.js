@@ -195,6 +195,13 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
     mode: 'primary',
+    strongEveryNRequests: 0,
+    strongEveryMinutes: 0,
+    strongMinGapMinutes: 0,
+    strongMaxPerHour: 0,
+    carryStrongResultToPrimary: false,
+    fallbackToStrongOnPrimaryError: false,
+    keepPrimaryIfStrongFails: false,
     routes: [route],
     workerPolicy: scopedWorkerPolicy,
     routePolicy: {

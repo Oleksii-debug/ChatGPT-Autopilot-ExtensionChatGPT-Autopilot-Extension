@@ -238,11 +238,16 @@ test('selection carries a full immutable definition snapshot so same-revision by
       definition({ instructions: 'Changed instructions without a revision bump.' }),
     ],
   });
+  assert.notEqual(
+    drifted.bindingKey,
+    reg.bindingKey,
+    'same-revision definition bytes must change the canonical registry binding',
+  );
   assert.throws(() => materializeAgentDefinitionV1({
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -563,12 +568,12 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
@@ -1052,17 +1057,10 @@ test('reusable Agent model route policy is canonical, immutable and materializes
   });
 });
 
-test('reusable Agent model route policy admits canonical resilience controls but rejects hidden authority and hostile descriptors', () => {
-  const failover = normalizeAgentDefinitionV1(definition({
-    modelRoutePolicy: {
-      retryBackoffSeconds: 1,
-      circuitBreakerFailures: 1,
-      circuitBreakerSeconds: 1,
-    },
-  })).modelRoutePolicy;
-  assert.equal(failover.retryBackoffSeconds, 1);
-  assert.equal(failover.circuitBreakerFailures, 1);
-  assert.equal(failover.circuitBreakerSeconds, 1);
+test('reusable Agent model route policy rejects resilience controls, hidden authority and hostile descriptors', () => {
+  assert.throws(() => normalizeAgentDefinitionV1(definition({
+    modelRoutePolicy: { retryBackoffSeconds: 1 },
+  })), /unknown field: retryBackoffSeconds/);
 
   assert.throws(() => normalizeAgentDefinitionV1(definition({
     modelRoutePolicy: { providerApiKey: 'secret' },
@@ -1081,16 +1079,12 @@ test('reusable Agent model route policy admits canonical resilience controls but
   assert.equal(reads, 0);
 });
 
-
 test('reusable Agent model route policy rejects coercive aliases so durable bytes stay exact', () => {
   for (const policy of [
     { autoSwitch: 'false' },
     { freeOnly: 1 },
     { maxInputPricePerMillionUsd: '1' },
     { maxOutputPricePerMillionUsd: -0 },
-    { retryBackoffSeconds: '60' },
-    { circuitBreakerFailures: 0 },
-    { circuitBreakerSeconds: -0 },
   ]) {
     assert.throws(
       () => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })),
