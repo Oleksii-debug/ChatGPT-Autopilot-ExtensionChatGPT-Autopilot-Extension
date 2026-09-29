@@ -259,7 +259,7 @@ test('resource evaluation snapshots the outer envelope before any getter can run
   });
   assert.throws(
     () => evaluateResourceBudgetV1(hidden),
-    /unknown field: authorityBypass/,
+    /own data properties/,
   );
 });
 
