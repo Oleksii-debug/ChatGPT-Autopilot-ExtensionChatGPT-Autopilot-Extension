@@ -35,7 +35,7 @@ const MATERIALIZE_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const MUTATION_KEYS = new Set([
-  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
+  'registry', 'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const MUTATION_KINDS = new Set(Object.values(AgentDefinitionRegistryMutationKind));
@@ -645,6 +645,13 @@ export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
   );
   if (expectedRegistryRevision !== registry.revision) {
     throw new Error('Agent definition registry revision drifted before mutation');
+  }
+  const expectedRegistryBindingKey = exactBindingKey(
+    raw.expectedRegistryBindingKey,
+    'expectedRegistryBindingKey',
+  );
+  if (expectedRegistryBindingKey !== registry.bindingKey) {
+    throw new Error('Agent definition registry bindingKey drifted before mutation');
   }
   if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
     throw new Error('Agent definition registry mutation kind is invalid');
