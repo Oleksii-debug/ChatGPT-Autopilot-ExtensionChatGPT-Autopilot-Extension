@@ -87,6 +87,37 @@ test('planner-only admission does not invent a verifier requirement', () => {
   assert.deepEqual(result.verifier.availableRouteIds, []);
 });
 
+
+test('verifier-only admission does not require an unrelated planner route', () => {
+  const result = inspectAgentRouteReadinessV1({
+    routes:[routes()[1]],
+    policy:{ pinnedRouteId:'verifier-remote', autoSwitch:false },
+    verifierCapabilityIds:['verify'],
+    requiresPlanner:false,
+    requiresVerifier:true,
+    now:1000,
+  });
+  assert.equal(result.state, AgentRouteReadinessState.READY);
+  assert.equal(result.requiresPlanner, false);
+  assert.equal(result.requiresVerifier, true);
+  assert.deepEqual(result.planner.availableRouteIds, []);
+  assert.deepEqual(result.planner.eligibleRouteIds, []);
+  assert.deepEqual(result.verifier.availableRouteIds, ['verifier-remote']);
+});
+
+test('readiness rejects an empty required-role set', () => {
+  assert.throws(
+    () => inspectAgentRouteReadinessV1({
+      routes:routes(),
+      policy:{},
+      requiresPlanner:false,
+      requiresVerifier:false,
+      now:1000,
+    }),
+    /must require planner or verifier/u,
+  );
+});
+
 test('pinned route that cannot perform the required verifier role fails as configuration-unavailable', () => {
   const result = inspectAgentRouteReadinessV1({
     routes:routes(),
@@ -234,7 +265,7 @@ test('one required role in backoff keeps readiness waiting until that role recov
 });
 
 test('boolean authority fields require exact booleans and null-prototype requests remain portable', () => {
-  for (const [field, value] of [['requiresVerifier', 1], ['requiresVision', 'false']]) {
+  for (const [field, value] of [['requiresPlanner', 1], ['requiresVerifier', 1], ['requiresVision', 'false']]) {
     assert.throws(
       () => inspectAgentRouteReadinessV1({
         routes:routes(),
