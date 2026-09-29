@@ -195,7 +195,7 @@ test('Agent resource admission snapshots outer envelopes before authority reads'
   });
   assert.throws(
     () => narrowResourceBudgetWithAgentPlanV1(hidden),
-    /unknown field: hiddenAuthority/,
+    /own data properties/,
   );
 });
 
