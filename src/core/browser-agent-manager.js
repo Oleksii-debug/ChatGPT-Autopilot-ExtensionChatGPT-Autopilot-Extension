@@ -62,6 +62,7 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import { normalizeAgentSpecialistDelegationBindingV1 } from './agent-specialist-delegation-profile.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -366,6 +367,46 @@ function normalizePersistedDefinitionConfigBindingKey(raw, selection, config) {
   }
   return raw;
 }
+function normalizePersistedAgentSpecialistDelegationBinding(raw, selection, scope, config) {
+  const profile = selection?.definition && Object.hasOwn(selection.definition, 'specialistDelegationProfile')
+    ? selection.definition.specialistDelegationProfile
+    : undefined;
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent specialist delegation binding requires persisted selection provenance');
+  }
+  if (profile == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent specialist delegation binding exists without a selected definition profile');
+  }
+  if (raw == null) {
+    throw new Error('Browser Agent selected definition delegation profile requires persisted specialist binding');
+  }
+  const binding = normalizeAgentSpecialistDelegationBindingV1(raw);
+  if (binding.jobId !== config.id
+      || binding.projectId !== (config.projectId || '')
+      || binding.registryId !== selection.registryId
+      || binding.registryRevision !== selection.registryRevision
+      || binding.agentDefinitionId !== selection.agentDefinitionId
+      || binding.definitionRevision !== selection.definitionRevision) {
+    throw new Error('Browser Agent specialist delegation binding provenance drifted from selected definition');
+  }
+  if (JSON.stringify(binding.profile) !== JSON.stringify(profile)) {
+    throw new Error('Browser Agent specialist delegation binding profile drifted from selected definition');
+  }
+  if (!scope) {
+    throw new Error('Browser Agent specialist delegation binding requires persisted definition scope');
+  }
+  const capabilities = new Set(scope.capabilityIds || []);
+  const tools = new Set(scope.toolIds || []);
+  if (binding.profile.requiredCapabilityIds.some(item => !capabilities.has(item))) {
+    throw new Error('Browser Agent specialist delegation binding capability scope exceeds persisted definition scope');
+  }
+  if (binding.profile.requiredToolIds.some(item => !tools.has(item))) {
+    throw new Error('Browser Agent specialist delegation binding tool scope exceeds persisted definition scope');
+  }
+  return binding;
+}
 function normalizePersistedDefinitionRouterOverride(raw, selection) {
   if (raw == null) {
     if (selection?.definition?.modelRoutePolicy) {
@@ -588,6 +629,12 @@ function normalizeStore(raw, now) {
         definitionSelection,
         config,
       );
+      const specialistDelegationBinding = normalizePersistedAgentSpecialistDelegationBinding(
+        raw.byId[id].specialistDelegationBinding,
+        definitionSelection,
+        definitionScope,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -596,6 +643,7 @@ function normalizeStore(raw, now) {
         definitionScope,
         definitionRouterOverride,
         definitionConfigBindingKey: definitionConfigBindingKeyValue,
+        specialistDelegationBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -1170,6 +1218,9 @@ export class BrowserAgentManager {
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
+        specialistDelegationBinding: materialized.specialistDelegationBinding
+          ? clone(materialized.specialistDelegationBinding)
+          : null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1232,6 +1283,7 @@ export class BrowserAgentManager {
         definitionScope: null,
         definitionRouterOverride: null,
         definitionConfigBindingKey: null,
+        specialistDelegationBinding: null,
         createdAt: now,
         updatedAt: now,
       };
