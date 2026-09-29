@@ -784,7 +784,11 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     const claim = structuredClone(message.payload?.claim || {});
     delete claim.at;
-    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', claim);
+    result = await browserAgent.claimSpecialistHandoffs(
+      message.payload?.id || '',
+      claim,
+      { specialistProviderReadinessResolver },
+    );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
