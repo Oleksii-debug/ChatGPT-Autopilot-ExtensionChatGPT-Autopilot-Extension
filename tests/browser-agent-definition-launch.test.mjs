@@ -157,6 +157,34 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
 });
 
+test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.config-binding' }));
+
+  const [storageKey] = Object.keys(data);
+  data[storageKey].byId['job.config-binding'].config.maxModelCalls = 999;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.config-binding');
+  assert.equal(loaded.job, null, 'persisted config drift must quarantine the definition-bound job on reload');
+});
+
+test('restart rejects a definition-bound job when its exact launch config binding disappears', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.binding-missing' }));
+
+  const [storageKey] = Object.keys(data);
+  delete data[storageKey].byId['job.binding-missing'].definitionConfigBindingKey;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.binding-missing');
+  assert.equal(loaded.job, null, 'definition launch config binding must survive restart');
+});
+
 test('restart rejects a selected definition when its persisted model route policy binding is missing', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
