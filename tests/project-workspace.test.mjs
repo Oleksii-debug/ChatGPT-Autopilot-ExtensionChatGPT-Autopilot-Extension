@@ -1224,3 +1224,74 @@ test('repository update rejects accessor-backed mutator results before owner fie
   const durable = await repository.load({ emptyNowMs: 2 });
   assert.equal(durable.revision, 0);
 });
+
+
+test('repository load returns a detached durable snapshot when storage returns the same object reference', async () => {
+  const stored = createProjectWorkspace(1);
+  addProjectSnapshot(stored, snapshot(), { nowMs: 2 });
+  stored.revision = 1;
+  stored.updatedAt = 2;
+  const data = { [PROJECT_WORKSPACE_STORAGE_KEY]: stored };
+  const chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: data[key] }; },
+        async set(value) { Object.assign(data, value); },
+      },
+    },
+  };
+  const repository = new ProjectWorkspaceRepository(chrome);
+  const loaded = await repository.load();
+  loaded.projectsById['project-a'].snapshot.title = 'caller mutation';
+  loaded.revision = 99;
+
+  const again = await repository.load();
+  assert.equal(again.revision, 1);
+  assert.equal(again.projectsById['project-a'].snapshot.title, 'Project A');
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 1);
+});
+
+test('workspace revision and expected revision reject unsafe integers', async () => {
+  const unsafe = createProjectWorkspace(1);
+  unsafe.revision = Number.MAX_SAFE_INTEGER + 1;
+  assert.throws(
+    () => validateProjectWorkspace(unsafe),
+    /Invalid project workspace revision/,
+  );
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(createProjectWorkspace(1), {
+      expectedPreviousRevision: Number.MAX_SAFE_INTEGER + 1,
+    }),
+    /Invalid expected project workspace revision/,
+  );
+});
+
+test('exact save replay accepts only the immediately preceding expected revision', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const current = await repository.load();
+  const next = structuredClone(current);
+  replaceProjectSnapshot(next, snapshot('project-r2', 'r2'), { nowMs: 3 });
+  next.revision = 2;
+  next.updatedAt = 3;
+  await repository.save(next, { expectedPreviousRevision: 1 });
+
+  await assert.doesNotReject(
+    repository.save(next, { expectedPreviousRevision: 1 }),
+  );
+  await assert.rejects(
+    repository.save(next, { expectedPreviousRevision: 0 }),
+    /exact replay expected revision mismatch/,
+  );
+  await assert.rejects(
+    repository.save(next, { expectedPreviousRevision: 2 }),
+    /exact replay expected revision mismatch/,
+  );
+});
