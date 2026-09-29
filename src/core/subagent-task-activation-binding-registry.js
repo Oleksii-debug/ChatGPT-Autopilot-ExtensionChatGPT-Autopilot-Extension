@@ -1,6 +1,6 @@
 import { OrchestrationActivationPurpose } from './orchestration-hierarchy.js';
 import { normalizeTrustedSubagentTaskActivationBindingV1 } from './subagent-result-reconciliation.js';
-import { normalizeAllowedSubagentAuthorityEnvelopeV1 } from './subagent-context-projection.js';
+import { normalizeAllowedSubagentAuthorityEnvelopeV1 } from './subagent-authority-envelope.js';
 
 export const SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_VERSION = 1;
 export const MAX_SUBAGENT_TASK_ACTIVATION_BINDINGS = 1024;
