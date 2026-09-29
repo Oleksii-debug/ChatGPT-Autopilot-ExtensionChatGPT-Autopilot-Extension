@@ -63,8 +63,22 @@ function required(raw, key, label) {
 }
 
 function registryInput(state) {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('OutcomeContract state must be an object');
-  return state.outcomeContractsById === undefined ? {} : state.outcomeContractsById;
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    throw new Error('OutcomeContract state must be an object');
+  }
+  const prototype = Object.getPrototypeOf(state);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('OutcomeContract state must be a plain object');
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(state, 'outcomeContractsById');
+  if (!descriptor) return {};
+  if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error('outcomeContractsById must be an enumerable own data property');
+  }
+  if (descriptor.value === undefined) {
+    throw new Error('outcomeContractsById cannot be undefined when present');
+  }
+  return descriptor.value;
 }
 
 function normalizeRegistryEntry(contractId, input) {
@@ -131,6 +145,11 @@ export function normalizeOutcomeContractRegistryV1(input = {}) {
 export function validateOutcomeContractRegistryV1(input = {}) {
   normalizeOutcomeContractRegistryV1(input);
   return input;
+}
+
+export function validateOutcomeContractRegistryStateV1(state) {
+  normalizeOutcomeContractRegistryV1(registryInput(state));
+  return state;
 }
 
 function mutableRegistry(state) {
