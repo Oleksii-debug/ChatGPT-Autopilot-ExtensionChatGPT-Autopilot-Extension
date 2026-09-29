@@ -2183,6 +2183,48 @@ function fillAgentDefinitionModelRoutePolicy(policy = null) {
   syncAgentDefinitionModelRoutePolicyControls();
 }
 
+function syncAgentDefinitionSpecialistDelegationControls() {
+  const configured = $('agent-definition-specialist-delegation-configured').checked;
+  for (const id of [
+    'agent-definition-specialist-delegation-enabled',
+    'agent-definition-specialist-registry-id',
+    'agent-definition-specialist-capabilities',
+    'agent-definition-specialist-tools',
+    'agent-definition-specialist-policy-envelope',
+    'agent-definition-specialist-deadline-seconds',
+    'agent-definition-specialist-max-concurrent',
+    'agent-definition-specialist-lease-seconds',
+    'agent-definition-specialist-priority',
+  ]) $(id).disabled = !configured;
+}
+
+function fillAgentDefinitionSpecialistDelegationProfile(definition = null) {
+  const profile = definition && Object.hasOwn(definition, 'specialistDelegationProfile')
+    ? definition.specialistDelegationProfile
+    : undefined;
+  const configured = Boolean(profile);
+  $('agent-definition-specialist-delegation-configured').checked = configured;
+  $('agent-definition-specialist-delegation-enabled').checked = profile?.enabled === true;
+  $('agent-definition-specialist-registry-id').value = profile?.registryId || '';
+  $('agent-definition-specialist-capabilities').value = agentDefinitionLines(profile?.requiredCapabilityIds);
+  $('agent-definition-specialist-tools').value = agentDefinitionLines(profile?.requiredToolIds);
+  $('agent-definition-specialist-policy-envelope').value = profile?.policyEnvelopeId || '';
+  $('agent-definition-specialist-deadline-seconds').value = String(profile?.deadlineSeconds ?? 900);
+  $('agent-definition-specialist-max-concurrent').value = String(profile?.maxConcurrentHandoffs ?? 4);
+  $('agent-definition-specialist-lease-seconds').value = String(profile?.leaseSeconds ?? 900);
+  $('agent-definition-specialist-priority').value = String(profile?.priority ?? 0);
+  syncAgentDefinitionSpecialistDelegationControls();
+}
+
+function agentDefinitionSpecialistDelegationSummary(definition) {
+  if (!definition || !Object.hasOwn(definition, 'specialistDelegationProfile')) {
+    return 'Specialist delegation: не налаштовано.';
+  }
+  const profile = definition.specialistDelegationProfile;
+  if (!profile) return 'Specialist delegation: очищено.';
+  return `Specialist delegation: ${profile.enabled ? 'увімкнено' : 'вимкнено'}; registry ${profile.registryId}.`;
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2198,9 +2240,10 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   fillAgentDefinitionModelRoutePolicy(definition?.modelRoutePolicy || null);
+  fillAgentDefinitionSpecialistDelegationProfile(definition);
   $('agent-definition-revision').textContent = definition
-    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}.`
-    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionSpecialistDelegationSummary(definition)}`
+    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}. Specialist delegation: не налаштовано.` : 'Реєстр не вибрано.');
   $('agent-definition-save-button').disabled = !hasRegistry;
   $('agent-definition-toggle-enabled-button').disabled = !definition;
   $('agent-definition-delete-button').disabled = !definition;
@@ -2464,6 +2507,16 @@ function agentDefinitionFormValue() {
     modelRouteRetryBackoffSeconds: $('agent-definition-model-route-backoff-seconds').value,
     modelRouteCircuitBreakerFailures: $('agent-definition-model-route-circuit-failures').value,
     modelRouteCircuitBreakerSeconds: $('agent-definition-model-route-circuit-seconds').value,
+    specialistDelegationConfigured: $('agent-definition-specialist-delegation-configured').checked,
+    specialistDelegationEnabled: $('agent-definition-specialist-delegation-enabled').checked,
+    specialistRegistryId: $('agent-definition-specialist-registry-id').value,
+    specialistCapabilityIdsText: $('agent-definition-specialist-capabilities').value,
+    specialistToolIdsText: $('agent-definition-specialist-tools').value,
+    specialistPolicyEnvelopeId: $('agent-definition-specialist-policy-envelope').value,
+    specialistDeadlineSeconds: $('agent-definition-specialist-deadline-seconds').value,
+    specialistMaxConcurrentHandoffs: $('agent-definition-specialist-max-concurrent').value,
+    specialistLeaseSeconds: $('agent-definition-specialist-lease-seconds').value,
+    specialistPriority: $('agent-definition-specialist-priority').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
@@ -4439,6 +4492,7 @@ $('agent-definition-save-button').addEventListener('click', saveAgentDefinition)
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
+$('agent-definition-specialist-delegation-configured').addEventListener('change', syncAgentDefinitionSpecialistDelegationControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
@@ -4636,6 +4690,7 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadAgentDefinitionRegistries();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);

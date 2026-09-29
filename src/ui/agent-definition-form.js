@@ -1,4 +1,5 @@
 import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -159,6 +160,51 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
   };
 }
 
+export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
+  persistedProfile = undefined,
+} = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма Specialist delegation недоступна.');
+  }
+  const configuredField = ownData(input, 'specialistDelegationConfigured', 'Specialist delegation configured');
+  if (!configuredField.present) {
+    return persistedProfile === undefined || persistedProfile === null
+      ? persistedProfile
+      : normalizeAgentSpecialistDelegationProfileV1(persistedProfile);
+  }
+  if (typeof configuredField.value !== 'boolean') {
+    throw new Error('Specialist delegation configured має бути boolean.');
+  }
+  if (!configuredField.value) return persistedProfile === undefined ? undefined : null;
+
+  const read = (key, fallback) => {
+    const field = ownData(input, key, key);
+    return field.present ? field.value : fallback;
+  };
+  const enabled = read('specialistDelegationEnabled', false);
+  if (typeof enabled !== 'boolean') throw new Error('Specialist delegation enabled має бути boolean.');
+  return normalizeAgentSpecialistDelegationProfileV1({
+    schemaVersion: 1,
+    registryId: parseCanonicalAgentIdentity(read('specialistRegistryId', ''), 'Specialist registry ID'),
+    requiredCapabilityIds: listFromLines(
+      read('specialistCapabilityIdsText', ''),
+      'Specialist capability ID',
+      { maxItems:64, itemMax:180, identity:true },
+    ),
+    requiredToolIds: listFromLines(
+      read('specialistToolIdsText', ''),
+      'Specialist tool ID',
+      { maxItems:128, itemMax:180, identity:true },
+    ),
+    policyEnvelopeId: parseCanonicalAgentIdentity(read('specialistPolicyEnvelopeId', ''), 'Policy envelope ID'),
+    deadlineSeconds: exactIntegerText(read('specialistDeadlineSeconds', '900'), 'Specialist deadline', { min:1, max:31_536_000 }),
+    maxConcurrentHandoffs: exactIntegerText(read('specialistMaxConcurrentHandoffs', '4'), 'Specialist concurrency', { min:0, max:256 }),
+    leaseSeconds: exactIntegerText(read('specialistLeaseSeconds', '900'), 'Specialist lease', { min:1, max:86_400 }),
+    priority: exactIntegerText(read('specialistPriority', '0'), 'Specialist priority', { min:0, max:1_000_000 }),
+    enabled,
+  });
+}
+
 function copyStructuredData(value, label) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' має бути data object.');
@@ -189,6 +235,9 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
     persistedPolicy: modelRoutePolicy,
   });
+  const effectiveSpecialistDelegationProfile = buildAgentSpecialistDelegationProfileFromFormV1(input, {
+    persistedProfile: specialistDelegationProfile,
+  });
   const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
   if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
     if (effectiveModelRoutePolicy.pinnedRouteId
@@ -215,9 +264,9 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: effectiveConfigDefaults,
     modelRoutePolicy: effectiveModelRoutePolicy,
-    ...(specialistDelegationProfile === undefined
+    ...(effectiveSpecialistDelegationProfile === undefined
       ? {}
-      : { specialistDelegationProfile: copyStructuredData(specialistDelegationProfile, 'specialistDelegationProfile') }),
+      : { specialistDelegationProfile: effectiveSpecialistDelegationProfile }),
     enabled: input.enabled === true,
     definitionRevision,
   };
