@@ -289,3 +289,160 @@ test('BrowserAgentManager authorizes retry only from durable trusted NO_EFFECT r
   assert.equal(store.byId['job-1'].runtime.history.at(-1).verificationId, 'verification-no-effect-specialist');
   assert.match(store.byId['job-1'].runtime.history.at(-1).evidence, /outcome=NO_EFFECT_VERIFIED/);
 });
+
+
+test('BrowserAgentManager leaves specialist state unchanged when trusted verification record is absent', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    { executionOwnerships: [ownership], availableSlots: 1, at: T0 },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const completed = completeAgentPlanSpecialistHandoffV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      agentId,
+      leaseId,
+      resultArtifactIds: ['artifact:archive'],
+      at: T1,
+    },
+  );
+  const store = {
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: completed.plan,
+          specialistHandoffs: completed.assignments,
+          specialistExecutionOwnerships: completed.executionOwnerships,
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+  };
+  const manager = managerWithStore(store, T3);
+
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId,
+      leaseId,
+      verificationId: 'verification-specialist-missing',
+      at: T3,
+    }),
+    /trusted.*verification.*record.*not found/i,
+  );
+
+  assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(store.byId['job-1'].runtime.specialistHandoffs[0].state, 'COMPLETED');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'OWNED');
+  assert.equal(store.byId['job-1'].runtime.history.length, 0);
+  assert.equal(store.byId['job-1'].runtime.updatedAt, Date.parse(T1));
+});
+
+test('BrowserAgentManager cannot use a trusted record under a different verification identity', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    { executionOwnerships: [ownership], availableSlots: 1, at: T0 },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const completed = completeAgentPlanSpecialistHandoffV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      agentId,
+      leaseId,
+      resultArtifactIds: ['artifact:archive'],
+      at: T1,
+    },
+  );
+  const store = {
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: completed.plan,
+          specialistHandoffs: completed.assignments,
+          specialistExecutionOwnerships: completed.executionOwnerships,
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+  };
+  const manager = managerWithStore(store, T3);
+  await manager.trustedExecutionVerificationLedger.append(trustedRecord({ executionId: leaseId }));
+
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId,
+      leaseId,
+      verificationId: 'verification-specialist-other',
+      at: T3,
+    }),
+    /trusted.*verification.*record.*not found/i,
+  );
+
+  assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'OWNED');
+  assert.equal(store.byId['job-1'].runtime.history.length, 0);
+});
+
+test('BrowserAgentManager rejects caller-shaped verifier authority fields before trusted lookup can authorize completion', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    { executionOwnerships: [ownership], availableSlots: 1, at: T0 },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const completed = completeAgentPlanSpecialistHandoffV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      agentId,
+      leaseId,
+      resultArtifactIds: ['artifact:archive'],
+      at: T1,
+    },
+  );
+  const store = {
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: completed.plan,
+          specialistHandoffs: completed.assignments,
+          specialistExecutionOwnerships: completed.executionOwnerships,
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+  };
+  const manager = managerWithStore(store, T3);
+  await manager.trustedExecutionVerificationLedger.append(trustedRecord({ executionId: leaseId }));
+
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId,
+      leaseId,
+      verificationId: 'verification-specialist-1',
+      verifierId: 'caller-forged-verifier',
+      verificationAuthorityId: 'caller-forged-authority',
+      at: T3,
+    }),
+    /unknown field|unexpected field|not allowed/i,
+  );
+
+  assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'OWNED');
+  assert.equal(store.byId['job-1'].runtime.history.length, 0);
+});
