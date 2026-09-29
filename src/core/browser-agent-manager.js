@@ -53,6 +53,7 @@ import {
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
+  createAgentDefinitionRegistryV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
@@ -69,11 +70,11 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
@@ -126,7 +127,7 @@ function snapshotExactOwnDataRequest(value, allowed, label) {
   return snapshot;
 }
 function canonicalAgentDefinitionRegistryId(value) {
-  return normalizeAgentDefinitionRegistryV1({
+  return createAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
@@ -772,7 +773,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
-      created = normalizeAgentDefinitionRegistryV1({
+      created = createAgentDefinitionRegistryV1({
         schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
         registryId,
         revision: 1,
@@ -793,6 +794,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent definition registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent definition registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let committed = null;
     await this.update(store => {
@@ -807,6 +811,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
@@ -1069,7 +1074,7 @@ export class BrowserAgentManager {
       'Browser Agent definition launch request',
     );
     for (const key of [
-      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
       'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
       'requestedCapabilityIds', 'requestedToolIds',
     ]) {
@@ -1099,6 +1104,9 @@ export class BrowserAgentManager {
       if (!registry) throw new Error('Agent definition registry not found');
       if (registry.revision !== request.expectedRegistryRevision) {
         throw new Error('Agent definition registry revision drifted before launch');
+      }
+      if (registry.bindingKey !== request.expectedRegistryBindingKey) {
+        throw new Error('Agent definition registry bindingKey drifted before launch');
       }
 
       const selection = selectAgentDefinitionV1({

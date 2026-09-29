@@ -284,9 +284,7 @@ export class AiOrchestrator {
     };
     const nonProviderRouteFailures = new WeakSet();
     const attachNonProviderFailureRuntime = error => {
-      if (error && (typeof error === 'object' || typeof error === 'function')) {
-        nonProviderRouteFailures.add(error);
-      }
+      if (error && (typeof error === 'object' || typeof error === 'function')) nonProviderRouteFailures.add(error);
       return attachFailureRuntime(error);
     };
     const invoke = async (route, callPrompt, callSystem, bounded) => {

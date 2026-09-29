@@ -470,3 +470,54 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
     ['after','reservation-gpt-strong','gpt-strong',false,'provider failed'],
   ]);
 });
+
+
+test('provider budget context fails closed when canonical lifecycle is unavailable', async () => {
+  const gateway = new FakeGateway(['must not run']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 90_000 });
+  await assert.rejects(
+    () => router.run(
+      settings({ routes:[
+        { routeId:'a', provider:'openai', model:'a', roles:['planner'], priority:20 },
+        { routeId:'b', provider:'ollama', model:'b', roles:['planner'], priority:10 },
+      ] }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      { maxOutputTokens:64, providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-9', controlEpoch:3 } },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_LIFECYCLE_UNAVAILABLE');
+      assert.equal(error.modelCallsUsed, 0);
+      assert.equal(error.routeAttempts.length, 0);
+      return true;
+    },
+  );
+  assert.equal(gateway.calls.length, 0);
+});
+
+test('missing durable provider reservation fails before gateway I/O and cannot trigger route failover', async () => {
+  const gateway = new FakeGateway(['must not run']);
+  const lifecycle = {
+    async beforeProviderCall() { return null; },
+    async afterProviderCall() { throw new Error('must not settle unadmitted call'); },
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 91_000 });
+  await assert.rejects(
+    () => router.run(
+      settings({ routes:[
+        { routeId:'a', provider:'openai', model:'a', roles:['planner'], priority:20 },
+        { routeId:'b', provider:'ollama', model:'b', roles:['planner'], priority:10 },
+      ] }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      { maxOutputTokens:64, providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-10', controlEpoch:4 } },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_RESERVATION_MISSING');
+      assert.equal(error.modelCallsUsed, 0);
+      assert.equal(error.routeAttempts.length, 0);
+      return true;
+    },
+  );
+  assert.equal(gateway.calls.length, 0);
+});
