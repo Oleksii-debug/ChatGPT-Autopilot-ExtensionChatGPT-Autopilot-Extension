@@ -442,9 +442,6 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
-  if (updatedAt < project.updatedAt) {
-    throw new Error('Project workspace project updatedAt cannot move backward');
-  }
   const current = normalizeProjectSnapshotV1(project.snapshot);
   const revisionIds = snapshotRevisionHistory(project, current);
   if (normalized.revisionId === current.revisionId) {
@@ -452,6 +449,9 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
       throw new Error('Project snapshot revisionId cannot be reused for different content');
     }
     return project;
+  }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
   }
   if (revisionIds.includes(normalized.revisionId)) {
     throw new Error('Project snapshot revisionId cannot be reused after it was superseded');
@@ -489,9 +489,6 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
   validateProjectWorkspace(workspace);
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
-  if (updatedAt < project.updatedAt) {
-    throw new Error('Project workspace project updatedAt cannot move backward');
-  }
   assertCapsuleMatchesSnapshot(normalized, project.snapshot);
   if (hasOwn(project.capsulesById, normalized.capsuleId)) {
     const current = normalizeContextCapsuleV1(project.capsulesById[normalized.capsuleId]);
@@ -499,6 +496,9 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
       throw new Error('Context capsuleId cannot be reused for different content');
     }
     return current;
+  }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
   }
   if (Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
   setOwn(project.capsulesById, normalized.capsuleId, normalized);
@@ -511,9 +511,6 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   validateProjectWorkspace(workspace);
   const normalized = normalizeArtifactProvenanceV1(provenance);
   const project = requireProject(workspace, normalized.projectId);
-  if (updatedAt < project.updatedAt) {
-    throw new Error('Project workspace project updatedAt cannot move backward');
-  }
   assertProvenanceMatchesSnapshot(normalized, project.snapshot);
   const artifactId = normalized.artifactRef.artifactId;
   if (hasOwn(project.provenanceByArtifactId, artifactId)) {
@@ -522,6 +519,9 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
       throw new Error('Artifact provenance identity cannot be reused for different content');
     }
     return current;
+  }
+  if (updatedAt < project.updatedAt) {
+    throw new Error('Project workspace project updatedAt cannot move backward');
   }
   if (Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
   setOwn(project.provenanceByArtifactId, artifactId, normalized);
