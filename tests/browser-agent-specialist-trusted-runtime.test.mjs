@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 import { TRUSTED_EXECUTION_VERIFICATION_LEDGER_STORAGE_KEY } from '../src/core/trusted-execution-verification-ledger.js';
@@ -9,6 +10,15 @@ import {
   claimAgentPlanSpecialistHandoffsV1,
   completeAgentPlanSpecialistHandoffV1,
 } from '../src/core/agent-specialist-bridge.js';
+import {
+  OPENHANDS_AGENT_SERVER_VERSION,
+  OPENHANDS_CODING_PROVIDER_ID,
+} from '../src/core/coding-specialist-provider.js';
+import {
+  SpecialistProviderConfigKind,
+  createSpecialistProviderConfigV1,
+} from '../src/core/specialist-provider-config.js';
+import { createSpecialistProviderExecutionV1 } from '../src/core/specialist-provider-execution.js';
 
 const T0 = '2026-09-29T00:00:00.000Z';
 const T1 = '2026-09-29T00:01:00.000Z';
@@ -564,4 +574,169 @@ test('BrowserAgentManager leaves reconciliation fenced when trusted NO_EFFECT re
   assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].leaseId, leaseId);
   assert.equal(store.byId['job-1'].runtime.history.length, 0);
   assert.equal(store.byId['job-1'].runtime.updatedAt, Date.parse(T1));
+});
+
+
+test('trusted NO_EFFECT safe retry releases historical PREPARED provider config authority', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    {
+      executionOwnerships: [ownership],
+      availableSlots: 1,
+      leaseSeconds: 30,
+      at: T0,
+    },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const leaseUntil = claimed.assignments[0].leaseExpiresAt;
+  const expired = claimAgentPlanSpecialistHandoffsV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      availableSlots: 1,
+      at: T1,
+    },
+  );
+
+  const providerConfig = createSpecialistProviderConfigV1({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    revision: 1,
+    updatedAt: T0,
+    config: {
+      schemaVersion: 1,
+      serverUrl: 'http://127.0.0.1:3000',
+      agentServerVersion: OPENHANDS_AGENT_SERVER_VERSION,
+      agentProfileId: '14141414-1414-4414-8414-141414141414',
+      agentProfileRevision: 1,
+      workspacePath: 'C:\\Autopilot\\workspace',
+      qualifiedCapabilityIds: ['filesystem.archive'],
+      requestTimeoutSeconds: 10,
+      maxExecutionSeconds: 600,
+      pollIntervalMs: 500,
+      maxIterations: 30,
+      maxResponseBytes: 65536,
+      authMode: 'LOCAL_UNAUTHENTICATED',
+    },
+  });
+  const prepared = createSpecialistProviderExecutionV1({
+    planId: expired.plan.planId,
+    nodeId: 'local',
+    agentId,
+    handoffId: 'handoff:trusted-safe-retry',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    leaseId,
+    leaseUntil,
+    conversationId: '15151515-1515-4515-8515-151515151515',
+    providerConfig,
+    at: T0,
+  });
+
+  const store = {
+    order: ['job-1'],
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: expired.plan,
+          specialistHandoffs: expired.assignments,
+          specialistExecutionOwnerships: expired.executionOwnerships,
+          specialistProviderExecutions: [prepared],
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+    specialistProviderConfigsById: {
+      [OPENHANDS_CODING_PROVIDER_ID]: providerConfig,
+    },
+    specialistProviderConfigRevisionById: {
+      [OPENHANDS_CODING_PROVIDER_ID]: 1,
+    },
+    specialistProviderConfigQuarantineById: Object.create(null),
+  };
+  const manager = managerWithStore(store, T1D);
+  await manager.trustedExecutionVerificationLedger.append(trustedRecord({
+    executionId: leaseId,
+    outcome: 'NO_EFFECT_VERIFIED',
+    verificationId: 'verification-no-effect-provider-config-release',
+    recordId: 'trusted-provider-config-release-record',
+    artifacts: [proofArtifact({ artifactId: 'artifact:no-effect-provider-config', createdAt: T1A })],
+    verifiedAt: T1B,
+    recordedAt: T1C,
+    validThrough: T2,
+  }));
+
+  await manager.authorizeSpecialistSafeRetry('job-1', {
+    agentId,
+    leaseId,
+    verificationId: 'verification-no-effect-provider-config-release',
+    at: T1D,
+  });
+
+  assert.equal(store.byId['job-1'].runtime.specialistHandoffs[0].state, 'READY');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'AVAILABLE');
+
+  const updated = await manager.setSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision: 1,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    config: {
+      ...providerConfig.config,
+      agentProfileRevision: 2,
+    },
+  });
+  assert.equal(updated.config.revision, 2);
+  assert.equal(store.byId['job-1'].runtime.specialistProviderExecutions[0].status, 'PREPARED');
+});
+
+
+test('service-worker owns timestamps for Specialist completion and trusted verification transitions', async () => {
+  const source = await readFile(
+    new URL('../src/background/service-worker.js', import.meta.url),
+    'utf8',
+  );
+  const cases = [
+    {
+      command: 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY',
+      variable: 'reconciliation',
+      payload: 'reconciliation',
+      method: 'authorizeSpecialistSafeRetry',
+    },
+    {
+      command: 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF',
+      variable: 'completion',
+      payload: 'completion',
+      method: 'completeSpecialistHandoff',
+    },
+    {
+      command: 'VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF',
+      variable: 'verification',
+      payload: 'verification',
+      method: 'verifySpecialistHandoff',
+    },
+  ];
+
+  for (const item of cases) {
+    const start = source.indexOf(`message.command === '${item.command}'`);
+    assert.notEqual(start, -1, `${item.command} handler must exist`);
+    const end = source.indexOf("  } else if (message.command === '", start + 1);
+    assert.notEqual(end, -1, `${item.command} handler must have a bounded branch`);
+    const block = source.slice(start, end);
+    assert.ok(
+      block.includes(`const ${item.variable} = structuredClone(message.payload?.${item.payload} || {});`),
+      `${item.command} must snapshot caller payload before authority filtering`,
+    );
+    assert.ok(
+      block.includes(`delete ${item.variable}.at;`),
+      `${item.command} must discard caller-controlled transition time`,
+    );
+    assert.ok(
+      block.includes(`browserAgent.${item.method}(message.payload?.id || '', ${item.variable})`),
+      `${item.command} must invoke Core with the sanitized payload`,
+    );
+  }
 });
