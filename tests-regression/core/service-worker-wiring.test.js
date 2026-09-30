@@ -56,9 +56,9 @@ test('startup and canonical alarm invoke the event-driven execution cycle', () =
 test('orchestration V2 uses read-only assistant reports and startup reconciles before Core sends', () => {
   assert.match(source, /async function probeAssistantConversation\(job\)/);
   assert.match(source, /collectAssistantReport: probeAssistantConversation/);
-  assert.match(source, /mode: 'READ_ASSISTANT_REPORT'/);
-  assert.match(source, /sameChatConversationUrl\(tab\.url, conversationUrl\)/, 'completion probe should reuse an existing conversation tab when possible');
-  assert.match(source, /if \(temporaryTab && tabId != null\)/, 'only a temporary probe tab may be auto-closed');
+  assert.match(fs.readFileSync(new URL('../../src/core/assistant-report-probe.js', import.meta.url), 'utf8'), /mode: 'READ_ASSISTANT_REPORT'/);
+  assert.match(source, /probeAssistantConversationCore/, 'completion probe uses the shared conversation reader');
+  assert.match(fs.readFileSync(new URL('../../src/core/assistant-report-probe.js', import.meta.url), 'utf8'), /if \(temporaryTab && tabId != null\)/, 'only a temporary probe tab may be auto-closed');
   assert.match(source, /await orchestrationV2\.reconcileAlarm\(\);/);
   assert.match(source, /await browserAgent\.reconcileAlarm\(\);/, 'cold start must restore Browser Agent wake alarms from durable jobs');
   assert.doesNotMatch(source, /await orchestrationV2\.enqueueRecoveryEvent\(\);/, 'ordinary MV3 worker restart must not manufacture a reasoning tick');

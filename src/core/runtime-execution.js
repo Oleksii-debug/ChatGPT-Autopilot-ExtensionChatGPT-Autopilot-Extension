@@ -5,6 +5,7 @@ import { appendDiagnostic } from './diagnostics.js';
 import { orderedSessionIdsForFairness } from './scheduler-fairness.js';
 import { CalendarOccurrenceState, calendarAdmissionForSession, commitVerifiedCalendarOccurrence } from './calendar-runtime.js';
 import { InteractionResult } from '../shared/protocol.js';
+import { reconcileOwnedPlaceholders, reconcileCompletedOpenCloseTabs } from './owned-tab-lifecycle.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -241,6 +242,9 @@ export async function reconcileRuntimeColdStart({
   now = () => Date.now(),
 }) {
   if (!repository || !chromeApi) throw new Error('Runtime cold-start dependencies are required');
+  await reconcileOwnedPlaceholders(repository, chromeApi);
+  await reconcileCompletedOpenCloseTabs(repository);
+  await retryPendingOwnedTabRetirements(repository, chromeApi, now());
   const state = await prepareStartupState(repository, executionAvailable, now);
   const wakeAt = await reconcileAlarm(chromeApi, state, now());
   return { state, wakeAt };
@@ -482,6 +486,7 @@ export async function runRuntimeCycle({
   // may Stop the final active Session exactly when Chrome transiently refuses
   // tabs.remove. Retry those durable obligations before scheduling/executing
   // new browser work so stopped Sessions cannot strand extension-owned tabs.
+  await reconcileCompletedOpenCloseTabs(repository);
   await retryPendingOwnedTabRetirements(repository, chromeApi, now());
 
   const outcomes = [];

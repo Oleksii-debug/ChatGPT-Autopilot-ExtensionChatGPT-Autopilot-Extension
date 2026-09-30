@@ -22,6 +22,7 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       task.status = 'IDLE';
       task.lastVerifiedSendAt = now;
       task.lastVerifiedFingerprint = promptFingerprint;
+      task.lastSubmittedUserMessageKey = String(result.submittedUserMessageKey || '');
       task.retryAfterAt = 0;
       const observedConversation = typeof result?.normalizedObservedUrl === 'string' ? result.normalizedObservedUrl : '';
       if (observedConversation && isExclusiveConversationUrl(observedConversation)) task.lastConversationUrl = observedConversation;

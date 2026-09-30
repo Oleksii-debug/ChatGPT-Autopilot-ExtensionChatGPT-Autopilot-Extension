@@ -97,7 +97,7 @@ test('CHAT_CYCLE profile round-trips an explicit five-chat pool preset and valid
 
   for (const pool of [
     { count: 0, replacementBudget: 0, staggerSeconds: 3 },
-    { count: 21, replacementBudget: 0, staggerSeconds: 3 },
+    { count: 100001, replacementBudget: 0, staggerSeconds: 3 },
     { count: 5, replacementBudget: -1, staggerSeconds: 3 },
     { count: 5, replacementBudget: 0, staggerSeconds: 604801 },
   ]) assert.throws(() => parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool })));

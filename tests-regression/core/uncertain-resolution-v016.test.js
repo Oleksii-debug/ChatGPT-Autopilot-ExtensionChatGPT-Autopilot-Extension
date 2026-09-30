@@ -39,14 +39,14 @@ test('managed orchestration never auto-resends an ambiguous submit after timeout
  await f.repo.save(dbState);
  const result=await f.executor.runSessionOnce('s');
  const state=await f.repo.load(), s=state.sessionsById.s;
- assert.equal(result.kind,'UNCERTAIN_VERIFY_HOLD');
- assert.equal(s.runState,'RECOVERING');
- assert.equal(s.operation.phase,'AMBIGUOUS');
- assert.equal(s.tasksById.t.status,'SUBMISSION_UNCERTAIN');
- assert.ok(s.tasksById.t.retryAfterAt>130000);
+ assert.equal(result.kind,'MANAGED_UNCERTAIN_SETTLED_NO_RESEND');
+ assert.equal(s.runState,'STOPPED');
+ assert.equal(s.operation.phase,'FAILED_SAFE');
+ assert.equal(s.tasksById.t.status,'FAILED_SAFE');
+ assert.equal(s.tasksById.t.retryAfterAt,0);
  assert.equal(s.lastSuccessfulSendAt,0);
- assert.match(s.lastError,/повторний Send заборонено/);
- assert.deepEqual(f.interactions,['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+ assert.match(s.lastError,/Send не повторюється/);
+ assert.deepEqual(f.interactions,[], 'expired managed recovery cannot open a fresh tab or submit again');
 });
 
 test('scenario-managed Session never auto-resends an ambiguous submit after timeout',async()=>{
@@ -56,14 +56,14 @@ test('scenario-managed Session never auto-resends an ambiguous submit after time
  await f.repo.save(dbState);
  const result=await f.executor.runSessionOnce('s');
  const state=await f.repo.load(), s=state.sessionsById.s;
- assert.equal(result.kind,'UNCERTAIN_VERIFY_HOLD');
- assert.equal(s.runState,'RECOVERING');
- assert.equal(s.operation.phase,'AMBIGUOUS');
- assert.equal(s.tasksById.t.status,'SUBMISSION_UNCERTAIN');
- assert.ok(s.tasksById.t.retryAfterAt>130000);
+ assert.equal(result.kind,'MANAGED_UNCERTAIN_SETTLED_NO_RESEND');
+ assert.equal(s.runState,'STOPPED');
+ assert.equal(s.operation.phase,'FAILED_SAFE');
+ assert.equal(s.tasksById.t.status,'FAILED_SAFE');
+ assert.equal(s.tasksById.t.retryAfterAt,0);
  assert.equal(s.lastSuccessfulSendAt,0);
- assert.match(s.lastError,/повторний Send заборонено/);
- assert.deepEqual(f.interactions,['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+ assert.match(s.lastError,/Send не повторюється/);
+ assert.deepEqual(f.interactions,[], 'expired managed recovery cannot open a fresh tab or submit again');
 });
 
 test('manual policy still expires into actionable pause with original operation preserved',async()=>{

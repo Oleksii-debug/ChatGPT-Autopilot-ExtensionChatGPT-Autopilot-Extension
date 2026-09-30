@@ -1,5 +1,7 @@
 import { createSession, createTask, PromptMode, RunMode, RunState, TabStrategy, OperationPhase, isExclusiveConversationUrl } from './schema.js';
 import { appendDiagnostic } from './diagnostics.js';
+import { createChatTab, sameChatConversationUrl } from './tabs.js';
+import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import {
   ScenarioWorkMode,
   ScenarioWorkRunState,
@@ -514,6 +516,7 @@ export class ScenarioWorkManager {
     this.createId = createId || (() => `scenario-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`);
     this.updateChain = Promise.resolve();
     this.cycleInFlight = null;
+    this.cyclesById = new Map();
     this.assistantObservationLogState = new Map();
   }
 
@@ -1209,7 +1212,11 @@ export class ScenarioWorkManager {
     return { removed, pending: !removed, reason: unresolved ? 'UNRESOLVED_OPERATION' : (removed ? 'REMOVED' : 'PENDING') };
   }
 
-  async closeOwnedScenarioTab(taskId, sessionId) {
+  closeOwnedScenarioTab(taskId, sessionId) {
+    return withTabLifecycle(this.coreRepository, () => this.performCloseOwnedScenarioTab(taskId, sessionId));
+  }
+
+  async performCloseOwnedScenarioTab(taskId, sessionId) {
     if (!taskId || !sessionId) return { closed: false, reason: 'IDENTITY_MISSING' };
     const state = await this.coreRepository.load();
     const hint = state.tabHintsByTaskId?.[taskId];
@@ -1218,6 +1225,11 @@ export class ScenarioWorkManager {
       return { closed: false, reason: 'TAB_NOT_EXTENSION_OWNED' };
     }
 
+    await this.coreRepository.update(next => {
+      const live = next.tabHintsByTaskId?.[taskId];
+      if (live?.tabId === hint.tabId && live.sessionId === sessionId) live.retirePending = true;
+      return next;
+    });
     let gone = false;
     try {
       if (!this.chrome.tabs?.remove) return { closed: false, reason: 'TAB_API_UNAVAILABLE' };
@@ -1264,6 +1276,7 @@ export class ScenarioWorkManager {
     if (!pending.length) return false;
     const core = await this.coreRepository.load();
     return pending.every(id => {
+      if (Object.values(core.tabHintsByTaskId || {}).some(hint => hint.sessionId === id && hint.ownedByExtension === true)) return false;
       const session = core.sessionsById?.[id];
       return !session || (session.scenarioWork?.managed === true
         && session.scenarioWork.scenarioId === scenario.id
@@ -1325,6 +1338,7 @@ export class ScenarioWorkManager {
       participantKey: action.participantKey,
       generation: action.generation,
       stage: action.stage,
+      closeTabsBetweenChecks: scenario.config.closeTabsBetweenChecks === true,
       preferredWindowId: Number.isInteger(scenario.runtime.preferredWindowId)
         ? scenario.runtime.preferredWindowId : null,
     };
@@ -1362,6 +1376,7 @@ export class ScenarioWorkManager {
           existingTask.lastVerifiedFingerprint = '';
           existingTask.lastAssistantBaselineCount = 0;
           existingTask.lastAssistantBaselineKnown = false;
+          existingTask.lastSubmittedUserMessageKey = '';
           existingTask.lastAssistantReport = '';
           existingTask.lastAssistantReportAt = 0;
           existingTask.retryAfterAt = 0;
@@ -1427,7 +1442,9 @@ export class ScenarioWorkManager {
         conversationUrl: task.lastConversationUrl,
         assistantBaselineCount: Number(task.lastAssistantBaselineCount || 0),
         assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
+        submittedUserMessageKey: task.lastSubmittedUserMessageKey || '',
         persistentManagedTab: true,
+        managedSessionId: participant.sessionId,
         managedTabId: Number.isInteger(tabHint?.tabId) ? tabHint.tabId : null,
         managedTabOwned: tabHint?.ownedByExtension === true,
         preferredWindowId: Number.isInteger(runtime.preferredWindowId)
@@ -1498,12 +1515,24 @@ export class ScenarioWorkManager {
 
           let openedReport = null;
           try {
-            openedReport = await this.collectAssistantReport({
-              ...reportJob,
-              managedTabId: null,
-              managedTabOwned: false,
-              createOwnedTab: true,
-              recoveryAction: ChatRecoveryAction.SAME_URL_REOPEN,
+            openedReport = await withTabLifecycle(this.coreRepository, async () => {
+              const live = await this.coreRepository.load();
+              const liveSession = live.sessionsById?.[participant.sessionId];
+              const liveTask = liveSession?.tasksById?.[participantTaskId];
+              if (!liveTask?.lastVerifiedSendAt || liveTask.lastConversationUrl !== task.lastConversationUrl
+                  || liveSession.operation?.phase !== OperationPhase.SENT_VERIFIED) return null;
+              const saved = live.tabHintsByTaskId?.[participantTaskId];
+              if (saved?.tabId != null) {
+                let existing = null;
+                try { existing = await this.chrome.tabs.get(saved.tabId); } catch { /* missing */ }
+                if (existing) return { recoveredManagedTabId: existing.id, recoveredManagedTabOwned: saved.ownedByExtension === true };
+              }
+              const ownedChrome = Object.create(this.chrome);
+              ownedChrome.tabs = Object.create(this.chrome.tabs);
+              ownedChrome.tabs.create = options => createRecordedOwnedTab(this.coreRepository, this.chrome,
+                { hintKey: participantTaskId, taskId: participantTaskId, sessionId: participant.sessionId, allowVerifiedResponse: true }, options);
+              const tab = await createChatTab(ownedChrome, task.lastConversationUrl, reportJob.preferredWindowId);
+              return { recoveredManagedTabId: tab.id, recoveredManagedTabOwned: true };
             });
           } catch (error) {
             await this.recordAssistantObservation({ scenario, participant, task, error, now });
@@ -1511,6 +1540,10 @@ export class ScenarioWorkManager {
           const openedTabId = Number(openedReport?.recoveredManagedTabId);
           if (Number.isInteger(openedTabId) && openedTabId > 0) {
             await this.coreRepository.update(state => {
+              const liveSession = state.sessionsById?.[participant.sessionId];
+              if (liveSession?.tasksById?.[participantTaskId]?.lastConversationUrl !== task.lastConversationUrl) return state;
+              const existing = state.tabHintsByTaskId?.[participantTaskId];
+              if (existing?.tabId != null && existing.tabId !== openedTabId) return state;
               state.tabHintsByTaskId ||= {};
               state.tabHintsByTaskId[participantTaskId] = {
                 sessionId: participant.sessionId,
@@ -1559,9 +1592,24 @@ export class ScenarioWorkManager {
       }
       await this.recordAssistantObservation({ scenario, participant, task, report, now });
       const reportCode = String(report?.safeDiagnosticCode || report?.code || '');
+      if (report?.status === 'BUSY' || reportCode === 'ASSISTANT_RESPONSE_STREAMING') {
+        const streaming = ensureManagerRuntimeFields(runtime);
+        const waiting = scenarioWorkParticipants(streaming).find(item => item.key === participant.key);
+        if (waiting?.state === ScenarioParticipantState.WAITING) {
+          const expired = Number(waiting.deadlineAt || 0) <= now;
+          waiting.deadlineAt = Math.max(Number(waiting.deadlineAt || 0), now + scenario.config.responseTimeoutMinutes * 60_000);
+          const checkpoint = await this.checkpointRuntime(scenario.id, streaming, expectedOwnerEpoch, now);
+          if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
+          runtime = checkpoint.runtime;
+          if (expired) await this.appendScenarioDiagnostic({ scenario, participant: waiting, task,
+            event: 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ГЕНЕРАЦІЯ_ТРИВАЄ', status: 'WAITING',
+            code: 'SCENARIO_RESPONSE_STREAMING_DEADLINE_EXTENDED', message: 'Поточна відповідь ще генерується; цей чат збережено.', now });
+        }
+      }
 
       if (scenario.config.closeTabsBetweenChecks === true
-          && reportCode === 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING'
+          && (reportCode === 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING'
+            || reportCode === 'ASSISTANT_RESPONSE_STREAMING')
           && tabHint?.ownedByExtension === true && Number.isInteger(tabHint.tabId)) {
         // Reopening a parked chat may take longer than one poll. Closing a
         // still-loading tab on every check makes completion unobservable.
@@ -1767,12 +1815,33 @@ export class ScenarioWorkManager {
     return { runtime, ownerChanged: false };
   }
 
-  async cycleOne(id) {
+  cycleOne(id) {
+    if (this.cyclesById.has(id)) return this.cyclesById.get(id);
+    const cycle = this.performCycleOne(id).finally(() => {
+      if (this.cyclesById.get(id) === cycle) this.cyclesById.delete(id);
+    });
+    this.cyclesById.set(id, cycle);
+    return cycle;
+  }
+
+  async performCycleOne(id) {
     const now = this.now();
     let current = await this.get(id);
     if (!current.scenario) return { kind: 'NOT_FOUND' };
     if (current.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) return { kind: 'IDLE' };
     const expectedOwnerEpoch = Math.max(0, Number(current.scenario.runtime.ownerEpoch || 0));
+
+    const policyCore = await this.coreRepository.load();
+    const closeTabsBetweenChecks = current.scenario.config.closeTabsBetweenChecks === true;
+    if (Object.values(policyCore.sessionsById || {}).some(session => session.scenarioWork?.scenarioId === id
+        && session.scenarioWork.closeTabsBetweenChecks !== closeTabsBetweenChecks)) {
+      await this.coreRepository.update(state => {
+        for (const session of Object.values(state.sessionsById || {})) {
+          if (session.scenarioWork?.scenarioId === id) session.scenarioWork.closeTabsBetweenChecks = closeTabsBetweenChecks;
+        }
+        return state;
+      });
+    }
 
     const cleanupBefore = await this.drainCleanupPending(id);
     if (cleanupBefore.pending.length && !(await this.retiredCleanupCanRunInBackground(current.scenario))) {

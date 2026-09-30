@@ -64,16 +64,16 @@ test('new-chat launch URL may transition from root to the created conversation a
 });
 
 
-test('fresh launch generation without exact user-turn evidence remains uncertain',async()=>{
+test('fresh unique conversation transition with empty composer and generation proves the one local submit',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
     redirectAfterSend:'https://chatgpt.com/c/generated-stop-proof',
     suppressMessage:true
   });
   const r=await f.run();
-  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
-  assert.equal(r.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
-  assert.equal(f.messages.length,0,'generation alone must not identify the submitted prompt');
+  assert.equal(r.status,'SENT_VERIFIED');
+  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION');
+  assert.equal(f.messages.length,0,'this fresh transition does not require materialized hidden user bubbles');
   assert.equal(f.clicks(),1);
 });
 
@@ -154,7 +154,7 @@ test('hidden form submission wakes a deferred changed UI once and observes its e
   assert.equal(f.clicks(),0);
   assert.equal(activations,1);
 });
-test('waking a hidden tab without an exact rendered turn leaves the Send uncertain',async()=>{
+test('waking the same hidden tab preserves fresh-conversation acknowledgement without another submit',async()=>{
   const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,
     startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/no-turn'});
   let activations=0;
@@ -163,10 +163,10 @@ test('waking a hidden tab without an exact rendered turn leaves the Send uncerta
     f.document.visibilityState='visible';
     return true;
   }});
-  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(r.status,'SENT_VERIFIED');
   assert.equal(f.submits(),1);
   assert.equal(f.clicks(),0);
-  assert.equal(activations,1);
+  assert.equal(activations,0,'already observed acknowledgement does not need a focus change');
 });
 test('unlabeled main user turn recovers after navigation without resending',async()=>{
   const f=fixture({messageShape:'unlabeled',ackAt:25000,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/new-account'});

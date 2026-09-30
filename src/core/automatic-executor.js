@@ -5,6 +5,7 @@ import { selectNextTask } from './scheduler.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
 import { restorePendingSendTabs } from './native-input.js';
 import { resolveTaskTab } from './tabs.js';
+import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
 import { appendLog } from './logger.js';
@@ -95,6 +96,15 @@ function exclusiveConversationIdentity(url) {
 function activeConversationHintConflict(state, sessionId, normalizedUrl) {
   const identity = exclusiveConversationIdentity(normalizedUrl);
   if (!identity) return null;
+  for (const owner of Object.values(state?.sessionsById || {})) {
+    if (owner.id === sessionId || owner.enabled === false) continue;
+    const managedWaiting = owner.scenarioWork?.managed && owner.operation?.phase === OperationPhase.SENT_VERIFIED;
+    if (!ACTIVE_STATES.has(owner.runState) && !managedWaiting) continue;
+    for (const task of Object.values(owner.tasksById || {})) {
+      if (Number(task.lastVerifiedSendAt || 0) > 0 && (exclusiveConversationIdentity(task.normalizedUrl) === identity
+          || (managedWaiting && exclusiveConversationIdentity(task.lastConversationUrl) === identity))) return { sessionId: owner.id };
+    }
+  }
   for (const hint of Object.values(state?.tabHintsByTaskId || {})) {
     if (!hint?.sessionId || hint.sessionId === sessionId) continue;
     const owner = state.sessionsById?.[hint.sessionId];
@@ -124,6 +134,7 @@ export class AutomaticSessionExecutor {
     this.now = now;
     this.coordinator = new DurableSubmissionCoordinator(repository, { now, cryptoApi, profileGapMs });
     this.tabBindQueues = new Map();
+    this.sessionRuns = new Map();
     this.forceHighEffort = forceHighEffort === true;
   }
 
@@ -135,7 +146,7 @@ export class AutomaticSessionExecutor {
     const conversationIdentity = exclusiveConversationIdentity(initialTask.normalizedUrl);
     const queueKey = conversationIdentity ? `conversation:${conversationIdentity}` : `session:${sessionId}`;
     const prior = this.tabBindQueues.get(queueKey) || Promise.resolve();
-    const operation = prior.catch(() => undefined).then(async () => {
+    const operation = prior.catch(() => undefined).then(() => withTabLifecycle(this.repo, async () => {
       try {
         // Chrome tab I/O must never run while StorageRepository.update owns its
         // serialized state-write queue. Exact /c/<id> conversation ownership is
@@ -150,16 +161,33 @@ export class AutomaticSessionExecutor {
           changed.safeDiagnosticCode = 'TAB_CONVERSATION_CHANGED_DURING_BIND';
           throw changed;
         }
+        const hintKeyForEvidence = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+          ? `__session_worker__:${sessionId}` : taskId;
+        if (Number(session.operation?.submitStartedAt || 0) > 0
+            && [OperationPhase.AMBIGUOUS, OperationPhase.SUBMITTING].includes(session.operation?.phase)
+            && !isExclusiveConversationUrl(task.normalizedUrl)) {
+          const evidence = snapshot.tabHintsByTaskId?.[hintKeyForEvidence];
+          let surviving = null;
+          try { if (evidence?.tabId != null) surviving = await this.chrome.tabs.get(evidence.tabId); } catch { /* missing */ }
+          if (!surviving) {
+            const lost = new Error('Post-submit launch tab is missing; recovery will not open a fresh composer');
+            lost.safeDiagnosticCode = 'TAB_POST_SUBMIT_BINDING_LOST';
+            throw lost;
+          }
+        }
         const conflict = activeConversationHintConflict(snapshot, sessionId, task.normalizedUrl);
         if (conflict) {
           const error = new Error('Another active Session already owns this exact ChatGPT conversation');
           error.safeDiagnosticCode = 'TAB_CONVERSATION_OWNERSHIP_CONFLICT';
           throw error;
         }
-        const tab = await resolveTaskTab(this.chrome, snapshot, sessionId, task);
         const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
-          ? `__session_worker__:${sessionId}`
-          : taskId;
+          ? `__session_worker__:${sessionId}` : taskId;
+        const owner = { hintKey, sessionId, taskId, kind: hintKey === taskId ? 'TASK' : 'SESSION_WORKER' };
+        const ownedChrome = Object.create(this.chrome);
+        ownedChrome.tabs = Object.create(this.chrome.tabs);
+        ownedChrome.tabs.create = options => createRecordedOwnedTab(this.repo, this.chrome, owner, options);
+        const tab = await resolveTaskTab(ownedChrome, snapshot, sessionId, task);
         const resolvedHint = snapshot.tabHintsByTaskId?.[hintKey];
         if (!resolvedHint || resolvedHint.tabId !== tab.id || resolvedHint.sessionId !== sessionId) {
           throw new Error('Resolved tab ownership was not recorded in snapshot');
@@ -172,7 +200,15 @@ export class AutomaticSessionExecutor {
           if (liveTask.normalizedUrl !== task.normalizedUrl) {
             throw new Error('Task target changed during tab binding');
           }
-          draft.tabHintsByTaskId[hintKey] = structuredClone(resolvedHint);
+          const currentHint = draft.tabHintsByTaskId?.[hintKey];
+          if (currentHint && currentHint.tabId !== resolvedHint.tabId
+              && currentHint.tabId !== initial.tabHintsByTaskId?.[hintKey]?.tabId) throw new Error('TAB_BINDING_CHANGED');
+          draft.tabHintsByTaskId[hintKey] = { ...structuredClone(resolvedHint),
+            boundAt: this.now(), boundSendCount: Number(live.successfulSendCount || 0), opening: false };
+          if (Number.isInteger(tab.windowId)) {
+            live.tabWindowId = tab.windowId;
+            if (live.scenarioWork) live.scenarioWork.preferredWindowId = tab.windowId;
+          }
           appendDiagnostic(draft, {
             event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
             sessionId,
@@ -187,7 +223,7 @@ export class AutomaticSessionExecutor {
       } catch (error) {
         throw attachTaskContext(error, taskId, 'TASK_TAB_BIND_FAILED');
       }
-    });
+    }));
     this.tabBindQueues.set(queueKey, operation);
     try {
       return await operation;
@@ -286,7 +322,6 @@ export class AutomaticSessionExecutor {
       const operationForTask = operation?.taskId === taskId ? operation : null;
       const unattendedPreSubmitReset = session.retryPolicy !== 'manual'
         && [
-          InteractionResult.AUTH_REQUIRED,
           InteractionResult.UNKNOWN_UI,
           InteractionResult.MANUAL_REVIEW_REQUIRED,
         ].includes(result?.status)
@@ -311,7 +346,10 @@ export class AutomaticSessionExecutor {
         }, { at: this.now() });
         return draft;
       }
+      if (hint.ownedByExtension === false) return draft;
       tabId = hint.tabId;
+      hint.ownedByExtension = true;
+      hint.retirePending = true;
       target = task.normalizedUrl || task.url;
       appendDiagnostic(draft, {
         event: 'ЗАКРИТТЯ_ВКЛАДКИ_ЗАПЛАНОВАНО',
@@ -626,6 +664,11 @@ export class AutomaticSessionExecutor {
       });
     }
 
+    if (beforeVerification >= deadline && session.retryPolicy !== 'manual' && managedNoResend) {
+      return this.settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, {
+        status: InteractionResult.TEMPORARY_ERROR, safeDiagnosticCode: 'RECOVERY_VERIFICATION_DEADLINE_EXPIRED',
+      });
+    }
     const retryAfterAt = task?.retryAfterAt || 0;
     if (retryAfterAt > beforeVerification) {
       return { kind: 'WAIT_RECOVERY', wakeAt: retryAfterAt };
@@ -691,7 +734,10 @@ export class AutomaticSessionExecutor {
         reconciled = true;
         return draft;
       });
-      if (reconciled) await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
+      if (reconciled) {
+        await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
+        await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
+      }
       return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
@@ -857,7 +903,16 @@ export class AutomaticSessionExecutor {
     return { kind: result.status === InteractionResult.SENT_VERIFIED ? 'SENT' : 'SUBMISSION_UNCERTAIN', result };
   }
 
-  async runSessionOnce(sessionId) {
+  runSessionOnce(sessionId) {
+    if (this.sessionRuns.has(sessionId)) return this.sessionRuns.get(sessionId);
+    const run = this.performSessionOnce(sessionId).finally(() => {
+      if (this.sessionRuns.get(sessionId) === run) this.sessionRuns.delete(sessionId);
+    });
+    this.sessionRuns.set(sessionId, run);
+    return run;
+  }
+
+  async performSessionOnce(sessionId) {
     const state = await this.repo.load();
     const session = requireSession(state, sessionId);
     if (!ACTIVE_STATES.has(session.runState)) return { kind: 'IDLE' };

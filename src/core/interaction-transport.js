@@ -63,18 +63,29 @@ export class ChromeInteractionTransport {
     siteAdapterId = SiteAdapterId.CHATGPT_WEB,
     tabReadinessOptions = {},
     checkOnlyUiReadinessOptions = {},
+    requestTimeoutMs = 30000,
   } = {}) {
     this.chrome = chromeApi;
     this.siteAdapter = getSiteAdapter(siteAdapterId);
     this.tabReadinessOptions = tabReadinessOptions;
     this.checkOnlyUiReadinessOptions = checkOnlyUiReadinessOptions;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   async send(tabId, request) {
-    return this.chrome.tabs.sendMessage(tabId, {
-      channel: 'autopilot-interaction',
-      request,
-    });
+    const bounded = ['SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
+    if (!bounded) return this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction', request });
+    const timeoutMs = Math.max(1, this.requestTimeoutMs);
+    let timer;
+    try {
+      return await Promise.race([
+        this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction',
+          request: { ...request, executionDeadlineAt: Date.now() + timeoutMs } }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(diagnosticError(
+          'INTERACTION_REQUEST_TIMEOUT', 'Page acknowledgement timed out; physical Send will not be replayed', null, request,
+        )), timeoutMs); }),
+      ]);
+    } finally { clearTimeout(timer); }
   }
 
   async restoreMissingSafeReceiver(tabId) {
@@ -89,6 +100,7 @@ export class ChromeInteractionTransport {
 
   readinessOptions(request) {
     const options = {
+      allowLoadingDocument: true,
       ...this.tabReadinessOptions,
       allowPostSendNavigation: request?.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
     };
@@ -125,6 +137,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT') throw error;
         throw diagnosticError(
           isMissingReceiverError(error)
             ? 'INTERACTION_RECEIVER_LOST_DURING_UI_READINESS'
@@ -157,6 +170,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT') throw error;
         // An unpacked-extension update/reload can leave an already-open ChatGPT tab
         // without the newly registered content-script receiver. Only the read-only
         // allow-list above may be restored and retried once.

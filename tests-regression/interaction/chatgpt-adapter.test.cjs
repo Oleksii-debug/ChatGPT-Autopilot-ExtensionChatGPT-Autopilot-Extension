@@ -321,3 +321,38 @@ test('effort slider fails closed if its key action is ignored or shape changes',
     assert.equal(page.state().open, false);
   }
 });
+
+test('response stays bound to the submitted user message after history virtualization', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  const user = chat.bubble('CONTINUE');
+  const originalAttr = user.getAttribute;
+  user.getAttribute = name => name === 'data-message-id' ? 'current-user-id' : originalAttr(name);
+  user.compareDocumentPosition = assistant => assistant.current ? 4 : 2;
+  chat.users.push(user);
+  const old = chat.reply('old answer'); chat.assistants.push(old);
+  const request = validRequest({mode:'READ_ASSISTANT_REPORT',assistantBaselineKnown:true,assistantBaselineCount:17,
+    submittedUserMessageKey:'message:current-user-id'});
+  const pending = await adapter.execute(request,{document:chat.document});
+  assert.equal(pending.assistantComplete,false,'old answer preceding current user cannot advance the scenario');
+  const current = chat.reply('current answer');current.current=true;chat.assistants.splice(0,1,current);
+  const ready = await adapter.execute(request,{document:chat.document});
+  assert.equal(ready.assistantComplete,true,'one visible current answer is enough even when the saved history count is 17');
+  assert.equal(ready.assistantText,'current answer');
+  const wrong = await adapter.execute({...request,submittedUserMessageKey:'message:other-user'},{document:chat.document});
+  assert.equal(wrong.assistantComplete,false);
+});
+
+test('already observed Send acknowledgement does not depend on a background timer', async () => {
+  const { adapter } = loadAdapter({setTimeout(){throw Error('background timers are suspended');}});
+  const chat = workChat();chat.composer.innerText='Continue now';
+  const sent=await adapter.execute(validRequest({mode:'SUBMIT_EXISTING',promptText:'Continue now'}),{document:chat.document});
+  assert.equal(sent.status,adapter.STATUS.SENT_VERIFIED);assert.equal(chat.sends,1);
+});
+
+test('a delayed request past its execution deadline cannot dispatch a physical Send',async()=>{
+  const {adapter}=loadAdapter();const chat=workChat();chat.composer.innerText='Continue now';
+  const result=await adapter.execute(validRequest({mode:'SUBMIT_EXISTING',promptText:'Continue now',executionDeadlineAt:1}),{document:chat.document});
+  assert.equal(chat.sends,0);assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(result.safeDiagnosticCode,'SEND_REQUEST_EXPIRED_BEFORE_EFFECT');
+});

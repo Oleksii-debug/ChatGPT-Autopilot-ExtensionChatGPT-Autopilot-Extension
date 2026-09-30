@@ -77,7 +77,7 @@ function formatTime(value) {
   return Number.isFinite(value) && value >= 0 ? new Date(value).toISOString() : 'немає';
 }
 
-function reportSession(session) {
+function reportSession(session, state) {
   const currentTask = session.tasksById?.[session.taskOrder?.[session.currentTaskIndex]] || null;
   const enabledIds = (session.taskOrder || []).filter(id => session.tasksById?.[id]?.enabled);
   const completedTaskCount = session.runMode === 'ONE_PASS'
@@ -89,6 +89,7 @@ function reportSession(session) {
     && isCompleted
     && successfulSendCount > 0
     && session.operation?.phase === OperationPhase.SENT_VERIFIED;
+  const hints = Object.values(state?.tabHintsByTaskId || {}).filter(hint => hint.sessionId === session.id);
   return [
     `Сеанс: ${safeText(session.name || 'без назви', 160)} (${safeText(session.id, 120)})`,
     line('  стан', scenarioAwaitingAssistant ? 'WAITING_RESPONSE' : (isCompleted ? 'COMPLETED' : session.runState)),
@@ -98,8 +99,12 @@ function reportSession(session) {
     line('  залишилось завдань', session.runMode === 'CONTINUOUS' ? 'не застосовується — постійний цикл' : Math.max(0, enabledIds.length - completedTaskCount)),
     line('  поточне завдання', safeText(currentTask?.label || currentTask?.id || '', 160)),
     line('  стан завдання', currentTask?.status),
+    line('  режим вкладок', session.tabStrategy),
+    line('  робоче вікно', session.tabWindowId ?? session.scenarioWork?.preferredWindowId),
+    line('  прив’язані вкладки', hints.map(hint => `${hint.tabId}; owned=${hint.ownedByExtension === true}; closing=${hint.retirePending === true}`).join(' | ')),
     line('  етап операції', session.operation?.phase || OperationPhase.NONE),
     line('  очікувана розмова', redactChatGptUrl(session.operation?.targetUrl || currentTask?.normalizedUrl || currentTask?.url)),
+    line('  розмова останнього Send', redactChatGptUrl(currentTask?.lastConversationUrl)),
     line('  повторна спроба не раніше', formatTime(currentTask?.retryAfterAt)),
     line('  остання помилка', safeText(session.lastError || '', MAX_DIAGNOSTIC_MESSAGE_LENGTH)),
   ].join('\n');
@@ -138,7 +143,7 @@ export function createDiagnosticReport(state, { now = Date.now(), extensionVersi
     'У звіт навмисно не включено: тексти промптів, повні приватні посилання, файли, дані сеансу браузера, ключі доступу, дані входу та вміст розмов.',
     '',
     'Поточний стан сеансів:',
-    sessions.length ? sessions.map(reportSession).join('\n\n') : 'Сеансів немає.',
+    sessions.length ? sessions.map(session => reportSession(session, state)).join('\n\n') : 'Сеансів немає.',
     '',
     `Діагностичні події (останні ${events.length}):`,
   ];

@@ -9,6 +9,7 @@ import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { InteractionProviderRouter } from '../core/interaction-provider-router.js';
 import { AgentProviderId, getAgentProvider } from '../core/capability-registry.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
+import { withTabLifecycle, createRecordedOwnedTab } from '../core/owned-tab-lifecycle.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
@@ -197,7 +198,16 @@ async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
 }
 
 async function probeAssistantConversation(job) {
-  return probeAssistantConversationCore(chrome, transport, job);
+  if (!job?.persistentManagedTab || !job.managedSessionId || !job.recoveryAction) return probeAssistantConversationCore(chrome, transport, job);
+  return withTabLifecycle(repo, async () => {
+    const ownedChrome = Object.create(chrome);
+    ownedChrome.tabs = Object.create(chrome.tabs);
+    ownedChrome.tabs.create = options => createRecordedOwnedTab(repo, chrome, {
+      hintKey: job.taskId, taskId: job.taskId, sessionId: job.managedSessionId,
+      allowVerifiedResponse: true,
+    }, options);
+    return probeAssistantConversationCore(ownedChrome, transport, job);
+  });
 }
 
 async function collectWebReportFromConversation(job) {

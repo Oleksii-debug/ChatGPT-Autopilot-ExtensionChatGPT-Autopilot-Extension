@@ -343,7 +343,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   const saveAgentPolicy = js.match(/async function saveBrowserAgentPolicy\(\)[\s\S]*?\n}\n/)?.[0] || '';
   assert.match(saveAgentPolicy, /assertBrowserAgentRouteReadyForLaunch\(\);/, 'existing Agent policy saves must enforce the same pinned-route readiness gate');
   assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
-  assert.ok(js.includes("item.routeId || '?'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
+  assert.ok(js.includes("item.routeId || 'legacy'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
   assert.match(js, /!ui\.agentDraftActive && !ui\.agentPolicyDirty\) fillBrowserAgentPolicy\(config\)/, 'status refresh must preserve unsaved Agent policy fields');
   assert.match(js, /if \(editEpoch === ui\.agentPolicyEditEpoch\)/, 'late save must not erase edits typed while Core was updating');
   assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');

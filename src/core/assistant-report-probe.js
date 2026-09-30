@@ -90,9 +90,7 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
     const tabs = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
     const existing = persistentManagedTab
       ? (hinted && matchesConversation(hinted, conversationUrl) ? hinted
-        : job?.createOwnedTab === true
-          ? (tabs || []).find(tab => tab?.id != null && matchesConversation(tab, conversationUrl)) || null
-          : null)
+        : null)
       : (tabs || []).find(tab => tab?.id != null && matchesConversation(tab, conversationUrl));
     const recoveryAction = String(job?.recoveryAction || '').trim();
 
@@ -194,7 +192,8 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
         });
       }
 
-      if (persistentManagedTab && existing.status === 'loading') {
+      if (persistentManagedTab && existing.status === 'loading'
+          && existing.pendingUrl && !sameChatConversationUrl(existing.pendingUrl, conversationUrl)) {
         return temporaryReport('ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', {
           tabRecoveryPending: true,
         });
@@ -226,6 +225,7 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       promptText: '',
       assistantBaselineCount: Number(job.assistantBaselineCount || 0),
       assistantBaselineKnown: job.assistantBaselineKnown === true,
+      submittedUserMessageKey: String(job.submittedUserMessageKey || ''),
     };
     if (recoveryAction === 'RETRY_BUTTON') request.mode = 'RECOVER_CHAT_ERROR_SURFACE';
     return await transport.execute(tabId, request);

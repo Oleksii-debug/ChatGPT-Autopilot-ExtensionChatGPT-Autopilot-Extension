@@ -376,6 +376,7 @@ function tabHintKeysRemovedByUpdatedSession(state, oldSession, replacement) {
   const removed = [];
   for (const [key, hint] of Object.entries(state.tabHintsByTaskId || {})) {
     if (hint?.sessionId !== oldSession.id) continue;
+    if (oldSession.tabStrategy !== replacement.tabStrategy) { removed.push(key); continue; }
     if (key === workerHintKey) {
       if (!workerMode) removed.push(key);
       continue;
@@ -404,8 +405,9 @@ function hintIsExtensionOwnedForPhysicalClose(session, hint) {
   // Worker mode can adopt an existing concrete conversation, so only close a
   // worker tab when provenance explicitly says the extension created it.
   if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) return hint.ownedByExtension === true;
-  // KEEP_TASK_TABS_OPEN intentionally keeps tabs and may point at user tabs.
-  return false;
+  // Stop/update/delete release every explicitly created tab, including KEEP.
+  // Adopted user tabs never carry this provenance bit.
+  return hint.ownedByExtension === true;
 }
 
 function unresolvedEvidenceHintKey(session) {
@@ -996,6 +998,7 @@ export class CoreCommandDispatcher {
         replacement.successfulSendCount=old.successfulSendCount||0;
         replacement.completedAt=old.completedAt||0;
         replacement.createdAt=old.createdAt;
+        replacement.tabWindowId=old.tabWindowId;
         replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
         replacement.onePassCompletedCount=Math.min(logicalTaskCount(replacement), Number(old.onePassCompletedCount ?? old.onePassCompletedTaskIds?.length ?? 0));
         for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}
