@@ -868,7 +868,7 @@ test('optional route and policy booleans reject present representation aliases w
           model:'local',
           [field]:invalid,
         }]),
-        new RegExp(`AI route 1 ${field} must be boolean`, 'u'),
+        new RegExp(`AI route 1 ${field} is invalid: must be boolean`, 'u'),
         `${field}=${String(invalid)}`,
       );
     }
@@ -890,7 +890,7 @@ test('optional route and policy booleans reject present representation aliases w
     for (const invalid of [0, 1, '', 'true', 'false', null]) {
       assert.throws(
         () => normalizeAiRoutePolicy({ [field]:invalid }),
-        new RegExp(`AI route ${field} must be boolean`, 'u'),
+        new RegExp(`AI route ${field} is invalid: must be boolean`, 'u'),
         `${field}=${String(invalid)}`,
       );
     }
