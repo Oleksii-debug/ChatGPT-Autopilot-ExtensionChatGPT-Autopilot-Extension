@@ -306,10 +306,9 @@ async function fixture({ projectWorkspaceRepository = null } = {}) {
   return { chrome, manager, task, registered, prepared };
 }
 
-function contextRequest(task, bindingId, overrides = {}) {
+function contextRequest(_task, bindingId, overrides = {}) {
   return {
     bindingId,
-    taskEnvelope: task,
     expectedProjectRevisionId: 'project-r2',
     capsuleId: 'capsule.parent',
     ...overrides,
@@ -384,24 +383,23 @@ test('durable child context uses persisted authority provenance and rejects prov
   assert.equal(durable.providerId, 'provider.main');
 });
 
-test('orchestration owner rejects task semantic substitution against durable activation evidence', async () => {
+test('orchestration owner rejects caller task substitution and resolves only durable activation evidence', async () => {
   let resolverCalls = 0;
   const projectWorkspaceRepository = {
     async resolveContext() {
       resolverCalls += 1;
-      throw new Error('resolver must not be reached for a substituted task');
+      throw new Error('resolver must not be reached for caller task substitution');
     },
   };
   const { manager, task, registered } = await fixture({ projectWorkspaceRepository });
   const substituted = structuredClone(task);
   substituted.objective = 'Different task semantics with the same visible identities.';
+  const request = contextRequest(task, registered.binding.bindingId);
+  request.taskEnvelope = substituted;
 
   await assert.rejects(
-    () => manager.resolveDurableSubagentTaskContext(
-      contextRequest(substituted, registered.binding.bindingId),
-      'orch-1',
-    ),
-    /taskDispatchIdentity/,
+    () => manager.resolveDurableSubagentTaskContext(request, 'orch-1'),
+    /unknown field: taskEnvelope/,
   );
   assert.equal(resolverCalls, 0);
 });
