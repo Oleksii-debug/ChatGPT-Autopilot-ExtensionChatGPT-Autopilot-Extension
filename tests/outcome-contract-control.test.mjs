@@ -783,6 +783,74 @@ test('Core OutcomeContract command wrappers reject accessors and unknown fields 
 });
 
 
+test('Core CREATE and UPDATE snapshot nested OutcomeContract before queued storage mutation', async () => {
+  const chrome = fakeChrome();
+  const repository = new StorageRepository(chrome);
+  const dispatcher = new CoreCommandDispatcher(repository, () => 1000);
+
+  const createInput = structuredClone(contractV1());
+  const expectedCreateDesired = createInput.desiredResult;
+  const expectedCreateCriterion = createInput.completionCriteria[0].description;
+  const createPending = dispatcher.execute(CoreCommand.CREATE_OUTCOME_CONTRACT, {
+    contract: createInput,
+  });
+  createInput.desiredResult = 'caller mutation after CREATE admission';
+  createInput.completionCriteria[0].description = 'caller criterion mutation after CREATE admission';
+  await createPending;
+
+  const created = await dispatcher.execute(CoreCommand.GET_OUTCOME_CONTRACT, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 1,
+  });
+  assert.equal(created.contract.desiredResult, expectedCreateDesired);
+  assert.equal(created.contract.completionCriteria[0].description, expectedCreateCriterion);
+
+  const updateInput = structuredClone(nextContract(created.contract, {
+    desiredResult: 'Revision two admitted before caller mutation.',
+  }));
+  const expectedUpdateDesired = updateInput.desiredResult;
+  const expectedUpdateCriterion = updateInput.completionCriteria[0].description;
+  const updatePending = dispatcher.execute(CoreCommand.UPDATE_OUTCOME_CONTRACT, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 1,
+    contract: updateInput,
+  });
+  updateInput.desiredResult = 'caller mutation after UPDATE admission';
+  updateInput.completionCriteria[0].description = 'caller criterion mutation after UPDATE admission';
+  await updatePending;
+
+  const updated = await dispatcher.execute(CoreCommand.GET_OUTCOME_CONTRACT, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+    expectedRevision: 2,
+  });
+  assert.equal(updated.contract.desiredResult, expectedUpdateDesired);
+  assert.equal(updated.contract.completionCriteria[0].description, expectedUpdateCriterion);
+
+  let getterCalls = 0;
+  const hostile = structuredClone(contractV1({ contractId: 'hostile-contract' }));
+  Object.defineProperty(hostile, 'desiredResult', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'must not execute';
+    },
+  });
+  await assert.rejects(
+    dispatcher.execute(CoreCommand.CREATE_OUTCOME_CONTRACT, { contract: hostile }),
+    /data propert/u,
+  );
+  assert.equal(getterCalls, 0, 'nested OutcomeContract snapshot must reject accessors without getter execution');
+  assert.equal(
+    listStoredOutcomeContractsV1(await repository.load(), { projectId: 'project-1' })
+      .some(item => item.contractId === 'hostile-contract'),
+    false,
+  );
+});
+
+
 test('concurrent Core revision CAS serializes writers so exactly one stale peer fails', async () => {
   const chrome = fakeChrome();
   const repository = new StorageRepository(chrome);
