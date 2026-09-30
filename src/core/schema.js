@@ -4,6 +4,7 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import { createAiRouteQualityEvidenceRegistryV1 } from './ai-route-quality-evidence-registry.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -61,7 +62,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiRouteQualityEvidenceRegistry: structuredClone(createAiRouteQualityEvidenceRegistryV1()), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -292,6 +293,9 @@ export function validateState(state) {
     requireString(runtime.lastRouteId, 'profile aiRouterRuntime lastRouteId');
     if (!Array.isArray(runtime.lastFailoverChain)) throw new Error('Invalid profile aiRouterRuntime lastFailoverChain');
   }
+  // Route-quality evidence is advisory. Its dedicated read bridge performs
+  // strict registry normalization at use time so corrupt evidence degrades to
+  // baseline Router behavior instead of making the entire Core state unloadable.
   if (state.profile.aiManager !== undefined) {
     requireRecord(state.profile.aiManager, 'profile aiManager');
     const manager = normalizeAiManagerSettings(state.profile.aiManager);
