@@ -142,7 +142,7 @@ function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
 
 function normalizeNode(raw) {
   const source = object(raw, 'AgentPlan node');
-  exact(source, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
+  exact(source, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'requiredCapabilityIds', 'requiredToolIds', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
   const state = source.state === undefined ? AgentPlanNodeState.PENDING : source.state;
   if (typeof state !== 'string' || !NODE_STATES.has(state)) throw new Error('AgentPlan node state is invalid');
   return {
@@ -153,6 +153,8 @@ function normalizeNode(raw) {
     conflictKeys: uniqueIds(source.conflictKeys === undefined ? [] : source.conflictKeys, 'AgentPlan node conflictKeys'),
     ownerId: source.ownerId == null || source.ownerId === '' ? '' : id(source.ownerId, 'AgentPlan node ownerId'),
     executionPlane: typeof source.executionPlane === 'string' && PLANES.has(source.executionPlane) ? source.executionPlane : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
+    requiredCapabilityIds: uniqueIds(source.requiredCapabilityIds === undefined ? [] : source.requiredCapabilityIds, 'AgentPlan node requiredCapabilityIds', 64),
+    requiredToolIds: uniqueIds(source.requiredToolIds === undefined ? [] : source.requiredToolIds, 'AgentPlan node requiredToolIds', 128),
     acceptanceCriteria: uniqueText(source.acceptanceCriteria === undefined ? [] : source.acceptanceCriteria, 'AgentPlan node acceptanceCriteria'),
     budget: normalizeBudget(source.budget === undefined ? {} : source.budget),
     state,

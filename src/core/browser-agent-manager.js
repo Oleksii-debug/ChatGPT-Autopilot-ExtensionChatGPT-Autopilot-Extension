@@ -39,24 +39,18 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeArtifactRefV1, normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
+import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
-  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
-import {
-  ExecutionOwnershipState,
-  normalizeExecutionOwnershipV1,
-  requireExecutionReconciliationV1,
-  recoverExpiredExecutionOwnershipV1,
-  resolveExecutionReconciliationV1,
-} from './execution-plane-ownership.js';
+import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
@@ -69,23 +63,13 @@ import {
 } from './agent-definition-registry.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
+  bindSpecialistHandoffToRegistryV1,
+  normalizeSpecialistSelectionV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
-  normalizeSpecialistSelectionV1,
-  bindSpecialistHandoffToRegistryV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
-import {
-  canonicalSpecialistProviderIdV1,
-  createSpecialistProviderConfigV1,
-  normalizeSpecialistProviderConfigV1,
-} from './specialist-provider-config.js';
-import {
-  SpecialistProviderExecutionStatus,
-  createSpecialistProviderExecutionV1,
-  normalizeSpecialistProviderExecutionV1,
-  recordSpecialistProviderExecutionOutcomeV1,
-} from './specialist-provider-execution.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
 import {
   BrowserAgentOrchestrationBindingStatus,
   createBrowserAgentOrchestrationNodeBindingV1,
@@ -93,16 +77,6 @@ import {
   normalizeBrowserAgentOrchestrationBindingRequestV1,
   normalizeBrowserAgentOrchestrationNodeBindingV1,
 } from './browser-agent-orchestration-binding.js';
-import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
-import {
-  createBrowserAgentParentRuntimeFenceFromJobV1,
-  inspectBrowserAgentParentRuntimeFenceFromJobV1,
-} from './browser-agent-parent-runtime-fence.js';
-import {
-  evaluateSubagentStructureAdmissionV1,
-  SubagentSpawnInitiator,
-  SubagentStructureDecision,
-} from './subagent-structure-policy.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -113,19 +87,6 @@ const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
-const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
-const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
-const SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS = new Set(['agentId', 'conversationId']);
-const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
-  'agentId', 'leaseId', 'conversationId', 'providerStatus', 'providerSucceeded',
-  'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
-  'effectEvidence', 'errorCode', 'providerUpdatedAt', 'providerObservedAt',
-]);
-const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS = new Set([
-  'providerUpdatedAt', 'providerObservedAt',
-]);
-const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
-const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
@@ -142,33 +103,20 @@ const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
+const AUTOMATIC_SPECIALIST_DELEGATION_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
+  'policyEnvelopeId', 'deadlineAt', 'priority', 'parentInvocationId', 'autoRun',
+]);
+const AUTOMATIC_SPECIALIST_ADMISSION_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'agentId',
+  'maxConcurrentHandoffs', 'maxChildrenPerAgent', 'maxDepth', 'leaseSeconds',
+]);
+const SPECIALIST_DISPATCH_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'agentId', 'leaseId',
+]);
 const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
   'resolveProjectHierarchyAuthority',
   'withProjectHierarchyAuthority',
-]);
-const ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS = new Set([
-  'withBrowserAgentBoundLifecycleAuthority',
-]);
-const BROWSER_AGENT_BOUND_LIFECYCLE_RETRY = Object.freeze({});
-const AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS = new Set([
-  'withProjectHierarchyAuthority',
-  'specialistProviderReadinessResolver',
-]);
-const TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS = new Set([
-  'resolveTrustedExecutionVerificationRecord',
-]);
-const TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS = new Set([
-  'agentId', 'leaseId', 'verificationId',
-]);
-const AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
-  'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
-  'maxConcurrentHandoffs', 'leaseSeconds',
-  'priority', 'childBudget', 'artifactRefs', 'credentialRefs', 'parentInvocationId',
-]);
-const PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS = new Set([
-  'schemaVersion', 'planId', 'nodeId', 'planRevision', 'registryId',
-  'registryRevision', 'selection', 'handoff', 'boundAt',
 ]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
@@ -239,135 +187,6 @@ function trustedOrchestrationAuthorityFence(dependencies) {
     throw new Error('Canonical orchestration Project authority fence is required');
   }
   return raw.withProjectHierarchyAuthority;
-}
-
-function trustedOrchestrationLifecycleFence(dependencies) {
-  const raw = snapshotExactOwnDataRequest(
-    dependencies,
-    ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS,
-    'Browser Agent orchestration lifecycle dependencies',
-  );
-  if (typeof raw.withBrowserAgentBoundLifecycleAuthority !== 'function') {
-    throw new Error('Canonical Browser Agent orchestration lifecycle authority fence is required');
-  }
-  return raw.withBrowserAgentBoundLifecycleAuthority;
-}
-
-function sameOrchestrationNodeBinding(leftRaw, rightRaw) {
-  const left = normalizeBrowserAgentOrchestrationNodeBindingV1(leftRaw);
-  const right = normalizeBrowserAgentOrchestrationNodeBindingV1(rightRaw);
-  return left.schemaVersion === right.schemaVersion
-    && left.jobId === right.jobId
-    && left.projectId === right.projectId
-    && left.orchestraId === right.orchestraId
-    && left.graphId === right.graphId
-    && left.controlEpoch === right.controlEpoch
-    && left.nodeId === right.nodeId
-    && left.boundAt === right.boundAt;
-}
-
-function trustedAutomaticDelegationDependencies(dependencies) {
-  const raw = snapshotExactOwnDataRequest(
-    dependencies,
-    AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS,
-    'Browser Agent automatic specialist delegation dependencies',
-  );
-  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
-    throw new Error('Canonical orchestration Project authority fence is required');
-  }
-  const resolver = raw.specialistProviderReadinessResolver;
-  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
-    throw new Error('Trusted specialist provider readiness resolver is required');
-  }
-  const dataMethod = name => {
-    let cursor = resolver;
-    while (cursor && cursor !== Object.prototype) {
-      const descriptor = Object.getOwnPropertyDescriptor(cursor, name);
-      if (descriptor) {
-        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
-          throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
-        }
-        return descriptor.value;
-      }
-      cursor = Object.getPrototypeOf(cursor);
-    }
-    throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
-  };
-  const resolveMethod = dataMethod('resolve');
-  const assertCurrentMethod = dataMethod('assertCurrent');
-  return Object.freeze({
-    withProjectHierarchyAuthority: raw.withProjectHierarchyAuthority,
-    resolveSpecialistReadiness: selection => resolveMethod.call(resolver, selection),
-    assertSpecialistReadinessCurrent: readiness => assertCurrentMethod.call(resolver, readiness),
-  });
-}
-
-function trustedSpecialistVerificationDependencies(dependencies) {
-  const raw = snapshotExactOwnDataRequest(
-    dependencies,
-    TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS,
-    'Browser Agent trusted specialist verification dependencies',
-  );
-  if (typeof raw.resolveTrustedExecutionVerificationRecord !== 'function') {
-    throw new Error('Canonical trusted execution verification resolver is required');
-  }
-  return Object.freeze({
-    resolveTrustedExecutionVerificationRecord: raw.resolveTrustedExecutionVerificationRecord,
-  });
-}
-
-function sameSpecialistSelection(left, right) {
-  const a = normalizeSpecialistSelectionV1(left);
-  const b = normalizeSpecialistSelectionV1(right);
-  return a.registryId === b.registryId
-    && a.registryRevision === b.registryRevision
-    && a.specialistId === b.specialistId
-    && a.providerId === b.providerId
-    && a.definitionRevision === b.definitionRevision
-    && a.executionPlane === b.executionPlane
-    && sameCanonicalIdentityList(a.requestedCapabilityIds, b.requestedCapabilityIds)
-    && sameCanonicalIdentityList(a.grantedToolIds, b.grantedToolIds);
-}
-
-function assertTrustedProviderReadinessForSelection(providerReadiness, selection, nowMs) {
-  const canonical = normalizeSpecialistSelectionV1(selection);
-  if (ownDataPropertyValue(providerReadiness, 'trustedResolverInvoked') !== true
-      || ownDataPropertyValue(providerReadiness, 'callerReadinessAccepted') !== false) {
-    throw new Error('Trusted specialist provider readiness resolver returned non-canonical provenance');
-  }
-  for (const [field, expected] of [
-    ['registryId', canonical.registryId],
-    ['registryRevision', canonical.registryRevision],
-    ['specialistId', canonical.specialistId],
-    ['providerId', canonical.providerId],
-    ['definitionRevision', canonical.definitionRevision],
-    ['executionPlane', canonical.executionPlane],
-  ]) {
-    if (ownDataPropertyValue(providerReadiness, field) !== expected) {
-      throw new Error('Trusted specialist provider readiness provenance does not match selected specialist');
-    }
-  }
-  if (ownDataPropertyValue(providerReadiness, 'executable') !== true) {
-    throw new Error('Selected specialist provider is not currently executable');
-  }
-  const resolvedAt = ownDataPropertyValue(providerReadiness, 'resolvedAt');
-  const maxAgeMs = ownDataPropertyValue(providerReadiness, 'maxAgeMs');
-  const resolvedMs = Date.parse(exactAutomaticDelegationTimestamp(resolvedAt, 'provider readiness resolvedAt'));
-  if (typeof maxAgeMs !== 'number'
-      || !Number.isSafeInteger(maxAgeMs)
-      || Object.is(maxAgeMs, -0)
-      || maxAgeMs < 1
-      || maxAgeMs > 5 * 60_000) {
-    throw new Error('Trusted specialist provider readiness maxAgeMs is invalid');
-  }
-  if (typeof nowMs !== 'number'
-      || !Number.isSafeInteger(nowMs)
-      || Object.is(nowMs, -0)
-      || nowMs < resolvedMs
-      || nowMs - resolvedMs > maxAgeMs) {
-    throw new Error('Trusted specialist provider readiness expired before durable admission');
-  }
-  return providerReadiness;
 }
 
 const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
@@ -530,247 +349,6 @@ function normalizePersistedAgentDefinitionScope(raw, selection) {
   };
 }
 
-function canonicalDenseArray(value, label, max, min = 0) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
-    throw new Error(`${label} must be a canonical array`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < min || length > max) {
-    throw new Error(`${label} has invalid length`);
-  }
-  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !expected.has(key)) {
-      throw new Error(`${label} contains non-canonical fields`);
-    }
-  }
-  const out = [];
-  for (let index = 0; index < length; index += 1) {
-    const descriptor = descriptors[String(index)];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label}[${index}] must be an enumerable own data property`);
-    }
-    out.push(descriptor.value);
-  }
-  return out;
-}
-
-function canonicalDelegationIds(value, label, max, min = 0) {
-  const out = canonicalDenseArray(value, label, max, min)
-    .map((item, index) => exactIdentity(item, `${label}[${index}]`));
-  if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicate identity`);
-  return Object.freeze([...out].sort());
-}
-
-function exactAutomaticDelegationTimestamp(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value) {
-    throw new Error(`${label} must be a canonical timestamp`);
-  }
-  const millis = Date.parse(value);
-  if (!Number.isFinite(millis) || new Date(millis).toISOString() !== value) {
-    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
-  }
-  return value;
-}
-
-function specialistCapacityLimit(value) {
-  if (typeof value !== 'number'
-      || !Number.isSafeInteger(value)
-      || Object.is(value, -0)
-      || value < 0
-      || value > 256) {
-    throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
-  }
-  return value;
-}
-
-function specialistLeaseSeconds(value) {
-  const candidate = value === undefined ? 900 : value;
-  if (typeof candidate !== 'number'
-      || !Number.isSafeInteger(candidate)
-      || Object.is(candidate, -0)
-      || candidate < 1
-      || candidate > 86_400) {
-    throw new Error('leaseSeconds must be an integer from 1 to 86400');
-  }
-  return candidate;
-}
-
-function sameCanonicalIdentityList(left, right) {
-  return Array.isArray(left)
-    && Array.isArray(right)
-    && left.length === right.length
-    && left.every((value, index) => value === right[index]);
-}
-
-function inspectProductWideSpecialistCapacity(store, maxConcurrentHandoffs) {
-  const limit = specialistCapacityLimit(maxConcurrentHandoffs);
-  const specialistOwnerships = store.order
-    .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
-    .map(normalizeExecutionOwnershipV1);
-  const effectIds = new Set();
-  for (const ownership of specialistOwnerships) {
-    if (effectIds.has(ownership.effectId)) {
-      throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
-    }
-    effectIds.add(ownership.effectId);
-  }
-  const capacityOwnerships = specialistOwnerships.filter(item =>
-    SPECIALIST_CAPACITY_STATES.has(item.state));
-  return Object.freeze({
-    maxConcurrentHandoffs: limit,
-    capacityObligations: capacityOwnerships.length,
-    remainingSlots: Math.max(0, limit - capacityOwnerships.length),
-  });
-}
-
-function normalizeAutomaticDelegationIntent(request) {
-  const childBudget = Object.hasOwn(request, 'childBudget')
-    ? (() => {
-      const raw = snapshotExactOwnDataRequest(
-        request.childBudget,
-        new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']),
-        'Browser Agent automatic specialist childBudget',
-      );
-      const out = Object.create(null);
-      for (const [key, value] of Object.entries(raw)) {
-        if (typeof value !== 'number'
-            || !Number.isSafeInteger(value)
-            || Object.is(value, -0)
-            || value < 0) {
-          throw new Error(`Browser Agent automatic specialist childBudget.${key} is invalid`);
-        }
-        out[key] = value;
-      }
-      return Object.freeze(out);
-    })()
-    : undefined;
-  const artifactRefs = Object.hasOwn(request, 'artifactRefs')
-    ? canonicalDenseArray(request.artifactRefs, 'Browser Agent automatic specialist artifactRefs', 128)
-      .map(normalizeArtifactRefV1)
-    : [];
-  const credentialRefs = Object.hasOwn(request, 'credentialRefs')
-    ? canonicalDenseArray(request.credentialRefs, 'Browser Agent automatic specialist credentialRefs', 64)
-      .map(normalizeCredentialRefV1)
-    : [];
-  const priority = Object.hasOwn(request, 'priority') ? request.priority : 0;
-  if (typeof priority !== 'number'
-      || !Number.isSafeInteger(priority)
-      || Object.is(priority, -0)
-      || priority < 0
-      || priority > 1_000_000) {
-    throw new Error('Browser Agent automatic specialist priority is invalid');
-  }
-  const parentInvocationId = Object.hasOwn(request, 'parentInvocationId') && request.parentInvocationId !== ''
-    ? exactIdentity(request.parentInvocationId, 'parentInvocationId')
-    : '';
-  return Object.freeze({
-    registryId: canonicalSpecialistRegistryId(request.registryId),
-    expectedRegistryRevision: positiveExactInteger(request.expectedRegistryRevision, 'expectedRegistryRevision'),
-    expectedPlanRevision: positiveExactInteger(request.expectedPlanRevision, 'expectedPlanRevision'),
-    nodeId: exactIdentity(request.nodeId, 'nodeId'),
-    requiredCapabilityIds: canonicalDelegationIds(
-      request.requiredCapabilityIds,
-      'requiredCapabilityIds',
-      64,
-      1,
-    ),
-    requiredToolIds: canonicalDelegationIds(request.requiredToolIds, 'requiredToolIds', 128),
-    policyEnvelopeId: exactIdentity(request.policyEnvelopeId, 'policyEnvelopeId'),
-    deadlineAt: exactAutomaticDelegationTimestamp(request.deadlineAt, 'deadlineAt'),
-    priority,
-    childBudget,
-    artifactRefs: Object.freeze(artifactRefs),
-    credentialRefs: Object.freeze(credentialRefs),
-    parentInvocationId,
-    maxConcurrentHandoffs: specialistCapacityLimit(request.maxConcurrentHandoffs),
-    leaseSeconds: specialistLeaseSeconds(request.leaseSeconds),
-  });
-}
-
-function positiveExactInteger(value, label) {
-  if (typeof value !== 'number'
-      || !Number.isSafeInteger(value)
-      || Object.is(value, -0)
-      || value < 1) {
-    throw new Error(`${label} must be a positive safe integer`);
-  }
-  return value;
-}
-
-function exactIdentity(value, label, max = 180) {
-  if (typeof value !== 'string'
-      || value !== value.trim()
-      || !value
-      || value.length > max
-      || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u.test(value)) {
-    throw new Error(`${label} is invalid`);
-  }
-  return value;
-}
-
-function normalizePersistedSpecialistDelegationBinding(raw) {
-  const record = snapshotExactOwnDataRequest(
-    raw,
-    PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS,
-    'Browser Agent specialist delegation binding',
-  );
-  for (const key of PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS) {
-    if (!Object.hasOwn(record, key)) {
-      throw new Error(`Browser Agent specialist delegation binding requires ${key}`);
-    }
-  }
-  if (record.schemaVersion !== 1) {
-    throw new Error('Unsupported Browser Agent specialist delegation binding schemaVersion');
-  }
-  const selection = normalizeSpecialistSelectionV1(record.selection);
-  const handoff = normalizeSpecialistHandoffV1(record.handoff);
-  const planId = exactIdentity(record.planId, 'specialist delegation planId');
-  const nodeId = exactIdentity(record.nodeId, 'specialist delegation nodeId');
-  const registryId = exactIdentity(record.registryId, 'specialist delegation registryId');
-  const planRevision = positiveExactInteger(record.planRevision, 'specialist delegation planRevision');
-  const registryRevision = positiveExactInteger(record.registryRevision, 'specialist delegation registryRevision');
-  const boundAt = specialistRequestTimestamp(record.boundAt, undefined, 'specialist delegation boundAt');
-  if (selection.registryId !== registryId || selection.registryRevision !== registryRevision) {
-    throw new Error('Specialist delegation selection registry provenance mismatch');
-  }
-  if (handoff.specialistId !== selection.specialistId) {
-    throw new Error('Specialist delegation handoff specialist provenance mismatch');
-  }
-  return Object.freeze({
-    schemaVersion: 1,
-    planId,
-    nodeId,
-    planRevision,
-    registryId,
-    registryRevision,
-    selection,
-    handoff,
-    boundAt,
-  });
-}
-
-function normalizePersistedSpecialistDelegationBindings(raw, plan) {
-  if (!plan || !Array.isArray(raw) || Object.getPrototypeOf(raw) !== Array.prototype) return [];
-  const out = [];
-  const seenNodes = new Set();
-  for (const item of raw.slice(0, 128)) {
-    try {
-      const binding = normalizePersistedSpecialistDelegationBinding(item);
-      if (binding.planId !== plan.planId) continue;
-      if (!plan.nodes.some(node => node.nodeId === binding.nodeId)) continue;
-      if (seenNodes.has(binding.nodeId)) continue;
-      seenNodes.add(binding.nodeId);
-      out.push(binding);
-    } catch {
-      // A corrupt delegation provenance record cannot grant authority. Drop it
-      // while preserving the assignment/ownership records for manual recovery.
-    }
-  }
-  return out;
-}
-
 function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
   const registries = Object.create(null);
   const quarantine = Object.create(null);
@@ -793,96 +371,6 @@ function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine)
     }
   }
   return { registries, quarantine };
-}
-
-function specialistProviderConfigHasLiveExecution(store, providerId, at) {
-  const nowMs = Date.parse(at);
-  for (const jobId of store.order || []) {
-    const runtime = store.byId?.[jobId]?.runtime;
-    if ((runtime?.specialistProviderExecutionQuarantine || []).length) {
-      throw new Error('Specialist provider execution provenance is quarantined; provider config mutation is unsafe');
-    }
-    for (const raw of runtime?.specialistProviderExecutions || []) {
-      const execution = normalizeSpecialistProviderExecutionV1(raw);
-      if (execution.providerId !== providerId) continue;
-      if ([
-        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
-        SpecialistProviderExecutionStatus.RECONCILE,
-      ].includes(execution.status)) {
-        return true;
-      }
-      if (Date.parse(execution.leaseUntil) <= nowMs) continue;
-      if ([
-        SpecialistProviderExecutionStatus.PREPARED,
-        SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
-      ].includes(execution.status)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
-  const configs = Object.create(null);
-  const quarantine = Object.create(null);
-  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
-    try {
-      quarantine[key] = clone(value);
-    } catch {
-      // Ignore impossible non-cloneable values; malformed provider config can
-      // never become runtime authority through this recovery path.
-    }
-  }
-  for (const [key, value] of storedDefinitionMapDescriptors(rawConfigs).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
-    try {
-      const config = normalizeSpecialistProviderConfigV1(value);
-      if (config.providerId !== key) throw new Error('Stored Specialist provider config identity drift');
-      configs[key] = config;
-      delete quarantine[key];
-    } catch {
-      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
-    }
-  }
-  return { configs, quarantine };
-}
-
-function normalizePersistedSpecialistProviderExecutions(rawExecutions, rawQuarantine, plan) {
-  const executions = [];
-  const quarantine = [];
-  const appendQuarantine = value => {
-    if (quarantine.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) return;
-    try { quarantine.push(clone(value)); } catch { /* preserve fail-closed signal below */ }
-  };
-  if (Array.isArray(rawQuarantine)) {
-    for (const value of rawQuarantine.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
-      appendQuarantine(value);
-    }
-  }
-  if (rawExecutions === undefined) return { executions, quarantine };
-  if (!Array.isArray(rawExecutions) || Object.getPrototypeOf(rawExecutions) !== Array.prototype) {
-    appendQuarantine({ reason: 'NON_CANONICAL_PROVIDER_EXECUTION_COLLECTION' });
-    return { executions, quarantine };
-  }
-  const seenLeases = new Set();
-  const seenConversations = new Set();
-  for (const raw of rawExecutions.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
-    try {
-      const execution = normalizeSpecialistProviderExecutionV1(raw);
-      if (!plan || execution.planId !== plan.planId) {
-        throw new Error('Specialist provider execution plan provenance drifted');
-      }
-      if (seenLeases.has(execution.leaseId) || seenConversations.has(execution.conversationId)) {
-        throw new Error('Specialist provider execution identity is duplicated');
-      }
-      seenLeases.add(execution.leaseId);
-      seenConversations.add(execution.conversationId);
-      executions.push(execution);
-    } catch {
-      appendQuarantine(raw);
-    }
-  }
-  return { executions, quarantine };
 }
 
 function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
@@ -1004,8 +492,6 @@ function freshStore() {
     definitionRegistryQuarantineById: Object.create(null),
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
-    specialistProviderConfigsById: Object.create(null),
-    specialistProviderConfigQuarantineById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -1109,23 +595,41 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
-  const specialistDelegationBindings = normalizePersistedSpecialistDelegationBindings(
-    raw.specialistDelegationBindings,
-    plan,
+  const specialistReadinessByAgentId = Object.fromEntries(
+    Object.entries(raw.specialistReadinessByAgentId && typeof raw.specialistReadinessByAgentId === 'object'
+      ? raw.specialistReadinessByAgentId
+      : {})
+      .filter(([agentId, value]) => typeof agentId === 'string' && value && typeof value === 'object')
+      .slice(0, 128)
+      .map(([agentId, value]) => [agentId, clone(value)]),
   );
-  const providerExecutionState = normalizePersistedSpecialistProviderExecutions(
-    raw.specialistProviderExecutions,
-    raw.specialistProviderExecutionQuarantine,
-    plan,
+  const specialistProviderHandoffsByAgentId = Object.fromEntries(
+    Object.entries(raw.specialistProviderHandoffsByAgentId && typeof raw.specialistProviderHandoffsByAgentId === 'object'
+      ? raw.specialistProviderHandoffsByAgentId : {})
+      .filter(([agentId, value]) => typeof agentId === 'string' && value && typeof value === 'object')
+      .slice(0, 128).map(([agentId, value]) => [agentId, clone(value)]),
+  );
+  const specialistDispatchByAgentId = Object.fromEntries(
+    Object.entries(raw.specialistDispatchByAgentId && typeof raw.specialistDispatchByAgentId === 'object'
+      ? raw.specialistDispatchByAgentId : {})
+      .filter(([agentId, value]) => typeof agentId === 'string' && value && typeof value === 'object')
+      .slice(0, 128).map(([agentId, value]) => [agentId, clone(value)]),
+  );
+  const specialistAutomationByAgentId = Object.fromEntries(
+    Object.entries(raw.specialistAutomationByAgentId && typeof raw.specialistAutomationByAgentId === 'object'
+      ? raw.specialistAutomationByAgentId : {})
+      .filter(([agentId, value]) => typeof agentId === 'string' && value && typeof value === 'object')
+      .slice(0, 128).map(([agentId, value]) => [agentId, clone(value)]),
   );
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
-    specialistDelegationBindings,
-    specialistProviderExecutions: providerExecutionState.executions,
-    specialistProviderExecutionQuarantine: providerExecutionState.quarantine,
+    specialistReadinessByAgentId,
+    specialistProviderHandoffsByAgentId,
+    specialistDispatchByAgentId,
+    specialistAutomationByAgentId,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1288,17 +792,11 @@ function normalizeStore(raw, now) {
   );
   out.specialistRegistriesById = specialistState.registries;
   out.specialistRegistryQuarantineById = specialistState.quarantine;
-  const providerConfigState = normalizePersistedSpecialistProviderConfigState(
-    raw.specialistProviderConfigsById,
-    raw.specialistProviderConfigQuarantineById,
-  );
-  out.specialistProviderConfigsById = providerConfigState.configs;
-  out.specialistProviderConfigQuarantineById = providerConfigState.quarantine;
   return out;
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
+  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined, specialistReadinessResolver = null, specialistProviderDispatcher = null, specialistVerificationResolver = null } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -1313,6 +811,18 @@ export class BrowserAgentManager {
     this.nativeCompanion = nativeCompanionClient === undefined
       ? (chromeApi?.runtime?.sendNativeMessage ? new NativeCompanionClient({ chromeApi }) : null)
       : nativeCompanionClient;
+    if (specialistReadinessResolver !== null && typeof specialistReadinessResolver?.resolve !== 'function') {
+      throw new Error('Browser Agent specialistReadinessResolver must expose resolve(selection)');
+    }
+    this.specialistReadinessResolver = specialistReadinessResolver;
+    if (specialistProviderDispatcher !== null && typeof specialistProviderDispatcher?.execute !== 'function') {
+      throw new Error('Browser Agent specialistProviderDispatcher must expose execute(request)');
+    }
+    this.specialistProviderDispatcher = specialistProviderDispatcher;
+    if (specialistVerificationResolver !== null && typeof specialistVerificationResolver?.resolve !== 'function') {
+      throw new Error('Browser Agent specialistVerificationResolver must expose resolve(request)');
+    }
+    this.specialistVerificationResolver = specialistVerificationResolver;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
     this.runBurstInFlight = new Map();
@@ -1321,6 +831,7 @@ export class BrowserAgentManager {
     this.executionSlotQueue = [];
     this.executionSlotPump = null;
     this.executionSlotPumpRequested = false;
+    this.specialistDispatchInFlight = new Set();
   }
 
   async load() {
@@ -1629,506 +1140,6 @@ export class BrowserAgentManager {
     return clone(committed);
   }
 
-  async listSpecialistProviderConfigs() {
-    const store = await this.load();
-    const configs = Object.keys(store.specialistProviderConfigsById || {})
-      .sort()
-      .map(providerId => clone(store.specialistProviderConfigsById[providerId]));
-    const quarantinedProviderIds = Object.keys(
-      store.specialistProviderConfigQuarantineById || {},
-    ).sort();
-    return { configs, quarantinedProviderIds };
-  }
-
-  async getSpecialistProviderConfig(providerId) {
-    const canonicalId = canonicalSpecialistProviderIdV1(providerId);
-    const store = await this.load();
-    const configs = store.specialistProviderConfigsById || Object.create(null);
-    const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
-    const config = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
-    return {
-      config: config ? clone(config) : null,
-      quarantined: !config && Object.hasOwn(quarantine, canonicalId),
-    };
-  }
-
-  async setSpecialistProviderConfig(input = {}) {
-    const request = snapshotExactOwnDataRequest(
-      input,
-      SPECIALIST_PROVIDER_CONFIG_SET_KEYS,
-      'Browser Agent Specialist provider config set request',
-    );
-    for (const key of SPECIALIST_PROVIDER_CONFIG_SET_KEYS) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider config set request requires ${key}`);
-      }
-    }
-    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
-    const expectedRevision = nonNegativeSafeInteger(
-      request.expectedRevision,
-      'Specialist provider config expectedRevision',
-    );
-    // Normalize and snapshot nested provider config before entering the
-    // serialized write queue. Caller mutation after this method is invoked
-    // cannot change the authority that will be committed.
-    const prepared = createSpecialistProviderConfigV1({
-      providerId,
-      kind: request.kind,
-      config: request.config,
-      revision: 1,
-      updatedAt: new Date(this.now()).toISOString(),
-    });
-    let committed = null;
-    await this.update(store => {
-      const configs = store.specialistProviderConfigsById
-        || (store.specialistProviderConfigsById = Object.create(null));
-      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
-      if (Object.hasOwn(quarantine, providerId)) {
-        throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
-      }
-      if (specialistProviderConfigHasLiveExecution(
-        store,
-        providerId,
-        new Date(this.now()).toISOString(),
-      )) {
-        throw new Error('Specialist provider config is bound to a live provider execution lease');
-      }
-      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
-      const currentRevision = current?.revision || 0;
-      if (currentRevision !== expectedRevision) {
-        throw new Error('Specialist provider config revision drifted before update');
-      }
-      if (!current && Object.keys(configs).length >= MAX_SPECIALIST_PROVIDER_CONFIGS) {
-        throw new Error('Specialist provider config capacity is exhausted');
-      }
-      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
-        throw new Error('Specialist provider config revision cannot advance');
-      }
-      committed = createSpecialistProviderConfigV1({
-        providerId,
-        kind: prepared.kind,
-        config: prepared.config,
-        revision: currentRevision + 1,
-        updatedAt: new Date(this.now()).toISOString(),
-      });
-      configs[providerId] = committed;
-      return store;
-    });
-    return { config: clone(committed) };
-  }
-
-  async clearSpecialistProviderConfig(input = {}) {
-    const request = snapshotExactOwnDataRequest(
-      input,
-      SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS,
-      'Browser Agent Specialist provider config clear request',
-    );
-    for (const key of SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider config clear request requires ${key}`);
-      }
-    }
-    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
-    const expectedRevision = nonNegativeSafeInteger(
-      request.expectedRevision,
-      'Specialist provider config expectedRevision',
-    );
-    let cleared = false;
-    await this.update(store => {
-      const configs = store.specialistProviderConfigsById || Object.create(null);
-      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
-      if (Object.hasOwn(quarantine, providerId)) {
-        throw new Error('Specialist provider config is quarantined as corrupt and requires explicit storage recovery');
-      }
-      if (specialistProviderConfigHasLiveExecution(
-        store,
-        providerId,
-        new Date(this.now()).toISOString(),
-      )) {
-        throw new Error('Specialist provider config is bound to a live provider execution lease');
-      }
-      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
-      if (!current) {
-        if (expectedRevision !== 0) {
-          throw new Error('Specialist provider config revision drifted before clear');
-        }
-        return store;
-      }
-      if (current.revision !== expectedRevision) {
-        throw new Error('Specialist provider config revision drifted before clear');
-      }
-      delete configs[providerId];
-      cleared = true;
-      return store;
-    });
-    return { providerId, cleared };
-  }
-
-  async listSpecialistProviderExecutions(id = '') {
-    const current = await this.get(id);
-    if (!current.job) {
-      return {
-        selectedId: current.selectedId,
-        jobId: '',
-        executions: [],
-        quarantinedCount: 0,
-      };
-    }
-    return {
-      selectedId: current.selectedId,
-      jobId: current.job.id,
-      executions: clone(current.job.runtime.specialistProviderExecutions || []),
-      quarantinedCount: (current.job.runtime.specialistProviderExecutionQuarantine || []).length,
-    };
-  }
-
-  async prepareClaimedSpecialistProviderExecution(id, payload = {}, dependencies = {}) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS,
-      'Browser Agent Specialist provider execution prepare request',
-    );
-    for (const key of SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider execution prepare request requires ${key}`);
-      }
-    }
-    const agentId = exactIdentity(request.agentId, 'agentId', 180);
-    const conversationId = request.conversationId;
-    const {
-      withProjectHierarchyAuthority,
-      resolveSpecialistReadiness,
-      assertSpecialistReadinessCurrent,
-    } = trustedAutomaticDelegationDependencies(dependencies);
-
-    const initial = await this.get(id);
-    if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
-    const projectId = initial.job.config?.projectId || '';
-    if (!projectId) throw new Error('Specialist provider execution requires a durable Project binding');
-    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
-    const initialPlan = normalizeAgentPlanV1(initial.job.runtime.plan);
-    const initialBinding = (initial.job.runtime.specialistDelegationBindings || []).find(binding =>
-      specialistAssignmentIdForPlanNodeV1(initialPlan.planId, binding.nodeId) === agentId);
-    if (!initialBinding) {
-      throw new Error('Claimed Specialist provider execution requires automatic delegation provenance');
-    }
-    const selection = normalizeSpecialistSelectionV1(initialBinding.selection);
-    const providerReadiness = assertTrustedProviderReadinessForSelection(
-      await resolveSpecialistReadiness(selection),
-      selection,
-      this.now(),
-    );
-
-    return withProjectHierarchyAuthority(projectId, async authority => {
-      let result = null;
-      await this.update(async store => {
-        await assertSpecialistReadinessCurrent(providerReadiness);
-        const job = store.byId[id];
-        if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
-        if ((job.config?.projectId || '') !== projectId) {
-          throw new Error('Browser Agent Project changed before Specialist provider execution');
-        }
-        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
-          fence: parentRuntimeFence,
-          job,
-        });
-        if (!parentFenceStatus.current) {
-          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
-        }
-        if (!job.definitionScope) {
-          throw new Error('Specialist provider execution requires durable Agent definition scope');
-        }
-        if (!job.orchestrationNodeBinding) {
-          throw new Error('Specialist provider execution requires a durable orchestration node binding');
-        }
-        const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
-          binding: job.orchestrationNodeBinding,
-          authority,
-        });
-        if (!bindingStatus.current) {
-          throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
-        }
-        const structureAdmission = evaluateSubagentStructureAdmissionV1({
-          policy: authority.subagentPolicy,
-          initiator: SubagentSpawnInitiator.AGENT,
-          graph: authority.graph,
-          parentNodeId: job.orchestrationNodeBinding.nodeId,
-          requestedChildren: 1,
-        });
-        if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
-          throw new Error(`Specialist provider execution denied by owner subagent policy: ${structureAdmission.reasonCode}`);
-        }
-
-        const plan = normalizeAgentPlanV1(job.runtime.plan);
-        const binding = (job.runtime.specialistDelegationBindings || []).find(candidate =>
-          specialistAssignmentIdForPlanNodeV1(plan.planId, candidate.nodeId) === agentId);
-        if (!binding || !sameSpecialistSelection(binding.selection, selection)) {
-          throw new Error('Specialist provider execution delegation provenance drifted');
-        }
-        const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
-        const at = new Date(this.now()).toISOString();
-        if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId) {
-          throw new Error('Specialist provider execution requires the current claimed lease');
-        }
-        const ownership = (job.runtime.specialistExecutionOwnerships || [])
-          .map(normalizeExecutionOwnershipV1)
-          .find(item => item.planId === plan.planId && item.nodeId === binding.nodeId);
-
-        const configQuarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
-        if (Object.hasOwn(configQuarantine, selection.providerId)) {
-          throw new Error('Selected Specialist provider config is quarantined as corrupt');
-        }
-        const providerConfig = store.specialistProviderConfigsById?.[selection.providerId];
-        if (!providerConfig) throw new Error('Selected Specialist provider is not configured by the owner');
-        const canonicalConfig = normalizeSpecialistProviderConfigV1(providerConfig);
-        if (canonicalConfig.providerId !== selection.providerId) {
-          throw new Error('Selected Specialist provider config identity drifted');
-        }
-
-        if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
-          throw new Error('Specialist provider execution provenance is quarantined as corrupt');
-        }
-        const executions = Array.isArray(job.runtime.specialistProviderExecutions)
-          ? job.runtime.specialistProviderExecutions
-          : [];
-        let execution = executions.find(item => item?.leaseId === assignment.leaseId) || null;
-        if (execution) {
-          execution = normalizeSpecialistProviderExecutionV1(execution);
-          if (execution.agentId !== agentId
-              || execution.nodeId !== binding.nodeId
-              || execution.handoffId !== binding.handoff.handoffId
-              || execution.providerId !== selection.providerId
-              || execution.leaseUntil !== assignment.leaseExpiresAt) {
-            throw new Error('Specialist provider execution identity drifted from current lease');
-          }
-          const dispatchable = [
-            SpecialistProviderExecutionStatus.PREPARED,
-            SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
-          ].includes(execution.status);
-          const expectedOwnershipState = execution.status === SpecialistProviderExecutionStatus.RECONCILE
-            ? ExecutionOwnershipState.RECONCILE
-            : execution.status === SpecialistProviderExecutionStatus.MANUAL_REVIEW
-              ? ExecutionOwnershipState.MANUAL_REVIEW
-              : ExecutionOwnershipState.OWNED;
-          if (!ownership || ownership.state !== expectedOwnershipState) {
-            throw new Error(
-              `Specialist provider execution requires matching canonical ${expectedOwnershipState} ownership`,
-            );
-          }
-          if (expectedOwnershipState !== ExecutionOwnershipState.MANUAL_REVIEW
-              && (ownership.ownerId !== agentId
-                || ownership.leaseId !== assignment.leaseId
-                || ownership.leaseUntil !== assignment.leaseExpiresAt)) {
-            throw new Error(
-              `Specialist provider execution requires matching canonical ${expectedOwnershipState} lease`,
-            );
-          }
-          if (dispatchable && assignment.leaseExpiresAt <= at) {
-            throw new Error('Specialist provider execution lease expired before dispatch');
-          }
-          if (dispatchable
-              && JSON.stringify(execution.providerConfig) !== JSON.stringify(canonicalConfig)) {
-            throw new Error('Specialist provider config changed after execution preparation');
-          }
-          result = {
-            execution: clone(execution),
-            handoff: clone(binding.handoff),
-            grantedCapabilityIds: clone(selection.requestedCapabilityIds),
-            dispatchable,
-            reused: true,
-          };
-          return store;
-        }
-
-        if (assignment.leaseExpiresAt <= at) {
-          throw new Error('Specialist provider execution lease expired before dispatch');
-        }
-        if (!ownership
-            || ownership.state !== ExecutionOwnershipState.OWNED
-            || ownership.ownerId !== agentId
-            || ownership.leaseId !== assignment.leaseId
-            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
-          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
-        }
-        if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
-          throw new Error('Specialist provider execution provenance capacity is exhausted');
-        }
-        execution = createSpecialistProviderExecutionV1({
-          planId: plan.planId,
-          nodeId: binding.nodeId,
-          agentId,
-          handoffId: binding.handoff.handoffId,
-          providerId: selection.providerId,
-          leaseId: assignment.leaseId,
-          leaseUntil: assignment.leaseExpiresAt,
-          conversationId,
-          providerConfig: canonicalConfig,
-          at,
-        });
-        job.runtime.specialistProviderExecutions = [...executions, execution];
-        job.runtime.updatedAt = this.now();
-        appendHistory(job.runtime, {
-          at: this.now(),
-          type: 'specialist-provider-execution-prepared',
-          agentId,
-          leaseId: assignment.leaseId,
-          providerId: selection.providerId,
-          conversationId: execution.conversationId,
-          message: 'Stable provider execution identity persisted before any external provider effect.',
-        });
-        result = {
-          execution: clone(execution),
-          handoff: clone(binding.handoff),
-          grantedCapabilityIds: clone(selection.requestedCapabilityIds),
-          dispatchable: true,
-          reused: false,
-        };
-        return store;
-      });
-      return Object.freeze(result);
-    });
-  }
-
-  async recordSpecialistProviderExecutionOutcome(id, payload = {}) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS,
-      'Browser Agent Specialist provider execution outcome request',
-    );
-    for (const key of SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS) {
-      if (!SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS.has(key) && !Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent Specialist provider execution outcome request requires ${key}`);
-      }
-    }
-    const agentId = exactIdentity(request.agentId, 'agentId', 180);
-    const leaseId = exactIdentity(request.leaseId, 'leaseId', 180);
-    const conversationId = request.conversationId;
-    let result = null;
-    await this.update(store => {
-      const job = store.byId[id];
-      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider outcome');
-      if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
-        throw new Error('Specialist provider execution provenance is quarantined as corrupt');
-      }
-      const executions = Array.isArray(job.runtime.specialistProviderExecutions)
-        ? job.runtime.specialistProviderExecutions
-        : [];
-      const index = executions.findIndex(item =>
-        item?.agentId === agentId
-        && item?.leaseId === leaseId
-        && item?.conversationId === conversationId);
-      if (index < 0) throw new Error('Specialist provider execution provenance not found');
-      const current = normalizeSpecialistProviderExecutionV1(executions[index]);
-      const plan = normalizeAgentPlanV1(job.runtime.plan);
-      const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
-      if (!assignment || assignment.leaseId !== leaseId) {
-        throw new Error('Specialist provider outcome does not match current durable handoff lease');
-      }
-      const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
-      const ownershipIndex = ownerships.findIndex(item =>
-        item.planId === plan.planId && item.nodeId === current.nodeId);
-      if (ownershipIndex < 0) throw new Error('Specialist provider outcome lacks canonical execution ownership');
-      let ownership = ownerships[ownershipIndex];
-      const at = new Date(this.now()).toISOString();
-      let outcome = {
-        providerStatus: request.providerStatus,
-        providerSucceeded: request.providerSucceeded,
-        manualReviewRequired: request.manualReviewRequired,
-        reconciliationRequired: request.reconciliationRequired,
-        safeToRetry: request.safeToRetry,
-        effectEvidence: request.effectEvidence,
-        errorCode: request.errorCode,
-        providerUpdatedAt: request.providerUpdatedAt || '',
-        providerObservedAt: request.providerObservedAt || '',
-        at,
-      };
-
-      if (Date.parse(at) > Date.parse(current.leaseUntil)
-          && [ExecutionOwnershipState.OWNED, ExecutionOwnershipState.HANDOFF_PENDING].includes(ownership.state)) {
-        ownership = recoverExpiredExecutionOwnershipV1(ownership, {
-          at,
-          reason: 'provider result arrived after execution lease expiry',
-        });
-        outcome = {
-          ...outcome,
-          providerSucceeded: false,
-          manualReviewRequired: false,
-          reconciliationRequired: true,
-          safeToRetry: false,
-          errorCode: 'SPECIALIST_PROVIDER_RESULT_AFTER_LEASE',
-        };
-      } else if (request.manualReviewRequired === true) {
-        ownership = requireExecutionReconciliationV1(ownership, {
-          leaseId,
-          reason: `provider requires human intervention: ${request.providerStatus}`,
-          at,
-        });
-        ownership = resolveExecutionReconciliationV1(ownership, {
-          leaseId,
-          outcome: 'MANUAL_REVIEW',
-          at,
-        });
-      } else if (request.reconciliationRequired === true) {
-        ownership = requireExecutionReconciliationV1(ownership, {
-          leaseId,
-          reason: request.errorCode || 'provider effect may have occurred without verified completion',
-          at,
-        });
-      } else if (ownership.state === ExecutionOwnershipState.RECONCILE) {
-        outcome = {
-          ...outcome,
-          providerSucceeded: false,
-          manualReviewRequired: false,
-          reconciliationRequired: true,
-          safeToRetry: false,
-          errorCode: request.errorCode || 'SPECIALIST_PROVIDER_RECONCILIATION_REQUIRED',
-        };
-      } else if (ownership.state !== ExecutionOwnershipState.OWNED
-          || ownership.ownerId !== agentId
-          || ownership.leaseId !== leaseId) {
-        throw new Error('Specialist provider outcome requires matching canonical execution owner lease');
-      }
-
-      const recorded = recordSpecialistProviderExecutionOutcomeV1(current, outcome);
-      const nextExecutions = [...executions];
-      nextExecutions[index] = recorded;
-      ownerships[ownershipIndex] = ownership;
-      job.runtime.specialistProviderExecutions = nextExecutions;
-      job.runtime.specialistExecutionOwnerships = ownerships;
-      job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, {
-        at: this.now(),
-        type: 'specialist-provider-execution-observed',
-        agentId,
-        leaseId,
-        providerId: recorded.providerId,
-        conversationId: recorded.conversationId,
-        providerStatus: recorded.providerStatus,
-        providerSucceeded: recorded.providerSucceeded,
-        reconciliationRequired: recorded.reconciliationRequired,
-        manualReviewRequired: recorded.manualReviewRequired,
-        providerUpdatedAt: recorded.providerUpdatedAt,
-        providerObservedAt: recorded.providerObservedAt,
-        errorCode: recorded.errorCode,
-        message: recorded.providerSucceeded
-          ? 'Provider terminal success observed; product completion remains blocked on result artifacts and independent verification.'
-          : 'Provider execution evidence recorded without granting completion authority.',
-      });
-      result = {
-        execution: clone(recorded),
-        executionOwnership: clone(ownership),
-        completionAuthorized: false,
-        verificationRequired: [
-          SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED,
-          SpecialistProviderExecutionStatus.PROVIDER_FAILED,
-          SpecialistProviderExecutionStatus.MANUAL_REVIEW,
-        ].includes(recorded.status),
-      };
-      return store;
-    });
-    return Object.freeze(result);
-  }
-
   #rejectExecutionSlotQueue(error) {
     const pending = this.executionSlotQueue.splice(0);
     for (const next of pending) next.reject(error);
@@ -2361,389 +1372,350 @@ export class BrowserAgentManager {
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
-      delegationBindings: clone(current.job.runtime.specialistDelegationBindings || []),
+      readinessByAgentId: clone(current.job.runtime.specialistReadinessByAgentId || {}),
+      dispatchByAgentId: clone(current.job.runtime.specialistDispatchByAgentId || {}),
     };
   }
 
   /**
-   * Automatically selects the least-authority specialist from the durable
-   * canonical registry and persists its existing handoff/ownership contracts.
-   * This prepares no provider effect and grants no execution authority.
+   * Selects the least-authority enabled specialist for one READY external
+   * AgentPlan node and persists the bounded handoff. All authority is read
+   * from the durable job definition scope, plan and specialist registry;
+   * callers cannot supply broader capability or tool grants.
    */
-  async autoPrepareSpecialistHandoff(id, payload = {}, dependencies = {}) {
+  async prepareAutomaticSpecialistDelegation(id, payload = {}) {
     const request = snapshotExactOwnDataRequest(
       payload,
-      AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS,
+      AUTOMATIC_SPECIALIST_DELEGATION_KEYS,
       'Browser Agent automatic specialist delegation request',
     );
-    for (const key of [
-      'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
-      'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
-      'maxConcurrentHandoffs',
-    ]) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent automatic specialist delegation request requires ${key}`);
-      }
+    for (const key of ['registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId', 'policyEnvelopeId', 'deadlineAt']) {
+      if (!Object.hasOwn(request, key)) throw new Error(`Automatic specialist delegation request requires ${key}`);
     }
-    const intent = normalizeAutomaticDelegationIntent(request);
-    const registryId = intent.registryId;
-    const expectedRegistryRevision = intent.expectedRegistryRevision;
-    const expectedPlanRevision = intent.expectedPlanRevision;
-    const {
-      withProjectHierarchyAuthority,
-      resolveSpecialistReadiness,
-      assertSpecialistReadinessCurrent,
-    } = trustedAutomaticDelegationDependencies(dependencies);
-
-    const initial = await this.get(id);
-    if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
-    const projectId = initial.job.config?.projectId || '';
-    if (!projectId) throw new Error('Automatic delegation requires a durable Project binding');
-    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
-    const preflightAt = new Date(this.now()).toISOString();
-
-    const preflightSelection = await withProjectHierarchyAuthority(projectId, async authority => {
-      const store = await this.load();
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    const at = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
-      if ((job.config?.projectId || '') !== projectId) {
-        throw new Error('Browser Agent Project changed before automatic delegation readiness probe');
-      }
-      const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({ fence: parentRuntimeFence, job });
-      if (!parentFenceStatus.current) {
-        throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
-      }
-      if (job.runtime.plan.revision !== expectedPlanRevision) {
-        throw new Error('AgentPlan revision drifted before automatic delegation');
-      }
-      if (!job.definitionScope) {
-        throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
-      }
-      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
-      if (Object.hasOwn(quarantine, registryId)) throw new Error('Specialist registry is quarantined as corrupt');
-      const registry = store.specialistRegistriesById?.[registryId];
+      if (!job.definitionScope) throw new Error('Automatic specialist delegation requires a reusable Agent definition scope');
+      const registry = store.specialistRegistriesById?.[registryId] || null;
       if (!registry) throw new Error('Specialist registry not found');
-      if (registry.revision !== expectedRegistryRevision) {
-        throw new Error('Specialist registry revision drifted before automatic delegation');
-      }
-      if (!job.orchestrationNodeBinding) {
-        throw new Error('Automatic delegation requires a durable orchestration node binding');
-      }
-      const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
-        binding: job.orchestrationNodeBinding,
-        authority,
-      });
-      if (!bindingStatus.current) {
-        throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
-      }
-      const structureAdmission = evaluateSubagentStructureAdmissionV1({
-        policy: authority.subagentPolicy,
-        initiator: SubagentSpawnInitiator.AGENT,
-        graph: authority.graph,
-        parentNodeId: job.orchestrationNodeBinding.nodeId,
-        requestedChildren: 1,
-      });
-      if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
-        throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+      if (registry.revision !== request.expectedRegistryRevision) throw new Error('Specialist registry revision drifted before delegation');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.revision !== request.expectedPlanRevision) throw new Error('AgentPlan revision conflict');
+      const node = plan.nodes.find(item => item.nodeId === request.nodeId);
+      if (!node) throw new Error('AgentPlan node not found');
+      if (!node.requiredCapabilityIds.length) throw new Error('External AgentPlan node must declare requiredCapabilityIds before automatic delegation');
+      const agentId = specialistAssignmentIdForPlanNodeV1(plan.planId, node.nodeId);
+      if ((job.runtime.specialistHandoffs || []).some(item => item?.agentId === agentId)) {
+        throw new Error('AgentPlan node already has a specialist handoff');
       }
 
-      const planId = normalizeAgentPlanV1(job.runtime.plan).planId;
-      const expectedAgentId = specialistAssignmentIdForPlanNodeV1(planId, intent.nodeId);
-      const existing = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === expectedAgentId);
-      if (existing) {
-        const existingBinding = (job.runtime.specialistDelegationBindings || [])
-          .find(item => item?.planId === planId && item?.nodeId === intent.nodeId);
-        if (!existingBinding) {
-          throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
-        }
-        bindSpecialistHandoffToRegistryV1({
-          registry,
-          selection: existingBinding.selection,
-          handoff: existingBinding.handoff,
-          parentCapabilityIds: job.definitionScope.capabilityIds,
-          parentToolIds: job.definitionScope.toolIds,
-        });
-        if (existingBinding.registryRevision !== registry.revision) {
-          throw new Error('Existing specialist delegation provenance drifted from current registry');
-        }
-        if (!sameCanonicalIdentityList(existingBinding.selection.requestedCapabilityIds, intent.requiredCapabilityIds)
-            || !sameCanonicalIdentityList(existingBinding.selection.grantedToolIds, intent.requiredToolIds)) {
-          throw new Error('Existing specialist delegation scope differs from current request');
-        }
-        return normalizeSpecialistSelectionV1(existingBinding.selection);
-      }
-
-      const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at: preflightAt });
       const proposal = prepareAutomaticAgentSpecialistDelegationV1({
-        plan: reconciledPlan,
-        expectedPlanRevision: reconciledPlan.revision,
-        nodeId: intent.nodeId,
+        schemaVersion: 1,
+        plan,
+        expectedPlanRevision: plan.revision,
+        nodeId: node.nodeId,
         registry,
         parentCapabilityIds: job.definitionScope.capabilityIds,
         parentToolIds: job.definitionScope.toolIds,
-        requiredCapabilityIds: intent.requiredCapabilityIds,
-        requiredToolIds: intent.requiredToolIds,
-        policyEnvelopeId: intent.policyEnvelopeId,
-        deadlineAt: intent.deadlineAt,
-        priority: intent.priority,
-        childBudget: intent.childBudget,
-        artifactRefs: intent.artifactRefs,
-        credentialRefs: intent.credentialRefs,
-        parentInvocationId: intent.parentInvocationId,
-        at: preflightAt,
+        requiredCapabilityIds: node.requiredCapabilityIds,
+        requiredToolIds: node.requiredToolIds,
+        policyEnvelopeId: request.policyEnvelopeId,
+        deadlineAt: request.deadlineAt,
+        priority: request.priority === undefined ? 0 : request.priority,
+        parentInvocationId: request.parentInvocationId === undefined ? '' : request.parentInvocationId,
+        at,
       });
-      return normalizeSpecialistSelectionV1(proposal.selection);
+      const nextPlan = reconcileAgentPlanV1(plan, { at });
+      job.runtime.plan = nextPlan;
+      job.runtime.specialistHandoffs = [...(job.runtime.specialistHandoffs || []), proposal.preview.assignment];
+      job.runtime.specialistExecutionOwnerships = [...(job.runtime.specialistExecutionOwnerships || []), proposal.preview.executionOwnership];
+      job.runtime.specialistProviderHandoffsByAgentId = {
+        ...(job.runtime.specialistProviderHandoffsByAgentId || {}),
+        [proposal.preview.assignment.agentId]: proposal.binding.handoff,
+      };
+      job.runtime.specialistAutomationByAgentId = {
+        ...(job.runtime.specialistAutomationByAgentId || {}),
+        [proposal.preview.assignment.agentId]: {
+          autoRun: request.autoRun === true,
+          registryId: registry.registryId,
+          registryRevision: registry.revision,
+          status: request.autoRun === true ? 'PENDING' : 'PREPARED_ONLY',
+          attempts: 0,
+          nextAttemptAt: request.autoRun === true ? this.now() + 1000 : 0,
+          lastErrorCode: '',
+          updatedAt: this.now(),
+        },
+      };
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-auto-prepared',
+        nodeId: node.nodeId,
+        agentId: proposal.preview.assignment.agentId,
+        message: `Selected least-authority specialist ${proposal.selection.specialistId} from ${registry.registryId}; bounded handoff prepared without dispatch.`,
+      });
+      result = { proposal: clone(proposal), plan: clone(nextPlan), handoff: clone(proposal.preview.assignment) };
+      return store;
+    });
+    await this.reconcileAlarm();
+    return result;
+  }
+
+  /**
+   * Resolves fresh provider readiness through an owner-injected trusted
+   * resolver, then atomically claims one prepared least-authority handoff.
+   * Readiness is evidence for admission only; this method dispatches no
+   * provider effect and grants no completion or verification authority.
+   */
+  async admitAutomaticSpecialistHandoff(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      AUTOMATIC_SPECIALIST_ADMISSION_KEYS,
+      'Browser Agent automatic specialist admission request',
+    );
+    for (const key of ['registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'agentId', 'maxConcurrentHandoffs']) {
+      if (!Object.hasOwn(request, key)) throw new Error(`Automatic specialist admission request requires ${key}`);
+    }
+    if (!this.specialistReadinessResolver) {
+      throw new Error('No trusted Specialist provider readiness resolver is configured');
+    }
+    if (typeof request.maxConcurrentHandoffs !== 'number'
+        || !Number.isSafeInteger(request.maxConcurrentHandoffs)
+        || request.maxConcurrentHandoffs < 1
+        || request.maxConcurrentHandoffs > 256) {
+      throw new Error('maxConcurrentHandoffs must be an integer from 1 to 256');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+
+    const resolveSelection = (store) => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to admit');
+      if (!job.definitionScope) throw new Error('Automatic specialist admission requires a reusable Agent definition scope');
+      const registry = store.specialistRegistriesById?.[registryId] || null;
+      if (!registry) throw new Error('Specialist registry not found');
+      if (registry.revision !== request.expectedRegistryRevision) throw new Error('Specialist registry revision drifted before admission');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.revision !== request.expectedPlanRevision) throw new Error('AgentPlan revision conflict');
+      const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === request.agentId);
+      if (!assignment || assignment.state !== 'READY') throw new Error('Specialist handoff must be READY before admission');
+      const node = plan.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === assignment.agentId);
+      if (!node) throw new Error('Specialist handoff does not bind a current AgentPlan node');
+      const ownership = (job.runtime.specialistExecutionOwnerships || []).find(item => item?.nodeId === node.nodeId);
+      if (!ownership || ownership.state !== ExecutionOwnershipState.AVAILABLE) {
+        throw new Error('Specialist handoff lacks AVAILABLE canonical execution ownership');
+      }
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        schemaVersion: 1,
+        plan,
+        expectedPlanRevision: plan.revision,
+        nodeId: node.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: node.requiredCapabilityIds,
+        requiredToolIds: node.requiredToolIds,
+        policyEnvelopeId: ownership.policyEnvelopeId,
+        deadlineAt: assignment.deadlineAt,
+        priority: assignment.priority,
+        parentInvocationId: '',
+        at: assignment.updatedAt,
+      });
+      if (proposal.selection.specialistId !== assignment.specialistId) {
+        throw new Error('Least-authority Specialist selection drifted before admission');
+      }
+      return { job, registry, plan, assignment, node, ownership, proposal };
+    };
+
+    const snapshot = await this.load();
+    const prepared = resolveSelection(snapshot);
+    const readiness = await this.specialistReadinessResolver.resolve(prepared.proposal.selection);
+    if (!readiness?.trustedResolverInvoked || readiness?.callerReadinessAccepted !== false) {
+      throw new Error('Specialist readiness lacks trusted resolver provenance');
+    }
+    if (readiness.executable !== true) {
+      const error = new Error(`Specialist provider is not executable: ${readiness.readiness || 'UNKNOWN'}`);
+      error.code = 'SPECIALIST_PROVIDER_NOT_READY';
+      throw error;
+    }
+
+    const at = new Date(this.now()).toISOString();
+    if (Date.parse(at) - Date.parse(readiness.observedAt) > readiness.maxAgeMs) {
+      throw new Error('Specialist provider readiness became stale before admission commit');
+    }
+    let result = null;
+    await this.update(store => {
+      const current = resolveSelection(store);
+      if (current.proposal.selection.providerId !== readiness.providerId
+          || current.proposal.selection.specialistId !== readiness.specialistId
+          || current.proposal.selection.definitionRevision !== readiness.definitionRevision) {
+        throw new Error('Specialist provider selection drifted after readiness resolution');
+      }
+      const limit = request.maxConcurrentHandoffs;
+      const active = store.order
+        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
+        .map(normalizeExecutionOwnershipV1)
+        .filter(item => SPECIALIST_CAPACITY_STATES.has(item.state)).length;
+      if (active >= limit) throw new Error('Product-wide Specialist handoff capacity is exhausted');
+      const claimOptions = {
+        executionOwnerships: current.job.runtime.specialistExecutionOwnerships || [],
+        availableSlots: 1,
+        at,
+      };
+      for (const key of ['maxChildrenPerAgent', 'maxDepth', 'leaseSeconds']) {
+        if (Object.hasOwn(request, key)) claimOptions[key] = request[key];
+      }
+      const claimed = claimAgentPlanSpecialistHandoffsV1(
+        current.plan,
+        current.job.runtime.specialistHandoffs || [],
+        claimOptions,
+      );
+      if (claimed.claimed.length !== 1 || claimed.claimed[0] !== request.agentId) {
+        throw new Error('Requested Specialist handoff is not the next eligible bounded assignment');
+      }
+      current.job.runtime.plan = claimed.plan;
+      current.job.runtime.specialistHandoffs = claimed.assignments;
+      current.job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
+      current.job.runtime.specialistReadinessByAgentId = {
+        ...(current.job.runtime.specialistReadinessByAgentId || {}),
+        [request.agentId]: clone(readiness),
+      };
+      current.job.runtime.updatedAt = this.now();
+      appendHistory(current.job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-admitted',
+        nodeId: current.node.nodeId,
+        agentId: request.agentId,
+        providerId: readiness.providerId,
+        message: `Fresh ${readiness.readiness} provider readiness resolved and bounded Specialist lease claimed; provider effect was not dispatched.`,
+      });
+      result = { ...clone(claimed), readiness: clone(readiness), selection: clone(current.proposal.selection) };
+      return store;
+    });
+    return result;
+  }
+
+  async dispatchAdmittedSpecialistHandoff(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(payload, SPECIALIST_DISPATCH_KEYS, 'Browser Agent Specialist dispatch request');
+    for (const key of SPECIALIST_DISPATCH_KEYS) {
+      if (!Object.hasOwn(request, key)) throw new Error(`Specialist dispatch request requires ${key}`);
+    }
+    if (!this.specialistProviderDispatcher) throw new Error('No trusted Specialist provider dispatcher is configured');
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+
+    const resolveDispatch = store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan || !job.definitionScope) throw new Error('Browser Agent has no durable scoped plan to dispatch');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.revision !== request.expectedPlanRevision) throw new Error('AgentPlan revision conflict');
+      const registry = store.specialistRegistriesById?.[registryId] || null;
+      if (!registry || registry.revision !== request.expectedRegistryRevision) throw new Error('Specialist registry revision drifted before dispatch');
+      const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === request.agentId);
+      if (!assignment || assignment.state !== 'LEASED' || assignment.leaseId !== request.leaseId) {
+        throw new Error('Specialist provider dispatch requires the current leased assignment');
+      }
+      const node = plan.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === assignment.agentId);
+      if (!node || node.state !== AgentPlanNodeState.RUNNING) throw new Error('Specialist provider dispatch requires a RUNNING plan node');
+      const ownership = (job.runtime.specialistExecutionOwnerships || []).find(item => item?.nodeId === node.nodeId);
+      if (!ownership || ownership.state !== ExecutionOwnershipState.OWNED || ownership.leaseId !== request.leaseId) {
+        throw new Error('Specialist provider dispatch requires matching canonical execution ownership');
+      }
+      const definition = registry.definitions.find(item => item.specialistId === assignment.specialistId && item.enabled);
+      if (!definition) throw new Error('Selected Specialist definition is missing or disabled');
+      const selection = normalizeSpecialistSelectionV1({
+        schemaVersion: 1, registryId: registry.registryId, registryRevision: registry.revision,
+        specialistId: definition.specialistId, providerId: definition.providerId,
+        definitionRevision: definition.definitionRevision, executionPlane: definition.executionPlane,
+        requestedCapabilityIds: assignment.requestedCapabilityIds,
+        grantedToolIds: node.requiredToolIds, resultContractId: definition.resultContractId,
+      });
+      const handoff = job.runtime.specialistProviderHandoffsByAgentId?.[request.agentId];
+      if (!handoff) throw new Error('Specialist provider handoff context is missing');
+      bindSpecialistHandoffToRegistryV1({
+        registry, selection, handoff,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+      });
+      const readiness = job.runtime.specialistReadinessByAgentId?.[request.agentId];
+      if (!readiness) throw new Error('Specialist provider readiness evidence is missing');
+      return { job, plan, assignment, node, ownership, selection, handoff, readiness };
+    };
+
+    let prepared;
+    await this.update(store => {
+      const current = resolveDispatch(store);
+      if (current.job.runtime.specialistDispatchByAgentId?.[request.agentId]) {
+        throw new Error('Specialist provider dispatch already has a durable attempt record');
+      }
+      const startedAt = new Date(this.now()).toISOString();
+      current.job.runtime.specialistDispatchByAgentId = {
+        ...(current.job.runtime.specialistDispatchByAgentId || {}),
+        [request.agentId]: {
+          state: 'DISPATCHING', providerId: current.selection.providerId,
+          leaseId: request.leaseId, startedAt, updatedAt: startedAt,
+          effectMayHaveOccurred: false, errorCode: '', resultArtifactRefs: [],
+        },
+      };
+      prepared = clone(current);
+      return store;
     });
 
-    const providerReadiness = assertTrustedProviderReadinessForSelection(
-      await resolveSpecialistReadiness(preflightSelection),
-      preflightSelection,
-      this.now(),
-    );
-
-    return withProjectHierarchyAuthority(projectId, async authority => {
-      const at = new Date(this.now()).toISOString();
-      let result = null;
-      await this.update(async store => {
-        await assertSpecialistReadinessCurrent(providerReadiness);
+    let providerResult;
+    const dispatchInFlightKey = `${id}\u0000${request.agentId}\u0000${request.leaseId}`;
+    this.specialistDispatchInFlight.add(dispatchInFlightKey);
+    try {
+      providerResult = await this.specialistProviderDispatcher.execute({
+        selection: prepared.selection,
+        handoff: prepared.handoff,
+        executionOwnership: prepared.ownership,
+        leaseId: request.leaseId,
+        readiness: prepared.readiness,
+      });
+    } catch (error) {
+      await this.update(store => {
         const job = store.byId[id];
-        if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
-        if ((job.config?.projectId || '') !== projectId) {
-          throw new Error('Browser Agent Project changed during automatic delegation');
-        }
-        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
-          fence: parentRuntimeFence,
-          job,
-        });
-        if (!parentFenceStatus.current) {
-          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
-        }
-        if (job.runtime.plan.revision !== expectedPlanRevision) {
-          throw new Error('AgentPlan revision drifted before automatic delegation');
-        }
-        if (!job.definitionScope) {
-          throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
-        }
-
-        const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
-        if (Object.hasOwn(quarantine, registryId)) {
-          throw new Error('Specialist registry is quarantined as corrupt');
-        }
-        const registry = store.specialistRegistriesById?.[registryId];
-        if (!registry) throw new Error('Specialist registry not found');
-        if (registry.revision !== expectedRegistryRevision) {
-          throw new Error('Specialist registry revision drifted before automatic delegation');
-        }
-
-        if (!job.orchestrationNodeBinding) {
-          throw new Error('Automatic delegation requires a durable orchestration node binding');
-        }
-        const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
-          binding: job.orchestrationNodeBinding,
-          authority,
-        });
-        if (!bindingStatus.current) {
-          throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
-        }
-
-        const structureAdmission = evaluateSubagentStructureAdmissionV1({
-          policy: authority.subagentPolicy,
-          initiator: SubagentSpawnInitiator.AGENT,
-          graph: authority.graph,
-          parentNodeId: job.orchestrationNodeBinding.nodeId,
-          requestedChildren: 1,
-        });
-        if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
-          throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
-        }
-
-        const handoffs = Array.isArray(job.runtime.specialistHandoffs)
-          ? job.runtime.specialistHandoffs
-          : [];
-        const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships)
-          ? job.runtime.specialistExecutionOwnerships
-          : [];
-        const bindings = Array.isArray(job.runtime.specialistDelegationBindings)
-          ? job.runtime.specialistDelegationBindings
-          : [];
-        const planId = normalizeAgentPlanV1(job.runtime.plan).planId;
-        const expectedAgentId = specialistAssignmentIdForPlanNodeV1(planId, intent.nodeId);
-        const existing = handoffs.find(item => item?.agentId === expectedAgentId);
-
-        if (existing) {
-          const existingOwnership = ownerships
-            .map(normalizeExecutionOwnershipV1)
-            .find(item => item.planId === planId && item.nodeId === intent.nodeId);
-          const existingBinding = bindings.find(item =>
-            item?.planId === planId && item?.nodeId === intent.nodeId);
-          if (!existingOwnership || !existingBinding) {
-            throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
-          }
-          bindSpecialistHandoffToRegistryV1({
-            registry,
-            selection: existingBinding.selection,
-            handoff: existingBinding.handoff,
-            parentCapabilityIds: job.definitionScope.capabilityIds,
-            parentToolIds: job.definitionScope.toolIds,
-          });
-          if (existingBinding.registryRevision !== registry.revision) {
-            throw new Error('Existing specialist delegation provenance drifted from current registry');
-          }
-          if (!sameSpecialistSelection(existingBinding.selection, preflightSelection)) {
-            throw new Error('Selected specialist changed after provider readiness probe');
-          }
-          if (!sameCanonicalIdentityList(
-            existingBinding.selection.requestedCapabilityIds,
-            intent.requiredCapabilityIds,
-          ) || !sameCanonicalIdentityList(
-            existingBinding.selection.grantedToolIds,
-            intent.requiredToolIds,
-          )) {
-            throw new Error('Existing specialist delegation scope differs from current request');
-          }
-          if (existingOwnership.policyEnvelopeId !== intent.policyEnvelopeId
-              || existing.priority !== intent.priority
-              || existing.deadlineAt !== intent.deadlineAt) {
-            throw new Error('Existing specialist delegation authority differs from current request');
-          }
-
-          const node = normalizeAgentPlanV1(job.runtime.plan).nodes
-            .find(item => item.nodeId === intent.nodeId);
-          const prepared = existing.state === 'READY'
-            && existingOwnership.state === ExecutionOwnershipState.AVAILABLE
-            && existing.leaseId === ''
-            && existing.leaseExpiresAt === ''
-            && existingOwnership.leaseId === ''
-            && existingOwnership.leaseUntil === ''
-            && node?.state === AgentPlanNodeState.READY;
-          const claimed = existing.state === 'LEASED'
-            && existingOwnership.state === ExecutionOwnershipState.OWNED
-            && Boolean(existing.leaseId)
-            && existing.leaseId === existingOwnership.leaseId
-            && existing.leaseExpiresAt === existingOwnership.leaseUntil
-            && existing.leaseExpiresAt > at
-            && node?.state === AgentPlanNodeState.RUNNING;
-          if (!prepared && !claimed) {
-            throw new Error('Existing automatic specialist delegation requires reconciliation before reuse');
-          }
-
-          const capacity = inspectProductWideSpecialistCapacity(
-            store,
-            intent.maxConcurrentHandoffs,
-          );
-          result = {
-            proposal: null,
-            assignment: clone(existing),
-            executionOwnership: clone(existingOwnership),
-            delegationBinding: clone(existingBinding),
-            structureAdmission: clone(structureAdmission),
-            capacityReservation: {
-              ...capacity,
-              reserved: claimed,
-              reused: true,
-            },
-            reused: true,
-            executionAuthorized: false,
-            providerDispatched: false,
-          };
-          return store;
-        }
-
-        const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at });
-        const proposal = prepareAutomaticAgentSpecialistDelegationV1({
-          plan: reconciledPlan,
-          expectedPlanRevision: reconciledPlan.revision,
-          nodeId: intent.nodeId,
-          registry,
-          parentCapabilityIds: job.definitionScope.capabilityIds,
-          parentToolIds: job.definitionScope.toolIds,
-          requiredCapabilityIds: intent.requiredCapabilityIds,
-          requiredToolIds: intent.requiredToolIds,
-          policyEnvelopeId: intent.policyEnvelopeId,
-          deadlineAt: intent.deadlineAt,
-          priority: intent.priority,
-          childBudget: intent.childBudget,
-          artifactRefs: intent.artifactRefs,
-          credentialRefs: intent.credentialRefs,
-          parentInvocationId: intent.parentInvocationId,
-          at,
-        });
-
-        if (!sameSpecialistSelection(proposal.selection, preflightSelection)) {
-          throw new Error('Selected specialist changed after provider readiness probe');
-        }
-        const assignment = proposal.preview.assignment;
-        const executionOwnership = proposal.preview.executionOwnership;
-        if (assignment.state !== 'READY'
-            || assignment.leaseId !== ''
-            || assignment.leaseExpiresAt !== ''
-            || executionOwnership.state !== ExecutionOwnershipState.AVAILABLE
-            || executionOwnership.leaseId !== ''
-            || executionOwnership.leaseUntil !== '') {
-          throw new Error('Automatic delegation proposal unexpectedly granted execution ownership');
-        }
-        if (ownerships.some(item =>
-          normalizeExecutionOwnershipV1(item).effectId === executionOwnership.effectId)) {
-          throw new Error('Automatic delegation found execution ownership without matching handoff');
-        }
-        if (bindings.some(item =>
-          item?.planId === proposal.planId && item?.nodeId === proposal.nodeId)) {
-          throw new Error('Automatic delegation found provenance binding without matching handoff');
-        }
-
-        // PREPARE observes current product-wide capacity but never reserves it.
-        // The existing canonical claim path is the only authority that may
-        // create a lease, OWNED execution ownership, or RUNNING plan state.
-        const capacityBefore = inspectProductWideSpecialistCapacity(
-          store,
-          intent.maxConcurrentHandoffs,
-        );
-
-        const delegationBinding = normalizePersistedSpecialistDelegationBinding({
-          schemaVersion: 1,
-          planId: proposal.planId,
-          nodeId: proposal.nodeId,
-          planRevision: proposal.planRevision,
-          registryId: proposal.registryId,
-          registryRevision: proposal.registryRevision,
-          selection: proposal.selection,
-          handoff: proposal.binding.handoff,
-          boundAt: at,
-        });
-        job.runtime.plan = reconciledPlan;
-        job.runtime.specialistHandoffs = [...handoffs, assignment];
-        job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
-        job.runtime.specialistDelegationBindings = [...bindings, delegationBinding];
-        job.runtime.updatedAt = this.now();
-        appendHistory(job.runtime, {
-          at: this.now(),
-          type: 'specialist-auto-delegation-prepared',
-          nodeId: proposal.nodeId,
-          agentId: assignment.agentId,
-          specialistId: proposal.selection.specialistId,
-          registryId: proposal.registryId,
-          registryRevision: proposal.registryRevision,
-          message: 'Least-authority specialist selected and durably prepared; canonical claim still owns capacity, lease and execution admission. No provider effect was dispatched.',
-        });
-        result = {
-          proposal: clone(proposal),
-          assignment: clone(assignment),
-          executionOwnership: clone(executionOwnership),
-          delegationBinding: clone(delegationBinding),
-          structureAdmission: clone(structureAdmission),
-          capacityReservation: {
-            ...capacityBefore,
-            reserved: false,
-            reused: false,
-          },
-          reused: false,
-          executionAuthorized: false,
-          providerDispatched: false,
-        };
+        const attempt = job?.runtime?.specialistDispatchByAgentId?.[request.agentId];
+        if (!attempt || attempt.leaseId !== request.leaseId || attempt.state !== 'DISPATCHING') return store;
+        attempt.state = error?.effectMayHaveOccurred === true ? 'AMBIGUOUS' : 'FAILED_SAFE';
+        attempt.effectMayHaveOccurred = error?.effectMayHaveOccurred === true;
+        attempt.errorCode = clean(error?.code || 'SPECIALIST_PROVIDER_FAILED', 120);
+        attempt.updatedAt = new Date(this.now()).toISOString();
+        appendHistory(job.runtime, { at:this.now(), type:'specialist-provider-failed', agentId:request.agentId, message:`Specialist provider dispatch ended ${attempt.state}; automatic redispatch is fenced.` });
         return store;
       });
-      return result;
+      throw error;
+    } finally {
+      this.specialistDispatchInFlight.delete(dispatchInFlightKey);
+    }
+
+    let result = null;
+    await this.update(store => {
+      const current = resolveDispatch(store);
+      const attempt = current.job.runtime.specialistDispatchByAgentId?.[request.agentId];
+      if (!attempt || attempt.leaseId !== request.leaseId || attempt.state !== 'DISPATCHING') {
+        throw new Error('Specialist provider result was fenced by durable dispatch state');
+      }
+      const at = new Date(this.now()).toISOString();
+      const completed = completeAgentPlanSpecialistHandoffV1(current.plan, current.job.runtime.specialistHandoffs || [], {
+        executionOwnerships: current.job.runtime.specialistExecutionOwnerships || [],
+        agentId: request.agentId, leaseId: request.leaseId,
+        resultArtifactIds: providerResult.resultArtifactRefs.map(item => item.artifactId), at,
+      });
+      current.job.runtime.plan = completed.plan;
+      current.job.runtime.specialistHandoffs = completed.assignments;
+      current.job.runtime.specialistExecutionOwnerships = completed.executionOwnerships;
+      attempt.state = 'PROVIDER_SUCCEEDED';
+      attempt.providerReceiptId = providerResult.providerReceiptId;
+      attempt.observedAt = providerResult.observedAt;
+      attempt.resultArtifactRefs = providerResult.resultArtifactRefs;
+      attempt.updatedAt = at;
+      appendHistory(current.job.runtime, { at:this.now(), type:'specialist-provider-succeeded', nodeId:current.node.nodeId, agentId:request.agentId, message:'Specialist provider returned hash-bound artifacts; independent verification is still required.' });
+      result = { providerResult: clone(providerResult), completion: clone(completed) };
+      return store;
     });
+    return result;
   }
 
   async prepareSpecialistHandoff(id, payload = {}) {
@@ -2788,17 +1760,7 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const plan = normalizeAgentPlanV1(job.runtime.plan);
-      const automaticAgentIds = new Set(
-        (job.runtime.specialistDelegationBindings || []).map(binding =>
-          specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId)),
-      );
-      const automaticReady = (job.runtime.specialistHandoffs || []).some(item =>
-        item?.state === 'READY' && automaticAgentIds.has(item?.agentId));
-      if (automaticReady) {
-        throw new Error('Automatic specialist delegation must use canonical cross-job claim admission');
-      }
-      const claimed = claimAgentPlanSpecialistHandoffsV1(plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
@@ -2817,338 +1779,106 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = {}) {
+  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
-    const limit = specialistCapacityLimit(request.maxConcurrentHandoffs);
-    const targetJobId = Object.hasOwn(request, 'targetJobId')
-      ? exactIdentity(request.targetJobId, 'targetJobId', 128)
-      : '';
+    const limit = request.maxConcurrentHandoffs;
+    if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
+      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    }
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     const claimRequest = Object.create(null);
     for (const [key, value] of Object.entries(request)) {
-      if (key !== 'maxConcurrentHandoffs' && key !== 'targetJobId') claimRequest[key] = value;
+      if (key !== 'maxConcurrentHandoffs') claimRequest[key] = value;
     }
     claimRequest.at = at;
-
-    const initialStore = await this.load();
-    const candidateJobIds = targetJobId
-      ? (initialStore.byId[targetJobId] ? [targetJobId] : [])
-      : [...initialStore.order];
-    if (targetJobId && candidateJobIds.length === 0) {
-      throw new Error('Browser Agent job not found');
-    }
-
-    let trustedDependencies = null;
-    const automaticAdmissions = new Map();
-    for (const jobId of candidateJobIds) {
-      const snapshotJob = initialStore.byId[jobId];
-      if (!snapshotJob?.runtime?.plan) continue;
-      const plan = normalizeAgentPlanV1(snapshotJob.runtime.plan);
-      const readyBindings = (snapshotJob.runtime.specialistDelegationBindings || []).filter(binding => {
-        const agentId = specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId);
-        return (snapshotJob.runtime.specialistHandoffs || [])
-          .some(item => item?.agentId === agentId && item?.state === 'READY');
-      });
-      if (!readyBindings.length) continue;
-
-      if (!trustedDependencies) {
-        trustedDependencies = trustedAutomaticDelegationDependencies(dependencies);
+    let result = null;
+    await this.update(store => {
+      const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
+        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
+      const specialistOwnerships = store.order
+        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
+        .map(normalizeExecutionOwnershipV1);
+      const effectIds = new Set();
+      for (const ownership of specialistOwnerships) {
+        if (effectIds.has(ownership.effectId)) {
+          throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
+        }
+        effectIds.add(ownership.effectId);
       }
-      const projectId = snapshotJob.config?.projectId || '';
-      if (!projectId) {
-        throw new Error('Automatic specialist claim requires a durable Project binding');
-      }
-      const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(snapshotJob);
-
-      const selections = await trustedDependencies.withProjectHierarchyAuthority(
-        projectId,
-        async authority => {
-          const store = await this.load();
-          const job = store.byId[jobId];
-          if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-          if ((job.config?.projectId || '') !== projectId) {
-            throw new Error('Browser Agent Project changed before specialist claim readiness probe');
-          }
-          const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
-            fence: parentRuntimeFence,
-            job,
-          });
-          if (!parentFenceStatus.current) {
-            throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
-          }
-          if (!job.definitionScope) {
-            throw new Error('Automatic specialist claim requires durable Agent definition scope');
-          }
-          if (!job.orchestrationNodeBinding) {
-            throw new Error('Automatic specialist claim requires a durable orchestration node binding');
-          }
-          const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
-            binding: job.orchestrationNodeBinding,
-            authority,
-          });
-          if (!bindingStatus.current) {
-            throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
-          }
-          const structureAdmission = evaluateSubagentStructureAdmissionV1({
-            policy: authority.subagentPolicy,
-            initiator: SubagentSpawnInitiator.AGENT,
-            graph: authority.graph,
-            parentNodeId: job.orchestrationNodeBinding.nodeId,
-            requestedChildren: 1,
-          });
-          if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
-            throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
-          }
-
-          const livePlan = normalizeAgentPlanV1(job.runtime.plan);
-          const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
-            const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
-            return (job.runtime.specialistHandoffs || [])
-              .some(item => item?.agentId === agentId && item?.state === 'READY');
-          });
-          if (currentReady.length !== readyBindings.length
-              || currentReady.some(binding =>
-                !readyBindings.some(expected => expected.nodeId === binding.nodeId))) {
-            throw new Error('Automatic specialist claim set drifted before readiness probe');
-          }
-
-          return currentReady.map(binding => {
-            const registry = store.specialistRegistriesById?.[binding.registryId];
-            if (!registry || registry.revision !== binding.registryRevision) {
-              throw new Error('Automatic specialist claim registry provenance drifted');
-            }
-            bindSpecialistHandoffToRegistryV1({
-              registry,
-              selection: binding.selection,
-              handoff: binding.handoff,
-              parentCapabilityIds: job.definitionScope.capabilityIds,
-              parentToolIds: job.definitionScope.toolIds,
-            });
-            return Object.freeze({
-              nodeId: binding.nodeId,
-              selection: normalizeSpecialistSelectionV1(binding.selection),
-            });
-          });
-        },
-      );
-
-      const readinessByNode = new Map();
-      for (const item of selections) {
-        const readiness = assertTrustedProviderReadinessForSelection(
-          await trustedDependencies.resolveSpecialistReadiness(item.selection),
-          item.selection,
-          this.now(),
-        );
-        readinessByNode.set(item.nodeId, readiness);
-      }
-      automaticAdmissions.set(jobId, Object.freeze({
-        projectId,
-        parentRuntimeFence,
-        selections,
-        readinessByNode,
-      }));
-    }
-
-    const claimed = [];
-    const reconciliationRequired = [];
-    for (const jobId of candidateJobIds) {
-      const admission = automaticAdmissions.get(jobId) || null;
-      const claimOne = async authority => {
-        await this.update(async store => {
-          const job = store.byId[jobId];
-          if (!job?.runtime?.plan) return store;
-
-          let effectiveMaxChildren = claimRequest.maxChildrenPerAgent;
-          let effectiveMaxDepth = claimRequest.maxDepth;
-          if (admission) {
-            if ((job.config?.projectId || '') !== admission.projectId) {
-              throw new Error('Browser Agent Project changed during automatic specialist claim');
-            }
-            const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
-              fence: admission.parentRuntimeFence,
-              job,
-            });
-            if (!parentFenceStatus.current) {
-              throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
-            }
-            if (!job.definitionScope) {
-              throw new Error('Automatic specialist claim requires durable Agent definition scope');
-            }
-            if (!job.orchestrationNodeBinding) {
-              throw new Error('Automatic specialist claim requires a durable orchestration node binding');
-            }
-            const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
-              binding: job.orchestrationNodeBinding,
-              authority,
-            });
-            if (!bindingStatus.current) {
-              throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
-            }
-            const structureAdmission = evaluateSubagentStructureAdmissionV1({
-              policy: authority.subagentPolicy,
-              initiator: SubagentSpawnInitiator.AGENT,
-              graph: authority.graph,
-              parentNodeId: job.orchestrationNodeBinding.nodeId,
-              requestedChildren: 1,
-            });
-            if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
-              throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
-            }
-
-            const livePlan = normalizeAgentPlanV1(job.runtime.plan);
-            const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
-              const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
-              return (job.runtime.specialistHandoffs || [])
-                .some(item => item?.agentId === agentId && item?.state === 'READY');
-            });
-            if (currentReady.length !== admission.selections.length
-                || currentReady.some(binding =>
-                  !admission.selections.some(expected => expected.nodeId === binding.nodeId))) {
-              throw new Error('Automatic specialist claim set drifted after readiness probe');
-            }
-            for (const binding of currentReady) {
-              const expected = admission.selections.find(item => item.nodeId === binding.nodeId);
-              if (!expected || !sameSpecialistSelection(binding.selection, expected.selection)) {
-                throw new Error('Selected specialist changed after claim readiness probe');
-              }
-              const registry = store.specialistRegistriesById?.[binding.registryId];
-              if (!registry || registry.revision !== binding.registryRevision) {
-                throw new Error('Automatic specialist claim registry provenance drifted');
-              }
-              bindSpecialistHandoffToRegistryV1({
-                registry,
-                selection: binding.selection,
-                handoff: binding.handoff,
-                parentCapabilityIds: job.definitionScope.capabilityIds,
-                parentToolIds: job.definitionScope.toolIds,
-              });
-              const providerReadiness = assertTrustedProviderReadinessForSelection(
-                admission.readinessByNode.get(binding.nodeId),
-                binding.selection,
-                this.now(),
-              );
-              await trustedDependencies.assertSpecialistReadinessCurrent(providerReadiness);
-            }
-            const policy = authority.subagentPolicy;
-            const requestedMaxChildren = claimRequest.maxChildrenPerAgent === undefined
-              ? 4
-              : claimRequest.maxChildrenPerAgent;
-            const requestedMaxDepth = claimRequest.maxDepth === undefined
-              ? 2
-              : claimRequest.maxDepth;
-            effectiveMaxChildren = Math.min(requestedMaxChildren, policy.maxChildrenPerAgent);
-            effectiveMaxDepth = Math.min(requestedMaxDepth, policy.maxDepth);
-          }
-
-          const capacity = inspectProductWideSpecialistCapacity(store, limit);
-          const outcome = claimAgentPlanSpecialistHandoffsV1(
-            job.runtime.plan,
-            job.runtime.specialistHandoffs || [],
-            {
-              ...claimRequest,
-              availableSlots: capacity.remainingSlots,
-              maxChildrenPerAgent: effectiveMaxChildren,
-              maxDepth: effectiveMaxDepth,
-              executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-              at,
-            },
-          );
-          job.runtime.plan = outcome.plan;
-          job.runtime.specialistHandoffs = outcome.assignments;
-          job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
-          job.runtime.updatedAt = this.now();
-          for (const agentId of outcome.claimed) {
-            claimed.push({ jobId, agentId });
-            appendHistory(job.runtime, {
-              at: this.now(),
-              type: 'specialist-handoff-claimed',
-              agentId,
-              message: 'Specialist lease admitted within live parent, provider and product-wide capacity authority.',
-            });
-          }
-          for (const agentId of outcome.reconciliationRequired) {
-            reconciliationRequired.push({ jobId, agentId });
-            appendHistory(job.runtime, {
-              at: this.now(),
-              type: 'specialist-handoff-reconcile',
-              agentId,
-              message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.',
-            });
-          }
-          return store;
+      const capacityOwnerships = specialistOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
+      let remaining = Math.max(0, limit - capacityOwnerships.length);
+      const claimed = [];
+      const reconciliationRequired = [];
+      for (const jobId of store.order) {
+        const job = store.byId[jobId];
+        if (!job?.runtime?.plan) continue;
+        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+          ...claimRequest,
+          availableSlots: remaining,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
         });
-      };
-
-      if (admission) {
-        await trustedDependencies.withProjectHierarchyAuthority(
-          admission.projectId,
-          authority => claimOne(authority),
-        );
-      } else {
-        await claimOne(null);
+        job.runtime.plan = outcome.plan;
+        job.runtime.specialistHandoffs = outcome.assignments;
+        job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
+        job.runtime.updatedAt = this.now();
+        remaining -= outcome.claimed.length;
+        for (const agentId of outcome.claimed) {
+          claimed.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
+        }
+        for (const agentId of outcome.reconciliationRequired) {
+          reconciliationRequired.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+        }
       }
-    }
-
-    const finalStore = await this.load();
-    const finalCapacity = inspectProductWideSpecialistCapacity(finalStore, limit);
-    const activeLeases = finalStore.order
-      .flatMap(jobId => finalStore.byId[jobId]?.runtime?.specialistHandoffs || [])
-      .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at))
-      .length;
-    return {
-      maxConcurrentHandoffs: limit,
-      activeLeases,
-      capacityObligations: finalCapacity.capacityObligations,
-      remainingSlots: finalCapacity.remainingSlots,
-      claimed,
-      reconciliationRequired,
-    };
+      result = {
+        maxConcurrentHandoffs: limit,
+        activeLeases: liveLeases.length,
+        capacityObligations: capacityOwnerships.length,
+        remainingSlots: remaining,
+        claimed,
+        reconciliationRequired,
+      };
+      return store;
+    });
+    return result;
   }
 
-  async authorizeSpecialistSafeRetry(id, payload = {}, dependencies = {}) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
-      'Browser Agent specialist reconciliation request',
-    );
-    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent specialist reconciliation request requires ${key}`);
-      }
-    }
-    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
-    const at = new Date(this.now()).toISOString();
+  async authorizeSpecialistSafeRetry(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
+    if (!this.specialistVerificationResolver) throw new Error('Specialist SAFE_RETRY requires canonical trusted verifier provenance; no resolver is configured');
+    const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
-        job.runtime.plan,
-        job.runtime.specialistHandoffs || [],
-        {
-          ...request,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-          at,
-        },
-        trustedDependencies,
-      );
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+        ...request,
+        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+        at,
+      }, {
+        resolveTrustedExecutionVerificationRecord: lookup => this.specialistVerificationResolver.resolve({
+          lookup,
+          dispatch: clone(job.runtime.specialistDispatchByAgentId?.[request.agentId] || null),
+        }),
+      });
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      const trusted = retriable.trustedVerification;
       appendHistory(job.runtime, {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        trustedRecordId: trusted.recordId,
-        verifierId: trusted.verifierId,
-        verificationAuthorityId: trusted.verificationAuthorityId,
-        verificationId: trusted.verificationId,
-        evidenceArtifactIds: trusted.evidenceArtifactIds,
-        verificationOutcome: trusted.outcome,
-        verificationProvenance: trusted.provenance,
+        verifierId: retriable.safeRetryVerification.verifierId,
+        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
+        verificationId: retriable.safeRetryVerification.verificationId,
+        observationId: retriable.safeRetryVerification.observationId,
+        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
+        evidence: retriable.safeRetryVerification.summary,
         message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
@@ -3177,55 +1907,191 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async verifySpecialistHandoff(id, payload = {}, dependencies = {}) {
-    const request = snapshotExactOwnDataRequest(
-      payload,
-      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
-      'Browser Agent specialist verification request',
-    );
-    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
-      if (!Object.hasOwn(request, key)) {
-        throw new Error(`Browser Agent specialist verification request requires ${key}`);
-      }
-    }
-    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
-    const at = new Date(this.now()).toISOString();
+  async verifySpecialistHandoff(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
+    if (!this.specialistVerificationResolver) throw new Error('Specialist verification requires canonical trusted verifier provenance; no resolver is configured');
+    const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
+      const dispatch = job.runtime.specialistDispatchByAgentId?.[request.agentId] || null;
+      if (!dispatch || dispatch.state !== 'PROVIDER_SUCCEEDED') throw new Error('Trusted Specialist verification requires a successful durable provider dispatch');
       const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
         job.runtime.plan,
         job.runtime.specialistHandoffs || [],
+        { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at },
         {
-          ...request,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-          at,
+          resolveTrustedExecutionVerificationRecord: lookup => this.specialistVerificationResolver.resolve({
+            lookup,
+            dispatch: clone(dispatch),
+          }),
         },
-        trustedDependencies,
       );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
+      const automation = job.runtime.specialistAutomationByAgentId?.[request.agentId];
+      if (automation) {
+        automation.autoRun = false;
+        automation.status = 'COMPLETED';
+        automation.nextAttemptAt = 0;
+        automation.lastErrorCode = '';
+        automation.updatedAt = this.now();
+      }
       job.runtime.updatedAt = this.now();
-      const trusted = verified.trustedVerification;
-      appendHistory(job.runtime, {
-        at: this.now(),
-        type: 'specialist-handoff-verified',
-        agentId: verified.verifiedAgentId,
-        trustedRecordId: trusted.recordId,
-        verifierId: trusted.verifierId,
-        verificationAuthorityId: trusted.verificationAuthorityId,
-        verificationId: trusted.verificationId,
-        evidenceArtifactIds: trusted.evidenceArtifactIds,
-        verificationOutcome: trusted.outcome,
-        verificationProvenance: trusted.provenance,
-        message: 'Independent canonical trusted verifier accepted specialist evidence and advanced the plan.',
-      });
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
       result = clone(verified);
       return store;
     });
     return result;
+  }
+
+  async #recordSpecialistAutomationFailure(id, agentId, error) {
+    await this.update(store => {
+      const job = store.byId[id];
+      const automation = job?.runtime?.specialistAutomationByAgentId?.[agentId];
+      if (!automation || automation.autoRun !== true) return store;
+      const attempt = job.runtime.specialistDispatchByAgentId?.[agentId] || null;
+      const terminalFence = ['AMBIGUOUS', 'FAILED_SAFE'].includes(attempt?.state);
+      const count = Math.max(0, Math.floor(Number(automation.attempts || 0))) + 1;
+      automation.attempts = count;
+      automation.lastErrorCode = clean(error?.code || 'SPECIALIST_AUTOMATION_FAILED', 120);
+      automation.status = terminalFence ? 'BLOCKED_RECONCILIATION' : 'RETRY_WAIT';
+      automation.autoRun = !terminalFence;
+      automation.nextAttemptAt = terminalFence
+        ? 0
+        : this.now() + Math.min(15 * 60_000, 30_000 * (2 ** Math.min(5, count - 1)));
+      automation.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: terminalFence ? 'specialist-automation-blocked' : 'specialist-automation-retry-wait',
+        agentId,
+        message: terminalFence
+          ? 'Automatic Specialist continuation stopped at a durable effect fence; reconciliation is required.'
+          : 'Automatic Specialist continuation will retry after bounded backoff.',
+      });
+      return store;
+    });
+  }
+
+  async #fenceInterruptedSpecialistDispatch(id, agentId, leaseId) {
+    const key = `${id}\u0000${agentId}\u0000${leaseId}`;
+    if (this.specialistDispatchInFlight.has(key)) return false;
+    let fenced = false;
+    await this.update(store => {
+      const job = store.byId[id];
+      const attempt = job?.runtime?.specialistDispatchByAgentId?.[agentId];
+      const automation = job?.runtime?.specialistAutomationByAgentId?.[agentId];
+      if (!attempt || attempt.leaseId !== leaseId || attempt.state !== 'DISPATCHING') return store;
+      attempt.state = 'AMBIGUOUS';
+      attempt.effectMayHaveOccurred = true;
+      attempt.errorCode = 'SPECIALIST_DISPATCH_INTERRUPTED';
+      attempt.updatedAt = new Date(this.now()).toISOString();
+      if (automation) {
+        automation.autoRun = false;
+        automation.status = 'BLOCKED_RECONCILIATION';
+        automation.nextAttemptAt = 0;
+        automation.lastErrorCode = attempt.errorCode;
+        automation.updatedAt = this.now();
+      }
+      appendHistory(job.runtime, {
+        at: this.now(), type: 'specialist-automation-blocked', agentId,
+        message: 'A service-worker restart interrupted Specialist dispatch; blind replay is fenced pending reconciliation.',
+      });
+      fenced = true;
+      return store;
+    });
+    return fenced;
+  }
+
+  /**
+   * Continues owner-enabled Specialist pipelines after alarms or service-worker
+   * restarts. Durable assignment/ownership/dispatch states decide the next
+   * step; an interrupted provider effect is fenced instead of replayed.
+   */
+  async resumeAutomaticSpecialistHandoffs({ maxOperations = 8 } = {}) {
+    const limit = Math.max(1, Math.min(64, Math.floor(Number(maxOperations) || 8)));
+    const results = [];
+    let operations = 0;
+    const initial = await this.load();
+    const targets = initial.order.flatMap(id => Object.entries(initial.byId[id]?.runtime?.specialistAutomationByAgentId || {})
+      .filter(([, automation]) => automation?.autoRun === true)
+      .map(([agentId]) => ({ id, agentId })));
+
+    for (const target of targets) {
+      while (operations < limit) {
+        const current = await this.get(target.id);
+        const job = current.job;
+        const automation = job?.runtime?.specialistAutomationByAgentId?.[target.agentId];
+        if (!job || !automation || automation.autoRun !== true) break;
+        if (Number(automation.nextAttemptAt || 0) > this.now()) break;
+        const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === target.agentId);
+        const plan = job.runtime.plan ? normalizeAgentPlanV1(job.runtime.plan) : null;
+        const node = plan?.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === target.agentId);
+        const ownership = (job.runtime.specialistExecutionOwnerships || []).find(item => item?.nodeId === node?.nodeId);
+        const attempt = job.runtime.specialistDispatchByAgentId?.[target.agentId] || null;
+        if (!assignment || !ownership) {
+          await this.#recordSpecialistAutomationFailure(target.id, target.agentId, Object.assign(new Error('Specialist automation durable state is incomplete'), { code:'SPECIALIST_AUTOMATION_STATE_INVALID' }));
+          break;
+        }
+        if (ownership.state === ExecutionOwnershipState.VERIFIED) {
+          await this.update(store => {
+            const item = store.byId[target.id]?.runtime?.specialistAutomationByAgentId?.[target.agentId];
+            if (item) { item.autoRun = false; item.status = 'COMPLETED'; item.nextAttemptAt = 0; item.updatedAt = this.now(); }
+            return store;
+          });
+          break;
+        }
+        try {
+          let result;
+          if (assignment.state === 'READY') {
+            result = await this.admitAutomaticSpecialistHandoff(target.id, {
+              registryId: automation.registryId,
+              expectedRegistryRevision: automation.registryRevision,
+              expectedPlanRevision: job.runtime.plan.revision,
+              agentId: target.agentId,
+              maxConcurrentHandoffs: 4,
+              leaseSeconds: 900,
+            });
+            results.push({ id:target.id, agentId:target.agentId, step:'ADMITTED', result });
+          } else if (assignment.state === 'LEASED' && !attempt) {
+            result = await this.dispatchAdmittedSpecialistHandoff(target.id, {
+              registryId: automation.registryId,
+              expectedRegistryRevision: automation.registryRevision,
+              expectedPlanRevision: job.runtime.plan.revision,
+              agentId: target.agentId,
+              leaseId: assignment.leaseId,
+            });
+            results.push({ id:target.id, agentId:target.agentId, step:'DISPATCHED', result });
+          } else if (assignment.state === 'LEASED' && attempt?.state === 'DISPATCHING') {
+            const fenced = await this.#fenceInterruptedSpecialistDispatch(target.id, target.agentId, attempt.leaseId);
+            if (fenced) results.push({ id:target.id, agentId:target.agentId, step:'FENCED_INTERRUPTED_DISPATCH' });
+            break;
+          } else if (assignment.state === 'COMPLETED' && attempt?.state === 'PROVIDER_SUCCEEDED') {
+            const verificationId = `specialist-verification:${attempt.leaseId}`.slice(0, 180);
+            result = await this.verifySpecialistHandoff(target.id, {
+              agentId: target.agentId,
+              leaseId: attempt.leaseId,
+              verificationId,
+            });
+            results.push({ id:target.id, agentId:target.agentId, step:'VERIFIED', result });
+          } else {
+            const error = Object.assign(new Error('Specialist automation reached a non-replayable durable state'), { code:'SPECIALIST_AUTOMATION_FENCED' });
+            await this.#recordSpecialistAutomationFailure(target.id, target.agentId, error);
+            break;
+          }
+          operations += 1;
+        } catch (error) {
+          await this.#recordSpecialistAutomationFailure(target.id, target.agentId, error);
+          results.push({ id:target.id, agentId:target.agentId, step:'RETRY_WAIT', errorCode:clean(error?.code || 'SPECIALIST_AUTOMATION_FAILED', 120) });
+          break;
+        }
+      }
+      if (operations >= limit) break;
+    }
+    return { kind:results.length ? 'SPECIALISTS_CONTINUED' : 'IDLE', operations, results };
   }
 
   async createFromAgentDefinition(input = {}) {
@@ -3809,103 +2675,11 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async #commitOwnerLifecycleMutation(
-    id,
-    transition,
-    mutator,
-    { expectedBinding = null, applyBoundLifecycle = null, rejectNewBinding = false } = {},
-  ) {
-    const operation = this.updateChain.then(async () => {
-      const before = await this.load();
-      const draft = clone(before);
-      const job = draft.byId[id];
-      if (!job) throw new Error('Browser Agent job not found');
-
-      const liveBinding = job.orchestrationNodeBinding
-        ? normalizeBrowserAgentOrchestrationNodeBindingV1(job.orchestrationNodeBinding)
-        : null;
-      if (rejectNewBinding && liveBinding) return BROWSER_AGENT_BOUND_LIFECYCLE_RETRY;
-      if (expectedBinding) {
-        if (!liveBinding || !sameOrchestrationNodeBinding(liveBinding, expectedBinding)) {
-          throw new Error('Browser Agent orchestration binding changed before lifecycle commit');
-        }
-        if (liveBinding.jobId !== job.id || liveBinding.projectId !== job.config?.projectId) {
-          throw new Error('Browser Agent orchestration binding no longer matches the durable job');
-        }
-        if (typeof applyBoundLifecycle !== 'function') {
-          throw new Error('Canonical Browser Agent bound lifecycle transition is required');
-        }
-      }
-
-      const next = await mutator(draft) || draft;
-      const saved = await this.save(next);
-      if (expectedBinding) {
-        try {
-          const live = saved.byId[id];
-          await applyBoundLifecycle(
-            transition,
-            {
-              browserControlEpoch: live.runtime.controlEpoch,
-              nowMs: live.runtime.updatedAt,
-            },
-          );
-        } catch (error) {
-          try {
-            await this.save(before);
-          } catch (rollbackError) {
-            throw new AggregateError(
-              [error, rollbackError],
-              'Browser Agent lifecycle propagation failed and Browser Agent rollback also failed.',
-            );
-          }
-          throw error;
-        }
-      }
-      return saved;
-    });
-    this.updateChain = operation.catch(() => undefined);
-    return operation;
-  }
-
-  async #updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
-    if (typeof mutator !== 'function') throw new Error('Browser Agent lifecycle mutator is required');
-    const initial = await this.get(id);
-    if (!initial.job) throw new Error('Browser Agent job not found');
-
-    const initialBinding = initial.job.orchestrationNodeBinding
-      ? normalizeBrowserAgentOrchestrationNodeBindingV1(initial.job.orchestrationNodeBinding)
-      : null;
-    if (!initialBinding) {
-      const result = await this.#commitOwnerLifecycleMutation(
-        id,
-        transition,
-        mutator,
-        { rejectNewBinding: true },
-      );
-      if (result === BROWSER_AGENT_BOUND_LIFECYCLE_RETRY) {
-        return this.#updateOwnerLifecycleState(id, transition, mutator, dependencies);
-      }
-      return result;
-    }
-
-    const withLifecycleAuthority = trustedOrchestrationLifecycleFence(dependencies);
-    return withLifecycleAuthority(initialBinding, async applyBoundLifecycle => {
-      if (typeof applyBoundLifecycle !== 'function') {
-        throw new Error('Canonical Browser Agent bound lifecycle transition is required');
-      }
-      return this.#commitOwnerLifecycleMutation(
-        id,
-        transition,
-        mutator,
-        { expectedBinding: initialBinding, applyBoundLifecycle },
-      );
-    });
-  }
-
-  async pause(id, dependencies = {}) {
+  async pause(id) {
     const now = this.now();
-    await this.#updateOwnerLifecycleState(id, 'PAUSE', store => {
+    await this.update(store => {
       const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING) throw new Error('Only a running Browser Agent can be paused');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.PAUSED;
@@ -3913,12 +2687,12 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = now;
       appendHistory(job.runtime, { at: now, type: 'owner', message: 'Paused by owner' });
       return store;
-    }, dependencies);
+    });
     await this.reconcileAlarm();
     return this.get(id);
   }
 
-  async resume(id, { runInitial = true } = {}, dependencies = {}) {
+  async resume(id, { runInitial = true } = {}) {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return this.get(id);
@@ -3928,8 +2702,9 @@ export class BrowserAgentManager {
       return this.get(id);
     }
     const now = this.now();
-    await this.#updateOwnerLifecycleState(id, 'RESUME', store => {
+    await this.update(store => {
       const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
       if (![BrowserAgentRunState.PAUSED, BrowserAgentRunState.STOPPED, BrowserAgentRunState.WAITING_PERMISSION, BrowserAgentRunState.WAITING_CAPABILITY, BrowserAgentRunState.WAITING_SCHEDULE].includes(job.runtime.runState)) throw new Error('Browser Agent cannot be resumed from its current state');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.RUNNING;
@@ -3939,7 +2714,7 @@ export class BrowserAgentManager {
       job.runtime.nextWakeAt = now;
       job.runtime.updatedAt = now;
       return store;
-    }, dependencies);
+    });
     if (!runInitial) {
       await this.reconcileAlarm();
       return this.get(id);
@@ -3949,11 +2724,12 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async stop(id, dependencies = {}) {
+  async stop(id) {
     const now = this.now();
     let closeTabs = false;
-    await this.#updateOwnerLifecycleState(id, 'STOP', store => {
+    await this.update(store => {
       const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.STOPPED;
       job.runtime.pendingApproval = null;
@@ -3962,7 +2738,7 @@ export class BrowserAgentManager {
       closeTabs = job.config.closeOwnedTabsOnStop === true;
       appendHistory(job.runtime, { at: now, type: 'owner', message: 'Stopped by owner' });
       return store;
-    }, dependencies);
+    });
     if (closeTabs) await this.closeOwnedTabs(id, { throwOnPending: false });
     await this.reconcileAlarm();
     return this.get(id);
@@ -5914,6 +4690,7 @@ export class BrowserAgentManager {
   cycleAll() {
     if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
+      const specialistContinuation = await this.resumeAutomaticSpecialistHandoffs({ maxOperations: 8 });
       const store = await this.load();
       const now = this.now();
       const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
@@ -5958,7 +4735,11 @@ export class BrowserAgentManager {
       await Promise.all(workers);
 
       await this.reconcileAlarm();
-      const results = [...preflightResults, ...runResults.filter(Boolean)];
+      const results = [
+        ...specialistContinuation.results.map(item => ({ id:item.id, specialistAgentId:item.agentId, result:item })),
+        ...preflightResults,
+        ...runResults.filter(Boolean),
+      ];
       return {
         kind: results.length ? 'CYCLED' : 'IDLE',
         results,
@@ -5978,6 +4759,12 @@ export class BrowserAgentManager {
     let next = Infinity;
     for (const id of store.order) {
       const job = store.byId[id];
+      const automaticSpecialists = Object.values(job?.runtime?.specialistAutomationByAgentId || {})
+        .filter(item => item?.autoRun === true);
+      if (automaticSpecialists.length) {
+        const specialistWake = Math.min(...automaticSpecialists.map(item => Number(item.nextAttemptAt || 0)));
+        next = Math.min(next, specialistWake > now ? specialistWake : now + MIN_WAKE_MS);
+      }
       if ((job?.runtime?.retirePendingTabIds || []).length) {
         next = Math.min(next, now + MIN_WAKE_MS);
         continue;

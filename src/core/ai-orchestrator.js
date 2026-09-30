@@ -12,7 +12,6 @@ import {
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
-import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 
 export const AiRouterMode = Object.freeze({
   PRIMARY: 'primary',
@@ -31,7 +30,6 @@ const MODES = new Set(Object.values(AiRouterMode));
 const PROVIDERS = new Set(Object.values(AiProvider));
 const ESCALATION_MARKER = '[[ESCALATE]]';
 const MAX_HANDOFF_CHARS = 50_000;
-const DEFAULT_ROUTE_QUALITY_EVIDENCE_TIMEOUT_MS = 250;
 
 export const DEFAULT_AI_ROUTER_SETTINGS = Object.freeze({
   enabled: false,
@@ -64,6 +62,9 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
   strongHistoryAt: Object.freeze([]),
   routeStates: Object.freeze({}),
   lastRouteId: '',
+  lastProvider: '',
+  lastModel: '',
+  lastEndpointId: '',
   lastFailoverChain: Object.freeze([]),
 });
 
@@ -145,29 +146,23 @@ export function normalizeAiRouterRuntime(raw = {}) {
     strongHistoryAt: Array.isArray(raw.strongHistoryAt) ? raw.strongHistoryAt.map(num).filter(Boolean).slice(-1000) : [],
     routeStates: normalizeAiRouteStates(raw.routeStates, routes.length ? routes : Object.keys(raw.routeStates || {}).map(routeId => ({ routeId }))),
     lastRouteId: clean(raw.lastRouteId),
-    lastFailoverChain: Array.isArray(raw.lastFailoverChain) ? raw.lastFailoverChain.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(-32).map(item => ({ routeId:clean(item.routeId), outcome:clean(item.outcome), code:clean(item.code), category:clean(item.category) })) : [],
+    lastProvider: clean(raw.lastProvider).slice(0, 100),
+    lastModel: clean(raw.lastModel).slice(0, 300),
+    lastEndpointId: clean(raw.lastEndpointId).slice(0, 180),
+    lastFailoverChain: Array.isArray(raw.lastFailoverChain) ? raw.lastFailoverChain.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(-32).map(item => ({
+      routeId:clean(item.routeId),
+      provider:clean(item.provider).slice(0, 100),
+      model:clean(item.model).slice(0, 300),
+      endpointId:clean(item.endpointId).slice(0, 180),
+      outcome:clean(item.outcome),
+      code:clean(item.code),
+      category:clean(item.category),
+    })) : [],
   };
 }
 
 function requireConfigured(slot, label) {
   if (!slot?.model) throw new Error(`${label} AI model is not selected`);
-}
-
-function resolveRouteQualityEvidenceWithDeadline(resolver, request, timeoutMs) {
-  return new Promise(resolve => {
-    let settled = false;
-    let timer = null;
-    const finish = value => {
-      if (settled) return;
-      settled = true;
-      if (timer !== null) clearTimeout(timer);
-      resolve(value);
-    };
-    timer = setTimeout(() => finish(null), timeoutMs);
-    Promise.resolve()
-      .then(() => resolver(request))
-      .then(finish, () => finish(null));
-  });
 }
 
 function previousStrongContext(settings, runtime) {
@@ -220,13 +215,7 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({
-    gatewayClient,
-    now = () => Date.now(),
-    providerCallLifecycle = null,
-    routeQualityEvidenceResolver = null,
-    routeQualityEvidenceTimeoutMs = DEFAULT_ROUTE_QUALITY_EVIDENCE_TIMEOUT_MS,
-  } = {}) {
+  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -235,20 +224,9 @@ export class AiOrchestrator {
     )) {
       throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
     }
-    if (routeQualityEvidenceResolver != null && typeof routeQualityEvidenceResolver !== 'function') {
-      throw new Error('AI route quality evidence resolver must be a function');
-    }
-    if (!Number.isSafeInteger(routeQualityEvidenceTimeoutMs)
-        || Object.is(routeQualityEvidenceTimeoutMs, -0)
-        || routeQualityEvidenceTimeoutMs < 1
-        || routeQualityEvidenceTimeoutMs > 5_000) {
-      throw new Error('AI route quality evidence timeout must be a whole number from 1 to 5000 milliseconds');
-    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
-    this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
-    this.routeQualityEvidenceTimeoutMs = routeQualityEvidenceTimeoutMs;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -269,9 +247,22 @@ export class AiOrchestrator {
     let routeStates = normalizeAiRouteStates(runtime.routeStates, settings.routes);
     const routeAttempts = [];
     let selectedRouteId = runtime.lastRouteId;
+    let selectedRouteIdentity = Object.freeze({
+      provider: runtime.lastProvider,
+      model: runtime.lastModel,
+      endpointId: runtime.lastEndpointId,
+    });
     const consumedOutput = () => Math.max(0, Number(primaryResult?.usage?.outputTokens || 0)) + Math.max(0, Number(strongResult?.usage?.outputTokens || 0));
     const remainingOutput = () => outputCeiling ? Math.max(0, outputCeiling - consumedOutput()) : 0;
-    const routeRuntimeSnapshot = () => normalizeAiRouterRuntime({ ...runtime, routeStates, lastRouteId:selectedRouteId, lastFailoverChain:routeAttempts });
+    const routeRuntimeSnapshot = () => normalizeAiRouterRuntime({
+      ...runtime,
+      routeStates,
+      lastRouteId:selectedRouteId,
+      lastProvider:selectedRouteIdentity.provider,
+      lastModel:selectedRouteIdentity.model,
+      lastEndpointId:selectedRouteIdentity.endpointId,
+      lastFailoverChain:routeAttempts,
+    });
     const attachFailureRuntime = error => {
       if (error && typeof error === 'object') {
         error.modelCallsUsed = Math.max(Number(error.modelCallsUsed || 0), callsUsed);
@@ -330,9 +321,13 @@ export class AiOrchestrator {
               error,
             });
           } catch (settlementError) {
+            const classification = classifyAiRouteError(settlementError);
+            routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
             throw attachFailureRuntime(settlementError);
           }
         }
+        const classification = classifyAiRouteError(error);
+        routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
         throw attachFailureRuntime(error);
       }
       if (lifecycle) {
@@ -345,9 +340,18 @@ export class AiOrchestrator {
             result: value,
           });
         } catch (settlementError) {
+          const classification = classifyAiRouteError(settlementError);
+          routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
           throw attachFailureRuntime(settlementError);
         }
       }
+      routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
+      selectedRouteId = routeIdentity.routeId;
+      selectedRouteIdentity = Object.freeze({
+        provider: routeIdentity.provider,
+        model: routeIdentity.model,
+        endpointId: routeIdentity.endpointId,
+      });
       return value;
     };
     const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
@@ -356,17 +360,7 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const requiresVision = Boolean(clean(imageDataUrl));
-      const selectCurrentCandidates = (selectionNow) => selectAiRouteCandidates({
-        routes:settings.routes,
-        policy:settings.routePolicy,
-        routeStates,
-        role:requestedRole,
-        capabilityIds,
-        requiresVision,
-        now:selectionNow,
-      });
-      let selected = selectCurrentCandidates(this.now());
+      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,
@@ -374,79 +368,24 @@ export class AiOrchestrator {
           message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
         }));
       }
-
-      let candidateRoutes = selected.candidates;
-      if (this.routeQualityEvidenceResolver && candidateRoutes.length > 1) {
-        const benchmarkRequests = await resolveRouteQualityEvidenceWithDeadline(
-          this.routeQualityEvidenceResolver,
-          Object.freeze({
-            routeIds:Object.freeze(candidateRoutes.map(route => route.routeId)),
-            role:requestedRole,
-            requiresVision,
-          }),
-          this.routeQualityEvidenceTimeoutMs,
-        );
-
-        // Evidence resolution may be asynchronous. Canonical Router authority must be
-        // refreshed after that wait before an advisory ranking can influence ordering.
-        const freshNow = this.now();
-        selected = selectCurrentCandidates(freshNow);
-        if (!selected.candidates.length) {
-          throw attachFailureRuntime(createAiRoutePoolExhaustedError({
-            attempts:routeAttempts,
-            retryAt:selected.retryAt,
-            message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
-          }));
-        }
-        candidateRoutes = selected.candidates;
-
-        if (benchmarkRequests != null) {
-          try {
-            const advisory = await rankAiRouteCandidatesByEvidenceV1({
-              routes:settings.routes,
-              policy:settings.routePolicy,
-              routeStates,
-              role:requestedRole,
-              capabilityIds,
-              requiresVision,
-              now:freshNow,
-              benchmarkRequests,
-            });
-            const advisoryRank = new Map(advisory.rankedRouteIds.map((routeId, index) => [routeId, index]));
-            candidateRoutes = [...candidateRoutes].sort((left, right) => {
-              const leftRank = advisoryRank.has(left.routeId) ? advisoryRank.get(left.routeId) : Number.MAX_SAFE_INTEGER;
-              const rightRank = advisoryRank.has(right.routeId) ? advisoryRank.get(right.routeId) : Number.MAX_SAFE_INTEGER;
-              return leftRank - rightRank;
-            });
-          } catch (_) {
-            // Quality evidence is advisory. Invalid/stale/unavailable evidence must not
-            // block the canonical baseline Router selection or widen its eligibility.
-            candidateRoutes = selected.candidates;
-          }
-        }
-      }
-
-      for (const route of candidateRoutes) {
+      for (const route of selected.candidates) {
         const started = this.now();
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
           const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
           const value = await invoke(route, routePrompt, routeSystem, bounded);
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
-          selectedRouteId = route.routeId;
-          routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
           return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
         } catch (error) {
           const classification = classifyAiRouteError(error);
           if (error && typeof error === 'object') error.routeFailureClassification = classification;
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
-          routeAttempts.push({ routeId:route.routeId, outcome:'FAILED', code:classification.code, category:classification.category });
           attachFailureRuntime(error);
           if (!classification.retryable) throw error;
           if (!settings.routePolicy.autoSwitch) {
             const failedState = routeStates[route.routeId];
             const retryAt = Math.max(failedState?.backoffUntil || 0, failedState?.circuitOpenUntil || 0);
-            if (error && typeof error === 'object' && retryAt > this.now()) error.retryAt = retryAt;
+            if (error && typeof error === 'object' && retryAt > now) error.retryAt = retryAt;
             throw attachFailureRuntime(error);
           }
         }
@@ -457,8 +396,8 @@ export class AiOrchestrator {
         routeStates,
         role: requestedRole,
         capabilityIds,
-        requiresVision,
-        now:this.now(),
+        requiresVision: Boolean(clean(imageDataUrl)),
+        now,
       });
       throw attachFailureRuntime(createAiRoutePoolExhaustedError({
         attempts: routeAttempts,
@@ -572,6 +511,9 @@ export class AiOrchestrator {
         : (runtime.strongHistoryAt || []).filter(at => now - at < 24 * 60 * 60_000),
       routeStates,
       lastRouteId: finalResult?.routeSelection?.routeId || selectedRouteId,
+      lastProvider: finalResult?.routeSelection?.provider || selectedRouteIdentity.provider,
+      lastModel: finalResult?.routeSelection?.model || selectedRouteIdentity.model,
+      lastEndpointId: finalResult?.routeSelection?.endpointId || selectedRouteIdentity.endpointId,
       lastFailoverChain: routeAttempts,
     };
 
@@ -596,7 +538,14 @@ export class AiOrchestrator {
       strong: strongResult ? { provider: strongResult.routeSelection?.provider || settings.strong.provider, model: strongResult.routeSelection?.model || settings.strong.model, routeId:strongResult.routeSelection?.routeId || '', text: strongResult.text, usage: strongResult.usage || null } : null,
       primaryError,
       strongError,
-      routing: { selectedRouteId:finalResult?.routeSelection?.routeId || '', reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'), failoverChain:structuredClone(routeAttempts) },
+      routing: {
+        selectedRouteId:finalResult?.routeSelection?.routeId || '',
+        selectedProvider:finalResult?.routeSelection?.provider || selectedRouteIdentity.provider,
+        selectedModel:finalResult?.routeSelection?.model || selectedRouteIdentity.model,
+        selectedEndpointId:finalResult?.routeSelection?.endpointId || selectedRouteIdentity.endpointId,
+        reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'),
+        failoverChain:structuredClone(routeAttempts),
+      },
       runtime: nextRuntime,
     };
   }

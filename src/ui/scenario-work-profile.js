@@ -7,11 +7,11 @@ const BOUNDS = Object.freeze({
   responseTimeoutMinutes: [1, 1440], pollSeconds: [5, 600],
   minimumLaunchGapSeconds: [0, 3600], preSendDelaySeconds: [1, 30],
   busyCheckDelaySeconds: [1, 30], retryBackoffSeconds: [5, 3600],
-  pairCount: [1, 100], workerCount: [1, 200], firstCount: [1, 100],
-  secondCount: [0, 100], auditTimeboxMinutes: [1, 1440], maxCorrectionAttempts: [0, 10],
+  pairCount: [1, 10000], workerCount: [1, 10000], firstCount: [1, 10000],
+  secondCount: [0, 10000], auditTimeboxMinutes: [1, 1440], maxCorrectionAttempts: [0, 10000],
 });
 const POOL_BOUNDS = Object.freeze({
-  count: [1, 20],
+  count: [1, 10000],
   replacementBudget: [0, 100000],
   staggerSeconds: [0, 604800],
 });
@@ -57,6 +57,8 @@ export function makeScenarioWorkTemplate() {
     preSendDelaySeconds: 10,
     busyCheckDelaySeconds: 3,
     retryBackoffSeconds: 15,
+    closeTabsBetweenChecks: true,
+    reopenOnceAfterProbeError: true,
     restartCurrentRoundOnTimeout: true,
     steps: [
       { id: 'start', label: 'Стартовий промпт', prompt: 'Вставте стартовий промпт.', repeat: 1 },
@@ -90,7 +92,14 @@ export function parseScenarioWorkProfileDocument(text) {
       throw new Error('Потрібен принаймні один непорожній промпт із коректною кількістю повторів.');
     }
   }
-  const { id, ...config } = normalizeScenarioWorkConfig(raw);
+  // Portable profiles made before tab parking existed have no explicit
+  // preference.  Treat that absence as the new robust profile default while
+  // leaving a caller's explicit false untouched.
+  const { id, ...config } = normalizeScenarioWorkConfig({
+    ...raw,
+    closeTabsBetweenChecks: raw.closeTabsBetweenChecks ?? true,
+    reopenOnceAfterProbeError: raw.reopenOnceAfterProbeError ?? true,
+  });
   const pool = normalizePoolPreset(profile.pool, config.mode);
   // A profile is configuration only. Creating a fresh scenario establishes new runtime and identity.
   return { config, pool };

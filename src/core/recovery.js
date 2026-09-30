@@ -158,7 +158,8 @@ function calendarWakeForSession(session, now) {
 }
 
 export function computeNextWake(state, now = Date.now()) {
-  let earliest = Infinity;
+  let earliestSend = Infinity;
+  let earliestRecovery = Infinity;
   let retirementEarliest = Infinity;
 
   for (const hint of Object.values(state.tabHintsByTaskId || {})) {
@@ -171,7 +172,7 @@ export function computeNextWake(state, now = Date.now()) {
       if (binding?.enabled !== true || !binding.fileId) continue;
       const rawNextCheckAt = Number(binding.nextCheckAt || 0);
       const nextCheckAt = Number.isFinite(rawNextCheckAt) ? rawNextCheckAt : 0;
-      earliest = Math.min(earliest, Math.max(now, nextCheckAt));
+      earliestRecovery = Math.min(earliestRecovery, Math.max(now, nextCheckAt));
     }
 
     if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
@@ -183,29 +184,34 @@ export function computeNextWake(state, now = Date.now()) {
     // work; it must never hide AMBIGUOUS or pre-send durable evidence.
     if (phase === OperationPhase.PRE_SEND_WAIT) {
       const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
-      earliest = Math.min(earliest, Math.max(now, session.operation.preSendDeadline || now, taskRetryAfter));
+      // This operation still contains a Send. Honor the provider reserve.
+      earliestSend = Math.min(earliestSend, Math.max(now, session.operation.preSendDeadline || now, taskRetryAfter));
       continue;
     }
 
     if (phase === OperationPhase.AMBIGUOUS) {
       const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
-      earliest = Math.min(earliest, Math.max(now, taskRetryAfter));
+      earliestRecovery = Math.min(earliestRecovery, Math.max(now, taskRetryAfter));
       continue;
     }
 
     const calendarWake = calendarWakeForSession(session, now);
     if (session.calendarSchedule) {
-      if (calendarWake != null) earliest = Math.min(earliest, calendarWake);
+      if (calendarWake != null) earliestSend = Math.min(earliestSend, calendarWake);
       continue;
     }
 
     const schedulerWake = schedulerWakeForSession(session, now);
-    if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
+    if (schedulerWake != null) earliestSend = Math.min(earliestSend, schedulerWake);
   }
 
   const profileRateLimitUntil = Number(state.profile?.rateLimitUntil || 0);
-  if (earliest < Infinity && profileRateLimitUntil > now) earliest = Math.max(earliest, profileRateLimitUntil);
-  const wakeAt = Math.min(earliest, retirementEarliest);
+  // A provider send reserve gates submissions, including a prepared Send.
+  // It cannot delay read-only verification of an uncertain Send or Drive polling.
+  if (earliestSend < Infinity && profileRateLimitUntil > now) {
+    earliestSend = Math.max(earliestSend, profileRateLimitUntil);
+  }
+  const wakeAt = Math.min(earliestSend, earliestRecovery, retirementEarliest);
   return wakeAt < Infinity ? wakeAt : null;
 }
 

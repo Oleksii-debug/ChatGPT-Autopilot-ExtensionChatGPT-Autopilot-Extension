@@ -37,7 +37,9 @@
     'SUBMIT_EXISTING',
     'INSERT_AND_SEND',
     'VERIFY_AFTER_UNCERTAIN_SUBMIT',
-    'READ_ASSISTANT_REPORT'
+    'READ_ASSISTANT_REPORT',
+    'RECOVER_CHAT_ERROR_SURFACE',
+    'OPEN_SAVED_CONVERSATION_FROM_SIDEBAR'
   ]);
   const PROMPT_REQUIRED_MODES = new Set([
     'INSERT_ONLY',
@@ -191,6 +193,17 @@
   function isVisible(el) {
     if (!el || !el.isConnected) return false;
     if (el.disabled || el.matches?.(':disabled') || isSemanticallyUnavailable(el)) return false;
+    const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
+    if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+    if (typeof el.getBoundingClientRect === 'function') {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return false;
+    }
+    return true;
+  }
+
+  function isRenderedRecoveryControl(el) {
+    if (!el || !el.isConnected || isSemanticallyUnavailable(el)) return false;
     const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
     if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
     if (typeof el.getBoundingClientRect === 'function') {
@@ -413,7 +426,10 @@
   }
 
   function closeEffortPickerIfOpen(doc, control) {
-    if (!control || !effortChoiceSurfaceOpen(doc)) return;
+    if (!control) return;
+    const expanded = control.getAttribute?.('aria-expanded') === 'true'
+      || control.getAttribute?.('data-state') === 'open';
+    if (!expanded && !effortChoiceSurfaceOpen(doc)) return;
     try { control.click?.(); } catch (_) {}
   }
 
@@ -435,33 +451,60 @@
   // positions is not a stable contract. Verify the result from the explicit
   // data-selected-reasoning-effort state on the model/intelligence trigger.
   function findReasoningPowerSlider(doc) {
-    const raw = Array.from(doc.querySelectorAll('[data-reasoning-slider="true"]') || [])
-      .filter(isVisible);
-    const rows = Array.from(new Set(raw.map((node) => {
-      if (normalizeEffortText(node.getAttribute?.('role')) === 'menuitem') return node;
-      return node.closest?.('[role="menuitem"]') || node;
-    }).filter(Boolean))).filter(isVisible).filter((row) => {
+    const expandedTrigger = Array.from(doc.querySelectorAll(
+      '[data-selected-reasoning-effort][aria-expanded="true"][data-composer-navigation-target="reasoning"], '
+      + '[data-selected-reasoning-effort][aria-expanded="true"][data-codex-intelligence-trigger="true"]'
+    ) || []).filter(isVisible);
+    const rawNodes = [
+      ...Array.from(doc.querySelectorAll('[data-reasoning-slider="true"]') || [])
+        .map((node) => ({ node, explicitQuery: true })),
+      ...Array.from(doc.querySelectorAll('[role="slider"]') || [])
+        .map((node) => ({ node, explicitQuery: false })),
+    ];
+    const raw = rawNodes.map(({ node, explicitQuery }) => {
+      const thumb = normalizeEffortText(node.getAttribute?.('role')) === 'slider'
+        ? node : node.querySelector?.('[role="slider"]');
+      if (!thumb || thumb.isConnected === false) return null;
+      const row = node.closest?.('[role="menuitem"]')
+        || thumb.closest?.('[role="menuitem"]')
+        || node;
       const surface = row.closest?.('[role="menu"], [role="listbox"], [role="dialog"]');
-      return !surface || isVisible(surface);
-    });
-    if (rows.length > 1) return { element: null, ambiguous: true };
-    if (!rows.length) return { element: null, ambiguous: false };
-    const row = rows[0];
-    const thumb = normalizeEffortText(row.getAttribute?.('role')) === 'slider'
-      ? row : row.querySelector?.('[role="slider"]');
+      if (surface && !isVisible(surface)) return null;
+      const min = Number(thumb.getAttribute?.('aria-valuemin'));
+      const max = Number(thumb.getAttribute?.('aria-valuemax'));
+      const explicit = explicitQuery
+        || node.getAttribute?.('data-reasoning-slider') === 'true'
+        || thumb.getAttribute?.('data-reasoning-slider') === 'true';
+      const semanticSurface = (surface && effortSemanticHint(effortSemanticText(surface)))
+        || expandedTrigger.length === 1;
+      if (!explicit && (!surface || !semanticSurface || !Number.isFinite(min) || !Number.isFinite(max) || max <= min)) return null;
+      return { row, thumb, surface, keyboardTarget: explicit && node !== thumb ? node : thumb };
+    }).filter(Boolean);
+    const candidates = raw.filter((entry, index) => raw.findIndex(other => other.thumb === entry.thumb) === index);
+    if (candidates.length > 1) return { element: null, ambiguous: true };
+    if (!candidates.length) return { element: null, ambiguous: false };
+    const { row, thumb, surface, keyboardTarget } = candidates[0];
     const valueRaw = thumb?.getAttribute?.('aria-valuenow');
     const minRaw = thumb?.getAttribute?.('aria-valuemin');
     const maxRaw = thumb?.getAttribute?.('aria-valuemax');
     const value = valueRaw == null || valueRaw === '' ? null : Number(valueRaw);
     const min = minRaw == null || minRaw === '' ? null : Number(minRaw);
     const max = maxRaw == null || maxRaw === '' ? null : Number(maxRaw);
-    const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u).filter(Boolean);
+    const ids = String(
+      thumb?.getAttribute?.('aria-describedby')
+      || row.getAttribute?.('aria-describedby')
+      || ''
+    ).split(/\s+/u).filter(Boolean);
     const described = ids.map((id) => doc.getElementById?.(id)).filter(Boolean);
     // Legacy ChatGPT exposed the slider's announced value through an
     // accessibility-only role=status node. It may be visually hidden and is
     // still authoritative because aria-describedby binds it to this control.
+    const surfaceStatuses = Array.from(surface?.querySelectorAll?.('[role="status"]') || [])
+      .filter((node) => classifyEffortLabel(textOf(node))
+        || /\b\d+\s*(?:of|из|із|з)\s*\d+\b/iu.test(textOf(node)));
     const status = described.find((node) => normalizeEffortText(node.getAttribute?.('role')) === 'status')
-      || described.find((node) => isVisible(node)) || null;
+      || described.find((node) => isVisible(node))
+      || (surfaceStatuses.length === 1 ? surfaceStatuses[0] : null);
     const statusText = textOf(status);
     const legacyOrdinal = normalizeEffortText(statusText)
       .match(/\b(\d+)\s*(?:of|из|із|з)\s*(\d+)\b/u);
@@ -472,7 +515,11 @@
       legacyShapeCompatible ? statusText.replace(/[,.;:!?]+/gu, ' ') : '',
     ].filter(Boolean).join(' ');
     return {
-      element: row,
+      // ChatGPT exposes an aria-hidden role=slider thumb inside a visible
+      // menuitem carrying data-reasoning-slider and aria-keyshortcuts. Send
+      // ArrowRight to that menuitem when available, then verify the explicit
+      // selected effort on the composer trigger.
+      element: keyboardTarget,
       thumb,
       value: Number.isFinite(value) ? value : null,
       min: Number.isFinite(min) ? min : null,
@@ -702,6 +749,121 @@
       ...Array.from(doc.querySelectorAll('[aria-modal="true"]'))
     ];
     return Array.from(new Set(candidates)).filter(isVisible);
+  }
+
+  const CHAT_RECOVERY_PATTERNS = Object.freeze([
+    {
+      category: 'CHAT_LOAD_FAILED',
+      label: 'Не вдалося завантажити цей чат',
+      pattern: /не вдалося завантажити (?:цей )?чат|could(?: not|n['’]t) load (?:this )?chat|unable to load (?:this )?(?:chat|conversation)|failed to load (?:this )?(?:chat|conversation)/iu,
+    },
+    {
+      category: 'MESSAGES_MISSING',
+      label: 'У цьому чаті не знайдено повідомлень ChatGPT',
+      pattern: /у цьому чаті не знайдено повідомлень chatgpt|no chatgpt messages (?:were )?found|no messages (?:are )?available to display/iu,
+    },
+    {
+      category: 'STREAM_RECOVERY_TIMEOUT',
+      label: 'ChatGPT stream recovery polling timed out',
+      pattern: /chatgpt stream recovery polling timed out|stream recovery (?:polling )?timed out/iu,
+    },
+    {
+      category: 'FETCH_FAILED',
+      label: 'Failed to fetch',
+      pattern: /failed to fetch|не вдалося (?:отримати|завантажити) дані/iu,
+    },
+    {
+      category: 'TEMPORARY_CHAT_ERROR',
+      label: 'Temporary ChatGPT error',
+      pattern: /something went wrong|network error|temporary error|error generating|failed to (?:load|generate)|please try again/iu,
+    },
+  ]);
+
+  const CHAT_RECOVERY_BUTTON = /^(?:спробувати ще раз|повторити спробу|повторити ще раз|retry|try again)$/iu;
+  const NON_CONVERSATION_RECOVERY = /не вдалося завантажити історію|failed to load history|could(?: not|n['’]t) load history/iu;
+
+  function recoveryButtonLabel(element) {
+    return (accessibleName(element) || textOf(element)).trim().slice(0, 80);
+  }
+
+  function recoverySurfaceContext(button) {
+    let current = button;
+    for (let depth = 0; depth < 7 && current; depth += 1, current = current.parentElement) {
+      const value = `${accessibleName(current)} ${textOf(current)}`.trim();
+      if (!value || NON_CONVERSATION_RECOVERY.test(value)) continue;
+      const match = CHAT_RECOVERY_PATTERNS.find(item => item.pattern.test(value));
+      if (match) return match;
+    }
+    return null;
+  }
+
+  function findChatRecoverySurface(doc) {
+    const candidates = Array.from(doc.querySelectorAll('button, [role="button"]'))
+      .filter(isRenderedRecoveryControl)
+      .map((button) => ({
+        button,
+        label: recoveryButtonLabel(button),
+        context: recoverySurfaceContext(button),
+      }))
+      .filter(item => CHAT_RECOVERY_BUTTON.test(item.label) && item.context);
+    if (!candidates.length) return null;
+    const enabled = candidates.filter(item => !item.button.disabled && item.button.getAttribute?.('aria-disabled') !== 'true');
+    const selected = enabled[0] || candidates[0];
+    return {
+      element: selected.button,
+      retryAvailable: candidates.length === 1 && enabled.length === 1,
+      ambiguous: candidates.length > 1,
+      retryButtonLabel: selected.label,
+      recoveryCategory: selected.context.category,
+      recoveryErrorLabel: selected.context.label,
+    };
+  }
+
+  function chatRecoveryResult(request, start, surface, extra = {}) {
+    return resultBase(request, start, {
+      status: STATUS.TEMPORARY_ERROR,
+      assistantText: '',
+      assistantComplete: false,
+      safeDiagnosticCode: 'CHATGPT_ERROR_SURFACE_VISIBLE_REPORT',
+      chatRecoveryRequired: true,
+      recoveryCategory: surface.recoveryCategory,
+      retryButtonLabel: surface.retryButtonLabel,
+      recoveryErrorLabel: surface.recoveryErrorLabel,
+      retryAvailable: surface.retryAvailable,
+      recoveryAmbiguous: surface.ambiguous === true,
+      ...extra,
+    });
+  }
+
+  function recoverChatErrorSurface(doc, request, start) {
+    const surface = findChatRecoverySurface(doc);
+    if (!surface) {
+      return resultBase(request, start, {
+        status: STATUS.TEMPORARY_ERROR,
+        assistantText: '',
+        assistantComplete: false,
+        safeDiagnosticCode: 'CHATGPT_RECOVERY_SURFACE_NOT_FOUND',
+        chatRecoveryRequired: true,
+        retryAvailable: false,
+      });
+    }
+    if (!surface.retryAvailable) {
+      return chatRecoveryResult(request, start, surface, {
+        safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_UNAVAILABLE',
+      });
+    }
+    try {
+      surface.element.click?.();
+    } catch (_) {
+      return chatRecoveryResult(request, start, surface, {
+        safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_CLICK_FAILED',
+      });
+    }
+    return chatRecoveryResult(request, start, surface, {
+      safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_CLICKED',
+      recoveryAction: 'RETRY_BUTTON_CLICK',
+      recoveryPending: true,
+    });
   }
 
   function detectBlockingState(doc) {
@@ -1604,10 +1766,6 @@
           }
         }
       }
-      // URL transition, composer clearing and generation state do not identify
-      // the submitted prompt. Completion requires operation-local exact evidence.
-      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
-
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
         return resultBase(request, start, {
@@ -1616,6 +1774,34 @@
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
       }
+
+      // On a fresh launch surface ChatGPT creates a unique /c/<id> at the same
+      // boundary as this operation's one physical submit. Some hidden Work
+      // tabs do not materialize user bubbles at all (messagesAfter=0), even
+      // while the Stop control proves generation. That exact transition plus
+      // an emptied composer and generation progress is operation-local proof.
+      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
+        const observedUrl = globalThis.location?.href || '';
+        const composerEmpty = !postFound.element || !compactPromptText(editorText(postFound.element));
+        const postBlocking = detectBlockingState(doc);
+        const generationStarted = postBlocking?.status === STATUS.BUSY
+          || semanticAssistantMessages(doc).length > assistantBaselineCount;
+        if (!textVerified && !unlabeledVerified && !representationVerified
+            && afterTextMessages.length === 0
+            && isExclusiveConversationLocation(observedUrl) && composerEmpty && generationStarted) {
+          return resultBase(request, start, {
+            status: STATUS.SENT_VERIFIED,
+            submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
+            safeDiagnosticCode: 'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION',
+            assistantBaselineCount,
+          });
+        }
+      }
+
+      // An existing conversation still requires an operation-bound appended
+      // message or representation. URL and composer state alone are historical.
+      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
+
       if (exactTextPending && postFound.element && promptTextMatches(editorText(postFound.element), submittedText)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
@@ -1719,6 +1905,23 @@
       const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
         ? Number(textEvidence.assistantBaselineCount)
         : 0;
+      const recoveryLaunchUrl = normalizeUrl(request.recoveryLaunchUrl || '');
+      const observedUrl = globalThis.location?.href || '';
+      const freshConversationAccepted = isFreshLaunchSurface(recoveryLaunchUrl)
+        && expectedPostSendLocation(observedUrl, recoveryLaunchUrl)
+        && isExclusiveConversationLocation(observedUrl)
+        && !pending
+        && afterMessages.length === 0
+        && unlabeledPromptCount(doc, submittedText) === 0
+        && (!found.element || !compactPromptText(editorText(found.element)));
+      if (freshConversationAccepted) {
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: 'FRESH_CONVERSATION_TRANSITION_WITH_EMPTY_COMPOSER',
+          safeDiagnosticCode: 'RECOVERY_FRESH_CONVERSATION_VERIFIED',
+          assistantBaselineCount: baselineCount,
+        });
+      }
       if ((appended || unlabeledAppended) && !pending) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
@@ -1799,6 +2002,8 @@
     if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'REPORT_URL_MISMATCH' });
     }
+    const recoverySurface = findChatRecoverySurface(doc);
+    if (recoverySurface) return chatRecoveryResult(request, start, recoverySurface);
     const blocking = detectBlockingState(doc);
     const assistantMessages = semanticAssistantMessages(doc);
     const text = latestAssistantText(doc);
@@ -1861,13 +2066,18 @@
     if (!doc?.querySelectorAll) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'DOCUMENT_UNAVAILABLE' });
 
     if (request.mode === 'READ_ASSISTANT_REPORT') return readAssistantReport(doc, request, start);
+    if (request.mode === 'RECOVER_CHAT_ERROR_SURFACE') return recoverChatErrorSurface(doc, request, start);
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
     if (request.mode === 'ENSURE_HIGH_EFFORT') return ensureHighEffort(doc, request, start, deps || {});
     if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
     if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
     if (request.mode === 'SUBMIT_EXISTING') return submitExisting(doc, request, start, deps || {});
     if (request.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT') return verifyAfterUncertain(doc, request, start);
-    return insertAndSend(doc, request, start, deps || {});
+    if (request.mode === 'INSERT_AND_SEND') return insertAndSend(doc, request, start, deps || {});
+    return resultBase(request, start, {
+      status: STATUS.MANUAL_REVIEW_REQUIRED,
+      safeDiagnosticCode: 'MODE_NOT_IMPLEMENTED'
+    });
   }
 
   return {
@@ -1880,6 +2090,7 @@
     findVisibleComposer,
     classifyEffortLabel,
     findEffortControl,
+    findChatRecoverySurface,
     detectBlockingState,
     execute
   };

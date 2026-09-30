@@ -10,6 +10,7 @@ import { appendDiagnostic } from './diagnostics.js';
 import { appendLog } from './logger.js';
 import { AgentProviderId } from './capability-registry.js';
 import { promptForVerifiedSendOrdinal } from './session-prompt-cadence.js';
+import { EXECUTION_POLICY } from '../config/execution-policy.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
@@ -115,6 +116,7 @@ export class AutomaticSessionExecutor {
     now = () => Date.now(),
     cryptoApi = globalThis.crypto,
     profileGapMs = DEFAULT_PROFILE_SEND_GAP_MS,
+    forceHighEffort = EXECUTION_POLICY.forceHighEffort,
   } = {}) {
     this.repo = repository;
     this.chrome = chromeApi;
@@ -122,6 +124,7 @@ export class AutomaticSessionExecutor {
     this.now = now;
     this.coordinator = new DurableSubmissionCoordinator(repository, { now, cryptoApi, profileGapMs });
     this.tabBindQueues = new Map();
+    this.forceHighEffort = forceHighEffort === true;
   }
 
   async bindTaskTab(sessionId, taskId) {
@@ -212,6 +215,7 @@ export class AutomaticSessionExecutor {
 
   async executeInteraction(sessionId, session, task, tabId, mode, requestId, promptText) {
     const request = this.request(session, task, mode, requestId, promptText);
+    const startedAt = Date.now();
     await this.repo.update(draft => {
       appendDiagnostic(draft, {
         event: 'ЗАПИТ_ДО_СТОРІНКИ',
@@ -236,7 +240,11 @@ export class AutomaticSessionExecutor {
           phase: session.operation?.phase,
           status: result.status,
           code: result.safeDiagnosticCode,
-          message: result.safeDiagnosticMessage,
+          message: [
+            result.safeDiagnosticMessage,
+            `interactionMs=${Math.max(0, Date.now() - startedAt)}`,
+            Number.isFinite(result.elapsedMs) ? `pageMs=${Math.max(0, result.elapsedMs)}` : '',
+          ].filter(Boolean).join('; '),
           observed: result.normalizedObservedUrl,
           target: request.expectedUrl,
           promptFingerprint: session.operation?.promptFingerprint,
@@ -254,7 +262,7 @@ export class AutomaticSessionExecutor {
           mode,
           phase: session.operation?.phase,
           code: error?.safeDiagnosticCode || 'INTERACTION_FAILURE',
-          message: error?.message || error,
+          message: `${error?.message || error}; interactionMs=${Math.max(0, Date.now() - startedAt)}`,
           target: request.expectedUrl,
           promptFingerprint: session.operation?.promptFingerprint,
         }, { at: this.now() });
@@ -535,6 +543,56 @@ export class AutomaticSessionExecutor {
     return { kind: 'UNCERTAIN_SETTLED_NO_RESEND', wakeAt, result };
   }
 
+  async settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, result) {
+    const now = this.now();
+    let settled = false;
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      const liveOperation = live.operation;
+      if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
+      const liveTask = live.tasksById[expectedOperation.taskId];
+      if (!liveTask) return draft;
+
+      // A manager-owned Scenario/Orchestration operation may never poll an
+      // ambiguous Send forever. End this physical operation without replaying
+      // it; the owning manager's configured timeout/replacement policy remains
+      // the only authority allowed to start another physical chat.
+      liveOperation.phase = OperationPhase.FAILED_SAFE;
+      liveOperation.updatedAt = now;
+      liveTask.status = 'FAILED_SAFE';
+      liveTask.manualReviewReason = 'MANAGED_SEND_ACK_TIMEOUT_NO_RESEND';
+      liveTask.retryAfterAt = 0;
+      live.enabled = false;
+      live.runState = RunState.STOPPED;
+      live.lastError = `Надсилання не вдалося підтвердити у відведене вікно. Цей фізичний Send не повторюється; керівний сценарій застосує свій timeout/replacement. Код: ${result?.safeDiagnosticCode || 'SEND_ACK_TIMEOUT'}.`;
+      live.lastActionAt = now;
+      live.updatedAt = now;
+      releaseSendLease(draft, {
+        sessionId,
+        operationId: expectedOperation.operationId,
+        now,
+        profileGapMs: DEFAULT_PROFILE_SEND_GAP_MS,
+      });
+      appendDiagnostic(draft, {
+        event: 'КЕРОВАНЕ_НЕВИЗНАЧЕНЕ_НАДСИЛАННЯ_ЗАВЕРШЕНО_БЕЗ_ПОВТОРУ',
+        sessionId,
+        taskId: expectedOperation.taskId,
+        phase: liveOperation.phase,
+        code: result?.safeDiagnosticCode || 'SEND_ACK_TIMEOUT',
+        message: live.lastError,
+        promptFingerprint: expectedOperation.promptFingerprint,
+      }, { at: now });
+      settled = true;
+      return draft;
+    });
+    if (!settled) return { kind: 'OPERATION_CHANGED', result };
+    await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, {
+      ...(result || {}),
+      status: InteractionResult.TEMPORARY_ERROR,
+    });
+    return { kind: 'MANAGED_UNCERTAIN_SETTLED_NO_RESEND', result };
+  }
+
   async recoverAmbiguous(sessionId, session) {
     const operation = session.operation;
     const expectedOperation = {
@@ -596,46 +654,7 @@ export class AutomaticSessionExecutor {
         && result.status !== InteractionResult.SENT_VERIFIED
         && session.retryPolicy !== 'manual'
         && managedNoResend) {
-      let held = false;
-      let wakeAt = now + Math.max(5000, session.retryBackoffMs || 30000);
-      await this.repo.update(draft => {
-        const live = requireSession(draft, sessionId);
-        const liveOperation = live.operation;
-        if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
-        const liveTask = live.tasksById[expectedOperation.taskId];
-        if (!liveTask) return draft;
-        wakeAt = now + Math.max(5000, live.retryBackoffMs || 30000);
-        liveTask.status = 'SUBMISSION_UNCERTAIN';
-        liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
-        liveOperation.verificationDeadline = wakeAt + Math.max(
-          15000,
-          Math.min(45000, Math.max(1000, live.retryBackoffMs || 30000) * 2)
-        );
-        liveOperation.updatedAt = now;
-        live.runState = RunState.RECOVERING;
-        live.lastError = `Надсилання не підтверджено; повторний Send заборонено, триває перевірка тієї самої керованої операції. Код: ${result.safeDiagnosticCode || 'SEND_ACK_TIMEOUT'}.`;
-        live.lastActionAt = now;
-        live.updatedAt = now;
-        releaseSendLease(draft, {
-          sessionId,
-          operationId: expectedOperation.operationId,
-          now,
-          profileGapMs: DEFAULT_PROFILE_SEND_GAP_MS,
-        });
-        appendDiagnostic(draft, {
-          event: 'КЕРОВАНА_СЕСІЯ_УТРИМУЄ_НЕВИЗНАЧЕНЕ_НАДСИЛАННЯ_БЕЗ_ПОВТОРУ',
-          sessionId,
-          taskId: expectedOperation.taskId,
-          phase: liveOperation.phase,
-          code: result.safeDiagnosticCode || 'SEND_ACK_TIMEOUT',
-          message: live.lastError,
-          promptFingerprint: expectedOperation.promptFingerprint,
-        }, { at: now });
-        held = true;
-        return draft;
-      });
-      if (held) return { kind: 'UNCERTAIN_VERIFY_HOLD', wakeAt, result };
-      return { kind: 'OPERATION_CHANGED', result };
+      return this.settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, result);
     }
 
     // After a physical Send attempt becomes ambiguous, at-most-once safety wins:
@@ -843,13 +862,12 @@ export class AutomaticSessionExecutor {
     const session = requireSession(state, sessionId);
     if (!ACTIVE_STATES.has(session.runState)) return { kind: 'IDLE' };
 
+    if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
+      return this.recoverAmbiguous(sessionId, session);
+    }
     const profileRateLimitUntil = Number(state.profile?.rateLimitUntil || 0);
     if (profileRateLimitUntil > this.now()) {
       return { kind: 'PROFILE_RATE_LIMIT_WAIT', wakeAt: profileRateLimitUntil };
-    }
-
-    if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
-      return this.recoverAmbiguous(sessionId, session);
     }
     if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
       return this.continuePreSend(sessionId, session);
@@ -907,10 +925,67 @@ export class AutomaticSessionExecutor {
       return { kind: check.status, result: check };
     }
 
-    // Reasoning-effort selection is intentionally deferred. Ordinary Sessions,
-    // Simplified Sessions, Scenario Work and Orchestration must not inspect,
-    // open, change or wait on ChatGPT's reasoning-effort UI in the active
-    // execution path. Proceed directly from readiness to prompt insertion.
+    // The standard package proceeds directly to insertion and therefore never
+    // opens or changes the model/effort menu. The separate High package sets a
+    // build-time policy and tries to select High before creating prompt state.
+    if (this.forceHighEffort) {
+      let highConfirmed = false;
+      let lastEffortCode = 'EFFORT_INTERACTION_FAILED';
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const effortState = await this.repo.load();
+        const effortSession = requireSession(effortState, sessionId);
+        if (!ACTIVE_STATES.has(effortSession.runState)) {
+          return { kind: 'QUIESCED', runState: effortSession.runState };
+        }
+        let effort;
+        try {
+          effort = await this.executeInteraction(
+            sessionId,
+            effortSession,
+            effortSession.tasksById[task.id] || task,
+            tab.id,
+            'ENSURE_HIGH_EFFORT',
+            `${sessionId}:${task.id}:effort:${this.now()}:${attempt}`,
+            '',
+          );
+        } catch (_) {
+          // A menu/transport failure is advisory. INSERT_ONLY still checks the
+          // target chat and composer before any message can be submitted.
+          lastEffortCode = 'EFFORT_INTERACTION_FAILED';
+        }
+        const postEffort = await this.repo.load();
+        const postEffortSession = requireSession(postEffort, sessionId);
+        if (!ACTIVE_STATES.has(postEffortSession.runState)) {
+          return { kind: 'QUIESCED', runState: postEffortSession.runState };
+        }
+        if (effort?.status === InteractionResult.READY) {
+          highConfirmed = true;
+          break;
+        }
+        if (effort) {
+          lastEffortCode = effort.safeDiagnosticCode || 'EFFORT_UNKNOWN_FAILURE';
+          if (!lastEffortCode.startsWith('EFFORT_')) {
+            await this.applyResult(sessionId, task.id, effort);
+            await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
+            return { kind: effort.status, result: effort };
+          }
+        }
+      }
+      if (!highConfirmed) {
+        await this.repo.update(draft => {
+          appendDiagnostic(draft, {
+            event: 'ВИСОКІ_ЗУСИЛЛЯ_НЕ_ПІДТВЕРДЖЕНО',
+            sessionId,
+            taskId: task.id,
+            tabId: tab.id,
+            mode: 'ENSURE_HIGH_EFFORT',
+            code: lastEffortCode,
+            message: 'Після трьох спроб продовжено вставлення промпта з поточним рівнем зусиль.',
+          }, { at: this.now() });
+          return draft;
+        });
+      }
+    }
 
     const fresh = await this.repo.load();
     const liveSession = requireSession(fresh, sessionId);

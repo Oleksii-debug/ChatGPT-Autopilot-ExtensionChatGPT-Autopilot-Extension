@@ -1,0 +1,34 @@
+QA — 11 ПІЛОТ / TECHNICAL 11.0.0
+
+2026-09-29 — Scenario parking, ordinary recovery and effort-menu repair
+- Core and integration deterministic suite: 430/430 PASS before the final provider-limit refinement. Focused provider-limit and recovery suite after that refinement: 21/21 PASS.
+- Mixed-runtime long run plus two-hour Ordinary cadence: 3/3 PASS. The ordinary simulation reaches about sixty verified sends with a two-minute interval.
+- Scenario ownership and failed-close cases: 22/22 PASS after the final tab repair.
+- `git diff --check` PASS.
+- These tests simulate the ChatGPT transport and Chrome tabs. The current build has not been tested as an installed extension in the owner's Chrome profile.
+Дата: 2026-09-28
+Статус: AUTOMATED QUALIFICATION PASS; installed owner-browser acceptance remains separate.
+
+ПЕРЕВІРЕНО
+- Core deterministic suite: PASS.
+- Interaction deterministic suite: PASS after current ChatGPT semantic effort-slider and hidden Work first-Send regressions.
+- UI/accessibility suite: PASS.
+- Release package suite: PASS with the expected Windows symlink privilege skip.
+- Focused Scenario tab-policy tests prove close, no duplicate reopen before poll deadline, exact saved URL reopen and one bounded error retry.
+- Focused timeout test proves BUSY/streaming cannot extend the owner deadline.
+- Standard executor test proves no effort-menu interaction.
+- High executor tests prove three bounded effort-selection attempts and continued prompt insertion if effort-only selection fails. Authentication and URL failures remain blocking.
+
+ВІДОМІ НЕЗАЛЕЖНІ ОБМЕЖЕННЯ СЕРЕДОВИЩА
+- The monolithic npm test command includes Windows symlink/path-case/PID tests that fail on this host because unprivileged symlink creation is denied or Windows normalizes path case. These failures reproduce outside this change and are recorded separately from product suites.
+
+АРТЕФАКТИ
+- Two deterministic ZIP variants are produced by scripts/package-release-variants.mjs.
+- Package allowlist and credential/private-URL scan run before either variant is written.
+- ZIP SHA-256 values are printed by the packager and copied into the diagnostic report.
+
+FLAGS
+AUTOMATED_TESTED=true
+HUMAN_TESTED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+SECRETS_ADDED=false

@@ -83,6 +83,49 @@ function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function protectManagedScenarioTab(chromeApi, session, tab) {
+  // Do not pin large Scenario pools in memory. Chrome may discard a background
+  // tab; the response observer owns one bounded exact-URL recovery instead.
+  if (session?.scenarioWork?.managed === true && Number.isInteger(tab?.windowId)) {
+    session.scenarioWork.preferredWindowId = tab.windowId;
+  }
+  return tab;
+}
+
+// Chrome puts a background tab in the focused window unless windowId is
+// explicit. A Scenario may be running in another window while the user browses.
+export async function createChatTab(chromeApi, url, preferredWindowId = null) {
+  let candidates = [];
+  try { candidates = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' }) || []; } catch { /* fallback below */ }
+  const counts = new Map();
+  for (const tab of candidates) {
+    if (Number.isInteger(tab?.windowId)) counts.set(tab.windowId, (counts.get(tab.windowId) || 0) + 1);
+  }
+  let windowId = null;
+  if (Number.isInteger(preferredWindowId)) {
+    if (counts.has(preferredWindowId)) windowId = preferredWindowId;
+    else if (chromeApi.windows?.get) {
+      try { await chromeApi.windows.get(preferredWindowId); windowId = preferredWindowId; } catch { /* closed window */ }
+    }
+  }
+  if (windowId == null && counts.size) {
+    windowId = [...counts].sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const options = { url, active: false };
+  if (windowId != null) options.windowId = windowId;
+  try { return await chromeApi.tabs.create(options); }
+  catch (error) {
+    if (windowId == null || !/window.*(not found|invalid|no window)|no window with id/i.test(String(error?.message || error))) throw error;
+    return chromeApi.tabs.create({ url, active: false });
+  }
+}
+
+function createTaskChatTab(chromeApi, session, url) {
+  return session?.scenarioWork?.managed === true
+    ? createChatTab(chromeApi, url, session.scenarioWork.preferredWindowId)
+    : chromeApi.tabs.create({ url, active: false });
+}
+
 export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   timeoutMs = DEFAULT_TAB_READY_TIMEOUT_MS,
   pollIntervalMs = DEFAULT_TAB_READY_POLL_MS,
@@ -319,7 +362,7 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
   const match = conversationId(task.normalizedUrl)
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
-  const tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+  const tab = match || await createTaskChatTab(chromeApi, session, task.normalizedUrl);
   state.tabHintsByTaskId[key] = {
     tabId: tab.id,
     sessionId,
@@ -360,7 +403,18 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       normalizedUrl: preservesFreshLaunchOwnership ? hint.normalizedUrl : task.normalizedUrl,
       allowPostSendNavigation: postSendRecovery,
     });
-    if (tab) return tab;
+    if (tab) return protectManagedScenarioTab(chromeApi, session, tab);
+    if (session?.scenarioWork?.managed === true && hint?.ownedByExtension === true
+        && hint.sessionId === sessionId && hint.kind === 'TASK'
+        && !Number(task.lastVerifiedSendAt || 0)
+        && !Number(session.operation?.submitStartedAt || 0)) {
+      try {
+        // A login redirect can temporarily leave the launch URL. Do not
+        // retire that same owned tab and produce a fresh draft on every retry.
+        const pendingLogin = await chromeApi.tabs.get(hint.tabId);
+        return protectManagedScenarioTab(chromeApi, session, pendingLogin);
+      } catch { /* Only a proven missing tab may be replaced. */ }
+    }
     if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
         || hint?.ownedByExtension === true) {
       // OPEN_CLOSE is always extension-owned. KEEP_TASK can also be safely
@@ -375,7 +429,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   // Open-and-close mode owns only tabs it creates.  It must never adopt a
   // manually opened conversation tab and then close the user's tab later.
   if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK) {
-    const tab = await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+    const tab = await createTaskChatTab(chromeApi, session, task.normalizedUrl);
     state.tabHintsByTaskId[task.id] = {
       tabId: tab.id,
       sessionId,
@@ -396,7 +450,8 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   const match = conversationId(task.normalizedUrl)
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
-  const tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+  let tab = match || await createTaskChatTab(chromeApi, session, task.normalizedUrl);
+  tab = await protectManagedScenarioTab(chromeApi, session, tab);
   state.tabHintsByTaskId[task.id] = {
     tabId: tab.id,
     sessionId,

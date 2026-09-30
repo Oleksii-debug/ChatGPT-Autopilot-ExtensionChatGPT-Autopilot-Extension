@@ -31,7 +31,6 @@ const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compat
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 function minimumNullable(left, right) {
   if (left == null) return right;
@@ -58,8 +57,7 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
   }
   const requested = normalizeAiRoutePolicy(rawRequested);
   for (const key of ['autoSwitch', 'freeOnly', 'pinnedRouteId', 'locality',
-    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
     if (Object.hasOwn(rawRequested, key)
         && (Object.is(rawRequested[key], -0) || !Object.is(rawRequested[key], requested[key]))) {
       throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
@@ -106,15 +104,6 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
     locality: base.locality === 'any' ? requested.locality : base.locality,
     maxInputPricePerMillionUsd: minimumNullable(base.maxInputPricePerMillionUsd, requested.maxInputPricePerMillionUsd),
     maxOutputPricePerMillionUsd: minimumNullable(base.maxOutputPricePerMillionUsd, requested.maxOutputPricePerMillionUsd),
-    retryBackoffSeconds: Object.hasOwn(rawRequested, 'retryBackoffSeconds')
-      ? Math.max(base.retryBackoffSeconds, requested.retryBackoffSeconds)
-      : base.retryBackoffSeconds,
-    circuitBreakerFailures: Object.hasOwn(rawRequested, 'circuitBreakerFailures')
-      ? Math.min(base.circuitBreakerFailures, requested.circuitBreakerFailures)
-      : base.circuitBreakerFailures,
-    circuitBreakerSeconds: Object.hasOwn(rawRequested, 'circuitBreakerSeconds')
-      ? Math.max(base.circuitBreakerSeconds, requested.circuitBreakerSeconds)
-      : base.circuitBreakerSeconds,
   };
   if (policy.pinnedRouteId) {
     if (policy.allowRouteIds.length && !policy.allowRouteIds.includes(policy.pinnedRouteId)) {
@@ -511,6 +500,7 @@ function calendarStatusForUi(session, now = Date.now()) {
 export function sessionToUi(session, state, now = Date.now()) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
   const currentTask = tasks[session.currentTaskIndex] || null;
+  const simplifiedWait = simplifiedWaitState(session, state, currentTask, now);
   const log = state.logs[session.id] || [];
   const lastLog = log.at(-1);
   const progress = sessionProgress(session);
@@ -549,11 +539,41 @@ export function sessionToUi(session, state, now = Date.now()) {
       lastActionAt: lastLog?.at || session.lastActionAt || 0,
       lastSuccessfulSendAt: session.lastSuccessfulSendAt,
       nextAllowedSendAt: progress.isCompleted ? 0 : session.nextAllowedSendAt,
+      simplifiedWaitReason: simplifiedWait.reason,
+      simplifiedWaitUntil: simplifiedWait.until,
       enabledTaskCount: progress.enabledTaskCount,
       lastError: session.lastError
     },
     log
   };
+}
+
+function simplifiedWaitState(session, state, task, now) {
+  if (session.simplifiedSession !== true || session.taskOrder.length !== 1) {
+    return { reason: '', until: 0 };
+  }
+  if (!ACTIVE_STATES.has(session.runState)) {
+    return { reason: 'SESSION_INACTIVE', until: 0 };
+  }
+  if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
+    return { reason: 'VERIFY_UNCERTAIN_SEND', until: Math.max(now, Number(task?.retryAfterAt || 0)) };
+  }
+  if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
+    return { reason: 'PRE_SEND_DELAY', until: Math.max(now, Number(session.operation.preSendDeadline || 0), Number(task?.retryAfterAt || 0)) };
+  }
+  if ([
+    OperationPhase.CHECKING, OperationPhase.READY, OperationPhase.INSERTING,
+    OperationPhase.INSERTED, OperationPhase.SUBMITTING,
+  ].includes(session.operation?.phase)) {
+    return { reason: 'OPERATION_IN_PROGRESS', until: 0 };
+  }
+  const gates = [
+    { reason: 'PROFILE_RATE_LIMIT', until: Number(state.profile?.rateLimitUntil || 0) },
+    { reason: 'SEND_INTERVAL', until: Number(session.nextAllowedSendAt || 0) },
+    { reason: task?.status === 'BUSY' ? 'CHAT_BUSY' : 'RETRY_BACKOFF', until: Number(task?.retryAfterAt || 0) },
+  ].filter(gate => Number.isFinite(gate.until) && gate.until > now)
+    .sort((left, right) => right.until - left.until);
+  return gates[0] || { reason: 'READY', until: 0 };
 }
 
 export class CoreCommandDispatcher {
@@ -680,7 +700,7 @@ export class CoreCommandDispatcher {
       const concurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
       return {
         rateLimitCooldownMinutes: Math.round(ms / 60000),
-        maxConcurrentSessionOperations: Number.isInteger(concurrency) ? Math.max(1, Math.min(32, concurrency)) : 10,
+        maxConcurrentSessionOperations: Number.isInteger(concurrency) ? Math.max(1, Math.min(1000, concurrency)) : 10,
       };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
@@ -692,8 +712,8 @@ export class CoreCommandDispatcher {
       if (hasCooldown && (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS)) {
         throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
-      if (hasConcurrency && (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32)) {
-        throw new Error('Maximum concurrent Session operations must be a whole number from 1 to 32');
+      if (hasConcurrency && (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 1000)) {
+        throw new Error('Maximum concurrent Session operations must be a whole number from 1 to 1000');
       }
       const state = await this.repo.update(draft => {
         if (hasCooldown) {
@@ -708,7 +728,7 @@ export class CoreCommandDispatcher {
       const storedConcurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
       return {
         rateLimitCooldownMinutes: Math.round(storedMs / 60000),
-        maxConcurrentSessionOperations: Number.isInteger(storedConcurrency) ? Math.max(1, Math.min(32, storedConcurrency)) : 10,
+        maxConcurrentSessionOperations: Number.isInteger(storedConcurrency) ? Math.max(1, Math.min(1000, storedConcurrency)) : 10,
       };
     }
     if (command === CoreCommand.GET_LOCAL_AI_SETTINGS) {
@@ -798,6 +818,9 @@ export class CoreCommandDispatcher {
             const failureRuntime = normalizeAiRouterRuntime(error.routerRuntime);
             current.routeStates = failureRuntime.routeStates;
             current.lastRouteId = failureRuntime.lastRouteId;
+            current.lastProvider = failureRuntime.lastProvider;
+            current.lastModel = failureRuntime.lastModel;
+            current.lastEndpointId = failureRuntime.lastEndpointId;
             current.lastFailoverChain = failureRuntime.lastFailoverChain;
             draft.profile.aiRouterRuntime = current;
             return draft;
@@ -828,8 +851,12 @@ export class CoreCommandDispatcher {
         }
         current.lastRoute = result.route || current.lastRoute;
         current.routeStates = normalizeAiRouterRuntime(result.runtime).routeStates;
-        current.lastRouteId = result.runtime?.lastRouteId || current.lastRouteId;
-        current.lastFailoverChain = normalizeAiRouterRuntime(result.runtime).lastFailoverChain;
+        const resultRuntime = normalizeAiRouterRuntime(result.runtime);
+        current.lastRouteId = resultRuntime.lastRouteId;
+        current.lastProvider = resultRuntime.lastProvider;
+        current.lastModel = resultRuntime.lastModel;
+        current.lastEndpointId = resultRuntime.lastEndpointId;
+        current.lastFailoverChain = resultRuntime.lastFailoverChain;
         draft.profile.aiRouterRuntime = current;
         result.runtime = structuredClone(current);
         return draft;

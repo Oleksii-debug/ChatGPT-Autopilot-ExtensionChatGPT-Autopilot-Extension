@@ -253,7 +253,7 @@ export function validateState(state) {
   if (state.profile.maxConcurrentSessionOperations !== undefined) {
     if (!Number.isInteger(state.profile.maxConcurrentSessionOperations)
         || state.profile.maxConcurrentSessionOperations < 1
-        || state.profile.maxConcurrentSessionOperations > 32) {
+        || state.profile.maxConcurrentSessionOperations > 1000) {
       throw new Error('Invalid profile maxConcurrentSessionOperations');
     }
   }
@@ -290,6 +290,9 @@ export function validateState(state) {
     if (!Array.isArray(runtime.strongHistoryAt)) throw new Error('Invalid profile aiRouterRuntime strongHistoryAt');
     requireRecord(runtime.routeStates, 'profile aiRouterRuntime routeStates');
     requireString(runtime.lastRouteId, 'profile aiRouterRuntime lastRouteId');
+    requireString(runtime.lastProvider, 'profile aiRouterRuntime lastProvider');
+    requireString(runtime.lastModel, 'profile aiRouterRuntime lastModel');
+    requireString(runtime.lastEndpointId, 'profile aiRouterRuntime lastEndpointId');
     if (!Array.isArray(runtime.lastFailoverChain)) throw new Error('Invalid profile aiRouterRuntime lastFailoverChain');
   }
   if (state.profile.aiManager !== undefined) {
