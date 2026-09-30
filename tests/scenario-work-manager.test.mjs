@@ -271,7 +271,7 @@ test('manager materializes scenario turns only as canonical one-pass core sessio
   assert.equal(session.runMode, 'ONE_PASS');
   assert.equal(session.scenarioWork.managed, true);
   assert.equal(session.sharedPrompt, '');
-  assert.equal(session.tasksById[session.taskOrder[0]].promptOverride, 'ONE');
+  assert.equal(session.tasksById[session.taskOrder[0]].promptOverride.split('\n')[0], 'ONE');
 });
 
 test('manager waits for assistant completion, preserves conversation URL, and launches next prompt in same chat', async () => {
@@ -294,7 +294,7 @@ test('manager waits for assistant completion, preserves conversation URL, and la
   assert.equal(live.successfulSendCount, 1, 'cumulative send proof survives the new turn');
   assert.equal(liveTask.lastVerifiedSendAt, 0, 'old send proof must not complete the new turn');
   assert.equal(liveTask.normalizedUrl, 'https://chatgpt.com/c/abc');
-  assert.equal(liveTask.promptOverride, 'TWO');
+  assert.equal(liveTask.promptOverride.split('\n')[0], 'TWO');
 });
 
 test('five independent chats each keep one Core Session and tab for 17 completed turns across restart', async () => {
@@ -335,7 +335,7 @@ test('five independent chats each keep one Core Session and tab for 17 completed
       const sid = sessionIds.get(id);
       const taskId = core.state.sessionsById[sid].taskOrder[0];
       const expectedPrompt = turn === 1 ? 'BOOT' : turn === 17 ? 'FINAL' : 'CONT';
-      assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, expectedPrompt);
+      assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride.split('\n')[0], expectedPrompt);
       const url = `https://chatgpt.com/c/slot-${slot + 1}`;
       const session = core.state.sessionsById[sid];
       session.tasksById[taskId].lastVerifiedSendAt = now + 1;
@@ -446,7 +446,7 @@ test('restart between rearming a turn and its manager checkpoint reuses the same
   manager = build();
   await manager.materializeLaunch(scenario, next, 10_001);
   assert.equal(core.state.sessionsById[sid].successfulSendCount, 1);
-  assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, 'SECOND');
+  assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride.split('\n')[0], 'SECOND');
   core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt = 10_002;
   core.state.sessionsById[sid].onePassCompletedCount = 1;
   core.state.sessionsById[sid].onePassCompletedTaskIds = [taskId];

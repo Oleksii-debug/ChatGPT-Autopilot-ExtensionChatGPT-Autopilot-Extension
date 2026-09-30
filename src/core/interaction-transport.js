@@ -73,7 +73,7 @@ export class ChromeInteractionTransport {
   }
 
   async send(tabId, request) {
-    const bounded = ['SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
+    const bounded = ['CHECK_ONLY', 'PREPARE_SEND', 'SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
     if (!bounded) return this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction', request });
     const timeoutMs = Math.max(1, this.requestTimeoutMs);
     let timer;

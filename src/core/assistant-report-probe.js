@@ -82,16 +82,28 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
   const persistentManagedTab = job?.persistentManagedTab === true;
   let tabId = null;
   let temporaryTab = false;
+  let restoreActiveTabId = null;
 
   try {
     const hinted = await getTab(chromeApi, job?.managedTabId);
     // A managed Scenario must inspect its bound tab, not the first matching
     // conversation in Chrome (which may be a manually opened user tab).
     const tabs = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
-    const existing = persistentManagedTab
+    let existing = persistentManagedTab
       ? (hinted && matchesConversation(hinted, conversationUrl) ? hinted
         : null)
       : (tabs || []).find(tab => tab?.id != null && matchesConversation(tab, conversationUrl));
+    // Frozen/discarded documents cannot run the receiver. Wake this owned
+    // physical tab, without focusing a window or replacing its conversation.
+    if (persistentManagedTab && job?.managedTabOwned === true && existing?.id != null
+        && (existing.frozen === true || existing.discarded === true) && chromeApi.tabs?.update) {
+      try {
+        const activeTabs = await chromeApi.tabs.query({ active: true, windowId: existing.windowId });
+        const prior = (activeTabs || []).find(item => item.active === true && item.windowId === existing.windowId);
+        if (prior?.id != null && prior.id !== existing.id) restoreActiveTabId = prior.id;
+        existing = await chromeApi.tabs.update(existing.id, { active: true, autoDiscardable: false });
+      } catch { /* Bounded recovery below retains the physical identity. */ }
+    }
     const recoveryAction = String(job?.recoveryAction || '').trim();
 
     if (recoveryAction === 'SAME_URL_RELOAD') {
@@ -167,6 +179,9 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
 
     if (existing?.id != null) {
       tabId = existing.id;
+      if (persistentManagedTab && job?.managedTabOwned === true && chromeApi.tabs?.update) {
+        try { await chromeApi.tabs.update(tabId, { autoDiscardable: false }); } catch { /* optional Chrome hint */ }
+      }
 
       if (persistentManagedTab && existing.discarded === true) {
         return temporaryReport('ASSISTANT_RESPONSE_TAB_DISCARDED', {
@@ -226,10 +241,16 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       assistantBaselineCount: Number(job.assistantBaselineCount || 0),
       assistantBaselineKnown: job.assistantBaselineKnown === true,
       submittedUserMessageKey: String(job.submittedUserMessageKey || ''),
+      responseCorrelationToken: String(job.responseCorrelationToken || ''),
+      submittedPromptText: String(job.submittedPromptText || ''),
+      requireStableResponse: job.requireStableResponse === true,
     };
     if (recoveryAction === 'RETRY_BUTTON') request.mode = 'RECOVER_CHAT_ERROR_SURFACE';
     return await transport.execute(tabId, request);
   } finally {
+    if (restoreActiveTabId != null) {
+      try { await chromeApi.tabs.update(restoreActiveTabId, { active: true }); } catch { /* prior tab closed */ }
+    }
     if (temporaryTab && tabId != null) {
       try { await chromeApi.tabs.remove(tabId); } catch (_) {}
     }

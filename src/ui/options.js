@@ -2028,8 +2028,8 @@ function scenarioWorkConfigFromForm() {
     preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'Пауза перед надсиланням'),
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
-    closeTabsBetweenChecks: $('scenario-work-close-tabs-between-checks').checked,
-    reopenOnceAfterProbeError: $('scenario-work-reopen-on-probe-error').checked,
+    closeTabsBetweenChecks: false,
+    reopenOnceAfterProbeError: false,
     timeoutPolicy: $('scenario-work-timeout-policy').value,
   };
   if (mode === 'CHAT_CYCLE') {

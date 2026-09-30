@@ -44,7 +44,8 @@ test('five persistent chats advance independently through 17 messages and replac
     const session = state.sessionsById[sessionId];
     const task = session.tasksById[before.chat.taskId];
     const chatUrl = `https://chatgpt.com/c/${id}-generation-${generation}`;
-    assert.equal(task.promptOverride, turn === 1 ? 'START' : turn === 17 ? 'FINAL' : 'CONTINUE');
+    assert.equal(task.promptOverride.split('\n')[0], turn === 1 ? 'START' : turn === 17 ? 'FINAL' : 'CONTINUE');
+    assert.ok(task.promptOverride.includes(task.responseCorrelationToken));
     assert.equal(task.normalizedUrl, turn === 1 ? 'https://chatgpt.com/' : chatUrl);
     assert.equal((await manager.cycleOne(id)).runtime.chat.state, 'WAITING');
     task.lastVerifiedSendAt = ++now;

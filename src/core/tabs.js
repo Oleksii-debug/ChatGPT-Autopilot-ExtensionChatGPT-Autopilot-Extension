@@ -91,13 +91,25 @@ function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function protectManagedScenarioTab(chromeApi, session, tab) {
-  // Do not pin large Scenario pools in memory. Chrome may discard a background
-  // tab; the response observer owns one bounded exact-URL recovery instead.
-  if (session?.scenarioWork?.managed === true && Number.isInteger(tab?.windowId)) {
-    session.scenarioWork.preferredWindowId = tab.windowId;
+async function protectManagedScenarioTab(chromeApi, session, tab, owned = false) {
+  if (session?.scenarioWork?.managed !== true) return tab;
+  if (Number.isInteger(tab?.windowId)) session.scenarioWork.preferredWindowId = tab.windowId;
+  if (!owned || !chromeApi.tabs?.update || tab?.id == null) return tab;
+  if (!tab.frozen && !tab.discarded) {
+    try { return await chromeApi.tabs.update(tab.id, { autoDiscardable: false }); } catch { return tab; }
   }
-  return tab;
+  let restoreId = null;
+  try {
+    const active = await chromeApi.tabs.query({ active: true, windowId: tab.windowId });
+    const previous = active.find(item => item.active === true && item.windowId === tab.windowId);
+    if (previous && previous.id !== tab.id) restoreId = previous.id;
+    return await chromeApi.tabs.update(tab.id, { active: true, autoDiscardable: false });
+  } catch { return tab; }
+  finally {
+    if (restoreId != null) {
+      try { await chromeApi.tabs.update(restoreId, { active: true }); } catch { /* prior tab closed */ }
+    }
+  }
 }
 
 // Chrome puts a background tab in the focused window unless windowId is
@@ -175,6 +187,9 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
       );
     }
 
+    if (lastTab.frozen === true) {
+      throw new TabReadinessError('TAB_DOCUMENT_FROZEN', 'Owned ChatGPT document is frozen; retain the tab and retry after waking it');
+    }
     const observedUrl = normalizedTabUrl(lastTab);
     if (isChatAuthUrl(lastTab.url)) {
       throw new TabReadinessError('TAB_AUTH_REQUIRED', 'Увійдіть у ChatGPT у поточній вкладці; Пілот збереже її та повторить перевірку.');
@@ -423,7 +438,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       if (opening && String(opening.url || '').startsWith('about:blank#autopilot-owned:')) {
         const resumed = await chromeApi.tabs.update(opening.id, { url: task.normalizedUrl, active: false });
         hint.opening = false;
-        return protectManagedScenarioTab(chromeApi, session, resumed);
+        return protectManagedScenarioTab(chromeApi, session, resumed, true);
       }
     }
     const postSendRecovery = operationAllowsPostSendTab(session, task);
@@ -442,7 +457,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       normalizedUrl: preservesFreshLaunchOwnership ? hint.normalizedUrl : task.normalizedUrl,
       allowPostSendNavigation: postSendRecovery,
     });
-    if (tab) return protectManagedScenarioTab(chromeApi, session, tab);
+    if (tab) return protectManagedScenarioTab(chromeApi, session, tab, hint.ownedByExtension === true);
     if (hint?.ownedByExtension === true
         && hint.sessionId === sessionId && hint.kind === 'TASK'
         && !postSendRecovery) {
@@ -450,7 +465,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
         // A login redirect can temporarily leave the launch URL. Do not
         // retire that same owned tab and produce a fresh draft on every retry.
         const pendingLogin = await chromeApi.tabs.get(hint.tabId);
-        if (session?.scenarioWork?.managed === true || isChatAuthUrl(pendingLogin.url)) return protectManagedScenarioTab(chromeApi, session, pendingLogin);
+        if (session?.scenarioWork?.managed === true || isChatAuthUrl(pendingLogin.url)) return protectManagedScenarioTab(chromeApi, session, pendingLogin, true);
       } catch { /* Only a proven missing tab may be replaced. */ }
     }
     if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
@@ -489,7 +504,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
   let tab = match || await createTaskChatTab(chromeApi, session, task.normalizedUrl);
-  tab = await protectManagedScenarioTab(chromeApi, session, tab);
+  tab = await protectManagedScenarioTab(chromeApi, session, tab, !match);
   state.tabHintsByTaskId[task.id] = {
     tabId: tab.id,
     sessionId,

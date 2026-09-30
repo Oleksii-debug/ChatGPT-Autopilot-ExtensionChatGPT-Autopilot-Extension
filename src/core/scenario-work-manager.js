@@ -748,6 +748,11 @@ export class ScenarioWorkManager {
       `baselineKnown=${task?.lastAssistantBaselineKnown === true ? 'yes' : 'no'}`,
       `baselineCount=${Math.max(0, Number(task?.lastAssistantBaselineCount || 0))}`,
       `assistantTextLength=${textLength}`,
+      `anchor=${report?.responseAnchorKind || 'unproven'}`,
+      `userCount=${Number(report?.observedUserCount || 0)}`,
+      `assistantCount=${Number(report?.observedAssistantCount || 0)}`,
+      `keyMatched=${report?.submittedKeyMatched === true ? 'yes' : 'no'}`,
+      `markerMatched=${report?.correlationTokenMatched === true ? 'yes' : 'no'}`,
       error ? `probeError=${String(error?.message || error || 'unknown').slice(0, 180)}` : '',
     ].filter(Boolean).join('; ');
     await this.appendScenarioDiagnostic({
@@ -1316,7 +1321,19 @@ export class ScenarioWorkManager {
     const sessionId = managedSessionId(scenario.id, action.participantKey,
       persistentChat ? `generation-${action.generation}` : ordinal);
     const taskId = managedTaskId(sessionId);
-    const task = createTask({ id: taskId, url: action.url, promptOverride: action.prompt, enabled: true, label: `${scenario.name}: ${action.participantKey}` });
+    const recordedSession = (await this.coreRepository.load()).sessionsById?.[sessionId];
+    const recordedTask = recordedSession?.tasksById?.[taskId];
+    const replay = recordedSession?.scenarioWork?.stage === action.stage
+      && recordedTask?.normalizedUrl === action.url
+      && (recordedTask.scenarioPromptText ?? recordedTask.promptOverride) === action.prompt;
+    const responseCorrelationToken = replay ? recordedTask.responseCorrelationToken || ''
+      : `[APSTEP:${encodeURIComponent(sessionId)}:${ordinal}]`;
+    const task = createTask({ id: taskId, url: action.url,
+      promptOverride: replay ? recordedTask.promptOverride
+        : `${action.prompt}\n\nСлужбова мітка цього кроку: ${responseCorrelationToken}`,
+      enabled: true, label: `${scenario.name}: ${action.participantKey}` });
+    task.responseCorrelationToken = responseCorrelationToken;
+    task.scenarioPromptText = action.prompt;
     const session = createSession({
       id: sessionId,
       name: `${scenario.name} — ${action.participantKey}`,
@@ -1371,6 +1388,8 @@ export class ScenarioWorkManager {
           existingTask.url = task.normalizedUrl;
           existingTask.normalizedUrl = task.normalizedUrl;
           existingTask.promptOverride = task.promptOverride;
+          existingTask.responseCorrelationToken = task.responseCorrelationToken;
+          existingTask.scenarioPromptText = task.scenarioPromptText;
           existingTask.status = 'IDLE';
           existingTask.lastVerifiedSendAt = 0;
           existingTask.lastVerifiedFingerprint = '';
@@ -1419,6 +1438,15 @@ export class ScenarioWorkManager {
       const participantTaskId = participant.taskIdCore || participant.taskId;
       const task = session?.tasksById?.[participantTaskId];
       if (!session || !task || !task.lastVerifiedSendAt || !task.lastConversationUrl) continue;
+      if (participant.deadlineSendAt !== task.lastVerifiedSendAt) {
+        const anchored = ensureManagerRuntimeFields(runtime);
+        const waiting = scenarioWorkParticipants(anchored).find(item => item.key === participant.key);
+        waiting.deadlineSendAt = task.lastVerifiedSendAt;
+        waiting.deadlineAt = task.lastVerifiedSendAt + scenario.config.responseTimeoutMinutes * 60_000;
+        const checkpoint = await this.checkpointRuntime(scenario.id, anchored, expectedOwnerEpoch, now);
+        if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
+        runtime = checkpoint.runtime;
+      }
       let tabHint = (await this.coreRepository.load()).tabHintsByTaskId?.[participantTaskId];
       // Save the physical home window before the owned tab is parked. Chrome's
       // focused window can change to an unrelated site before the next poll.
@@ -1434,7 +1462,9 @@ export class ScenarioWorkManager {
             if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
             runtime = checkpoint.runtime;
           }
-        } catch { /* A vanished tab is recovered by the scheduled probe. */ }
+        } catch (error) {
+          if (isTabAlreadyGoneError(error)) tabHint = null;
+        }
       }
       const reportJob = {
         id: `scenario-work:${scenario.id}:${participant.key}`,
@@ -1443,6 +1473,9 @@ export class ScenarioWorkManager {
         assistantBaselineCount: Number(task.lastAssistantBaselineCount || 0),
         assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
         submittedUserMessageKey: task.lastSubmittedUserMessageKey || '',
+        responseCorrelationToken: task.responseCorrelationToken || '',
+        submittedPromptText: task.responseCorrelationToken ? '' : task.promptOverride,
+        requireStableResponse: true,
         persistentManagedTab: true,
         managedSessionId: participant.sessionId,
         managedTabId: Number.isInteger(tabHint?.tabId) ? tabHint.tabId : null,
@@ -1451,53 +1484,14 @@ export class ScenarioWorkManager {
           ? runtime.preferredWindowId : session?.scenarioWork?.preferredWindowId,
       };
 
-      if (scenario.config.closeTabsBetweenChecks === true) {
-        // The first observation after a verified Send is a parking boundary,
-        // not a probe.  Keeping hundreds of streaming ChatGPT tabs alive for
-        // one full poll interval was the source of the tab-window buildup in
-        // the diagnostic reports.  A later missing-tab branch below opens the
-        // exact durable conversation URL only when the probe is due.
-        if (Number.isInteger(tabHint?.tabId) && participant.probeOpenPending !== true) {
-          let parked = true;
-          if (tabHint.ownedByExtension === true) {
-            const closed = await this.closeOwnedScenarioTab(participantTaskId, participant.sessionId);
-            parked = closed.closed === true;
-          } else {
-            // Core may have reused a manually opened chat. Release its binding
-            // without closing that tab; the scheduled probe opens its own tab.
-            await this.coreRepository.update(state => {
-              const liveHint = state.tabHintsByTaskId?.[participantTaskId];
-              if (liveHint?.sessionId === participant.sessionId
-                  && liveHint.tabId === tabHint.tabId
-                  && liveHint.ownedByExtension !== true) {
-                delete state.tabHintsByTaskId[participantTaskId];
-              }
-              return state;
-            });
-          }
-          const parkedRuntime = ensureManagerRuntimeFields(runtime);
-          const parkedParticipant = scenarioWorkParticipants(parkedRuntime)
-            .find(item => item.key === participant.key);
-          if (parkedParticipant?.state === ScenarioParticipantState.WAITING) {
-            // A failed physical close must not suppress response checks forever.
-            // Keep the owned tab bound and inspect it on this pass.
-            parkedParticipant.probeOpenPending = !parked;
-            parkedParticipant.nextProbeAt = parked ? now + scenario.config.pollSeconds * 1000 : now;
-            parkedRuntime.updatedAt = now;
-            const parkedCheckpoint = await this.checkpointRuntime(
-              scenario.id, parkedRuntime, expectedOwnerEpoch, now,
-            );
-            if (!parkedCheckpoint.applied) {
-              return { runtime: parkedCheckpoint.runtime || runtime, ownerChanged: true };
-            }
-            runtime = parkedCheckpoint.runtime;
-          }
-          if (parked) continue;
-        }
+      {
+        // A verified Send is not a saved response. Keep the sending document
+        // alive through generation and durable completion; only missing tabs
+        // are reopened at their recorded URL.
         const probeParticipant = scenarioWorkParticipants(runtime)
           .find(item => item.key === participant.key) || participant;
-        if (Number(probeParticipant.nextProbeAt || 0) > now) continue;
-        if (!Number.isInteger(tabHint?.tabId)) {
+        if (!Number.isInteger(tabHint?.tabId) && this.chrome.tabs?.create) {
+          if (Number(probeParticipant.nextProbeAt || 0) > now) continue;
           const pendingRuntime = ensureManagerRuntimeFields(runtime);
           const pendingParticipant = scenarioWorkParticipants(pendingRuntime)
             .find(item => item.key === participant.key);
@@ -1565,105 +1559,32 @@ export class ScenarioWorkManager {
         report = await this.collectAssistantReport(reportJob);
       } catch (error) {
         await this.recordAssistantObservation({ scenario, participant, task, error, now });
-        if (scenario.config.closeTabsBetweenChecks === true) {
-          const closed = await this.closeOwnedScenarioTab(participantTaskId, participant.sessionId);
-          const delayedRuntime = ensureManagerRuntimeFields(runtime);
-          const delayedParticipant = scenarioWorkParticipants(delayedRuntime)
-            .find(item => item.key === participant.key);
-          if (delayedParticipant?.state === ScenarioParticipantState.WAITING) {
-            const useErrorRetry = scenario.config.reopenOnceAfterProbeError === true
-              && delayedParticipant.probeErrorReopenCount < 1;
-            delayedParticipant.probeErrorReopenCount = useErrorRetry ? 1 : delayedParticipant.probeErrorReopenCount;
-            delayedParticipant.probeOpenPending = closed.closed !== true;
-            delayedParticipant.nextProbeAt = now + (useErrorRetry
-              ? scenario.config.retryBackoffSeconds * 1000
-              : scenario.config.pollSeconds * 1000);
-            delayedRuntime.updatedAt = now;
-            const delayedCheckpoint = await this.checkpointRuntime(
-              scenario.id, delayedRuntime, expectedOwnerEpoch, now,
-            );
-            if (!delayedCheckpoint.applied) {
-              return { runtime: delayedCheckpoint.runtime || runtime, ownerChanged: true };
-            }
-            runtime = delayedCheckpoint.runtime;
-          }
-        }
-        continue;
+        report = {
+          status: 'TEMPORARY_ERROR', assistantComplete: false,
+          safeDiagnosticCode: 'ASSISTANT_REPORT_TRANSPORT_UNAVAILABLE',
+          chatRecoveryRequired: true, recoveryCategory: 'TRANSPORT_UNAVAILABLE',
+          recoveryErrorLabel: String(error?.safeDiagnosticCode || 'Read-only transport failed'),
+        };
       }
       await this.recordAssistantObservation({ scenario, participant, task, report, now });
       const reportCode = String(report?.safeDiagnosticCode || report?.code || '');
-      if (report?.status === 'BUSY' || reportCode === 'ASSISTANT_RESPONSE_STREAMING') {
-        const streaming = ensureManagerRuntimeFields(runtime);
-        const waiting = scenarioWorkParticipants(streaming).find(item => item.key === participant.key);
+      if (!(report?.status === 'READY' && report?.assistantComplete === true)) {
+        const scheduled = ensureManagerRuntimeFields(runtime);
+        const waiting = scenarioWorkParticipants(scheduled).find(item => item.key === participant.key);
         if (waiting?.state === ScenarioParticipantState.WAITING) {
-          const expired = Number(waiting.deadlineAt || 0) <= now;
-          waiting.deadlineAt = Math.max(Number(waiting.deadlineAt || 0), now + scenario.config.responseTimeoutMinutes * 60_000);
-          const checkpoint = await this.checkpointRuntime(scenario.id, streaming, expectedOwnerEpoch, now);
-          if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
-          runtime = checkpoint.runtime;
-          if (expired) await this.appendScenarioDiagnostic({ scenario, participant: waiting, task,
-            event: 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ГЕНЕРАЦІЯ_ТРИВАЄ', status: 'WAITING',
-            code: 'SCENARIO_RESPONSE_STREAMING_DEADLINE_EXTENDED', message: 'Поточна відповідь ще генерується; цей чат збережено.', now });
-        }
-      }
-
-      if (scenario.config.closeTabsBetweenChecks === true
-          && (reportCode === 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING'
-            || reportCode === 'ASSISTANT_RESPONSE_STREAMING')
-          && tabHint?.ownedByExtension === true && Number.isInteger(tabHint.tabId)) {
-        // Reopening a parked chat may take longer than one poll. Closing a
-        // still-loading tab on every check makes completion unobservable.
-        const pending = ensureManagerRuntimeFields(runtime);
-        const waiting = scenarioWorkParticipants(pending).find(item => item.key === participant.key);
-        if (waiting?.state === ScenarioParticipantState.WAITING) {
-          waiting.probeOpenPending = true;
-          waiting.nextProbeAt = now + Math.min(15_000, scenario.config.pollSeconds * 1000);
-          pending.updatedAt = now;
-          const checkpoint = await this.checkpointRuntime(
-            scenario.id, pending, expectedOwnerEpoch, now,
-          );
+          const firstMinute = now - task.lastVerifiedSendAt < 60_000;
+          waiting.nextProbeAt = now + (reportCode === 'ASSISTANT_RESPONSE_STABILITY_PENDING'
+            ? 1000 : firstMinute ? Math.min(5000, scenario.config.pollSeconds * 1000)
+              : scenario.config.pollSeconds * 1000);
+          const checkpoint = await this.checkpointRuntime(scenario.id, scheduled, expectedOwnerEpoch, now);
           if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
           runtime = checkpoint.runtime;
         }
-        continue;
       }
-
-      if (scenario.config.closeTabsBetweenChecks === true
-          && !(report?.status === 'READY' && report?.assistantComplete === true)) {
-        const observedError = report?.status === 'TEMPORARY_ERROR'
-          || report?.chatRecoveryRequired === true
-          || ASSISTANT_TAB_RECOVERY_CODES.has(reportCode);
-        const closed = await this.closeOwnedScenarioTab(participantTaskId, participant.sessionId);
-        const delayedRuntime = ensureManagerRuntimeFields(runtime);
-        const delayedParticipant = scenarioWorkParticipants(delayedRuntime)
-          .find(item => item.key === participant.key);
-        if (delayedParticipant?.state === ScenarioParticipantState.WAITING) {
-          const useErrorRetry = observedError
-            && scenario.config.reopenOnceAfterProbeError === true
-            && delayedParticipant.probeErrorReopenCount < 1;
-          delayedParticipant.probeErrorReopenCount = observedError
-            ? (useErrorRetry ? 1 : delayedParticipant.probeErrorReopenCount)
-            : 0;
-          delayedParticipant.probeOpenPending = closed.closed !== true;
-          delayedParticipant.nextProbeAt = now + (useErrorRetry
-            ? scenario.config.retryBackoffSeconds * 1000
-            : scenario.config.pollSeconds * 1000);
-          delayedRuntime.updatedAt = now;
-          const delayedCheckpoint = await this.checkpointRuntime(
-            scenario.id, delayedRuntime, expectedOwnerEpoch, now,
-          );
-          if (!delayedCheckpoint.applied) {
-            return { runtime: delayedCheckpoint.runtime || runtime, ownerChanged: true };
-          }
-          runtime = delayedCheckpoint.runtime;
-        }
-        continue;
-      }
-
       // ChatGPT can render a recoverable error while the tab itself remains
       // alive. Persist the planned effect before touching the page, so a
       // service-worker restart cannot click Retry or reopen the chat twice.
-      const recoveryPlan = planChatRecovery(participant.chatRecovery, report, now);
+      const recoveryPlan = planChatRecovery(participant.chatRecovery, report, now, { reopenAttempts: 0 });
       if (recoveryPlan.action !== ChatRecoveryAction.NONE) {
         const refreshed = ensureManagerRuntimeFields(runtime);
         const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
@@ -1792,6 +1713,15 @@ export class ScenarioWorkManager {
         now,
       });
       next = ensureManagerRuntimeFields(next);
+      // Save the received text and its operation anchor in the same durable
+      // checkpoint as progress, before any generation tab can be retired.
+      next.lastCompletedResponse = {
+        sessionId: completedSessionId, taskId: participantTaskId,
+        stage: observedStage, at: now, conversationUrl: task.lastConversationUrl,
+        correlationToken: task.responseCorrelationToken || '',
+        anchorKind: report.responseAnchorKind || '',
+        text: String(report.assistantText || report.text || ''),
+      };
       const preserveChat = scenario.config.mode === ScenarioWorkMode.CHAT_CYCLE
         && next.runState === ScenarioWorkRunState.RUNNING
         && next.generation === completedGeneration;
@@ -1805,7 +1735,7 @@ export class ScenarioWorkManager {
       const checkpoint = await this.checkpointRuntime(scenario.id, next, expectedOwnerEpoch, now);
       if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
       runtime = checkpoint.runtime;
-      if (preserveChat) continue;
+      if (preserveChat) continue; // Same physical chat throughout the configured prompt cycle.
       const cleanup = await this.cleanupManagedSession(completedSessionId);
       if (cleanup.removed) {
         await this.clearCleanupObligation(scenario.id, completedSessionId);
@@ -1894,26 +1824,6 @@ export class ScenarioWorkManager {
         const timeoutSession = participant.sessionId ? coreBeforeTimeout.sessionsById?.[participant.sessionId] : null;
         const timeoutTaskId = participant.taskIdCore || participant.taskId;
         const timeoutTask = timeoutSession?.tasksById?.[timeoutTaskId] || null;
-        if (timeoutSession && !Number(timeoutTask?.lastVerifiedSendAt || 0)
-            && !Number(timeoutSession.operation?.submitStartedAt || 0)) {
-          // A login dialog, effort picker or slow composer before Send is not
-          // a response timeout. Keep the same member, Session and physical tab.
-          const held = ensureManagerRuntimeFields(runtime);
-          const waiting = scenarioWorkParticipants(held).find(item => item.key === action.participantKey);
-          waiting.deadlineAt = now + scenario.config.responseTimeoutMinutes * 60_000;
-          held.updatedAt = now;
-          const checkpoint = await this.checkpointRuntime(id, held, expectedOwnerEpoch, now);
-          if (!checkpoint.applied) return { kind: 'CANCELLED_BY_OWNER' };
-          runtime = checkpoint.runtime;
-          scenario = { ...scenario, runtime };
-          await this.appendScenarioDiagnostic({
-            scenario, participant: waiting, task: timeoutTask,
-            event: 'СЦЕНАРІЙ_ОЧІКУЄ_ПЕРШОГО_SEND', status: 'WAITING',
-            code: 'SCENARIO_PRE_SEND_TIMEOUT_SAME_TAB',
-            message: 'Промпт ще не надіслано; поточний чат збережено без створення заміни.', now,
-          });
-          continue;
-        }
         await this.appendScenarioDiagnostic({
           scenario,
           participant,
@@ -2004,6 +1914,7 @@ export class ScenarioWorkManager {
       const store = await this.load();
       const results = [];
       for (const id of store.order) {
+        try {
         let live = await this.get(id);
         if (!live.scenario) continue;
         if ((live.scenario.runtime.cleanupPendingSessionIds || []).length) {
@@ -2019,6 +1930,15 @@ export class ScenarioWorkManager {
         }
         if (live.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
         results.push({ id, result: await this.cycleOne(id) });
+        } catch (error) {
+          results.push({ id, result: { kind: 'RETRY_PENDING', code: error?.safeDiagnosticCode || 'SCENARIO_CYCLE_ERROR' } });
+          const current = await this.get(id);
+          if (current.scenario) await this.appendScenarioDiagnostic({
+            scenario: current.scenario, event: 'СЦЕНАРІЙ_ЦИКЛ_ПОМИЛКА_ПОВТОР_ЗАПЛАНОВАНО',
+            status: 'RETRY_PENDING', code: error?.safeDiagnosticCode || 'SCENARIO_CYCLE_ERROR',
+            message: 'Стан збережено для повторної перевірки; інші сценарії продовжують роботу.', now: this.now(),
+          });
+        }
       }
       await this.reconcileAlarm();
       return { kind: results.length ? 'CYCLED' : 'IDLE', results };
@@ -2045,7 +1965,7 @@ export class ScenarioWorkManager {
       const waiting = participants.filter(participant => participant.state === ScenarioParticipantState.WAITING);
       for (const participant of waiting) {
         if (participant.deadlineAt > now) next = Math.min(next, participant.deadlineAt);
-        if (item.config.closeTabsBetweenChecks === true && participant.nextProbeAt > now) {
+        if (participant.nextProbeAt > now) {
           next = Math.min(next, participant.nextProbeAt);
         }
         const recovery = normalizeChatRecovery(participant.chatRecovery);
@@ -2068,9 +1988,7 @@ export class ScenarioWorkManager {
       if (waiting.length) {
         // Assistant completion is observed by polling; keep the existing
         // bounded poll while a physical chat is actually in flight.
-        const policyProbeAt = item.config.closeTabsBetweenChecks === true
-          ? Math.min(...waiting.map(participant => Number(participant.nextProbeAt || now)))
-          : 0;
+        const policyProbeAt = Math.min(...waiting.map(participant => Number(participant.nextProbeAt || now)));
         next = Math.min(next, policyProbeAt > now
           ? policyProbeAt
           : now + item.config.pollSeconds * 1000);

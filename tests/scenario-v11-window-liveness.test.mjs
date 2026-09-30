@@ -84,7 +84,7 @@ test('login redirect before first Send retains the same owned Scenario tab', asy
   assert.equal(removes, 0);
 });
 
-test('a pre-Send deadline does not replace the member or draft tab', async () => {
+test('an expired pre-Send draft is retired before a replacement is materialized', async () => {
   let now = 1000;
   const data = {};
   const chrome = { storage: { local: {
@@ -104,12 +104,13 @@ test('a pre-Send deadline does not replace the member or draft tab', async () =>
   await manager.cycleOne('same-tab');
   const live = (await manager.get('same-tab')).scenario.runtime;
   assert.equal(live.chat.sessionId, sessionId);
-  assert.equal(live.totalLaunches, 1);
+  assert.equal(live.totalLaunches, 2);
+  assert.equal(core.state.sessionsById[sessionId].createdAt, now);
   assert.equal(core.state.sessionsById[sessionId].tasksById[taskId].lastVerifiedSendAt, 0);
   assert.ok(live.chat.deadlineAt > now);
 });
 
-test('parking persists the owner window for the next scheduled probe', async () => {
+test('scenario retains its sending tab and saved window across all response checks', async () => {
   let now = 1000;
   const data = {};
   const jobs = [];
@@ -150,16 +151,48 @@ test('parking persists the owner window for the next scheduled probe', async () 
   await manager.cycleOne('parked');
   const parked = (await manager.get('parked')).scenario.runtime;
   assert.equal(parked.preferredWindowId, 11);
-  assert.deepEqual(removed, [7]);
-  assert.equal(jobs.length, 0);
-  now = parked.chat.nextProbeAt + 1;
-  await manager.cycleOne('parked');
-  assert.equal(jobs.length, 0, 'creation is recorded without a separate probe-side create');
-  assert.equal(created.length, 1);
-  assert.equal(created[0].windowId, 11);
-  assert.equal(core.state.tabHintsByTaskId[taskId].tabId, 8);
+  assert.deepEqual(removed, []);
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].managedTabId, 7);
   now += 15_001;
   await manager.cycleOne('parked');
-  assert.deepEqual(removed, [7], 'the loading report tab stays open for the next observation');
-  assert.equal(core.state.tabHintsByTaskId[taskId].tabId, 8);
+  assert.equal(created.length, 0);
+  assert.equal(jobs.length, 2);
+  assert.equal(core.state.tabHintsByTaskId[taskId].tabId, 7);
+  assert.deepEqual(removed, [], 'loading response checks never close the generation tab');
+});
+
+test('a frozen owned response tab is woken in place and the previous active tab is restored', async () => {
+  const tab = {id:7,windowId:11,url:'https://chatgpt.com/c/owner',status:'complete',frozen:true};
+  const previous = {id:3,windowId:11,url:'https://chatgpt.com/',active:true};
+  const effects=[];
+  const chrome={tabs:{async get(){return {...tab};},async query(){return [{...tab},{...previous}];},
+    async update(id,patch){effects.push({id,...patch});if(id===7){Object.assign(tab,patch);if(patch.active)tab.frozen=false;return {...tab};}return {...previous,...patch};},
+    async remove(){throw Error('A response check must not close the scenario');},
+    async create(){throw Error('A response check must not replace the scenario');}}};
+  const result=await probeAssistantConversation(chrome,{async execute(id,request){
+    assert.equal(id,7);assert.equal(tab.frozen,false);assert.equal(request.mode,'READ_ASSISTANT_REPORT');
+    return {status:'READY',assistantComplete:true,assistantText:'Final'};
+  }},{conversationUrl:tab.url,persistentManagedTab:true,managedTabId:7,managedTabOwned:true});
+  assert.equal(result.assistantComplete,true);
+  assert.ok(effects.some(effect=>effect.id===7&&effect.active===true));
+  assert.deepEqual(effects.at(-1),{id:3,active:true});
+});
+
+test('a failed scenario cycle does not prevent the other four slots from running', async () => {
+  let serial=0;const data={};
+  const chrome={storage:{local:{async get(key){return {[key]:structuredClone(data[key])};},
+    async set(value){Object.assign(data,structuredClone(value));}}},alarms:{async create(){},async clear(){}}};
+  const core={state:createEmptyState(0),async load(){return structuredClone(this.state);},
+    async update(mutator){this.state=await mutator(structuredClone(this.state))||this.state;return this.load();}};
+  const manager=new ScenarioWorkManager({coreRepository:core,chromeApi:chrome,now:()=>1000,
+    createId:()=>`isolated-${++serial}`,collectAssistantReport:async()=>({status:'WAITING'})});
+  const pool=await manager.createChatPool({count:5,replacementBudget:1,config:{steps:[{prompt:'ONE'}]}});
+  await manager.startChatPool(pool.pool.id);
+  const called=[];
+  manager.cycleOne=async id=>{called.push(id);if(id===pool.ids[1])throw Error('Synthetic one-slot fault');return {kind:'CYCLED'};};
+  const result=await manager.cycleAll();
+  assert.deepEqual(called,pool.ids);
+  assert.equal(result.results.filter(item=>item.result?.kind==='RETRY_PENDING').length,1);
+  assert.equal(result.results.filter(item=>item.result?.kind==='CYCLED').length,4);
 });
