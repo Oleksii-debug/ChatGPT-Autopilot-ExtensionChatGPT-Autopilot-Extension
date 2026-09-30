@@ -336,7 +336,7 @@ test('envelope chronology cannot predate plan/outcome and cannot bind a future A
       }),
       createdAt: T1,
     })),
-    /cannot predate AgentPlan node state/,
+    /AgentPlan node updatedAt is outside the plan causal window|outside plan chronology/,
   );
 
   assert.throws(
