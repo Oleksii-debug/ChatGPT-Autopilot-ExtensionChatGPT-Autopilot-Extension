@@ -249,7 +249,10 @@ test('resolver rejects canonical job binding pointed at another Project or witho
 test('resolver rejects Project provenance made stale by a newer current snapshot', async () => {
   const current = workspaceWithProvenance();
   const stale = structuredClone(current);
-  replaceProjectSnapshot(stale, snapshot(artifact(), { revisionId:'project-r2' }), { nowMs:4 });
+  replaceProjectSnapshot(stale, snapshot(artifact(), {
+    revisionId:'project-r2',
+    sourceRefs:[source({ revisionId:'rev-2', contentSha256:hash('c') })],
+  }), { nowMs:4 });
   await assert.rejects(
     () => resolve({}, { workspaces:[current, stale] }),
     /not current/,
