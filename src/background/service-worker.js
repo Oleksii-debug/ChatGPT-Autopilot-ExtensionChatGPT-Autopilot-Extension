@@ -21,17 +21,15 @@ import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
-import {
-  OPENHANDS_CODING_PROVIDER_ID,
-  OpenHandsCodingSpecialistClient,
-  OpenHandsCodingSpecialistError,
-} from '../core/coding-specialist-provider.js';
-import {
-  createOpenHandsSpecialistReadinessBindingV1,
-  probeOpenHandsSpecialistProviderConfigV1,
-} from '../core/openhands-specialist-readiness.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
-import { sameChatConversationUrl } from '../core/tabs.js';
+import { SpecialistProviderDispatcherV1 } from '../core/specialist-provider-dispatcher.js';
+import {
+  AiRouteSpecialistVerificationResolverV1,
+  ChromeAiRouteSpecialistArtifactStoreV1,
+  createMistralSpecialistDispatchBindingV1,
+  createMistralSpecialistReadinessBindingV1,
+} from '../core/ai-route-specialist-runtime.js';
+import { probeAssistantConversation as probeAssistantConversationCore } from '../core/assistant-report-probe.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
   DriveScalarProviderV1,
@@ -82,11 +80,9 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES',
   'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
+  'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
+  'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
-  'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
-  'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
-  'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
-  'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS',
   'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
 const repo = new StorageRepository(chrome);
@@ -201,35 +197,7 @@ async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
 }
 
 async function probeAssistantConversation(job) {
-  const conversationUrl = String(job?.conversationUrl || '').trim();
-  if (!conversationUrl) throw new Error('Assistant report probe requires conversationUrl');
-  let tabId = null;
-  let temporaryTab = false;
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://chatgpt.com/*' });
-    const existing = (tabs || []).find(tab => tab?.id != null && sameChatConversationUrl(tab.url, conversationUrl));
-    if (existing?.id != null) {
-      tabId = existing.id;
-    } else {
-      const tab = await chrome.tabs.create({ url: conversationUrl, active: false });
-      tabId = tab?.id ?? null;
-      temporaryTab = true;
-    }
-    if (tabId == null) throw new Error('Assistant report probe could not resolve a ChatGPT tab');
-    return await transport.execute(tabId, {
-      requestId: `assistant-report:${job.id || job.workerId || job.taskId || 'probe'}:${Date.now()}`,
-      taskId: job.taskId || job.workerId || 'assistant-report',
-      mode: 'READ_ASSISTANT_REPORT',
-      expectedUrl: conversationUrl,
-      promptText: '',
-      assistantBaselineCount: Number(job.assistantBaselineCount || 0),
-      assistantBaselineKnown: job.assistantBaselineKnown === true,
-    });
-  } finally {
-    if (temporaryTab && tabId != null) {
-      try { await chrome.tabs.remove(tabId); } catch (_) {}
-    }
-  }
+  return probeAssistantConversationCore(chrome, transport, job);
 }
 
 async function collectWebReportFromConversation(job) {
@@ -245,68 +213,30 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+const specialistArtifactStore = new ChromeAiRouteSpecialistArtifactStoreV1({ chromeApi: chrome });
+const specialistReadinessResolver = new SpecialistProviderReadinessResolverV1({
+  bindings: [createMistralSpecialistReadinessBindingV1({ repository: repo, aiGatewayClient })],
+});
+const specialistProviderDispatcher = new SpecialistProviderDispatcherV1({
+  bindings: [createMistralSpecialistDispatchBindingV1({
+    repository: repo,
+    routePrompt: payload => dispatchSerializedAiRoute(payload),
+    artifactStore: specialistArtifactStore,
+  })],
+});
+const specialistVerificationResolver = new AiRouteSpecialistVerificationResolverV1({
+  repository: repo,
+  routePrompt: payload => dispatchSerializedAiRoute(payload),
+  artifactStore: specialistArtifactStore,
+});
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
+  specialistReadinessResolver,
+  specialistProviderDispatcher,
+  specialistVerificationResolver,
 });
 browserAgentLifecycle.current = browserAgent;
-
-const browserAgentOrchestrationLifecycleDependencies = Object.freeze({
-  withBrowserAgentBoundLifecycleAuthority: (binding, operation) =>
-    orchestrationV2.withBrowserAgentBoundLifecycleAuthority(binding, operation),
-});
-const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({
-  fetchFn: (...args) => fetch(...args),
-});
-const specialistReadinessConfigProvenance = new WeakMap();
-const specialistProviderReadinessResolver = Object.freeze({
-  async resolve(selection) {
-    const providerId = selection?.providerId || '';
-    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
-      throw new Error('No executable Specialist provider readiness adapter is installed for selected provider');
-    }
-    const persisted = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (persisted.quarantined) {
-      throw new Error('Selected Specialist provider config is quarantined as corrupt');
-    }
-    if (!persisted.config) {
-      throw new Error('Selected Specialist provider is not configured by the owner');
-    }
-    const resolver = new SpecialistProviderReadinessResolverV1({
-      bindings: [
-        createOpenHandsSpecialistReadinessBindingV1({
-          config: persisted.config.config,
-          client: openHandsSpecialistClient,
-        }),
-      ],
-    });
-    const readiness = await resolver.resolve(selection);
-    specialistReadinessConfigProvenance.set(readiness, Object.freeze({
-      providerId,
-      configSnapshot: JSON.stringify(persisted.config),
-    }));
-    return readiness;
-  },
-  async assertCurrent(readiness) {
-    const provenance = specialistReadinessConfigProvenance.get(readiness);
-    if (!provenance) {
-      throw new Error('Specialist provider readiness lacks durable config provenance');
-    }
-    const persisted = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
-    if (persisted.quarantined || !persisted.config) {
-      throw new Error('Specialist provider config changed after readiness probe');
-    }
-    if (JSON.stringify(persisted.config) !== provenance.configSnapshot) {
-      throw new Error('Specialist provider config changed after readiness probe');
-    }
-    return true;
-  },
-});
-const automaticSpecialistDelegationDependencies = Object.freeze({
-  withProjectHierarchyAuthority: (projectId, operation) =>
-    orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
-  specialistProviderReadinessResolver,
-});
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -590,6 +520,38 @@ function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
   return run;
 }
 
+async function runAutomaticSpecialistHandoff(id, payload = {}) {
+  const registryId = payload.registryId || '';
+  const expectedRegistryRevision = payload.expectedRegistryRevision;
+  const agentId = payload.agentId || '';
+  const admitted = await browserAgent.admitAutomaticSpecialistHandoff(id, {
+    registryId,
+    expectedRegistryRevision,
+    expectedPlanRevision: payload.expectedPlanRevision,
+    agentId,
+    maxConcurrentHandoffs: Number.isSafeInteger(payload.maxConcurrentHandoffs)
+      ? payload.maxConcurrentHandoffs
+      : 4,
+    leaseSeconds: Number.isSafeInteger(payload.leaseSeconds) ? payload.leaseSeconds : 900,
+  });
+  const assignment = admitted.assignments.find(item => item.agentId === agentId);
+  if (!assignment?.leaseId) throw new Error('Automatic Specialist admission did not produce a lease');
+  const dispatched = await browserAgent.dispatchAdmittedSpecialistHandoff(id, {
+    registryId,
+    expectedRegistryRevision,
+    expectedPlanRevision: admitted.plan.revision,
+    agentId,
+    leaseId: assignment.leaseId,
+  });
+  const verificationId = `specialist-verification:${Date.now().toString(36)}:${agentId}`.slice(0, 180);
+  const verified = await browserAgent.verifySpecialistHandoff(id, {
+    agentId,
+    leaseId: assignment.leaseId,
+    verificationId,
+  });
+  return { admitted, dispatched, verified };
+}
+
 export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
@@ -764,47 +726,28 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createSpecialistRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
-  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
-    result = await browserAgent.listSpecialistProviderConfigs();
-  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
-  } else if (message.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    const providerId = message.payload?.providerId || '';
-    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
-      throw new Error('No read-only Specialist provider probe is installed for requested provider');
-    }
-    const beforeProbe = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (beforeProbe.quarantined) {
-      throw new Error('Selected Specialist provider config is quarantined as corrupt');
-    }
-    if (!beforeProbe.config) {
-      throw new Error('Selected Specialist provider is not configured by the owner');
-    }
-    const configSnapshot = JSON.stringify(beforeProbe.config);
-    const probe = await probeOpenHandsSpecialistProviderConfigV1({
-      config: beforeProbe.config.config,
-      client: openHandsSpecialistClient,
-    });
-    const afterProbe = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (afterProbe.quarantined || !afterProbe.config
-        || JSON.stringify(afterProbe.config) !== configSnapshot) {
-      throw new Error('Specialist provider config changed during readiness probe');
-    }
-    result = {
-      providerId,
-      configRevision: afterProbe.config.revision,
-      observedAt: probe.observedAt,
-      providerState: probe.providerState,
-      authority: probe.authority,
-    };
-  } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.setSpecialistProviderConfig(message.payload || {});
-  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.clearSpecialistProviderConfig(message.payload || {});
-  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS') {
-    result = await browserAgent.listSpecialistProviderExecutions(message.payload?.id || '');
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION') {
+    result = await browserAgent.prepareAutomaticSpecialistDelegation(
+      message.payload?.id || '',
+      message.payload?.delegation || {},
+    );
+  } else if (message.command === 'ADMIT_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF') {
+    result = await browserAgent.admitAutomaticSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.admission || {},
+    );
+  } else if (message.command === 'DISPATCH_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.dispatchAdmittedSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.dispatch || {},
+    );
+  } else if (message.command === 'RUN_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF') {
+    result = await runAutomaticSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.run || {},
+    );
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.create(message.payload || {});
   } else if (message.command === 'SELECT_BROWSER_AGENT_JOB') {
@@ -820,103 +763,10 @@ export async function dispatchUiMessage(message) {
           orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
       },
     );
-  } else if (message.command === 'AUTO_PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    result = await browserAgent.autoPrepareSpecialistHandoff(
-      message.payload?.id || '',
-      message.payload?.delegation || {},
-      automaticSpecialistDelegationDependencies,
-    );
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
     result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
-    const claim = message.payload?.claim || {};
-    result = await browserAgent.claimSpecialistHandoffsAcrossJobs(
-      { ...claim, targetJobId: message.payload?.id || '' },
-      automaticSpecialistDelegationDependencies,
-    );
-  } else if (message.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION') {
-    const jobId = message.payload?.id || '';
-    const agentId = message.payload?.agentId || '';
-    const randomUuid = globalThis.crypto?.randomUUID;
-    if (typeof randomUuid !== 'function') {
-      throw new Error('Secure UUID generation is unavailable for Specialist provider execution');
-    }
-    const prepared = await browserAgent.prepareClaimedSpecialistProviderExecution(
-      jobId,
-      {
-        agentId,
-        conversationId: randomUuid.call(globalThis.crypto).toLowerCase(),
-      },
-      automaticSpecialistDelegationDependencies,
-    );
-    if (!prepared.dispatchable) {
-      result = {
-        ...prepared,
-        providerDispatched: false,
-        completionAuthorized: false,
-      };
-    } else {
-      if (prepared.execution.providerId !== OPENHANDS_CODING_PROVIDER_ID) {
-        throw new Error('No executable Specialist provider adapter is installed for claimed execution');
-      }
-      let outcome;
-      let providerDispatched = false;
-      try {
-        const providerResult = await openHandsSpecialistClient.execute({
-          handoff: prepared.handoff,
-          grantedCapabilityIds: prepared.grantedCapabilityIds,
-          config: prepared.execution.providerConfig.config,
-          conversationId: prepared.execution.conversationId,
-        });
-        providerDispatched = providerResult.created === true || Boolean(providerResult.effectEvidence);
-        outcome = {
-          providerStatus: providerResult.providerStatus,
-          providerSucceeded: providerResult.providerSucceeded === true,
-          manualReviewRequired: providerResult.manualReviewRequired === true,
-          reconciliationRequired: providerResult.reconciliationRequired === true,
-          safeToRetry: providerResult.safeToRetry === true,
-          effectEvidence: providerResult.effectEvidence || '',
-          providerUpdatedAt: providerResult.providerUpdatedAt || '',
-          providerObservedAt: providerResult.providerObservedAt || '',
-          errorCode: '',
-        };
-      } catch (error) {
-        if (error instanceof OpenHandsCodingSpecialistError) {
-          providerDispatched = error.effectMayHaveOccurred === true;
-          outcome = {
-            providerStatus: '',
-            providerSucceeded: false,
-            manualReviewRequired: false,
-            reconciliationRequired: error.reconciliationRequired === true,
-            safeToRetry: error.safeToRetry === true,
-            effectEvidence: '',
-            errorCode: error.code || 'OPENHANDS_CODING_SPECIALIST_ERROR',
-          };
-        } else {
-          outcome = {
-            providerStatus: '',
-            providerSucceeded: false,
-            manualReviewRequired: false,
-            reconciliationRequired: false,
-            safeToRetry: false,
-            effectEvidence: '',
-            errorCode: 'OPENHANDS_PROVIDER_PREPARE_REJECTED',
-          };
-        }
-      }
-      const recorded = await browserAgent.recordSpecialistProviderExecutionOutcome(jobId, {
-        agentId: prepared.execution.agentId,
-        leaseId: prepared.execution.leaseId,
-        conversationId: prepared.execution.conversationId,
-        ...outcome,
-      });
-      result = {
-        ...prepared,
-        ...recorded,
-        providerDispatched,
-        completionAuthorized: false,
-      };
-    }
+    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
@@ -926,21 +776,11 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
-    result = await browserAgent.pause(
-      message.payload?.id || '',
-      browserAgentOrchestrationLifecycleDependencies,
-    );
+    result = await browserAgent.pause(message.payload?.id || '');
   } else if (message.command === 'RESUME_BROWSER_AGENT_JOB') {
-    result = await browserAgent.resume(
-      message.payload?.id || '',
-      {},
-      browserAgentOrchestrationLifecycleDependencies,
-    );
+    result = await browserAgent.resume(message.payload?.id || '');
   } else if (message.command === 'STOP_BROWSER_AGENT_JOB') {
-    result = await browserAgent.stop(
-      message.payload?.id || '',
-      browserAgentOrchestrationLifecycleDependencies,
-    );
+    result = await browserAgent.stop(message.payload?.id || '');
   } else if (message.command === 'STEP_BROWSER_AGENT_JOB') {
     result = await browserAgent.step(message.payload?.id || '');
   } else if (message.command === 'ADD_BROWSER_AGENT_INSTRUCTION') {

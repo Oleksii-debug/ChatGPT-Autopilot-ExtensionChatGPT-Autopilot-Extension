@@ -66,7 +66,7 @@
         <label for="simplified-rate-limit-cooldown-minutes">Пауза після обмеження запитів, хв</label>
         <input id="simplified-rate-limit-cooldown-minutes" type="number" min="0" max="120" step="1" inputmode="numeric" value="0">
         <label for="simplified-max-concurrent-session-operations">Максимум одночасних операцій сеансів</label>
-        <input id="simplified-max-concurrent-session-operations" type="number" min="1" max="32" step="1" inputmode="numeric" value="10">
+        <input id="simplified-max-concurrent-session-operations" type="number" min="1" max="1000" step="1" inputmode="numeric" value="10">
         <button id="simplified-profile-apply" type="button">Застосувати</button>
         <p id="simplified-profile-setting-status" role="status">Активна пауза: 0 хв. Паралельність: 10 одночасних операцій.</p>
       </section>
@@ -266,101 +266,9 @@
           <textarea id="agent-definition-tags" rows="3" spellcheck="false"></textarea>
           <label for="agent-definition-acceptance">Критерії завершення — по одному в рядку</label>
           <textarea id="agent-definition-acceptance" rows="4" spellcheck="true"></textarea>
-
-          <fieldset class="settings-group" id="agent-definition-model-defaults-group">
-            <legend>Модель за замовчуванням для цієї definition</legend>
-            <p>Ці значення застосовуються до нових завдань, створених із definition. «Не задавати» залишає відповідне runtime-налаштування власнику або глобальному AI Router.</p>
-            <label for="agent-definition-ai-routing-mode">Маршрут моделі</label>
-            <select id="agent-definition-ai-routing-mode">
-              <option value="">Не задавати</option>
-              <option value="inherit">Успадкувати глобальний AI Router — явно</option>
-              <option value="primary">Завжди primary</option>
-              <option value="strong">Завжди strong</option>
-              <option value="hybrid-auto">Hybrid AUTO</option>
-              <option value="hybrid-rules">Hybrid за глобальними правилами</option>
-            </select>
-            <label for="agent-definition-ai-pinned-route-id">Pinned route ID із вкладки «Моделі» — необов’язково</label>
-            <input id="agent-definition-ai-pinned-route-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-ai-primary-provider">Primary provider</label>
-            <select id="agent-definition-ai-primary-provider">
-              <option value="">Не задавати</option>
-              <option value="inherit">Успадкувати</option>
-              <option value="ollama">Локальна Ollama</option>
-              <option value="openai">OpenAI API</option>
-              <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
-            </select>
-            <label for="agent-definition-ai-primary-model">Primary model — необов’язково при inherited provider</label>
-            <input id="agent-definition-ai-primary-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-ai-strong-provider">Strong provider</label>
-            <select id="agent-definition-ai-strong-provider">
-              <option value="">Не задавати</option>
-              <option value="inherit">Успадкувати</option>
-              <option value="openai">OpenAI API</option>
-              <option value="ollama">Локальна Ollama</option>
-              <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
-            </select>
-            <label for="agent-definition-ai-strong-model">Strong model — необов’язково при inherited provider</label>
-            <input id="agent-definition-ai-strong-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
-          </fieldset>
-
-          <fieldset class="settings-group" id="agent-definition-model-route-policy-group">
-            <legend>Model Router policy для цієї definition</legend>
-            <label><input id="agent-definition-model-route-policy-configured" type="checkbox">Зберігати окрему Router policy для цієї Agent definition. Якщо вимкнено — успадковувати глобальну Router policy</label>
-            <p id="agent-definition-model-route-policy-help">Якщо вимкнено, Agent успадковує глобальну Router policy. Збереження policy не вибирає модель, не запускає provider і не запускає Agent; runtime повторно перевіряє поточний Router перед model I/O.</p>
-            <label><input id="agent-definition-model-route-auto-switch" type="checkbox" checked>Дозволити автоматичний failover між допустимими routes</label>
-            <label for="agent-definition-model-route-pinned-id">Pinned route ID — необов’язково</label>
-            <input id="agent-definition-model-route-pinned-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-model-route-ordered-ids">Пріоритет routes — по одному ID в рядку, у потрібному порядку</label>
-            <textarea id="agent-definition-model-route-ordered-ids" rows="4" spellcheck="false"></textarea>
-            <label for="agent-definition-model-route-allow-ids">Allow routes — по одному ID в рядку; порожньо означає весь owner-authorized pool</label>
-            <textarea id="agent-definition-model-route-allow-ids" rows="4" spellcheck="false"></textarea>
-            <label for="agent-definition-model-route-deny-ids">Deny routes — по одному ID в рядку</label>
-            <textarea id="agent-definition-model-route-deny-ids" rows="4" spellcheck="false"></textarea>
-            <label><input id="agent-definition-model-route-free-only" type="checkbox">Лише routes з нульовою відомою ціною</label>
-            <label for="agent-definition-model-route-locality">Locality</label>
-            <select id="agent-definition-model-route-locality">
-              <option value="any">Будь-яка</option>
-              <option value="local">Лише local</option>
-              <option value="remote">Лише remote</option>
-            </select>
-            <label for="agent-definition-model-route-max-input-price">Максимальна input-ціна USD за 1M tokens — порожньо без окремого cap</label>
-            <input id="agent-definition-model-route-max-input-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-model-route-max-output-price">Максимальна output-ціна USD за 1M tokens — порожньо без окремого cap</label>
-            <input id="agent-definition-model-route-max-output-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-model-route-backoff-seconds">Retry backoff, секунд</label>
-            <input id="agent-definition-model-route-backoff-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="60">
-            <label for="agent-definition-model-route-circuit-failures">Circuit breaker: послідовних retryable failures до відкриття</label>
-            <input id="agent-definition-model-route-circuit-failures" type="number" min="1" max="100" step="1" inputmode="numeric" value="2">
-            <label for="agent-definition-model-route-circuit-seconds">Circuit breaker: тривалість, секунд</label>
-            <input id="agent-definition-model-route-circuit-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="300">
-          </fieldset>
-
-          <fieldset class="settings-group" id="agent-definition-specialist-delegation-group">
-            <legend>Автоматичне делегування Specialist</legend>
-            <label><input id="agent-definition-specialist-delegation-configured" type="checkbox">Зберігати Specialist delegation profile для цієї Agent definition</label>
-            <label><input id="agent-definition-specialist-delegation-enabled" type="checkbox">Profile увімкнений для майбутнього автоматичного PREPARE</label>
-            <p id="agent-definition-specialist-delegation-help">Збереження profile нічого не запускає. Runtime все одно повторно перевіряє plan, registry, policy, provider readiness і product-wide capacity перед будь-якою дією.</p>
-            <label for="agent-definition-specialist-registry-id">Specialist registry ID</label>
-            <input id="agent-definition-specialist-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-specialist-capabilities">Required capability IDs — по одному в рядку</label>
-            <textarea id="agent-definition-specialist-capabilities" rows="4" spellcheck="false"></textarea>
-            <label for="agent-definition-specialist-tools">Required tool IDs — по одному в рядку; можна залишити порожнім</label>
-            <textarea id="agent-definition-specialist-tools" rows="4" spellcheck="false"></textarea>
-            <label for="agent-definition-specialist-policy-envelope">Policy envelope ID</label>
-            <input id="agent-definition-specialist-policy-envelope" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-            <label for="agent-definition-specialist-deadline-seconds">Deadline після PREPARE, секунд</label>
-            <input id="agent-definition-specialist-deadline-seconds" type="number" min="1" max="31536000" step="1" inputmode="numeric" value="900">
-            <label for="agent-definition-specialist-max-concurrent">Максимум одночасних Specialist handoffs у продукті для цього profile</label>
-            <input id="agent-definition-specialist-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric" value="4">
-            <label for="agent-definition-specialist-lease-seconds">Lease, секунд</label>
-            <input id="agent-definition-specialist-lease-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="900">
-            <label for="agent-definition-specialist-priority">Priority</label>
-            <input id="agent-definition-specialist-priority" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="0">
-          </fieldset>
-
           <label><input id="agent-definition-enabled" type="checkbox" checked>Definition увімкнена</label>
           <p id="agent-definition-revision" tabindex="0">Реєстр не вибрано.</p>
-          <p>Інші збережені config defaults, яких немає в цій формі, під час оновлення зберігаються без змін.</p>
+          <p>Збережені model/config defaults не редагуються тут: під час оновлення вони зберігаються без змін.</p>
           <div class="agent-actions" aria-label="Дії з reusable Agent definition">
             <button id="agent-definition-save-button" type="button" disabled>Зберегти definition</button>
             <button id="agent-definition-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
@@ -393,119 +301,57 @@
         </fieldset>
       </details>
 
-      <details id="specialist-registry-details">
-        <summary>Specialists</summary>
-        <p>Тут налаштовуються reusable Specialist definitions. Ця форма не запускає Specialist і не створює handoff.</p>
-
-        <fieldset class="settings-group" id="specialist-registry-group">
-          <legend>Реєстри Specialists</legend>
-          <label for="specialist-registry-list">Реєстр Specialist definitions</label>
-          <select id="specialist-registry-list" size="4"></select>
-          <label for="specialist-create-registry-id">ID нового Specialist реєстру</label>
-          <input id="specialist-create-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-          <button id="specialist-create-registry-button" type="button">Створити Specialist реєстр</button>
-          <p id="specialist-quarantine-status" tabindex="0">Пошкоджених Specialist реєстрів у карантині немає.</p>
+      <details id="agent-specialist-details">
+        <summary>Субагенти та specialist providers</summary>
+        <fieldset class="settings-group" id="agent-specialist-registry-group">
+          <legend>Реєстри субагентів</legend>
+          <label for="agent-specialist-registry-list">Реєстр specialist definitions</label>
+          <select id="agent-specialist-registry-list" size="4"></select>
+          <label for="agent-specialist-create-registry-id">ID нового реєстру</label>
+          <input id="agent-specialist-create-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <button id="agent-specialist-create-registry-button" type="button">Створити реєстр</button>
+          <p id="agent-specialist-quarantine-status" tabindex="0">Пошкоджених specialist-реєстрів у карантині немає.</p>
         </fieldset>
 
-        <fieldset class="settings-group" id="specialist-selection-group">
-          <legend>Збережені Specialists</legend>
-          <label for="specialist-list">Specialist definition</label>
-          <select id="specialist-list" size="5"></select>
-          <button id="specialist-new-button" type="button" disabled>Новий Specialist</button>
+        <fieldset class="settings-group" id="agent-specialist-selection-group">
+          <legend>Збережені субагенти</legend>
+          <label for="agent-specialist-list">Specialist definition</label>
+          <select id="agent-specialist-list" size="5"></select>
+          <button id="agent-specialist-new-button" type="button" disabled>Новий specialist</button>
         </fieldset>
 
-        <fieldset class="settings-group" id="specialist-form-group" disabled>
-          <legend>Specialist definition</legend>
-          <label for="specialist-id">Specialist ID</label>
-          <input id="specialist-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-          <label for="specialist-provider-id">Provider ID</label>
-          <input id="specialist-provider-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-          <label for="specialist-label">Назва Specialist</label>
-          <input id="specialist-label" type="text" maxlength="300" autocomplete="off">
-          <label for="specialist-description">Опис — необов’язково</label>
-          <textarea id="specialist-description" rows="3" maxlength="4000" spellcheck="true"></textarea>
-          <label for="specialist-execution-plane">Execution plane</label>
-          <select id="specialist-execution-plane">
-            <option value="BROWSER">BROWSER</option>
+        <fieldset class="settings-group" id="agent-specialist-form-group" disabled>
+          <legend>Specialist</legend>
+          <label for="agent-specialist-id">Specialist ID</label>
+          <input id="agent-specialist-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="agent-specialist-provider-id">Provider ID</label>
+          <input id="agent-specialist-provider-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <p>Для хмарного субагента через налаштований маршрут Містраль використовуйте Provider ID <code>ai-router/mistral</code>, execution plane CLOUD і ті самі capability IDs, що має coder route у вкладці «Моделі». Для незалежної перевірки додайте окремий enabled route з роллю verifier.</p>
+          <label for="agent-specialist-label">Назва</label>
+          <input id="agent-specialist-label" type="text" maxlength="300" autocomplete="off">
+          <label for="agent-specialist-description">Опис — необов’язково</label>
+          <textarea id="agent-specialist-description" rows="3" maxlength="4000" spellcheck="true"></textarea>
+          <label for="agent-specialist-plane">Execution plane</label>
+          <select id="agent-specialist-plane">
             <option value="LOCAL">LOCAL</option>
             <option value="CLOUD">CLOUD</option>
             <option value="REMOTE">REMOTE</option>
           </select>
-          <label for="specialist-capabilities">Capability IDs — щонайменше один, по одному в рядку</label>
-          <textarea id="specialist-capabilities" rows="4" spellcheck="false"></textarea>
-          <label for="specialist-tools">Tool IDs — по одному в рядку</label>
-          <textarea id="specialist-tools" rows="4" spellcheck="false"></textarea>
-          <label for="specialist-result-contract-id">Result contract ID</label>
-          <input id="specialist-result-contract-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
-          <label><input id="specialist-enabled" type="checkbox" checked>Specialist увімкнений</label>
-          <p id="specialist-revision" tabindex="0">Specialist реєстр не вибрано.</p>
-          <div class="agent-actions" aria-label="Дії з Specialist definition">
-            <button id="specialist-save-button" type="button" disabled>Зберегти Specialist</button>
-            <button id="specialist-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
-            <button id="specialist-delete-button" type="button" disabled>Видалити Specialist</button>
+          <label for="agent-specialist-capabilities">Capability IDs — по одному в рядку</label>
+          <textarea id="agent-specialist-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-specialist-tools">Tool IDs — по одному в рядку</label>
+          <textarea id="agent-specialist-tools" rows="4" spellcheck="false"></textarea>
+          <label for="agent-specialist-result-contract">Result contract ID</label>
+          <input id="agent-specialist-result-contract" type="text" maxlength="180" autocomplete="off" spellcheck="false" value="agent-result:v1">
+          <label><input id="agent-specialist-enabled" type="checkbox" checked>Specialist увімкнений</label>
+          <p id="agent-specialist-revision" tabindex="0">Реєстр не вибрано.</p>
+          <div class="agent-actions" aria-label="Дії із specialist definition">
+            <button id="agent-specialist-save-button" type="button" disabled>Зберегти specialist</button>
+            <button id="agent-specialist-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
+            <button id="agent-specialist-delete-button" type="button" disabled>Видалити specialist</button>
           </div>
         </fieldset>
-
-        <p id="specialist-status" role="status">Specialist реєстри ще не завантажено.</p>
-
-        <fieldset class="settings-group" id="specialist-provider-config-group">
-          <legend>OpenHands provider config</legend>
-          <p>Це owner-qualified конфігурація canonical OpenHands provider. Збереження не запускає provider і не означає readiness.</p>
-          <label for="specialist-provider-config-provider-id">Provider ID</label>
-          <input id="specialist-provider-config-provider-id" type="text" readonly spellcheck="false">
-          <label for="specialist-openhands-server-url">Agent Server URL — лише localhost HTTP</label>
-          <input id="specialist-openhands-server-url" type="text" maxlength="300" autocomplete="off" spellcheck="false">
-          <label for="specialist-openhands-server-version">Підтримувана Agent Server version</label>
-          <input id="specialist-openhands-server-version" type="text" readonly spellcheck="false">
-          <label for="specialist-openhands-profile-id">Agent profile ID — canonical lowercase UUID</label>
-          <input id="specialist-openhands-profile-id" type="text" maxlength="36" autocomplete="off" spellcheck="false">
-          <label for="specialist-openhands-profile-revision">Agent profile revision</label>
-          <input id="specialist-openhands-profile-revision" type="number" min="1" step="1">
-          <label for="specialist-openhands-workspace-path">Абсолютний workspace path</label>
-          <input id="specialist-openhands-workspace-path" type="text" maxlength="1000" autocomplete="off" spellcheck="false">
-          <label for="specialist-openhands-capabilities">Qualified capability IDs — щонайменше один, по одному в рядку</label>
-          <textarea id="specialist-openhands-capabilities" rows="4" spellcheck="false"></textarea>
-          <label for="specialist-openhands-request-timeout">Request timeout, секунд — 1–120</label>
-          <input id="specialist-openhands-request-timeout" type="number" min="1" max="120" step="1">
-          <label for="specialist-openhands-max-execution">Max execution, секунд — 1–21600</label>
-          <input id="specialist-openhands-max-execution" type="number" min="1" max="21600" step="1">
-          <label for="specialist-openhands-poll-interval">Poll interval, мс — 100–30000</label>
-          <input id="specialist-openhands-poll-interval" type="number" min="100" max="30000" step="1">
-          <label for="specialist-openhands-max-iterations">Max iterations — 1–500</label>
-          <input id="specialist-openhands-max-iterations" type="number" min="1" max="500" step="1">
-          <label for="specialist-openhands-max-response-bytes">Max response bytes — 1024–2000000</label>
-          <input id="specialist-openhands-max-response-bytes" type="number" min="1024" max="2000000" step="1">
-          <label for="specialist-openhands-auth-mode">Auth mode</label>
-          <input id="specialist-openhands-auth-mode" type="text" readonly spellcheck="false">
-          <p id="specialist-provider-config-revision" tabindex="0">OpenHands provider config ще не збережено.</p>
-          <p id="specialist-provider-config-quarantine-status" tabindex="0">Provider config quarantine ще не перевірено.</p>
-          <div class="agent-actions" aria-label="Дії з OpenHands provider config">
-            <button id="specialist-provider-config-reload-button" type="button">Перезавантажити config</button>
-            <button id="specialist-provider-config-probe-button" type="button" disabled>Перевірити readiness збереженого config</button>
-            <button id="specialist-provider-config-save-button" type="button">Зберегти owner config</button>
-            <button id="specialist-provider-config-clear-button" type="button" disabled>Очистити owner config</button>
-          </div>
-          <p id="specialist-provider-config-status" role="status">OpenHands provider config ще не завантажено.</p>
-        </fieldset>
-
-        <fieldset class="settings-group" id="specialist-provider-runtime-group">
-          <legend>Specialist provider execution</legend>
-          <p id="specialist-provider-runtime-job" tabindex="0">Browser Agent job не вибрано.</p>
-          <p>Claim використовує canonical cross-job admission. Provider success є лише evidence: completion вимагає result artifacts та незалежної verification authority.</p>
-          <label for="specialist-provider-max-concurrent-handoffs">Product-wide max concurrent Specialist handoffs — 0–256, обов’язково для claim</label>
-          <input id="specialist-provider-max-concurrent-handoffs" type="number" min="0" max="256" step="1">
-          <div class="agent-actions" aria-label="Дії з Specialist handoffs">
-            <button id="specialist-provider-runtime-refresh-button" type="button">Оновити handoffs та evidence</button>
-            <button id="specialist-provider-claim-button" type="button" disabled>Claim готових handoffs</button>
-          </div>
-          <label for="specialist-provider-handoff-list">Specialist handoffs поточного Agent</label>
-          <select id="specialist-provider-handoff-list" size="5"></select>
-          <button id="specialist-provider-run-button" type="button" disabled>Запустити provider для вибраного LEASED handoff</button>
-          <label for="specialist-provider-execution-list">Durable provider execution evidence</label>
-          <select id="specialist-provider-execution-list" size="5"></select>
-          <p id="specialist-provider-runtime-status" role="status">Оберіть Browser Agent job, щоб переглянути Specialist handoffs.</p>
-          <p id="specialist-provider-completion-fence" tabindex="0">Provider terminal status не завершує Specialist автоматично. Completion/SAFE_RETRY залишаються fail-closed до artifacts + canonical independent verifier provenance.</p>
-        </fieldset>
+        <p id="agent-specialist-status" role="status">Specialist definitions ще не завантажено.</p>
       </details>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
@@ -550,6 +396,26 @@
           <button id="agent-delete-button" type="button" disabled>Видалити завдання</button>
         </div>
         <div id="agent-history" tabindex="0" aria-label="Історія роботи агента">Історії ще немає.</div>
+      </details>
+
+      <details id="agent-plan-details" open>
+        <summary>План і субагенти поточного завдання</summary>
+        <p id="agent-plan-summary" tabindex="0">Durable plan ще не створено.</p>
+        <ol id="agent-plan-tree" aria-label="Вузли durable plan"></ol>
+        <p id="agent-specialist-handoff-summary" tabindex="0">Specialist handoff ще немає.</p>
+        <ol id="agent-specialist-handoff-list" aria-label="Handoff субагентів"></ol>
+        <fieldset class="settings-group" id="agent-specialist-delegation-group" disabled>
+          <legend>Підготувати bounded handoff</legend>
+          <label for="agent-specialist-delegation-node">Готовий зовнішній plan node</label>
+          <select id="agent-specialist-delegation-node"></select>
+          <label for="agent-specialist-delegation-registry">Реєстр specialist definitions</label>
+          <select id="agent-specialist-delegation-registry"></select>
+          <label for="agent-specialist-delegation-deadline-minutes">Deadline субагента, хвилин</label>
+          <input id="agent-specialist-delegation-deadline-minutes" type="number" min="1" max="10080" step="1" inputmode="numeric" value="60">
+          <label><input id="agent-specialist-delegation-run-now" type="checkbox" checked> Після підготовки автоматично перевірити readiness, видати lease, запустити provider і незалежно перевірити результат</label>
+          <button id="agent-specialist-delegation-prepare-button" type="button" disabled>Вибрати specialist і підготувати handoff</button>
+          <p id="agent-specialist-delegation-status" role="status">Потрібен READY LOCAL, CLOUD або REMOTE node з declared capabilities.</p>
+        </fieldset>
       </details>
 
       <fieldset class="settings-group" id="agent-native-companion-group">
@@ -899,8 +765,8 @@
         </div>
         <label for="scenario-work-timeout">Скільки чекати завершення відповіді, хв</label>
         <input id="scenario-work-timeout" type="number" min="1" max="1440" step="1" inputmode="numeric" value="40">
-        <label for="scenario-work-poll">Перевірка завершення відповіді, с</label>
-        <input id="scenario-work-poll" type="number" min="5" max="600" step="1" inputmode="numeric" value="15">
+        <label for="scenario-work-poll">Перевірка завершення відповіді, с (рекомендовано 180–300)</label>
+        <input id="scenario-work-poll" type="number" min="5" max="600" step="1" inputmode="numeric" value="180">
         <label for="scenario-work-launch-gap">Пауза після завершення відповіді перед наступною роботою, с</label>
         <input id="scenario-work-launch-gap" type="number" min="0" max="3600" step="1" inputmode="numeric" value="0">
         <label for="scenario-work-pre-send">Пауза перед надсиланням, с</label>
@@ -909,6 +775,8 @@
         <input id="scenario-work-busy-check" type="number" min="1" max="30" step="1" inputmode="numeric" value="3">
         <label for="scenario-work-retry">Повтор після технічної помилки, с</label>
         <input id="scenario-work-retry" type="number" min="5" max="3600" step="1" inputmode="numeric" value="30">
+        <label><input id="scenario-work-close-tabs-between-checks" type="checkbox" checked>Після підтвердженого Send одразу закривати вкладку й відкривати її лише для планової перевірки</label>
+        <label><input id="scenario-work-reopen-on-probe-error" type="checkbox" checked>Після помилки перевірки застосувати короткий retry через свіже відкриття цього самого чату</label>
         <label for="scenario-work-timeout-policy">Як діяти, якщо учасник завис</label>
         <select id="scenario-work-timeout-policy">
           <option value="REPLACE_MEMBER">Замінити тільки завислого учасника</option>
@@ -934,7 +802,7 @@
           <div id="scenario-cycle-steps"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
           <label for="scenario-cycle-parallel-count">Скільки чатів тримати одночасно в пулі</label>
-          <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="1">
+          <input id="scenario-cycle-parallel-count" type="number" min="1" max="10000" step="1" inputmode="numeric" value="1">
           <label for="scenario-cycle-replacement-budget">Скільки додаткових чатів створити після початкових</label>
           <input id="scenario-cycle-replacement-budget" type="number" min="0" max="100000" step="1" inputmode="numeric" value="0">
           <label for="scenario-cycle-initial-stagger">Пауза між запуском перших промптів</label>

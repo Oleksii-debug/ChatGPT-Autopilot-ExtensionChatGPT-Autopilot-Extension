@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Автопілот",
-  "version": "10.0.0",
+  "name": "ChatGPT Автопілот — High",
+  "version": "11.0.1",
   "description": "Керує ChatGPT-сеансами та multi-agent оркестрацією з відновленням, GitHub control і локальними лімітами.",
   "permissions": [
     "storage",
@@ -27,7 +27,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Відкрити ChatGPT Автопілот",
+    "default_title": "Відкрити ChatGPT Автопілот — High",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -58,7 +58,7 @@
       "run_at": "document_idle"
     }
   ],
-  "short_name": "Autopilot",
+  "short_name": "Autopilot High",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -76,5 +76,5 @@
     "downloads",
     "notifications"
   ],
-  "version_name": "10"
+  "version_name": "11.0.1 High"
 }

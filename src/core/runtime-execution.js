@@ -58,7 +58,10 @@ const POST_SUBMIT_EVIDENCE_PRESERVE_CODES = new Set([
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
 
 export const DEFAULT_MAX_CONCURRENT_SESSION_OPERATIONS = 10;
-export const MAX_CONCURRENT_SESSION_OPERATIONS = 32;
+// The scheduler must not silently turn a configured 1,000-chat workload into
+// 32 operations.  Tab parking keeps Scenario work from retaining a matching
+// number of live tabs; this is the explicit user-configurable admission cap.
+export const MAX_CONCURRENT_SESSION_OPERATIONS = 1000;
 
 function runtimeConcurrency(state) {
   const raw = Number(state?.profile?.maxConcurrentSessionOperations);
