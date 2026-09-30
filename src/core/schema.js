@@ -4,6 +4,7 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import { validateOutcomeContractRegistryStateV1 } from './outcome-contract-control.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -69,6 +70,7 @@ export function createEmptyState(now = Date.now()) {
     logs: {},
     diagnostics: [],
     migrationHistory: [],
+    outcomeContractsById: {},
   };
 }
 
@@ -349,6 +351,7 @@ export function validateState(state) {
     throw new Error('Invalid diagnostics');
   }
   if (!Array.isArray(state.migrationHistory)) throw new Error('Invalid migrationHistory');
+  validateOutcomeContractRegistryStateV1(state);
 
   const sessionIds = Object.keys(state.sessionsById);
   if (sessionIds.length !== state.sessionOrder.length || sessionIds.some(id => !state.sessionOrder.includes(id))) {
