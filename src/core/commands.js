@@ -14,8 +14,11 @@ import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
-import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeAiRoutePolicy, selectAiRouteCandidates } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
+import {
+  normalizeBoundAgentModelOrchestratorEnvelopeV1,
+} from './agent-model-orchestrator-envelope.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -37,6 +40,45 @@ function minimumNullable(left, right) {
   if (left == null) return right;
   if (right == null) return left;
   return Math.min(left, right);
+}
+function normalizeInternalAgentProviderBudgetContext(value, expectedJobId) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Agent model invocation requires canonical provider budget context');
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Agent model invocation provider budget context must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error('Agent model invocation provider budget context contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent model invocation provider budget context must contain data-only fields');
+    }
+    out[key] = descriptor.value;
+  }
+  if (out.kind !== 'browser-agent') {
+    throw new Error('Agent model invocation requires an existing durable provider budget lifecycle');
+  }
+  if (typeof out.jobId !== 'string' || out.jobId !== expectedJobId) {
+    throw new Error('Agent model invocation budget owner does not match envelope job identity');
+  }
+  if (typeof out.controlEpoch !== 'number'
+      || !Number.isSafeInteger(out.controlEpoch)
+      || Object.is(out.controlEpoch, -0)
+      || out.controlEpoch < 1) {
+    throw new Error('Agent model invocation budget controlEpoch is invalid');
+  }
+  return Object.freeze({
+    kind: out.kind,
+    jobId: out.jobId,
+    controlEpoch: out.controlEpoch,
+  });
 }
 function narrowAiRoutePolicy(baseSettings, rawRequested) {
   if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
@@ -769,27 +811,113 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
+      if (Object.hasOwn(payload, 'agentModelOrchestratorEnvelope')) {
+        throw new Error('Agent model orchestrator envelope is internal-only');
+      }
+      const internalEnvelope = internal?.agentModelOrchestratorEnvelope === undefined
+        ? null
+        : normalizeBoundAgentModelOrchestratorEnvelopeV1(
+          internal.agentModelOrchestratorEnvelope,
+        );
+      if (internalEnvelope) {
+        for (const alias of [
+          'settings','routerOverride','routerRuntime','isolatedRuntime',
+          'forceStrong','taskRole','strongTaskRole','capabilityIds',
+        ]) {
+          if (Object.hasOwn(payload, alias)) {
+            throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
+          }
+        }
+        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
+        if (!Number.isSafeInteger(boundedOutputTokens)
+            || Object.is(boundedOutputTokens, -0)
+            || boundedOutputTokens < 1) {
+          throw new Error('Agent model invocation requires bounded maxOutputTokens');
+        }
+      }
+      const providerCallBudgetContext = internalEnvelope
+        ? normalizeInternalAgentProviderBudgetContext(
+          internal?.providerCallBudgetContext,
+          internalEnvelope.jobId,
+        )
+        : internal?.providerCallBudgetContext || null;
+
       const state = await this.repo.load();
-      const baseSettings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-      const settings = payload.routerOverride
-        ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
-        : baseSettings;
-      const isolatedRuntime = payload.isolatedRuntime === true;
-      const runtime = isolatedRuntime
-        ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
-        : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
+      if (internalEnvelope) {
+        const invocationNow = this.now();
+        if (typeof invocationNow !== 'number'
+            || !Number.isSafeInteger(invocationNow)
+            || Object.is(invocationNow, -0)
+            || invocationNow < internalEnvelope.revalidatedAt) {
+          throw new Error('Agent model invocation time is stale or invalid');
+        }
+        const currentSettings = normalizeAiRouterSettings(
+          state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+        if (currentSettings.enabled !== true) {
+          throw new Error('Current canonical AI Router is disabled before Agent model invocation');
+        }
+        const currentRoute = currentSettings.routes.find(
+          route => route.routeId === internalEnvelope.routeId,
+        );
+        const envelopeRoute = internalEnvelope.settings.routes[0];
+        if (currentSettings.gatewayUrl !== internalEnvelope.settings.gatewayUrl) {
+          throw new Error('Agent model Gateway identity drifted before provider invocation');
+        }
+        if (!currentRoute
+            || currentRoute.provider !== envelopeRoute.provider
+            || currentRoute.model !== envelopeRoute.model
+            || currentRoute.endpointId !== envelopeRoute.endpointId) {
+          throw new Error('Agent model route identity drifted before provider invocation');
+        }
+        const currentRuntime = normalizeAiRouterRuntime(
+          state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
+        );
+        const currentCandidates = selectAiRouteCandidates({
+          routes: currentSettings.routes,
+          policy: currentSettings.routePolicy,
+          routeStates: currentRuntime.routeStates,
+          role: internalEnvelope.role,
+          capabilityIds: internalEnvelope.capabilityIds,
+          requiresVision: internalEnvelope.requiresVision,
+          now: invocationNow,
+        });
+        if (!currentCandidates.candidates.some(
+          route => route.routeId === internalEnvelope.routeId,
+        )) {
+          throw new Error('Agent model route is no longer authorized by current canonical Router');
+        }
+      }
+      const baseSettings = internalEnvelope
+        ? internalEnvelope.settings
+        : normalizeAiRouterSettings(
+          payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+      const settings = internalEnvelope
+        ? baseSettings
+        : payload.routerOverride
+          ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
+          : baseSettings;
+      const isolatedRuntime = internalEnvelope ? true : payload.isolatedRuntime === true;
+      const runtime = internalEnvelope
+        ? internalEnvelope.runtime
+        : isolatedRuntime
+          ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
+          : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
         result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
           systemPrompt: payload.systemPrompt || '',
-          forceStrong: payload.forceStrong === true,
+          forceStrong: internalEnvelope ? false : payload.forceStrong === true,
           maxOutputTokens: Number(payload.maxOutputTokens || 0),
           maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
           imageDataUrl: payload.imageDataUrl || '',
-          taskRole: payload.taskRole || 'planner',
-          strongTaskRole: payload.strongTaskRole || 'verifier',
-          capabilityIds: Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
-          providerCallBudgetContext: internal?.providerCallBudgetContext || null,
+          taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
+          strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
+          capabilityIds: internalEnvelope
+            ? [...internalEnvelope.capabilityIds]
+            : Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
+          providerCallBudgetContext,
         });
       } catch (error) {
         if (!isolatedRuntime && error?.routerRuntime) {
