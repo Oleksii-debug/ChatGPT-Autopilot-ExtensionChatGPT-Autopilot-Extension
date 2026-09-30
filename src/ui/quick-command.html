@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Швидкі дії — ChatGPT Автопілот</title>
+  <link rel="stylesheet" href="quick-command.css">
+</head>
+<body>
+  <main>
+    <h1>Швидкі дії</h1>
+    <p id="intro">Виберіть джерело і read-only дію. Ctrl+Shift+Y відкриває це вікно.</p>
+
+    <label for="source-kind">Джерело</label>
+    <select id="source-kind">
+      <option value="SELECTION">Виділений текст на поточній сторінці</option>
+      <option value="CLIPBOARD">Буфер обміну — вставити вручну</option>
+      <option value="CURRENT_PAGE">Текст поточної сторінки</option>
+    </select>
+
+    <button id="capture-source" type="button">Захопити джерело</button>
+    <p id="capture-help">Захоплення виконується тільки після натискання цієї кнопки.</p>
+
+    <label for="source-text">Текст джерела</label>
+    <textarea id="source-text" rows="8" aria-describedby="capture-help" readonly></textarea>
+
+    <label for="source-uri">Адреса сторінки</label>
+    <input id="source-uri" type="text" readonly>
+
+    <label for="operation">Дія</label>
+    <select id="operation">
+      <option value="SUMMARIZE">Підсумувати</option>
+      <option value="REWRITE">Переписати</option>
+      <option value="TRANSLATE">Перекласти</option>
+      <option value="EXTRACT_STRUCTURED">Витягти структуровані дані</option>
+    </select>
+
+    <div class="actions">
+      <button id="run-command" type="button">Запустити швидку дію</button>
+      <button id="open-options" type="button">Відкрити повні налаштування</button>
+    </div>
+
+    <p id="status" role="status" aria-live="polite" tabindex="-1">Готово.</p>
+  </main>
+  <script type="module" src="quick-command.js"></script>
+</body>
+</html>
