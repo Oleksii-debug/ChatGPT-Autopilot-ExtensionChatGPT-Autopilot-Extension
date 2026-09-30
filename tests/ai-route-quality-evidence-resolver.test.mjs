@@ -78,6 +78,64 @@ test('resolver gives the reader only immutable route IDs and returns requested e
   assert.equal(Object.isFrozen(result[0]), true);
 });
 
+test('resolver snapshots reader-owned nested evaluation data without aliasing', async () => {
+  const source = binding('route-a');
+  source.evaluationRequest = {
+    nested:{ value:'before' },
+    rows:[{ score:1 }],
+  };
+  const resolver = createAiRouteQualityEvidenceResolverV1({
+    readBenchmarkRequests:async () => [source],
+  });
+
+  const result = await resolver({
+    routeIds:['route-a'],
+    role:'planner',
+    requiresVision:false,
+  });
+
+  source.evaluationRequest.nested.value = 'after';
+  source.evaluationRequest.rows[0].score = 2;
+
+  assert.equal(result[0].evaluationRequest.nested.value, 'before');
+  assert.equal(result[0].evaluationRequest.rows[0].score, 1);
+  assert.equal(Object.isFrozen(result[0].evaluationRequest), true);
+  assert.equal(Object.isFrozen(result[0].evaluationRequest.nested), true);
+  assert.equal(Object.isFrozen(result[0].evaluationRequest.rows), true);
+  assert.equal(Object.isFrozen(result[0].evaluationRequest.rows[0]), true);
+});
+
+test('resolver nested evaluation boundary rejects accessors and cycles without executing getter code', async () => {
+  let reads = 0;
+  const hostile = binding('route-a');
+  Object.defineProperty(hostile.evaluationRequest, 'danger', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return 'must-not-run';
+    },
+  });
+  const hostileResolver = createAiRouteQualityEvidenceResolverV1({
+    readBenchmarkRequests:async () => [hostile],
+  });
+  await assert.rejects(
+    hostileResolver({ routeIds:['route-a'], role:'planner', requiresVision:false }),
+    /enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+
+  const cyclic = binding('route-a');
+  cyclic.evaluationRequest.self = cyclic.evaluationRequest;
+  const cyclicResolver = createAiRouteQualityEvidenceResolverV1({
+    readBenchmarkRequests:async () => [cyclic],
+  });
+  await assert.rejects(
+    cyclicResolver({ routeIds:['route-a'], role:'planner', requiresVision:false }),
+    /cyclic JSON data/u,
+  );
+});
+
 test('missing benchmark evidence is valid and does not invent records', async () => {
   const resolver = createAiRouteQualityEvidenceResolverV1({
     readBenchmarkRequests:async () => [],
