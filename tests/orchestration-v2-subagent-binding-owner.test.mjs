@@ -95,7 +95,10 @@ function contract(projectId='project-1'){
       criterionId:'criterion-1',description:'Result complete.',observable:'Artifact exists.',
       requiredEvidenceKinds:['ARTIFACT'],
     }],
-    constraints:[],sourceTruth:[],allowedAuthority:[],
+    constraints:[],sourceTruth:[{
+      sourceId:'source-main',location:'github://owner/repo/main',revisionId:'main-exact',
+      purpose:'Canonical implementation truth.',
+    }],allowedAuthority:[],
     budgetBoundaries:{
       maxModelCalls:2,maxRuntimeSeconds:60,maxCostUsdMicros:100,maxConcurrency:1,
       enforcementAuthority:'NONE',
