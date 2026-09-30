@@ -170,7 +170,7 @@ test('binding ID cannot be reused with divergent boundAt even though boundAt is 
   assert.equal(divergent.bindingId, value.bindingId);
   assert.throws(
     () => append(registry, divergent, '2026-09-27T18:05:00.000Z'),
-    /Divergent subagent task activation bindingId collision/u,
+    /Divergent subagent task activation bindingId(?: or authority provenance)? collision/u,
   );
 });
 
