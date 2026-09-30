@@ -544,6 +544,7 @@ test('task-bound child context rejects stale source and artifact identities', ()
           sourceId: 'source.allowed',
           location: 'private://parent/source.allowed',
           revisionId: 'r-stale',
+          contentSha256: 'a'.repeat(64),
         }],
       }),
     })),
