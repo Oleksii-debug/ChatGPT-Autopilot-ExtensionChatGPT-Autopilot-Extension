@@ -6,6 +6,7 @@ import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
+import { createAgentViewFenceV1, createAgentJobsReadGateV1, readAgentJobsWithDeadlineV1, describeAgentSpecialistProgressV1 } from './agent-owner-view.js';
 import {
   agentDefinitionLaunchScopeTextV1,
   buildAgentDefinitionLaunchRequestV1,
@@ -63,6 +64,39 @@ const ui = {
 };
 
 const $ = (id) => document.getElementById(id);
+const agentViewFence = createAgentViewFenceV1();
+const agentOwnerOperations = new Set();
+let agentBackgroundRefresh = null;
+const agentJobsReadGate = createAgentJobsReadGateV1(() => core('LIST_BROWSER_AGENT_JOBS'));
+let agentOwnerOperationSequence = 0;
+let agentListProjection = '';
+function selectBrowserAgentView(id) {
+  ui.selectedBrowserAgentId = id || '';
+  return agentViewFence.select(ui.selectedBrowserAgentId);
+}
+function beginAgentOwnerOperation(command, id = ui.selectedBrowserAgentId) {
+  const key = `${command}:${id || ''}`;
+  if (agentOwnerOperations.has(key)) return null;
+  agentOwnerOperations.add(key);
+  agentJobsReadGate.invalidate();
+  return { key, ticket: selectBrowserAgentView(ui.selectedBrowserAgentId), sequence: ++agentOwnerOperationSequence };
+}
+function finishAgentOwnerOperation(operation) {
+  agentOwnerOperations.delete(operation.key);
+  agentJobsReadGate.invalidate();
+}
+function agentOwnerResult(operation, message) {
+  if (operation.sequence === agentOwnerOperationSequence) $('agent-command-result').textContent = message;
+}
+function refreshBrowserAgentJobs() {
+  const changingList = [...agentOwnerOperations].some(key => key.startsWith('CREATE:') || key.startsWith('DELETE:'));
+  if (agentBackgroundRefresh || changingList) return agentBackgroundRefresh;
+  const refresh = loadBrowserAgentJobs();
+  agentBackgroundRefresh = refresh;
+  const release = () => { if (agentBackgroundRefresh === refresh) agentBackgroundRefresh = null; };
+  refresh.then(release, release);
+  return refresh;
+}
 const announce = (text) => { $('live-announcer').textContent = ''; requestAnimationFrame(() => { $('live-announcer').textContent = text; }); };
 const formatTime = (value) => value ? new Date(value).toLocaleString() : 'Not available';
 const runtimeAvailable = () => Boolean(globalThis.chrome?.runtime?.sendMessage);
@@ -2572,45 +2606,44 @@ async function createBrowserAgentFromDefinition() {
     status.textContent = 'Спочатку оберіть reusable Agent definition.';
     return;
   }
-
+  const operation = beginAgentOwnerOperation('CREATE', '');
+  if (!operation) return;
+  let createdId = '';
   try {
     const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
-      registry,
-      definition,
-      ownerPolicy: browserAgentOwnerBudgetPolicyFromForm(),
+      registry, definition, ownerPolicy: browserAgentOwnerBudgetPolicyFromForm(),
     });
     button.disabled = true;
-    status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
-
+    status.textContent = 'Створюю збережене STOPPED-завдання. Виконання не запускається…';
     const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
     const id = created?.job?.id || created?.selectedId;
     if (!id) throw new Error('Core не повернув id створеного Agent job.');
-
-    ui.selectedBrowserAgentId = id;
+    createdId = id;
+    agentJobsReadGate.invalidate();
+    const runState = created?.job?.runtime?.runState || '';
+    if (runState !== 'STOPPED') throw new Error(`Завдання вже створено, але Core повернув стан ${runState || 'UNKNOWN'}`);
+    const message = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Перевірте його і запускайте окремо.`;
+    agentOwnerResult(operation, message);
+    status.textContent = message;
+    if (!agentViewFence.current(operation.ticket)) return;
+    operation.ticket = selectBrowserAgentView(id);
     ui.agentDraftActive = false;
     ui.agentPolicyDirty = false;
-    await loadBrowserAgentJobs({ selectId: id });
-
-    const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
-    if (runState !== 'STOPPED') {
-      throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
-    }
-
-    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    renderBrowserAgentJob(created.job);
+    const refreshed = await loadBrowserAgentJobs({ selectId: id });
+    if (refreshed.error) status.textContent = `${message} Оновлення списку не вдалося: ${refreshed.error.message}`;
+    if (agentViewFence.current(operation.ticket)) $('agent-job-list').focus();
     announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
-    $('agent-job-list').focus();
   } catch (error) {
-    if (/revision drifted/i.test(String(error?.message || ''))) {
-      await loadAgentDefinitionRegistries({
-        selectRegistryId: registry.registryId,
-        selectDefinitionId: definition.agentDefinitionId,
-      });
+    if (createdId) {
+      status.textContent = `Завдання ${createdId} вже створено. Перевірка стану не вдалася: ${error.message}. Перевірте його у списку перед повторним створенням.`;
+    } else if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadAgentDefinitionRegistries({ selectRegistryId: registry.registryId, selectDefinitionId: definition.agentDefinitionId });
       status.textContent = 'Definition змінилася до створення. Актуальні дані перезавантажено; перевірте grants і повторіть створення.';
-      announce('Agent definition змінилася. Актуальні дані перезавантажено.');
-    } else {
-      status.textContent = `Завдання з definition не створено: ${error.message}`;
-    }
+    } else status.textContent = `Створення з definition не підтверджено: ${error.message}. Перевірте список завдань перед повторним створенням.`;
+    agentOwnerResult(operation, status.textContent);
   } finally {
+    finishAgentOwnerOperation(operation);
     button.disabled = !(ui.selectedAgentDefinition?.enabled === true && ui.selectedAgentDefinitionRegistry);
   }
 }
@@ -3288,7 +3321,8 @@ function renderBrowserAgentPlan(runtime = {}) {
       ? `; artifacts ${handoff.resultArtifactIds.join(', ')}`
       : '';
     const lease = handoff.leaseExpiresAt ? `; lease до ${new Date(handoff.leaseExpiresAt).toLocaleString()}` : '';
-    item.textContent = `[${handoff.state}] ${handoff.specialistId} — ${handoff.purpose} (${handoff.agentId})${capabilities}${artifacts}${lease}`;
+    const progress = describeAgentSpecialistProgressV1(runtime, handoff);
+    item.textContent = `[${progress.label}] ${handoff.specialistId} — ${handoff.purpose} (${handoff.agentId})${capabilities}${artifacts}${lease}${progress.details ? `; ${progress.details}` : ''}`;
     handoffList.append(item);
   }
   renderSpecialistDelegationControls(runtime);
@@ -3347,51 +3381,57 @@ async function prepareAutomaticSpecialistDelegation() {
     $('agent-specialist-delegation-deadline-minutes').focus();
     return;
   }
+  const operation = beginAgentOwnerOperation('SPECIALIST', job.id);
+  if (!operation) return;
+  const runNow = $('agent-specialist-delegation-run-now').checked;
   let prepared = false;
   try {
     $('agent-specialist-delegation-prepare-button').disabled = true;
-    $('agent-specialist-delegation-status').textContent = 'Перевіряю scope, registry revision і вибираю least-authority specialist…';
+    $('agent-specialist-delegation-status').textContent = 'Перевіряю повноваження й вибираю спеціаліста…';
     const deadlineAt = new Date(Date.now() + minutes * 60_000).toISOString();
     const result = await core('PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION', {
       id: job.id,
-      delegation: {
-        registryId: registry.registryId,
-        expectedRegistryRevision: registry.revision,
-        expectedPlanRevision: plan.revision,
-        nodeId,
-        policyEnvelopeId: `browser-agent-policy:${job.id}`,
-        deadlineAt,
-        priority: 0,
-        autoRun: $('agent-specialist-delegation-run-now').checked,
-      },
+      delegation: { registryId: registry.registryId, expectedRegistryRevision: registry.revision,
+        expectedPlanRevision: plan.revision, nodeId, policyEnvelopeId: `browser-agent-policy:${job.id}`,
+        deadlineAt, priority: 0, autoRun: runNow },
     });
     prepared = true;
-    if ($('agent-specialist-delegation-run-now').checked) {
-      $('agent-specialist-delegation-status').textContent = 'Handoff підготовлено. Перевіряю provider readiness, запускаю bounded lease і незалежну перевірку…';
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Субагента для ${job.id} підготовлено.`);
+    if (!agentViewFence.current(operation.ticket)) return;
+    if (runNow) {
+      $('agent-specialist-delegation-status').textContent = 'Субагента підготовлено. Очікую виконання та незалежну перевірку…';
       await core('RUN_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF', {
-        id: job.id,
-        run: {
-          registryId: registry.registryId,
-          expectedRegistryRevision: registry.revision,
-          expectedPlanRevision: result.plan.revision,
-          agentId: result.handoff.agentId,
-          maxConcurrentHandoffs: 4,
-          leaseSeconds: 900,
-        },
+        id: job.id, run: { registryId: registry.registryId, expectedRegistryRevision: registry.revision,
+          expectedPlanRevision: result.plan.revision, agentId: result.handoff.agentId,
+          maxConcurrentHandoffs: 4, leaseSeconds: 900 },
       });
-      await loadBrowserAgentJobs({ selectId: job.id });
-      $('agent-specialist-delegation-status').textContent = `Specialist ${result?.proposal?.selection?.specialistId || ''} виконав handoff; незалежний verifier підтвердив результат.`;
-      announce('Specialist handoff виконано й незалежно перевірено.');
-    } else {
-      await loadBrowserAgentJobs({ selectId: job.id });
-      $('agent-specialist-delegation-status').textContent = `Handoff підготовлено для ${result?.proposal?.selection?.specialistId || 'specialist'}. Provider effect ще не запускався.`;
-      announce('Least-authority specialist handoff підготовлено.');
+      agentJobsReadGate.invalidate();
     }
+    if (!agentViewFence.current(operation.ticket)) return;
+    const refreshed = await loadBrowserAgentJobs({ selectId: job.id });
+    if (!agentViewFence.current(operation.ticket)) return;
+    const handoff = refreshed.job?.runtime?.specialistHandoffs?.find(item => item.agentId === result.handoff.agentId);
+    const progress = handoff ? describeAgentSpecialistProgressV1(refreshed.job.runtime, handoff) : null;
+    const message = progress
+      ? `Субагент ${result.handoff.agentId}: ${progress.label}${progress.details ? `; ${progress.details}` : ''}.`
+      : `Субагента ${result.handoff.agentId} підготовлено. Актуальний стан виконання ще не прочитано.`;
+    $('agent-specialist-delegation-status').textContent = message;
+    agentOwnerResult(operation, message);
+    announce(message);
   } catch (error) {
-    await loadBrowserAgentJobs({ selectId: job.id });
-    $('agent-specialist-delegation-status').textContent = prepared
-      ? `Handoff підготовлено, але автоматичне виконання зупинилося: ${error.message}`
-      : `Handoff не підготовлено: ${error.message}`;
+    const message = prepared ? `Субагента для ${job.id} підготовлено; завершення виконання не підтверджене: ${error.message}`
+      : `Підготовка субагента для ${job.id} не підтверджена: ${error.message}`;
+    agentOwnerResult(operation, message);
+    if (agentViewFence.current(operation.ticket)) {
+      await loadBrowserAgentJobs({ selectId: job.id });
+      if (agentViewFence.current(operation.ticket)) $('agent-specialist-delegation-status').textContent = message;
+    }
+  } finally {
+    finishAgentOwnerOperation(operation);
+    const previousStatus = $('agent-specialist-delegation-status').textContent;
+    renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {});
+    if (agentViewFence.current(operation.ticket)) $('agent-specialist-delegation-status').textContent = previousStatus;
   }
 }
 
@@ -3461,6 +3501,9 @@ ${pendingScript}` : '';
 function renderBrowserAgentList() {
   const list = $('agent-job-list');
   const selected = ui.selectedBrowserAgentId;
+  const projection = JSON.stringify(ui.browserAgentJobs.map(job => [job.id, job.config?.name, job.runtime?.runState]));
+  if (projection === agentListProjection) { list.value = selected; return; }
+  agentListProjection = projection;
   list.replaceChildren();
   for (const job of ui.browserAgentJobs) {
     const option = document.createElement('option');
@@ -3500,22 +3543,35 @@ async function saveBrowserAgentExecutionPolicy() {
 }
 
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
+  const ticket = agentViewFence.beginRead();
   try {
-    const data = await core('LIST_BROWSER_AGENT_JOBS');
+    let result;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      result = await readAgentJobsWithDeadlineV1(() => agentJobsReadGate.read());
+      if (!agentViewFence.currentRead(ticket)) return { applied: false };
+      if (agentJobsReadGate.current(result)) break;
+      result = null;
+    }
+    if (!result) return { applied: false };
+    const data = result.data;
     const previousId = ui.selectedBrowserAgentId;
     ui.browserAgentJobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    ui.selectedBrowserAgentId = selectId || ui.selectedBrowserAgentId || data?.selectedId || ui.browserAgentJobs[0]?.id || '';
-    if (ui.selectedBrowserAgentId && !ui.browserAgentJobs.some(job => job.id === ui.selectedBrowserAgentId)) ui.selectedBrowserAgentId = ui.browserAgentJobs[0]?.id || '';
-    if (previousId && previousId !== ui.selectedBrowserAgentId) {
+    const requestedId = selectId || previousId || data?.selectedId || '';
+    const nextId = ui.browserAgentJobs.some(job => job.id === requestedId)
+      ? requestedId : ui.browserAgentJobs[0]?.id || '';
+    if (nextId !== previousId) selectBrowserAgentView(nextId);
+    if (previousId && previousId !== nextId) {
       ui.agentPolicyDirty = false;
       ui.agentPolicyEditEpoch += 1;
       $('agent-policy-edit-status').textContent = 'Вибране завдання змінилося; показано його збережену політику.';
     }
     renderBrowserAgentList();
-    const job = ui.browserAgentJobs.find(item => item.id === ui.selectedBrowserAgentId) || null;
+    const job = ui.browserAgentJobs.find(item => item.id === nextId) || null;
     renderBrowserAgentJob(job);
+    return { applied: true, job };
   } catch (error) {
-    $('agent-status').textContent = `Не вдалося завантажити Agent: ${error.message}`;
+    if (agentViewFence.currentRead(ticket)) $('agent-status').textContent = `Не вдалося завантажити Agent: ${error.message}`;
+    return { applied: false, error };
   }
 }
 
@@ -3525,48 +3581,66 @@ async function selectBrowserAgentJob() {
   ui.agentPolicyEditEpoch += 1;
   $('agent-policy-edit-status').textContent = 'Змін політики немає.';
   const id = $('agent-job-list').value;
-  if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
+  const ticket = selectBrowserAgentView(id);
+  renderBrowserAgentJob(ui.browserAgentJobs.find(job => job.id === id) || null);
+  if (!id) return;
   try {
     const data = await core('SELECT_BROWSER_AGENT_JOB', { id });
-    ui.selectedBrowserAgentId = id;
+    if (!agentViewFence.current(ticket)) return;
+    if (data?.job && data.job.id !== id) throw new Error('Core повернув інше завдання Agent.');
     renderBrowserAgentJob(data?.job || null);
     renderBrowserAgentList();
-  } catch (error) { $('agent-status').textContent = `Не вдалося відкрити завдання: ${error.message}`; }
+  } catch (error) {
+    if (agentViewFence.current(ticket)) $('agent-status').textContent = `Не вдалося відкрити завдання: ${error.message}`;
+  }
 }
 
 async function runBrowserAgentPrompt() {
   const goal = $('agent-prompt').value.trim();
   if (!goal) { $('agent-status').textContent = 'Опишіть, що Agent має зробити.'; $('agent-prompt').focus(); return; }
+  const operation = beginAgentOwnerOperation('CREATE', '');
+  if (!operation) return;
+  let createdId = '';
   try {
     assertBrowserAgentRouteReadyForLaunch();
     $('agent-run-prompt-button').disabled = true;
     $('agent-status').textContent = 'Створюю завдання й запускаю Agent…';
     const created = await core('CREATE_BROWSER_AGENT_JOB', {
-      name: browserAgentNameFromGoal(goal),
-      goal,
-      ...browserAgentPolicyFromForm(),
+      name: browserAgentNameFromGoal(goal), goal, ...browserAgentPolicyFromForm(),
     });
-    const id = created?.job?.id || created?.selectedId;
-    if (!id) throw new Error('Core не повернув id завдання Agent.');
-    ui.selectedBrowserAgentId = id;
-    ui.agentDraftActive = false;
-    ui.agentPolicyDirty = false;
-    $('agent-policy-edit-status').textContent = 'Політику нового завдання збережено.';
-    await core('START_BROWSER_AGENT_JOB', { id });
-    await loadBrowserAgentJobs({ selectId: id });
+    createdId = created?.job?.id || created?.selectedId || '';
+    if (!createdId) throw new Error('Core не повернув id завдання Agent.');
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Завдання ${createdId} створено. Надсилаю команду запуску…`);
+    if (agentViewFence.current(operation.ticket)) {
+      operation.ticket = selectBrowserAgentView(createdId);
+      ui.agentDraftActive = false;
+      ui.agentPolicyDirty = false;
+      $('agent-policy-edit-status').textContent = 'Політику нового завдання збережено.';
+      if (created.job) renderBrowserAgentJob(created.job);
+    }
+    await core('START_BROWSER_AGENT_JOB', { id: createdId });
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Завдання ${createdId} створено; Core підтвердив команду запуску.`);
+    if (!agentViewFence.current(operation.ticket)) return;
+    const refreshed = await loadBrowserAgentJobs({ selectId: createdId });
+    if (!refreshed.applied || !agentViewFence.current(operation.ticket)) return;
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
       $('agent-permission-status').textContent = 'Потрібен дозвіл Chrome на сайт. Натисніть «Дозволити потрібний сайт».';
       $('agent-allow-current-site-button').focus();
     } else if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_CAPABILITY') {
-      $('agent-permission-status').textContent = `Потрібен додатковий дозвіл Chrome: ${ui.selectedBrowserAgent?.runtime?.capabilityPermission || 'capability'}.`;
-      if (ui.selectedBrowserAgent?.runtime?.capabilityPermission === 'downloads') $('agent-allow-downloads-button').focus();
-      else if (ui.selectedBrowserAgent?.runtime?.capabilityPermission === 'notifications') $('agent-allow-notifications-button').focus();
-    } else {
-      $('agent-status').focus?.();
-    }
+      $('agent-permission-status').textContent = `Потрібен додатковий дозвіл Chrome: ${ui.selectedBrowserAgent.runtime.capabilityPermission || 'capability'}.`;
+    } else $('agent-status').focus?.();
   } catch (error) {
-    $('agent-status').textContent = `Agent не запущено: ${error.message}`;
-  } finally { $('agent-run-prompt-button').disabled = false; }
+    const message = createdId
+      ? `Завдання ${createdId} вже створено. Core не підтвердив команду запуску: ${error.message}. Перевірте це завдання у списку перед повторним запуском.`
+      : `Створення Agent не підтверджено: ${error.message}. Перевірте список завдань перед повторним створенням.`;
+    agentOwnerResult(operation, message);
+    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
+  } finally {
+    finishAgentOwnerOperation(operation);
+    $('agent-run-prompt-button').disabled = false;
+  }
 }
 
 async function importBrowserAgentDraft() {
@@ -3596,68 +3670,86 @@ function exportBrowserAgentDraft() {
 async function browserAgentLifecycle(command) {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
+  const label = ({ PAUSE_BROWSER_AGENT_JOB: 'Пауза', RESUME_BROWSER_AGENT_JOB: 'Продовження', STOP_BROWSER_AGENT_JOB: 'Stop', STEP_BROWSER_AGENT_JOB: 'Один крок', RUN_BROWSER_AGENT_BURST: 'Виконання', APPROVE_BROWSER_AGENT_ACTION: 'Підтвердження дії', REJECT_BROWSER_AGENT_ACTION: 'Відхилення дії' })[command] || 'Команда';
+  const operation = beginAgentOwnerOperation(command, id);
+  if (!operation) return;
   try {
     await core(command, { id });
-    await loadBrowserAgentJobs({ selectId: id });
-  } catch (error) { $('agent-status').textContent = `Команда Agent не виконана: ${error.message}`; }
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `${label}: Core підтвердив команду для завдання ${id}.`);
+    if (agentViewFence.current(operation.ticket)) await loadBrowserAgentJobs({ selectId: id });
+  } catch (error) {
+    const message = `${label} для Agent ${id} не підтверджено: ${error.message}.`;
+    agentOwnerResult(operation, message);
+    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
+  } finally { finishAgentOwnerOperation(operation); }
 }
 
 async function sendBrowserAgentFollowUp() {
   const id = ui.selectedBrowserAgentId;
   const text = $('agent-follow-up').value.trim();
   if (!id || !text) { $('agent-follow-up').focus(); return; }
+  const operation = beginAgentOwnerOperation('FOLLOW_UP', id);
+  if (!operation) return;
+  let recorded = false;
   try {
     await core('ADD_BROWSER_AGENT_INSTRUCTION', { id, text });
-    $('agent-follow-up').value = '';
-    await loadBrowserAgentJobs({ selectId: id });
-    if (ui.selectedBrowserAgent?.runtime?.runState === 'RUNNING') await core('RUN_BROWSER_AGENT_BURST', { id });
-    await loadBrowserAgentJobs({ selectId: id });
-    announce('Уточнення передано Agent.');
-  } catch (error) { $('agent-status').textContent = `Уточнення не передано: ${error.message}`; }
+    recorded = true;
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Уточнення записано для Agent ${id}.`);
+    if (!agentViewFence.current(operation.ticket)) return;
+    if ($('agent-follow-up').value.trim() === text) $('agent-follow-up').value = '';
+    const refreshed = await loadBrowserAgentJobs({ selectId: id });
+    if (!agentViewFence.current(operation.ticket)) return;
+    if (refreshed.job?.runtime?.runState === 'RUNNING') {
+      await core('RUN_BROWSER_AGENT_BURST', { id });
+      agentJobsReadGate.invalidate();
+      if (agentViewFence.current(operation.ticket)) await loadBrowserAgentJobs({ selectId: id });
+    }
+    if (agentViewFence.current(operation.ticket)) announce(`Уточнення передано Agent ${id}.`);
+  } catch (error) {
+    const message = recorded ? `Уточнення для Agent ${id} записано; оновлення стану не підтверджене: ${error.message}`
+      : `Запис уточнення для Agent ${id} не підтверджено: ${error.message}`;
+    agentOwnerResult(operation, message);
+    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
+  } finally { finishAgentOwnerOperation(operation); }
 }
 
 async function saveBrowserAgentPolicy() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
+  const operation = beginAgentOwnerOperation('SAVE_POLICY', id);
+  if (!operation) return;
   try {
     assertBrowserAgentRouteReadyForLaunch();
     const editEpoch = ui.agentPolicyEditEpoch;
     await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
-    if (ui.selectedBrowserAgentId !== id) return;
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Політику Agent ${id} збережено.`);
+    if (!agentViewFence.current(operation.ticket)) return;
     if (editEpoch === ui.agentPolicyEditEpoch) {
       ui.agentPolicyDirty = false;
       ui.agentDraftActive = false;
       $('agent-policy-edit-status').textContent = 'Політику Agent збережено.';
-    } else {
-      $('agent-policy-edit-status').textContent = 'Попередні зміни збережено; нові зміни ще не збережені.';
-    }
+    } else $('agent-policy-edit-status').textContent = 'Попередні зміни збережено; нові зміни ще не збережені.';
     await loadBrowserAgentJobs({ selectId: id });
-    announce('Політику Agent збережено.');
-  } catch (error) { $('agent-status').textContent = `Політику не збережено: ${error.message}`; }
+  } catch (error) {
+    agentOwnerResult(operation, `Збереження політики Agent ${id} не підтверджено: ${error.message}`);
+    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = `Політику не збережено: ${error.message}`;
+  } finally { finishAgentOwnerOperation(operation); }
 }
 
 async function approveBrowserAgentAction() {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  try {
-    $('agent-approval-status').textContent = 'Підтверджую дію та продовжую Agent…';
-    await core('APPROVE_BROWSER_AGENT_ACTION', { id });
-    await loadBrowserAgentJobs({ selectId: id });
-    announce('Дію Agent підтверджено.');
-  } catch (error) { $('agent-approval-status').textContent = `Дію не підтверджено: ${error.message}`; }
+  await browserAgentLifecycle('APPROVE_BROWSER_AGENT_ACTION');
 }
 
 async function rejectBrowserAgentAction() {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  try {
-    await core('REJECT_BROWSER_AGENT_ACTION', { id });
-    await loadBrowserAgentJobs({ selectId: id });
-    announce('Дію Agent відхилено; завдання поставлено на паузу.');
-  } catch (error) { $('agent-approval-status').textContent = `Дію не відхилено: ${error.message}`; }
+  await browserAgentLifecycle('REJECT_BROWSER_AGENT_ACTION');
 }
 
 async function requestBrowserAgentPermission({ allSites = false } = {}) {
+  const id = ui.selectedBrowserAgentId;
+  const ticket = agentViewFence.capture();
   try {
     if (!globalThis.chrome?.permissions?.request) throw new Error('Chrome permissions API недоступний.');
     let origins;
@@ -3670,23 +3762,31 @@ async function requestBrowserAgentPermission({ allSites = false } = {}) {
       origins = [`${url.origin}/*`];
     }
     const granted = await chrome.permissions.request({ origins });
+    if (!agentViewFence.current(ticket)) return;
     $('agent-permission-status').textContent = granted ? 'Дозвіл надано.' : 'Chrome не надав дозвіл.';
-    if (granted && ui.selectedBrowserAgentId && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
-      await core('RESUME_BROWSER_AGENT_JOB', { id: ui.selectedBrowserAgentId });
-      await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
+    if (granted && id && agentViewFence.current(ticket) && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
+      await core('RESUME_BROWSER_AGENT_JOB', { id });
+      agentJobsReadGate.invalidate();
+      if (!agentViewFence.current(ticket)) return;
+      await loadBrowserAgentJobs({ selectId: id });
     }
   } catch (error) { $('agent-permission-status').textContent = `Дозвіл не отримано: ${error.message}`; }
 }
 
 async function requestBrowserAgentCapability(permission) {
+  const id = ui.selectedBrowserAgentId;
+  const ticket = agentViewFence.capture();
   try {
     if (!globalThis.chrome?.permissions?.request) throw new Error('Chrome permissions API недоступний.');
     const granted = await chrome.permissions.request({ permissions: [permission] });
+    if (!agentViewFence.current(ticket)) return;
     $('agent-permission-status').textContent = granted ? `Capability ${permission} дозволено.` : `Chrome не надав capability ${permission}.`;
-    if (granted && ui.selectedBrowserAgentId && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_CAPABILITY'
+    if (granted && id && agentViewFence.current(ticket) && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_CAPABILITY'
       && ui.selectedBrowserAgent?.runtime?.capabilityPermission === permission) {
-      await core('RESUME_BROWSER_AGENT_JOB', { id: ui.selectedBrowserAgentId });
-      await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
+      await core('RESUME_BROWSER_AGENT_JOB', { id });
+      agentJobsReadGate.invalidate();
+      if (!agentViewFence.current(ticket)) return;
+      await loadBrowserAgentJobs({ selectId: id });
     }
   } catch (error) { $('agent-permission-status').textContent = `Capability не дозволено: ${error.message}`; }
 }
@@ -3716,23 +3816,28 @@ async function checkNativeCompanion() {
 }
 
 async function runBrowserAgentNow() {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  try {
-    await core('RUN_BROWSER_AGENT_BURST', { id });
-    await loadBrowserAgentJobs({ selectId: id });
-  } catch (error) { $('agent-status').textContent = `Agent cycle не виконано: ${error.message}`; }
+  await browserAgentLifecycle('RUN_BROWSER_AGENT_BURST');
 }
 
 async function deleteBrowserAgentJob() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
+  const operation = beginAgentOwnerOperation('DELETE', id);
+  if (!operation) return;
   try {
     await core('DELETE_BROWSER_AGENT_JOB', { id });
-    ui.selectedBrowserAgentId = '';
+    agentJobsReadGate.invalidate();
+    agentOwnerResult(operation, `Завдання Agent ${id} видалено.`);
+    if (!agentViewFence.current(operation.ticket)) return;
+    selectBrowserAgentView('');
+    renderBrowserAgentJob(null);
     await loadBrowserAgentJobs();
     announce('Завдання Agent видалено.');
-  } catch (error) { $('agent-status').textContent = `Завдання не видалено: ${error.message}`; }
+  } catch (error) {
+    const message = `Видалення Agent ${id} не підтверджене: ${error.message}`;
+    agentOwnerResult(operation, message);
+    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
+  } finally { finishAgentOwnerOperation(operation); }
 }
 
 async function core(command, payload = {}) {
@@ -5739,8 +5844,8 @@ async function initialLoad() {
 void initialLoad();
 window.setInterval(() => { void recordDashboardDiagnosticSnapshot(); }, DIAGNOSTIC_SNAPSHOT_DELAY_MS);
 window.setInterval(() => {
-  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
-}, 2000);
+  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void refreshBrowserAgentJobs();
+}, 5000);
 
 window.setInterval(() => {
   if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') {

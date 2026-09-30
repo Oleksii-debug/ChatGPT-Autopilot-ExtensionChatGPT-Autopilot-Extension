@@ -318,8 +318,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("repeatMode: $('agent-repeat-mode').value"), 'schedule/repeat policy must be persisted through Core');
   assert.match(js, /WAITING_SCHEDULE: 'очікує розкладу'/, 'scheduled wait must be exposed in readable status');
   assert.match(js, /WAITING_APPROVAL: 'очікує підтвердження дії'/, 'approval wait must be exposed in readable status');
-  assert.match(js, /core\('APPROVE_BROWSER_AGENT_ACTION'/, 'approval button must route through Core');
-  assert.match(js, /core\('REJECT_BROWSER_AGENT_ACTION'/, 'rejection button must route through Core');
+  assert.match(js, /browserAgentLifecycle\('APPROVE_BROWSER_AGENT_ACTION'\)/, 'approval button must use the fenced Core lifecycle path');
+  assert.match(js, /browserAgentLifecycle\('REJECT_BROWSER_AGENT_ACTION'\)/, 'rejection button must use the fenced Core lifecycle path');
+  assert.match(js, /await core\(command, \{ id \}\)/, 'the fenced lifecycle path must dispatch the exact command and captured job to Core');
   assert.ok(js.includes("approvalMode: $('agent-approval-mode').value"), 'approval policy must be persisted through Core');
   assert.ok(js.includes("visionOnDemand: $('agent-vision-on-demand').checked"), 'vision policy must be persisted through Core');
   assert.ok(js.includes("trustedScriptEnabled: $('agent-trusted-script-enabled').checked"), 'Trusted Script opt-in must be persisted through Core');
