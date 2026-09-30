@@ -150,7 +150,7 @@ export class DurableSubmissionCoordinator {
     const finishedAt = this.now();
     if (result?.status === InteractionResult.TEMPORARY_ERROR
       && result?.submissionEvidence === 'PROVEN_NO_EFFECT'
-      && result?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+      && ['SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT', 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT'].includes(result?.safeDiagnosticCode)) {
       let proven = false;
       await this.repo.update(draft => {
         const session = requireSession(draft, sessionId);

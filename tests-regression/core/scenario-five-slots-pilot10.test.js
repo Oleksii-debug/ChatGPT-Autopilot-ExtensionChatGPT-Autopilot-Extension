@@ -56,7 +56,12 @@ test('five persistent chats advance independently through 17 messages and replac
     state.tabHintsByTaskId[task.id] = { sessionId, tabId, ownedByExtension: true, normalizedUrl: chatUrl };
     openTabs.add(tabId);
     const result = await manager.cycleOne(id);
-    assert.equal(result.kind, 'CYCLED', `slot ${id}, generation ${generation}, turn ${turn}`);
+    if (generation === 1 && turn === 17) {
+      assert.equal(result.kind, 'CLEANUP_PENDING');
+      assert.equal((await manager.get(id)).scenario.runtime.chat.sessionId, '', 'replacement is not materialized before physical retirement');
+      failClose = false;
+      await manager.cycleOne(id);
+    } else assert.equal(result.kind, 'CYCLED', `slot ${id}, generation ${generation}, turn ${turn}`);
     return { sessionId, chatUrl };
   }
 
@@ -81,12 +86,12 @@ test('five persistent chats advance independently through 17 messages and replac
   assert.deepEqual((await manager.get(ids[2])).scenario.verifiedSends,
     { confirmedInThisChat: 0, confirmedOverall: 17 });
   assert.equal((await manager.list()).pools[0].replacementsUsed, 1);
-  assert.equal(state.sessionsById[retired.sessionId].enabled, false);
+  assert.equal(state.sessionsById[retired.sessionId], undefined, 'retired Session is removed after confirmed physical close');
   assert.equal((await manager.get(ids[2])).scenario.runtime.chat.chatUrl, '');
   for (const [index, id] of ids.filter(id => id !== ids[2]).entries()) {
     assert.deepEqual((await manager.get(id)).scenario.runtime, snapshots[index].scenario.runtime);
   }
-  await completeTurn(ids[2], 1, 2);
+  await completeTurn(ids[2], 1, 2, 404);
   assert.notEqual((await manager.get(ids[2])).scenario.runtime.chat.chatUrl, retired.chatUrl);
   assert.equal((await manager.list()).pools[0].replacementsUsed, 1);
   failClose = false;

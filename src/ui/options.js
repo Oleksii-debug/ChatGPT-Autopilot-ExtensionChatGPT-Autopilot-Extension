@@ -3887,6 +3887,7 @@ function showSimplifiedSession(session) {
   $('simplified-state').textContent = session
     ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
     : 'Сеанс не вибрано.';
+  ui.simplifiedDirty = false;
   $('simplified-draft-status').textContent = 'Незбережених змін немає.';
   renderSimplifiedActions(session);
   renderSimplifiedLog(session);
@@ -3953,16 +3954,29 @@ async function simplifiedAction(command) {
   renderSimplifiedActions(ui.simplifiedSelected, { busy: true });
   $('simplified-command-result').textContent = 'Команду передано Core…';
   try {
+    if (ui.simplifiedDirty && ['START_SESSION', 'RESUME_SESSION'].includes(command)) {
+      const config = buildSimplifiedSessionConfig(simplifiedFields(), ui.simplifiedSelected);
+      const saved = await core('UPDATE_SESSION', { sessionId: config.id, expectedVersion: ui.simplifiedSelected.version, config });
+      ui.simplifiedSelected = clone(saved.session);
+      ui.simplifiedDirty = false;
+    }
     const data = await core(command, { sessionId: ui.simplifiedSelectedId });
     await loadSessions();
     const session = data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session;
-    showSimplifiedSession(session);
+    if (ui.simplifiedDirty) {
+      ui.simplifiedSelected = clone(session);
+      renderSimplifiedActions(session);
+      renderSimplifiedLog(session);
+    } else showSimplifiedSession(session);
     $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${session.runState}.`;
   } catch (error) {
     $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`;
     try {
       const current = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
-      showSimplifiedSession(current.session);
+      if (ui.simplifiedDirty) {
+        ui.simplifiedSelected = clone(current.session);
+        renderSimplifiedActions(current.session);
+      } else showSimplifiedSession(current.session);
     } catch {
       renderSimplifiedActions(ui.simplifiedSelected);
     }
@@ -5417,10 +5431,12 @@ $('simplified-template').addEventListener('click', () => {
 $('simplified-diagnostics').addEventListener('click', () => { void downloadSimplifiedDiagnosticReport(); });
 $('simplified-editor').addEventListener('input', event => {
   if (event.target.closest('button')) return;
+  ui.simplifiedDirty = true;
   $('simplified-draft-status').textContent = 'Є незбережені зміни.';
 });
 $('simplified-editor').addEventListener('change', event => {
   if (event.target.closest('button')) return;
+  ui.simplifiedDirty = true;
   $('simplified-draft-status').textContent = 'Є незбережені зміни.';
 });
 
@@ -5735,4 +5751,3 @@ window.setInterval(() => {
 window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
-

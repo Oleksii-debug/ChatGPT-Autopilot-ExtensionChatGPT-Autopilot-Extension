@@ -48,7 +48,7 @@ test('Simplified Sessions restores the familiar legacy editor questions with sel
 test('Simplified Sessions exposes the old global recovery and concurrency controls against current Core', () => {
   const section = simplifiedSection();
   assert.match(section, /Пауза після обмеження запитів, хв/u);
-  assert.match(section, /id="simplified-max-concurrent-session-operations"[^>]*min="1"[^>]*max="32"/u);
+  assert.match(section, /id="simplified-max-concurrent-session-operations"[^>]*min="1"[^>]*max="1000"/u);
   assert.match(js, /UPDATE_PROFILE_SETTINGS[\s\S]*maxConcurrentSessionOperations: concurrency/u);
   assert.match(js, /GET_PROFILE_SETTINGS/u);
 });

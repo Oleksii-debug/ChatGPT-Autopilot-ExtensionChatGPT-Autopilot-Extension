@@ -111,6 +111,7 @@ test('shared-URL insertion mismatch holds every sibling cycle but keeps session 
     async get() { return { id: 7, url: 'https://chatgpt.com/' }; },
     async query() { return [{ id: 7, url: 'https://chatgpt.com/' }]; },
     async create({ url }) { return { id: 8, url }; },
+    async update(id, changes) { return { id, ...changes }; },
   } };
   const transport = { async execute(_tab, request) {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };

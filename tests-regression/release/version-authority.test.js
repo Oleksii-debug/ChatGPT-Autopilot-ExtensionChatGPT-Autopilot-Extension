@@ -15,7 +15,7 @@ test('release version has one authority across package, manifest and packagers',
   assert.equal(RELEASE_VERSION, packageJson.version);
   assert.equal(SOURCE_VERSION, packageJson.version);
   assert.equal(manifest.version, packageJson.version);
-  assert.equal(manifest.version_name, packageJson.version.split('.')[0]);
+  assert.equal(manifest.version_name, `${packageJson.version} High`);
 });
 
 test('current release metadata files exist for the authoritative version', async () => {

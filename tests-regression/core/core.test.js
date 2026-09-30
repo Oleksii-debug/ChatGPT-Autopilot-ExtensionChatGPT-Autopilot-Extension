@@ -62,10 +62,10 @@ test('profile settings preserve concurrency independently from rate-limit cooldo
 
   await assert.rejects(
     () => core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { maxConcurrentSessionOperations: 0 }),
-    /1 to 32/,
+    /1 to 1000/,
   );
   await assert.rejects(
-    () => core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { maxConcurrentSessionOperations: 33 }),
-    /1 to 32/,
+    () => core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { maxConcurrentSessionOperations: 1001 }),
+    /1 to 1000/,
   );
 });

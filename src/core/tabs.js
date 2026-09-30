@@ -29,6 +29,14 @@ function conversationId(url) {
   }
 }
 
+export function isChatAuthUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'auth.openai.com'
+      || (parsed.hostname === 'chatgpt.com' && /^\/(?:auth|api\/auth|login|signin)(?:\/|$)/u.test(parsed.pathname));
+  } catch { return false; }
+}
+
 // ChatGPT can canonicalize a Custom GPT conversation from
 // /g/<gpt-slug>/c/<conversation-id> to /c/<conversation-id>.  The stable
 // conversation id is the authority; treating the canonical redirect as a
@@ -103,9 +111,9 @@ export async function createChatTab(chromeApi, url, preferredWindowId = null) {
   }
   let windowId = null;
   if (Number.isInteger(preferredWindowId)) {
-    if (counts.has(preferredWindowId)) windowId = preferredWindowId;
-    else if (chromeApi.windows?.get) {
-      try { await chromeApi.windows.get(preferredWindowId); windowId = preferredWindowId; } catch { /* closed window */ }
+    windowId = preferredWindowId;
+    if (!counts.has(preferredWindowId) && chromeApi.windows?.get) {
+      try { await chromeApi.windows.get(preferredWindowId); } catch { windowId = null; }
     }
   }
   if (windowId == null && counts.size) {
@@ -123,7 +131,7 @@ export async function createChatTab(chromeApi, url, preferredWindowId = null) {
 function createTaskChatTab(chromeApi, session, url) {
   return session?.scenarioWork?.managed === true
     ? createChatTab(chromeApi, url, session.scenarioWork.preferredWindowId)
-    : chromeApi.tabs.create({ url, active: false });
+    : createChatTab(chromeApi, url, session?.tabWindowId);
 }
 
 export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
@@ -132,6 +140,7 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   now = () => Date.now(),
   wait = waitMs,
   allowPostSendNavigation = false,
+  allowLoadingDocument = false,
 } = {}) {
   if (!chromeApi?.tabs?.get) {
     throw new TabReadinessError(
@@ -167,7 +176,14 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
     }
 
     const observedUrl = normalizedTabUrl(lastTab);
-    const documentReady = lastTab.status === 'complete' || lastTab.status == null;
+    if (isChatAuthUrl(lastTab.url)) {
+      throw new TabReadinessError('TAB_AUTH_REQUIRED', 'Увійдіть у ChatGPT у поточній вкладці; Пілот збереже її та повторить перевірку.');
+    }
+    const pendingUrl = lastTab.pendingUrl ? normalizedTabUrl({ url: lastTab.pendingUrl }) : null;
+    const pendingMatches = !pendingUrl || sameChatConversationUrl(pendingUrl, normalizedExpected)
+      || (allowPostSendNavigation && expectedPostSendConversationUrl(pendingUrl, normalizedExpected));
+    const documentReady = pendingMatches && (lastTab.status === 'complete' || lastTab.status == null
+      || (allowLoadingDocument && now() - startedAt >= 1500 && !lastTab.discarded && !lastTab.frozen));
     if (documentReady && (sameChatConversationUrl(observedUrl, normalizedExpected)
       || (allowPostSendNavigation && expectedPostSendConversationUrl(observedUrl, normalizedExpected)))) return lastTab;
 
@@ -353,13 +369,26 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
     return navigated;
   }
 
+  if (hint?.ownedByExtension === true && hint.tabId != null) {
+    let owned = null;
+    try { owned = await chromeApi.tabs.get(hint.tabId); } catch { /* absent */ }
+    if (owned) {
+      if (isChatAuthUrl(owned.url) && !preserveCurrentPostSend) return owned;
+      if (hint.opening === true || (preserveCurrentPostSend && expectedPostSendConversationUrl(owned.url, hint.normalizedUrl))) {
+        const navigated = await chromeApi.tabs.update(owned.id, { url: task.normalizedUrl, active: false });
+        state.tabHintsByTaskId[key] = { ...hint, normalizedUrl: task.normalizedUrl, opening: false };
+        return navigated;
+      }
+      await retireStaleOwnedOpenCloseHint(chromeApi, state, key, hint);
+    }
+  }
   delete state.tabHintsByTaskId[key];
   const excluded = claimedTabIdsByOtherSessions(state, sessionId);
   // A launch surface (/ or /g/<slug>) has no durable conversation identity.
   // Never adopt an arbitrary existing launch tab: concurrent Sessions could
   // otherwise race on the same composer. Concrete /c/<id> targets may reuse
   // an unclaimed matching tab because the conversation identity is exclusive.
-  const match = conversationId(task.normalizedUrl)
+  const match = conversationId(task.normalizedUrl) && session?.scenarioWork?.managed !== true
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
   const tab = match || await createTaskChatTab(chromeApi, session, task.normalizedUrl);
@@ -382,11 +411,21 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   }
 
   let hint = state.tabHintsByTaskId[task.id];
+  if (hint && session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK && hint.ownedByExtension === undefined) hint.ownedByExtension = true;
   if (hint?.retirePending && hint?.ownedByExtension === true) {
     await retireOwnedHintBeforeReuse(chromeApi, state, task.id, hint);
     hint = state.tabHintsByTaskId[task.id];
   }
   if (hint?.tabId != null) {
+    if (hint.opening === true && hint.ownedByExtension === true) {
+      let opening = null;
+      try { opening = await chromeApi.tabs.get(hint.tabId); } catch { /* absent */ }
+      if (opening && String(opening.url || '').startsWith('about:blank#autopilot-owned:')) {
+        const resumed = await chromeApi.tabs.update(opening.id, { url: task.normalizedUrl, active: false });
+        hint.opening = false;
+        return protectManagedScenarioTab(chromeApi, session, resumed);
+      }
+    }
     const postSendRecovery = operationAllowsPostSendTab(session, task);
     // During a fresh-launch ambiguous Send, applyInteractionResult binds the
     // Task to the observed concrete /c/<id>, while the tab hint still records
@@ -404,15 +443,14 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       allowPostSendNavigation: postSendRecovery,
     });
     if (tab) return protectManagedScenarioTab(chromeApi, session, tab);
-    if (session?.scenarioWork?.managed === true && hint?.ownedByExtension === true
+    if (hint?.ownedByExtension === true
         && hint.sessionId === sessionId && hint.kind === 'TASK'
-        && !Number(task.lastVerifiedSendAt || 0)
-        && !Number(session.operation?.submitStartedAt || 0)) {
+        && !postSendRecovery) {
       try {
         // A login redirect can temporarily leave the launch URL. Do not
         // retire that same owned tab and produce a fresh draft on every retry.
         const pendingLogin = await chromeApi.tabs.get(hint.tabId);
-        return protectManagedScenarioTab(chromeApi, session, pendingLogin);
+        if (session?.scenarioWork?.managed === true || isChatAuthUrl(pendingLogin.url)) return protectManagedScenarioTab(chromeApi, session, pendingLogin);
       } catch { /* Only a proven missing tab may be replaced. */ }
     }
     if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
@@ -447,7 +485,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   // Never adopt an arbitrary existing launch tab: concurrent Sessions could
   // otherwise race on the same composer. Concrete /c/<id> targets may reuse
   // an unclaimed matching tab because the conversation identity is exclusive.
-  const match = conversationId(task.normalizedUrl)
+  const match = conversationId(task.normalizedUrl) && session?.scenarioWork?.managed !== true
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
   let tab = match || await createTaskChatTab(chromeApi, session, task.normalizedUrl);

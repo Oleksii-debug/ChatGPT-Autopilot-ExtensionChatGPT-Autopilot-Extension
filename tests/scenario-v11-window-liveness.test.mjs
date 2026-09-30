@@ -19,21 +19,21 @@ test('Scenario tabs reopen in their saved window while another window is focused
   assert.equal(created[0].windowId, 11);
 });
 
-test('parked Scenario reuses the exact conversation across windows without creating a duplicate', async () => {
+test('parked Scenario does not adopt an unbound user conversation across windows', async () => {
   let creates = 0;
   const existing = { id: 7, windowId: 11, url: 'https://chatgpt.com/c/owner', status: 'complete' };
   const chrome = { tabs: {
     async get() { throw new Error('No saved tab'); },
     async query() { return [existing]; },
-    async create() { creates += 1; throw new Error('Should reuse existing conversation'); },
+    async create(options) { creates += 1; return { id: 8, windowId: 11, ...options }; },
   } };
   const report = await probeAssistantConversation(chrome, { execute() { throw new Error('Not due yet'); } }, {
     conversationUrl: existing.url, persistentManagedTab: true, createOwnedTab: true,
     recoveryAction: 'SAME_URL_REOPEN', preferredWindowId: 11,
   });
-  assert.equal(report.recoveredManagedTabId, 7);
-  assert.equal(report.recoveredManagedTabOwned, false);
-  assert.equal(creates, 0);
+  assert.equal(report.recoveredManagedTabId, 8);
+  assert.equal(report.recoveredManagedTabOwned, true);
+  assert.equal(creates, 1);
 });
 
 test('a loading or redirected owned probe tab is retained and navigated in place', async () => {
@@ -114,12 +114,17 @@ test('parking persists the owner window for the next scheduled probe', async () 
   const data = {};
   const jobs = [];
   const removed = [];
+  const tabs = new Map([[7, { id: 7, windowId: 11, url: 'https://chatgpt.com/c/owner' }]]);
+  const created = [];
   const chrome = { storage: { local: {
     async get(key) { return key in data ? { [key]: structuredClone(data[key]) } : {}; },
     async set(value) { Object.assign(data, structuredClone(value)); },
   } }, alarms: { async create() {}, async clear() {} }, tabs: {
-    async get(id) { return { id, windowId: 11, url: 'https://chatgpt.com/c/owner' }; },
-    async remove(id) { removed.push(id); },
+    async get(id) { if (!tabs.has(id)) throw Error('No tab'); return structuredClone(tabs.get(id)); },
+    async query() { return [...tabs.values()]; },
+    async create(options) { const tab = { id: 8, windowId: options.windowId, ...options }; created.push(tab); tabs.set(8, tab); return tab; },
+    async update(id, patch) { Object.assign(tabs.get(id), patch); return structuredClone(tabs.get(id)); },
+    async remove(id) { removed.push(id); tabs.delete(id); },
   } };
   const core = { state: createEmptyState(0), async load() { return structuredClone(this.state); },
     async update(mutator) { this.state = await mutator(structuredClone(this.state)) || this.state; return this.load(); } };
@@ -134,6 +139,7 @@ test('parking persists the owner window for the next scheduled probe', async () 
   await manager.start('parked');
   const sessionId = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sessionId].taskOrder[0];
+  core.state.sessionsById[sessionId].operation = { phase: 'SENT_VERIFIED', taskId };
   core.state.sessionsById[sessionId].tasksById[taskId].lastVerifiedSendAt = 1001;
   core.state.sessionsById[sessionId].tasksById[taskId].lastConversationUrl = 'https://chatgpt.com/c/owner';
   core.state.tabHintsByTaskId[taskId] = {
@@ -148,8 +154,9 @@ test('parking persists the owner window for the next scheduled probe', async () 
   assert.equal(jobs.length, 0);
   now = parked.chat.nextProbeAt + 1;
   await manager.cycleOne('parked');
-  assert.equal(jobs.length, 1);
-  assert.equal(jobs[0].preferredWindowId, 11);
+  assert.equal(jobs.length, 0, 'creation is recorded without a separate probe-side create');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].windowId, 11);
   assert.equal(core.state.tabHintsByTaskId[taskId].tabId, 8);
   now += 15_001;
   await manager.cycleOne('parked');

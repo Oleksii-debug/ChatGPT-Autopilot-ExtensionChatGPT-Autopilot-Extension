@@ -84,6 +84,23 @@
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+  function waitForSubmissionObservation(doc, deps, ready) {
+    if (ready()) return Promise.resolve();
+    if (deps.wait) return deps.wait(100);
+    const Observer = doc.defaultView?.MutationObserver || globalThis.MutationObserver;
+    if (!Observer || !doc.documentElement) return wait(100);
+    // Background-page timers can be throttled for a minute. DOM changes wake
+    // acknowledgement immediately without another physical Send or tab focus.
+    return new Promise(resolve => {
+      let timer;
+      const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(); };
+      const observer = new Observer(finish);
+      observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true, attributes: true });
+      timer = setTimeout(finish, 100);
+      if (ready()) finish();
+    });
+  }
+
   function normalizeUrl(value) {
     try {
       const url = new URL(value);
@@ -1259,6 +1276,28 @@
     return latest ? assistantMessageText(latest) : '';
   }
 
+  function stableMessageKey(el) {
+    const direct = el?.getAttribute?.('data-message-id');
+    if (direct) return `message:${direct}`;
+    const turn = el?.closest?.('[data-turn-key], [data-testid^="conversation-turn-"], article[id]');
+    const key = turn?.getAttribute?.('data-turn-key') || turn?.getAttribute?.('data-testid') || turn?.getAttribute?.('id');
+    return key ? `turn:${key}` : '';
+  }
+
+  function submittedUserKey(doc) {
+    const users = semanticUserMessages(doc);
+    return stableMessageKey(users[users.length - 1]);
+  }
+
+  function assistantFollowsSubmittedUser(doc, key, assistants) {
+    if (!key) return false;
+    const users = semanticUserMessages(doc);
+    const user = users[users.length - 1];
+    const assistant = assistants[assistants.length - 1];
+    if (!user || !assistant || stableMessageKey(user) !== key) return false;
+    return Boolean(user.compareDocumentPosition?.(assistant) & 4);
+  }
+
   function userMessageHistorySnapshot(doc) {
     return semanticUserMessages(doc).map(userMessageText);
   }
@@ -1685,6 +1724,10 @@
       }
       backgroundDocument = false;
     }
+    if (Number(request.executionDeadlineAt || 0) > 0 && nowMs() >= request.executionDeadlineAt) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
+        safeDiagnosticCode: 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT' });
+    }
     if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
       // CDP mouse events are unreliable in a hidden background tab. A genuine
       // form submitter can be invoked through the page's own form semantics
@@ -1732,7 +1775,11 @@
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
     while (nowMs() < verifyDeadline) {
-      await (deps.wait || wait)(100);
+      await waitForSubmissionObservation(doc, deps, () =>
+        (!isFreshLaunchSurface(request.expectedUrl) || isExclusiveConversationLocation(globalThis.location?.href || '')) && (
+        (exactTextPending && hasStrictAppendedPrompt(beforeTextMessages, userMessageHistorySnapshot(doc), submittedText))
+        || (evidence && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature))
+        || semanticAssistantMessages(doc).length > assistantBaselineCount));
 
       if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
         return resultBase(request, start, {
@@ -1794,6 +1841,7 @@
             submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
             safeDiagnosticCode: 'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION',
             assistantBaselineCount,
+            submittedUserMessageKey: submittedUserKey(doc),
           });
         }
       }
@@ -1837,7 +1885,8 @@
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
           safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION',
-          assistantBaselineCount
+          assistantBaselineCount,
+          submittedUserMessageKey: submittedUserKey(doc),
         });
       }
 
@@ -1849,7 +1898,8 @@
         safeDiagnosticCode: unlabeledVerified && !textVerified
           ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
           : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
-        assistantBaselineCount
+        assistantBaselineCount,
+        submittedUserMessageKey: submittedUserKey(doc),
       });
     }
 
@@ -1920,6 +1970,7 @@
           submissionEvidence: 'FRESH_CONVERSATION_TRANSITION_WITH_EMPTY_COMPOSER',
           safeDiagnosticCode: 'RECOVERY_FRESH_CONVERSATION_VERIFIED',
           assistantBaselineCount: baselineCount,
+          submittedUserMessageKey: submittedUserKey(doc),
         });
       }
       if ((appended || unlabeledAppended) && !pending) {
@@ -1931,7 +1982,8 @@
           safeDiagnosticCode: unlabeledAppended && !appended
             ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
             : 'RECOVERY_TEXT_OPERATION_VERIFIED',
-          assistantBaselineCount: baselineCount
+          assistantBaselineCount: baselineCount,
+          submittedUserMessageKey: submittedUserKey(doc),
         });
       }
       // Unchanged draft text does not prove that a request was never dispatched.
@@ -1976,7 +2028,8 @@
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
           safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED',
-          assistantBaselineCount: Number.isInteger(Number(evidence.assistantBaselineCount)) ? Number(evidence.assistantBaselineCount) : undefined
+          assistantBaselineCount: Number.isInteger(Number(evidence.assistantBaselineCount)) ? Number(evidence.assistantBaselineCount) : undefined,
+          submittedUserMessageKey: submittedUserKey(doc),
         });
       }
       return resultBase(request, start, {
@@ -2009,7 +2062,9 @@
     const text = latestAssistantText(doc);
     const baselineKnown = request.assistantBaselineKnown === true;
     const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
-    const hasNewAssistantTurn = baselineKnown && assistantMessages.length > baselineCount;
+    const submittedKey = String(request.submittedUserMessageKey || '');
+    const paired = assistantFollowsSubmittedUser(doc, submittedKey, assistantMessages);
+    const hasNewAssistantTurn = submittedKey ? paired : (baselineKnown && assistantMessages.length > baselineCount);
     if (blocking?.status === STATUS.BUSY) {
       return resultBase(request, start, {
         status: STATUS.BUSY,
@@ -2026,7 +2081,7 @@
         safeDiagnosticCode: `${blocking.code}_REPORT`
       });
     }
-    if (!baselineKnown) {
+    if (!baselineKnown && !paired) {
       return resultBase(request, start, {
         status: STATUS.TEMPORARY_ERROR,
         assistantText: '',
