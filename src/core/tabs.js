@@ -3,6 +3,7 @@ import { normalizeChatUrl, OperationPhase, TabStrategy } from './schema.js';
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
 const DEFAULT_TAB_READY_TIMEOUT_MS = 90000;
 const DEFAULT_TAB_READY_POLL_MS = 250;
+const DEFAULT_TAB_WAKE_TIMEOUT_MS = 5000;
 
 export class TabReadinessError extends Error {
   constructor(safeDiagnosticCode, message, cause = null) {
@@ -89,6 +90,7 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   now = () => Date.now(),
   wait = waitMs,
   allowPostSendNavigation = false,
+  wakeTimeoutMs = DEFAULT_TAB_WAKE_TIMEOUT_MS,
 } = {}) {
   if (!chromeApi?.tabs?.get) {
     throw new TabReadinessError(
@@ -111,6 +113,8 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   const startedAt = now();
   const deadline = startedAt + Math.max(0, timeoutMs);
   let lastTab = null;
+  let wakeAttempted = false;
+  let wakeDeadline = null;
 
   while (true) {
     try {
@@ -121,6 +125,44 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
         'Selected ChatGPT tab became unavailable before CHECK_ONLY',
         error,
       );
+    }
+
+    const suspended = lastTab?.discarded === true || lastTab?.frozen === true;
+    if (suspended) {
+      if (!wakeAttempted) {
+        if (!chromeApi?.tabs?.reload) {
+          throw new TabReadinessError(
+            'TAB_WAKE_API_UNAVAILABLE',
+            'Selected ChatGPT tab is suspended and Chrome reload API is unavailable',
+          );
+        }
+        wakeAttempted = true;
+        wakeDeadline = Math.min(deadline, now() + Math.max(0, wakeTimeoutMs));
+        try {
+          await chromeApi.tabs.reload(tabId);
+        } catch (error) {
+          throw new TabReadinessError(
+            'TAB_WAKE_FAILED',
+            'Selected ChatGPT tab could not be woken before CHECK_ONLY',
+            error,
+          );
+        }
+      } else if (now() >= wakeDeadline) {
+        throw new TabReadinessError(
+          'TAB_WAKE_TIMEOUT',
+          'Selected ChatGPT tab remained suspended after one bounded wake attempt',
+        );
+      }
+
+      const wakeWaitDeadline = Math.min(deadline, wakeDeadline ?? deadline);
+      if (now() >= wakeWaitDeadline) {
+        throw new TabReadinessError(
+          'TAB_WAKE_TIMEOUT',
+          'Selected ChatGPT tab remained suspended after one bounded wake attempt',
+        );
+      }
+      await wait(Math.max(1, Math.min(pollIntervalMs, wakeWaitDeadline - now())));
+      continue;
     }
 
     const observedUrl = normalizedTabUrl(lastTab);
