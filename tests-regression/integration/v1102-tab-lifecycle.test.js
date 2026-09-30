@@ -108,14 +108,14 @@ test('five scenario slots complete 17 turns and one replacement each with bounde
     if(i===62 || i===185) f.restart();
     const state=await f.repo.load(); const hints=Object.values(state.tabHintsByTaskId);
     const ids=hints.map(h=>h.tabId); assert.equal(new Set(ids).size,ids.length,'one physical owner per tab');
-    assert.ok(hints.length<=5,`hints=${hints.length}`);
+    assert.ok(hints.length<=3,`hints=${hints.length}`);
     for(const tab of f.tabs.values()) if(tab.id>2) {
       assert.equal(tab.windowId,11); assert.ok(hints.some(h=>h.tabId===tab.id),'no untracked probe or draft');
     }
     if(f.sends.length===170) break;
   }
   assert.equal(f.sends.length,170);
-  assert.ok(f.maxTabs<=7,`peak=${f.maxTabs}`);
+  assert.ok(f.maxTabs<=5,`peak=${f.maxTabs}`);
   for(let i=0;i<5;i++){f.advance();await f.manager.cycleAll();await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,now:()=>f.now});}
   assert.equal(f.tabs.size,2,'all owned scenario tabs retired');
 });

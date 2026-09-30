@@ -1,5 +1,10 @@
 # ChatGPT Autopilot — development history
 
+## 2026-10-01T01:01:46+02:00 — 11.0.4 High incident repair
+
+See HISTORY-2026-09-30.md for the dated incident, rejected alternatives, preserved prior history, and CHANGES-11.0.4.txt / QA-11.0.4.txt for changes and qualification. Agent owner-view WIP remains checkpointed separately and is excluded from this incident release.
+
+
 ## 2026-09-26 — Pool-level Scenario Work control and response-observation diagnostics
 - Follow-up truth defect from owner live UI: “current step 1/12; confirmed Send 3/12; completed responses 1/12”. The projection had mixed physical transport attempts with logical sequence progress. New invariant: sequenceVerifiedSends = completedResponses + at most one current in-flight verified Send. A row may therefore truthfully show logical 2/12, completed responses 1/12, physical Send attempts 3, retry/replacement attempts 1.
 - CHAT_CYCLE timeout/replacement never rewinds already completed logical steps. The planner reconstructs the next cursor from durable confirmed completions. If an old corrupted runtime already resent START after progress, the eventual duplicate-stage response is observable but non-advancing. Exhausted timeout replacement budget yields ERROR instead of a false COMPLETED state.

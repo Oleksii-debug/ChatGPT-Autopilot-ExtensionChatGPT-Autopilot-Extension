@@ -96,7 +96,9 @@
       let timer;
       const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(); };
       const observer = new Observer(finish);
-      observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true, attributes: true });
+      observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true,
+        attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'data-message-id',
+          'data-message-author-role', 'data-turn'] });
       timer = setTimeout(finish, 100);
       if (ready()) finish();
     });
@@ -821,9 +823,12 @@
       .map((button) => ({
         button,
         label: recoveryButtonLabel(button),
-        context: recoverySurfaceContext(button),
       }))
-      .filter(item => CHAT_RECOVERY_BUTTON.test(item.label) && item.context);
+      // Reading seven ancestors of EVERY button repeatedly forces expensive
+      // layout/text work on the whole conversation. Only Retry needs context.
+      .filter(item => CHAT_RECOVERY_BUTTON.test(item.label))
+      .map(item => ({ ...item, context: recoverySurfaceContext(item.button) }))
+      .filter(item => item.context);
     if (!candidates.length) return null;
     const enabled = candidates.filter(item => !item.button.disabled && item.button.getAttribute?.('aria-disabled') !== 'true');
     const selected = enabled[0] || candidates[0];
@@ -1227,7 +1232,8 @@
     ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
+        return role === 'user' || el.getAttribute?.('data-turn') === 'user'
+          || el.getAttribute?.('data-testid') === 'user-message'
           || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
@@ -1238,14 +1244,15 @@
     // Read the message body without the turn heading, copy/edit buttons or footer.
     if (el.getAttribute?.('data-user-message-bubble') === 'true') {
       const body = el.querySelector?.('.whitespace-pre-wrap, [data-message-content]');
-      return textOf(body || el).trim();
+      return String((body || el).textContent ?? textOf(body || el)).trim();
     }
     const bodies = [...new Set([
       ...Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []),
       ...Array.from(el.querySelectorAll?.('[data-user-message-bubble="true"]') || []),
     ])];
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
-    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
+    return (roots.length ? roots.map(node => String(node.textContent ?? textOf(node))).join('\n')
+      : String(el.textContent ?? textOf(el))).trim();
   }
 
   function latestUserMessages(doc) {
@@ -1265,7 +1272,8 @@
           && (el.querySelector?.('[data-conversation-role="assistant"]')
             || /:assistant$/.test(workKey))
           && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
-        return role === 'assistant' || (el.getAttribute?.('data-conversation-role') === 'assistant'
+        return role === 'assistant' || el.getAttribute?.('data-turn') === 'assistant'
+          || (el.getAttribute?.('data-conversation-role') === 'assistant'
           || el.getAttribute?.('data-markdown-text-style') === 'assistant-message')
           && Boolean(el.closest?.('main, [role="main"]')) || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
           || workUnit;
@@ -1276,7 +1284,8 @@
   function assistantMessageText(el) {
     const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"], [data-markdown-text-style="assistant-message"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
-    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
+    return (roots.length ? roots.map(node => String(node.textContent ?? textOf(node))).join('\n')
+      : String(el.textContent ?? textOf(el))).trim();
   }
 
   function latestAssistantText(doc) {
@@ -1337,13 +1346,16 @@
     if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
     // Once this page exposes canonical user bubbles, the unlabeled fallback
     // must not count an assistant quote or a sidebar copy of the same prompt.
-    if (main.querySelector?.('[data-user-message-bubble="true"]')) return 0;
+    if (semanticUserMessages(doc).length) return 0;
     let count = 0;
+    let inspected = 0;
     for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
-      if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
-      if (!promptTextMatches(textOf(node), promptText)) continue;
-      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(textOf(child), promptText));
-      if (!nestedMatch) count += 1;
+      if (++inspected > 1000) return 0; // no uncertain fallback proof on huge DOM
+      if (!promptTextMatches(String(node.textContent ?? textOf(node)), promptText)) continue;
+      if (node.closest?.('form, [contenteditable="true"], nav, aside, [data-turn="assistant"], [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
+      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(String(child.textContent ?? textOf(child)), promptText));
+      if (nestedMatch || !isVisible(node)) continue;
+      count += 1;
     }
     return count;
   }
@@ -1801,7 +1813,10 @@
     }
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
-    while (nowMs() < verifyDeadline) {
+    let observationPasses = 0;
+    // Streaming/animation mutations can arrive faster than the timeout clock.
+    // Bound the DOM work too, then leave an uncertain Send for reconciliation.
+    while (nowMs() < verifyDeadline && observationPasses++ < 200) {
       await waitForSubmissionObservation(doc, deps, () =>
         (!isFreshLaunchSurface(request.expectedUrl) || isExclusiveConversationLocation(globalThis.location?.href || '')) && (
         (exactTextPending && hasStrictAppendedPrompt(beforeTextMessages, userMessageHistorySnapshot(doc), submittedText))
@@ -2084,7 +2099,8 @@
     }
     const assistants = semanticAssistantMessages(doc);
     const anchor = responseAnchor(doc, request, assistants);
-    const text = latestAssistantText(doc);
+    const latest = assistants[assistants.length - 1];
+    const text = latest ? assistantMessageText(latest) : '';
     const baselineKnown = request.assistantBaselineKnown === true;
     const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
     const anchoredRequest = Boolean(request.submittedUserMessageKey || request.responseCorrelationToken);

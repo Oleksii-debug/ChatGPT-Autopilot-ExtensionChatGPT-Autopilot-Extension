@@ -36,7 +36,7 @@ test('parked Scenario does not adopt an unbound user conversation across windows
   assert.equal(creates, 1);
 });
 
-test('a loading or redirected owned probe tab is retained and navigated in place', async () => {
+test('a loading or redirected owned probe tab is retained; ordinary reads never navigate', async () => {
   const tab = { id: 8, windowId: 11, url: 'https://chatgpt.com/', status: 'loading' };
   let creates = 0;
   let updates = 0;
@@ -54,9 +54,9 @@ test('a loading or redirected owned probe tab is retained and navigated in place
   assert.equal(updates, 0);
   tab.status = 'complete';
   const redirected = await probeAssistantConversation(chrome, transport, job);
-  assert.equal(redirected.safeDiagnosticCode, 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING');
-  assert.equal(updates, 1);
-  assert.equal(tab.url, job.conversationUrl);
+  assert.equal(redirected.safeDiagnosticCode, 'CHATGPT_RECOVERY_CONVERSATION_IDENTITY_LOST');
+  assert.equal(updates, 0);
+  assert.equal(tab.url, 'https://chatgpt.com/');
   assert.equal(creates, 0);
 });
 
@@ -162,7 +162,7 @@ test('scenario retains its sending tab and saved window across all response chec
   assert.deepEqual(removed, [], 'loading response checks never close the generation tab');
 });
 
-test('a frozen owned response tab is woken in place and the previous active tab is restored', async () => {
+test('a frozen owned response tab is retained without forced activation or memory residency', async () => {
   const tab = {id:7,windowId:11,url:'https://chatgpt.com/c/owner',status:'complete',frozen:true};
   const previous = {id:3,windowId:11,url:'https://chatgpt.com/',active:true};
   const effects=[];
@@ -170,13 +170,12 @@ test('a frozen owned response tab is woken in place and the previous active tab 
     async update(id,patch){effects.push({id,...patch});if(id===7){Object.assign(tab,patch);if(patch.active)tab.frozen=false;return {...tab};}return {...previous,...patch};},
     async remove(){throw Error('A response check must not close the scenario');},
     async create(){throw Error('A response check must not replace the scenario');}}};
-  const result=await probeAssistantConversation(chrome,{async execute(id,request){
-    assert.equal(id,7);assert.equal(tab.frozen,false);assert.equal(request.mode,'READ_ASSISTANT_REPORT');
-    return {status:'READY',assistantComplete:true,assistantText:'Final'};
-  }},{conversationUrl:tab.url,persistentManagedTab:true,managedTabId:7,managedTabOwned:true});
-  assert.equal(result.assistantComplete,true);
-  assert.ok(effects.some(effect=>effect.id===7&&effect.active===true));
-  assert.deepEqual(effects.at(-1),{id:3,active:true});
+  const result=await probeAssistantConversation(chrome,{async execute(){throw Error('Frozen documents must not be probed');}},
+    {conversationUrl:tab.url,persistentManagedTab:true,managedTabId:7,managedTabOwned:true});
+  assert.equal(result.assistantComplete,false);
+  assert.equal(result.safeDiagnosticCode,'ASSISTANT_RESPONSE_TAB_FROZEN');
+  assert.equal(result.chatRecoveryRequired,undefined);
+  assert.deepEqual(effects,[]);
 });
 
 test('a failed scenario cycle does not prevent the other four slots from running', async () => {

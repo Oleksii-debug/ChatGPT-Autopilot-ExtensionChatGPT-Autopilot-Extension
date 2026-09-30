@@ -446,7 +446,7 @@ test('assistant-response diagnostics distinguish streaming, completion and hard 
   assert.ok(!events.some(event => event.event === 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ГЕНЕРАЦІЯ_ТРИВАЄ'));
 
   mode = 'READY';
-  h.now += 5_000;
+  h.now = scenario.runtime.chat.nextProbeAt;
   await h.manager.cycleOne(id);
   events = h.state.diagnostics || [];
   assert.ok(events.some(event => event.event === 'СЦЕНАРІЙ_ВІДПОВІДЬ_ПІДТВЕРДЖЕНО_ЗАВЕРШЕНОЮ'

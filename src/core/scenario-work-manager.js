@@ -1175,7 +1175,7 @@ export class ScenarioWorkManager {
             if (!this.chrome.tabs?.get) throw new Error('TAB_EXISTENCE_UNPROVEN');
             await this.chrome.tabs.get(target.tabId);
           } catch (getError) {
-            if (String(getError?.message || '') !== 'TAB_EXISTENCE_UNPROVEN') gone = true;
+            if (isTabAlreadyGoneError(getError)) gone = true;
           }
         }
       }
@@ -1243,7 +1243,8 @@ export class ScenarioWorkManager {
     } catch (error) {
       if (isTabAlreadyGoneError(error)) gone = true;
       else if (this.chrome.tabs?.get) {
-        try { await this.chrome.tabs.get(hint.tabId); } catch { gone = true; }
+        try { await this.chrome.tabs.get(hint.tabId); }
+        catch (getError) { if (isTabAlreadyGoneError(getError)) gone = true; }
       }
     }
     if (!gone) return { closed: false, reason: 'TAB_CLOSE_UNPROVEN' };
@@ -1438,15 +1439,21 @@ export class ScenarioWorkManager {
       const participantTaskId = participant.taskIdCore || participant.taskId;
       const task = session?.tasksById?.[participantTaskId];
       if (!session || !task || !task.lastVerifiedSendAt || !task.lastConversationUrl) continue;
-      if (participant.deadlineSendAt !== task.lastVerifiedSendAt) {
+      const freshVerifiedSend = participant.deadlineSendAt !== task.lastVerifiedSendAt;
+      if (freshVerifiedSend) {
         const anchored = ensureManagerRuntimeFields(runtime);
         const waiting = scenarioWorkParticipants(anchored).find(item => item.key === participant.key);
         waiting.deadlineSendAt = task.lastVerifiedSendAt;
+        waiting.nextProbeAt = 0;
         waiting.deadlineAt = task.lastVerifiedSendAt + scenario.config.responseTimeoutMinutes * 60_000;
         const checkpoint = await this.checkpointRuntime(scenario.id, anchored, expectedOwnerEpoch, now);
         if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
         runtime = checkpoint.runtime;
       }
+      // Core/UI callbacks can wake the manager much faster than its alarm.
+      // Enforce the persisted poll deadline here as well, before any Chrome
+      // API, DOM scan, navigation or recovery action can occur.
+      if (!freshVerifiedSend && Number(participant.nextProbeAt || 0) > now) continue;
       let tabHint = (await this.coreRepository.load()).tabHintsByTaskId?.[participantTaskId];
       // Save the physical home window before the owned tab is parked. Chrome's
       // focused window can change to an unrelated site before the next poll.
@@ -1573,9 +1580,12 @@ export class ScenarioWorkManager {
         const waiting = scenarioWorkParticipants(scheduled).find(item => item.key === participant.key);
         if (waiting?.state === ScenarioParticipantState.WAITING) {
           const firstMinute = now - task.lastVerifiedSendAt < 60_000;
-          waiting.nextProbeAt = now + (reportCode === 'ASSISTANT_RESPONSE_STABILITY_PENDING'
-            ? 1000 : firstMinute ? Math.min(5000, scenario.config.pollSeconds * 1000)
-              : scenario.config.pollSeconds * 1000);
+          const suspended = ['ASSISTANT_RESPONSE_TAB_FROZEN', 'ASSISTANT_RESPONSE_TAB_DISCARDED',
+            'ASSISTANT_REPORT_TRANSPORT_UNAVAILABLE'].includes(reportCode);
+          waiting.nextProbeAt = now + (suspended ? Math.max(60_000, scenario.config.pollSeconds * 1000)
+            : reportCode === 'ASSISTANT_RESPONSE_STABILITY_PENDING' ? 1000
+              : firstMinute ? Math.max(5000, Math.min(15_000, scenario.config.pollSeconds * 1000))
+                : Math.max(15_000, scenario.config.pollSeconds * 1000));
           const checkpoint = await this.checkpointRuntime(scenario.id, scheduled, expectedOwnerEpoch, now);
           if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
           runtime = checkpoint.runtime;
@@ -1584,7 +1594,8 @@ export class ScenarioWorkManager {
       // ChatGPT can render a recoverable error while the tab itself remains
       // alive. Persist the planned effect before touching the page, so a
       // service-worker restart cannot click Retry or reopen the chat twice.
-      const recoveryPlan = planChatRecovery(participant.chatRecovery, report, now, { reopenAttempts: 0 });
+      const recoveryPlan = planChatRecovery(participant.chatRecovery, report, now,
+        { reopenAttempts: 0, requireCompletedResponse: true });
       if (recoveryPlan.action !== ChatRecoveryAction.NONE) {
         const refreshed = ensureManagerRuntimeFields(runtime);
         const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
@@ -1970,7 +1981,8 @@ export class ScenarioWorkManager {
         }
         const recovery = normalizeChatRecovery(participant.chatRecovery);
         if (recovery.phase !== ChatRecoveryPhase.IDLE && recovery.phase !== ChatRecoveryPhase.FAILED) {
-          next = Math.min(next, recovery.nextAt > now ? recovery.nextAt : now + 250);
+          next = Math.min(next, Math.max(now + 1000, Number(recovery.nextAt || 0),
+            Number(participant.nextProbeAt || now + Math.max(15, item.config.pollSeconds) * 1000)));
         }
       }
 

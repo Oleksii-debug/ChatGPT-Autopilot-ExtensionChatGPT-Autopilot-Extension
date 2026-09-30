@@ -3,6 +3,7 @@ import { appendDiagnostic } from './diagnostics.js';
 
 const queues = new WeakMap();
 const PLACEHOLDER_PREFIX = 'about:blank#autopilot-owned:';
+const tabAbsent = error => /no tab with id|invalid tab id|tab not found/iu.test(String(error?.message || error));
 
 // All Core and Scenario bindings share this queue. Storage writes stay short;
 // Chrome effects never hold StorageRepository's update queue.
@@ -23,13 +24,15 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
   const transient = sessionBefore?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
     || sessionBefore?.scenarioWork?.managed === true;
   if (transient) {
-    const limit = Math.max(1, Math.min(1000, Math.floor(Number(before.profile?.maxConcurrentSessionOperations) || 10)));
+    const limit = Math.max(1, Math.min(sessionBefore?.scenarioWork?.managed === true ? 3 : 1000,
+      Math.floor(Number(before.profile?.maxConcurrentSessionOperations) || 10)));
     let live = 0;
     for (const [key, hint] of Object.entries(before.tabHintsByTaskId || {})) {
       if (key === hintKey || hint.ownedByExtension !== true) continue;
       const other = before.sessionsById?.[hint.sessionId];
       if (other?.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK && other?.scenarioWork?.managed !== true) continue;
-      try { await chromeApi.tabs.get(hint.tabId); live += 1; } catch { /* missing binding consumes no browser resource */ }
+      try { await chromeApi.tabs.get(hint.tabId); live += 1; }
+      catch (error) { if (!tabAbsent(error)) throw error; }
     }
     if (live >= limit) {
       const error = new Error('Live owned tab budget is full; wait for an existing tab to close');
@@ -40,7 +43,8 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
   let previousId = before.tabHintsByTaskId?.[hintKey]?.tabId;
   if (previousId != null) {
     let present = null;
-    try { present = await chromeApi.tabs.get(previousId); } catch { /* proven absent */ }
+    try { present = await chromeApi.tabs.get(previousId); }
+    catch (error) { if (!tabAbsent(error)) throw error; }
     if (present && before.tabHintsByTaskId[hintKey].ownedByExtension === true) throw new Error('TAB_BINDING_ALREADY_EXISTS');
     if (present) {
       await repository.update(state => {
@@ -89,7 +93,7 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
     }
     throw error;
   }
-  return chromeApi.tabs.update(tab.id, { url: targetUrl, active: false, autoDiscardable: false });
+  return chromeApi.tabs.update(tab.id, { url: targetUrl, active: false });
 }
 
 export async function reconcileOwnedPlaceholders(repository, chromeApi) {
