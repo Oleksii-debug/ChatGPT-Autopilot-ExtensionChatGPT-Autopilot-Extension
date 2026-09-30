@@ -53,6 +53,7 @@
       ],
       "js": [
         "src/interaction/chatgpt-adapter.js",
+        "src/interaction/chatgpt-live-send-recovery.js",
         "src/interaction/content-script.js"
       ],
       "run_at": "document_idle"
