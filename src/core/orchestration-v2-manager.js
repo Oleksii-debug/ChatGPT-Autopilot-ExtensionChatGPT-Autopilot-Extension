@@ -743,6 +743,21 @@ export class OrchestrationV2Manager {
       }
 
       const registry = storedSubagentTaskActivationBindingRegistry(current);
+      const existingEvidence = resolveSubagentTaskActivationEvidenceV1(
+        registry,
+        { bindingId: derived.bindingId },
+      );
+      if (existingEvidence) {
+        const existingAuthorityIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
+          existingEvidence.authorityEnvelope,
+        );
+        if (existingAuthorityIdentity !== authorityEnvelopeIdentity) {
+          throw new Error('Subagent activation binding replay authority provenance mismatch');
+        }
+        persistedBinding = existingEvidence.binding;
+        return current;
+      }
+
       current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
         registry,
         {
