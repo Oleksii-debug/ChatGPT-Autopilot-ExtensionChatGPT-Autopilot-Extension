@@ -1216,6 +1216,7 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       generation,
       purpose: event.purpose,
       nowMs,
+      providerDispatchIdentity: event.providerDispatchIdentity,
     });
     if (prepared.action) actions.push(prepared.action);
     return { runtime, actions, deduplicated: false, reason: prepared.reason };
