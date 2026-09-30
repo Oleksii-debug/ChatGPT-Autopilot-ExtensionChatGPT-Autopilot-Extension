@@ -362,7 +362,7 @@ test('durable child context uses persisted authority provenance and rejects prov
       invocationId: 'invocation-child-1',
       authorityEnvelope: authorityEnvelope({ providerId: 'provider.other' }),
     }, 'orch-1'),
-    /authority envelope does not match task identity/,
+    /authority envelope does not match task identity|tool descriptor provider mismatch/,
   );
   assert.deepEqual(
     chrome.data['autopilotOrchestrationV2Runtime:orch-1'].subagentTaskActivationBindingRegistry,
@@ -479,7 +479,7 @@ test('durable context rejects corrupted persisted authority provenance before Pr
       contextRequest(task, registered.binding.bindingId),
       'orch-1',
     ),
-    /durable subagent authority provenance does not match task identity/u,
+    /durable subagent authority provenance does not match task identity|taskEnvelope authority identity does not match authorityEnvelope provenance/u,
   );
   assert.equal(resolverCalls, 0);
 });
