@@ -1,5 +1,10 @@
 # ChatGPT Autopilot — development history
 
+## 2026-10-01T01:31:00+02:00 — 11.0.5 Agent owner view
+
+Agent selection/read/command races, durable Create acknowledgements and verified Specialist progress repaired over 11.0.4. See HISTORY-2026-09-30.md, CHANGES-11.0.5.txt and QA-11.0.5.txt. Broader baseline Agent API/model-default qualification gaps remain explicitly recorded.
+
+
 ## 2026-10-01T01:01:46+02:00 — 11.0.4 High incident repair
 
 See HISTORY-2026-09-30.md for the dated incident, rejected alternatives, preserved prior history, and CHANGES-11.0.4.txt / QA-11.0.4.txt for changes and qualification. Agent owner-view WIP remains checkpointed separately and is excluded from this incident release.
