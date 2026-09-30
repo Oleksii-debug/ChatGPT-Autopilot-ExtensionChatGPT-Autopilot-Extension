@@ -285,6 +285,7 @@ test('repository context resolver snapshots caller identity before storage await
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
   putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+  workspace.updatedAt = 3;
 
   const data = { [PROJECT_WORKSPACE_STORAGE_KEY]: structuredClone(workspace) };
   let releaseGet;
@@ -881,7 +882,7 @@ test('snapshot revision history rejects accessor-backed and decorated array shap
   });
   assert.throws(
     () => validateProjectWorkspace(accessorBacked),
-    /enumerable own data property/,
+    /enumerable own data propert(?:y|ies)/,
   );
   assert.equal(getterCalls, 0);
 
@@ -1390,6 +1391,7 @@ test('initial direct save cannot bootstrap future capsule evidence', async () =>
     ...capsule('project-r2', 'r2'),
     capsuleId: 'capsule-future',
   };
+  workspace.updatedAt = workspace.projectsById['project-a'].updatedAt;
 
   const repository = new ProjectWorkspaceRepository(fakeChrome());
   await assert.rejects(
@@ -1407,6 +1409,7 @@ test('initial direct save cannot bootstrap mismatched artifact provenance', asyn
     uri: 'drive://unbound-build',
   };
   workspace.projectsById['project-a'].provenanceByArtifactId.build = mismatched;
+  workspace.updatedAt = workspace.projectsById['project-a'].updatedAt;
 
   const repository = new ProjectWorkspaceRepository(fakeChrome());
   await assert.rejects(
