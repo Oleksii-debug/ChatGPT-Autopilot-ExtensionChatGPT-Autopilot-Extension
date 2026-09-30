@@ -21,14 +21,14 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
   const before = await repository.load();
   const sessionBefore = before.sessionsById?.[sessionId];
   const transient = sessionBefore?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
-    || sessionBefore?.scenarioWork?.closeTabsBetweenChecks === true;
+    || sessionBefore?.scenarioWork?.managed === true;
   if (transient) {
     const limit = Math.max(1, Math.min(1000, Math.floor(Number(before.profile?.maxConcurrentSessionOperations) || 10)));
     let live = 0;
     for (const [key, hint] of Object.entries(before.tabHintsByTaskId || {})) {
       if (key === hintKey || hint.ownedByExtension !== true) continue;
       const other = before.sessionsById?.[hint.sessionId];
-      if (other?.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK && other?.scenarioWork?.closeTabsBetweenChecks !== true) continue;
+      if (other?.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK && other?.scenarioWork?.managed !== true) continue;
       try { await chromeApi.tabs.get(hint.tabId); live += 1; } catch { /* missing binding consumes no browser resource */ }
     }
     if (live >= limit) {
@@ -89,7 +89,7 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
     }
     throw error;
   }
-  return chromeApi.tabs.update(tab.id, { url: targetUrl, active: false });
+  return chromeApi.tabs.update(tab.id, { url: targetUrl, active: false, autoDiscardable: false });
 }
 
 export async function reconcileOwnedPlaceholders(repository, chromeApi) {

@@ -72,43 +72,29 @@ test('initial pool stagger accepts three minutes and is stored only as first-lau
   }
 });
 
-test('active streaming response renews response timeout instead of resetting the chat sequence', async () => {
-  const h = harness({
-    report: async () => ({
-      status: 'BUSY',
-      assistantComplete: false,
-      safeDiagnosticCode: 'ASSISTANT_RESPONSE_STREAMING',
-    }),
-  });
-  const created = await h.manager.createChatPool({
-    name: 'Accessible Chess',
-    count: 1,
-    replacementBudget: 0,
-    staggerSeconds: 0,
-    autoStart: true,
-    config: chessConfig,
-  });
+test('active streaming cannot extend the configured hard response timeout', async () => {
+  const h = harness({ report: async () => ({ status: 'BUSY', assistantComplete: false,
+    responseAnchorMatched: true, safeDiagnosticCode: 'ASSISTANT_RESPONSE_STREAMING' }) });
+  const created = await h.manager.createChatPool({ count: 1, replacementBudget: 1,
+    staggerSeconds: 0, autoStart: true, config: { ...chessConfig, responseTimeoutMinutes: 35 } });
   const id = created.ids[0];
   let scenario = (await h.manager.get(id)).scenario;
-  assert.equal(scenario.runtime.chat.state, 'WAITING');
   const sessionId = scenario.runtime.chat.sessionId;
-  const taskId = scenario.runtime.chat.taskId;
   const session = h.state.sessionsById[sessionId];
-  session.tasksById[taskId].lastVerifiedSendAt = h.now + 1;
-  session.tasksById[taskId].lastConversationUrl = 'https://chatgpt.com/c/streaming';
-  session.successfulSendCount = 1;
-
-  const oldDeadline = scenario.runtime.chat.deadlineAt;
-  h.now = oldDeadline + 1;
+  session.tasksById[scenario.runtime.chat.taskId].lastVerifiedSendAt = h.now;
+  session.tasksById[scenario.runtime.chat.taskId].lastConversationUrl = 'https://chatgpt.com/c/streaming';
+  session.successfulSendCount = 1; session.operation = { phase: 'SENT_VERIFIED' };
+  h.now += 34 * 60_000;
   await h.manager.cycleOne(id);
   scenario = (await h.manager.get(id)).scenario;
-
-  assert.equal(scenario.runtime.chat.state, 'WAITING');
   assert.equal(scenario.runtime.chat.sessionId, sessionId);
-  assert.equal(scenario.runtime.stepIndex, 0);
-  assert.equal(scenario.runtime.repeatIndex, 0);
-  assert.equal(scenario.runtime.poolReplacementsUsed, 0);
-  assert.ok(scenario.runtime.chat.deadlineAt > h.now);
+  assert.equal(scenario.runtime.chat.deadlineAt, session.tasksById[session.taskOrder[0]].lastVerifiedSendAt + 35 * 60_000);
+  h.now += 60_001;
+  await h.manager.cycleOne(id);
+  scenario = (await h.manager.get(id)).scenario;
+  assert.equal(h.state.sessionsById[scenario.runtime.chat.sessionId].createdAt, h.now, 'new physical launch is materialized at timeout');
+  assert.equal(scenario.runtime.poolReplacementsUsed, 1);
+  assert.equal(scenario.runtime.totalCompletedTurns, 0);
 });
 
 test('global status separates eight scenario chats from ten whole-product work units', () => {
@@ -422,7 +408,7 @@ test('whole pool structural program cannot be changed in place after creation', 
   );
 });
 
-test('assistant-response diagnostics distinguish streaming, completion and timeout extension evidence', async () => {
+test('assistant-response diagnostics distinguish streaming, completion and hard timeout evidence', async () => {
   let mode = 'BUSY';
   const h = harness({
     report: async () => mode === 'BUSY'
@@ -456,12 +442,8 @@ test('assistant-response diagnostics distinguish streaming, completion and timeo
     && /waitSeconds=10/u.test(event.message || '')));
 
   scenario = (await h.manager.get(id)).scenario;
-  h.now = scenario.runtime.chat.deadlineAt + 1;
-  await h.manager.cycleOne(id);
-  events = h.state.diagnostics || [];
-  assert.ok(events.some(event => event.event === 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ГЕНЕРАЦІЯ_ТРИВАЄ'));
-  scenario = (await h.manager.get(id)).scenario;
-  assert.ok(scenario.runtime.chat.deadlineAt > h.now);
+  assert.equal(scenario.runtime.chat.deadlineAt, task.lastVerifiedSendAt + 60_000);
+  assert.ok(!events.some(event => event.event === 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ГЕНЕРАЦІЯ_ТРИВАЄ'));
 
   mode = 'READY';
   h.now += 5_000;
@@ -578,7 +560,7 @@ test('CHAT_CYCLE timeout retries the same logical prompt and never rewinds compl
   assert.equal(scenario.runtime.chat.stage, 'STEP:0:1:0');
   session = h.state.sessionsById[scenario.runtime.chat.sessionId];
   task = session.tasksById[scenario.runtime.chat.taskId];
-  assert.equal(task.promptOverride, 'CONTINUE');
+  assert.equal(task.promptOverride.split('\n')[0], 'CONTINUE');
 
   reportMode = 'WAITING';
   task.lastVerifiedSendAt = h.now + 1;
@@ -589,7 +571,7 @@ test('CHAT_CYCLE timeout retries the same logical prompt and never rewinds compl
   session.runState = 'COMPLETED';
 
   scenario = (await h.manager.get(id)).scenario;
-  h.now = scenario.runtime.chat.deadlineAt + 1;
+  h.now = task.lastVerifiedSendAt + 60_001;
   await h.manager.cycleOne(id);
   scenario = (await h.manager.get(id)).scenario;
 
@@ -599,7 +581,7 @@ test('CHAT_CYCLE timeout retries the same logical prompt and never rewinds compl
   assert.equal(scenario.runtime.chat.stage, 'STEP:0:1:0', 'replacement retries the current logical CONTINUE turn');
   const replacementSession = h.state.sessionsById[scenario.runtime.chat.sessionId];
   const replacementTask = replacementSession.tasksById[scenario.runtime.chat.taskId];
-  assert.equal(replacementTask.promptOverride, 'CONTINUE');
+  assert.equal(replacementTask.promptOverride.split('\n')[0], 'CONTINUE');
 });
 
 test('timeout with no replacement budget is ERROR, never false COMPLETED', async () => {

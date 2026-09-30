@@ -15,7 +15,7 @@ function fixture() {
     [2, {id: 2, windowId: 22, url: 'https://www.youtube.com/', status: 'complete'}]]);
   let serial = 2, maxTabs = 2, now = 1_800_000_000_000, focused = 11, generated = 0;
   const drafts = new Map(), sends = [], closeFaults = new Set();
-  let injectCloseFaults = false, failNavigation = false;
+  let injectCloseFaults = false, failNavigation = false, requiredTurnsBeforeClose = 0, reportOverride = null;
   const chrome = { storage: {local: {
     async get(key) { return {[key]: structuredClone(data[key])}; },
     async set(record) { Object.assign(data, structuredClone(record)); },
@@ -33,6 +33,11 @@ function fixture() {
       Object.assign(tabs.get(id),patch); return structuredClone(tabs.get(id));
     },
     async remove(id) {
+      if (requiredTurnsBeforeClose && tabs.get(id)?.url.includes('/c/')) {
+        const url = tabs.get(id).url;
+        assert.equal(sends.filter(send => send.url === url).length, requiredTurnsBeforeClose,
+          'a scenario physical tab is never closed between prompts or polling');
+      }
       if (injectCloseFaults && id % 9 === 0 && !closeFaults.has(id)) { closeFaults.add(id); throw Error('synthetic transient close refusal'); }
       if (!tabs.delete(id)) throw Error('No tab with id'); drafts.delete(id);
     },
@@ -49,6 +54,7 @@ function fixture() {
       sends.push({operation:req.requestId,tabId:id,url:tab.url});
       return {status:'SENT_VERIFIED', normalizedObservedUrl:tab.url,assistantBaselineCount:0, submittedUserMessageKey:`message:${req.requestId}`};
     }
+    if (req.mode === 'READ_ASSISTANT_REPORT' && reportOverride) return structuredClone(reportOverride);
     if (req.mode === 'READ_ASSISTANT_REPORT') return {status:'READY',assistantComplete:true,assistantText:'OK',safeDiagnosticCode:'ASSISTANT_RESPONSE_READY'};
     throw Error(`Unexpected ${req.mode}`);
   }};
@@ -60,7 +66,7 @@ function fixture() {
   }; restart();
   return {chrome,repo,tabs,sends,restart,get executor(){return executor;},get manager(){return manager;},
     get maxTabs(){return maxTabs;},get now(){return now;},advance(ms=16000){now+=ms;focused=22;},
-    faults(){injectCloseFaults=true;},navigationFault(){failNavigation=true;}};
+    setReport(report){reportOverride=report;},guardCycle(turns){requiredTurnsBeforeClose=turns;},faults(){injectCloseFaults=true;},navigationFault(){failNavigation=true;}};
 }
 
 async function addSession(f, id='ordinary', strategy=TabStrategy.OPEN_CLOSE_PER_TASK) {
@@ -90,7 +96,7 @@ test('open-close exceeds 12 sends through restart and failed closes without orph
 });
 
 test('five scenario slots complete 17 turns and one replacement each with bounded live tabs through restart',async()=>{
-  const f=fixture(); f.faults();
+  const f=fixture(); f.faults(); f.guardCycle(17);
   await f.manager.createChatPool({count:5,replacementBudget:5,config:{mode:'CHAT_CYCLE',roundsPerGeneration:1,
     launchUrl:'https://chatgpt.com/',steps:[{prompt:'START',repeat:1},{prompt:'CONTINUE',repeat:15},{prompt:'FINAL',repeat:1}],
     closeTabsBetweenChecks:true,pollSeconds:15,preSendDelaySeconds:1,retryBackoffSeconds:5,responseTimeoutMinutes:10}});
@@ -158,4 +164,36 @@ test('physical tab budget applies to held drafts across the whole profile, not j
   assert.equal(results.filter(r=>r.status==='fulfilled').length,3);
   assert.ok(results.filter(r=>r.status==='rejected').every(r=>r.reason.safeDiagnosticCode==='TAB_RESOURCE_CAPACITY_WAIT'));
   assert.equal(f.tabs.size,5);assert.equal(Object.values((await f.repo.load()).tabHintsByTaskId).length,3);
+});
+
+for (const minutes of [35, 45]) test(`scenario keeps its exact physical tab until the ${minutes}-minute hard timeout, then creates a fresh chat`,async()=>{
+  const f=fixture();
+  f.setReport({status:'BUSY',assistantComplete:false,responseAnchorMatched:true,
+    safeDiagnosticCode:'ASSISTANT_RESPONSE_STREAMING'});
+  const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{mode:'CHAT_CYCLE',launchUrl:'https://chatgpt.com/',steps:[{prompt:'CONTINUE',repeat:2}],
+      closeTabsBetweenChecks:true,responseTimeoutMinutes:minutes,preSendDelaySeconds:1}});
+  const id=pool.ids[0]; await f.manager.startChatPool(pool.pool.id);
+  const initial=(await f.manager.get(id)).scenario.runtime;
+  const sid=initial.chat.sessionId;
+  await f.executor.runSessionOnce(sid); f.advance(2000); await f.executor.runSessionOnce(sid);
+  await f.manager.cycleOne(id);
+  const sent=f.sends[0]; assert.ok(sent.url.includes('/c/'));
+  let scenario=(await f.manager.get(id)).scenario;
+  const deadline=scenario.runtime.chat.deadlineAt;
+  f.advance(deadline-f.now-1); f.restart(); await f.manager.cycleOne(id);
+  assert.ok(f.tabs.has(sent.tabId));
+  assert.equal((await f.manager.get(id)).scenario.runtime.chat.deadlineAt,deadline);
+  assert.equal(f.sends.length,1);
+  f.advance(2); await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(sent.tabId),'the expired physical chat was closed');
+  scenario=(await f.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.totalCompletedTurns,0);
+  assert.equal(scenario.runtime.poolReplacementsUsed,1);
+  await f.executor.runSessionOnce(scenario.runtime.chat.sessionId);
+  f.advance(2000); await f.executor.runSessionOnce(scenario.runtime.chat.sessionId);
+  assert.equal(f.sends.length,2);
+  assert.notEqual(f.sends[1].tabId,sent.tabId);
+  assert.notEqual(f.sends[1].url,sent.url,'replacement is a fresh conversation, not a report-only reopen');
+  assert.equal(f.tabs.get(f.sends[1].tabId).windowId,11);
 });

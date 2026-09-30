@@ -56,6 +56,7 @@
   // Retain the pre-send baseline for late acknowledgement and worker restarts.
   // A page reload intentionally loses this evidence: history equality alone is unsafe.
   const textSubmissionEvidence = new Map();
+  const responseStability = new WeakMap();
 
   function evidenceUrlMatches(storedExpected, requestExpected) {
     const stored = normalizeUrl(storedExpected);
@@ -869,6 +870,12 @@
         safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_UNAVAILABLE',
       });
     }
+    if (request.requireStableResponse === true
+        && !responseAnchor(doc, request, semanticAssistantMessages(doc)).responseAnchorMatched) {
+      return chatRecoveryResult(request, start, surface, {
+        safeDiagnosticCode: 'CHATGPT_RECOVERY_USER_ANCHOR_UNPROVEN', retryAvailable: false,
+      });
+    }
     try {
       surface.element.click?.();
     } catch (_) {
@@ -1246,7 +1253,7 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key]'))
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key], [data-conversation-role="assistant"], [data-markdown-text-style="assistant-message"]'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         // Work exposes separate keyed units for the user and assistant within
@@ -1258,7 +1265,9 @@
           && (el.querySelector?.('[data-conversation-role="assistant"]')
             || /:assistant$/.test(workKey))
           && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
-        return role === 'assistant' || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
+        return role === 'assistant' || (el.getAttribute?.('data-conversation-role') === 'assistant'
+          || el.getAttribute?.('data-markdown-text-style') === 'assistant-message')
+          && Boolean(el.closest?.('main, [role="main"]')) || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
           || workUnit;
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
@@ -1289,13 +1298,31 @@
     return stableMessageKey(users[users.length - 1]);
   }
 
-  function assistantFollowsSubmittedUser(doc, key, assistants) {
-    if (!key) return false;
+  function responseAnchor(doc, request, assistants) {
     const users = semanticUserMessages(doc);
     const user = users[users.length - 1];
     const assistant = assistants[assistants.length - 1];
-    if (!user || !assistant || stableMessageKey(user) !== key) return false;
-    return Boolean(user.compareDocumentPosition?.(assistant) & 4);
+    const key = String(request.submittedUserMessageKey || '');
+    const token = String(request.responseCorrelationToken || '');
+    const keyMatched = Boolean(key && user && stableMessageKey(user) === key);
+    // The persisted marker is unique to this physical scenario turn. Unlike a
+    // temporary turn index, it survives optimistic-ID replacement and reload.
+    const tokenMatched = Boolean(token && user && userMessageText(user).includes(token));
+    // Upgrade old fresh-chat sessions only when their sole user bubble is the
+    // exact submitted prompt. Never use this for repeated historical messages
+    // or to override a different canonical server message ID.
+    const legacyMatched = !token && !keyMatched && !key.startsWith('message:')
+      && users.length === 1 && Number(request.assistantBaselineCount || 0) === 0
+      && request.assistantBaselineKnown === true && request.submittedPromptText
+      && promptTextMatches(userMessageText(user), request.submittedPromptText);
+    const kind = tokenMatched ? 'STEP_MARKER' : keyMatched ? 'MESSAGE_KEY' : legacyMatched ? 'LEGACY_SINGLE_TURN' : '';
+    const position = user && assistant ? Number(user.compareDocumentPosition?.(assistant) || 0) : 0;
+    return {
+      responseAnchorMatched: Boolean(kind), responseAnchorKind: kind,
+      submittedKeyMatched: keyMatched, correlationTokenMatched: tokenMatched,
+      observedUserCount: users.length, observedAssistantCount: assistants.length,
+      paired: Boolean(kind && (position & 4) && !(position & 1)),
+    };
   }
 
   function userMessageHistorySnapshot(doc) {
@@ -2055,54 +2082,55 @@
     if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'REPORT_URL_MISMATCH' });
     }
-    const recoverySurface = findChatRecoverySurface(doc);
-    if (recoverySurface) return chatRecoveryResult(request, start, recoverySurface);
-    const blocking = detectBlockingState(doc);
-    const assistantMessages = semanticAssistantMessages(doc);
+    const assistants = semanticAssistantMessages(doc);
+    const anchor = responseAnchor(doc, request, assistants);
     const text = latestAssistantText(doc);
     const baselineKnown = request.assistantBaselineKnown === true;
     const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
-    const submittedKey = String(request.submittedUserMessageKey || '');
-    const paired = assistantFollowsSubmittedUser(doc, submittedKey, assistantMessages);
-    const hasNewAssistantTurn = submittedKey ? paired : (baselineKnown && assistantMessages.length > baselineCount);
-    if (blocking?.status === STATUS.BUSY) {
-      return resultBase(request, start, {
-        status: STATUS.BUSY,
-        assistantText: hasNewAssistantTurn ? text : '',
-        assistantComplete: false,
-        safeDiagnosticCode: 'ASSISTANT_RESPONSE_STREAMING'
-      });
+    const anchoredRequest = Boolean(request.submittedUserMessageKey || request.responseCorrelationToken);
+    const hasNewAssistantTurn = anchoredRequest ? anchor.paired : (anchor.paired || baselineKnown && assistants.length > baselineCount);
+    const metadata = { ...anchor, paired: undefined };
+    const recoverySurface = findChatRecoverySurface(doc);
+    if (recoverySurface) {
+      responseStability.delete(doc);
+      // Retry changes server state. It must be tied to this submitted user turn.
+      return { ...chatRecoveryResult(request, start, recoverySurface), ...metadata,
+        retryAvailable: anchor.responseAnchorMatched && recoverySurface.retryAvailable === true };
     }
+    const blocking = detectBlockingState(doc);
     if (blocking) {
+      responseStability.delete(doc);
       return resultBase(request, start, {
-        status: blocking.status,
-        assistantText: hasNewAssistantTurn ? text : '',
-        assistantComplete: false,
-        safeDiagnosticCode: `${blocking.code}_REPORT`
+        ...metadata, status: blocking.status,
+        assistantText: hasNewAssistantTurn ? text : '', assistantComplete: false,
+        safeDiagnosticCode: blocking.status === STATUS.BUSY ? 'ASSISTANT_RESPONSE_STREAMING' : `${blocking.code}_REPORT`
       });
     }
-    if (!baselineKnown && !paired) {
-      return resultBase(request, start, {
-        status: STATUS.TEMPORARY_ERROR,
-        assistantText: '',
-        assistantComplete: false,
-        safeDiagnosticCode: 'ASSISTANT_BASELINE_UNKNOWN'
-      });
+    if (!baselineKnown && !anchor.paired) {
+      return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
+        assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_BASELINE_UNKNOWN' });
     }
     if (!hasNewAssistantTurn || !text) {
-      return resultBase(request, start, {
-        status: STATUS.TEMPORARY_ERROR,
-        assistantText: '',
-        assistantComplete: false,
-        safeDiagnosticCode: hasNewAssistantTurn ? 'ASSISTANT_RESPONSE_NOT_READY' : 'ASSISTANT_NEW_RESPONSE_NOT_STARTED'
-      });
+      responseStability.delete(doc);
+      return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
+        assistantText: '', assistantComplete: false,
+        safeDiagnosticCode: hasNewAssistantTurn ? 'ASSISTANT_RESPONSE_NOT_READY' : 'ASSISTANT_NEW_RESPONSE_NOT_STARTED' });
     }
-    return resultBase(request, start, {
-      status: STATUS.READY,
-      assistantText: text,
-      assistantComplete: true,
-      safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY'
-    });
+    if (request.requireStableResponse === true) {
+      const identity = `${request.expectedUrl}|${request.responseCorrelationToken || request.submittedUserMessageKey || ''}`;
+      const previous = responseStability.get(doc);
+      if (!previous || previous.identity !== identity || previous.text !== text) {
+        responseStability.set(doc, { identity, text, seenAt: nowMs() });
+        return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
+          assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_STABILITY_PENDING' });
+      }
+      if (nowMs() - previous.seenAt < 1000) {
+        return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
+          assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_STABILITY_PENDING' });
+      }
+    }
+    return resultBase(request, start, { ...metadata, status: STATUS.READY,
+      assistantText: text, assistantComplete: true, safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY' });
   }
 
   async function insertAndSend(doc, request, start, deps) {

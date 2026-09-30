@@ -356,3 +356,53 @@ test('a delayed request past its execution deadline cannot dispatch a physical S
   assert.equal(chat.sends,0);assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
   assert.equal(result.safeDiagnosticCode,'SEND_REQUEST_EXPIRED_BEFORE_EFFECT');
 });
+
+test('scenario step marker survives an optimistic user ID changing after reload', async () => {
+  let clock = 2000;
+  class ClockDate extends Date { static now() { return clock; } }
+  const { adapter } = loadAdapter({Date: ClockDate});
+  const chat = workChat();
+  const user = chat.bubble('CONTINUE\n\nСлужбова мітка: [APSTEP:slot:12]');
+  user.getAttribute = name => name === 'data-user-message-bubble' ? 'true'
+    : name === 'data-message-id' ? 'server-id-after-reload' : null;
+  user.compareDocumentPosition = assistant => assistant.current ? 4 : 2;
+  chat.users.push(user);
+  const current = chat.reply('New final report'); current.current = true;
+  chat.assistants.push(current);
+  const request = validRequest({mode:'READ_ASSISTANT_REPORT', assistantBaselineKnown:true,
+    assistantBaselineCount:17, submittedUserMessageKey:'message:optimistic-id',
+    responseCorrelationToken:'[APSTEP:slot:12]', requireStableResponse:true});
+  const candidate = await adapter.execute(request,{document:chat.document});
+  assert.equal(candidate.assistantComplete,false);
+  assert.equal(candidate.responseAnchorKind,'STEP_MARKER');
+  clock += 1001;
+  const ready = await adapter.execute(request,{document:chat.document});
+  assert.equal(ready.assistantComplete,true);
+  assert.equal(ready.assistantText,'New final report');
+  assert.equal(ready.submittedKeyMatched,false);
+  const nextStep = await adapter.execute({...request,responseCorrelationToken:'[APSTEP:slot:13]'},{document:chat.document});
+  assert.equal(nextStep.assistantComplete,false,'a repeated CONTINUE from another step cannot supply its answer');
+});
+
+test('a reply before the marked user turn cannot advance a scenario', async () => {
+  const { adapter } = loadAdapter(); const chat = workChat();
+  const user = chat.bubble('CONTINUE [APSTEP:slot:2]'); user.compareDocumentPosition = () => 2;
+  chat.users.push(user); chat.assistants.push(chat.reply('Old report quoting [APSTEP:slot:2]'));
+  const result = await adapter.execute(validRequest({mode:'READ_ASSISTANT_REPORT',
+    assistantBaselineKnown:true, assistantBaselineCount:0, responseCorrelationToken:'[APSTEP:slot:2]'}),{document:chat.document});
+  assert.equal(result.assistantComplete,false);
+  assert.equal(result.assistantText,'');
+});
+
+test('legacy fresh-chat response can be matched only to its sole exact user prompt', async () => {
+  const { adapter } = loadAdapter(); const chat = workChat();
+  const user = chat.bubble('START exact'); user.compareDocumentPosition = () => 4;
+  chat.users.push(user); chat.assistants.push(chat.reply('Legacy answer'));
+  const request = validRequest({mode:'READ_ASSISTANT_REPORT', assistantBaselineKnown:true,
+    assistantBaselineCount:0, submittedUserMessageKey:'turn:old-layout',submittedPromptText:'START exact'});
+  const ready = await adapter.execute(request,{document:chat.document});
+  assert.equal(ready.assistantComplete,true); assert.equal(ready.responseAnchorKind,'LEGACY_SINGLE_TURN');
+  chat.users.unshift(chat.bubble('START exact'));
+  const historical = await adapter.execute(request,{document:chat.document});
+  assert.equal(historical.assistantComplete,false);
+});

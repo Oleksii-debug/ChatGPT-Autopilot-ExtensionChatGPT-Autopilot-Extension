@@ -10,8 +10,8 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser()
-parser.add_argument('--base', type=pathlib.Path, default=ROOT / 'releases/11.0.1/ChatGPT-Autopilot-11.0.1-HIGH-2026-09-30.zip')
-parser.add_argument('--out-dir', type=pathlib.Path, default=ROOT / 'releases/11.0.2')
+parser.add_argument('--base', type=pathlib.Path, default=ROOT / 'releases/11.0.2/ChatGPT-Autopilot-11.0.2-HIGH-2026-09-30.zip')
+parser.add_argument('--out-dir', type=pathlib.Path, default=ROOT / 'releases' / json.loads((ROOT / 'package.json').read_text())['version'])
 args = parser.parse_args()
 version = json.loads((ROOT / 'package.json').read_text())['version']
 manifest = json.loads((ROOT / 'manifest.json').read_text())
@@ -20,7 +20,7 @@ assert "forceHighEffort: true" in (ROOT / 'src/config/execution-policy.js').read
 with zipfile.ZipFile(args.base) as old:
     assert old.testzip() is None
     files = {name.split('/', 1)[1] for name in old.namelist() if not name.endswith('/')}
-files.update({f'CHANGES-{version}.txt', f'QA-{version}.txt'})
+files.update({f'CHANGES-{version}.txt', f'QA-{version}.txt', 'HISTORY-2026-09-30.md'})
 # Discover newly introduced local dependencies from the product entry points.
 imports = re.compile(r'''(?:from\s*|import\s*\()(['"])([^'"]+)\1''')
 queue = list(files)
