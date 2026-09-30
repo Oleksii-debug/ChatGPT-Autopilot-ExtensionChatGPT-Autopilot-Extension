@@ -337,6 +337,25 @@ export async function rankAiRouteCandidatesByEvidenceV1(input = {}) {
     now,
   });
 
+  let comparableSuiteId = '';
+  let comparableSuiteRevisionId = '';
+  for (const route of selected.candidates) {
+    const binding = benchmarkByRoute.get(route.routeId);
+    if (!binding || binding.stale) continue;
+    const { suiteId, suiteRevisionId } = binding.evaluation;
+    if (!comparableSuiteId) {
+      comparableSuiteId = suiteId;
+      comparableSuiteRevisionId = suiteRevisionId;
+      continue;
+    }
+    if (suiteId !== comparableSuiteId || suiteRevisionId !== comparableSuiteRevisionId) {
+      throw new Error(
+        'AI route governor fresh benchmark evidence for eligible routes must use one '
+          + 'comparable suiteId and suiteRevisionId',
+      );
+    }
+  }
+
   const ownerOrder = new Map(
     policy.orderedRouteIds.map((routeId, index) => [routeId, index]),
   );
