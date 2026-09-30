@@ -1,4 +1,4 @@
-import { createChatTab, sameChatConversationUrl } from './tabs.js';
+import { createChatTab, sameChatConversationUrl, isChatAuthUrl } from './tabs.js';
 
 function temporaryReport(code, extra = {}) {
   return {
@@ -35,8 +35,10 @@ async function getTab(chromeApi, tabId) {
   if (tabId == null || !chromeApi?.tabs?.get) return null;
   try {
     return await chromeApi.tabs.get(tabId);
-  } catch {
-    return null;
+  } catch (error) {
+    if (/no tab with id|invalid tab id|tab not found/iu.test(String(error?.message || error))) return null;
+    // A slow/unavailable Chrome API does not prove physical absence.
+    throw error;
   }
 }
 
@@ -82,28 +84,19 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
   const persistentManagedTab = job?.persistentManagedTab === true;
   let tabId = null;
   let temporaryTab = false;
-  let restoreActiveTabId = null;
 
   try {
-    const hinted = await getTab(chromeApi, job?.managedTabId);
+    let hinted = await getTab(chromeApi, job?.managedTabId);
+    if (persistentManagedTab && job?.managedTabOwned === true && hinted?.autoDiscardable === false && chromeApi.tabs?.update) {
+      try { hinted = await chromeApi.tabs.update(hinted.id, { autoDiscardable: true }); } catch { /* preserve identity */ }
+    }
     // A managed Scenario must inspect its bound tab, not the first matching
     // conversation in Chrome (which may be a manually opened user tab).
-    const tabs = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
+    const tabs = persistentManagedTab ? [] : await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
     let existing = persistentManagedTab
       ? (hinted && matchesConversation(hinted, conversationUrl) ? hinted
         : null)
       : (tabs || []).find(tab => tab?.id != null && matchesConversation(tab, conversationUrl));
-    // Frozen/discarded documents cannot run the receiver. Wake this owned
-    // physical tab, without focusing a window or replacing its conversation.
-    if (persistentManagedTab && job?.managedTabOwned === true && existing?.id != null
-        && (existing.frozen === true || existing.discarded === true) && chromeApi.tabs?.update) {
-      try {
-        const activeTabs = await chromeApi.tabs.query({ active: true, windowId: existing.windowId });
-        const prior = (activeTabs || []).find(item => item.active === true && item.windowId === existing.windowId);
-        if (prior?.id != null && prior.id !== existing.id) restoreActiveTabId = prior.id;
-        existing = await chromeApi.tabs.update(existing.id, { active: true, autoDiscardable: false });
-      } catch { /* Bounded recovery below retains the physical identity. */ }
-    }
     const recoveryAction = String(job?.recoveryAction || '').trim();
 
     if (recoveryAction === 'SAME_URL_RELOAD') {
@@ -141,20 +134,14 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
     }
 
     if (!existing && persistentManagedTab && hinted?.id != null) {
+      if (isChatAuthUrl(hinted.url)) return temporaryReport('AUTH_SURFACE_VISIBLE_REPORT', { status: 'AUTH_REQUIRED' });
       if (hinted.status === 'loading') {
         return temporaryReport('ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', {
           tabRecoveryPending: true,
         });
       }
-      if (job?.managedTabOwned === true && chromeApi.tabs?.update) {
-        try {
-          await chromeApi.tabs.update(hinted.id, { url: conversationUrl, active: false });
-          return temporaryReport('ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', {
-            tabRecoveryPending: true,
-            recoveredManagedTabId: hinted.id,
-          });
-        } catch { /* Leave the saved identity intact for bounded recovery. */ }
-      }
+      // A normal read must never navigate. The canonical recovery ledger may
+      // authorize one explicit in-place recovery, rather than an endless loop.
       return temporaryReport('CHATGPT_RECOVERY_CONVERSATION_IDENTITY_LOST', {
         chatRecoveryRequired: true,
         recoveryPending: true,
@@ -179,9 +166,6 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
 
     if (existing?.id != null) {
       tabId = existing.id;
-      if (persistentManagedTab && job?.managedTabOwned === true && chromeApi.tabs?.update) {
-        try { await chromeApi.tabs.update(tabId, { autoDiscardable: false }); } catch { /* optional Chrome hint */ }
-      }
 
       if (persistentManagedTab && existing.discarded === true) {
         return temporaryReport('ASSISTANT_RESPONSE_TAB_DISCARDED', {
@@ -198,7 +182,6 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       if (persistentManagedTab && existing.frozen === true) {
         return temporaryReport('ASSISTANT_RESPONSE_TAB_FROZEN', {
           tabRecoveryPending: true,
-          chatRecoveryRequired: true,
           recoveryPending: true,
           recoveryCategory: 'TAB_FROZEN',
           recoveryErrorLabel: 'Scenario conversation tab was frozen by Chrome',
@@ -248,9 +231,6 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
     if (recoveryAction === 'RETRY_BUTTON') request.mode = 'RECOVER_CHAT_ERROR_SURFACE';
     return await transport.execute(tabId, request);
   } finally {
-    if (restoreActiveTabId != null) {
-      try { await chromeApi.tabs.update(restoreActiveTabId, { active: true }); } catch { /* prior tab closed */ }
-    }
     if (temporaryTab && tabId != null) {
       try { await chromeApi.tabs.remove(tabId); } catch (_) {}
     }

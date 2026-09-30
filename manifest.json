@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Автопілот — High",
-  "version": "11.0.3",
+  "version": "11.0.4",
   "description": "Керує ChatGPT-сеансами та multi-agent оркестрацією з відновленням, GitHub control і локальними лімітами.",
   "permissions": [
     "storage",
@@ -76,5 +76,5 @@
     "downloads",
     "notifications"
   ],
-  "version_name": "11.0.3 High"
+  "version_name": "11.0.4 High"
 }

@@ -13,7 +13,7 @@ const SAFE_RECEIVER_RECOVERY_MODES = new Set([
   'RECOVER_CHAT_ERROR_SURFACE',
 ]);
 const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
-const DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS = 10000;
+const DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS = 2000;
 const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
 
 function waitMs(ms) {
@@ -75,7 +75,8 @@ export class ChromeInteractionTransport {
   async send(tabId, request) {
     const bounded = ['CHECK_ONLY', 'PREPARE_SEND', 'SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
     if (!bounded) return this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction', request });
-    const timeoutMs = Math.max(1, this.requestTimeoutMs);
+    const timeoutMs = Math.max(1, request?.mode === 'READ_ASSISTANT_REPORT'
+      ? Math.min(5000, this.requestTimeoutMs) : this.requestTimeoutMs);
     let timer;
     try {
       return await Promise.race([

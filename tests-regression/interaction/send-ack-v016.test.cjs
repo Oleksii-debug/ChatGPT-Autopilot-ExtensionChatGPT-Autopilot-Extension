@@ -63,6 +63,15 @@ test('new-chat launch URL may transition from root to the created conversation a
   assert.equal(f.clicks(),1);
 });
 
+test('acknowledgement stops bounded DOM work even when wakeups do not advance the clock', async () => {
+  const f = fixture({ noOp: true });
+  let wakeups = 0;
+  const result = await f.run('SUBMIT_EXISTING', {}, { wait: async () => { wakeups++; } });
+  assert.equal(result.status, 'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(), 1);
+  assert.equal(wakeups, 200);
+});
+
 
 test('fresh unique conversation transition with empty composer and generation proves the one local submit',async()=>{
   const f=fixture({

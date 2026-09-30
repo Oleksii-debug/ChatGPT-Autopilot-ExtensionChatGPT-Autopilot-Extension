@@ -95,21 +95,12 @@ async function protectManagedScenarioTab(chromeApi, session, tab, owned = false)
   if (session?.scenarioWork?.managed !== true) return tab;
   if (Number.isInteger(tab?.windowId)) session.scenarioWork.preferredWindowId = tab.windowId;
   if (!owned || !chromeApi.tabs?.update || tab?.id == null) return tab;
-  if (!tab.frozen && !tab.discarded) {
-    try { return await chromeApi.tabs.update(tab.id, { autoDiscardable: false }); } catch { return tab; }
+  // Undo 11.0.3's residency override once. Chrome must remain free to reclaim
+  // memory; polling never rotates active tabs to fight its memory pressure.
+  if (tab.autoDiscardable === false) {
+    try { return await chromeApi.tabs.update(tab.id, { autoDiscardable: true }); } catch { return tab; }
   }
-  let restoreId = null;
-  try {
-    const active = await chromeApi.tabs.query({ active: true, windowId: tab.windowId });
-    const previous = active.find(item => item.active === true && item.windowId === tab.windowId);
-    if (previous && previous.id !== tab.id) restoreId = previous.id;
-    return await chromeApi.tabs.update(tab.id, { active: true, autoDiscardable: false });
-  } catch { return tab; }
-  finally {
-    if (restoreId != null) {
-      try { await chromeApi.tabs.update(restoreId, { active: true }); } catch { /* prior tab closed */ }
-    }
-  }
+  return tab;
 }
 
 // Chrome puts a background tab in the focused window unless windowId is

@@ -776,6 +776,7 @@
         <label for="scenario-work-retry">Повтор після технічної помилки, с</label>
         <input id="scenario-work-retry" type="number" min="5" max="3600" step="1" inputmode="numeric" value="30">
         <p>Сценарна вкладка залишається відкритою протягом усіх налаштованих промптів. Закривається після завершення циклу або спливу налаштованого таймауту; тоді відкривається новий чат.</p>
+        <p>Нові сценарні запуски тримають відкритими до трьох робочих чатів одночасно в одному профілі. Решта чекає звільнення місця після завершення циклу.</p>
         <input id="scenario-work-close-tabs-between-checks" type="checkbox" hidden disabled>
         <input id="scenario-work-reopen-on-probe-error" type="checkbox" hidden disabled>
         <label for="scenario-work-timeout-policy">Як діяти, якщо учасник завис</label>

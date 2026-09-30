@@ -12,7 +12,9 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser()
 parser.add_argument('--base', type=pathlib.Path, default=ROOT / 'releases/11.0.2/ChatGPT-Autopilot-11.0.2-HIGH-2026-09-30.zip')
 parser.add_argument('--out-dir', type=pathlib.Path, default=ROOT / 'releases' / json.loads((ROOT / 'package.json').read_text())['version'])
+parser.add_argument('--date', default='2026-09-30')
 args = parser.parse_args()
+assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', args.date)
 version = json.loads((ROOT / 'package.json').read_text())['version']
 manifest = json.loads((ROOT / 'manifest.json').read_text())
 assert manifest['version'] == version
@@ -39,7 +41,7 @@ while queue:
             files.add(dependency)
             queue.append(dependency)
 args.out_dir.mkdir(parents=True, exist_ok=True)
-name = f'ChatGPT-Autopilot-{version}-HIGH-2026-09-30.zip'
+name = f'ChatGPT-Autopilot-{version}-HIGH-{args.date}.zip'
 output = args.out_dir / name
 prefix = f'ChatGPT-Autopilot-{version}-HIGH'
 with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

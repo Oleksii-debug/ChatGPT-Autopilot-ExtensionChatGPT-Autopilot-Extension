@@ -30,7 +30,6 @@ const RECOVERY_CODES = new Set([
   'CHATGPT_RECOVERY_CONVERSATION_IDENTITY_LOST',
   'ASSISTANT_RESPONSE_TAB_MISSING',
   'ASSISTANT_RESPONSE_TAB_DISCARDED',
-  'ASSISTANT_RESPONSE_TAB_FROZEN',
 ]);
 
 function boundedCount(value) {
@@ -106,6 +105,13 @@ export function planChatRecovery(rawState, report, now = Date.now(), policyRaw =
 
   if (!observedFailure) {
     if (!active) return { state, action: ChatRecoveryAction.NONE };
+    // A loading/frozen/unrecognized document is not proof of recovery. Keep
+    // the attempt ledger until this submitted turn has a completed reply.
+    if (policyRaw.requireCompletedResponse === true
+        && !(report?.status === 'READY' && report?.assistantComplete === true)) {
+      state.elapsedMs = Math.max(0, now - state.startedAt);
+      return { state, action: ChatRecoveryAction.WAIT };
+    }
     return {
       state: normalizeChatRecovery(),
       action: ChatRecoveryAction.RECOVERY_SUCCESS,
@@ -147,4 +153,3 @@ export function planChatRecovery(rawState, report, now = Date.now(), policyRaw =
   state.elapsedMs = Math.max(0, now - state.startedAt);
   return { state, action: ChatRecoveryAction.RECOVERY_FAILED, exhausted: true };
 }
-
