@@ -92,7 +92,7 @@ function contract(projectId='project-1'){
   return createOutcomeContractV1({
     contractId:'outcome-1',projectId,desiredResult:'Return one verified result.',
     completionCriteria:[{
-      criterionId:'criterion-1',description:'Result complete.',observable:'Artifact exists.',
+      criterionId:'criterion-1',description:'Done',observable:'Artifact exists.',
       requiredEvidenceKinds:['ARTIFACT'],
     }],
     constraints:[],sourceTruth:[{
