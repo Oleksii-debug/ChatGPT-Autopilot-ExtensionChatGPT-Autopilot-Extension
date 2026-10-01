@@ -147,3 +147,23 @@ test('Drive scalar hierarchy provider uses the existing orchestra cycle and expl
   assert.doesNotMatch(source, /DRIVE_SCALAR_ALARM|drive-scalar-wake/, 'Drive scalar must not create a second scheduler/alarm');
   assert.doesNotMatch(source, /authorized:\s*true[\s\S]{0,120}token\s*:/i, 'access token must never be returned to the UI');
 });
+
+test('reusable Agent model dispatch preserves canonical fail-closed request bounds', () => {
+  assert.match(source, /const requestedCallCeilingPresent = Object\.hasOwn\(sanitizedPayload, 'maxModelCallsForRequest'\);/);
+  assert.match(
+    source,
+    /requestedCallCeilingPresent[\s\S]*?Number\.isSafeInteger\(requestedCallCeiling\)[\s\S]*?Object\.is\(requestedCallCeiling, -0\)[\s\S]*?requestedCallCeiling < 1[\s\S]*?Reusable Agent model dispatch requires canonical bounded maxModelCallsForRequest/s,
+  );
+  assert.match(
+    source,
+    /sanitizedPayload\.maxModelCallsForRequest = requestedCallCeilingPresent\s*\? Math\.min\(requestedCallCeiling, boundRouteCallCeiling\)\s*:\s*boundRouteCallCeiling;/s,
+  );
+  assert.match(source, /const explicitRole = Object\.hasOwn\(safePayload, 'taskRole'\);/);
+  assert.match(
+    source,
+    /explicitRole && typeof safePayload\.taskRole !== 'string'[\s\S]*?Reusable Agent model dispatch taskRole must be canonical text/s,
+  );
+  assert.match(source, /const role = explicitRole \? safePayload\.taskRole : 'planner';/);
+  assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
+});
+
