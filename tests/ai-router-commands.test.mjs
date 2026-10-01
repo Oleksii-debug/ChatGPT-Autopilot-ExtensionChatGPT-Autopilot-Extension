@@ -1453,6 +1453,40 @@ test('internal Agent invocation requires an explicit positive model-call ceiling
   assert.equal(calls, 0);
 });
 
+test('internal Agent invocation rejects a model-call ceiling accessor without executing it', async () => {
+  let calls = 0;
+  let reads = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  const payload = { prompt:'agent', maxOutputTokens:128 };
+  Object.defineProperty(payload, 'maxModelCallsForRequest', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 1;
+    },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      payload,
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /requires canonical bounded maxModelCallsForRequest/u,
+  );
+  assert.equal(reads, 0, 'model-call ceiling validation must inspect descriptors without invoking getters');
+  assert.equal(calls, 0);
+});
+
 test('internal Agent invocation time cannot precede envelope revalidation', async () => {
   let calls = 0;
   const repo = new MemoryRepo();
