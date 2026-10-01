@@ -369,6 +369,30 @@ test('corrupt persisted cycle is quarantined locally without poisoning its Brows
   assert.equal(listed.quarantinedCount, 1);
 });
 
+test('duplicate persisted cycle identities are all quarantined instead of choosing by storage order', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
+    expectedCycleUpdatedAt: null,
+    cycle: cycle(),
+  });
+
+  const [storageKey] = Object.keys(data);
+  const first = structuredClone(data[storageKey].byId['job.repair'].runtime.selfRepairCycles[0]);
+  const conflicting = structuredClone(first);
+  conflicting.cycle.updatedAt = '2026-10-01T12:01:21.000Z';
+  conflicting.cycle.attempts[0].diagnosis.createdAt = '2026-10-01T12:01:21.000Z';
+  data[storageKey].byId['job.repair'].runtime.selfRepairCycles = [first, conflicting];
+
+  const restarted = managerFor(chrome);
+  const listed = await restarted.listSelfRepairCycles('job.repair');
+  assert.equal(listed.cycles.length, 0);
+  assert.equal(listed.quarantinedCount, 2);
+});
+
 test('failed-node drift after persistence quarantines only the stale cycle on restart', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
