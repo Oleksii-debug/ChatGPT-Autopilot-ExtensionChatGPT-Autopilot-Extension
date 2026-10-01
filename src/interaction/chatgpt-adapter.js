@@ -2028,7 +2028,43 @@
         && afterMessages.length === 0
         && unlabeledPromptCount(doc, submittedText) === 0
         && (!found.element || !compactPromptText(editorText(found.element)));
-      if (freshConversationAccepted && request.requireGenerationAcknowledgement !== true) {
+      const generationAcknowledged = request.requireGenerationAcknowledgement !== true
+        || blocking?.status === STATUS.BUSY || semanticAssistantMessages(doc).length > baselineCount;
+      if (freshConversationAccepted) {
+        if (request.requireGenerationAcknowledgement === true) {
+          if (!generationAcknowledged) {
+            return resultBase(request, start, {
+              status: STATUS.SUBMISSION_UNCERTAIN,
+              submissionEvidence: 'FRESH_CONVERSATION_GENERATION_UNPROVEN',
+              safeDiagnosticCode: 'SCENARIO_GENERATION_ACK_PENDING',
+              safeDiagnosticMessage: submissionDiagnostic(doc, request, textEvidence.beforeMessages),
+            });
+          }
+          const currentUrl = normalizeUrl(observedUrl);
+          if (textEvidence.acknowledgementUrl !== currentUrl) {
+            textEvidence.acknowledgementUrl = currentUrl;
+            textEvidence.acknowledgementAt = nowMs();
+            return resultBase(request, start, {
+              status: STATUS.SUBMISSION_UNCERTAIN,
+              submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
+              safeDiagnosticCode: 'SCENARIO_GENERATION_STABILITY_PENDING',
+            });
+          }
+          if (nowMs() - Number(textEvidence.acknowledgementAt || 0) < 1000) {
+            return resultBase(request, start, {
+              status: STATUS.SUBMISSION_UNCERTAIN,
+              submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
+              safeDiagnosticCode: 'SCENARIO_GENERATION_STABILITY_PENDING',
+            });
+          }
+          return resultBase(request, start, {
+            status: STATUS.SENT_VERIFIED,
+            submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
+            safeDiagnosticCode: 'RECOVERY_SCENARIO_FRESH_GENERATION_VERIFIED',
+            assistantBaselineCount: baselineCount,
+            submittedUserMessageKey: submittedUserKey(doc),
+          });
+        }
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'FRESH_CONVERSATION_TRANSITION_WITH_EMPTY_COMPOSER',
@@ -2037,8 +2073,6 @@
           submittedUserMessageKey: submittedUserKey(doc),
         });
       }
-      const generationAcknowledged = request.requireGenerationAcknowledgement !== true
-        || blocking?.status === STATUS.BUSY || semanticAssistantMessages(doc).length > baselineCount;
       if ((appended || unlabeledAppended) && !pending && generationAcknowledged) {
         if (request.requireGenerationAcknowledgement === true) {
           const currentUrl = normalizeUrl(observedUrl);
