@@ -24,7 +24,7 @@ function form(overrides = {}) {
 }
 
 test('Agent definition form builds canonical portable data and preserves config/model defaults', () => {
-  const defaults = { maxSteps: 50, aiPinnedRouteId: 'route.research', visionOnDemand: false };
+  const defaults = { maxSteps: 50, visionOnDemand: false };
   const routePolicy = { autoSwitch: false, pinnedRouteId: 'route.research', orderedRouteIds: [], allowRouteIds: ['route.research'], denyRouteIds: [], freeOnly: true, locality: 'any', maxInputPricePerMillionUsd: 0, maxOutputPricePerMillionUsd: 0 };
   const definition = buildAgentDefinitionFromFormV1(form(), { definitionRevision: 7, configDefaults: defaults, modelRoutePolicy: routePolicy });
   assert.equal(definition.schemaVersion, 1);
@@ -116,6 +116,30 @@ test('registry and definition identities share the exact canonical ID syntax', (
   assert.throws(() => parseCanonicalAgentIdentity('agents project','Registry ID'), /канонічним ID/);
 });
 
+
+test('Agent model defaults drop the historical configDefaults route pin alias', () => {
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    configDefaults: {
+      maxSteps: 50,
+      aiPinnedRouteId: 'route.legacy',
+      visionOnDemand: false,
+    },
+    modelRoutePolicy: {
+      autoSwitch: false,
+      pinnedRouteId: 'route.current',
+      orderedRouteIds: [],
+      allowRouteIds: ['route.current'],
+      denyRouteIds: [],
+      freeOnly: false,
+      locality: 'any',
+      maxInputPricePerMillionUsd: null,
+      maxOutputPricePerMillionUsd: null,
+    },
+  });
+  assert.equal(Object.hasOwn(definition.configDefaults, 'aiPinnedRouteId'), false);
+  assert.equal(definition.modelRoutePolicy.pinnedRouteId, 'route.current');
+  assert.doesNotThrow(() => normalizeAgentDefinitionV1(definition));
+});
 
 test('Agent model defaults edit provider/model fields while route pin remains separate policy authority', () => {
   const definition = buildAgentDefinitionFromFormV1(form({
