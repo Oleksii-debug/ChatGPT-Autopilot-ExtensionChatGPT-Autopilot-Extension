@@ -42,6 +42,7 @@ import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import { normalizeSelfRepairCycleV1, assessSelfRepairCycleV1 } from './self-repair-cycle.js';
+import { proposeAgentSelfRepairWorkV1 } from './agent-self-repair-bridge.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
@@ -122,6 +123,10 @@ const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRe
 const SPECIALIST_AUTOMATION_POLICY_SET_KEYS = new Set(['expectedRevision', 'enabled']);
 const LEGACY_SPECIALIST_AUTOMATION_POLICY_KEYS = new Set(['schemaVersion', 'revision', 'enabled', 'maxConcurrentHandoffs', 'updatedAt']);
 const OWNER_RESOURCE_BUDGET_SET_KEYS = new Set(['expectedRevision', 'budget']);
+const SELF_REPAIR_WORK_PROPOSAL_KEYS = new Set([
+  'cycleId', 'expectedPlanId', 'expectedPlanRevision', 'expectedCycleUpdatedAt',
+  'workNode', 'predecessorNodeId',
+]);
 const SPECIALIST_AUTOMATION_POLICY_CLEAR_KEYS = new Set(['expectedRevision']);
 const SPECIALIST_READINESS_DEPENDENCY_KEYS = new Set(['specialistProviderReadinessResolver']);
 const SPECIALIST_PROVIDER_EXECUTE_KEYS = new Set(['agentId', 'conversationId', 'expectedControlEpoch', 'at']);
@@ -2351,6 +2356,101 @@ export class BrowserAgentManager {
       return store;
     });
     return result;
+  }
+
+  async proposeSelfRepairWork(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SELF_REPAIR_WORK_PROPOSAL_KEYS,
+      'Browser Agent self-repair work proposal request',
+    );
+    for (const key of SELF_REPAIR_WORK_PROPOSAL_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent self-repair work proposal request requires ${key}`);
+      }
+    }
+    if (typeof request.cycleId !== 'string'
+        || !request.cycleId
+        || request.cycleId !== request.cycleId.trim()) {
+      throw new Error('Browser Agent self-repair cycleId must be exact non-empty text');
+    }
+    if (typeof request.expectedPlanId !== 'string'
+        || !request.expectedPlanId
+        || request.expectedPlanId !== request.expectedPlanId.trim()) {
+      throw new Error('Browser Agent self-repair expectedPlanId must be exact non-empty text');
+    }
+    if (typeof request.expectedPlanRevision !== 'number'
+        || !Number.isSafeInteger(request.expectedPlanRevision)
+        || Object.is(request.expectedPlanRevision, -0)
+        || request.expectedPlanRevision < 1) {
+      throw new Error('Browser Agent self-repair expectedPlanRevision must be a positive safe integer');
+    }
+    if (typeof request.expectedCycleUpdatedAt !== 'string'
+        || !request.expectedCycleUpdatedAt
+        || new Date(request.expectedCycleUpdatedAt).toISOString() !== request.expectedCycleUpdatedAt) {
+      throw new Error('Browser Agent self-repair expectedCycleUpdatedAt must be a canonical timestamp');
+    }
+
+    const store = await this.load();
+    const job = store.byId[id];
+    if (!job) throw new Error('Browser Agent job not found');
+    if (!job.runtime?.plan) throw new Error('Browser Agent self-repair requires a durable AgentPlan');
+    const currentPlan = normalizeAgentPlanV1(job.runtime.plan);
+    if (currentPlan.jobId !== job.id) {
+      throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+    }
+    if (currentPlan.planId !== request.expectedPlanId) {
+      throw new Error('Browser Agent AgentPlan identity drifted before self-repair proposal');
+    }
+    if (currentPlan.revision !== request.expectedPlanRevision) {
+      throw new Error('Browser Agent AgentPlan revision drifted before self-repair proposal');
+    }
+
+    const bindings = Array.isArray(job.runtime.selfRepairCycles) ? job.runtime.selfRepairCycles : [];
+    const binding = bindings.find(item => item?.cycle?.cycleId === request.cycleId);
+    if (!binding) throw new Error('Browser Agent durable self-repair cycle was not found');
+    if (binding.planId !== currentPlan.planId) {
+      throw new Error('Browser Agent durable self-repair cycle plan identity drifted');
+    }
+    const cycle = validateSelfRepairCycleAgainstPlan(binding.cycle, currentPlan, this.now());
+    if (cycle.updatedAt !== request.expectedCycleUpdatedAt) {
+      throw new Error('Browser Agent self-repair cycle revision drifted before proposal');
+    }
+    const originPlan = normalizeSelfRepairOriginPlan(binding.originPlan, currentPlan, cycle);
+
+    if (store.ownerResourceBudgetQuarantined === true) {
+      throw new Error('Owner resource budget is quarantined and cannot bound self-repair proposal');
+    }
+    const ownerBudget = normalizeResourceBudgetV1(store.ownerResourceBudget || {});
+    const ownerBudgetRevision = nonNegativeSafeInteger(
+      store.ownerResourceBudgetRevision,
+      'Owner resource budget current revision',
+    );
+    const resourceEnvelope = Object.freeze({
+      maxModelCalls: ownerBudget.maxModelCalls,
+      maxRuntimeSeconds: ownerBudget.maxRuntimeSeconds,
+      maxCostUsdMicros: ownerBudget.maxCostUsdMicros,
+    });
+    const at = new Date(this.now()).toISOString();
+    const proposal = proposeAgentSelfRepairWorkV1({
+      originPlan,
+      currentPlan,
+      failedNodeId: cycle.subjectId,
+      cycle,
+      workNode: request.workNode,
+      predecessorNodeId: request.predecessorNodeId,
+      resourceEnvelope,
+      at,
+    });
+    return {
+      proposal: clone(proposal),
+      ownerResourceBudgetRevision,
+      resourceEnvelope: clone(resourceEnvelope),
+      budgetReserved: false,
+      requiresCanonicalBudgetReservation: true,
+      planRevision: currentPlan.revision,
+      cycleUpdatedAt: cycle.updatedAt,
+    };
   }
 
   async listSelfRepairCycles(id = '') {
