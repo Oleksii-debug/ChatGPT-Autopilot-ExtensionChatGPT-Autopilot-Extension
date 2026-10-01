@@ -749,7 +749,9 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /routePolicy:\s*structuredClone\(settings\.routePolicy\)/);
   assert.match(source, /routeStates:\s*structuredClone\(runtime\.routeStates\)/);
   assert.match(source, /taskRole,/);
-  assert.match(source, /const role = Object\.hasOwn\(safePayload, 'taskRole'\)/);
+  assert.match(source, /explicitRole = Object\.hasOwn\(safePayload, 'taskRole'\)/);
+  assert.match(source, /Reusable Agent model dispatch taskRole must be canonical text/);
+  assert.match(source, /const role = explicitRole \? safePayload\.taskRole : 'planner'/);
   assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
   assert.match(source, /capabilityIds,/);
   assert.match(source, /requiresVision,/);
