@@ -14,7 +14,7 @@ import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
-import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, normalizeAiRouterSettings } from '../core/ai-orchestrator.js';
+import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime } from '../core/ai-orchestrator.js';
 import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
@@ -107,13 +107,16 @@ const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
-    beforeProviderCall: async ({ context, route, gatewayUrl, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
+    beforeProviderCall: async ({ context, route, gatewayUrl, taskRole, capabilityIds, requiresVision, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
       if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
       return browserAgentLifecycle.current.reserveProviderModelBudget({
         jobId: context.jobId,
         controlEpoch: context.controlEpoch,
         route,
         gatewayUrl,
+        taskRole,
+        capabilityIds,
+        requiresVision,
         prompt,
         systemPrompt,
         maxOutputTokens,
@@ -263,10 +266,15 @@ const browserAgent = new BrowserAgentManager({
       && state.profile.aiRoutePoolRevision > 0
       ? state.profile.aiRoutePoolRevision
       : 1;
+    const runtime = normalizeAiRouterRuntime(
+      state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
+    );
     return {
       routePool: structuredClone(settings.routes),
       routePoolRevision,
       gatewayUrl: settings.gatewayUrl,
+      routePolicy: structuredClone(settings.routePolicy),
+      routeStates: structuredClone(runtime.routeStates),
       ownerAllowedRouteIds: ownerAllowedRouteIdsForSettings(settings),
     };
   },
