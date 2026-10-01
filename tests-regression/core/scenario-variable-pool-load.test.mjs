@@ -23,7 +23,7 @@ test('three uneven chats exhaust 50 shared replacements after ten verified turns
     mode: 'CHAT_CYCLE', roundsPerGeneration: 1, launchUrl: 'https://chatgpt.com/',
     steps: [{ prompt: 'OPEN', repeat: 1 }, { prompt: 'CONTINUE', repeat: 8 }, { prompt: 'CLOSE', repeat: 1 }],
   } });
-  for (const id of ids) await manager.start(id);
+  for (const id of ids) await manager.start(id, { launchWindowId: 11 });
   const sends = new Map(ids.map(id => [id, 0]));
   for (let iteration = 0; iteration < 530; iteration++) {
     // Different response orders exercise whichever slot completes first.
