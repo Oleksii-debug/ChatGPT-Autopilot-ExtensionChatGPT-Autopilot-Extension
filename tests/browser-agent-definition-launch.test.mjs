@@ -324,6 +324,30 @@ test('definition-bound provider reservation rejects a definition revision change
   assert.equal(current.job.runtime.modelCalls, 0);
 });
 
+test('definition launch fails before route-context reads when Project identity is absent', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContextReads = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => {
+      routeContextReads += 1;
+      throw new Error('must not read route context for invalid projectless launch');
+    },
+  });
+  await seedRegistry(manager);
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId:'job.projectless',
+      projectId:'',
+    })),
+    /requires Project ID for durable model authority/u,
+  );
+  assert.equal(routeContextReads, 0);
+  assert.equal((await manager.get('job.projectless')).job, null);
+});
+
 test('definition launch route-context failure is atomic and persists no partial job', async () => {
   const { chrome } = makeChromeStorage();
   const manager = new BrowserAgentManager({
