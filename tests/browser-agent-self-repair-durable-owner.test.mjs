@@ -175,6 +175,7 @@ test('BrowserAgent owns durable self-repair cycle evidence across restart', asyn
   assert.equal(listed.planId, 'plan.repair');
   assert.equal(listed.quarantinedCount, 0);
   assert.equal(listed.cycles.length, 1);
+  assert.equal(listed.cycles[0].planId, 'plan.repair');
   assert.equal(listed.cycles[0].cycle.cycleId, 'cycle.1');
   assert.equal(listed.cycles[0].assessment.state, 'READY_FOR_REPAIR');
 });
@@ -281,8 +282,11 @@ test('corrupt persisted cycle is quarantined locally without poisoning its Brows
 
   const [storageKey] = Object.keys(data);
   data[storageKey].byId['job.repair'].runtime.selfRepairCycles.push({
-    ...cycle({ cycleId: 'cycle.corrupt' }),
-    baselineRevisionId: 'stale.revision',
+    planId: 'plan.repair',
+    cycle: {
+      ...cycle({ cycleId: 'cycle.corrupt' }),
+      baselineRevisionId: 'stale.revision',
+    },
   });
 
   const restarted = managerFor(chrome);
@@ -313,6 +317,28 @@ test('failed-node drift after persistence quarantines only the stale cycle on re
   const listed = await restarted.listSelfRepairCycles('job.repair');
   assert.equal(listed.cycles.length, 0);
   assert.equal(listed.quarantinedCount, 1);
+});
+
+test('plan replacement cannot silently rebind persisted self-repair evidence', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanRevision: 3,
+    expectedCycleUpdatedAt: null,
+    cycle: cycle(),
+  });
+
+  const [storageKey] = Object.keys(data);
+  data[storageKey].byId['job.repair'].runtime.plan.planId = 'plan.replacement';
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.repair');
+  assert.ok(loaded.job, 'plan replacement must not poison the BrowserAgent job');
+  const listed = await restarted.listSelfRepairCycles('job.repair');
+  assert.equal(listed.planId, 'plan.replacement');
+  assert.equal(listed.cycles.length, 0);
+  assert.equal(listed.quarantinedCount, 1, 'old cycle must not acquire authority over a replacement plan');
 });
 
 test('self-repair request and nested cycle accessors fail without getter execution', async () => {
