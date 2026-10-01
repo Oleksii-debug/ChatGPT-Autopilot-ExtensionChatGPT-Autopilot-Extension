@@ -173,6 +173,37 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
+test('reusable Agent may keep an unbounded whole-job model-call budget while retaining bounded route authority', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const unboundedDefinition = definition({
+    configDefaults: {
+      ...definition().configDefaults,
+      maxModelCalls: 0,
+    },
+  });
+  const createdRegistry = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const mutated = await manager.mutateAgentDefinitionRegistry({
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: createdRegistry.registry.bindingKey,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: unboundedDefinition,
+  });
+
+  const created = await manager.createFromAgentDefinition(launchRequest({
+    expectedRegistryBindingKey: mutated.registry.bindingKey,
+    ownerBudget: ownerBudget({ maxModelCalls: 0 }),
+    jobId: 'job.unbounded-model-calls',
+  }));
+
+  assert.equal(created.job.config.maxModelCalls, 0);
+  assert.deepEqual(
+    created.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds,
+    ['route.research'],
+  );
+});
+
 test('definition launch provenance and narrowed scope survive service-worker restart', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
