@@ -459,5 +459,6 @@ test('Scenario owner progress stays factual and hides transport recovery counter
   assert.doesNotMatch(js, /addScenarioStateLine\('Пул: фізично підтверджених Send-спроб'/, 'transport attempt count belongs in diagnostics only');
   assert.doesNotMatch(js, /addScenarioStateLine\('Пул: повторних\/замінних Send-спроб'/, 'replacement/retry count belongs in diagnostics only');
   assert.doesNotMatch(js, /addScenarioStateLine\('Пул: використано ліміт нових чатів'/, 'replacement budget belongs in diagnostics only');
+  assert.doesNotMatch(js, /addScenarioStateLine\('Цей слот: нових чатів після початкового'/, 'per-slot replacement progress belongs in diagnostics only');
   assert.match(js, /Сценарій працює тільки у вікні Chrome, з якого його запущено/, 'owner view must state exact-window isolation');
 });
