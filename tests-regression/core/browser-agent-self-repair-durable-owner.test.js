@@ -97,3 +97,16 @@ test('Core: future self-repair evidence is rejected by the durable owner clock',
     /cannot come from the future/,
   );
 });
+
+
+test('Core: durable self-repair history cannot be rewritten under a newer timestamp',async()=>{
+  const {chrome}=storage();const m=manager(chrome);await seed(m);
+  const initial=cycle();
+  await m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
+  const rewritten=cycle('2026-10-01T12:02:00.000Z');
+  rewritten.attempts[0].failure.evidenceSha256='2'.repeat(64);
+  await assert.rejects(
+    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:initial.updatedAt,cycle:rewritten}),
+    /cannot rewrite failure or diagnosis evidence/,
+  );
+});
