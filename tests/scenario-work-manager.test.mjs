@@ -826,3 +826,32 @@ test('manager bounds persisted collection length and recursive depth bombs', asy
   assert.equal(listed.selectedId, '');
   assert.deepEqual(listed.scenarios, []);
 });
+
+
+test('paused Scenario cannot resume from a different Chrome window in the same profile', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  let idCounter = 0;
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000 + idCounter,
+    createId: () => `window-bound-${++idCounter}`,
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  const created = await manager.create({
+    name: 'Window-bound',
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    config: { steps: [{ prompt: 'ONE' }] },
+  });
+  const id = created.scenario.id;
+  await manager.start(id, { launchWindowId: 11 });
+  await manager.pause(id);
+  await assert.rejects(
+    () => manager.resume(id, { launchWindowId: 22 }),
+    /SCENARIO_LAUNCH_WINDOW_MISMATCH/u,
+  );
+  const after = await manager.get(id);
+  assert.equal(after.scenario.runtime.launchWindowId, 11);
+  assert.equal(after.scenario.runtime.runState, ScenarioWorkRunState.PAUSED);
+});
