@@ -220,6 +220,9 @@ test('definition-bound provider reservation revalidates current Router authority
       endpointId:'',
     },
     gatewayUrl:'http://127.0.0.1:3210',
+    taskRole:'planner',
+    capabilityIds:['research'],
+    requiresVision:false,
     callNumber:1,
   });
 
@@ -254,6 +257,19 @@ test('definition-bound provider reservation revalidates current Router authority
   routeContext = {
     ...routeContext,
     gatewayUrl:'http://127.0.0.1:3210',
+    routePolicy:{ pinnedRouteId:'route.research', autoSwitch:false },
+    routeStates:{
+      'route.research':{
+        backoffUntil:Number.MAX_SAFE_INTEGER,
+      },
+    },
+  };
+  await assert.rejects(request, /no longer dispatchable by current Router policy\/state/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routeStates:{},
   };
   const reservation = await request();
   assert.match(reservation.reservationId, /^job\.provider-revalidation:model-budget:/);
@@ -296,6 +312,9 @@ test('definition-bound provider reservation rejects a definition revision change
         endpointId:'',
       },
       gatewayUrl:'http://127.0.0.1:3210',
+      taskRole:'planner',
+      capabilityIds:['research'],
+      requiresVision:false,
       callNumber:1,
     }),
     /definition authority drifted before provider admission/,
@@ -691,6 +710,11 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /Object\.getOwnPropertyDescriptors\(rawPayload\)/);
   assert.match(source, /snapshotBrowserAgentProviderBudgetContext/);
   assert.match(source, /gatewayUrl:\s*settings\.gatewayUrl/);
+  assert.match(source, /routePolicy:\s*structuredClone\(settings\.routePolicy\)/);
+  assert.match(source, /routeStates:\s*structuredClone\(runtime\.routeStates\)/);
+  assert.match(source, /taskRole,/);
+  assert.match(source, /capabilityIds,/);
+  assert.match(source, /requiresVision,/);
   assert.match(source, /gatewayUrl,/);
   assert.match(source, /Object\.getOwnPropertyDescriptors\(rawContext\)/);
   assert.match(source, /controlEpoch drifted before model dispatch/);
