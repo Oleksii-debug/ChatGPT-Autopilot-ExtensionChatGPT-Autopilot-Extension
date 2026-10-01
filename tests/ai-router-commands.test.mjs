@@ -129,6 +129,67 @@ test('AI route-pool revision fails closed instead of overflowing canonical safe 
   assert.deepEqual(after.settings, before.settings);
 });
 
+test('routed prompt cannot silently replace durable Router topology or route-pool revision', async () => {
+  const repo = new MemoryRepo();
+  const seen = [];
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: {
+      async run(settings, runtime) {
+        seen.push(structuredClone(settings));
+        return {
+          text: 'one-shot',
+          route: 'primary',
+          trigger: 'primary-only',
+          primary: { provider: settings.primary.provider, model: settings.primary.model, text: 'one-shot' },
+          strong: null,
+          runtime: { ...runtime, requestCount: runtime.requestCount + 1, primaryCount: runtime.primaryCount + 1 },
+        };
+      },
+    },
+  });
+
+  const durable = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', {
+    settings: {
+      enabled: true,
+      mode: 'primary',
+      primary: { provider: 'ollama', model: 'durable-model' },
+      routes: [{
+        routeId: 'route.durable',
+        provider: 'ollama',
+        model: 'durable-model',
+        priority: 10,
+        locality: 'local',
+        costClass: 'free',
+      }],
+    },
+  });
+  assert.equal(durable.routePoolRevision, 2);
+  const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt: 'one-shot settings',
+    settings: {
+      ...before.settings,
+      primary: { provider: 'ollama', model: 'ephemeral-model' },
+      routes: [{
+        routeId: 'route.ephemeral',
+        provider: 'ollama',
+        model: 'ephemeral-model',
+        priority: 1,
+        locality: 'local',
+        costClass: 'free',
+      }],
+    },
+  });
+  assert.equal(result.result.text, 'one-shot');
+  assert.equal(seen[0].routes[0].routeId, 'route.ephemeral');
+
+  const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.deepEqual(after.settings, before.settings, 'execution input must not become durable Router configuration');
+  assert.equal(after.routePoolRevision, before.routePoolRevision, 'execution must not silently mint or bypass route-pool identity');
+  assert.equal(after.runtime.requestCount, before.runtime.requestCount + 1, 'execution telemetry remains durable');
+});
+
 test('routed prompt persists hybrid runtime', async () => {
   const repo = new MemoryRepo();
   const fakeOrchestrator = {
