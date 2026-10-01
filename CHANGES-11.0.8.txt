@@ -1,6 +1,7 @@
 Пілот 11.0.8 High — Scenario window isolation і простий прогрес
 
 - Scenario Start/Resume захоплює точне вікно Chrome, з якого власник запускає роботу.
+- Legacy RUNNING сценарії 11.0.7 без authoritative launchWindowId після оновлення читаються як PAUSED; старий learned preferredWindowId відкидається, а Resume явно прив'язує сценарій до поточного вікна.
 - Це launchWindowId є незмінною межею виконання для всього Scenario/пулу.
 - Створення, повторне відкриття, відновлення, прийняття та використання Scenario-вкладок в іншому вікні заборонене fail-closed.
 - Якщо початкове вікно Chrome зникло, Scenario не переходить у focused або інше вікно.
