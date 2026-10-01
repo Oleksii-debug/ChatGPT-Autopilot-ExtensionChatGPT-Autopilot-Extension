@@ -199,7 +199,7 @@ async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
 }
 
 async function probeAssistantConversation(job) {
-  if (!job?.persistentManagedTab || !job.managedSessionId || !job.recoveryAction) return probeAssistantConversationCore(chrome, transport, job);
+  if (!job?.persistentManagedTab || !job.managedSessionId || !job.recoveryAction) return probeAssistantConversationCore(chrome, transport, job, { repository: repo });
   return withTabLifecycle(repo, async () => {
     const ownedChrome = Object.create(chrome);
     ownedChrome.tabs = Object.create(chrome.tabs);
@@ -207,7 +207,7 @@ async function probeAssistantConversation(job) {
       hintKey: job.taskId, taskId: job.taskId, sessionId: job.managedSessionId,
       allowVerifiedResponse: true,
     }, options);
-    return probeAssistantConversationCore(ownedChrome, transport, job);
+    return probeAssistantConversationCore(ownedChrome, transport, job, { repository: repo });
   });
 }
 

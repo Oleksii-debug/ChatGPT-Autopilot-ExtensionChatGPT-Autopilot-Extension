@@ -1,6 +1,7 @@
 import { assertSessionWindow } from './window-binding.js';
 import { normalizeChatUrl, OperationPhase, RunState, TabStrategy } from './schema.js';
 import { sameChatConversationUrl, expectedPostSendConversationUrl } from './tabs.js';
+import { withWindowFocus } from './window-focus.js';
 
 function fail(code) {
   const error = new Error(code);
@@ -155,6 +156,11 @@ function hasOtherWindowFocusLease(state, windowId, operationId) {
 }
 
 export async function activateOwnedSendTab(chromeApi, repository, message, sender) {
+  const tab = await chromeApi.tabs.get(sender?.tab?.id);
+  return withWindowFocus(repository, tab.windowId, () => activateOwnedSendTabImpl(chromeApi, repository, message, sender));
+}
+
+async function activateOwnedSendTabImpl(chromeApi, repository, message, sender) {
   const state = await repository.load();
   const { session, operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
   const tab = await chromeApi.tabs.get(sender.tab.id);
