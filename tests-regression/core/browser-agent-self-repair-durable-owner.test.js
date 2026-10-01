@@ -51,7 +51,7 @@ async function seed(m){
 
 test('Core: BrowserAgent self-repair cycle survives restart under the same durable plan identity',async()=>{
   const {chrome}=storage();const m=manager(chrome);await seed(m);
-  await m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()});
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()});
   const restarted=manager(chrome);
   const state=await restarted.listSelfRepairCycles('job.repair');
   assert.equal(state.planId,'plan.repair');
@@ -64,10 +64,10 @@ test('Core: BrowserAgent self-repair cycle survives restart under the same durab
 test('Core: stale cycle CAS cannot overwrite durable self-repair evidence',async()=>{
   const {chrome}=storage();const m=manager(chrome);await seed(m);
   const initial=cycle();
-  await m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
   await assert.rejects(
     ()=>m.putSelfRepairCycle('job.repair',{
-      expectedPlanRevision:3,
+      expectedPlanId:'plan.repair',expectedPlanRevision:3,
       expectedCycleUpdatedAt:'2026-10-01T12:01:19.000Z',
       cycle:cycle('2026-10-01T12:01:30.000Z'),
     }),
@@ -77,7 +77,7 @@ test('Core: stale cycle CAS cannot overwrite durable self-repair evidence',async
 
 test('Core: replacement AgentPlan cannot inherit prior self-repair evidence',async()=>{
   const {data,chrome}=storage();const m=manager(chrome);await seed(m);
-  await m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()});
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()});
   const [key]=Object.keys(data);
   data[key].byId['job.repair'].runtime.plan.planId='plan.replacement';
   const restarted=manager(chrome);
@@ -93,7 +93,7 @@ test('Core: future self-repair evidence is rejected by the durable owner clock',
   const future=cycle('2026-10-01T13:00:01.000Z');
   future.attempts[0].diagnosis.createdAt='2026-10-01T13:00:01.000Z';
   await assert.rejects(
-    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:future}),
+    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:future}),
     /cannot come from the future/,
   );
 });
@@ -102,11 +102,21 @@ test('Core: future self-repair evidence is rejected by the durable owner clock',
 test('Core: durable self-repair history cannot be rewritten under a newer timestamp',async()=>{
   const {chrome}=storage();const m=manager(chrome);await seed(m);
   const initial=cycle();
-  await m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
   const rewritten=cycle('2026-10-01T12:02:00.000Z');
   rewritten.attempts[0].failure.evidenceSha256='2'.repeat(64);
   await assert.rejects(
-    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:initial.updatedAt,cycle:rewritten}),
+    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:initial.updatedAt,cycle:rewritten}),
     /cannot rewrite failure or diagnosis evidence/,
+  );
+});
+
+
+test('Core: same-revision replacement AgentPlan cannot accept a stale prepared cycle',async()=>{
+  const {chrome}=storage();const m=manager(chrome);await seed(m);
+  await m.update(store=>{store.byId['job.repair'].runtime.plan=plan('plan.replacement');return store;});
+  await assert.rejects(
+    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()}),
+    /AgentPlan identity drifted/,
   );
 });
