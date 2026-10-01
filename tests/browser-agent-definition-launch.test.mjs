@@ -173,6 +173,126 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
+test('definition-bound provider reservation revalidates current Router authority immediately before admission', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContext = {
+    routePoolRevision: 7,
+    routePool: [{
+      schemaVersion: 1,
+      routeId: 'route.research',
+      provider: 'ollama',
+      model: 'research-local',
+      roles: ['planner', 'verifier', 'vision'],
+      capabilityIds: ['research'],
+      priority: 10,
+      enabled: true,
+      locality: 'local',
+      costClass: 'free',
+      supportsVision: true,
+      maxWorkers: 1,
+    }],
+    ownerAllowedRouteIds: ['route.research'],
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => structuredClone(routeContext),
+  });
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.provider-revalidation' }));
+  await manager.update(store => {
+    store.byId['job.provider-revalidation'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const request = () => manager.reserveProviderModelBudget({
+    jobId:'job.provider-revalidation',
+    controlEpoch:0,
+    prompt:'provider-bound task',
+    systemPrompt:'system',
+    maxOutputTokens:128,
+    route:{
+      routeId:'route.research',
+      provider:'ollama',
+      model:'research-local',
+      endpointId:'',
+    },
+    callNumber:1,
+  });
+
+  routeContext = { ...routeContext, ownerAllowedRouteIds: [] };
+  await assert.rejects(request, /no longer allowed by current owner Router policy/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePoolRevision:8,
+    ownerAllowedRouteIds:['route.research'],
+  };
+  await assert.rejects(request, /route-pool revision drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePoolRevision:7,
+    routePool:[{ ...routeContext.routePool[0], model:'research-replaced' }],
+  };
+  await assert.rejects(request, /provider route identity drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePool:[{ ...routeContext.routePool[0], model:'research-local' }],
+  };
+  const reservation = await request();
+  assert.match(reservation.reservationId, /^job\.provider-revalidation:model-budget:/);
+  assert.equal(reservation.routeId, 'route.research');
+  assert.equal(reservation.model, 'research-local');
+});
+
+test('definition-bound provider reservation rejects a definition revision changed after dispatch preparation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.definition-revalidation' }));
+  await manager.update(store => {
+    store.byId['job.definition-revalidation'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const before = await manager.getAgentDefinitionRegistry('agents:project-1');
+  await manager.mutateAgentDefinitionRegistry({
+    registryId:'agents:project-1',
+    expectedRegistryRevision:2,
+    expectedRegistryBindingKey:before.registry.bindingKey,
+    kind:AgentDefinitionRegistryMutationKind.UPDATE,
+    agentDefinitionId:'agent.research',
+    expectedDefinitionRevision:1,
+    definition:definition({ definitionRevision:2, label:'Research Agent v2' }),
+  });
+
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job.definition-revalidation',
+      controlEpoch:0,
+      prompt:'stale definition task',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+      route:{
+        routeId:'route.research',
+        provider:'ollama',
+        model:'research-local',
+        endpointId:'',
+      },
+      callNumber:1,
+    }),
+    /definition authority drifted before provider admission/,
+  );
+  const current = await manager.get('job.definition-revalidation');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 0);
+});
+
 test('definition launch route-context failure is atomic and persists no partial job', async () => {
   const { chrome } = makeChromeStorage();
   const manager = new BrowserAgentManager({
