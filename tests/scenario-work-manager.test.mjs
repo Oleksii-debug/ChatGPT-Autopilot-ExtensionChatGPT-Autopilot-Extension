@@ -855,3 +855,40 @@ test('paused Scenario cannot resume from a different Chrome window in the same p
   assert.equal(after.scenario.runtime.launchWindowId, 11);
   assert.equal(after.scenario.runtime.runState, ScenarioWorkRunState.PAUSED);
 });
+
+
+test('11.0.8 does not trust legacy learned preferredWindowId for a running Scenario', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  let idCounter = 0;
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 2000 + idCounter,
+    createId: () => `legacy-window-${++idCounter}`,
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  const created = await manager.create({
+    name: 'Legacy window',
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    config: { steps: [{ prompt: 'ONE' }] },
+  });
+  const id = created.scenario.id;
+  const stored = structuredClone(chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY]);
+  stored.byId[id].runtime.runState = ScenarioWorkRunState.RUNNING;
+  stored.byId[id].runtime.preferredWindowId = 99;
+  delete stored.byId[id].runtime.launchWindowId;
+  await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+
+  const listed = await manager.list();
+  const legacy = listed.scenarios.find(item => item.id === id);
+  assert.equal(legacy.runtime.runState, ScenarioWorkRunState.PAUSED);
+  assert.equal(legacy.runtime.launchWindowId, null);
+  assert.equal(legacy.runtime.preferredWindowId, null);
+  assert.match(legacy.runtime.lastError, /resume it from the Chrome window/u);
+
+  await manager.resume(id, { launchWindowId: 11 });
+  const rebound = await manager.get(id);
+  assert.equal(rebound.scenario.runtime.launchWindowId, 11);
+  assert.equal(rebound.scenario.runtime.preferredWindowId, 11);
+});
