@@ -708,12 +708,22 @@ function snapshotBrowserAgentProviderBudgetContext(rawContext) {
 }
 
 async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
-  const budgetContext = snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext);
-  if (budgetContext?.kind !== 'browser-agent'
-      || typeof budgetContext.jobId !== 'string') return null;
-  const current = await browserAgent.get(budgetContext.jobId);
+  if (!providerCallBudgetContext
+      || typeof providerCallBudgetContext !== 'object'
+      || Array.isArray(providerCallBudgetContext)) return null;
+  const contextDescriptors = Object.getOwnPropertyDescriptors(providerCallBudgetContext);
+  const kindDescriptor = contextDescriptors.kind;
+  const jobIdDescriptor = contextDescriptors.jobId;
+  if (!kindDescriptor
+      || !Object.hasOwn(kindDescriptor, 'value')
+      || kindDescriptor.value !== 'browser-agent'
+      || !jobIdDescriptor
+      || !Object.hasOwn(jobIdDescriptor, 'value')
+      || typeof jobIdDescriptor.value !== 'string') return null;
+  const current = await browserAgent.get(jobIdDescriptor.value);
   const job = current.job;
   if (!job?.definitionModelPolicyBinding) return null;
+  const budgetContext = snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext);
   const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
   if (!Number.isSafeInteger(budgetContext.controlEpoch)
       || Object.is(budgetContext.controlEpoch, -0)
