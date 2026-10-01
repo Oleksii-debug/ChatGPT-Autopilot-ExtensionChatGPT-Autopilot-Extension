@@ -557,6 +557,9 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /prepareDefinitionBoundAgentInvocation/);
   assert.match(source, /snapshotDefinitionBoundAgentRoutePayload/);
   assert.match(source, /Object\.getOwnPropertyDescriptors\(rawPayload\)/);
+  assert.match(source, /snapshotBrowserAgentProviderBudgetContext/);
+  assert.match(source, /Object\.getOwnPropertyDescriptors\(rawContext\)/);
+  assert.match(source, /controlEpoch drifted before model dispatch/);
   assert.match(source, /fields must be enumerable own data properties/);
   assert.doesNotMatch(source, /const sanitizedPayload = \{ \.\.\.\(payload \|\| \{\}\) \}/);
   assert.match(source, /definitionModelPolicyBinding/);
