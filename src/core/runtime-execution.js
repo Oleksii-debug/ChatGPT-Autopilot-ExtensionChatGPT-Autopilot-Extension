@@ -165,7 +165,9 @@ async function retryPendingOwnedTabRetirements(repository, chromeApi, now) {
     .filter(([, hint]) => hint?.retirePending === true
       && hint?.ownedByExtension === true
       && Number.isInteger(hint?.tabId)
-      && Number(hint?.retireRetryAt || 0) <= now)
+      && Number(hint?.retireRetryAt || 0) <= now
+      && (snapshot.sessionsById?.[hint.sessionId]?.enabled === false
+        || Number(snapshot.sessionsById?.[hint.sessionId]?.operation?.postSendHoldUntil || 0) <= now))
     .map(([hintKey, hint]) => ({ hintKey, sessionId: hint.sessionId, tabId: hint.tabId }));
 
   for (const target of targets) {

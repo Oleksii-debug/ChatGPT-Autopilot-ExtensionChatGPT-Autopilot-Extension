@@ -4,6 +4,7 @@ import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
 import { restorePendingSendTabs } from './native-input.js';
+import { assertSessionWindow } from './window-binding.js';
 import { resolveTaskTab } from './tabs.js';
 import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import { InteractionResult } from '../shared/protocol.js';
@@ -188,6 +189,7 @@ export class AutomaticSessionExecutor {
         ownedChrome.tabs = Object.create(this.chrome.tabs);
         ownedChrome.tabs.create = options => createRecordedOwnedTab(this.repo, this.chrome, owner, options);
         const tab = await resolveTaskTab(ownedChrome, snapshot, sessionId, task);
+        assertSessionWindow(session, tab);
         const resolvedHint = snapshot.tabHintsByTaskId?.[hintKey];
         if (!resolvedHint || resolvedHint.tabId !== tab.id || resolvedHint.sessionId !== sessionId) {
           throw new Error('Resolved tab ownership was not recorded in snapshot');
@@ -203,11 +205,12 @@ export class AutomaticSessionExecutor {
           const currentHint = draft.tabHintsByTaskId?.[hintKey];
           if (currentHint && currentHint.tabId !== resolvedHint.tabId
               && currentHint.tabId !== initial.tabHintsByTaskId?.[hintKey]?.tabId) throw new Error('TAB_BINDING_CHANGED');
+          if (!Number.isFinite(resolvedHint.readyAfterAt)) resolvedHint.readyAfterAt = this.now() + Number(live.tabReadyDelayMs || 0);
           draft.tabHintsByTaskId[hintKey] = { ...structuredClone(resolvedHint),
             boundAt: this.now(), boundSendCount: Number(live.successfulSendCount || 0), opening: false };
           if (Number.isInteger(tab.windowId)) {
             live.tabWindowId = tab.windowId;
-            if (live.scenarioWork) live.scenarioWork.preferredWindowId = tab.windowId;
+            if (live.scenarioWork && !Number.isInteger(live.scenarioWork.preferredWindowId)) live.scenarioWork.preferredWindowId = tab.windowId;
           }
           appendDiagnostic(draft, {
             event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
@@ -241,6 +244,9 @@ export class AutomaticSessionExecutor {
       taskId: task.id,
       providerId,
       mode,
+      expectedWindowId: session?.scenarioWork?.managed ? session.scenarioWork.preferredWindowId : session?.tabWindowId,
+      requireWindowBinding: session?.scenarioWork?.windowBindingRequired === true,
+      postSendDelayMs: Math.min(60000, Math.max(0, Number(session.postSendDelayMs || 0))),
       requireGenerationAcknowledgement: session?.scenarioWork?.managed === true,
       expectedUrl: task.normalizedUrl || task.url,
       promptText,
@@ -348,6 +354,7 @@ export class AutomaticSessionExecutor {
         return draft;
       }
       if (hint.ownedByExtension === false) return draft;
+      if (Number(operationForTask?.postSendHoldUntil || 0) > this.now()) return draft;
       tabId = hint.tabId;
       hint.ownedByExtension = true;
       hint.retirePending = true;
@@ -918,6 +925,11 @@ export class AutomaticSessionExecutor {
     const session = requireSession(state, sessionId);
     if (!ACTIVE_STATES.has(session.runState)) return { kind: 'IDLE' };
 
+    if (session.scenarioWork?.managed && session.operation?.phase === OperationPhase.FAILED_SAFE
+        && Number(session.operation.submitStartedAt || 0) > 0
+        && !session.tasksById[session.operation.taskId]?.lastVerifiedSendAt) {
+      return { kind: 'MANAGED_SEND_HELD_NO_RESEND' };
+    }
     if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
       return this.recoverAmbiguous(sessionId, session);
     }
@@ -935,6 +947,7 @@ export class AutomaticSessionExecutor {
       return { kind: 'OPERATION_IN_PROGRESS', phase: session.operation.phase };
     }
 
+    if (Number(session.operation?.postSendHoldUntil || 0) > this.now()) return { kind: 'POST_SEND_WAIT', wakeAt: session.operation.postSendHoldUntil };
     const selection = selectNextTask(session, this.now());
     if (selection.kind === 'IDLE' || selection.kind === 'COOLDOWN' || selection.kind === 'WAIT') return selection;
     if (selection.kind === 'COMPLETE') {
@@ -953,6 +966,9 @@ export class AutomaticSessionExecutor {
 
     const task = selection.task;
     const tab = await this.bindTaskTab(sessionId, task.id);
+    const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? `__session_worker__:${sessionId}` : task.id;
+    const readyAfterAt = (await this.repo.load()).tabHintsByTaskId[hintKey]?.readyAfterAt || 0;
+    if (readyAfterAt > this.now()) return { kind: 'TAB_SETTLING', wakeAt: readyAfterAt };
     const checkId = `${sessionId}:${task.id}:check:${this.now()}`;
     const check = await this.executeInteraction(
       sessionId,

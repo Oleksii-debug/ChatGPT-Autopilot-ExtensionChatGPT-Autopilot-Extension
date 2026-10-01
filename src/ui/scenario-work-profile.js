@@ -5,6 +5,7 @@ const MODES = new Set(['CHAT_CYCLE', 'PAIRS', 'AUDITOR_GROUP', 'AUDITOR_PIPELINE
 const BOUNDS = Object.freeze({
   roundsPerGeneration: [1, 10000], maxGenerations: [0, 10000],
   responseTimeoutMinutes: [1, 1440], pollSeconds: [5, 600],
+  tabReadyDelaySeconds: [0, 60], postSendDelaySeconds: [0, 60],
   minimumLaunchGapSeconds: [0, 3600], preSendDelaySeconds: [1, 30],
   busyCheckDelaySeconds: [1, 30], retryBackoffSeconds: [5, 3600],
   pairCount: [1, 10000], workerCount: [1, 10000], firstCount: [1, 10000],

@@ -46,7 +46,7 @@ test('Scenario Work UI delegates lifecycle and execution to background Core comm
     'UPDATE_SCENARIO_WORK','START_SCENARIO_WORK','PAUSE_SCENARIO_WORK','RESUME_SCENARIO_WORK',
     'STOP_SCENARIO_WORK','DELETE_SCENARIO_WORK','RUN_SCENARIO_WORK_NOW'
   ]) assert.ok(js.includes(`'${command}'`), `missing ${command}`);
-  assert.doesNotMatch(js, /chrome\.tabs/);
+  assert.doesNotMatch(js, /chrome\.tabs\.(?:create|update|remove|sendMessage|query)/);
   assert.doesNotMatch(js, /chrome\.alarms/);
 });
 

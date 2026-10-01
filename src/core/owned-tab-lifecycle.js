@@ -1,3 +1,4 @@
+import { assertSessionWindow } from './window-binding.js';
 import { TabStrategy } from './schema.js';
 import { appendDiagnostic } from './diagnostics.js';
 
@@ -64,6 +65,7 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
   const candidates = await chromeApi.tabs.query({});
   let tab = (candidates || []).find(item => item.url === marker || item.pendingUrl === marker);
   if (!tab) tab = await chromeApi.tabs.create({ ...options, url: marker });
+  assertSessionWindow(sessionBefore, tab);
   try {
     await repository.update(state => {
       const session = state.sessionsById?.[sessionId];
@@ -83,7 +85,7 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
         message: 'owned=true; вкладка має durable власника перед переходом на ChatGPT.' });
       if (Number.isInteger(tab.windowId)) {
         session.tabWindowId = tab.windowId;
-        if (session.scenarioWork) session.scenarioWork.preferredWindowId = tab.windowId;
+        if (session.scenarioWork && !Number.isInteger(session.scenarioWork.preferredWindowId)) session.scenarioWork.preferredWindowId = tab.windowId;
       }
       return state;
     });

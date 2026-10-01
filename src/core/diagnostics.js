@@ -106,6 +106,9 @@ function reportSession(session, state) {
     line('  очікувана розмова', redactChatGptUrl(session.operation?.targetUrl || currentTask?.normalizedUrl || currentTask?.url)),
     line('  розмова останнього Send', redactChatGptUrl(currentTask?.lastConversationUrl)),
     line('  повторна спроба не раніше', formatTime(currentTask?.retryAfterAt)),
+    line('  пауза після відкриття вкладки, мс', session.tabReadyDelayMs || 0),
+    line('  очікування після натискання Send, мс', session.postSendDelayMs || 0),
+    line('  postSendHoldUntil', formatTime(session.operation?.postSendHoldUntil)),
     line('  остання помилка', safeText(session.lastError || '', MAX_DIAGNOSTIC_MESSAGE_LENGTH)),
   ].join('\n');
 }

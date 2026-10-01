@@ -151,6 +151,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       const row = {
         id: `${scenario.id}:${participant.key}`,
         scenario: scenario.pool?.name || scenario.name,
+        scenarioId: scenario.id,
         role: participant.role,
         poolId: scenario.pool?.id || '',
         slotIndex: num(scenario.pool?.slotIndex) || num(String(scenario.name || '').match(/\s+—\s+чат\s+(\d+)$/u)?.[1]),
@@ -201,6 +202,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         firstPromptSent: 0,
         firstPromptPending: 0,
         completedResponses: 0,
+        totalReceivedResponses: 0,
         verifiedSends: 0,
         sequenceVerifiedSends: 0,
         transportVerifiedSends: 0,
@@ -235,6 +237,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       aggregate.sequenceVerifiedSends += sequenceVerified;
       aggregate.retryVerifiedSends += retryVerified;
       aggregate.completedResponses += completedInGeneration;
+      aggregate.totalReceivedResponses += completedTurns;
       if (sequenceVerified > 0) aggregate.firstPromptSent += 1;
       aggregate.verifiedSendHistoryComplete = aggregate.verifiedSendHistoryComplete && historyKnown;
       scenarioPoolMap.set(poolId, aggregate);
@@ -285,6 +288,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   }
   const scenarioPools = [...scenarioPoolMap.values()].map(pool => ({
     ...pool,
+    totalSentPrompts: pool.verifiedSends,
     firstPromptPending: Math.max(0, pool.slots - pool.firstPromptSent),
   }));
   const counts = Object.fromEntries(CATEGORIES.map(key => [key, units.filter(unit => unit.category === key).length]));

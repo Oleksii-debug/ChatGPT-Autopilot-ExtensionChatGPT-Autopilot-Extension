@@ -33,8 +33,9 @@
     <section id="global-runtime-panel" aria-labelledby="global-runtime-heading">
       <h3 id="global-runtime-heading">Весь Autopilot зараз</h3>
       <p id="global-runtime-summary" tabindex="0">Завантаження стану…</p>
+      <p id="global-launch-result" role="status" aria-live="polite"></p>
       <h4>Спрощені сеанси</h4><ul id="global-simplified-sessions"></ul>
-      <h4>Сценарні чати</h4><p id="global-scenario-summary">Сценарних чатів: 0.</p><ul id="global-scenario-slots"></ul>
+      <h4>Сценарні пули</h4><p id="global-scenario-summary">Сценарних чатів: 0.</p><ul id="global-scenario-slots"></ul>
       <h4>Оркестрація</h4><ul id="global-orchestration"></ul>
       <h4>Агент</h4><ul id="global-agents"></ul>
       <h4>Моделі</h4><ul id="global-models"></ul>
@@ -140,6 +141,10 @@
           </select>
           <p>Відлік починається після підтвердженого надсилання. Фактичне наступне надсилання може бути на кілька секунд пізніше через перевірку сторінки та паузу перед Send.</p>
 
+          <label for="simplified-tab-ready">Пауза після відкриття вкладки, секунд</label>
+          <input id="simplified-tab-ready" type="number" min="0" max="60" step="1" value="0" inputmode="numeric">
+          <label for="simplified-post-send">Очікування після натискання «Надіслати», секунд</label>
+          <input id="simplified-post-send" type="number" min="0" max="60" step="1" value="5" inputmode="numeric">
           <label for="simplified-delay">Пауза перед відправленням, с</label>
           <input id="simplified-delay" type="number" min="1" max="30" step="1" value="20" inputmode="numeric">
 
@@ -770,6 +775,10 @@
         <input id="scenario-work-poll" type="number" min="5" max="600" step="1" inputmode="numeric" value="15">
         <label for="scenario-work-launch-gap">Пауза після завершення відповіді перед наступною роботою, с</label>
         <input id="scenario-work-launch-gap" type="number" min="0" max="3600" step="1" inputmode="numeric" value="0">
+        <label for="scenario-work-tab-ready">Пауза після відкриття вкладки, секунд</label>
+        <input id="scenario-work-tab-ready" type="number" min="0" max="60" step="1" value="0" inputmode="numeric">
+        <label for="scenario-work-post-send">Очікування після натискання «Надіслати», секунд</label>
+        <input id="scenario-work-post-send" type="number" min="0" max="60" step="1" value="5" inputmode="numeric">
         <label for="scenario-work-pre-send">Пауза перед надсиланням, с</label>
         <input id="scenario-work-pre-send" type="number" min="1" max="30" step="1" inputmode="numeric" value="10">
         <label for="scenario-work-busy-check">Повторна перевірка зайнятого чату, с</label>
@@ -777,7 +786,7 @@
         <label for="scenario-work-retry">Повтор після технічної помилки, с</label>
         <input id="scenario-work-retry" type="number" min="5" max="3600" step="1" inputmode="numeric" value="30">
         <p>Сценарна вкладка залишається відкритою протягом усіх налаштованих промптів. Закривається після завершення циклу або спливу налаштованого таймауту; тоді відкривається новий чат.</p>
-        <p>Нові сценарні запуски тримають відкритими до трьох робочих чатів одночасно в одному профілі. Решта чекає звільнення місця після завершення циклу.</p>
+        <p>Усі паралельні чати пулу працюють у вікні, де натиснуто «Запустити». Для іншого проєкту відкрийте Пілот в іншому вікні цього профілю.</p>
         <input id="scenario-work-close-tabs-between-checks" type="checkbox" hidden disabled>
         <input id="scenario-work-reopen-on-probe-error" type="checkbox" hidden disabled>
         <label for="scenario-work-timeout-policy">Як діяти, якщо учасник завис</label>
@@ -1305,6 +1314,10 @@
           <option value="seconds">Seconds</option>
         </select>
 
+        <label for="tab-ready-delay">Пауза після відкриття вкладки, секунд</label>
+        <input id="tab-ready-delay" type="number" min="0" max="60" step="1" value="0" inputmode="numeric">
+        <label for="post-send-delay">Очікування після натискання «Надіслати», секунд</label>
+        <input id="post-send-delay" type="number" min="0" max="60" step="1" value="5" inputmode="numeric">
         <label for="pre-send-delay">Delay after prompt insertion before Send, seconds</label>
         <input id="pre-send-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
 

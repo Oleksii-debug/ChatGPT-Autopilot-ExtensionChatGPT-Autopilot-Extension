@@ -286,3 +286,57 @@ Code hazard іsafe correction відтворені; причина drift на li
 Regression703 PASS, integration68 PASS, final focus49 PASS.5 changed-URL tabs не перестворюються; wrong marker/auth відхиляються; optimistic/no-generation і URL-onlyScenario відхиляються.15×3 workflow і35/45-minute full-tab policy збережені. Windows/Chrome/NVDA іreal provider тут недоступні.
 
 Release archive: releases/11.0.7/ChatGPT-Autopilot-11.0.7-HIGH-2026-10-01.zip. Source branch: release/11.0.7-scenario-response-identity, based on11.0.6. Private diagnostic attachment remains local, only aggregated findings are published.
+
+
+# 11.0.8 — incident and implementation — 2026-10-01T20:31:02+02:00
+
+Four user-supplied 11.0.7 reports at 17:12:45, 17:14:17, 17:19:21 and 17:26:56 UTC on 2026-10-01 were inspected locally. The 17:12 report splits one pool across windows 1747062009/1747062622; 17:19 splits another across 1747062511/1747062587. The 17:14 report concentrates distinct projects in one window. 17:26 records frozen tabs and held unverified sends. Private attachments/prompts/conversation contents are not published.
+
+## Reproduced causes
+
+createChatTab queried all ChatGPT tabs and chose the most-populated window; failure of a saved window dropped authority and created in the focused window. Per-member preferredWindowId was learned after creation and then overwritten by bound-tab reads. chrome.runtime.openOptionsPage could focus an existing Pilot panel rather than create one per owner window. The same profile could therefore converge different projects into that panel/window. Cross-profile API transfer or attack is not established by those reports, which have no stable profile identity.
+
+observeCompletedTurns skipped every task without lastVerifiedSendAt, including sends whose assistant response was already available after the 45-second ack ledger expired. Core had deliberately disabled FAILED_SAFE sends. A strict read-only current-marker paired-completed-response reconciliation now uses applyInteractionResult, operation identity and exact owned tab/window to count once without replay. Core also fences those physical submissions when reenabled by Start/Resume.
+
+Native adapter restored selection immediately after native input, before acknowledgement; configurable dwell now precedes restoration. Focus remains protected by the existing per-window operation lease. New dwell uses async timers and bounded DOM observations; no memory residency override or unbounded MutationObserver scan was introduced.
+
+## Design decisions
+
+Explicit options source tab → verified local Chrome window → persisted per-pool/per-participant authority. No bound-window fallback. Two independent panels/pools per profile are supported. Migrated old running scenarios pause instead of guessing launch provenance; explicit Start binds/re-homes only positively owned tabs. Missing/moved documents fail closed. Post-Send holds and opening delay persist across restarts. Ordinary positive send and response counts remain distinct.
+
+Simple UI receives cumulative actual sent/received totals; technical retry/replacement/generation metrics remain in exported diagnostics. Two accessible launch lists retain buttons during updates and dispatch exact IDs. Local diagnostic scope ID is storage.local only and exported for future report comparison; it is not account authentication proof.
+
+## Alternatives rejected
+
+Choosing last focused/most-populated window; following a moved tab; using URL alone as Send proof; repeating an unknown physical Send; resetting counters to optimistic click totals; disabling Chrome reclamation on every tab; bulk activating/focusing windows during report polling. No live ChatGPT account operations performed here.
+
+## Remaining limits
+
+Real Windows Chrome/NVDA not available here. Frozen pages can still defer reading until Chrome resumes them; the hard configured chat timeout remains the sole replacement policy. DOM proof is not a server network receipt. Historical incorrect counts cannot be reconstructed from redacted reports alone. Previously documented broader Agent/API qualification gaps remain separate. Browser profile/ChatGPT account isolation must be checked with new locally scoped live reports; no cyberattack attribution is made.
+
+11 ПІЛОТ HIGH — 11.0.8 — 2026-10-01T20:31:02+02:00
+
+1. Кожен сценарний пул закріплено за точним вікном вкладки Пілота, з якої натиснуто «Запустити». Всі учасники та заміни успадковують одне вікно. Не використовуються фокус браузера чи кількість чатів для вибору іншого вікна. При втраті прив’язаного вікна немає fallback-створення вкладок.
+2. Два пули одного Chrome-профілю працюють у різних вікнах. Кнопка розширення відкриває Пілот саме у своєму вікні. Перенесена вкладка блокується до вставлення/Send. Перевіряються source tab, sender, window, ownership у transport/native/probe.
+3. Прогрес пулу: «Надіслано промптів» та «Отримано відповідей» — сукупно за всі паралельні чати, включно з завершеними поколіннями. Спроби, заміни і технічні проекції залишені у діагностичному звіті.
+4. Завершена відповідь з точною поточною APSTEP-міткою може підтвердити неоднозначне або FAILED_SAFE надсилання. Це read-only перевірка власної вкладки без повторного Send. Зарахування через той самий durable scheduler/counter, один раз. Старий текст або невідправлений редактор не є доказом.
+5. Крутілки 0–60 секунд: пауза після відкриття вкладки та очікування після натискання «Надіслати». Є у спрощених, звичайних і сценарних налаштуваннях, збереженні та JSON імпорті/експорті. Пауза перед Send збережена. Focus restoration виконується після dwell/ack, не одразу після кліку. Deadline зберігається для restart/timeout і не дає почати інший цикл/закрити вкладку раніше.
+6. У «Сеансах» два окремі керовані списки: спрощені сесії і сценарні пули. Для кожного є «Відкрити та редагувати» й «Зупинити». Оновлення лічильників зберігає DOM кнопок і клавіатурний фокус.
+7. На першому оновленні старі сценарні запуски призупиняються зі збереженням чатів і прогресу: їх старе автоматично вивчене вікно не доводить місце запуску. Відкрийте Пілот у потрібному вікні, виберіть пул і натисніть «Запустити». Власні вкладки саме цього пулу, якщо потрібно, переміщуються у це вікно; чужі вкладки не рухаються. Resume без прив’язки відхиляється. Непідтверджений FAILED_SAFE фізичний Send не повторюється після Start/Resume.
+8. У звіті додано випадковий локальний ідентифікатор профілю. Звіти доводять змішування вікон. Міжпрофільний/міжакаунтний механізм і кібератака не доведені; credentials/account-session/network contents не читаються.
+
+Збережено: High до 3 дорадчих спроб без блокування Send; конфігуровані 5/15 паралельних чатів; один сценарний чат відкритий до всієї послідовності або hard 35/45-minute timeout; звичайний open-close лише після verified Send; state не скидається; попередні історії збережені.
+
+Оновлення: розпакуйте у папку поточної версії та «Оновити» на тій самій картці chrome://extensions. Не встановлюйте другу копію й не видаляйте дані. Час очікування не означає підтвердження надсилання. Windows/Chrome/NVDA і фактична доставка ChatGPT потребують live перевірки; mock DOM/Chrome не є server receipt.
+
+
+Final profile isolation checkpoint — 2026-10-01T20:39:24+02:00
+The local scope ID is also persisted as launch authority, not merely printed. A copied foreign runtime is paused before any operation; explicit restart in a different local scope is rejected even if numeric Chrome tab/window IDs coincide. Startup also fences orphan managed sessions. Scope creation is single-flight per Chrome API instance. Config-only JSON imports stay portable; runtime ownership is not portable. Import-and-start ordinary/simplified launches are pinned before Core execution. Standalone completed scenario restart preserves binding/scope.
+
+Final validation: full Core/Scenario/global/interaction/UI/release suite797 PASS; final targeted window/profile/UI/runtime wiring126 PASS. Counts concern automated models only. Installer archive byte/CRC/import/syntax validation is documented in QA-11.0.8.txt.
+
+## 11.0.9 — 2026-10-02T00:54+02:00
+
+Three 11.0.8 live reports at 22:38–22:39 UTC show five-chat pools with ambiguous hidden form submits and frozen/busy response reads. One pool confirmed six sends but no completed responses in its snapshot; another recorded zero verified sends after five physical attempts. Exact counts, evidence and limitations: INCIDENT-11.0.9.md.
+
+The hidden scenario form now activates its own tab before Send even with 0-second dwell. Read-only response probes can wake an owned frozen tab or refresh one stale background tab, at most once per 15 seconds per window, then restore the previous selection safely. Strict send and APSTEP correlation remain: an unsafe URL-only acknowledgement idea was rejected by an existing negative test and removed. 799 automated regression checks passed. No claim of live server delivery or physical Windows qualification. Installer and full source are versioned independently; private reports are omitted.

@@ -138,7 +138,7 @@ test('scenario retains its sending tab and saved window across all response chec
         : { status: 'TEMPORARY_ERROR', safeDiagnosticCode: 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', tabRecoveryPending: true };
     } });
   await manager.create({ config: { steps: [{ prompt: 'ONE' }], closeTabsBetweenChecks: true } });
-  await manager.start('parked');
+  await manager.start('parked', { preferredWindowId: 11 });
   const sessionId = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sessionId].taskOrder[0];
   core.state.sessionsById[sessionId].operation = { phase: 'SENT_VERIFIED', taskId };
@@ -163,20 +163,24 @@ test('scenario retains its sending tab and saved window across all response chec
   assert.deepEqual(removed, [], 'loading response checks never close the generation tab');
 });
 
-test('a frozen owned response tab is retained without forced activation or memory residency', async () => {
-  const tab = {id:7,windowId:11,url:'https://chatgpt.com/c/owner',status:'complete',frozen:true};
+test('a frozen owned response tab is read after one bounded activation and previous tab is restored', async () => {
+  const tab = {id:7,windowId:11,url:'https://chatgpt.com/c/owner',status:'complete',frozen:true,active:false};
   const previous = {id:3,windowId:11,url:'https://chatgpt.com/',active:true};
   const effects=[];
-  const chrome={tabs:{async get(){return {...tab};},async query(){return [{...tab},{...previous}];},
-    async update(id,patch){effects.push({id,...patch});if(id===7){Object.assign(tab,patch);if(patch.active)tab.frozen=false;return {...tab};}return {...previous,...patch};},
+  const chrome={tabs:{async get(){return {...tab};},async query(){return [{...tab},{...previous}].filter(t=>t.active);},
+    async update(id,patch){effects.push({id,...patch});if(id===7){Object.assign(tab,patch);if(patch.active){tab.frozen=false;previous.active=false;}return {...tab};}if(id===3){previous.active=true;tab.active=false;}return {...previous};},
     async remove(){throw Error('A response check must not close the scenario');},
     async create(){throw Error('A response check must not replace the scenario');}}};
-  const result=await probeAssistantConversation(chrome,{async execute(){throw Error('Frozen documents must not be probed');}},
-    {conversationUrl:tab.url,persistentManagedTab:true,managedTabId:7,managedTabOwned:true});
-  assert.equal(result.assistantComplete,false);
-  assert.equal(result.safeDiagnosticCode,'ASSISTANT_RESPONSE_TAB_FROZEN');
-  assert.equal(result.chatRecoveryRequired,undefined);
-  assert.deepEqual(effects,[]);
+  const job={conversationUrl:tab.url,persistentManagedTab:true,managedTabId:7,managedTabOwned:true,
+    preferredWindowId:11,requireWindowBinding:true};
+  const transport={async execute(id){assert.equal(id,7);assert.equal(tab.frozen,false);return {status:'READY',assistantComplete:true,assistantText:'Відповідь'};}};
+  const result=await probeAssistantConversation(chrome,transport,job);
+  assert.equal(result.assistantComplete,true);
+  assert.deepEqual(effects,[{id:7,active:true},{id:3,active:true}]);
+  tab.frozen=true;
+  const cooldown=await probeAssistantConversation(chrome,transport,job);
+  assert.equal(cooldown.safeDiagnosticCode,'ASSISTANT_RESPONSE_TAB_FROZEN');
+  assert.equal(effects.length,2,'no busy activation loop');
 });
 
 test('a failed scenario cycle does not prevent the other four slots from running', async () => {

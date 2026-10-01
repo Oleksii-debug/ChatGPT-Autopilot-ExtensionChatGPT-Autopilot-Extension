@@ -1,3 +1,4 @@
+import { assertSessionWindow } from './window-binding.js';
 import { normalizeChatUrl, OperationPhase, RunState, TabStrategy } from './schema.js';
 import { sameChatConversationUrl, expectedPostSendConversationUrl } from './tabs.js';
 
@@ -23,6 +24,7 @@ function authorizedOperation(state, message, sender, chromeApi, { allowSubmitted
   const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
     ? `__session_worker__:${session.id}` : operation.taskId;
   if (state.tabHintsByTaskId[hintKey]?.tabId !== sender.tab.id) fail('NATIVE_INPUT_TAB_NOT_OWNED');
+  assertSessionWindow(session, sender.tab);
   if (message.kind === 'submit' && operation.nativeSubmitDispatched && !allowSubmitted) fail('NATIVE_SUBMIT_ALREADY_DISPATCHED');
   return { session, operation };
 }
@@ -62,9 +64,10 @@ function targetProof(requestId, kind) {
 
 export async function performNativeInput(chromeApi, repository, message, sender) {
   const initial = await repository.load();
-  const { operation } = authorizedOperation(initial, message, sender, chromeApi);
+  const { session, operation } = authorizedOperation(initial, message, sender, chromeApi);
   const tabId = sender.tab.id;
   const tab = await chromeApi.tabs.get(tabId);
+  assertSessionWindow(session, tab);
   if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
   // A service-worker restart can restore owner focus after activation but before
   // the content script's native-submit message reaches the new worker. Never
@@ -94,9 +97,13 @@ export async function performNativeInput(chromeApi, repository, message, sender)
     await repository.update(state => {
       const live = authorizedOperation(state, message, sender, chromeApi);
       text = live.operation.promptText;
-      if (message.kind === 'submit') live.operation.nativeSubmitDispatched = true;
+      if (message.kind === 'submit') {
+        live.operation.nativeSubmitDispatched = true;
+        live.operation.postSendHoldUntil = Date.now() + Math.min(60000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+      }
       return state;
     });
+    assertSessionWindow(session, await chromeApi.tabs.get(tabId));
     const finalProof = (await inspectTarget())?.[0]?.result;
     if (!finalProof?.url || !sameChatConversationUrl(normalizeChatUrl(finalProof.url), operation.targetUrl)) {
       fail('NATIVE_INPUT_TARGET_CHANGED');
@@ -149,8 +156,9 @@ function hasOtherWindowFocusLease(state, windowId, operationId) {
 
 export async function activateOwnedSendTab(chromeApi, repository, message, sender) {
   const state = await repository.load();
-  const { operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
+  const { session, operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
   const tab = await chromeApi.tabs.get(sender.tab.id);
+  assertSessionWindow(session, tab);
   const observedUrl = normalizeChatUrl(tab.url);
   if (!sameChatConversationUrl(observedUrl, operation.targetUrl)
     && !(message.observationOnly === true && expectedPostSendConversationUrl(observedUrl, operation.targetUrl))) {
@@ -225,6 +233,7 @@ export async function restorePendingSendTabs(chromeApi, repository, { sessionId 
     const previousTabId = Number(operation?.previousSendTabId || 0);
     const previousWindowId = Number(operation?.previousSendWindowId || 0);
     if (!Number.isInteger(previousTabId) || previousTabId <= 0) continue;
+    if (['RUNNING', 'RECOVERING'].includes(session.runState) && Number(operation?.postSendHoldUntil || 0) > Date.now()) continue;
 
     const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       ? `__session_worker__:${session.id}` : operation.taskId;

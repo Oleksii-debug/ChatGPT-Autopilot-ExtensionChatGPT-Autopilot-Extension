@@ -1,4 +1,7 @@
 import { createSession, createTask, PromptMode, RunMode, RunState, TabStrategy, OperationPhase, isExclusiveConversationUrl } from './schema.js';
+import { applyInteractionResult } from './execution.js';
+import { windowBindingError, localProfileScope } from './window-binding.js';
+import { releaseSendLease } from './arbiter.js';
 import { appendDiagnostic } from './diagnostics.js';
 import { createChatTab, sameChatConversationUrl } from './tabs.js';
 import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
@@ -58,7 +61,7 @@ const ASSISTANT_TAB_RECOVERY_CODES = new Set([
 ]);
 const POOL_RUNTIME_EDITABLE_CONFIG_KEYS = Object.freeze([
   'responseTimeoutMinutes', 'pollSeconds', 'minimumLaunchGapSeconds',
-  'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
+  'tabReadyDelaySeconds', 'postSendDelaySeconds', 'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
   'timeoutPolicy', 'restartCurrentRoundOnTimeout', 'closeTabsBetweenChecks',
   'reopenOnceAfterProbeError',
 ]);
@@ -220,6 +223,8 @@ function compatiblePersistedConfig(persisted, canonical) {
   const legacyCanonical = clone(canonical);
   let migrated = false;
   for (const [key, defaultValue] of [
+    ['tabReadyDelaySeconds', 0],
+    ['postSendDelaySeconds', 0],
     ['schemaVersion', 1],
     ['timeoutPolicy', 'REPLACE_MEMBER'],
     ['closeTabsBetweenChecks', false],
@@ -313,6 +318,9 @@ function poolSummary(store, poolId, coreState = null) {
       ? sequence.reduce((sum, item) => sum + item.completedResponses, 0)
       : members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
     verifiedSends,
+    totalSentPrompts: verifiedSends,
+    totalReceivedResponses: members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
+    ownerWindowId: first?.runtime?.preferredWindowId ?? null,
     transportVerifiedSends: coreState
       ? sequence.reduce((sum, item) => sum + item.transportVerifiedSends, 0)
       : verifiedSends,
@@ -794,7 +802,7 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async createChatPool({ name = 'Пул чатів', count, replacementBudget, staggerSeconds = 0, autoStart = false, config = {} } = {}) {
+  async createChatPool({ name = 'Пул чатів', count, replacementBudget, staggerSeconds = 0, autoStart = false, preferredWindowId = null, config = {} } = {}) {
     if (!Number.isInteger(count) || count < 1 || count > MAX_SCENARIO_POOL_SLOTS) {
       throw new Error(`Кількість одночасних чатів: від 1 до ${MAX_SCENARIO_POOL_SLOTS}.`);
     }
@@ -804,6 +812,7 @@ export class ScenarioWorkManager {
     if (!Number.isInteger(staggerSeconds) || staggerSeconds < 0 || staggerSeconds > MAX_INITIAL_STAGGER_SECONDS) {
       throw new Error('Пауза між початковими чатами: від 0 до 604800 секунд (до 7 діб).');
     }
+    const profileScope = Number.isInteger(preferredWindowId) ? await localProfileScope(this.chrome) : null;
     const poolId = this.createId();
     const poolName = scenarioPoolBaseName(name);
     const ids = Array.from({ length: count }, () => this.createId());
@@ -816,6 +825,9 @@ export class ScenarioWorkManager {
         const normalized = normalizeScenarioWorkConfig({ ...config, id, name: slotName,
           mode: ScenarioWorkMode.CHAT_CYCLE, roundsPerGeneration: 1, maxGenerations: 0 });
         const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
+        runtime.preferredWindowId = preferredWindowId;
+        runtime.windowBindingRequired = Number.isInteger(preferredWindowId);
+        runtime.localProfileScopeId = profileScope;
         runtime.initialStartAt = now + index * staggerSeconds * 1000;
         runtime.initialStaggerSeconds = staggerSeconds;
         if (autoStart === true) runtime.runState = ScenarioWorkRunState.RUNNING;
@@ -885,7 +897,95 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async start(id) {
+  async enforceWindowBindings() {
+    const profileScope = await localProfileScope(this.chrome);
+    const changed = [];
+    await this.update(store => {
+      for (const item of Object.values(store.byId)) {
+        if (item.runtime.windowBindingRequired === true && item.runtime.localProfileScopeId === profileScope) continue;
+        item.runtime.windowBindingRequired = true;
+        item.runtime.preferredWindowId = null;
+        item.runtime.ownerEpoch += 1;
+        if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.WAITING_SCHEDULE].includes(item.runtime.runState)) {
+          item.runtime.runState = ScenarioWorkRunState.PAUSED;
+        }
+        changed.push(item.id);
+      }
+      return store;
+    });
+    const authority = await this.load();
+    await this.coreRepository.update(state => {
+      for (const session of Object.values(state.sessionsById)) if (session.scenarioWork?.managed
+          && (changed.includes(session.scenarioWork.scenarioId)
+            || !authority.byId[session.scenarioWork.scenarioId]
+            || session.scenarioWork.localProfileScopeId !== profileScope)) {
+        session.scenarioWork.windowBindingRequired = true;
+        session.scenarioWork.preferredWindowId = null;
+        session.enabled = false; session.runState = RunState.PAUSED;
+      }
+      if (changed.length) appendDiagnostic(state, { event: 'СЦЕНАРІЇ_ЧЕКАЮТЬ_ПРИВʼЯЗКИ_ВІКНА', code: 'SCENARIO_WINDOW_BINDING_REQUIRED',
+        message: `legacyScenarios=${changed.length}; старий вибір вікна не є доказом місця запуску.` }, { at: this.now() });
+      return state;
+    });
+    return changed;
+  }
+
+  async bindLaunchWindow(ids, windowId) {
+    if (!ids.length || !Number.isInteger(windowId)) throw windowBindingError();
+    if (this.chrome.windows?.get) await this.chrome.windows.get(windowId);
+    const profileScope = await localProfileScope(this.chrome);
+    const before = await this.load();
+    for (const id of ids) {
+      const item = before.byId[id];
+      if (!item) throw new Error('Сценарій не знайдено.');
+      if (item.runtime.localProfileScopeId && item.runtime.localProfileScopeId !== profileScope) throw new Error('Цей запуск належить іншому локальному профілю. Імпортуйте шаблон та створіть новий запуск у цьому профілі.');
+      if (item.runtime.runState === ScenarioWorkRunState.RUNNING && item.runtime.preferredWindowId !== windowId) {
+        throw new Error('Спочатку призупиніть сценарій перед зміною робочого вікна.');
+      }
+    }
+    // Fence Core before moving only these scenarios' positively owned tabs.
+    await this.coreRepository.update(state => {
+      for (const session of Object.values(state.sessionsById)) if (ids.includes(session.scenarioWork?.scenarioId)) {
+        session.enabled = false; session.runState = RunState.PAUSED;
+      }
+      return state;
+    });
+    const core = await this.coreRepository.load();
+    for (const hint of Object.values(core.tabHintsByTaskId)) {
+      if (hint.ownedByExtension !== true || !ids.includes(core.sessionsById[hint.sessionId]?.scenarioWork?.scenarioId)) continue;
+      let tab;
+      try { tab = await this.chrome.tabs.get(hint.tabId); } catch (error) {
+        if (isTabAlreadyGoneError(error)) continue;
+        throw error;
+      }
+      if (tab.windowId !== windowId) {
+        if (!this.chrome.tabs.move) throw windowBindingError('SCENARIO_TAB_WINDOW_MISMATCH');
+        await this.chrome.tabs.move(tab.id, { windowId, index: -1 });
+      }
+    }
+    await this.update(store => {
+      for (const id of ids) {
+        store.byId[id].runtime.preferredWindowId = windowId;
+        store.byId[id].runtime.windowBindingRequired = true;
+        store.byId[id].runtime.localProfileScopeId = profileScope;
+      }
+      return store;
+    });
+    await this.coreRepository.update(state => {
+      for (const session of Object.values(state.sessionsById)) if (ids.includes(session.scenarioWork?.scenarioId)) {
+        session.scenarioWork.preferredWindowId = windowId;
+        session.scenarioWork.windowBindingRequired = true;
+        session.scenarioWork.localProfileScopeId = profileScope;
+        session.tabWindowId = windowId;
+      }
+      appendDiagnostic(state, { event: 'СЦЕНАРІЙ_ПРИВʼЯЗАНО_ДО_ВІКНА', code: 'SCENARIO_WINDOW_BOUND',
+        message: `windowId=${windowId}; scenarioCount=${ids.length}` }, { at: this.now() });
+      return state;
+    });
+  }
+
+  async start(id, { preferredWindowId = null } = {}) {
+    if (Number.isInteger(preferredWindowId)) await this.bindLaunchWindow([id], preferredWindowId);
     const now = this.now();
     let runtime = null;
     await this.update(store => {
@@ -898,6 +998,9 @@ export class ScenarioWorkManager {
       if (next.runState === ScenarioWorkRunState.COMPLETED) {
         next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
         next.verifiedSendHistoryComplete = true;
+        next.preferredWindowId = item.runtime.preferredWindowId;
+        next.windowBindingRequired = item.runtime.windowBindingRequired;
+        next.localProfileScopeId = item.runtime.localProfileScopeId;
       }
       next = startScenarioWork(item.config, next, now);
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
@@ -992,6 +1095,8 @@ export class ScenarioWorkManager {
       for (const sessionId of participantSessionIds) {
         const session = state.sessionsById?.[sessionId];
         if (!session?.scenarioWork?.managed || session.scenarioWork.scenarioId !== scenarioId) continue;
+        session.tabReadyDelayMs = config.tabReadyDelaySeconds * 1000;
+        session.postSendDelayMs = config.postSendDelaySeconds * 1000;
         session.preSendDelayMs = config.preSendDelaySeconds * 1000;
         session.busyCheckDelayMs = config.busyCheckDelaySeconds * 1000;
         session.retryBackoffMs = config.retryBackoffSeconds * 1000;
@@ -1000,7 +1105,11 @@ export class ScenarioWorkManager {
     });
   }
 
-  async transitionChatPool(poolId, action) {
+  async transitionChatPool(poolId, action, { preferredWindowId = null } = {}) {
+    if (action === 'START' && Number.isInteger(preferredWindowId)) {
+      const store = await this.load();
+      await this.bindLaunchWindow(poolMembers(store, poolId).map(item => item.id), preferredWindowId);
+    }
     const now = this.now();
     const changed = [];
     await this.update(store => {
@@ -1009,6 +1118,7 @@ export class ScenarioWorkManager {
       if (action === 'START' && members.every(item => item.runtime.runState === ScenarioWorkRunState.COMPLETED)) {
         throw new Error('Усі чати пулу вже завершені. Створіть новий пул.');
       }
+      if (action === 'RESUME' && members.some(item => item.runtime.windowBindingRequired && !Number.isInteger(item.runtime.preferredWindowId))) throw windowBindingError();
       for (const item of members) {
         const state = item.runtime.runState;
         let next = item.runtime;
@@ -1017,12 +1127,15 @@ export class ScenarioWorkManager {
           next = pauseScenarioWork(item.runtime, now); shouldChange = true;
         } else if (action === 'RESUME' && state === ScenarioWorkRunState.PAUSED) {
           next = resumeScenarioWork(item.runtime, now); shouldChange = true;
-        } else if (action === 'START' && state === ScenarioWorkRunState.STOPPED) {
+        } else if (action === 'START' && [ScenarioWorkRunState.STOPPED, ScenarioWorkRunState.PAUSED].includes(state)) {
           next = startScenarioWork(item.config, item.runtime, now); shouldChange = true;
         } else if (action === 'STOP' && [ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.PAUSED].includes(state)) {
           next = stopScenarioWork(item.runtime, now); shouldChange = true;
         }
-        if (!shouldChange) continue;
+        if (!shouldChange) {
+          if (action === 'START') changed.push({ id: item.id, runtime: clone(item.runtime) });
+          continue;
+        }
         next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
         item.runtime = ensureManagerRuntimeFields(next);
         item.updatedAt = now;
@@ -1036,7 +1149,7 @@ export class ScenarioWorkManager {
     return this.getChatPool(poolId);
   }
 
-  async startChatPool(poolId) { return this.transitionChatPool(poolId, 'START'); }
+  async startChatPool(poolId, options = {}) { return this.transitionChatPool(poolId, 'START', options); }
   async pauseChatPool(poolId) { return this.transitionChatPool(poolId, 'PAUSE'); }
   async resumeChatPool(poolId) { return this.transitionChatPool(poolId, 'RESUME'); }
   async stopChatPool(poolId) { return this.transitionChatPool(poolId, 'STOP'); }
@@ -1065,6 +1178,7 @@ export class ScenarioWorkManager {
     await this.update(store => {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
+      if (item.runtime.windowBindingRequired && !Number.isInteger(item.runtime.preferredWindowId)) throw windowBindingError();
       const next = resumeScenarioWork(item.runtime, now);
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
       item.runtime = ensureManagerRuntimeFields(next);
@@ -1370,6 +1484,8 @@ export class ScenarioWorkManager {
       sharedPrompt: '',
       runMode: RunMode.ONE_PASS,
       minimumSendIntervalMs: 0,
+      tabReadyDelayMs: scenario.config.tabReadyDelaySeconds * 1000,
+      postSendDelayMs: scenario.config.postSendDelaySeconds * 1000,
       preSendDelayMs: scenario.config.preSendDelaySeconds * 1000,
       busyCheckDelayMs: scenario.config.busyCheckDelaySeconds * 1000,
       retryBackoffMs: scenario.config.retryBackoffSeconds * 1000,
@@ -1384,6 +1500,8 @@ export class ScenarioWorkManager {
       generation: action.generation,
       stage: action.stage,
       closeTabsBetweenChecks: scenario.config.closeTabsBetweenChecks === true,
+      windowBindingRequired: scenario.runtime.windowBindingRequired === true,
+      localProfileScopeId: scenario.runtime.localProfileScopeId || null,
       preferredWindowId: Number.isInteger(scenario.runtime.preferredWindowId)
         ? scenario.runtime.preferredWindowId : null,
     };
@@ -1456,15 +1574,81 @@ export class ScenarioWorkManager {
     return { sessionId, taskId };
   }
 
+  async reconcileUnverifiedTurn(scenario, participant, session, task, hint, now, expectedOwnerEpoch) {
+    const operation = session.operation;
+    if (!task.responseCorrelationToken || operation?.taskId !== task.id || !operation.submitStartedAt
+        || ![OperationPhase.AMBIGUOUS, OperationPhase.FAILED_SAFE].includes(operation.phase)
+        || hint?.sessionId !== session.id || hint.ownedByExtension !== true || hint.retirePending
+        || !Number.isInteger(hint.tabId)) return null;
+    const authority = await this.get(scenario.id);
+    if (authority.scenario?.runtime.runState !== ScenarioWorkRunState.RUNNING
+        || Number(authority.scenario.runtime.ownerEpoch || 0) !== expectedOwnerEpoch) return null;
+    let report;
+    try {
+      report = await this.collectAssistantReport({
+        id: `scenario-reconcile:${scenario.id}:${operation.operationId}`,
+        taskId: task.id, conversationUrl: task.lastConversationUrl || operation.targetUrl,
+        persistentManagedTab: true, managedTabId: hint.tabId, managedTabOwned: true,
+        preferredWindowId: scenario.runtime.preferredWindowId,
+        requireWindowBinding: scenario.runtime.windowBindingRequired === true,
+        responseCorrelationToken: task.responseCorrelationToken,
+        requireStableResponse: true, assistantBaselineKnown: false,
+        observationAgeMs: Math.max(0, now - operation.submitStartedAt),
+      });
+    } catch (error) {
+      await this.recordAssistantObservation({ scenario, participant, task, error, now });
+      return null;
+    }
+    await this.recordAssistantObservation({ scenario, participant, task, report, now });
+    if (report?.assistantComplete !== true || !String(report.assistantText || '').trim()
+        || report.responseAnchorMatched !== true || report.correlationTokenMatched !== true
+        || report.observedTabId !== hint.tabId || !isExclusiveConversationUrl(report.normalizedObservedUrl)) return null;
+    // Recheck physical window after the asynchronous page read. Never count
+    // another document, an unsent draft, or a stale operation after Stop.
+    const tab = await this.chrome.tabs.get(hint.tabId);
+    if (Number.isInteger(scenario.runtime.preferredWindowId) && tab.windowId !== scenario.runtime.preferredWindowId) return null;
+    const latest = await this.get(scenario.id);
+    if (latest.scenario?.runtime.runState !== ScenarioWorkRunState.RUNNING
+        || Number(latest.scenario.runtime.ownerEpoch || 0) !== expectedOwnerEpoch) return null;
+    let reconciled = null;
+    await this.coreRepository.update(state => {
+      const live = state.sessionsById?.[session.id], current = live?.tasksById?.[task.id];
+      const owned = state.tabHintsByTaskId?.[task.id];
+      if (!current || current.lastVerifiedSendAt || current.responseCorrelationToken !== task.responseCorrelationToken
+          || live.operation?.operationId !== operation.operationId || live.operation.phase !== operation.phase
+          || live.operation.submitStartedAt !== operation.submitStartedAt
+          || owned?.tabId !== hint.tabId || owned.sessionId !== session.id || owned.ownedByExtension !== true
+          || owned.retirePending || live.runState === RunState.PAUSED
+          || (live.enabled === false && current.manualReviewReason !== 'MANAGED_SEND_ACK_TIMEOUT_NO_RESEND')
+          || live.scenarioWork.preferredWindowId !== session.scenarioWork.preferredWindowId) return state;
+      applyInteractionResult(live, live.taskOrder.indexOf(task.id), {
+        status: 'SENT_VERIFIED', normalizedObservedUrl: report.normalizedObservedUrl,
+      }, { now: operation.submitStartedAt, promptFingerprint: operation.promptFingerprint });
+      current.manualReviewReason = '';
+      current.url = current.normalizedUrl = current.lastConversationUrl = report.normalizedObservedUrl;
+      live.operation.targetUrl = report.normalizedObservedUrl;
+      owned.normalizedUrl = report.normalizedObservedUrl;
+      releaseSendLease(state, { sessionId: session.id, operationId: operation.operationId });
+      appendDiagnostic(state, { event: 'НАДСИЛАННЯ_ПІДТВЕРДЖЕНО_ВІДПОВІДДЮ', sessionId: session.id,
+        taskId: task.id, tabId: hint.tabId, observed: report.normalizedObservedUrl,
+        code: 'SCENARIO_SEND_RECONCILED_BY_CORRELATED_RESPONSE',
+        message: 'uniqueStepMarker=true; pairedCompletedResponse=true; resend=false; counterIncrement=1' }, { at: now });
+      reconciled = { session: clone(live), task: clone(current), report };
+      return state;
+    });
+    return reconciled;
+  }
+
   async observeCompletedTurns(scenario, now, expectedOwnerEpoch) {
     let runtime = ensureManagerRuntimeFields(scenario.runtime);
     const core = await this.coreRepository.load();
 
     for (const participant of scenarioWorkParticipants(runtime)) {
       if (participant.state !== ScenarioParticipantState.WAITING || !participant.sessionId) continue;
-      const session = core.sessionsById?.[participant.sessionId];
+      let session = core.sessionsById?.[participant.sessionId];
       const participantTaskId = participant.taskIdCore || participant.taskId;
-      const task = session?.tasksById?.[participantTaskId];
+      let task = session?.tasksById?.[participantTaskId];
+      let reconciledReport = null;
       if (!session || !task) continue;
       if (!task.lastVerifiedSendAt) {
         // Logical launch can wait behind Core admission/rate limits. No
@@ -1484,7 +1668,19 @@ export class ScenarioWorkManager {
           if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
           runtime = checkpoint.runtime;
         }
-        continue;
+        if (bound && Number(participant.nextProbeAt || 0) <= now) {
+          const reconciled = await this.reconcileUnverifiedTurn({ ...scenario, runtime }, participant, session, task, hint, now, expectedOwnerEpoch);
+          if (reconciled) { session = reconciled.session; task = reconciled.task; reconciledReport = reconciled.report; }
+          else {
+            const scheduled = ensureManagerRuntimeFields(runtime);
+            const waiting = scenarioWorkParticipants(scheduled).find(item => item.key === participant.key);
+            waiting.nextProbeAt = now + Math.max(15_000, scenario.config.pollSeconds * 1000);
+            const checkpoint = await this.checkpointRuntime(scenario.id, scheduled, expectedOwnerEpoch, now);
+            if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
+            runtime = checkpoint.runtime;
+          }
+        }
+        if (!task.lastVerifiedSendAt) continue;
       }
       if (!task.lastConversationUrl) continue;
       const freshVerifiedSend = participant.deadlineSendAt !== task.lastVerifiedSendAt;
@@ -1503,24 +1699,6 @@ export class ScenarioWorkManager {
       // API, DOM scan, navigation or recovery action can occur.
       if (!freshVerifiedSend && Number(participant.nextProbeAt || 0) > now) continue;
       let tabHint = (await this.coreRepository.load()).tabHintsByTaskId?.[participantTaskId];
-      // Save the physical home window before the owned tab is parked. Chrome's
-      // focused window can change to an unrelated site before the next poll.
-      if (Number.isInteger(tabHint?.tabId) && this.chrome.tabs?.get) {
-        try {
-          const boundTab = await this.chrome.tabs.get(tabHint.tabId);
-          if (Number.isInteger(boundTab?.windowId) && runtime.preferredWindowId !== boundTab.windowId) {
-            const pinned = ensureManagerRuntimeFields(runtime);
-            pinned.preferredWindowId = boundTab.windowId;
-            const checkpoint = await this.checkpointRuntime(
-              scenario.id, pinned, expectedOwnerEpoch, now,
-            );
-            if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
-            runtime = checkpoint.runtime;
-          }
-        } catch (error) {
-          if (isTabAlreadyGoneError(error)) tabHint = null;
-        }
-      }
       const reportJob = {
         id: `scenario-work:${scenario.id}:${participant.key}`,
         taskId: participantTaskId,
@@ -1530,8 +1708,10 @@ export class ScenarioWorkManager {
         submittedUserMessageKey: task.lastSubmittedUserMessageKey || '',
         responseCorrelationToken: task.responseCorrelationToken || '',
         submittedPromptText: task.responseCorrelationToken ? '' : task.promptOverride,
+        observationAgeMs: Math.max(0, now - Number(task.lastVerifiedSendAt || 0)),
         requireStableResponse: true,
         persistentManagedTab: true,
+        requireWindowBinding: runtime.windowBindingRequired === true,
         managedSessionId: participant.sessionId,
         managedTabId: Number.isInteger(tabHint?.tabId) ? tabHint.tabId : null,
         managedTabOwned: tabHint?.ownedByExtension === true,
@@ -1611,7 +1791,7 @@ export class ScenarioWorkManager {
 
       let report;
       try {
-        report = await this.collectAssistantReport(reportJob);
+        report = reconciledReport || await this.collectAssistantReport(reportJob);
       } catch (error) {
         await this.recordAssistantObservation({ scenario, participant, task, error, now });
         report = {
@@ -1848,6 +2028,7 @@ export class ScenarioWorkManager {
     let current = await this.get(id);
     if (!current.scenario) return { kind: 'NOT_FOUND' };
     if (current.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) return { kind: 'IDLE' };
+    if (current.scenario.runtime.windowBindingRequired && !Number.isInteger(current.scenario.runtime.preferredWindowId)) return { kind: 'SCENARIO_WINDOW_BINDING_REQUIRED' };
     const expectedOwnerEpoch = Math.max(0, Number(current.scenario.runtime.ownerEpoch || 0));
 
     const policyCore = await this.coreRepository.load();

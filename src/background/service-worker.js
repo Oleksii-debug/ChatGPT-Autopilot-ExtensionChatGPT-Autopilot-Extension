@@ -1,3 +1,4 @@
+import { resolveLaunchWindow, openWindowPilotPanel, localProfileScope } from '../core/window-binding.js';
 import { projectGlobalStatus } from '../core/global-status.js';
 import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../core/action-center-runtime.js';
 import { ProjectWorkspaceRepository } from '../core/project-workspace.js';
@@ -301,6 +302,7 @@ function beginColdStartReconciliation() {
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
     // restarts are common and must not manufacture a coordinator reasoning tick.
     await orchestrationV2.reconcileAlarm();
+    await scenarioWork.enforceWindowBindings();
     await scenarioWork.reconcileAlarm();
     await browserAgent.reconcileAlarm();
     coldStartReconciled = true;
@@ -562,11 +564,23 @@ async function runAutomaticSpecialistHandoff(id, payload = {}) {
   return { admitted, dispatched, verified };
 }
 
-export async function dispatchUiMessage(message) {
+export async function dispatchUiMessage(message, sender = null) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
   let result;
-  if (message.command === 'GET_GLOBAL_STATUS') {
+  if (message.command === 'GET_DIAGNOSTIC_REPORT') {
+    result = await dispatcher.execute(message.command, message.payload || {});
+    const state = await scenarioWork.list();
+    const scope = await localProfileScope(chrome);
+    result.report += `\nЛокальна область профілю: ${scope}\nТехнічні дані сценарних пулів:\n`;
+    for (const pool of state.pools || []) {
+      const fields = ['id', 'ownerWindowId', 'slots', 'totalSentPrompts', 'totalReceivedResponses',
+        'plannedSends', 'firstPromptSent', 'firstPromptPending', 'completedResponses',
+        'transportVerifiedSends', 'transportVerifiedSendsOverall', 'sequenceVerifiedSends',
+        'retryVerifiedSends', 'replacementsUsed', 'replacementBudget', 'runState'];
+      result.report += fields.map(key => `${key}=${pool[key] ?? 'unknown'}`).join('; ') + '\n';
+    }
+  } else if (message.command === 'GET_GLOBAL_STATUS') {
     const [coreState, scenarioState, orchestraState, agentState] = await Promise.all([
       repo.load(), scenarioWork.list(), orchestrationV2.list(), browserAgent.list(),
     ]);
@@ -668,7 +682,8 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'CREATE_SCENARIO_WORK') {
     result = await scenarioWork.create(message.payload || {});
   } else if (message.command === 'CREATE_SCENARIO_CHAT_POOL') {
-    result = await scenarioWork.createChatPool(message.payload || {});
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.createChatPool({ ...message.payload, preferredWindowId });
   } else if (message.command === 'GET_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.getChatPool(message.payload?.id || '');
   } else if (message.command === 'UPDATE_SCENARIO_CHAT_POOL') {
@@ -677,7 +692,8 @@ export async function dispatchUiMessage(message) {
       staggerSeconds: message.payload?.staggerSeconds,
     });
   } else if (message.command === 'START_SCENARIO_CHAT_POOL') {
-    result = await scenarioWork.startChatPool(message.payload?.id || '');
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.startChatPool(message.payload?.id || '', { preferredWindowId });
   } else if (message.command === 'PAUSE_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.pauseChatPool(message.payload?.id || '');
   } else if (message.command === 'RESUME_SCENARIO_CHAT_POOL') {
@@ -691,7 +707,8 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'UPDATE_SCENARIO_WORK') {
     result = await scenarioWork.updateConfig(message.payload?.id || '', message.payload?.config || {});
   } else if (message.command === 'START_SCENARIO_WORK') {
-    result = await scenarioWork.start(message.payload?.id || '');
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.start(message.payload?.id || '', { preferredWindowId });
   } else if (message.command === 'PAUSE_SCENARIO_WORK') {
     result = await scenarioWork.pause(message.payload?.id || '');
   } else if (message.command === 'RESUME_SCENARIO_WORK') {
@@ -821,11 +838,28 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'RUN_REMOTE_DISPATCH_NOW') {
     result = await runRemoteDispatchCycle({ execute: true });
   } else {
+    const importedLaunchWindow = message.command === 'IMPORT_PORTABLE_PROFILE' && message.payload?.confirmAutoStart === true
+      ? await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId) : null;
+    if (['START_SESSION', 'RESUME_SESSION'].includes(message.command)) {
+      const windowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+      await repo.update(state => {
+        const session = state.sessionsById?.[message.payload?.sessionId];
+        if (!session) throw new Error('Session not found');
+        if (message.command === 'START_SESSION' || !Number.isInteger(session.tabWindowId)) session.tabWindowId = windowId;
+        return state;
+      });
+    }
     result = message.command === 'RUN_AI_ROUTED_PROMPT'
       ? await dispatchSerializedAiRoute(message.payload || {})
       : message.command === 'RUN_AI_MANAGER_NOW'
         ? await aiManager.process({ force: true })
         : await dispatcher.execute(message.command, message.payload || {});
+    if (Number.isInteger(importedLaunchWindow)) await repo.update(state => {
+      for (const id of result?.summary?.importedSessionIds || []) {
+        if (state.sessionsById[id]) state.sessionsById[id].tabWindowId = importedLaunchWindow;
+      }
+      return state;
+    });
   }
   // Read-only status/configuration queries must not create a STATUS_CHANGED
   // feedback loop with the options page. Only state-changing UI commands need
@@ -876,9 +910,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message?.channel !== 'autopilot-ui') return false;
-  dispatchUiMessage(message)
+  dispatchUiMessage(message, _sender)
     .then(data => sendResponse({ ok: true, data }))
     .catch(error => sendResponse({ ok: false, error: { message: error?.message || 'Core command failed' } }));
   return true;
 });
-chrome.action?.onClicked.addListener(() => { runSafely(chrome.runtime.openOptionsPage()); });
+chrome.action?.onClicked.addListener(tab => { runSafely(openWindowPilotPanel(chrome, tab)); });

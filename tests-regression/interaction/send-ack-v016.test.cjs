@@ -163,6 +163,27 @@ test('hidden form submission wakes a deferred changed UI once and observes its e
   assert.equal(f.clicks(),0);
   assert.equal(activations,1);
 });
+
+test('managed hidden form is activated before physical Send and requires its appended turn', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/managed'});
+  let activated=0;
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
+    activated++;f.document.visibilityState='visible';return true;
+  }});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(activated,1);
+  assert.equal(f.submits(),1);
+  assert.equal(f.clicks(),0);
+});
+
+test('managed hidden form cannot send when activation fails', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/'});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>false});
+  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(f.submits(),0);
+  assert.equal(f.clicks(),0);
+});
 test('waking the same hidden tab preserves fresh-conversation acknowledgement without another submit',async()=>{
   const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,
     startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/no-turn'});
@@ -258,7 +279,7 @@ test('focus reconciled away before native Send is reported as proven no effect',
   assert.equal(f.clicks(),0);
 });
 
-test('hidden non-submit control activates for native click and restores focus before acknowledgement completes',async()=>{
+test('hidden non-submit control activates for native click and restores focus after acknowledgement completes',async()=>{
   const f=fixture();let activation=0,nativeCalls=0,restores=0;
   const order=[];
   const result=await f.run('SUBMIT_EXISTING',{}, {
@@ -324,4 +345,16 @@ test('Scenario URL-only generation fallback cannot count an absent submitted mes
   assert.equal(result.status,'SUBMISSION_UNCERTAIN');
   const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{requireGenerationAcknowledgement:true,recoveryLaunchUrl:'https://chatgpt.com/'});
   assert.notEqual(recovered.status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
+});
+
+
+test('configured post-Send dwell keeps the activated tab through verification, then restores it once', async () => {
+  const f=fixture(); let clickedAt=0, restoredAt=0, restores=0;
+  const result=await f.run('SUBMIT_EXISTING',{postSendDelayMs:7000},{
+    activate:async()=>{f.document.visibilityState='visible';return true;},
+    submit:async()=>{clickedAt=f.sandbox.Date.now();f.acknowledge();},
+    restore:async()=>{restores++;restoredAt=f.sandbox.Date.now();f.document.visibilityState='hidden';},
+  });
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.ok(restoredAt-clickedAt>=7000); assert.equal(restores,1);
 });
