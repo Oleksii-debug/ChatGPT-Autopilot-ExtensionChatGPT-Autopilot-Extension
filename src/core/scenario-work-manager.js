@@ -387,8 +387,17 @@ function isSafeToRemoveSession(session) {
 function ensureManagerRuntimeFields(runtime) {
   const out = clone(runtime);
   out.ownerEpoch = Math.max(0, Number(out.ownerEpoch || 0));
-  out.launchWindowId = Number.isInteger(out.launchWindowId) ? out.launchWindowId : null;
-  out.preferredWindowId = out.launchWindowId ?? (Number.isInteger(out.preferredWindowId) ? out.preferredWindowId : null);
+  const hasAuthoritativeLaunchWindow = Number.isInteger(out.launchWindowId);
+  out.launchWindowId = hasAuthoritativeLaunchWindow ? out.launchWindowId : null;
+  // 11.0.7 preferredWindowId was learned from whichever tab happened to bind
+  // first and therefore cannot be promoted into 11.0.8 window authority.
+  // A legacy RUNNING Scenario is read as PAUSED until the owner explicitly
+  // resumes it from the intended Chrome window, which persists launchWindowId.
+  if (!hasAuthoritativeLaunchWindow && out.runState === ScenarioWorkRunState.RUNNING) {
+    out.runState = ScenarioWorkRunState.PAUSED;
+    out.lastError = 'Scenario paused after upgrade: resume it from the Chrome window that should own this run.';
+  }
+  out.preferredWindowId = out.launchWindowId;
   // A legacy store cannot reconstruct verified sends from already retired
   // timed-out chats. Keep that uncertainty visible to the read projection.
   out.verifiedSendHistoryComplete = out.verifiedSendHistoryComplete === true;
