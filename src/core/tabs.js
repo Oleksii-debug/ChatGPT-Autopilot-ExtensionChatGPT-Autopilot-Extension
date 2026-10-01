@@ -449,6 +449,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       let opening = null;
       try { opening = await chromeApi.tabs.get(hint.tabId); } catch { /* absent */ }
       if (opening && String(opening.url || '').startsWith('about:blank#autopilot-owned:')) {
+        await protectManagedScenarioTab(chromeApi, session, opening, true);
         const resumed = await chromeApi.tabs.update(opening.id, { url: task.normalizedUrl, active: false });
         hint.opening = false;
         return protectManagedScenarioTab(chromeApi, session, resumed, true);
