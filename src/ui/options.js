@@ -2204,6 +2204,12 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
+  const configDefaults = definition?.configDefaults || {};
+  $('agent-definition-ai-routing-mode').value = Object.hasOwn(configDefaults, 'aiRoutingMode') ? configDefaults.aiRoutingMode : '';
+  $('agent-definition-ai-primary-provider').value = Object.hasOwn(configDefaults, 'aiPrimaryProvider') ? configDefaults.aiPrimaryProvider : '';
+  $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
+  $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
+  $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   fillAgentDefinitionModelRoutePolicy(definition?.modelRoutePolicy || null);
   $('agent-definition-revision').textContent = definition
@@ -2463,6 +2469,11 @@ function agentDefinitionFormValue() {
     toolIdsText: $('agent-definition-tools').value,
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    aiRoutingMode: $('agent-definition-ai-routing-mode').value,
+    aiPrimaryProvider: $('agent-definition-ai-primary-provider').value,
+    aiPrimaryModel: $('agent-definition-ai-primary-model').value,
+    aiStrongProvider: $('agent-definition-ai-strong-provider').value,
+    aiStrongModel: $('agent-definition-ai-strong-model').value,
     modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
     modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
     modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,

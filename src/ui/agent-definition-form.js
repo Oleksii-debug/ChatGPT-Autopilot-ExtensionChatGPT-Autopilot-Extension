@@ -153,6 +153,69 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
   };
 }
 
+const AGENT_MODEL_ROUTING_MODES = new Set(['inherit', 'primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
+const AGENT_MODEL_PROVIDERS = new Set(['inherit', 'ollama', 'openai', 'openai-compatible']);
+
+function optionalOwnModelDefaultText(input, key, label, max) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor) return { present: false, value: '' };
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  const value = descriptor.value;
+  if (typeof value !== 'string') throw new Error(label + ' має бути текстом.');
+  if (value !== value.trim() || value.length > max || value.includes('\0')) {
+    throw new Error(label + ' має бути канонічним текстом без пробілів на початку/в кінці.');
+  }
+  return { present: true, value };
+}
+
+export function mergeAgentDefinitionModelDefaultsV1(input = {}, configDefaults = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма model defaults недоступна.');
+  }
+  const out = copyDataRecord(configDefaults, 'configDefaults');
+
+  const routingMode = optionalOwnModelDefaultText(input, 'aiRoutingMode', 'AI routing mode', 40);
+  if (routingMode.present) {
+    if (!routingMode.value) delete out.aiRoutingMode;
+    else if (!AGENT_MODEL_ROUTING_MODES.has(routingMode.value)) throw new Error('AI routing mode не підтримується.');
+    else out.aiRoutingMode = routingMode.value;
+  }
+
+  const primaryProvider = optionalOwnModelDefaultText(input, 'aiPrimaryProvider', 'Primary provider', 40);
+  if (primaryProvider.present) {
+    if (!primaryProvider.value) delete out.aiPrimaryProvider;
+    else if (!AGENT_MODEL_PROVIDERS.has(primaryProvider.value)) throw new Error('Primary provider не підтримується.');
+    else out.aiPrimaryProvider = primaryProvider.value;
+  }
+  const primaryModel = optionalOwnModelDefaultText(input, 'aiPrimaryModel', 'Primary model', 300);
+  if (primaryModel.present) {
+    if (!primaryModel.value) delete out.aiPrimaryModel;
+    else out.aiPrimaryModel = primaryModel.value;
+  }
+
+  const strongProvider = optionalOwnModelDefaultText(input, 'aiStrongProvider', 'Strong provider', 40);
+  if (strongProvider.present) {
+    if (!strongProvider.value) delete out.aiStrongProvider;
+    else if (!AGENT_MODEL_PROVIDERS.has(strongProvider.value)) throw new Error('Strong provider не підтримується.');
+    else out.aiStrongProvider = strongProvider.value;
+  }
+  const strongModel = optionalOwnModelDefaultText(input, 'aiStrongModel', 'Strong model', 300);
+  if (strongModel.present) {
+    if (!strongModel.value) delete out.aiStrongModel;
+    else out.aiStrongModel = strongModel.value;
+  }
+
+  if (out.aiPrimaryProvider && out.aiPrimaryProvider !== 'inherit' && !out.aiPrimaryModel) {
+    throw new Error('Primary provider override потребує explicit Primary model.');
+  }
+  if (out.aiStrongProvider && out.aiStrongProvider !== 'inherit' && !out.aiStrongModel) {
+    throw new Error('Strong provider override потребує explicit Strong model.');
+  }
+  return out;
+}
+
 function copyStructuredData(value, label) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' має бути data object.');
@@ -179,7 +242,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
-  const effectiveConfigDefaults = copyDataRecord(configDefaults, 'configDefaults');
+  const effectiveConfigDefaults = mergeAgentDefinitionModelDefaultsV1(input, configDefaults);
   const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
     persistedPolicy: modelRoutePolicy,
   });
