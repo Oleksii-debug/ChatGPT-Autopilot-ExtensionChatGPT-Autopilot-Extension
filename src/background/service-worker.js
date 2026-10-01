@@ -708,6 +708,21 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     'settings','routerOverride','routerRuntime','isolatedRuntime',
     'forceStrong','taskRole','strongTaskRole','capabilityIds',
   ]) delete sanitizedPayload[key];
+
+  // A reusable Agent may intentionally have maxModelCalls=0, meaning no
+  // whole-job call ceiling. Internal Agent envelopes are still required to be
+  // bounded per dispatcher request. Bound that request by the exact durable
+  // model-policy route authority, while preserving any stricter positive
+  // remaining whole-job ceiling supplied by BrowserAgentManager.
+  const boundRouteCallCeiling = binding.modelPolicyBinding?.effectiveRouteIds?.length;
+  if (!Number.isSafeInteger(boundRouteCallCeiling) || boundRouteCallCeiling < 1) {
+    throw new Error('Reusable Agent model-policy binding has no bounded route-call authority');
+  }
+  const requestedCallCeiling = sanitizedPayload.maxModelCallsForRequest;
+  sanitizedPayload.maxModelCallsForRequest =
+    Number.isSafeInteger(requestedCallCeiling) && requestedCallCeiling > 0
+      ? Math.min(requestedCallCeiling, boundRouteCallCeiling)
+      : boundRouteCallCeiling;
   return { payload:sanitizedPayload, envelope };
 }
 
