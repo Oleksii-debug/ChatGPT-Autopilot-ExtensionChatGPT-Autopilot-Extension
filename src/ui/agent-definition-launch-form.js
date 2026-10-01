@@ -151,6 +151,7 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     registryRaw.revision,
     'Agent definition registry revision',
   );
+
   const expectedRegistryBindingKey = exactRegistryBindingKey(
     registryRaw.bindingKey,
     'Agent definition registry bindingKey',

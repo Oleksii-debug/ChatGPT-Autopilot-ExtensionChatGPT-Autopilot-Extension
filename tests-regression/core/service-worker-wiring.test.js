@@ -64,7 +64,7 @@ test('orchestration V2 uses read-only assistant reports and startup reconciles b
   assert.doesNotMatch(source, /await orchestrationV2\.enqueueRecoveryEvent\(\);/, 'ordinary MV3 worker restart must not manufacture a reasoning tick');
   assert.match(source, /const orchestrationSync = await orchestrationV2\.syncAfterCoreCycle\(\);/);
   assert.match(source, /export function runOrchestrationV2Cycle/);
-  assert.match(source, /const orchestration = await orchestrationV2\.cycleAll\(\);\s*const scenario = await scenarioWork\.cycleAll\(\);\s*const agent = await browserAgent\.cycleAll\(\);\s*const execution = await runExecutionCycle\(\);/, 'startup must reconcile orchestration, scenario work and Browser Agent before resuming Core sends');
+  assert.match(source, /const orchestration = await orchestrationV2\.cycleAll\(\);\s*const scenario = await scenarioWork\.cycleAll\(\);\s*const agent = await runBrowserAgentAutomationCycle\(\);\s*const execution = await runExecutionCycle\(\);/, 'startup must reconcile orchestration, scenario work and the canonical Browser Agent automation cycle before resuming Core sends');
 });
 
 test('overlapping wake events share one in-flight execution cycle', () => {
@@ -132,7 +132,7 @@ test('Browser Agent uses a dedicated durable manager with fast-burst and owner-i
   assert.match(source, /browserAgent\.approvePendingAction\(/);
   assert.match(source, /message\.command === 'REJECT_BROWSER_AGENT_ACTION'/);
   assert.match(source, /browserAgent\.rejectPendingAction\(/);
-  assert.match(source, /alarm\.name === BROWSER_AGENT_ALARM\) runSafely\(browserAgent\.cycleAll\(\)\)/);
+  assert.match(source, /alarm\.name === BROWSER_AGENT_ALARM\) runSafely\(runBrowserAgentAutomationCycle\(\)\)/);
 });
 
 
