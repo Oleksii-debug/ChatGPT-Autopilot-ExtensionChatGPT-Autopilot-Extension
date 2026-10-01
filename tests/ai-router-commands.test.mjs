@@ -1393,6 +1393,32 @@ test('internal Agent envelope rechecks live route-pool revision before provider 
   assert.equal(calls, 0);
 });
 
+test('internal Agent envelope rejects malformed persisted route-pool revision instead of aliasing it to revision 1', async () => {
+  for (const invalidRevision of [0, -0, '1', 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    let calls = 0;
+    const repo = new MemoryRepo();
+    const envelope = internalAgentEnvelope();
+    repo.state.profile.aiRouter = structuredClone(envelope.settings);
+    repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+    repo.state.profile.aiRoutePoolRevision = invalidRevision;
+    const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+      aiOrchestrator: { async run() { calls += 1; return {}; } },
+    });
+    await assert.rejects(
+      dispatcher.execute(
+        'RUN_AI_ROUTED_PROMPT',
+        { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
+        {
+          agentModelOrchestratorEnvelope: envelope,
+          providerCallBudgetContext: internalAgentBudgetContext(),
+        },
+      ),
+      /canonical AI route-pool revision is invalid before Agent model invocation/u,
+    );
+    assert.equal(calls, 0);
+  }
+});
+
 test('internal Agent envelope rechecks live canonical Router deny before provider invocation', async () => {
   let calls = 0;
   const repo = new MemoryRepo();
