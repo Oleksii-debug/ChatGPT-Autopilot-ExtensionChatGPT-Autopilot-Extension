@@ -10,6 +10,14 @@ const SAFE_RECEIVER_RECOVERY_MODES = new Set([
   'VERIFY_AFTER_UNCERTAIN_SUBMIT',
   'READ_ASSISTANT_REPORT',
 ]);
+const READ_ONLY_TAB_FALLBACK_CODES = new Set([
+  'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
+  'TAB_WAKE_TIMEOUT',
+  'TAB_WAKE_FAILED',
+  'INTERACTION_SEND_FAILED',
+  'ASSISTANT_RESPONSE_TAB_MISSING',
+  'ASSISTANT_RESPONSE_TAB_FROZEN',
+]);
 const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
 const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
 
@@ -91,6 +99,38 @@ export class ChromeInteractionTransport {
     };
   }
 
+  canUseFreshReadTab(request, code, allowReadOnlyTabFallback) {
+    return allowReadOnlyTabFallback
+      && request?.mode === 'READ_ASSISTANT_REPORT'
+      && Boolean(request?.expectedUrl)
+      && READ_ONLY_TAB_FALLBACK_CODES.has(code)
+      && typeof this.chrome?.tabs?.create === 'function';
+  }
+
+  async executeOnFreshReadTab(request, cause = null) {
+    let replacementTabId = null;
+    try {
+      const replacement = await this.chrome.tabs.create({
+        url: request.expectedUrl,
+        active: false,
+      });
+      replacementTabId = replacement?.id ?? null;
+      if (replacementTabId == null) {
+        throw diagnosticError(
+          'ASSISTANT_RESPONSE_TAB_REPLACEMENT_FAILED',
+          'Read-only assistant report recovery could not create a replacement ChatGPT tab',
+          cause,
+          request,
+        );
+      }
+      return await this.execute(replacementTabId, request, { allowReadOnlyTabFallback: false });
+    } finally {
+      if (replacementTabId != null && typeof this.chrome?.tabs?.remove === 'function') {
+        try { await this.chrome.tabs.remove(replacementTabId); } catch (_) {}
+      }
+    }
+  }
+
   async waitForCheckOnlyUiReady(tabId, request, initialResponse) {
     if (request?.mode !== 'CHECK_ONLY') return initialResponse;
 
@@ -131,7 +171,7 @@ export class ChromeInteractionTransport {
     return response;
   }
 
-  async execute(tabId, request) {
+  async execute(tabId, request, { allowReadOnlyTabFallback = true } = {}) {
     if (tabId == null) throw new Error('Interaction tab id is required');
 
     try {
@@ -224,9 +264,16 @@ export class ChromeInteractionTransport {
           request,
         );
       }
+      if (this.canUseFreshReadTab(request, response.data.safeDiagnosticCode, allowReadOnlyTabFallback)) {
+        return await this.executeOnFreshReadTab(request);
+      }
       return response.data;
     } catch (error) {
-      throw attachRequestContext(error, request);
+      const contextual = attachRequestContext(error, request);
+      if (!this.canUseFreshReadTab(request, contextual.safeDiagnosticCode, allowReadOnlyTabFallback)) {
+        throw contextual;
+      }
+      return this.executeOnFreshReadTab(request, contextual);
     }
   }
 }

@@ -7,7 +7,7 @@ const H2 = 'b'.repeat(64);
 function source(overrides = {}) {
   return {
     schemaVersion: 1, sourceId: 'src-1', projectId: 'proj-1', kind: 'github',
-    uri: 'https://example.invalid/runtime-repo', revisionId: 'rev-1', contentSha256: H,
+    uri: 'https://example.invalid/repo', revisionId: 'rev-1', contentSha256: H,
     observedAt: '2026-09-23T15:00:00.000Z', authority: 'CANONICAL', metadata: { branch: 'main' },
     ...overrides,
   };
@@ -313,7 +313,6 @@ test('result cap is explicit and reports truncation', () => {
   assert.equal(out.truncated, true);
   assert.equal(out.results.length, 2);
 });
-
 
 test('project title is not searchable without a separate content-visibility authority', () => {
   const record = candidate();
