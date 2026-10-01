@@ -173,6 +173,29 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
+test('definition launch route-context failure is atomic and persists no partial job', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => {
+      throw new Error('route context unavailable');
+    },
+    createId: () => 'job.generated',
+  });
+  await seedRegistry(manager);
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({ jobId:'job.route-context-failure' })),
+    /route context unavailable/,
+  );
+  assert.equal(
+    (await manager.get('job.route-context-failure')).job,
+    null,
+    'route-context failure must not persist a partially materialized reusable Agent',
+  );
+});
+
 test('reusable Agent may keep an unbounded whole-job model-call budget while retaining bounded route authority', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
