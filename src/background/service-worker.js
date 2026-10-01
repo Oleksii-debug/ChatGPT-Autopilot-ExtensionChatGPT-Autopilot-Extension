@@ -711,15 +711,15 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
   const budgetContext = snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext);
   if (budgetContext?.kind !== 'browser-agent'
       || typeof budgetContext.jobId !== 'string') return null;
+  const current = await browserAgent.get(budgetContext.jobId);
+  const job = current.job;
+  if (!job?.definitionModelPolicyBinding) return null;
   const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
   if (!Number.isSafeInteger(budgetContext.controlEpoch)
       || Object.is(budgetContext.controlEpoch, -0)
       || budgetContext.controlEpoch < 1) {
     throw new Error('Reusable Agent model dispatch requires a canonical positive controlEpoch');
   }
-  const current = await browserAgent.get(budgetContext.jobId);
-  const job = current.job;
-  if (!job?.definitionModelPolicyBinding) return null;
   if (job.runtime?.controlEpoch !== budgetContext.controlEpoch) {
     throw new Error('Reusable Agent controlEpoch drifted before model dispatch');
   }
