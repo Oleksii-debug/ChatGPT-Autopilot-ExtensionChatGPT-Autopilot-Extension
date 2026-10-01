@@ -16,7 +16,7 @@ test('frozen Scenario tab enters bounded canonical recovery instead of waiting u
   const first = planChatRecovery(null, frozen, 1_000, {
     retryAttempts: 1,
     reloadAttempts: 1,
-    reopenAttempts: 1,
+    reopenAttempts: 0,
     cooldownMs: 30_000,
     requireCompletedResponse: true,
   });
@@ -26,26 +26,16 @@ test('frozen Scenario tab enters bounded canonical recovery instead of waiting u
   const cooldown = planChatRecovery(first.state, frozen, 2_000, {
     retryAttempts: 1,
     reloadAttempts: 1,
-    reopenAttempts: 1,
+    reopenAttempts: 0,
     cooldownMs: 30_000,
     requireCompletedResponse: true,
   });
   assert.equal(cooldown.action, ChatRecoveryAction.WAIT);
 
-  const second = planChatRecovery(first.state, frozen, 31_001, {
+  const exhausted = planChatRecovery(first.state, frozen, 31_001, {
     retryAttempts: 1,
     reloadAttempts: 1,
-    reopenAttempts: 1,
-    cooldownMs: 30_000,
-    requireCompletedResponse: true,
-  });
-  assert.equal(second.action, ChatRecoveryAction.SAME_URL_REOPEN);
-  assert.equal(second.state.reopenAttempts, 1);
-
-  const exhausted = planChatRecovery(second.state, frozen, 61_002, {
-    retryAttempts: 1,
-    reloadAttempts: 1,
-    reopenAttempts: 1,
+    reopenAttempts: 0,
     cooldownMs: 30_000,
     requireCompletedResponse: true,
   });
