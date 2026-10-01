@@ -182,3 +182,19 @@ test('reusable Agent strict preflight does not leak onto ordinary Browser Agent 
   assert.ok(epochFence > bindingGate, 'strict reusable controlEpoch admission must not alter ordinary Browser Agent dispatch');
 });
 
+test('Browser Agent provider-context identity cannot fall through reusable envelope admission', () => {
+  const functionStart = source.indexOf('async function prepareDefinitionBoundAgentInvocation');
+  const functionEnd = source.indexOf('\n}\n\nfunction dispatchSerializedAiRoute', functionStart);
+  assert.ok(functionStart >= 0 && functionEnd > functionStart);
+  const preflight = source.slice(functionStart, functionEnd);
+  assert.match(preflight, /Agent provider budget context must be a plain object/);
+  assert.match(preflight, /kind must be an enumerable own data property/);
+  assert.match(preflight, /if \(kindDescriptor\.value !== 'browser-agent'\) return null;/);
+  assert.match(preflight, /Browser Agent provider budget context jobId must be an enumerable own text data property/);
+  assert.doesNotMatch(
+    preflight,
+    /kindDescriptor\.value !== 'browser-agent'[\s\S]*?typeof jobIdDescriptor\.value !== 'string'\) return null/s,
+    'invalid Browser Agent job identity must fail closed instead of falling through to generic routing',
+  );
+});
+
