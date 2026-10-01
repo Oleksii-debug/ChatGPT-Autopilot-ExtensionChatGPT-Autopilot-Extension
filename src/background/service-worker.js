@@ -236,6 +236,15 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+function canonicalAgentRoutePoolRevision(state) {
+  const value = state?.profile?.aiRoutePoolRevision;
+  if (value == null) return 1;
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+    throw new Error('Canonical AI route-pool revision is invalid for reusable Agent authority');
+  }
+  return value;
+}
+
 function ownerAllowedRouteIdsForSettings(settings) {
   const policy = settings.routePolicy;
   const explicitAllow = policy.allowRouteIds.length
@@ -262,10 +271,7 @@ const browserAgent = new BrowserAgentManager({
   readModelRouteContext: async () => {
     const state = await repo.load();
     const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-    const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-      && state.profile.aiRoutePoolRevision > 0
-      ? state.profile.aiRoutePoolRevision
-      : 1;
+    const routePoolRevision = canonicalAgentRoutePoolRevision(state);
     const runtime = normalizeAiRouterRuntime(
       state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
     );
@@ -760,10 +766,7 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
 
   const state = await repo.load();
   const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-  const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-    && state.profile.aiRoutePoolRevision > 0
-    ? state.profile.aiRoutePoolRevision
-    : 1;
+  const routePoolRevision = canonicalAgentRoutePoolRevision(state);
   const now = Date.now();
   const explicitRole = Object.hasOwn(safePayload, 'taskRole');
   if (explicitRole && typeof safePayload.taskRole !== 'string') {
