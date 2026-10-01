@@ -438,6 +438,58 @@ test('same-revision authority route ordering drift fails closed', () => {
   );
 });
 
+test('bound readiness supports verifier-only work without requiring planner eligibility', () => {
+  const verifierOnlyRoutes = pool().map(item => (
+    item.routeId === 'route.a' || item.routeId === 'route.b'
+      ? { ...item, roles: ['verifier'] }
+      : item
+  ));
+  const result = inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+    routes: verifierOnlyRoutes,
+    requiresPlanner: false,
+    requiresVerifier: true,
+    verifierCapabilityIds: ['cap.reason'],
+  }));
+
+  assert.equal(result.readiness.state, AgentRouteReadinessState.READY);
+  assert.equal(result.readiness.requiresPlanner, false);
+  assert.equal(result.readiness.requiresVerifier, true);
+  assert.deepEqual(result.readiness.planner.availableRouteIds, []);
+  assert.deepEqual(result.readiness.verifier.availableRouteIds, ['route.b', 'route.a']);
+});
+
+test('bound verifier-only readiness preserves durable vision requirement', () => {
+  const verifierOnlyRoutes = pool().map(item => (
+    item.routeId === 'route.a' || item.routeId === 'route.b'
+      ? { ...item, roles: ['verifier'], supportsVision: false }
+      : item
+  ));
+  const blocked = inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+    routes: verifierOnlyRoutes,
+    requiresPlanner: false,
+    requiresVerifier: true,
+    requiresVision: true,
+    verifierCapabilityIds: ['cap.reason'],
+  }));
+  assert.equal(blocked.readiness.state, AgentRouteReadinessState.UNAVAILABLE_CONFIG);
+  assert.deepEqual(blocked.readiness.verifier.eligibleRouteIds, []);
+
+  const visionVerifierRoutes = verifierOnlyRoutes.map(item => (
+    item.routeId === 'route.a' || item.routeId === 'route.b'
+      ? { ...item, supportsVision: true }
+      : item
+  ));
+  const ready = inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+    routes: visionVerifierRoutes,
+    requiresPlanner: false,
+    requiresVerifier: true,
+    requiresVision: true,
+    verifierCapabilityIds: ['cap.reason'],
+  }));
+  assert.equal(ready.readiness.state, AgentRouteReadinessState.READY);
+  assert.deepEqual(ready.readiness.verifier.availableRouteIds, ['route.b', 'route.a']);
+});
+
 test('routes outside durable effectiveRouteIds cannot make an otherwise unavailable Agent ready', () => {
   const limitedBinding = definitionBinding({
     ownerAllowedRouteIds: ['route.a', 'route.b'],
