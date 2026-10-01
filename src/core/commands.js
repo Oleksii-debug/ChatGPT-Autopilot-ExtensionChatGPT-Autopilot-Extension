@@ -1113,6 +1113,13 @@ export class CoreCommandDispatcher {
         if (currentSettings.enabled !== true) {
           throw new Error('Current canonical AI Router is disabled before Agent model invocation');
         }
+        const currentRoutePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+          && state.profile.aiRoutePoolRevision > 0
+          ? state.profile.aiRoutePoolRevision
+          : 1;
+        if (currentRoutePoolRevision !== internalEnvelope.routePoolRevision) {
+          throw new Error('Agent model route-pool revision drifted before provider invocation');
+        }
         const currentRoute = currentSettings.routes.find(
           route => route.routeId === internalEnvelope.routeId,
         );
