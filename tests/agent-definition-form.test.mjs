@@ -199,3 +199,101 @@ test('model-default fields fail closed on aliases, incomplete explicit providers
   assert.throws(() => mergeAgentDefinitionModelDefaultsV1(hostile, {}), /data property/);
   assert.equal(reads, 0);
 });
+
+
+test('Agent definition form builds canonical Specialist delegation profile with explicit enabled state', () => {
+  const definition = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read\nproject.context',
+    specialistToolIdsText: 'files.read\nbrowser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  }));
+  assert.equal(definition.specialistDelegationProfile.enabled, true);
+  assert.equal(definition.specialistDelegationProfile.registryId, 'specialists:project-1');
+  assert.deepEqual(definition.specialistDelegationProfile.requiredCapabilityIds, ['project.context','research.read']);
+  assert.deepEqual(definition.specialistDelegationProfile.requiredToolIds, ['browser.read','files.read']);
+  assert.equal(definition.specialistDelegationProfile.maxConcurrentHandoffs, 2);
+});
+
+test('Specialist delegation clear semantics distinguish new absence from persisted-profile removal', () => {
+  const created = buildAgentDefinitionFromFormV1(form({ specialistDelegationConfigured: false }));
+  assert.equal(Object.hasOwn(created, 'specialistDelegationProfile'), false);
+  const persisted = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const cleared = buildAgentDefinitionFromFormV1(form({ specialistDelegationConfigured: false }), {
+    specialistDelegationProfile: persisted,
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationProfile'), true);
+  assert.equal(cleared.specialistDelegationProfile, null);
+});
+
+test('Specialist delegation form rejects malformed numeric and accessor-backed authority input', () => {
+  const baseInput = {
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  };
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({ ...baseInput, specialistDeadlineSeconds: '0900' })),
+    /канонічному форматі/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({ ...baseInput, specialistMaxConcurrentHandoffs: '257' })),
+    /діапазоном/u,
+  );
+  let reads = 0;
+  const hostile = form();
+  Object.defineProperty(hostile, 'specialistDelegationConfigured', {
+    enumerable: true,
+    get() { reads += 1; return false; },
+  });
+  assert.throws(() => buildAgentDefinitionFromFormV1(hostile), /data property/u);
+  assert.equal(reads, 0);
+});
+
+test('disabled Specialist delegation does not inspect inactive subordinate fields', () => {
+  let reads = 0;
+  const input = form({ specialistDelegationConfigured: false });
+  Object.defineProperty(input, 'specialistRegistryId', {
+    enumerable: true,
+    get() { reads += 1; return 'specialists:should-not-run'; },
+  });
+  const persisted = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const cleared = buildAgentDefinitionFromFormV1(input, { specialistDelegationProfile: persisted });
+  assert.equal(cleared.specialistDelegationProfile, null);
+  assert.equal(reads, 0);
+});
