@@ -10,7 +10,7 @@ STATUS: AUTOMATED QUALIFICATION IN PROGRESS
 - normal Scenario progress не показує transport/replacement/recovery counters;
 - uncertain fresh Work submit із порожнім composer + concrete /c/... + generation evidence після recovery стає SENT_VERIFIED без другого click, навіть якщо user bubble scanner ще повертає 0;
 - diagnostics managed Scenario містить launch window і actual tab window окремо.
-- frozen Scenario tab входить у canonical bounded recovery: one reload -> cooldown -> one reopen -> fail closed; completed response очищає recovery ledger.
+- frozen Scenario tab входить у canonical bounded recovery: one reload -> cooldown -> fail closed; Scenario reopenAttempts=0; completed response очищає recovery ledger.
 
 Exact-head GitHub Core/UI/Release/Windows results мають бути terminal SUCCESS перед release qualification.
 Локальний clone у цьому execution environment не був доступний через відсутній DNS/network, тому локальний PASS не заявляється.
