@@ -38,6 +38,7 @@ import {
   normalizeBrowserAgentAcceptanceCriteria,
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
+import { normalizeAiRoutePool } from './ai-route-pool.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
@@ -3544,6 +3545,60 @@ export class BrowserAgentManager {
     return Math.max(0, Math.floor(limit));
   }
 
+  async assertDefinitionBoundProviderRouteCurrent(store, job, route = {}) {
+    if (!job?.definitionModelPolicyBinding) return;
+    if (!this.readModelRouteContext) {
+      throw new Error('Reusable Agent provider admission requires canonical AI route-pool context');
+    }
+    const binding = normalizeAgentDefinitionModelPolicyBindingV1(job.definitionModelPolicyBinding);
+    const context = await this.readModelRouteContext();
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new Error('Canonical AI route-pool context is unavailable before provider admission');
+    }
+    const routePoolRevision = context.routePoolRevision;
+    if (!Number.isSafeInteger(routePoolRevision)
+        || Object.is(routePoolRevision, -0)
+        || routePoolRevision < 1
+        || routePoolRevision !== binding.modelPolicyBinding.routePoolRevision) {
+      throw new Error('Reusable Agent route-pool revision drifted before provider admission');
+    }
+
+    const routeId = clean(route?.routeId, 180);
+    const provider = clean(route?.provider, 80);
+    const model = clean(route?.model, 300);
+    const endpointId = clean(route?.endpointId, 180);
+    if (!routeId || !binding.modelPolicyBinding.effectiveRouteIds.includes(routeId)) {
+      throw new Error('Reusable Agent provider route exceeds durable model-policy authority');
+    }
+    const currentRoutes = normalizeAiRoutePool(context.routePool);
+    const currentRoute = currentRoutes.find(candidate => candidate.routeId === routeId);
+    if (!currentRoute
+        || currentRoute.provider !== provider
+        || currentRoute.model !== model
+        || currentRoute.endpointId !== endpointId) {
+      throw new Error('Reusable Agent provider route identity drifted before provider admission');
+    }
+    if (!Array.isArray(context.ownerAllowedRouteIds)
+        || !context.ownerAllowedRouteIds.includes(routeId)) {
+      throw new Error('Reusable Agent provider route is no longer allowed by current owner Router policy');
+    }
+
+    const definitionBinding = binding.definitionBinding;
+    const registry = store.definitionRegistriesById?.[definitionBinding.registryId];
+    if (!registry) {
+      throw new Error('Reusable Agent definition registry is unavailable before provider admission');
+    }
+    const selection = selectAgentDefinitionV1({
+      registry,
+      agentDefinitionId: definitionBinding.agentDefinitionId,
+    });
+    if (selection.registryRevision !== definitionBinding.registryRevision
+        || selection.definitionRevision !== definitionBinding.definitionRevision
+        || selection.definition.enabled !== true) {
+      throw new Error('Reusable Agent definition authority drifted before provider admission');
+    }
+  }
+
   async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
     const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
@@ -3561,6 +3616,7 @@ export class BrowserAgentManager {
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
         throw error;
       }
+      await this.assertDefinitionBoundProviderRouteCurrent(store, job, route);
       if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
         const error = new Error('Browser Agent already has an unsettled model budget reservation');
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
