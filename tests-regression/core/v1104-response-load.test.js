@@ -142,3 +142,36 @@ test('role-marked div turns without article wrappers still produce a correlated 
     assert.equal(report.assistantComplete,true);assert.equal(report.responseAnchorKind,'STEP_MARKER');
   } finally {globalThis.location=saved;}
 });
+
+
+test('saved provisional URL is replaced only by the sending document with the exact current step marker',async()=>{
+  const saved=globalThis.location;globalThis.location={href:'https://chatgpt.com/c/canonical'};
+  let navigations=0,reloads=0,creates=0;
+  const chrome={tabs:{async get(){return {id:7,url:globalThis.location.href,status:'complete'};},
+    async update(){navigations++;},async reload(){reloads++;},async create(){creates++;}}};
+  const token='[APSTEP:canonical:1]';const doc=currentDom(token);
+  const transport={execute:(_,request)=>adapter.execute(request,{document:doc})};
+  const job={id:'canonical',taskId:'t',managedTabId:7,managedTabOwned:true,persistentManagedTab:true,
+    conversationUrl:'https://chatgpt.com/c/provisional',responseCorrelationToken:token,
+    assistantBaselineKnown:true,assistantBaselineCount:0,requireStableResponse:false};
+  try {
+    const result=await probeAssistantConversation(chrome,transport,job);
+    assert.equal(result.assistantComplete,true);assert.equal(result.correlationTokenMatched,true);
+    assert.equal(result.correlatedConversationRebind,true);assert.equal(result.observedTabId,7);
+    assert.equal(result.normalizedObservedUrl,globalThis.location.href);
+    const wrong=await probeAssistantConversation(chrome,transport,{...job,responseCorrelationToken:'[APSTEP:other:2]'});
+    assert.equal(wrong.assistantComplete,false);assert.equal(wrong.safeDiagnosticCode,'ASSISTANT_BOUND_CONVERSATION_UNPROVEN');
+    const staleRecovery=await probeAssistantConversation(chrome,transport,{...job,recoveryAction:'SAME_URL_RELOAD'});
+    assert.equal(staleRecovery.safeDiagnosticCode,'ASSISTANT_BOUND_CONVERSATION_UNPROVEN');
+    assert.equal(navigations+reloads+creates,0);
+  } finally {globalThis.location=saved;}
+});
+
+
+test('correlated bound read still reports login and never treats it as a recoverable conversation',async()=>{
+  const chrome={tabs:{async get(){return {id:7,url:'https://chatgpt.com/auth/login',status:'complete'};}}};
+  const result=await probeAssistantConversation(chrome,{execute(){throw Error('Never read login');}},
+    {managedTabId:7,managedTabOwned:true,persistentManagedTab:true,responseCorrelationToken:'[APSTEP:auth:1]',
+      conversationUrl:'https://chatgpt.com/c/saved'});
+  assert.equal(result.status,'AUTH_REQUIRED');assert.notEqual(result.chatRecoveryRequired,true);
+});

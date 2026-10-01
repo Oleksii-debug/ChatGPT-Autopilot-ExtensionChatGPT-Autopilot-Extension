@@ -93,11 +93,26 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
     // A managed Scenario must inspect its bound tab, not the first matching
     // conversation in Chrome (which may be a manually opened user tab).
     const tabs = persistentManagedTab ? [] : await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
+    const correlateBoundDocument = persistentManagedTab && job?.managedTabOwned === true
+      && Boolean(job?.responseCorrelationToken);
     let existing = persistentManagedTab
-      ? (hinted && matchesConversation(hinted, conversationUrl) ? hinted
+      ? (hinted && (matchesConversation(hinted, conversationUrl) || correlateBoundDocument) ? hinted
         : null)
       : (tabs || []).find(tab => tab?.id != null && matchesConversation(tab, conversationUrl));
     const recoveryAction = String(job?.recoveryAction || '').trim();
+    if (persistentManagedTab && hinted?.id != null && isChatAuthUrl(hinted.url)) {
+      return temporaryReport('AUTH_SURFACE_VISIBLE_REPORT', { status: 'AUTH_REQUIRED',
+        normalizedObservedUrl: hinted.url || '', observedTabId: hinted.id });
+    }
+
+    if (persistentManagedTab && hinted?.id != null && !matchesConversation(hinted, conversationUrl)
+        && ['SAME_URL_RELOAD', 'SAME_URL_REOPEN'].includes(recoveryAction)) {
+      // A provisional /c/id may have been canonicalized by the server. Never
+      // navigate a living sending document back to an unproven old identity.
+      return temporaryReport('ASSISTANT_BOUND_CONVERSATION_UNPROVEN', {
+        normalizedObservedUrl: hinted.url || '', observedTabId: hinted.id,
+      });
+    }
 
     if (recoveryAction === 'SAME_URL_RELOAD') {
       const recovered = persistentManagedTab && job?.managedTabOwned !== true
@@ -140,15 +155,8 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
           tabRecoveryPending: true,
         });
       }
-      // A normal read must never navigate. The canonical recovery ledger may
-      // authorize one explicit in-place recovery, rather than an endless loop.
-      return temporaryReport('CHATGPT_RECOVERY_CONVERSATION_IDENTITY_LOST', {
-        chatRecoveryRequired: true,
-        recoveryPending: true,
-        recoveryCategory: 'CONVERSATION_IDENTITY_LOST',
-        recoveryErrorLabel: 'Managed tab left the saved conversation URL',
-        retryButtonLabel: '',
-        retryAvailable: false,
+      return temporaryReport('ASSISTANT_BOUND_CONVERSATION_UNPROVEN', {
+        normalizedObservedUrl: hinted.url || '', observedTabId: hinted.id,
       });
     }
 
@@ -219,7 +227,9 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       requestId: `assistant-report:${job.id || job.workerId || job.taskId || 'probe'}:${Date.now()}`,
       taskId: job.taskId || job.workerId || 'assistant-report',
       mode: 'READ_ASSISTANT_REPORT',
-      expectedUrl: conversationUrl,
+      expectedUrl: correlateBoundDocument && existing?.url ? existing.url : conversationUrl,
+      allowCorrelatedConversationRebind: correlateBoundDocument,
+      boundConversationUrl: conversationUrl,
       promptText: '',
       assistantBaselineCount: Number(job.assistantBaselineCount || 0),
       assistantBaselineKnown: job.assistantBaselineKnown === true,
@@ -229,7 +239,8 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       requireStableResponse: job.requireStableResponse === true,
     };
     if (recoveryAction === 'RETRY_BUTTON') request.mode = 'RECOVER_CHAT_ERROR_SURFACE';
-    return await transport.execute(tabId, request);
+    const report = await transport.execute(tabId, request);
+    return { ...report, observedTabId: tabId };
   } finally {
     if (temporaryTab && tabId != null) {
       try { await chromeApi.tabs.remove(tabId); } catch (_) {}

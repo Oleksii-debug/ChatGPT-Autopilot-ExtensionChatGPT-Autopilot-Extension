@@ -1818,6 +1818,7 @@
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
     let observationPasses = 0;
+    let acknowledgedUrl = ''; let acknowledgementSeenAt = 0;
     // Streaming/animation mutations can arrive faster than the timeout clock.
     // Bound the DOM work too, then leave an uncertain Send for reconciliation.
     while (nowMs() < verifyDeadline && observationPasses++ < 200) {
@@ -1866,6 +1867,23 @@
           submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN' : 'UNCERTAIN',
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
+      }
+
+      if (request.requireGenerationAcknowledgement === true) {
+        // Scenario progress must not count a client-only optimistic bubble.
+        // Require this operation's appended message plus independent generation
+        // and a stable concrete identity, without performing a second Send.
+        const observedUrl = normalizeUrl(globalThis.location?.href || '');
+        const generationStarted = detectBlockingState(doc)?.status === STATUS.BUSY
+          || semanticAssistantMessages(doc).length > assistantBaselineCount;
+        const appended = textVerified || unlabeledVerified || representationVerified;
+        if (!appended || !generationStarted || !isExclusiveConversationLocation(observedUrl)) {
+          acknowledgementSeenAt = 0; acknowledgedUrl = '';
+          await (deps.wait || wait)(250);
+          continue;
+        }
+        if (acknowledgedUrl !== observedUrl) { acknowledgedUrl = observedUrl; acknowledgementSeenAt = nowMs(); }
+        if (nowMs() - acknowledgementSeenAt < 1000) { await (deps.wait || wait)(250); continue; }
       }
 
       // On a fresh launch surface ChatGPT creates a unique /c/<id> at the same
@@ -2010,7 +2028,7 @@
         && afterMessages.length === 0
         && unlabeledPromptCount(doc, submittedText) === 0
         && (!found.element || !compactPromptText(editorText(found.element)));
-      if (freshConversationAccepted) {
+      if (freshConversationAccepted && request.requireGenerationAcknowledgement !== true) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'FRESH_CONVERSATION_TRANSITION_WITH_EMPTY_COMPOSER',
@@ -2019,7 +2037,19 @@
           submittedUserMessageKey: submittedUserKey(doc),
         });
       }
-      if ((appended || unlabeledAppended) && !pending) {
+      const generationAcknowledged = request.requireGenerationAcknowledgement !== true
+        || blocking?.status === STATUS.BUSY || semanticAssistantMessages(doc).length > baselineCount;
+      if ((appended || unlabeledAppended) && !pending && generationAcknowledged) {
+        if (request.requireGenerationAcknowledgement === true) {
+          const currentUrl = normalizeUrl(observedUrl);
+          if (!isExclusiveConversationLocation(currentUrl)) return resultBase(request, start, {
+            status: STATUS.SUBMISSION_UNCERTAIN, safeDiagnosticCode: 'SCENARIO_GENERATION_IDENTITY_PENDING' });
+          if (textEvidence.acknowledgementUrl !== currentUrl) {
+            textEvidence.acknowledgementUrl = currentUrl; textEvidence.acknowledgementAt = nowMs();
+          }
+          if (nowMs() - textEvidence.acknowledgementAt < 1000) return resultBase(request, start, {
+            status: STATUS.SUBMISSION_UNCERTAIN, safeDiagnosticCode: 'SCENARIO_GENERATION_STABILITY_PENDING' });
+        }
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: unlabeledAppended && !appended
@@ -2098,18 +2128,27 @@
   }
 
   function readAssistantReport(doc, request, start) {
-    if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'REPORT_URL_MISMATCH' });
-    }
     const assistants = semanticAssistantMessages(doc);
     const anchor = responseAnchor(doc, request, assistants);
+    const currentUrl = globalThis.location?.href || '';
+    const boundUrl = request.boundConversationUrl || request.expectedUrl;
+    const identityChanged = !expectedPostSendLocation(currentUrl, boundUrl);
+    const correlatedIdentity = request.allowCorrelatedConversationRebind === true
+      && Boolean(request.responseCorrelationToken) && anchor.correlationTokenMatched === true
+      && isExclusiveConversationLocation(currentUrl);
+    if ((!expectedPostSendLocation(currentUrl, request.expectedUrl) || identityChanged)
+        && !correlatedIdentity) {
+      return resultBase(request, start, { ...anchor, paired: undefined, status: STATUS.TEMPORARY_ERROR,
+        assistantComplete: false, safeDiagnosticCode: request.allowCorrelatedConversationRebind
+          ? 'ASSISTANT_BOUND_CONVERSATION_UNPROVEN' : 'REPORT_URL_MISMATCH' });
+    }
     const latest = assistants[assistants.length - 1];
     const text = latest ? assistantMessageText(latest) : '';
     const baselineKnown = request.assistantBaselineKnown === true;
     const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
     const anchoredRequest = Boolean(request.submittedUserMessageKey || request.responseCorrelationToken);
     const hasNewAssistantTurn = anchoredRequest ? anchor.paired : (anchor.paired || baselineKnown && assistants.length > baselineCount);
-    const metadata = { ...anchor, paired: undefined };
+    const metadata = { ...anchor, paired: undefined, correlatedConversationRebind: Boolean(identityChanged && correlatedIdentity) };
     const recoverySurface = findChatRecoverySurface(doc);
     if (recoverySurface) {
       responseStability.delete(doc);

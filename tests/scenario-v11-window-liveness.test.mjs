@@ -54,7 +54,8 @@ test('a loading or redirected owned probe tab is retained; ordinary reads never 
   assert.equal(updates, 0);
   tab.status = 'complete';
   const redirected = await probeAssistantConversation(chrome, transport, job);
-  assert.equal(redirected.safeDiagnosticCode, 'CHATGPT_RECOVERY_CONVERSATION_IDENTITY_LOST');
+  assert.equal(redirected.safeDiagnosticCode, 'ASSISTANT_BOUND_CONVERSATION_UNPROVEN');
+  assert.notEqual(redirected.chatRecoveryRequired, true);
   assert.equal(updates, 0);
   assert.equal(tab.url, 'https://chatgpt.com/');
   assert.equal(creates, 0);

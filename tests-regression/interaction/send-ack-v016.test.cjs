@@ -297,3 +297,31 @@ test('wrong conversation is blocked without sending',async()=>{
 test('repeated submit request after success returns proof without another send',async()=>{
   const f=fixture();assert.equal((await f.run()).status,'SENT_VERIFIED');assert.equal((await f.run()).status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
 });
+
+
+test('Scenario optimistic user bubble without generation is not counted as Send, including recovery',async()=>{
+  const f=fixture({startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/client-only'});
+  const query=f.document.querySelectorAll.bind(f.document);
+  f.document.querySelectorAll=s=>s==='button, [role="button"]'?query(s).slice(0,1):query(s);
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true});
+  assert.equal(result.status,'SUBMISSION_UNCERTAIN');assert.equal(f.clicks(),1);
+  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{requireGenerationAcknowledgement:true});
+  assert.notEqual(recovered.status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
+});
+
+test('Scenario first Send requires its own appended turn and stable concrete URL with generation',async()=>{
+  const f=fixture({startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/provisional'});
+  const wait=f.wait;let canonicalized=false;
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{wait:async ms=>{
+    await wait(ms);if(!canonicalized && f.clicks()){canonicalized=true;f.sandbox.location.href='https://chatgpt.com/c/canonical';}
+  }});
+  assert.equal(result.status,'SENT_VERIFIED');assert.equal(result.normalizedObservedUrl,'https://chatgpt.com/c/canonical');assert.equal(f.clicks(),1);
+});
+
+test('Scenario URL-only generation fallback cannot count an absent submitted message',async()=>{
+  const f=fixture({startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/client-only',suppressMessage:true});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true});
+  assert.equal(result.status,'SUBMISSION_UNCERTAIN');
+  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{requireGenerationAcknowledgement:true,recoveryLaunchUrl:'https://chatgpt.com/'});
+  assert.notEqual(recovered.status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
+});

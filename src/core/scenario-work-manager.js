@@ -703,7 +703,7 @@ export class ScenarioWorkManager {
     };
   }
 
-  async appendScenarioDiagnostic({ scenario, participant, task, event, status = '', code = '', message = '', now = this.now() }) {
+  async appendScenarioDiagnostic({ scenario, participant, task, event, status = '', code = '', message = '', observedUrl = '', tabId = null, now = this.now() }) {
     await this.coreRepository.update(state => {
       appendDiagnostic(state, {
         at: now,
@@ -718,6 +718,7 @@ export class ScenarioWorkManager {
         code,
         message,
         target: task?.lastConversationUrl || participant?.chatUrl || '',
+        observed: observedUrl, tabId,
       }, { at: now });
       return state;
     });
@@ -767,7 +768,7 @@ export class ScenarioWorkManager {
       event: complete ? 'СЦЕНАРІЙ_ВІДПОВІДЬ_ПІДТВЕРДЖЕНО_ЗАВЕРШЕНОЮ' : 'СЦЕНАРІЙ_СПОСТЕРЕЖЕННЯ_ВІДПОВІДІ',
       status,
       code,
-      message,
+      message, observedUrl: report?.normalizedObservedUrl || '', tabId: report?.observedTabId ?? null,
       now,
     });
     return true;
@@ -1619,6 +1620,36 @@ export class ScenarioWorkManager {
           chatRecoveryRequired: true, recoveryCategory: 'TRANSPORT_UNAVAILABLE',
           recoveryErrorLabel: String(error?.safeDiagnosticCode || 'Read-only transport failed'),
         };
+      }
+      // The server may replace the optimistic conversation identity. Adopt
+      // only the exact sending tab plus its unique persisted step marker.
+      // URL movement alone never counts Send or completes an assistant turn.
+      const observedConversation = String(report?.normalizedObservedUrl || '');
+      if (report?.responseAnchorMatched === true && report?.correlationTokenMatched === true
+          && task.responseCorrelationToken && isExclusiveConversationUrl(observedConversation)
+          && !sameChatConversationUrl(observedConversation, task.lastConversationUrl)) {
+        let adopted = false;
+        await this.coreRepository.update(state => {
+          const live = state.sessionsById?.[participant.sessionId];
+          const liveTask = live?.tasksById?.[participantTaskId];
+          const hint = state.tabHintsByTaskId?.[participantTaskId];
+          if (liveTask?.lastVerifiedSendAt !== task.lastVerifiedSendAt
+              || liveTask?.responseCorrelationToken !== task.responseCorrelationToken
+              || hint?.sessionId !== participant.sessionId || hint.ownedByExtension !== true
+              || hint.tabId !== report.observedTabId || hint.tabId !== tabHint?.tabId
+              || hint.retirePending === true) return state;
+          liveTask.lastConversationUrl = observedConversation;
+          liveTask.url = observedConversation; liveTask.normalizedUrl = observedConversation;
+          if (live.operation?.taskId === participantTaskId) live.operation.targetUrl = observedConversation;
+          hint.normalizedUrl = observedConversation;
+          adopted = true;
+          appendDiagnostic(state, { event: 'СЦЕНАРІЙ_АДРЕСУ_ПІДТВЕРДЖЕНО_МІТКОЮ',
+            sessionId: participant.sessionId, taskId: participantTaskId, tabId: hint.tabId,
+            code: 'SCENARIO_CORRELATED_CONVERSATION_ADOPTED', target: task.lastConversationUrl,
+            observed: observedConversation, message: 'Exact owned tab and current step marker; no navigation or new Send.' }, { at: now });
+          return state;
+        });
+        if (adopted) { task.lastConversationUrl = observedConversation; reportJob.conversationUrl = observedConversation; }
       }
       await this.recordAssistantObservation({ scenario, participant, task, report, now });
       const reportCode = String(report?.safeDiagnosticCode || report?.code || '');
