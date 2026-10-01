@@ -287,6 +287,9 @@ function poolSummary(store, poolId, coreState = null) {
   const firstPromptSent = coreState
     ? sequence.filter(item => item.sequenceVerifiedSends > 0).length
     : members.filter(item => Number(item.runtime.totalLaunches || 0) > 0).length;
+  const firstResponseReceived = coreState
+    ? sequence.filter(item => item.completedResponses > 0).length
+    : members.filter(item => Number(item.runtime.totalCompletedTurns || 0) > 0).length;
   const messagesPerChat = scenarioMessagesPerChat(first?.config);
   return {
     id: poolId,
@@ -309,6 +312,7 @@ function poolSummary(store, poolId, coreState = null) {
       && item.runtime.chat?.state === ScenarioParticipantState.WAITING).length,
     firstPromptSent,
     firstPromptPending: Math.max(0, members.length - firstPromptSent),
+    firstResponseReceived,
     completedResponses: coreState
       ? sequence.reduce((sum, item) => sum + item.completedResponses, 0)
       : members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
