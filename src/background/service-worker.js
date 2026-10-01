@@ -649,9 +649,33 @@ export async function reconcileRuntime() {
 
 let aiRouteQueue = Promise.resolve();
 
+function snapshotDefinitionBoundAgentRoutePayload(rawPayload) {
+  if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+    throw new Error('Reusable Agent model payload must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(rawPayload);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Reusable Agent model payload must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawPayload);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') {
+      throw new Error('Reusable Agent model payload may contain only string fields');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Reusable Agent model payload fields must be enumerable own data properties');
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+
 async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
   if (providerCallBudgetContext?.kind !== 'browser-agent'
       || typeof providerCallBudgetContext.jobId !== 'string') return null;
+  const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
   const current = await browserAgent.get(providerCallBudgetContext.jobId);
   const job = current.job;
   if (!job?.definitionModelPolicyBinding) return null;
@@ -673,9 +697,9 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     ? state.profile.aiRoutePoolRevision
     : 1;
   const now = Date.now();
-  const role = payload?.taskRole || 'planner';
+  const role = safePayload.taskRole || 'planner';
   const capabilityIds = job.definitionScope?.capabilityIds || [];
-  const requiresVision = Boolean(payload?.imageDataUrl);
+  const requiresVision = Boolean(safePayload.imageDataUrl);
   const agentRuntime = job.runtime?.aiRouterRuntime || state.profile?.aiRouterRuntime;
 
   const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1({
@@ -703,7 +727,7 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     currentNow: now,
   });
 
-  const sanitizedPayload = { ...(payload || {}) };
+  const sanitizedPayload = safePayload;
   for (const key of [
     'settings','routerOverride','routerRuntime','isolatedRuntime',
     'forceStrong','taskRole','strongTaskRole','capabilityIds',
