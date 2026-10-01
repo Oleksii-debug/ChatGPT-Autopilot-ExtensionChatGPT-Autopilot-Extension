@@ -2446,6 +2446,8 @@ export class BrowserAgentManager {
       proposal: clone(proposal),
       ownerResourceBudgetRevision,
       resourceEnvelope: clone(resourceEnvelope),
+      budgetReserved: false,
+      requiresCanonicalBudgetReservation: true,
       planRevision: currentPlan.revision,
       cycleUpdatedAt: cycle.updatedAt,
     };
