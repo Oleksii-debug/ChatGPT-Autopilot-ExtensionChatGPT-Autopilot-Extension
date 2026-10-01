@@ -453,6 +453,7 @@ test('Scenario owner progress stays factual and hides transport recovery counter
   assert.match(js, /async function currentScenarioLaunchWindowId\(\)/, 'Scenario Start must capture the current Chrome window');
   assert.match(js, /CREATE_SCENARIO_CHAT_POOL'[\s\S]*launchWindowId/, 'parallel Scenario launch must carry exact window identity');
   assert.match(js, /'З цієї групи перший промпт уже надіслано'/, 'owner view must expose initial parallel cohort progress');
+  assert.match(js, /'З цієї групи відповідь уже отримано'/, 'owner view must expose first completed response progress for the current cohort');
   assert.match(js, /'Усього успішно надіслано промптів'/, 'owner view must expose logical successful prompt count');
   assert.match(js, /'Усього отримано завершених відповідей'/, 'owner view must expose completed response count');
   assert.match(js, /'Зараз чекають відповіді'/, 'owner view must expose current reply wait count');
