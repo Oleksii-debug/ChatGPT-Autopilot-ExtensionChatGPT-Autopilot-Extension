@@ -72,7 +72,6 @@ function managerFixture(){
   const manager = new OrchestrationV2Manager({ coreRepository:core, chromeApi:chrome, createId:()=>`orch-${++n}`, now:()=>1000 });
   return { chrome, core, manager };
 }
-
 test('independent multiple orchestras keep namespaced config/runtime and selection', async()=>{
   const {manager,chrome}=managerFixture();
   const a=await manager.create({name:'Шахи',config:cfg('chess')});

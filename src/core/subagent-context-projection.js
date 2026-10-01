@@ -2,6 +2,7 @@ import {
   normalizeContextCapsuleV1,
   normalizeProjectSnapshotV1,
 } from './project-context-artifact.js';
+import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
 
 export const SUBAGENT_CONTEXT_PROJECTION_VERSION = 1;
 
@@ -143,7 +144,7 @@ function sameArtifactIdentity(left, right) {
     && left.sensitive === right.sensitive;
 }
 
-function normalizeAllowedEnvelope(input) {
+function normalizeProjectionSubagentAuthorityEnvelopeV1(input) {
   const raw = strictRecord(input, ENVELOPE_KEYS, 'SubagentAuthorityEnvelopeV1');
   if (raw.schemaVersion !== 1) throw new Error('Unsupported SubagentAuthorityEnvelopeV1 schemaVersion');
   if (raw.decision !== 'ALLOW' || raw.reasonCode !== 'LEAST_AUTHORITY_DERIVED') {
@@ -163,6 +164,10 @@ function normalizeAllowedEnvelope(input) {
     sourceIds: idList(raw.sourceIds, 'authorityEnvelope.sourceIds'),
     artifactIds: idList(raw.artifactIds, 'authorityEnvelope.artifactIds'),
     toolIds: idList(raw.toolIds, 'authorityEnvelope.toolIds'),
+    // Durable child-context provenance never carries executable descriptors.
+    // Keep the field canonical so the normalized envelope can be revalidated
+    // after persistence without minting tool execution authority.
+    toolDescriptors: [],
     executionAuthority: exactFalse(raw.executionAuthority, 'authorityEnvelope.executionAuthority'),
     credentialAuthority: exactFalse(raw.credentialAuthority, 'authorityEnvelope.credentialAuthority'),
     policyAuthority: exactFalse(raw.policyAuthority, 'authorityEnvelope.policyAuthority'),
@@ -192,7 +197,7 @@ export function projectSubagentContextV1(input = {}) {
     throw new Error('Unsupported SubagentContextProjectionRequestV1 schemaVersion');
   }
 
-  const envelope = normalizeAllowedEnvelope(own(request, 'authorityEnvelope'));
+  const envelope = normalizeProjectionSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
   const expectedParentAgentId = exactId(
     own(request, 'expectedParentAgentId'),
     'expectedParentAgentId',
@@ -305,5 +310,382 @@ export function projectSubagentContextV1(input = {}) {
     credentialAuthority: false,
     policyAuthority: false,
     sourceTrust: 'CALLER_BOUND_NOT_AUTHENTICATED',
+  });
+}
+
+
+const TASK_CONTEXT_REQUEST_KEYS = new Set([
+  'schemaVersion',
+  'authorityEnvelope',
+  'taskEnvelope',
+  'expectedParentAgentId',
+  'expectedChildAgentId',
+  'expectedTaskId',
+  'expectedProjectRevisionId',
+  'parentProjectSnapshot',
+  'priorParentCapsule',
+]);
+
+function sameTaskArtifactIdentity(left, right) {
+  return left.schemaVersion === right.schemaVersion
+    && left.artifactId === right.artifactId
+    && left.kind === right.kind
+    && left.uri === right.uri
+    && left.mediaType === right.mediaType
+    && left.sha256 === right.sha256
+    && left.sizeBytes === right.sizeBytes
+    && left.createdAt === right.createdAt
+    && left.producerInvocationId === right.producerInvocationId
+    && left.sensitive === right.sensitive;
+}
+
+/**
+ * Bind child-visible Project context to the exact immutable inputs of one
+ * canonical SubagentTaskEnvelopeV1 before applying the ordinary least-authority
+ * projection.
+ *
+ * This is still pure and non-authorizing. The task envelope itself explicitly
+ * carries UNVERIFIED_INPUT provenance and requires trusted runtime resolution.
+ * This adapter only prevents an already-authorized child from seeing sources or
+ * artifacts that are outside the exact task input set.
+ */
+export function projectSubagentTaskContextV1(input = {}) {
+  const request = strictRecord(
+    input,
+    TASK_CONTEXT_REQUEST_KEYS,
+    'SubagentTaskContextProjectionRequestV1',
+  );
+  if (own(request, 'schemaVersion') !== SUBAGENT_CONTEXT_PROJECTION_VERSION) {
+    throw new Error('Unsupported SubagentTaskContextProjectionRequestV1 schemaVersion');
+  }
+
+  const envelope = normalizeProjectionSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
+  const task = normalizeSubagentTaskEnvelopeV1(own(request, 'taskEnvelope'));
+  const expectedParentAgentId = exactId(
+    own(request, 'expectedParentAgentId'),
+    'expectedParentAgentId',
+  );
+  const expectedChildAgentId = exactId(
+    own(request, 'expectedChildAgentId'),
+    'expectedChildAgentId',
+  );
+  const expectedTaskId = exactId(own(request, 'expectedTaskId'), 'expectedTaskId');
+
+  if (task.projectId !== envelope.projectId) {
+    throw new Error('Subagent task projectId does not match authority envelope');
+  }
+  if (task.parentAgentId !== envelope.parentAgentId
+      || task.parentAgentId !== expectedParentAgentId) {
+    throw new Error('Subagent task parentAgentId binding mismatch');
+  }
+  if (task.childAgentId !== envelope.childAgentId
+      || task.childAgentId !== expectedChildAgentId) {
+    throw new Error('Subagent task childAgentId binding mismatch');
+  }
+  if (task.taskId !== envelope.taskId || task.taskId !== expectedTaskId) {
+    throw new Error('Subagent task taskId binding mismatch');
+  }
+
+  const allowedSourceIds = new Set(envelope.sourceIds);
+  const allowedArtifactIds = new Set(envelope.artifactIds);
+  const taskSourceIds = task.inputSourceRefs.map(ref => ref.sourceId);
+  const taskArtifactIds = task.inputArtifactRefs.map(ref => ref.artifactId);
+
+  for (const sourceId of taskSourceIds) {
+    if (!allowedSourceIds.has(sourceId)) {
+      throw new Error(`Subagent task source is outside child authority: ${sourceId}`);
+    }
+  }
+  for (const artifactId of taskArtifactIds) {
+    if (!allowedArtifactIds.has(artifactId)) {
+      throw new Error(`Subagent task artifact is outside child authority: ${artifactId}`);
+    }
+  }
+
+  const parentSnapshot = normalizeProjectSnapshotV1(
+    own(request, 'parentProjectSnapshot'),
+  );
+  const sourceById = new Map(parentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
+  const artifactById = new Map(parentSnapshot.artifactRefs.map(artifact => [artifact.artifactId, artifact]));
+
+  for (const taskSource of task.inputSourceRefs) {
+    const current = sourceById.get(taskSource.sourceId);
+    if (!current
+        || current.revisionId !== taskSource.revisionId
+        || current.uri !== taskSource.location
+        || current.contentSha256 !== taskSource.contentSha256) {
+      throw new Error(`Subagent task source identity is stale or mismatched: ${taskSource.sourceId}`);
+    }
+  }
+  for (const taskArtifact of task.inputArtifactRefs) {
+    const current = artifactById.get(taskArtifact.artifactId);
+    if (!current || !sameTaskArtifactIdentity(current, taskArtifact)) {
+      throw new Error(`Subagent task artifact identity is stale or mismatched: ${taskArtifact.artifactId}`);
+    }
+  }
+
+  const narrowedEnvelope = {
+    ...envelope,
+    sourceIds: taskSourceIds,
+    artifactIds: taskArtifactIds,
+    toolDescriptors: [],
+  };
+
+  return projectSubagentContextV1({
+    schemaVersion: SUBAGENT_CONTEXT_PROJECTION_VERSION,
+    authorityEnvelope: narrowedEnvelope,
+    expectedParentAgentId,
+    expectedChildAgentId,
+    expectedTaskId,
+    expectedProjectRevisionId: own(request, 'expectedProjectRevisionId'),
+    parentProjectSnapshot: parentSnapshot,
+    priorParentCapsule: own(request, 'priorParentCapsule'),
+  });
+}
+
+
+const DURABLE_TASK_CONTEXT_REQUEST_KEYS = new Set([
+  'schemaVersion',
+  'authorityEnvelope',
+  'taskEnvelope',
+  'expectedParentAgentId',
+  'expectedChildAgentId',
+  'expectedTaskId',
+  'expectedProjectRevisionId',
+  'capsuleId',
+]);
+const DURABLE_CONTEXT_RESOLUTION_KEYS = new Set([
+  'schemaVersion',
+  'workspaceRevision',
+  'projectId',
+  'projectRevisionId',
+  'snapshot',
+  'capsule',
+  'ownerStateSource',
+  'sourceAuthorityAuthenticated',
+  'retrievalAuthorized',
+  'executionAuthorized',
+  'mutationAuthorized',
+  'policyAuthority',
+]);
+
+function nonNegativeRevision(value, label) {
+  if (!Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
+    throw new Error(`${label} must be a non-negative safe integer`);
+  }
+  return value;
+}
+
+function normalizeDurableProjectContextResolutionV1(value, expected) {
+  const raw = strictRecord(
+    value,
+    DURABLE_CONTEXT_RESOLUTION_KEYS,
+    'ProjectWorkspaceContextResolutionV1',
+  );
+  if (own(raw, 'schemaVersion') !== 1) {
+    throw new Error('Unsupported ProjectWorkspaceContextResolutionV1 schemaVersion');
+  }
+
+  const workspaceRevision = nonNegativeRevision(
+    own(raw, 'workspaceRevision'),
+    'ProjectWorkspaceContextResolutionV1.workspaceRevision',
+  );
+  const projectId = exactId(
+    own(raw, 'projectId'),
+    'ProjectWorkspaceContextResolutionV1.projectId',
+  );
+  const projectRevisionId = exactId(
+    own(raw, 'projectRevisionId'),
+    'ProjectWorkspaceContextResolutionV1.projectRevisionId',
+  );
+  if (projectId !== expected.projectId) {
+    throw new Error('Durable Project context projectId binding mismatch');
+  }
+  if (projectRevisionId !== expected.expectedProjectRevisionId) {
+    throw new Error('Durable Project context revision binding mismatch');
+  }
+
+  const snapshot = normalizeProjectSnapshotV1(own(raw, 'snapshot'));
+  if (snapshot.projectId !== projectId || snapshot.revisionId !== projectRevisionId) {
+    throw new Error('Durable Project context snapshot binding mismatch');
+  }
+
+  let capsule = null;
+  const rawCapsule = own(raw, 'capsule');
+  if (rawCapsule != null) {
+    capsule = normalizeContextCapsuleV1(rawCapsule);
+    if (capsule.projectId !== projectId
+        || capsule.projectRevisionId !== projectRevisionId) {
+      throw new Error('Durable Project context capsule binding mismatch');
+    }
+  }
+  if (expected.capsuleId) {
+    if (!capsule || capsule.capsuleId !== expected.capsuleId) {
+      throw new Error('Durable Project context capsuleId binding mismatch');
+    }
+  } else if (capsule !== null) {
+    throw new Error('Durable Project context returned an unrequested capsule');
+  }
+
+  if (own(raw, 'ownerStateSource') !== 'DURABLE_PROJECT_WORKSPACE') {
+    throw new Error('Durable Project context ownerStateSource is not canonical');
+  }
+  exactFalse(
+    own(raw, 'sourceAuthorityAuthenticated'),
+    'ProjectWorkspaceContextResolutionV1.sourceAuthorityAuthenticated',
+  );
+  exactFalse(
+    own(raw, 'retrievalAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.retrievalAuthorized',
+  );
+  exactFalse(
+    own(raw, 'executionAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.executionAuthorized',
+  );
+  exactFalse(
+    own(raw, 'mutationAuthorized'),
+    'ProjectWorkspaceContextResolutionV1.mutationAuthorized',
+  );
+  exactFalse(
+    own(raw, 'policyAuthority'),
+    'ProjectWorkspaceContextResolutionV1.policyAuthority',
+  );
+
+  return deepFreeze({
+    schemaVersion: 1,
+    workspaceRevision,
+    projectId,
+    projectRevisionId,
+    snapshot,
+    capsule,
+    ownerStateSource: 'DURABLE_PROJECT_WORKSPACE',
+    sourceAuthorityAuthenticated: false,
+    retrievalAuthorized: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    policyAuthority: false,
+  });
+}
+
+/**
+ * Resolve the exact parent Project context from the owner-injected canonical
+ * ProjectWorkspace resolver before projecting task-bound child-visible data.
+ *
+ * The resolver is a dependency, not a new persistence authority. Production
+ * wiring must supply ProjectWorkspaceRepository.resolveContext (or an
+ * equivalent canonical owner boundary). Resolver output is revalidated and may
+ * not grant retrieval, execution, mutation, policy, or source-authentication
+ * authority.
+ *
+ * Caller-controlled envelopes/tasks are normalized before the first await so an
+ * in-flight caller cannot swap identity, task inputs, or the requested Project
+ * revision while durable owner state is being resolved.
+ */
+export async function projectDurableSubagentTaskContextV1(
+  input = {},
+  resolveProjectContext,
+) {
+  if (typeof resolveProjectContext !== 'function') {
+    throw new Error('A canonical ProjectWorkspace context resolver is required');
+  }
+
+  const request = strictRecord(
+    input,
+    DURABLE_TASK_CONTEXT_REQUEST_KEYS,
+    'DurableSubagentTaskContextRequestV1',
+  );
+  if (own(request, 'schemaVersion') !== SUBAGENT_CONTEXT_PROJECTION_VERSION) {
+    throw new Error('Unsupported DurableSubagentTaskContextRequestV1 schemaVersion');
+  }
+
+  const normalizedEnvelope = normalizeProjectionSubagentAuthorityEnvelopeV1(own(request, 'authorityEnvelope'));
+  const authorityEnvelope = deepFreeze({
+    ...normalizedEnvelope,
+    toolDescriptors: [],
+  });
+  const taskEnvelope = deepFreeze(
+    normalizeSubagentTaskEnvelopeV1(own(request, 'taskEnvelope')),
+  );
+  const expectedParentAgentId = exactId(
+    own(request, 'expectedParentAgentId'),
+    'expectedParentAgentId',
+  );
+  const expectedChildAgentId = exactId(
+    own(request, 'expectedChildAgentId'),
+    'expectedChildAgentId',
+  );
+  const expectedTaskId = exactId(
+    own(request, 'expectedTaskId'),
+    'expectedTaskId',
+  );
+  const expectedProjectRevisionId = exactId(
+    own(request, 'expectedProjectRevisionId'),
+    'expectedProjectRevisionId',
+  );
+
+  if (taskEnvelope.projectId !== authorityEnvelope.projectId) {
+    throw new Error('Subagent task projectId does not match authority envelope');
+  }
+  if (taskEnvelope.parentAgentId !== authorityEnvelope.parentAgentId
+      || taskEnvelope.parentAgentId !== expectedParentAgentId) {
+    throw new Error('Subagent task parentAgentId binding mismatch');
+  }
+  if (taskEnvelope.childAgentId !== authorityEnvelope.childAgentId
+      || taskEnvelope.childAgentId !== expectedChildAgentId) {
+    throw new Error('Subagent task childAgentId binding mismatch');
+  }
+  if (taskEnvelope.taskId !== authorityEnvelope.taskId
+      || taskEnvelope.taskId !== expectedTaskId) {
+    throw new Error('Subagent task taskId binding mismatch');
+  }
+
+  const allowedSourceIds = new Set(authorityEnvelope.sourceIds);
+  const allowedArtifactIds = new Set(authorityEnvelope.artifactIds);
+  for (const sourceRef of taskEnvelope.inputSourceRefs) {
+    if (!allowedSourceIds.has(sourceRef.sourceId)) {
+      throw new Error(`Subagent task source is outside child authority: ${sourceRef.sourceId}`);
+    }
+  }
+  for (const artifactRef of taskEnvelope.inputArtifactRefs) {
+    if (!allowedArtifactIds.has(artifactRef.artifactId)) {
+      throw new Error(`Subagent task artifact is outside child authority: ${artifactRef.artifactId}`);
+    }
+  }
+
+  const resolverRequest = {
+    projectId: authorityEnvelope.projectId,
+    expectedProjectRevisionId,
+  };
+  if (Object.hasOwn(request, 'capsuleId')) {
+    resolverRequest.capsuleId = exactId(own(request, 'capsuleId'), 'capsuleId');
+  }
+  deepFreeze(resolverRequest);
+
+  const resolvedRaw = await resolveProjectContext(resolverRequest);
+  const resolved = normalizeDurableProjectContextResolutionV1(
+    resolvedRaw,
+    resolverRequest,
+  );
+
+  const projected = projectSubagentTaskContextV1({
+    schemaVersion: SUBAGENT_CONTEXT_PROJECTION_VERSION,
+    authorityEnvelope,
+    taskEnvelope,
+    expectedParentAgentId,
+    expectedChildAgentId,
+    expectedTaskId,
+    expectedProjectRevisionId,
+    parentProjectSnapshot: resolved.snapshot,
+    priorParentCapsule: resolved.capsule,
+  });
+
+  return deepFreeze({
+    ...projected,
+    workspaceRevision: resolved.workspaceRevision,
+    ownerStateSource: resolved.ownerStateSource,
+    sourceAuthorityAuthenticated: false,
+    sourceTrust: 'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED',
   });
 }
