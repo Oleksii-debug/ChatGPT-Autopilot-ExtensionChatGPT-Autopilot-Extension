@@ -198,3 +198,15 @@ test('Browser Agent provider-context identity cannot fall through reusable envel
   );
 });
 
+test('reusable Agent route-pool revision reads fail closed on malformed persisted identity', () => {
+  assert.match(source, /function canonicalAgentRoutePoolRevision\(state\)/);
+  assert.match(source, /if \(value == null\) return 1;/);
+  assert.match(source, /!Number\.isSafeInteger\(value\) \|\| Object\.is\(value, -0\) \|\| value < 1/);
+  assert.match(source, /Canonical AI route-pool revision is invalid for reusable Agent authority/);
+  assert.equal(
+    (source.match(/canonicalAgentRoutePoolRevision\(state\)/g) || []).length,
+    3,
+    'helper declaration plus launch-context and dispatch reads must share one canonical revision boundary',
+  );
+});
+
