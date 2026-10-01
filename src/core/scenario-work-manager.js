@@ -387,7 +387,8 @@ function isSafeToRemoveSession(session) {
 function ensureManagerRuntimeFields(runtime) {
   const out = clone(runtime);
   out.ownerEpoch = Math.max(0, Number(out.ownerEpoch || 0));
-  out.preferredWindowId = Number.isInteger(out.preferredWindowId) ? out.preferredWindowId : null;
+  out.launchWindowId = Number.isInteger(out.launchWindowId) ? out.launchWindowId : null;
+  out.preferredWindowId = out.launchWindowId ?? (Number.isInteger(out.preferredWindowId) ? out.preferredWindowId : null);
   // A legacy store cannot reconstruct verified sends from already retired
   // timed-out chats. Keep that uncertainty visible to the read projection.
   out.verifiedSendHistoryComplete = out.verifiedSendHistoryComplete === true;
@@ -794,7 +795,7 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async createChatPool({ name = 'Пул чатів', count, replacementBudget, staggerSeconds = 0, autoStart = false, config = {} } = {}) {
+  async createChatPool({ name = 'Пул чатів', count, replacementBudget, staggerSeconds = 0, autoStart = false, launchWindowId = null, config = {} } = {}) {
     if (!Number.isInteger(count) || count < 1 || count > MAX_SCENARIO_POOL_SLOTS) {
       throw new Error(`Кількість одночасних чатів: від 1 до ${MAX_SCENARIO_POOL_SLOTS}.`);
     }
@@ -818,7 +819,12 @@ export class ScenarioWorkManager {
         const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
         runtime.initialStartAt = now + index * staggerSeconds * 1000;
         runtime.initialStaggerSeconds = staggerSeconds;
-        if (autoStart === true) runtime.runState = ScenarioWorkRunState.RUNNING;
+        if (autoStart === true) {
+          if (!Number.isInteger(launchWindowId)) throw new Error('Запуск сценарію вимагає точного Chrome window.');
+          runtime.runState = ScenarioWorkRunState.RUNNING;
+          runtime.launchWindowId = launchWindowId;
+          runtime.preferredWindowId = launchWindowId;
+        }
         runtime.verifiedSendHistoryComplete = true;
         store.byId[id] = { id, name: slotName, config: normalized, runtime,
           pool: {
@@ -885,8 +891,9 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async start(id) {
+  async start(id, { launchWindowId = null } = {}) {
     const now = this.now();
+    if (!Number.isInteger(launchWindowId)) throw new Error('Запуск сценарію вимагає точного Chrome window.');
     let runtime = null;
     await this.update(store => {
       const item = store.byId[id];
@@ -900,6 +907,12 @@ export class ScenarioWorkManager {
         next.verifiedSendHistoryComplete = true;
       }
       next = startScenarioWork(item.config, next, now);
+      const existingWindowId = Number.isInteger(next.launchWindowId) ? next.launchWindowId : null;
+      if (existingWindowId != null && existingWindowId !== launchWindowId) {
+        throw new Error('SCENARIO_LAUNCH_WINDOW_MISMATCH');
+      }
+      next.launchWindowId = existingWindowId ?? launchWindowId;
+      next.preferredWindowId = next.launchWindowId;
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
       item.runtime = ensureManagerRuntimeFields(next);
       runtime = clone(item.runtime);
@@ -1000,8 +1013,11 @@ export class ScenarioWorkManager {
     });
   }
 
-  async transitionChatPool(poolId, action) {
+  async transitionChatPool(poolId, action, { launchWindowId = null } = {}) {
     const now = this.now();
+    if ((action === 'START' || action === 'RESUME') && !Number.isInteger(launchWindowId)) {
+      throw new Error('Запуск сценарію вимагає точного Chrome window.');
+    }
     const changed = [];
     await this.update(store => {
       const members = poolMembers(store, poolId);
@@ -1023,6 +1039,14 @@ export class ScenarioWorkManager {
           next = stopScenarioWork(item.runtime, now); shouldChange = true;
         }
         if (!shouldChange) continue;
+        if (action === 'START' || action === 'RESUME') {
+          const existingWindowId = Number.isInteger(next.launchWindowId) ? next.launchWindowId : null;
+          if (existingWindowId != null && existingWindowId !== launchWindowId) {
+            throw new Error('SCENARIO_LAUNCH_WINDOW_MISMATCH');
+          }
+          next.launchWindowId = existingWindowId ?? launchWindowId;
+          next.preferredWindowId = next.launchWindowId;
+        }
         next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
         item.runtime = ensureManagerRuntimeFields(next);
         item.updatedAt = now;
@@ -1036,9 +1060,9 @@ export class ScenarioWorkManager {
     return this.getChatPool(poolId);
   }
 
-  async startChatPool(poolId) { return this.transitionChatPool(poolId, 'START'); }
+  async startChatPool(poolId, options = {}) { return this.transitionChatPool(poolId, 'START', options); }
   async pauseChatPool(poolId) { return this.transitionChatPool(poolId, 'PAUSE'); }
-  async resumeChatPool(poolId) { return this.transitionChatPool(poolId, 'RESUME'); }
+  async resumeChatPool(poolId, options = {}) { return this.transitionChatPool(poolId, 'RESUME', options); }
   async stopChatPool(poolId) { return this.transitionChatPool(poolId, 'STOP'); }
 
   async pause(id) {
@@ -1059,13 +1083,20 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async resume(id) {
+  async resume(id, { launchWindowId = null } = {}) {
     const now = this.now();
+    if (!Number.isInteger(launchWindowId)) throw new Error('Продовження сценарію вимагає точного Chrome window.');
     let runtime = null;
     await this.update(store => {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
       const next = resumeScenarioWork(item.runtime, now);
+      const existingWindowId = Number.isInteger(next.launchWindowId) ? next.launchWindowId : null;
+      if (existingWindowId != null && existingWindowId !== launchWindowId) {
+        throw new Error('SCENARIO_LAUNCH_WINDOW_MISMATCH');
+      }
+      next.launchWindowId = existingWindowId ?? launchWindowId;
+      next.preferredWindowId = next.launchWindowId;
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
       item.runtime = ensureManagerRuntimeFields(next);
       runtime = clone(item.runtime);
@@ -1384,8 +1415,10 @@ export class ScenarioWorkManager {
       generation: action.generation,
       stage: action.stage,
       closeTabsBetweenChecks: scenario.config.closeTabsBetweenChecks === true,
-      preferredWindowId: Number.isInteger(scenario.runtime.preferredWindowId)
-        ? scenario.runtime.preferredWindowId : null,
+      launchWindowId: Number.isInteger(scenario.runtime.launchWindowId)
+        ? scenario.runtime.launchWindowId : null,
+      preferredWindowId: Number.isInteger(scenario.runtime.launchWindowId)
+        ? scenario.runtime.launchWindowId : null,
     };
     await this.coreRepository.update(state => {
       const existing = state.sessionsById[sessionId];
@@ -1503,22 +1536,27 @@ export class ScenarioWorkManager {
       // API, DOM scan, navigation or recovery action can occur.
       if (!freshVerifiedSend && Number(participant.nextProbeAt || 0) > now) continue;
       let tabHint = (await this.coreRepository.load()).tabHintsByTaskId?.[participantTaskId];
-      // Save the physical home window before the owned tab is parked. Chrome's
-      // focused window can change to an unrelated site before the next poll.
+      // The launch window is owner authority, not something learned from whichever
+      // tab happens to exist later. A stale/wrong-window hint is never observed.
       if (Number.isInteger(tabHint?.tabId) && this.chrome.tabs?.get) {
         try {
           const boundTab = await this.chrome.tabs.get(tabHint.tabId);
-          if (Number.isInteger(boundTab?.windowId) && runtime.preferredWindowId !== boundTab.windowId) {
-            const pinned = ensureManagerRuntimeFields(runtime);
-            pinned.preferredWindowId = boundTab.windowId;
-            const checkpoint = await this.checkpointRuntime(
-              scenario.id, pinned, expectedOwnerEpoch, now,
-            );
-            if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
-            runtime = checkpoint.runtime;
+          const launchWindowId = runtime.launchWindowId ?? runtime.preferredWindowId;
+          if (!Number.isInteger(launchWindowId) || boundTab?.windowId !== launchWindowId) {
+            await this.appendScenarioDiagnostic({
+              scenario, participant, task,
+              event: 'СЦЕНАРІЙ_ВІДХИЛИВ_ЧУЖЕ_ВІКНО',
+              status: 'WINDOW_MISMATCH',
+              code: 'SCENARIO_WRONG_WINDOW',
+              message: 'Owned-tab hint is outside immutable Scenario launch window; no page interaction performed.',
+              tabId: tabHint.tabId,
+              now,
+            });
+            continue;
           }
         } catch (error) {
           if (isTabAlreadyGoneError(error)) tabHint = null;
+          else throw error;
         }
       }
       const reportJob = {
@@ -1535,8 +1573,8 @@ export class ScenarioWorkManager {
         managedSessionId: participant.sessionId,
         managedTabId: Number.isInteger(tabHint?.tabId) ? tabHint.tabId : null,
         managedTabOwned: tabHint?.ownedByExtension === true,
-        preferredWindowId: Number.isInteger(runtime.preferredWindowId)
-          ? runtime.preferredWindowId : session?.scenarioWork?.preferredWindowId,
+        preferredWindowId: Number.isInteger(runtime.launchWindowId)
+          ? runtime.launchWindowId : session?.scenarioWork?.launchWindowId,
       };
 
       {
