@@ -315,7 +315,7 @@ export class GoogleWorkspaceExactEffectExecutorV1 {
         || verification.reasonCode !== 'NO_COMMITTED_EFFECT') {
         throw new Error('SAFE_RETRY requires fresh independent proof of no committed effect');
       }
-    } else if (![VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)) {
+    } else if (verification.status !== VerificationStatus.VERIFIED) {
       throw new Error('VERIFIED reconciliation requires fresh independent verified evidence');
     }
 

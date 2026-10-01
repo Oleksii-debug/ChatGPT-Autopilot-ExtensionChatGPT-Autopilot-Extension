@@ -53,6 +53,8 @@ function verification(overrides = {}) {
     summary: 'Expected postcondition observed.',
     evidenceArtifactIds: [],
     verifiedAt: '2026-09-19T12:00:04Z',
+    verifierId: 'independent-verifier-1',
+    verificationAuthorityId: 'decision-1',
     effectId: 'invoke-1',
     executionId: 'invoke-1:attempt:1',
     attempt: 1,
@@ -173,12 +175,17 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'POSTCONDITION_PROVES_NO_EFFECT',
       summary: 'Verifier proved effect did not occur.',
-      observation: observation({ observationId: 'reconcile-obs-1', status: 'ERROR', summary: 'Expected effect is absent.' }),
+      observation: observation({
+        observationId: 'reconcile-obs-1',
+        status: 'ERROR',
+        summary: 'Expected effect is absent.',
+        data: { committed: false },
+      }),
       verification: verification({
         verificationId: 'reconcile-verify-1',
         observationId: 'reconcile-obs-1',
         status: 'FAILED',
-        reasonCode: 'POSTCONDITION_ABSENT',
+        reasonCode: 'NO_COMMITTED_EFFECT',
         summary: 'No committed effect exists; retry is safe.',
       }),
     },
@@ -197,6 +204,48 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
   assert.equal(state.phase, ExactEffectPhase.EXECUTING);
   assert.equal(state.attempt, 2);
   assert.equal(state.executionId, 'invoke-1:attempt:2');
+});
+
+test('SAFE_RETRY rejects generic FAILED verification without canonical no-effect semantics', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'generic-failed-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'generic-failed-ambiguous',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'generic-failed-safe-retry',
+      '2026-09-19T12:00:04Z',
+      {
+        outcome: ReconciliationOutcome.SAFE_RETRY,
+        reasonCode: 'CALLER_ASSERTED_SAFE',
+        observation: observation({
+          observationId: 'generic-failed-observation',
+          status: 'ERROR',
+          summary: 'Verification failed but absence is not proven.',
+          data: { committed: true },
+        }),
+        verification: verification({
+          verificationId: 'generic-failed-verification',
+          observationId: 'generic-failed-observation',
+          status: 'FAILED',
+          reasonCode: 'POSTCONDITION_FAILED',
+        }),
+      },
+    )),
+    /canonical no-effect verification/,
+  );
+  assert.equal(state.phase, ExactEffectPhase.RECONCILE);
+  assert.equal(exactEffectCanExecuteV1(state), false);
 });
 
 test('SAFE_RETRY without fresh reconciliation evidence fails closed', () => {
@@ -387,12 +436,17 @@ test('late evidence from an older execution attempt cannot satisfy a SAFE_RETRY 
     {
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'NO_EFFECT_PROVEN',
-      observation: observation({ observationId: 'reconcile-obs-late', status: 'ERROR', summary: 'Effect absent.' }),
+      observation: observation({
+        observationId: 'reconcile-obs-late',
+        status: 'ERROR',
+        summary: 'Effect absent.',
+        data: { committed: false },
+      }),
       verification: verification({
         verificationId: 'reconcile-verify-late',
         observationId: 'reconcile-obs-late',
         status: 'FAILED',
-        reasonCode: 'POSTCONDITION_ABSENT',
+        reasonCode: 'NO_COMMITTED_EFFECT',
       }),
     },
   )).state;
@@ -532,6 +586,56 @@ test('verification used by exact effect requires exact effect execution and atte
   assert.equal(valid.action, 'COMMIT');
 });
 
+test('verification authority is bound to an independent verifier and exact policy decision', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'authority-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'authority-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+
+  const cases = [
+    [{ verifierId: null }, /requires independent verifierId/],
+    [{ verifierId: 'native-companion' }, /independent from effect provider/],
+    [{ verificationAuthorityId: null }, /authority must match invocation policy decision/],
+    [{ verificationAuthorityId: 'decision-other' }, /authority must match invocation policy decision/],
+  ];
+  for (const [overrides, pattern] of cases) {
+    assert.throws(
+      () => reduceExactEffectV1(state, event(
+        ExactEffectEventType.RECORD_VERIFICATION,
+        'authority-' + String(Object.keys(overrides)[0]) + '-' + String(Object.values(overrides)[0]),
+        '2026-09-19T12:00:04Z',
+        { verification: verification(overrides) },
+      )),
+      pattern,
+    );
+  }
+
+  const valid = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'authority-valid',
+    '2026-09-19T12:00:04Z',
+    { verification: verification() },
+  ));
+  assert.equal(valid.state.phase, ExactEffectPhase.VERIFIED);
+  assert.equal(valid.action, 'COMMIT');
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...valid.state,
+      verification: { ...valid.state.verification, verificationAuthorityId: 'decision-other' },
+    }),
+    /authority must match invocation policy decision/,
+  );
+});
+
 test('effect event replay is idempotent across durable restart', () => {
   let state = createExactEffectStateV1(invocation(), { createdAt: AT });
   const start = event(
@@ -588,6 +692,205 @@ test('state normalization rejects corrupted durable bindings and mismatched evid
     )),
     /does not match current effect observation/,
   );
+});
+
+
+test('NOT_APPLICABLE verification cannot authorize exact-effect commit', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'not-applicable-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'not-applicable-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+
+  const result = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'not-applicable-verify',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        status: 'NOT_APPLICABLE',
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+      }),
+    },
+  ));
+
+  assert.equal(result.state.phase, ExactEffectPhase.MANUAL_REVIEW);
+  assert.equal(result.action, 'MANUAL_REVIEW');
+  assert.equal(result.state.verification.status, 'NOT_APPLICABLE');
+
+  const commit = reduceExactEffectV1(result.state, event(
+    ExactEffectEventType.COMMIT,
+    'not-applicable-commit',
+    '2026-09-19T12:00:05Z',
+    { commitId: 'must-not-commit' },
+  ));
+  assert.equal(commit.accepted, false);
+  assert.equal(commit.reason, 'COMMIT_REQUIRES_VERIFIED_EFFECT');
+  assert.equal(commit.state.phase, ExactEffectPhase.MANUAL_REVIEW);
+});
+
+test('VERIFIED reconciliation rejects NOT_APPLICABLE verification without mutating the ambiguous effect', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'not-applicable-reconcile-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'not-applicable-reconcile-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'not-applicable-reconcile-ambiguous',
+    '2026-09-19T12:00:03Z',
+    { reasonCode: 'ACK_LOST' },
+  )).state;
+
+  const before = JSON.parse(JSON.stringify(state));
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'not-applicable-reconcile-resolve',
+      '2026-09-19T12:00:04Z',
+      {
+        outcome: ReconciliationOutcome.VERIFIED,
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+        verification: verification({
+          status: 'NOT_APPLICABLE',
+          reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+        }),
+      },
+    )),
+    /VERIFIED reconciliation requires a verified verification/,
+  );
+  assert.deepEqual(state, before);
+  assert.equal(state.phase, ExactEffectPhase.RECONCILE);
+});
+
+
+test('restart normalization rejects forged VERIFIED or COMMITTED state without positive verification', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'restart-forge-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'restart-forge-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'restart-forge-na',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        status: 'NOT_APPLICABLE',
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+      }),
+    },
+  )).state;
+  assert.equal(state.phase, ExactEffectPhase.MANUAL_REVIEW);
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, phase: ExactEffectPhase.VERIFIED }),
+    /requires positive VERIFIED evidence/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      phase: ExactEffectPhase.COMMITTED,
+      commitId: 'forged-commit',
+    }),
+    /requires positive VERIFIED evidence/,
+  );
+
+  let verified = createExactEffectStateV1(invocation({ invocationId: 'invoke-commit-binding' }), { createdAt: AT });
+  const localEvent = (type, eventId, at, fields = {}) => ({
+    ...event(type, eventId, at, fields),
+    effectId: 'invoke-commit-binding',
+    executionId: 'invoke-commit-binding:attempt:1',
+  });
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'commit-binding-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'commit-binding-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation({ invocationId: 'invoke-commit-binding' }) },
+  )).state;
+  verified = reduceExactEffectV1(verified, localEvent(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'commit-binding-verify',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        invocationId: 'invoke-commit-binding',
+        effectId: 'invoke-commit-binding',
+        executionId: 'invoke-commit-binding:attempt:1',
+      }),
+    },
+  )).state;
+  assert.equal(verified.phase, ExactEffectPhase.VERIFIED);
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...verified, commitId: 'premature-commit-id' }),
+    /commitId is only valid for COMMITTED/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...verified, phase: ExactEffectPhase.COMMITTED }),
+    /requires commitId/,
+  );
+});
+
+
+test('restart normalization rejects forged executable phases without canonical retry proof', () => {
+  const prepared = createExactEffectStateV1(invocation(), { createdAt: AT });
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...prepared,
+      phase: ExactEffectPhase.PREPARED,
+      attempt: 1,
+      executionId: 'invoke-1:attempt:1',
+    }),
+    /PREPARED exact-effect phase must be pristine/,
+  );
+
+  let reconcile = reduceExactEffectV1(prepared, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'forged-safe-retry-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  reconcile = reduceExactEffectV1(reconcile, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'forged-safe-retry-ambiguity',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+  assert.equal(reconcile.phase, ExactEffectPhase.RECONCILE);
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...reconcile,
+      phase: ExactEffectPhase.SAFE_RETRY,
+    }),
+    /SAFE_RETRY exact-effect phase requires canonical no-effect verification/,
+  );
+  assert.equal(exactEffectCanExecuteV1(reconcile), false);
 });
 
 test('commit is impossible without verified evidence', () => {
@@ -693,6 +996,69 @@ test('state, nested metadata and create options reject accessors before getter e
     /enumerable own data property/,
   );
   assert.equal(reads, 0);
+});
+
+test('restart normalization rejects evidence outside durable exact-effect chronology', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'chronology-binding-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'chronology-binding-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'chronology-binding-verify',
+    '2026-09-19T12:00:04Z',
+    { verification: verification() },
+  )).state;
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      createdAt: '2026-09-19T12:00:05.000Z',
+    }),
+    /durable time cannot predate creation|observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      observation: { ...state.observation, observedAt: '2026-09-19T11:59:59.000Z' },
+    }),
+    /observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      observation: { ...state.observation, observedAt: '2026-09-19T12:01:05.000Z' },
+    }),
+    /observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:02.000Z' },
+    }),
+    /verification chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      verification: { ...state.verification, verifiedAt: '2026-09-19T12:01:05.000Z' },
+    }),
+    /verification chronology is invalid/,
+  );
+
+  const boundedSkew = normalizeExactEffectStateV1({
+    ...state,
+    verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:34.000Z' },
+  });
+  assert.equal(boundedSkew.verification.verifiedAt, '2026-09-19T12:00:34.000Z');
 });
 
 test('state envelope rejects hidden, symbol and inherited authority aliases', () => {
@@ -850,6 +1216,60 @@ test('nested reconciliation outcome uses exact enum representation and strict da
   assert.throws(
     () => normalizeExactEffectStateV1({ ...state, reconciliation: persisted }),
     /symbol fields/,
+  );
+});
+
+test('restart normalization rejects partial or time-inconsistent recovery metadata', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'metadata-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'metadata-ambiguity',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      ambiguity: { ...state.ambiguity, declaredAt: '' },
+    }),
+    /ambiguity metadata is incomplete/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      ambiguity: { ...state.ambiguity, declaredAt: '2026-09-19T12:01:03.000Z' },
+    }),
+    /ambiguity chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      reconciliation: {
+        outcome: ReconciliationOutcome.MANUAL_REVIEW,
+        reasonCode: '',
+        summary: 'caller-shaped partial recovery',
+        resolvedAt: '2026-09-19T12:00:02.000Z',
+      },
+    }),
+    /reconciliation metadata is incomplete/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      reconciliation: {
+        outcome: ReconciliationOutcome.MANUAL_REVIEW,
+        reasonCode: 'UNRESOLVED',
+        summary: '',
+        resolvedAt: '2026-09-19T12:01:03.000Z',
+      },
+    }),
+    /reconciliation chronology is invalid/,
   );
 });
 
