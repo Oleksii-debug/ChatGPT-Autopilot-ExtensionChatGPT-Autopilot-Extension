@@ -1200,7 +1200,10 @@ export class CoreCommandDispatcher {
         return { result };
       }
       await this.repo.update(draft => {
-        draft.profile.aiRouter = structuredClone(settings);
+        // Routed invocation is execution, not Router configuration authority.
+        // Ad-hoc payload.settings/routerOverride are one-shot inputs; only
+        // UPDATE_AI_ROUTER_SETTINGS may mutate durable Router settings and the
+        // authoritative route-pool revision.
         const current = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
         current.requestCount += 1;
         current.startedAt = current.startedAt || result.runtime.startedAt || this.now();
