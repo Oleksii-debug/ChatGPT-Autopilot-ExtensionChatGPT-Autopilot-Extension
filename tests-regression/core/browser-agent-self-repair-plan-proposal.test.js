@@ -53,6 +53,8 @@ test('Core: self-repair proposal is canonical and storage read-only',async()=>{
   assert.equal(result.proposal.originPlanRevision,3);
   assert.equal(result.proposal.proposedPlan.revision,4);
   assert.equal(result.ownerResourceBudgetRevision,1);
+  assert.equal(result.budgetReserved,false);
+  assert.equal(result.requiresCanonicalBudgetReservation,true);
   assert.equal(result.proposal.mutationAuthorized,false);
   assert.deepEqual(data[key],before);
 });
