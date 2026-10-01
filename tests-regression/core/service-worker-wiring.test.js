@@ -174,9 +174,11 @@ test('reusable Agent strict preflight does not leak onto ordinary Browser Agent 
   assert.notEqual(functionEnd, -1);
   const preflight = source.slice(functionStart, functionEnd);
   const bindingGate = preflight.indexOf('if (!job?.definitionModelPolicyBinding) return null;');
+  const contextFence = preflight.indexOf('snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext)');
   const payloadFence = preflight.indexOf('snapshotDefinitionBoundAgentRoutePayload(payload)');
   const epochFence = preflight.indexOf('Reusable Agent model dispatch requires a canonical positive controlEpoch');
-  assert.ok(bindingGate >= 0 && payloadFence > bindingGate, 'strict payload admission must start only after durable reusable-Agent binding is known');
+  assert.ok(bindingGate >= 0 && contextFence > bindingGate, 'strict context admission must start only after durable reusable-Agent binding is known');
+  assert.ok(payloadFence > bindingGate, 'strict payload admission must start only after durable reusable-Agent binding is known');
   assert.ok(epochFence > bindingGate, 'strict reusable controlEpoch admission must not alter ordinary Browser Agent dispatch');
 });
 
