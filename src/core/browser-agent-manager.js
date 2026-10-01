@@ -1129,8 +1129,8 @@ function normalizePersistedSelfRepairCycles(raw, plan, now) {
   }
   const source = raw.slice(-MAX_SELF_REPAIR_CYCLES);
   let quarantinedCount = Math.max(0, raw.length - source.length);
-  const cycles = [];
-  const cycleIds = new Set();
+  const validBindings = [];
+  const identityCounts = new Map();
   for (const candidate of source) {
     try {
       const persisted = snapshotExactOwnDataRequest(
@@ -1148,13 +1148,14 @@ function normalizePersistedSelfRepairCycles(raw, plan, now) {
         throw new Error('Persisted Browser Agent self-repair cycle plan identity drifted');
       }
       const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan, now);
-      if (cycleIds.has(cycle.cycleId)) throw new Error('Duplicate durable self-repair cycle identity');
-      cycleIds.add(cycle.cycleId);
-      cycles.push({ schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION, planId: plan.planId, cycle });
+      identityCounts.set(cycle.cycleId, (identityCounts.get(cycle.cycleId) || 0) + 1);
+      validBindings.push({ schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION, planId: plan.planId, cycle });
     } catch {
       quarantinedCount += 1;
     }
   }
+  const cycles = validBindings.filter(binding => identityCounts.get(binding.cycle.cycleId) === 1);
+  quarantinedCount += validBindings.length - cycles.length;
   return { cycles, quarantinedCount };
 }
 
