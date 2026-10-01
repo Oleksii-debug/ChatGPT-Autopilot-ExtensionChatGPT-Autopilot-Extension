@@ -133,7 +133,7 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.equal(created.job.config.projectId, 'project-1');
   assert.equal(created.job.config.maxSteps, 50, 'definition ceiling must narrow owner ceiling');
   assert.equal(created.job.config.maxModelCalls, 8);
-  assert.equal(created.job.config.aiPinnedRouteId, '');
+  assert.equal(created.job.config.aiPinnedRouteId, '', 'legacy compatibility field must remain inert; durable Model Router policy owns route authority');
   assert.match(created.job.config.goal, /^Reusable Agent definition instructions:/);
   assert.match(created.job.config.goal, /Owner task:\nCompare the current evidence/);
 
@@ -429,7 +429,6 @@ test('definition-bound jobs reject generic config mutation that could bypass dur
   assert.equal(reloaded.job.config.goal, created.job.config.goal);
   assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
   assert.equal(reloaded.job.config.aiPinnedRouteId, '');
-  assert.equal(reloaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
   assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
 });
