@@ -135,3 +135,25 @@ test('Core: duplicate durable self-repair identities are all quarantined',async(
   assert.equal(state.cycles.length,0);
   assert.equal(state.quarantinedCount,2);
 });
+
+
+test('Core: self-repair origin plan survives later plan revision growth',async()=>{
+  const {chrome}=storage();const m=manager(chrome);await seed(m);
+  const initial=cycle();
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:initial});
+  await m.update(store=>{
+    const current=structuredClone(store.byId['job.repair'].runtime.plan);
+    current.revision=4;
+    current.updatedAt='2026-10-01T12:01:30.000Z';
+    current.nodes.push({
+      nodeId:'unrelated',title:'Unrelated',objective:'Unrelated',dependsOn:[],conflictKeys:[],
+      ownerId:'actor.2',executionPlane:'LOCAL',acceptanceCriteria:[],
+      budget:{maxModelCalls:0,maxRuntimeSeconds:0,maxCostUsdMicros:0},
+      state:'READY',evidence:'',updatedAt:'2026-10-01T12:01:30.000Z',
+    });
+    store.byId['job.repair'].runtime.plan=current;return store;
+  });
+  const state=await manager(chrome).listSelfRepairCycles('job.repair');
+  assert.equal(state.cycles.length,1);
+  assert.equal(state.cycles[0].originPlan.revision,3);
+});
