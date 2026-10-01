@@ -744,7 +744,9 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     ? state.profile.aiRoutePoolRevision
     : 1;
   const now = Date.now();
-  const role = safePayload.taskRole || 'planner';
+  const role = Object.hasOwn(safePayload, 'taskRole')
+    ? safePayload.taskRole
+    : 'planner';
   const capabilityIds = job.definitionScope?.capabilityIds || [];
   const requiresVision = Boolean(safePayload.imageDataUrl);
   const agentRuntime = job.runtime?.aiRouterRuntime || state.profile?.aiRouterRuntime;
