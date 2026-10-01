@@ -789,11 +789,17 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
   if (!Number.isSafeInteger(boundRouteCallCeiling) || boundRouteCallCeiling < 1) {
     throw new Error('Reusable Agent model-policy binding has no bounded route-call authority');
   }
+  const requestedCallCeilingPresent = Object.hasOwn(sanitizedPayload, 'maxModelCallsForRequest');
   const requestedCallCeiling = sanitizedPayload.maxModelCallsForRequest;
-  sanitizedPayload.maxModelCallsForRequest =
-    Number.isSafeInteger(requestedCallCeiling) && requestedCallCeiling > 0
-      ? Math.min(requestedCallCeiling, boundRouteCallCeiling)
-      : boundRouteCallCeiling;
+  if (requestedCallCeilingPresent
+      && (!Number.isSafeInteger(requestedCallCeiling)
+        || Object.is(requestedCallCeiling, -0)
+        || requestedCallCeiling < 1)) {
+    throw new Error('Reusable Agent model dispatch requires canonical bounded maxModelCallsForRequest');
+  }
+  sanitizedPayload.maxModelCallsForRequest = requestedCallCeilingPresent
+    ? Math.min(requestedCallCeiling, boundRouteCallCeiling)
+    : boundRouteCallCeiling;
   return { payload:sanitizedPayload, envelope, providerCallBudgetContext:budgetContext };
 }
 
