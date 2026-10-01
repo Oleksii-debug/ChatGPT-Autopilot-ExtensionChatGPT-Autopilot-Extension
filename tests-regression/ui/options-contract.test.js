@@ -236,12 +236,16 @@ test('Multi-Agent Orchestration V2 exposes concise owner limits, profile files a
     'orchestration-v2-worker-probe','orchestration-v2-watchdog','orchestration-v2-max-turns','orchestration-v2-stale-worker',
     'download-orchestration-v2-template','orchestration-v2-profile-file','import-orchestration-v2-profile-button','export-orchestration-v2-profile-button',
     'save-orchestration-v2-button','test-orchestration-v2-button','run-orchestration-v2-button','stop-orchestration-v2-button',
-    'orchestration-v2-status','orchestration-v2-runtime',
+    'orchestration-v2-status','orchestration-v2-runtime','orchestration-v2-agent-tree-heading','orchestration-v2-agent-tree-refresh-button',
+    'orchestration-v2-agent-tree-summary','orchestration-v2-agent-tree',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Orchestration V2 control ${id}`);
   has(/id="orchestration-v2-desired-workers" type="number" min="0" max="200"/, 'initial workers must support large bounded pools');
   has(/id="orchestration-v2-status" role="status"/, 'Orchestration V2 state changes must be announced');
   has(/id="orchestration-v2-runtime" tabindex="0"/, 'Orchestration V2 runtime summary must be keyboard readable');
+  has(/id="orchestration-v2-agent-tree" tabindex="0" aria-label="Дерево Agent і телеметрія"/, 'Agent tree must be keyboard readable with a stable accessible name');
+  has(/id="orchestration-v2-agent-tree-summary" role="status"/, 'Agent tree refresh result must be announced');
   assert.match(js, /core\('GET_ORCHESTRATION_V2_STATUS'\)/);
+  assert.match(js, /core\('GET_ORCHESTRATION_V2_AGENT_TREE'/);
   assert.match(js, /core\('UPDATE_ORCHESTRATION_V2_SETTINGS'/);
   assert.match(js, /core\('TEST_ORCHESTRATION_V2_CONTROL'/);
   assert.match(js, /core\('PREVIEW_ORCHESTRATION_V2_PROFILE'/);

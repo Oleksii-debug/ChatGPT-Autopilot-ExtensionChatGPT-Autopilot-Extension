@@ -10,6 +10,7 @@ import { OperationPhase, RunState } from './schema.js';
 import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import { buildAgentTreeProjectionV1 } from './agent-tree-observability.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
 import {
   createSubagentTaskActivationBindingRegistryV1,
@@ -412,6 +413,28 @@ export class OrchestrationV2Manager {
       out.push({ id, name: record.name, ownerPaused: record.ownerPaused, selected: id === meta.selectedId, config: status.config, runtime: status.runtime });
     }
     return { selectedId: meta.selectedId, orchestras: out };
+  }
+
+  async getAgentTreeProjection(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) {
+      return { selectedId: '', projection: null };
+    }
+    const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
+    const hierarchy = runtime?.hierarchy;
+    if (!hierarchy?.graph || !hierarchy?.state) {
+      return { selectedId: orchestraId, projection: null };
+    }
+    return {
+      selectedId: orchestraId,
+      projection: buildAgentTreeProjectionV1({
+        schemaVersion: 1,
+        graph: hierarchy.graph,
+        runtime: hierarchy.state,
+        telemetry: [],
+      }),
+    };
   }
 
   async getStatus(id = '') {
