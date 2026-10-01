@@ -163,6 +163,7 @@ test('BrowserAgent owns durable self-repair cycle evidence across restart', asyn
   await seedJob(manager);
 
   const created = await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: cycle(),
@@ -187,12 +188,14 @@ test('self-repair persistence is exact-CAS and exact replay is idempotent', asyn
   await seedJob(manager);
   const initial = cycle();
   await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: initial,
   });
 
   const replay = await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: initial.updatedAt,
     cycle: initial,
@@ -201,6 +204,7 @@ test('self-repair persistence is exact-CAS and exact replay is idempotent', asyn
 
   const advanced = repairedCycle();
   const updated = await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: initial.updatedAt,
     cycle: advanced,
@@ -210,7 +214,8 @@ test('self-repair persistence is exact-CAS and exact replay is idempotent', asyn
 
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: initial.updatedAt,
       cycle: repairedCycle({ updatedAt: '2026-10-01T12:03:00.000Z' }),
     }),
@@ -224,6 +229,7 @@ test('self-repair updates cannot rewrite historical evidence or cycle authority'
   await seedJob(manager);
   const initial = cycle();
   await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: initial,
@@ -241,7 +247,8 @@ test('self-repair updates cannot rewrite historical evidence or cycle authority'
   });
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: initial.updatedAt,
       cycle: rewrittenFailure,
     }),
@@ -250,7 +257,8 @@ test('self-repair updates cannot rewrite historical evidence or cycle authority'
 
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: initial.updatedAt,
       cycle: cycle({
         maxAttempts: 4,
@@ -268,6 +276,7 @@ test('self-repair cycle binds exact current plan revision and failed-node baseli
 
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
+      expectedPlanId: 'plan.repair',
       expectedPlanRevision: 2,
       expectedCycleUpdatedAt: null,
       cycle: cycle(),
@@ -276,7 +285,8 @@ test('self-repair cycle binds exact current plan revision and failed-node baseli
   );
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: null,
       cycle: cycle({
         baselineRevisionId: '2026-10-01T12:00:59.000Z',
@@ -306,7 +316,8 @@ test('cycle cannot bind a non-failed or missing AgentPlan subject', async () => 
 
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: null,
       cycle: cycle(),
     }),
@@ -319,6 +330,7 @@ test('corrupt persisted cycle is quarantined locally without poisoning its Brows
   const manager = managerFor(chrome);
   await seedJob(manager);
   await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: cycle(),
@@ -347,6 +359,7 @@ test('failed-node drift after persistence quarantines only the stale cycle on re
   const manager = managerFor(chrome);
   await seedJob(manager);
   await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: cycle(),
@@ -368,6 +381,7 @@ test('plan replacement cannot silently rebind persisted self-repair evidence', a
   const manager = managerFor(chrome);
   await seedJob(manager);
   await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: cycle(),
@@ -391,7 +405,8 @@ test('durable owner rejects self-repair evidence from the future', async () => {
   await seedJob(manager);
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: null,
       cycle: cycle({
         updatedAt: '2026-10-01T13:00:01.000Z',
@@ -415,6 +430,7 @@ test('self-repair request and nested cycle accessors fail without getter executi
 
   let requestReads = 0;
   const request = {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
   };
@@ -442,7 +458,8 @@ test('self-repair request and nested cycle accessors fail without getter executi
   });
   await assert.rejects(
     () => manager.putSelfRepairCycle('job.repair', {
-      expectedPlanRevision: 3,
+      expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
       expectedCycleUpdatedAt: null,
       cycle: hostileCycle,
     }),
@@ -464,6 +481,7 @@ test('self-repair persistence remains non-authorizing and does not execute the m
   });
   await seedJob(manager);
   const persisted = await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
     expectedPlanRevision: 3,
     expectedCycleUpdatedAt: null,
     cycle: cycle(),
@@ -473,4 +491,25 @@ test('self-repair persistence remains non-authorizing and does not execute the m
   assert.equal(persisted.assessment.verificationAuthorized, false);
   assert.equal(persisted.assessment.completionAuthorized, false);
   assert.equal(modelCalls, 0);
+});
+
+
+test('self-repair write rejects replacement AgentPlan with same revision', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  await manager.update(store => {
+    store.byId['job.repair'].runtime.plan = plan({ planId: 'plan.replacement' });
+    return store;
+  });
+
+  await assert.rejects(
+    () => manager.putSelfRepairCycle('job.repair', {
+      expectedPlanId: 'plan.repair',
+      expectedPlanRevision: 3,
+      expectedCycleUpdatedAt: null,
+      cycle: cycle(),
+    }),
+    /AgentPlan identity drifted/,
+  );
 });
