@@ -32,6 +32,7 @@ function managerFor(chrome) {
   return new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse('2026-10-01T13:00:00.000Z'),
   });
 }
 
@@ -341,6 +342,29 @@ test('plan replacement cannot silently rebind persisted self-repair evidence', a
   assert.equal(listed.quarantinedCount, 1, 'old cycle must not acquire authority over a replacement plan');
 });
 
+test('durable owner rejects self-repair evidence from the future', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  await assert.rejects(
+    () => manager.putSelfRepairCycle('job.repair', {
+      expectedPlanRevision: 3,
+      expectedCycleUpdatedAt: null,
+      cycle: cycle({
+        updatedAt: '2026-10-01T13:00:01.000Z',
+        attempts: [{
+          ...cycle().attempts[0],
+          diagnosis: {
+            ...cycle().attempts[0].diagnosis,
+            createdAt: '2026-10-01T13:00:01.000Z',
+          },
+        }],
+      }),
+    }),
+    /cannot come from the future/,
+  );
+});
+
 test('self-repair request and nested cycle accessors fail without getter execution', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
@@ -393,6 +417,7 @@ test('self-repair persistence remains non-authorizing and does not execute the m
       modelCalls += 1;
       return { text: '{}' };
     },
+    now: () => Date.parse('2026-10-01T13:00:00.000Z'),
   });
   await seedJob(manager);
   const persisted = await manager.putSelfRepairCycle('job.repair', {
