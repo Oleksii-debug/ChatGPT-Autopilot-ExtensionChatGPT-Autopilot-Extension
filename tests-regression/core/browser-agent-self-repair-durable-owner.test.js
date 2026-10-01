@@ -120,3 +120,18 @@ test('Core: same-revision replacement AgentPlan cannot accept a stale prepared c
     /AgentPlan identity drifted/,
   );
 });
+
+
+test('Core: duplicate durable self-repair identities are all quarantined',async()=>{
+  const {data,chrome}=storage();const m=manager(chrome);await seed(m);
+  await m.putSelfRepairCycle('job.repair',{expectedPlanId:'plan.repair',expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:cycle()});
+  const [key]=Object.keys(data);
+  const first=structuredClone(data[key].byId['job.repair'].runtime.selfRepairCycles[0]);
+  const second=structuredClone(first);
+  second.cycle.updatedAt='2026-10-01T12:01:21.000Z';
+  second.cycle.attempts[0].diagnosis.createdAt='2026-10-01T12:01:21.000Z';
+  data[key].byId['job.repair'].runtime.selfRepairCycles=[first,second];
+  const state=await manager(chrome).listSelfRepairCycles('job.repair');
+  assert.equal(state.cycles.length,0);
+  assert.equal(state.quarantinedCount,2);
+});
