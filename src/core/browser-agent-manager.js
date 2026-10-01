@@ -1093,10 +1093,21 @@ function normalizePersistedSelfRepairCycles(raw, plan) {
   const cycleIds = new Set();
   for (const candidate of source) {
     try {
-      const cycle = validateSelfRepairCycleAgainstPlan(candidate, plan);
+      const persisted = snapshotExactOwnDataRequest(
+        candidate,
+        new Set(['planId', 'cycle']),
+        'Persisted Browser Agent self-repair cycle binding',
+      );
+      if (!Object.hasOwn(persisted, 'planId') || !Object.hasOwn(persisted, 'cycle')) {
+        throw new Error('Persisted Browser Agent self-repair cycle binding is incomplete');
+      }
+      if (typeof persisted.planId !== 'string' || persisted.planId !== plan.planId) {
+        throw new Error('Persisted Browser Agent self-repair cycle plan identity drifted');
+      }
+      const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan);
       if (cycleIds.has(cycle.cycleId)) throw new Error('Duplicate durable self-repair cycle identity');
       cycleIds.add(cycle.cycleId);
-      cycles.push(cycle);
+      cycles.push({ planId: plan.planId, cycle });
     } catch {
       quarantinedCount += 1;
     }
@@ -2281,9 +2292,10 @@ export class BrowserAgentManager {
     }
     const plan = current.job.runtime?.plan ? normalizeAgentPlanV1(current.job.runtime.plan) : null;
     const cycles = Array.isArray(current.job.runtime?.selfRepairCycles)
-      ? current.job.runtime.selfRepairCycles.map(cycle => ({
-        cycle: clone(cycle),
-        assessment: clone(assessSelfRepairCycleV1(cycle)),
+      ? current.job.runtime.selfRepairCycles.map(binding => ({
+        planId: binding.planId,
+        cycle: clone(binding.cycle),
+        assessment: clone(assessSelfRepairCycleV1(binding.cycle)),
       }))
       : [];
     return {
@@ -2332,8 +2344,8 @@ export class BrowserAgentManager {
       }
       const cycle = validateSelfRepairCycleAgainstPlan(cycleSnapshot, plan);
       const cycles = Array.isArray(job.runtime.selfRepairCycles) ? job.runtime.selfRepairCycles : [];
-      const index = cycles.findIndex(item => item?.cycleId === cycle.cycleId);
-      const existing = index >= 0 ? normalizeSelfRepairCycleV1(cycles[index]) : null;
+      const index = cycles.findIndex(item => item?.cycle?.cycleId === cycle.cycleId);
+      const existing = index >= 0 ? normalizeSelfRepairCycleV1(cycles[index].cycle) : null;
       if (request.expectedCycleUpdatedAt === null) {
         if (existing) throw new Error('Browser Agent self-repair cycle already exists');
       } else {
@@ -2349,12 +2361,13 @@ export class BrowserAgentManager {
         }
       }
       const next = [...cycles];
-      if (index >= 0) next[index] = cycle;
+      const durableBinding = { planId: plan.planId, cycle };
+      if (index >= 0) next[index] = durableBinding;
       else {
         if (next.length >= MAX_SELF_REPAIR_CYCLES) {
           throw new Error('Browser Agent self-repair cycle capacity is exhausted');
         }
-        next.push(cycle);
+        next.push(durableBinding);
       }
       job.runtime.selfRepairCycles = next;
       job.runtime.updatedAt = this.now();
