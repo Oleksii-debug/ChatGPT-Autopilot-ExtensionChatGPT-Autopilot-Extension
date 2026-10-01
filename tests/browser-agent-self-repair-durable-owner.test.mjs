@@ -178,6 +178,7 @@ test('BrowserAgent owns durable self-repair cycle evidence across restart', asyn
   assert.equal(listed.quarantinedCount, 0);
   assert.equal(listed.cycles.length, 1);
   assert.equal(listed.cycles[0].planId, 'plan.repair');
+  assert.equal(listed.cycles[0].originPlan.revision, 3);
   assert.equal(listed.cycles[0].cycle.cycleId, 'cycle.1');
   assert.equal(listed.cycles[0].assessment.state, 'READY_FOR_REPAIR');
 });
@@ -221,6 +222,55 @@ test('self-repair persistence is exact-CAS and exact replay is idempotent', asyn
     }),
     /cycle revision drifted/,
   );
+});
+
+test('self-repair origin AgentPlan remains immutable across later plan evolution', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  const initial = cycle();
+  await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 3,
+    expectedCycleUpdatedAt: null,
+    cycle: initial,
+  });
+
+  await manager.update(store => {
+    const current = structuredClone(store.byId['job.repair'].runtime.plan);
+    current.revision = 4;
+    current.updatedAt = '2026-10-01T12:01:30.000Z';
+    current.nodes.push({
+      nodeId: 'unrelated',
+      title: 'Unrelated',
+      objective: 'Continue unrelated work',
+      dependsOn: ['prepare'],
+      conflictKeys: [],
+      ownerId: 'actor.2',
+      executionPlane: 'LOCAL',
+      acceptanceCriteria: [],
+      budget: budget(),
+      state: 'READY',
+      evidence: '',
+      updatedAt: '2026-10-01T12:01:30.000Z',
+    });
+    store.byId['job.repair'].runtime.plan = current;
+    return store;
+  });
+
+  const advanced = await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanId: 'plan.repair',
+    expectedPlanRevision: 4,
+    expectedCycleUpdatedAt: initial.updatedAt,
+    cycle: repairedCycle(),
+  });
+  assert.equal(advanced.assessment.state, 'READY_FOR_RETEST');
+
+  const restarted = managerFor(chrome);
+  const listed = await restarted.listSelfRepairCycles('job.repair');
+  assert.equal(listed.cycles.length, 1);
+  assert.equal(listed.cycles[0].originPlan.revision, 3);
+  assert.equal(listed.cycles[0].cycle.updatedAt, '2026-10-01T12:02:00.000Z');
 });
 
 test('self-repair updates cannot rewrite historical evidence or cycle authority', async () => {
