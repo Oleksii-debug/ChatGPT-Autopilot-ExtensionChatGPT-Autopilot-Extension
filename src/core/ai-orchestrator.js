@@ -449,6 +449,7 @@ export class AiOrchestrator {
           callPrompt,
           callSystem,
           bounded,
+          requestedRole,
         );
         return {
           ...admitted.value,
