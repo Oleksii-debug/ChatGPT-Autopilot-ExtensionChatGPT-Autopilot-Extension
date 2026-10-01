@@ -1885,6 +1885,10 @@ function renderScenarioWorkState(item) {
       pool?.firstPromptSent != null ? `${pool.firstPromptSent}/${pool.slots ?? '—'}` : '—',
     );
     addScenarioStateLine(
+      'З цієї групи відповідь уже отримано',
+      pool?.firstResponseReceived != null ? `${pool.firstResponseReceived}/${pool.slots ?? '—'}` : '—',
+    );
+    addScenarioStateLine(
       'Усього успішно надіслано промптів',
       pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—',
     );
