@@ -1612,7 +1612,13 @@ export class ScenarioWorkManager {
               if (saved?.tabId != null) {
                 let existing = null;
                 try { existing = await this.chrome.tabs.get(saved.tabId); } catch { /* missing */ }
-                if (existing) return { recoveredManagedTabId: existing.id, recoveredManagedTabOwned: saved.ownedByExtension === true };
+                if (existing) {
+                  const launchWindowId = runtime.launchWindowId ?? runtime.preferredWindowId;
+                  if (!Number.isInteger(launchWindowId) || existing.windowId !== launchWindowId) {
+                    throw new Error('SCENARIO_WRONG_WINDOW');
+                  }
+                  return { recoveredManagedTabId: existing.id, recoveredManagedTabOwned: saved.ownedByExtension === true };
+                }
               }
               const ownedChrome = Object.create(this.chrome);
               ownedChrome.tabs = Object.create(this.chrome.tabs);
@@ -1625,7 +1631,15 @@ export class ScenarioWorkManager {
             await this.recordAssistantObservation({ scenario, participant, task, error, now });
           }
           const openedTabId = Number(openedReport?.recoveredManagedTabId);
+          let openedTabWindowValid = false;
           if (Number.isInteger(openedTabId) && openedTabId > 0) {
+            try {
+              const openedTab = await this.chrome.tabs.get(openedTabId);
+              const launchWindowId = runtime.launchWindowId ?? runtime.preferredWindowId;
+              openedTabWindowValid = Number.isInteger(launchWindowId) && openedTab?.windowId === launchWindowId;
+            } catch { openedTabWindowValid = false; }
+          }
+          if (openedTabWindowValid) {
             await this.coreRepository.update(state => {
               const liveSession = state.sessionsById?.[participant.sessionId];
               if (liveSession?.tasksById?.[participantTaskId]?.lastConversationUrl !== task.lastConversationUrl) return state;
@@ -1739,7 +1753,16 @@ export class ScenarioWorkManager {
             actionError = error;
           }
           const recoveredManagedTabId = Number(actionReport?.recoveredManagedTabId);
+          let recoveredWindowValid = false;
           if (Number.isInteger(recoveredManagedTabId) && recoveredManagedTabId > 0) {
+            try {
+              const recoveredTab = await this.chrome.tabs.get(recoveredManagedTabId);
+              const launchWindowId = runtime.launchWindowId ?? runtime.preferredWindowId;
+              recoveredWindowValid = Number.isInteger(launchWindowId)
+                && recoveredTab?.windowId === launchWindowId;
+            } catch { recoveredWindowValid = false; }
+          }
+          if (recoveredWindowValid) {
             await this.coreRepository.update(state => {
               const liveHint = state.tabHintsByTaskId?.[participantTaskId];
               if (liveHint?.sessionId === participant.sessionId) {
