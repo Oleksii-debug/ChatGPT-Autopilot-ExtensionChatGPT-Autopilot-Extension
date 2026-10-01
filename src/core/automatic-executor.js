@@ -216,13 +216,13 @@ export class AutomaticSessionExecutor {
           draft.tabHintsByTaskId[hintKey] = { ...structuredClone(resolvedHint),
             boundAt: this.now(), boundSendCount: Number(live.successfulSendCount || 0), opening: false };
           if (Number.isInteger(tab.windowId)) {
-            live.tabWindowId = tab.windowId;
             if (live.scenarioWork?.managed === true) {
               const expectedWindowId = live.scenarioWork.launchWindowId ?? live.scenarioWork.preferredWindowId;
               if (!Number.isInteger(expectedWindowId) || tab.windowId !== expectedWindowId) {
                 throw new Error('SCENARIO_WRONG_WINDOW');
               }
             }
+            live.tabWindowId = tab.windowId;
           }
           appendDiagnostic(draft, {
             event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
