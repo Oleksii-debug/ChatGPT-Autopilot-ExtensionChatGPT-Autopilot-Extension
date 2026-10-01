@@ -167,3 +167,16 @@ test('reusable Agent model dispatch preserves canonical fail-closed request boun
   assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
 });
 
+test('reusable Agent strict preflight does not leak onto ordinary Browser Agent dispatch', () => {
+  const functionStart = source.indexOf('async function prepareDefinitionBoundAgentInvocation');
+  assert.notEqual(functionStart, -1);
+  const functionEnd = source.indexOf('\n}\n\nfunction dispatchSerializedAiRoute', functionStart);
+  assert.notEqual(functionEnd, -1);
+  const preflight = source.slice(functionStart, functionEnd);
+  const bindingGate = preflight.indexOf('if (!job?.definitionModelPolicyBinding) return null;');
+  const payloadFence = preflight.indexOf('snapshotDefinitionBoundAgentRoutePayload(payload)');
+  const epochFence = preflight.indexOf('Reusable Agent model dispatch requires a canonical positive controlEpoch');
+  assert.ok(bindingGate >= 0 && payloadFence > bindingGate, 'strict payload admission must start only after durable reusable-Agent binding is known');
+  assert.ok(epochFence > bindingGate, 'strict reusable controlEpoch admission must not alter ordinary Browser Agent dispatch');
+});
+
