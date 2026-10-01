@@ -676,9 +676,17 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
   if (providerCallBudgetContext?.kind !== 'browser-agent'
       || typeof providerCallBudgetContext.jobId !== 'string') return null;
   const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
+  if (!Number.isSafeInteger(providerCallBudgetContext.controlEpoch)
+      || Object.is(providerCallBudgetContext.controlEpoch, -0)
+      || providerCallBudgetContext.controlEpoch < 1) {
+    throw new Error('Reusable Agent model dispatch requires a canonical positive controlEpoch');
+  }
   const current = await browserAgent.get(providerCallBudgetContext.jobId);
   const job = current.job;
   if (!job?.definitionModelPolicyBinding) return null;
+  if (job.runtime?.controlEpoch !== providerCallBudgetContext.controlEpoch) {
+    throw new Error('Reusable Agent controlEpoch drifted before model dispatch');
+  }
 
   const binding = job.definitionModelPolicyBinding;
   const registryState = await browserAgent.getAgentDefinitionRegistry(binding.definitionBinding.registryId);
