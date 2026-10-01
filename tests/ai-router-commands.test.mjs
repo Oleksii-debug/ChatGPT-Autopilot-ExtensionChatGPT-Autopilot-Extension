@@ -55,6 +55,80 @@ test('AI router settings persist and old states without router fields stay valid
   assert.equal(loaded.settings.primary.model, 'qwen');
 });
 
+
+test('AI route-pool revision advances only when normalized route pool changes', async () => {
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  const initial = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(initial.routePoolRevision, 1);
+
+  const routeA = {
+    routeId: 'route.revision-a',
+    provider: 'ollama',
+    model: 'model-a',
+    priority: 10,
+    costClass: 'free',
+    locality: 'local',
+  };
+  const changed = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', {
+    settings: {
+      ...initial.settings,
+      enabled: false,
+      routes: [routeA],
+      routePolicy: {},
+    },
+  });
+  assert.equal(changed.routePoolRevision, 2);
+  assert.equal((await dispatcher.execute('GET_AI_ROUTER_SETTINGS')).routePoolRevision, 2);
+
+  const policyOnly = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', {
+    settings: {
+      ...changed.settings,
+      routePolicy: { allowRouteIds: ['route.revision-a'], freeOnly: true },
+    },
+  });
+  assert.equal(policyOnly.routePoolRevision, 2, 'policy-only changes must not invent a new route-pool identity');
+
+  const identityChanged = await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', {
+    settings: {
+      ...policyOnly.settings,
+      routes: [{ ...routeA, model: 'model-b' }],
+    },
+  });
+  assert.equal(identityChanged.routePoolRevision, 3);
+  const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(loaded.routePoolRevision, 3);
+  assert.equal(loaded.settings.routes[0].model, 'model-b');
+});
+
+test('AI route-pool revision fails closed instead of overflowing canonical safe integer identity', async () => {
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  await repo.update(draft => {
+    draft.profile.aiRoutePoolRevision = Number.MAX_SAFE_INTEGER;
+    return draft;
+  });
+  const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  await assert.rejects(
+    dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', {
+      settings: {
+        ...before.settings,
+        enabled: false,
+        routes: [{
+          routeId: 'route.revision-overflow',
+          provider: 'ollama',
+          model: 'model-overflow',
+          priority: 1,
+        }],
+      },
+    }),
+    /route-pool revision exhausted/,
+  );
+  const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(after.routePoolRevision, Number.MAX_SAFE_INTEGER);
+  assert.deepEqual(after.settings, before.settings);
+});
+
 test('routed prompt persists hybrid runtime', async () => {
   const repo = new MemoryRepo();
   const fakeOrchestrator = {
