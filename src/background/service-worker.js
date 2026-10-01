@@ -107,12 +107,13 @@ const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
-    beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
+    beforeProviderCall: async ({ context, route, gatewayUrl, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
       if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
       return browserAgentLifecycle.current.reserveProviderModelBudget({
         jobId: context.jobId,
         controlEpoch: context.controlEpoch,
         route,
+        gatewayUrl,
         prompt,
         systemPrompt,
         maxOutputTokens,
@@ -265,6 +266,7 @@ const browserAgent = new BrowserAgentManager({
     return {
       routePool: structuredClone(settings.routes),
       routePoolRevision,
+      gatewayUrl: settings.gatewayUrl,
       ownerAllowedRouteIds: ownerAllowedRouteIdsForSettings(settings),
     };
   },
