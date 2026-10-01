@@ -30,6 +30,9 @@ import {
 } from '../core/openhands-specialist-readiness.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
+import { selectAgentDefinitionV1 } from '../core/agent-definition-registry.js';
+import { createBoundAgentModelRouteDispatchIntentV1 } from '../core/agent-model-route-dispatch-intent.js';
+import { createBoundAgentModelOrchestratorEnvelopeV1 } from '../core/agent-model-orchestrator-envelope.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
@@ -625,12 +628,81 @@ export async function reconcileRuntime() {
 }
 
 let aiRouteQueue = Promise.resolve();
+
+async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
+  if (providerCallBudgetContext?.kind !== 'browser-agent'
+      || typeof providerCallBudgetContext.jobId !== 'string') return null;
+  const current = await browserAgent.get(providerCallBudgetContext.jobId);
+  const job = current.job;
+  if (!job?.definitionModelPolicyBinding) return null;
+
+  const binding = job.definitionModelPolicyBinding;
+  const registryState = await browserAgent.getAgentDefinitionRegistry(binding.definitionBinding.registryId);
+  if (!registryState.registry) {
+    throw new Error('Reusable Agent definition registry is unavailable before model dispatch');
+  }
+  const currentDefinitionSelection = selectAgentDefinitionV1({
+    registry: registryState.registry,
+    agentDefinitionId: binding.definitionBinding.agentDefinitionId,
+  });
+
+  const state = await repo.load();
+  const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+  const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+    && state.profile.aiRoutePoolRevision > 0
+    ? state.profile.aiRoutePoolRevision
+    : 1;
+  const now = Date.now();
+  const role = payload?.taskRole || 'planner';
+  const capabilityIds = job.definitionScope?.capabilityIds || [];
+  const requiresVision = Boolean(payload?.imageDataUrl);
+  const agentRuntime = job.runtime?.aiRouterRuntime || state.profile?.aiRouterRuntime;
+
+  const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1({
+    definitionModelPolicyBinding: binding,
+    currentDefinitionModelPolicyBindingKey: binding.bindingKey,
+    currentDefinitionSelection,
+    currentJobId: job.id,
+    currentProjectId: job.config.projectId,
+    currentRoutePoolRevision: routePoolRevision,
+    routes: settings.routes,
+    routeStates: agentRuntime?.routeStates || {},
+    role,
+    capabilityIds,
+    requiresVision,
+    now,
+  });
+  const envelope = createBoundAgentModelOrchestratorEnvelopeV1({
+    dispatchIntent,
+    currentDefinitionModelPolicyBindingKey: binding.bindingKey,
+    currentJobId: job.id,
+    currentProjectId: job.config.projectId,
+    currentRoutePoolRevision: routePoolRevision,
+    currentRouterSettings: settings,
+    currentRouterRuntime: agentRuntime || state.profile?.aiRouterRuntime || {},
+    currentNow: now,
+  });
+
+  const sanitizedPayload = { ...(payload || {}) };
+  for (const key of [
+    'settings','routerOverride','routerRuntime','isolatedRuntime',
+    'forceStrong','taskRole','strongTaskRole','capabilityIds',
+  ]) delete sanitizedPayload[key];
+  return { payload:sanitizedPayload, envelope };
+}
+
 function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
-  const run = aiRouteQueue.then(() => dispatcher.execute(
-    'RUN_AI_ROUTED_PROMPT',
-    payload || {},
-    { providerCallBudgetContext },
-  ));
+  const run = aiRouteQueue.then(async () => {
+    const bound = await prepareDefinitionBoundAgentInvocation(payload || {}, providerCallBudgetContext);
+    return dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      bound ? bound.payload : payload || {},
+      {
+        providerCallBudgetContext,
+        ...(bound ? { agentModelOrchestratorEnvelope:bound.envelope } : {}),
+      },
+    );
+  });
   aiRouteQueue = run.catch(() => undefined);
   return run;
 }
