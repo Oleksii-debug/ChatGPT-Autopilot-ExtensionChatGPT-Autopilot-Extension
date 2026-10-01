@@ -1085,6 +1085,42 @@ function validateSelfRepairCycleAgainstPlan(cycleInput, planInput, now = null) {
   return cycle;
 }
 
+function assertSelfRepairCycleMonotonicUpdate(existingInput, nextInput) {
+  const existing = normalizeSelfRepairCycleV1(existingInput);
+  const next = normalizeSelfRepairCycleV1(nextInput);
+  for (const key of [
+    'cycleId', 'subjectId', 'actorId', 'verifierId', 'verifierPlanRevisionId',
+    'baselineRevisionId', 'maxAttempts', 'createdAt',
+  ]) {
+    if (existing[key] !== next[key]) {
+      throw new Error(`Browser Agent self-repair cycle update cannot rewrite ${key}`);
+    }
+  }
+  if (next.attempts.length < existing.attempts.length) {
+    throw new Error('Browser Agent self-repair cycle update cannot remove historical attempts');
+  }
+  for (let index = 0; index < existing.attempts.length; index += 1) {
+    const before = existing.attempts[index];
+    const after = next.attempts[index];
+    if (JSON.stringify(before.failure) !== JSON.stringify(after.failure)
+        || JSON.stringify(before.diagnosis) !== JSON.stringify(after.diagnosis)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite failure or diagnosis evidence');
+    }
+    if (before.repair !== null
+        && JSON.stringify(before.repair) !== JSON.stringify(after.repair)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite applied repair evidence');
+    }
+    if (before.retest !== null
+        && JSON.stringify(before.retest) !== JSON.stringify(after.retest)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite retest evidence');
+    }
+    if (before.repair === null && after.retest !== null && after.repair === null) {
+      throw new Error('Browser Agent self-repair cycle retest requires monotonic repair evidence');
+    }
+  }
+  return next;
+}
+
 function normalizePersistedSelfRepairCycles(raw, plan, now) {
   if (raw == null) return { cycles: [], quarantinedCount: 0 };
   if (!plan || !Array.isArray(raw)) {
@@ -2359,6 +2395,7 @@ export class BrowserAgentManager {
           result = { cycle: clone(existing), assessment: clone(assessSelfRepairCycleV1(existing)), reused: true };
           return store;
         }
+        assertSelfRepairCycleMonotonicUpdate(existing, cycle);
         if (Date.parse(cycle.updatedAt) <= Date.parse(existing.updatedAt)) {
           throw new Error('Browser Agent self-repair cycle update must advance updatedAt');
         }
