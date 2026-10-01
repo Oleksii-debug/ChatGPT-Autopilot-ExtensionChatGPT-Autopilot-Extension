@@ -111,6 +111,7 @@ const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
 const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const MAX_SELF_REPAIR_CYCLES = 32;
+const SELF_REPAIR_CYCLE_BINDING_VERSION = 1;
 const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const MAX_SPECIALIST_AUTOMATION_CLAIM_ADMISSIONS = 256;
 const SPECIALIST_AUTOMATION_CLAIM_ADMISSION_KEYS = new Set([
@@ -1134,11 +1135,14 @@ function normalizePersistedSelfRepairCycles(raw, plan, now) {
     try {
       const persisted = snapshotExactOwnDataRequest(
         candidate,
-        new Set(['planId', 'cycle']),
+        new Set(['schemaVersion', 'planId', 'cycle']),
         'Persisted Browser Agent self-repair cycle binding',
       );
-      if (!Object.hasOwn(persisted, 'planId') || !Object.hasOwn(persisted, 'cycle')) {
+      if (!Object.hasOwn(persisted, 'schemaVersion') || !Object.hasOwn(persisted, 'planId') || !Object.hasOwn(persisted, 'cycle')) {
         throw new Error('Persisted Browser Agent self-repair cycle binding is incomplete');
+      }
+      if (persisted.schemaVersion !== SELF_REPAIR_CYCLE_BINDING_VERSION) {
+        throw new Error('Persisted Browser Agent self-repair cycle binding schemaVersion is unsupported');
       }
       if (typeof persisted.planId !== 'string' || persisted.planId !== plan.planId) {
         throw new Error('Persisted Browser Agent self-repair cycle plan identity drifted');
@@ -1146,7 +1150,7 @@ function normalizePersistedSelfRepairCycles(raw, plan, now) {
       const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan, now);
       if (cycleIds.has(cycle.cycleId)) throw new Error('Duplicate durable self-repair cycle identity');
       cycleIds.add(cycle.cycleId);
-      cycles.push({ planId: plan.planId, cycle });
+      cycles.push({ schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION, planId: plan.planId, cycle });
     } catch {
       quarantinedCount += 1;
     }
@@ -2332,6 +2336,7 @@ export class BrowserAgentManager {
     const plan = current.job.runtime?.plan ? normalizeAgentPlanV1(current.job.runtime.plan) : null;
     const cycles = Array.isArray(current.job.runtime?.selfRepairCycles)
       ? current.job.runtime.selfRepairCycles.map(binding => ({
+        schemaVersion: binding.schemaVersion,
         planId: binding.planId,
         cycle: clone(binding.cycle),
         assessment: clone(assessSelfRepairCycleV1(binding.cycle)),
@@ -2401,7 +2406,7 @@ export class BrowserAgentManager {
         }
       }
       const next = [...cycles];
-      const durableBinding = { planId: plan.planId, cycle };
+      const durableBinding = { schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION, planId: plan.planId, cycle };
       if (index >= 0) next[index] = durableBinding;
       else {
         if (next.length >= MAX_SELF_REPAIR_CYCLES) {
