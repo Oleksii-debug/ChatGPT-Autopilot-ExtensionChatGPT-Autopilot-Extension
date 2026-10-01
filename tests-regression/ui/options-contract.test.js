@@ -280,6 +280,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-definition-list','agent-definition-new-button','agent-definition-form-group','agent-definition-id','agent-definition-label','agent-definition-description','agent-definition-instructions',
     'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance',
     'agent-definition-model-defaults-group','agent-definition-ai-routing-mode','agent-definition-ai-primary-provider','agent-definition-ai-primary-model','agent-definition-ai-strong-provider','agent-definition-ai-strong-model',
+    'agent-definition-specialist-delegation-group','agent-definition-specialist-delegation-configured','agent-definition-specialist-delegation-enabled',
+    'agent-definition-specialist-registry-id','agent-definition-specialist-capabilities','agent-definition-specialist-tools','agent-definition-specialist-policy-envelope',
+    'agent-definition-specialist-deadline-seconds','agent-definition-specialist-max-concurrent','agent-definition-specialist-lease-seconds','agent-definition-specialist-priority',
     'agent-definition-enabled','agent-definition-revision',
     'agent-definition-save-button','agent-definition-toggle-enabled-button','agent-definition-delete-button','agent-definition-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
@@ -322,6 +325,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   for (const id of ['agent-definition-ai-routing-mode','agent-definition-ai-primary-provider','agent-definition-ai-primary-model','agent-definition-ai-strong-provider','agent-definition-ai-strong-model']) {
     assert.match(html, new RegExp(`<label for=["']${id}["']>`), 'model defaults need persistent native labels: ' + id);
   }
+  assert.match(html, /Збереження profile нічого не запускає/, 'Specialist delegation profile must stay setup-only');
+  assert.match(js, /syncAgentDefinitionSpecialistDelegationControls/, 'inactive Specialist fields must leave keyboard tab flow');
+  assert.doesNotMatch(js.match(/async function saveAgentDefinition\(\)[\s\S]*?\n\}/)?.[0] || '', /PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF|CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS/, 'definition save must not execute Specialist delegation');
   assert.match(html, /id="agent-definition-status" role="status"/, 'definition CRUD outcomes must be announced');
   assert.match(html, /id="agent-definition-quarantine-status" tabindex="0"/, 'definition quarantine summary must be keyboard readable without a noisy live region');
   assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadAgentDefinitionRegistries\(\);/, 'Agent runtime and reusable-definition state must load through the canonical startup sequence');

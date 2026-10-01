@@ -1,4 +1,5 @@
 import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -216,6 +217,93 @@ export function mergeAgentDefinitionModelDefaultsV1(input = {}, configDefaults =
   return out;
 }
 
+function exactIntegerText(value, label, { min, max }) {
+  if (typeof value !== 'string' || value !== value.trim() || !/^(?:0|[1-9][0-9]*)$/u.test(value)) {
+    throw new Error(label + ' має бути цілим числом у канонічному форматі.');
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < min || number > max) {
+    throw new Error(label + ' поза допустимим діапазоном.');
+  }
+  return number;
+}
+
+function specialistFormDataValue(input, key, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  return descriptor.value;
+}
+
+function specialistFormBoolean(input, key, label) {
+  const value = specialistFormDataValue(input, key, label);
+  if (typeof value !== 'boolean') throw new Error(label + ' має бути boolean.');
+  return value;
+}
+
+export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
+  persistedProfile = undefined,
+} = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма Specialist delegation недоступна.');
+  }
+  const configured = specialistFormBoolean(
+    input,
+    'specialistDelegationConfigured',
+    'Specialist delegation configured',
+  );
+  if (!configured) return persistedProfile === undefined ? undefined : null;
+
+  const enabled = specialistFormBoolean(
+    input,
+    'specialistDelegationEnabled',
+    'Specialist delegation enabled',
+  );
+  return normalizeAgentSpecialistDelegationProfileV1({
+    schemaVersion: 1,
+    registryId: parseCanonicalAgentIdentity(
+      specialistFormDataValue(input, 'specialistRegistryId', 'Specialist registry ID'),
+      'Specialist registry ID',
+    ),
+    requiredCapabilityIds: listFromLines(
+      specialistFormDataValue(input, 'specialistCapabilityIdsText', 'Specialist capability IDs'),
+      'Specialist capability ID',
+      { maxItems: 64, itemMax: 180, identity: true },
+    ),
+    requiredToolIds: listFromLines(
+      specialistFormDataValue(input, 'specialistToolIdsText', 'Specialist tool IDs'),
+      'Specialist tool ID',
+      { maxItems: 128, itemMax: 180, identity: true },
+    ),
+    policyEnvelopeId: parseCanonicalAgentIdentity(
+      specialistFormDataValue(input, 'specialistPolicyEnvelopeId', 'Policy envelope ID'),
+      'Policy envelope ID',
+    ),
+    deadlineSeconds: exactIntegerText(
+      specialistFormDataValue(input, 'specialistDeadlineSeconds', 'Specialist deadline'),
+      'Specialist deadline',
+      { min: 1, max: 31_536_000 },
+    ),
+    maxConcurrentHandoffs: exactIntegerText(
+      specialistFormDataValue(input, 'specialistMaxConcurrentHandoffs', 'Specialist concurrency'),
+      'Specialist concurrency',
+      { min: 0, max: 256 },
+    ),
+    leaseSeconds: exactIntegerText(
+      specialistFormDataValue(input, 'specialistLeaseSeconds', 'Specialist lease'),
+      'Specialist lease',
+      { min: 1, max: 86_400 },
+    ),
+    priority: exactIntegerText(
+      specialistFormDataValue(input, 'specialistPriority', 'Specialist priority'),
+      'Specialist priority',
+      { min: 0, max: 1_000_000 },
+    ),
+    enabled,
+  });
+}
+
 function copyStructuredData(value, label) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' має бути data object.');
@@ -272,9 +360,18 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: effectiveConfigDefaults,
     modelRoutePolicy: effectiveModelRoutePolicy,
-    ...(specialistDelegationProfile === undefined
-      ? {}
-      : { specialistDelegationProfile: copyStructuredData(specialistDelegationProfile, 'specialistDelegationProfile') }),
+    ...(() => {
+      const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
+        ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
+          persistedProfile: specialistDelegationProfile,
+        })
+        : specialistDelegationProfile === undefined || specialistDelegationProfile === null
+          ? specialistDelegationProfile
+          : normalizeAgentSpecialistDelegationProfileV1(specialistDelegationProfile);
+      return effectiveProfile === undefined
+        ? {}
+        : { specialistDelegationProfile: effectiveProfile };
+    })(),
     enabled: input.enabled === true,
     definitionRevision,
   };
