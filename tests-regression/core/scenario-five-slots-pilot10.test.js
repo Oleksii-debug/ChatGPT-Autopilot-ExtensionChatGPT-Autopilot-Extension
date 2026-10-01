@@ -32,7 +32,7 @@ test('five persistent chats advance independently through 17 messages and replac
     mode: 'CHAT_CYCLE', roundsPerGeneration: 1, launchUrl: 'https://chatgpt.com/',
     steps: [{ prompt: 'START', repeat: 1 }, { prompt: 'CONTINUE', repeat: 15 }, { prompt: 'FINAL', repeat: 1 }],
   } });
-  for (const id of ids) await manager.start(id);
+  for (const id of ids) await manager.start(id, { launchWindowId: 11 });
   assert.equal(Object.keys(state.sessionsById).length, 5);
   assert.deepEqual((await manager.get(ids[2])).scenario.verifiedSends,
     { confirmedInThisChat: 0, confirmedOverall: 0 });
