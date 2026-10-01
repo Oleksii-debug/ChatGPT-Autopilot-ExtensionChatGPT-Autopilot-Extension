@@ -749,6 +749,8 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /routePolicy:\s*structuredClone\(settings\.routePolicy\)/);
   assert.match(source, /routeStates:\s*structuredClone\(runtime\.routeStates\)/);
   assert.match(source, /taskRole,/);
+  assert.match(source, /const role = Object\.hasOwn\(safePayload, 'taskRole'\)/);
+  assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
   assert.match(source, /capabilityIds,/);
   assert.match(source, /requiresVision,/);
   assert.match(source, /gatewayUrl,/);
