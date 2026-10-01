@@ -10,6 +10,66 @@ export const ProjectCurrentStateDigestVersion = 1;
 const MAX_SOURCES = 128;
 const MAX_ARTIFACTS = 128;
 
+const CURRENT_STATE_REQUEST_KEYS = new Set(['snapshot', 'capsule', 'currentSourceRefs']);
+const CURRENT_STATE_DIGEST_REQUEST_KEYS = new Set(['baseline', 'current', 'allowedSourceIds']);
+
+function strictRecord(input, allowedKeys, label) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error(`${label} must be a plain record`);
+  }
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain record`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const values = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      throw new Error(`${label} contains unknown field`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    values[key] = descriptor.value;
+  }
+  return values;
+}
+
+function denseArray(input, label, max) {
+  if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) {
+    throw new Error(`${label} must be an explicit bounded array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be an explicit bounded array`);
+  }
+  const result = new Array(lengthDescriptor.value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)) {
+      throw new Error(`${label} contains an invalid array property`);
+    }
+    const index = Number(key);
+    if (index >= lengthDescriptor.value) {
+      throw new Error(`${label} contains an out-of-range array property`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} items must be enumerable own data properties`);
+    }
+    result[index] = descriptor.value;
+  }
+  for (let index = 0; index < result.length; index += 1) {
+    if (!Object.hasOwn(result, index)) throw new Error(`${label} must be a dense array`);
+  }
+  return result;
+}
+
 function frozen(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) frozen(child);
@@ -17,8 +77,7 @@ function frozen(value) {
 }
 
 function bounded(value, label, max, normalize) {
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value.map((item, index) => {
+  return denseArray(value, label, max).map((item, index) => {
     try { return normalize(item); }
     catch (error) { throw new Error(`${label}[${index}]: ${error.message}`); }
   });
@@ -35,14 +94,14 @@ function unique(items, key, label) {
 }
 
 function boundedVisibilityIds(value, label = 'allowedSourceIds') {
-  if (!Array.isArray(value) || value.length > MAX_SOURCES) {
-    throw new Error(`${label} must be an explicit bounded array`);
-  }
-  const ids = value.map(item => {
+  const ids = denseArray(value, label, MAX_SOURCES).map(item => {
     if (typeof item !== 'string') throw new Error(`${label} must contain string ids`);
-    return item.trim();
+    if (!item || item !== item.trim()) {
+      throw new Error(`${label} must contain exact non-empty ids`);
+    }
+    return item;
   });
-  if (ids.some(item => !item) || new Set(ids).size !== ids.length) {
+  if (new Set(ids).size !== ids.length) {
     throw new Error(`${label} must contain unique non-empty ids`);
   }
   return new Set(ids);
@@ -52,7 +111,11 @@ function artifactIdentity(ref) {
   return `${ref.artifactId}:${ref.sha256 || ''}:${ref.sizeBytes}`;
 }
 
-export function deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRefs = [] } = {}) {
+export function deriveProjectCurrentStateV1(input = {}) {
+  const request = strictRecord(input, CURRENT_STATE_REQUEST_KEYS, 'ProjectCurrentStateV1 request');
+  const snapshot = request.snapshot;
+  const capsule = request.capsule;
+  const currentSourceRefs = request.currentSourceRefs === undefined ? [] : request.currentSourceRefs;
   const normalizedSnapshot = normalizeProjectSnapshotV1(snapshot);
   const normalizedCapsule = normalizeContextCapsuleV1(capsule);
   if (normalizedCapsule.projectId !== normalizedSnapshot.projectId) {
@@ -262,14 +325,15 @@ function hiddenArtifactDriftCount(state, hiddenArtifactIds) {
   ).length;
 }
 
-export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSourceIds } = {}) {
-  const allowedIds = boundedVisibilityIds(allowedSourceIds);
-  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) {
-    throw new Error('baseline must be a project current-state input object');
-  }
-  if (!current || typeof current !== 'object' || Array.isArray(current)) {
-    throw new Error('current must be a project current-state input object');
-  }
+export function deriveProjectCurrentStateDigestV1(input = {}) {
+  const request = strictRecord(
+    input,
+    CURRENT_STATE_DIGEST_REQUEST_KEYS,
+    'ProjectCurrentStateDigestV1 request',
+  );
+  const baseline = strictRecord(request.baseline, CURRENT_STATE_REQUEST_KEYS, 'baseline');
+  const current = strictRecord(request.current, CURRENT_STATE_REQUEST_KEYS, 'current');
+  const allowedIds = boundedVisibilityIds(request.allowedSourceIds);
 
   const baselineSnapshot = normalizeProjectSnapshotV1(baseline.snapshot);
   const baselineCapsule = normalizeContextCapsuleV1(baseline.capsule);

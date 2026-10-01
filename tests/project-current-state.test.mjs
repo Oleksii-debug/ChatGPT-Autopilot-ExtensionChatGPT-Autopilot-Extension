@@ -535,3 +535,136 @@ test('current-state visibility envelope rejects type-coerced source identities',
     allowedSourceIds: [true],
   }), /string ids/);
 });
+
+
+test('visibility envelope requires exact source-id spelling instead of trimming aliases', () => {
+  const input = stateInput();
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: [' github-main'],
+  }), /exact non-empty ids/);
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: ['github-main '],
+  }), /exact non-empty ids/);
+});
+
+test('current-state request rejects accessor, hidden, symbol and exotic fields before value getters run', () => {
+  let getterCalls = 0;
+  const accessorRequest = {
+    capsule: capsule(),
+    currentSourceRefs: [source()],
+  };
+  Object.defineProperty(accessorRequest, 'snapshot', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return snapshot();
+    },
+  });
+  assert.throws(
+    () => deriveProjectCurrentStateV1(accessorRequest),
+    /enumerable own data properties/,
+  );
+  assert.equal(getterCalls, 0);
+
+  const hidden = { snapshot: snapshot(), capsule: capsule(), currentSourceRefs: [source()] };
+  Object.defineProperty(hidden, 'hidden', { enumerable: false, value: true });
+  assert.throws(() => deriveProjectCurrentStateV1(hidden), /unknown field/);
+
+  const symbol = { snapshot: snapshot(), capsule: capsule(), currentSourceRefs: [source()] };
+  symbol[Symbol('authority')] = true;
+  assert.throws(() => deriveProjectCurrentStateV1(symbol), /unknown field/);
+
+  const exotic = Object.create({ inherited: true });
+  Object.assign(exotic, { snapshot: snapshot(), capsule: capsule(), currentSourceRefs: [source()] });
+  assert.throws(() => deriveProjectCurrentStateV1(exotic), /plain record/);
+});
+
+test('current-state and visibility arrays reject sparse or accessor-backed items without executing getters', () => {
+  const sparseSources = new Array(1);
+  assert.throws(() => deriveProjectCurrentStateV1({
+    snapshot: snapshot(),
+    capsule: capsule(),
+    currentSourceRefs: sparseSources,
+  }), /dense array/);
+
+  let sourceGetterCalls = 0;
+  const accessorSources = [];
+  Object.defineProperty(accessorSources, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      sourceGetterCalls += 1;
+      return source();
+    },
+  });
+  accessorSources.length = 1;
+  assert.throws(() => deriveProjectCurrentStateV1({
+    snapshot: snapshot(),
+    capsule: capsule(),
+    currentSourceRefs: accessorSources,
+  }), /enumerable own data properties/);
+  assert.equal(sourceGetterCalls, 0);
+
+  let visibilityGetterCalls = 0;
+  const accessorVisibility = [];
+  Object.defineProperty(accessorVisibility, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      visibilityGetterCalls += 1;
+      return 'github-main';
+    },
+  });
+  accessorVisibility.length = 1;
+  const input = stateInput();
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: accessorVisibility,
+  }), /enumerable own data properties/);
+  assert.equal(visibilityGetterCalls, 0);
+});
+
+test('digest snapshots outer and nested state-input records before reading fields', () => {
+  const input = stateInput();
+  let outerGetterCalls = 0;
+  const request = {
+    baseline: input,
+    current: input,
+  };
+  Object.defineProperty(request, 'allowedSourceIds', {
+    enumerable: true,
+    get() {
+      outerGetterCalls += 1;
+      return ['github-main'];
+    },
+  });
+  assert.throws(
+    () => deriveProjectCurrentStateDigestV1(request),
+    /enumerable own data properties/,
+  );
+  assert.equal(outerGetterCalls, 0);
+
+  let nestedGetterCalls = 0;
+  const hostileBaseline = {
+    snapshot: snapshot(),
+    currentSourceRefs: [source()],
+  };
+  Object.defineProperty(hostileBaseline, 'capsule', {
+    enumerable: true,
+    get() {
+      nestedGetterCalls += 1;
+      return capsule();
+    },
+  });
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: hostileBaseline,
+    current: input,
+    allowedSourceIds: ['github-main'],
+  }), /enumerable own data properties/);
+  assert.equal(nestedGetterCalls, 0);
+});
