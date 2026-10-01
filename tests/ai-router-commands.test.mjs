@@ -187,7 +187,8 @@ test('routed prompt cannot silently replace durable Router topology or route-poo
   const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
   assert.deepEqual(after.settings, before.settings, 'execution input must not become durable Router configuration');
   assert.equal(after.routePoolRevision, before.routePoolRevision, 'execution must not silently mint or bypass route-pool identity');
-  assert.equal(after.runtime.requestCount, before.runtime.requestCount + 1, 'execution telemetry remains durable');
+  assert.deepEqual(after.runtime, before.runtime, 'one-shot Router execution must not contaminate durable Router runtime');
+  assert.equal(result.result.runtime.requestCount, 1, 'one-shot execution still returns its isolated runtime telemetry');
 });
 
 test('routed prompt persists hybrid runtime', async () => {
