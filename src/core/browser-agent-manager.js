@@ -38,7 +38,7 @@ import {
   normalizeBrowserAgentAcceptanceCriteria,
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
-import { normalizeAiRoutePool } from './ai-route-pool.js';
+import { normalizeAiRoutePool, selectAiRouteCandidates } from './ai-route-pool.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
@@ -3545,7 +3545,13 @@ export class BrowserAgentManager {
     return Math.max(0, Math.floor(limit));
   }
 
-  async assertDefinitionBoundProviderRouteCurrent(store, job, route = {}, gatewayUrl = '') {
+  async assertDefinitionBoundProviderRouteCurrent(
+    store,
+    job,
+    route = {},
+    gatewayUrl = '',
+    { taskRole = 'planner', capabilityIds = [], requiresVision = false } = {},
+  ) {
     if (!job?.definitionModelPolicyBinding) return;
     if (!this.readModelRouteContext) {
       throw new Error('Reusable Agent provider admission requires canonical AI route-pool context');
@@ -3588,6 +3594,18 @@ export class BrowserAgentManager {
         || !context.ownerAllowedRouteIds.includes(routeId)) {
       throw new Error('Reusable Agent provider route is no longer allowed by current owner Router policy');
     }
+    const liveCandidates = selectAiRouteCandidates({
+      routes: currentRoutes,
+      policy: context.routePolicy || {},
+      routeStates: context.routeStates || {},
+      role: taskRole,
+      capabilityIds,
+      requiresVision,
+      now: this.now(),
+    });
+    if (!liveCandidates.candidates.some(candidate => candidate.routeId === routeId)) {
+      throw new Error('Reusable Agent provider route is no longer dispatchable by current Router policy/state');
+    }
 
     const definitionBinding = binding.definitionBinding;
     const registry = store.definitionRegistriesById?.[definitionBinding.registryId];
@@ -3605,7 +3623,19 @@ export class BrowserAgentManager {
     }
   }
 
-  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, gatewayUrl = '', callNumber = 1 } = {}) {
+  async reserveProviderModelBudget({
+    jobId,
+    controlEpoch,
+    prompt = '',
+    systemPrompt = '',
+    maxOutputTokens = 0,
+    route = {},
+    gatewayUrl = '',
+    taskRole = 'planner',
+    capabilityIds = [],
+    requiresVision = false,
+    callNumber = 1,
+  } = {}) {
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
     const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
     if (pendingOutputTokens < 1) {
@@ -3622,7 +3652,13 @@ export class BrowserAgentManager {
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
         throw error;
       }
-      await this.assertDefinitionBoundProviderRouteCurrent(store, job, route, gatewayUrl);
+      await this.assertDefinitionBoundProviderRouteCurrent(
+        store,
+        job,
+        route,
+        gatewayUrl,
+        { taskRole, capabilityIds, requiresVision },
+      );
       if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
         const error = new Error('Browser Agent already has an unsettled model budget reservation');
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
