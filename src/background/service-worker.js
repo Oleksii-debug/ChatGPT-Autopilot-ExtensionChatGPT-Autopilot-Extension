@@ -744,9 +744,11 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     ? state.profile.aiRoutePoolRevision
     : 1;
   const now = Date.now();
-  const role = Object.hasOwn(safePayload, 'taskRole')
-    ? safePayload.taskRole
-    : 'planner';
+  const explicitRole = Object.hasOwn(safePayload, 'taskRole');
+  if (explicitRole && typeof safePayload.taskRole !== 'string') {
+    throw new Error('Reusable Agent model dispatch taskRole must be canonical text');
+  }
+  const role = explicitRole ? safePayload.taskRole : 'planner';
   const capabilityIds = job.definitionScope?.capabilityIds || [];
   const requiresVision = Boolean(safePayload.imageDataUrl);
   const agentRuntime = job.runtime?.aiRouterRuntime || state.profile?.aiRouterRuntime;
