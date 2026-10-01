@@ -3288,6 +3288,9 @@ export class BrowserAgentManager {
       if (materialized.config.id !== jobId) {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
+      if (!materialized.config.projectId) {
+        throw new Error('Reusable Agent definition launch requires Project ID for durable model authority');
+      }
       if (!this.readModelRouteContext) {
         throw new Error('Reusable Agent launch requires canonical AI route-pool context');
       }
