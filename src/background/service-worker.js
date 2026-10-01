@@ -708,18 +708,29 @@ function snapshotBrowserAgentProviderBudgetContext(rawContext) {
 }
 
 async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
-  if (!providerCallBudgetContext
-      || typeof providerCallBudgetContext !== 'object'
-      || Array.isArray(providerCallBudgetContext)) return null;
+  if (providerCallBudgetContext == null) return null;
+  if (typeof providerCallBudgetContext !== 'object'
+      || Array.isArray(providerCallBudgetContext)) {
+    throw new Error('Agent provider budget context must be a plain object');
+  }
+  const contextPrototype = Object.getPrototypeOf(providerCallBudgetContext);
+  if (contextPrototype !== Object.prototype && contextPrototype !== null) {
+    throw new Error('Agent provider budget context must be a plain object');
+  }
   const contextDescriptors = Object.getOwnPropertyDescriptors(providerCallBudgetContext);
   const kindDescriptor = contextDescriptors.kind;
+  if (!kindDescriptor) return null;
+  if (kindDescriptor.enumerable !== true || !Object.hasOwn(kindDescriptor, 'value')) {
+    throw new Error('Agent provider budget context kind must be an enumerable own data property');
+  }
+  if (kindDescriptor.value !== 'browser-agent') return null;
   const jobIdDescriptor = contextDescriptors.jobId;
-  if (!kindDescriptor
-      || !Object.hasOwn(kindDescriptor, 'value')
-      || kindDescriptor.value !== 'browser-agent'
-      || !jobIdDescriptor
+  if (!jobIdDescriptor
+      || jobIdDescriptor.enumerable !== true
       || !Object.hasOwn(jobIdDescriptor, 'value')
-      || typeof jobIdDescriptor.value !== 'string') return null;
+      || typeof jobIdDescriptor.value !== 'string') {
+    throw new Error('Browser Agent provider budget context jobId must be an enumerable own text data property');
+  }
   const current = await browserAgent.get(jobIdDescriptor.value);
   const job = current.job;
   if (!job?.definitionModelPolicyBinding) return null;
