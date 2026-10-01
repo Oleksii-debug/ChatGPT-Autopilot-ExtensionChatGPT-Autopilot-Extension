@@ -29,7 +29,7 @@ import {
   probeOpenHandsSpecialistProviderConfigV1,
 } from '../core/openhands-specialist-readiness.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
-import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
+import { BROWSER_AGENT_ALARM, BrowserAgentRunState } from '../core/browser-agent.js';
 import { selectAgentDefinitionV1 } from '../core/agent-definition-registry.js';
 import { createBoundAgentModelRouteDispatchIntentV1 } from '../core/agent-model-route-dispatch-intent.js';
 import { createBoundAgentModelOrchestratorEnvelopeV1 } from '../core/agent-model-orchestrator-envelope.js';
@@ -712,6 +712,9 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
   if (!job?.definitionModelPolicyBinding) return null;
   if (job.runtime?.controlEpoch !== budgetContext.controlEpoch) {
     throw new Error('Reusable Agent controlEpoch drifted before model dispatch');
+  }
+  if (job.runtime?.runState !== BrowserAgentRunState.RUNNING) {
+    throw new Error('Reusable Agent is not running before model dispatch');
   }
 
   const binding = job.definitionModelPolicyBinding;
