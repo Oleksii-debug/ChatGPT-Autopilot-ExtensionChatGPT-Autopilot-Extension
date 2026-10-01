@@ -8,6 +8,7 @@ STATUS: AUTOMATED QUALIFICATION IN PROGRESS
 - два Scenario launch windows одного Chrome profile створюють вкладки тільки у своїх window IDs;
 - Start/Resume test harnesses передають explicit launchWindowId;
 - normal Scenario progress не показує transport/replacement/recovery counters;
+- uncertain fresh Work submit із порожнім composer + concrete /c/... + generation evidence після recovery стає SENT_VERIFIED без другого click, навіть якщо user bubble scanner ще повертає 0;
 - diagnostics managed Scenario містить launch window і actual tab window окремо.
 
 Exact-head GitHub Core/UI/Release/Windows results мають бути terminal SUCCESS перед release qualification.
