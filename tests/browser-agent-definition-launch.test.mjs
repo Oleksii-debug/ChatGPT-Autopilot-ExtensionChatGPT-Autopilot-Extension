@@ -693,6 +693,42 @@ test('standard Browser Agent creation carries no reusable-definition provenance'
   assert.equal(loaded.job.definitionScope, null);
 });
 
+test('ordinary Browser Agent provider reservation bypasses reusable-definition Router revalidation', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContextReads = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text:'{}' }),
+    readModelRouteContext: async () => {
+      routeContextReads += 1;
+      throw new Error('ordinary jobs must not read reusable-Agent route context');
+    },
+  });
+  await manager.create({
+    id:'job.manual-provider',
+    goal:'Owner-created Browser Agent provider call',
+  });
+  await manager.update(store => {
+    store.byId['job.manual-provider'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job.manual-provider',
+    controlEpoch:0,
+    prompt:'ordinary task',
+    systemPrompt:'system',
+    maxOutputTokens:128,
+    route:{ routeId:'ordinary', provider:'ollama', model:'local', endpointId:'' },
+    gatewayUrl:'http://127.0.0.1:3210',
+    taskRole:'planner',
+    capabilityIds:[],
+    requiresVision:false,
+    callNumber:1,
+  });
+  assert.match(reservation.reservationId, /^job\.manual-provider:model-budget:/);
+  assert.equal(routeContextReads, 0);
+});
+
 test('Core exposes definition launch only through the canonical BrowserAgentManager', async () => {
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
   assert.match(source, /'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION'/);
