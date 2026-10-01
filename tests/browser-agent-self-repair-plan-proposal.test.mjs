@@ -106,6 +106,8 @@ test('durable BrowserAgent materializes canonical self-repair work without mutat
 
   const result=await m.proposeSelfRepairWork('job.repair',request());
   assert.equal(result.ownerResourceBudgetRevision,1);
+  assert.equal(result.budgetReserved,false);
+  assert.equal(result.requiresCanonicalBudgetReservation,true);
   assert.deepEqual(result.resourceEnvelope,{maxModelCalls:10,maxRuntimeSeconds:100,maxCostUsdMicros:1000});
   assert.equal(result.planRevision,3);
   assert.equal(result.cycleUpdatedAt,'2026-10-01T12:01:20.000Z');
