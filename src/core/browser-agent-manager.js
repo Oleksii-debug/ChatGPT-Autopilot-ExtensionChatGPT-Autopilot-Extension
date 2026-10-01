@@ -1061,8 +1061,11 @@ function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0
   return out;
 }
 
-function validateSelfRepairCycleAgainstPlan(cycleInput, planInput) {
+function validateSelfRepairCycleAgainstPlan(cycleInput, planInput, now = null) {
   const cycle = normalizeSelfRepairCycleV1(cycleInput);
+  if (Number.isFinite(now) && Date.parse(cycle.updatedAt) > now) {
+    throw new Error('Self-repair cycle evidence cannot come from the future');
+  }
   const plan = normalizeAgentPlanV1(planInput);
   const subject = plan.nodes.find(node => node.nodeId === cycle.subjectId);
   if (!subject) throw new Error('Self-repair cycle subject does not exist in the durable AgentPlan');
@@ -1082,7 +1085,7 @@ function validateSelfRepairCycleAgainstPlan(cycleInput, planInput) {
   return cycle;
 }
 
-function normalizePersistedSelfRepairCycles(raw, plan) {
+function normalizePersistedSelfRepairCycles(raw, plan, now) {
   if (raw == null) return { cycles: [], quarantinedCount: 0 };
   if (!plan || !Array.isArray(raw)) {
     return { cycles: [], quarantinedCount: Array.isArray(raw) ? raw.length : 1 };
@@ -1104,7 +1107,7 @@ function normalizePersistedSelfRepairCycles(raw, plan) {
       if (typeof persisted.planId !== 'string' || persisted.planId !== plan.planId) {
         throw new Error('Persisted Browser Agent self-repair cycle plan identity drifted');
       }
-      const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan);
+      const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan, now);
       if (cycleIds.has(cycle.cycleId)) throw new Error('Duplicate durable self-repair cycle identity');
       cycleIds.add(cycle.cycleId);
       cycles.push({ planId: plan.planId, cycle });
@@ -1156,7 +1159,7 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
-  const selfRepairState = normalizePersistedSelfRepairCycles(raw.selfRepairCycles, plan);
+  const selfRepairState = normalizePersistedSelfRepairCycles(raw.selfRepairCycles, plan, now);
   const specialistDelegationAdmissions = normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions);
   let specialistProviderExecutionQuarantined = raw.specialistProviderExecutionQuarantined === true;
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
@@ -2342,7 +2345,7 @@ export class BrowserAgentManager {
       if (plan.revision !== request.expectedPlanRevision) {
         throw new Error('Browser Agent AgentPlan revision drifted before self-repair cycle persistence');
       }
-      const cycle = validateSelfRepairCycleAgainstPlan(cycleSnapshot, plan);
+      const cycle = validateSelfRepairCycleAgainstPlan(cycleSnapshot, plan, this.now());
       const cycles = Array.isArray(job.runtime.selfRepairCycles) ? job.runtime.selfRepairCycles : [];
       const index = cycles.findIndex(item => item?.cycle?.cycleId === cycle.cycleId);
       const existing = index >= 0 ? normalizeSelfRepairCycleV1(cycles[index].cycle) : null;
