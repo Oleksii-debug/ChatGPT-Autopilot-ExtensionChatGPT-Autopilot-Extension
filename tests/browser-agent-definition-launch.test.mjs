@@ -502,6 +502,8 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /createBoundAgentModelOrchestratorEnvelopeV1/);
   assert.match(source, /prepareDefinitionBoundAgentInvocation/);
   assert.match(source, /definitionModelPolicyBinding/);
+  assert.match(source, /ownerAllowedRouteIds:\s*ownerAllowedRouteIdsForSettings\(settings\)/);
+  assert.doesNotMatch(source, /ownerAllowedRouteIds:\s*settings\.routes\.map/);
   assert.match(source, /agentModelOrchestratorEnvelope:bound\.envelope/);
   assert.match(source, /delete sanitizedPayload\[key\]/);
   assert.doesNotMatch(source, /agentModelOrchestratorEnvelope\s*:\s*message\.payload/u);
