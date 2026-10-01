@@ -274,3 +274,44 @@ test('two Scenario launch windows in one Chrome profile stay disjoint', async ()
   assert.deepEqual(created.map(item => item.windowId), [11, 22]);
   assert.ok(created.every(item => item.windowId !== 33), 'unrelated browsing window must never receive Scenario tabs');
 });
+
+
+test('wrong-window Scenario opening hint is fenced before navigation', async () => {
+  const task = createTask({ id: 'task-opening-wrong-window', url: 'https://chatgpt.com/' });
+  const session = createSession({ id: 'session-opening-wrong-window', name: 'Opening fence', tasks: [task], now: 1 });
+  session.scenarioWork = {
+    managed: true,
+    scenarioId: 'scenario-opening-fence',
+    launchWindowId: 11,
+    preferredWindowId: 11,
+  };
+  const state = createEmptyState(1);
+  state.sessionsById[session.id] = session;
+  state.sessionOrder.push(session.id);
+  state.tabHintsByTaskId[task.id] = {
+    tabId: 66,
+    sessionId: session.id,
+    kind: 'TASK',
+    normalizedUrl: task.normalizedUrl,
+    ownedByExtension: true,
+    opening: true,
+  };
+  let updates = 0;
+  const chrome = {
+    tabs: {
+      async get(id) {
+        assert.equal(id, 66);
+        return { id, windowId: 22, url: 'about:blank#autopilot-owned:test', status: 'complete' };
+      },
+      async update() {
+        updates += 1;
+        throw new Error('wrong-window opening tab must never be navigated');
+      },
+    },
+  };
+  await assert.rejects(
+    () => resolveTaskTab(chrome, state, session.id, task),
+    /outside the window|SCENARIO_WRONG_WINDOW/i,
+  );
+  assert.equal(updates, 0);
+});
