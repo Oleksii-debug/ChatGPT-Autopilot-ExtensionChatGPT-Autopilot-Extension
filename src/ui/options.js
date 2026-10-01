@@ -1895,9 +1895,8 @@ function renderScenarioWorkState(item) {
     addScenarioStateLine('Зараз чекають відповіді', pool?.waitingResponse ?? '—');
     if (item.poolController === true) {
       addScenarioStateLine('Керування', 'Сценарій працює тільки у вікні Chrome, з якого його запущено. Технічні retry/replacement/recovery деталі залишаються лише в діагностиці.');
-      return;
     }
-    addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
+    return;
   }
   if (runtime.mode === 'CHAT_CYCLE') {
     const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
