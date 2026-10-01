@@ -504,6 +504,14 @@
           <p id="orchestration-v2-hierarchy-template-status" tabindex="0">Ієрархію ще не створено цим шаблоном.</p>
         </fieldset>
 
+        <section aria-labelledby="orchestration-v2-agent-tree-heading">
+          <h3 id="orchestration-v2-agent-tree-heading">Дерево Agent і стан виконання</h3>
+          <p class="field-help">Лише читання: показує canonical hierarchy state без prompt body, transcript або hidden reasoning і не запускає, не відновлює та не переплановує Agent.</p>
+          <button id="orchestration-v2-agent-tree-refresh-button" type="button">Оновити дерево Agent</button>
+          <p id="orchestration-v2-agent-tree-summary" role="status">Дерево Agent ще не завантажено.</p>
+          <pre id="orchestration-v2-agent-tree" tabindex="0" aria-label="Дерево Agent і телеметрія">Дерево Agent ще не завантажено.</pre>
+        </section>
+
         <p id="orchestration-v2-orchestra-summary" role="status">Оркестри ще не створені. Створіть новий оркестр або завантажте JSON-файл.</p>
       </div>
 
