@@ -4,6 +4,7 @@ STATUS: AUTOMATED QUALIFICATION IN PROGRESS
 
 Нові regression contracts:
 - exact Scenario launch-window ID не може fallback-нути в інше Chrome window;
+- legacy RUNNING state без launchWindowId не довіряє старому preferredWindowId: projection PAUSED/null, explicit Resume binds exact current window;
 - wrong-window owned hint відхиляється до page interaction;
 - два Scenario launch windows одного Chrome profile створюють вкладки тільки у своїх window IDs;
 - Start/Resume test harnesses передають explicit launchWindowId;
