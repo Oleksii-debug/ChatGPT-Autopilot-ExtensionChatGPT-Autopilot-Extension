@@ -506,5 +506,8 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.doesNotMatch(source, /ownerAllowedRouteIds:\s*settings\.routes\.map/);
   assert.match(source, /agentModelOrchestratorEnvelope:bound\.envelope/);
   assert.match(source, /delete sanitizedPayload\[key\]/);
+  assert.match(source, /boundRouteCallCeiling = binding\.modelPolicyBinding\?\.effectiveRouteIds\?\.length/);
+  assert.match(source, /sanitizedPayload\.maxModelCallsForRequest/);
+  assert.match(source, /Math\.min\(requestedCallCeiling, boundRouteCallCeiling\)/);
   assert.doesNotMatch(source, /agentModelOrchestratorEnvelope\s*:\s*message\.payload/u);
 });
