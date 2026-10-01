@@ -87,6 +87,12 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
 
   try {
     let hinted = await getTab(chromeApi, job?.managedTabId);
+    if (persistentManagedTab && job?.requireWindowBinding && !Number.isInteger(job.preferredWindowId)) {
+      return temporaryReport('SCENARIO_WINDOW_BINDING_REQUIRED');
+    }
+    if (persistentManagedTab && hinted && Number.isInteger(job?.preferredWindowId) && hinted.windowId !== job.preferredWindowId) {
+      return temporaryReport('SCENARIO_TAB_WINDOW_MISMATCH', { observedTabId: hinted.id });
+    }
     if (persistentManagedTab && job?.managedTabOwned === true && hinted?.autoDiscardable === false && chromeApi.tabs?.update) {
       try { hinted = await chromeApi.tabs.update(hinted.id, { autoDiscardable: true }); } catch { /* preserve identity */ }
     }
@@ -227,6 +233,8 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       requestId: `assistant-report:${job.id || job.workerId || job.taskId || 'probe'}:${Date.now()}`,
       taskId: job.taskId || job.workerId || 'assistant-report',
       mode: 'READ_ASSISTANT_REPORT',
+      expectedWindowId: persistentManagedTab ? job?.preferredWindowId : undefined,
+      requireWindowBinding: job?.requireWindowBinding === true,
       expectedUrl: correlateBoundDocument && existing?.url ? existing.url : conversationUrl,
       allowCorrelatedConversationRebind: correlateBoundDocument,
       boundConversationUrl: conversationUrl,

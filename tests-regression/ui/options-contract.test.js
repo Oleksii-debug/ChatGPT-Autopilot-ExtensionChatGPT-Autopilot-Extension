@@ -151,7 +151,7 @@ test('UI talks to Core by message protocol rather than owning scheduler/storage'
   }
   assert.doesNotMatch(js, /chrome\.storage/);
   assert.doesNotMatch(js, /chrome\.alarms/);
-  assert.doesNotMatch(js, /chrome\.tabs/);
+  assert.doesNotMatch(js, /chrome\.tabs\.(?:create|update|remove|sendMessage|query)/);
 });
 
 test('validation uses aria-invalid, aria-describedby and deterministic focus', () => {

@@ -1,3 +1,4 @@
+import { windowBindingError } from './window-binding.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { waitForTaskTabReady } from './tabs.js';
 import { SiteAdapterId, getSiteAdapter, requireSiteAdapterUrl } from './site-adapter-registry.js';
@@ -73,10 +74,15 @@ export class ChromeInteractionTransport {
   }
 
   async send(tabId, request) {
+    if (request?.requireWindowBinding && !Number.isInteger(request.expectedWindowId)) throw windowBindingError();
+    if (Number.isInteger(request?.expectedWindowId)) {
+      const tab = await this.chrome.tabs.get(tabId);
+      if (tab.windowId !== request.expectedWindowId) throw windowBindingError('SCENARIO_TAB_WINDOW_MISMATCH');
+    }
     const bounded = ['CHECK_ONLY', 'PREPARE_SEND', 'SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
     if (!bounded) return this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction', request });
     const timeoutMs = Math.max(1, request?.mode === 'READ_ASSISTANT_REPORT'
-      ? Math.min(5000, this.requestTimeoutMs) : this.requestTimeoutMs);
+      ? Math.min(5000, this.requestTimeoutMs) : this.requestTimeoutMs + (request?.mode === 'SUBMIT_EXISTING' ? Math.min(60000, Math.max(0, Number(request.postSendDelayMs || 0))) : 0));
     let timer;
     try {
       return await Promise.race([
@@ -138,7 +144,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
-        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT') throw error;
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT' || error?.safeDiagnosticCode?.startsWith('SCENARIO_')) throw error;
         throw diagnosticError(
           isMissingReceiverError(error)
             ? 'INTERACTION_RECEIVER_LOST_DURING_UI_READINESS'
@@ -157,6 +163,8 @@ export class ChromeInteractionTransport {
     if (tabId == null) throw new Error('Interaction tab id is required');
 
     try {
+      if (request?.requireWindowBinding && !Number.isInteger(request.expectedWindowId)) throw windowBindingError();
+      if (Number.isInteger(request?.expectedWindowId) && (await this.chrome.tabs.get(tabId)).windowId !== request.expectedWindowId) throw windowBindingError('SCENARIO_TAB_WINDOW_MISMATCH');
       if (request?.expectedUrl) requireSiteAdapterUrl(this.siteAdapter.id, request.expectedUrl);
       if (SAFE_RECEIVER_RECOVERY_MODES.has(request?.mode)) {
         await waitForTaskTabReady(
@@ -171,7 +179,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
-        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT') throw error;
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT' || error?.safeDiagnosticCode?.startsWith('SCENARIO_')) throw error;
         // An unpacked-extension update/reload can leave an already-open ChatGPT tab
         // without the newly registered content-script receiver. Only the read-only
         // allow-list above may be restored and retried once.

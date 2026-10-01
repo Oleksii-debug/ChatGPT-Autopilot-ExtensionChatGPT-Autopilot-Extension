@@ -101,6 +101,8 @@ export function normalizeScenarioWorkConfig(raw = {}) {
     responseTimeoutMinutes: int(raw.responseTimeoutMinutes, 40, 1, 1440),
     pollSeconds: int(raw.pollSeconds, 180, 5, 600),
     minimumLaunchGapSeconds: int(raw.minimumLaunchGapSeconds, 0, 0, 3600),
+    tabReadyDelaySeconds: int(raw.tabReadyDelaySeconds, 0, 0, 60),
+    postSendDelaySeconds: int(raw.postSendDelaySeconds, 0, 0, 60),
     preSendDelaySeconds: int(raw.preSendDelaySeconds, 10, 1, 30),
     busyCheckDelaySeconds: int(raw.busyCheckDelaySeconds, 3, 1, 30),
     retryBackoffSeconds: int(raw.retryBackoffSeconds, 30, 5, 3600),

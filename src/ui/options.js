@@ -1,3 +1,5 @@
+import { renderLaunchList } from './launch-list.js';
+import { scenarioProgressText } from './scenario-progress.js';
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
@@ -1872,26 +1874,13 @@ function renderScenarioWorkState(item) {
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   if (item.pool) {
     const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
-    addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
-    addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
-    addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
-    addScenarioStateLine('Пул: перший Send підтверджено', pool ? `${pool.firstPromptSent ?? 0}/${pool.slots}` : '—');
-    addScenarioStateLine('Пул: ще не отримали перший Send', pool?.firstPromptPending ?? '—');
-    addScenarioStateLine('Пул: чекають завершення відповіді', pool?.waitingResponse ?? '—');
-    addScenarioStateLine('Пул: підтверджено завершених відповідей', pool?.completedResponses ?? '—');
-    addScenarioStateLine('Пул: логічних Send у послідовностях', pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—');
-    addScenarioStateLine('Пул: фізично підтверджених Send-спроб', pool?.transportVerifiedSends ?? pool?.verifiedSends ?? '—');
-    addScenarioStateLine('Пул: повторних/замінних Send-спроб', pool?.retryVerifiedSends ?? '—');
-    addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
-    addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
-    addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
-    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${pool?.replacementBudget ?? item.pool.replacementBudget}`);
-    addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
+    addScenarioStateLine('Паралельних чатів', pool?.slots ?? '—');
+    addScenarioStateLine('Прогрес усього пулу', scenarioProgressText(pool));
     if (item.poolController === true) {
       addScenarioStateLine('Керування', 'Дії на цій вкладці застосовуються до всіх фізичних чатів сценарію. Деталі кожного чату дивіться у «Сеансах» та діагностиці.');
       return;
     }
-    addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
+
   }
   if (runtime.mode === 'CHAT_CYCLE') {
     const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
@@ -1901,14 +1890,12 @@ function renderScenarioWorkState(item) {
     const beforeCurrent = steps.slice(0, stepIndex).reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
     const currentMessage = totalMessages ? Math.min(totalMessages, beforeCurrent + repeatIndex + 1) : 0;
     const currentRepeatTotal = Math.max(0, Number(steps[stepIndex]?.repeat || 0));
-    addScenarioStateLine(item.pool ? 'Фізичний чат у цьому слоті' : 'Фізичний чат', `№${runtime.generation ?? 1}`);
-    const confirmed = Number.isInteger(item.verifiedSends?.confirmedInThisChat)
-      ? item.verifiedSends.confirmedInThisChat : null;
-    addScenarioStateLine('Підтверджено повідомлень у цьому чаті', `${confirmed ?? '—'}/${totalMessages}`);
-    addScenarioStateLine('Наступне повідомлення', `${currentMessage}/${totalMessages}`);
-    addScenarioStateLine('Підтверджено за весь сценарій', item.verifiedSends?.confirmedOverall ?? '—');
-    addScenarioStateLine('Промпт у послідовності', `${steps.length ? stepIndex + 1 : 0}/${steps.length}`);
-    addScenarioStateLine('Повтор цього промпта', `${currentRepeatTotal ? Math.min(currentRepeatTotal, repeatIndex + 1) : 0}/${currentRepeatTotal}`);
+    if (!item.pool) {
+      addScenarioStateLine('Прогрес сценарію', scenarioProgressText({
+        totalSentPrompts: item.verifiedSends?.confirmedOverall ?? 0,
+        totalReceivedResponses: runtime.totalCompletedTurns ?? 0,
+      }));
+    }
   } else if (runtime.mode === 'AUDITOR_GROUP') {
     addScenarioStateLine('Покоління', runtime.generation ?? 1);
     addScenarioStateLine('Фаза', runtime.phase || '—');
@@ -2059,6 +2046,8 @@ function scenarioWorkConfigFromForm() {
     responseTimeoutMinutes: scenarioWorkInt('scenario-work-timeout', 1, 1440, 'Час очікування відповіді'),
     pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Інтервал перевірки'),
     minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
+    tabReadyDelaySeconds: scenarioWorkInt('scenario-work-tab-ready', 0, 60, 'Пауза після відкриття вкладки'),
+    postSendDelaySeconds: scenarioWorkInt('scenario-work-post-send', 0, 60, 'Очікування після надсилання'),
     preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'Пауза перед надсиланням'),
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
@@ -2124,6 +2113,8 @@ function fillScenarioWorkForm(item) {
   $('scenario-work-timeout').value = String(config.responseTimeoutMinutes ?? 40);
   $('scenario-work-poll').value = String(config.pollSeconds ?? 180);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
+  $('scenario-work-tab-ready').value = String(config.tabReadyDelaySeconds ?? 0);
+  $('scenario-work-post-send').value = String(config.postSendDelaySeconds ?? 5);
   $('scenario-work-pre-send').value = String(config.preSendDelaySeconds ?? 10);
   $('scenario-work-busy-check').value = String(config.busyCheckDelaySeconds ?? 3);
   $('scenario-work-retry').value = String(config.retryBackoffSeconds ?? 30);
@@ -2387,7 +2378,7 @@ async function startParallelScenarioChats() {
       await openScenarioWorkTarget(scenarioPoolListValue(result.pool.id), { selectSingle: false });
     }
     setScenarioWorkPanel('state');
-    announce(`Пул підтверджено Core: ${ids.length} фізичних чатів; ${result?.pool?.messagesPerChat || config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень на чат; фактична пауза між першими промптами ${formatScenarioInitialStagger(result?.pool?.initialStaggerSeconds ?? staggerSeconds)}; додаткових чатів ${replacementBudget}.`);
+    announce(`Сценарій запущено: ${ids.length} паралельних чатів у цьому вікні.`);
   } catch (error) {
     await loadScenarioWork();
     const message = `Не вдалося підтвердити запуск пулу. Перевірте список сценаріїв: ${error.message}`;
@@ -3842,6 +3833,11 @@ async function deleteBrowserAgentJob() {
 
 async function core(command, payload = {}) {
   if (!runtimeAvailable()) throw new Error('Core runtime is not available yet.');
+  if (['CREATE_SCENARIO_CHAT_POOL', 'START_SCENARIO_CHAT_POOL', 'START_SCENARIO_WORK', 'START_SESSION', 'RESUME_SESSION'].includes(command) || (command === 'IMPORT_PORTABLE_PROFILE' && payload.confirmAutoStart === true)) {
+    const source = await chrome.tabs.getCurrent();
+    if (!Number.isInteger(source?.id)) throw new Error('Відкрийте Пілот у вкладці потрібного робочого вікна.');
+    payload = { ...payload, sourceTabId: source.id };
+  }
   const response = await chrome.runtime.sendMessage({ channel: 'autopilot-ui', command, payload });
   if (!response || response.ok !== true) throw new Error(response?.error?.message || 'Core command failed.');
   return response.data;
@@ -3913,6 +3909,7 @@ function simplifiedFields() {
     prompt: field('simplified-prompt'), prompts: field('simplified-prompts'),
     runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
     interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
+    tabReady: field('simplified-tab-ready'), postSend: field('simplified-post-send'),
     delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
     retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
     busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
@@ -3977,6 +3974,8 @@ function showSimplifiedSession(session) {
   $('simplified-cycles').value = String(session?.configuredTaskCount || 1);
   $('simplified-interval-unit').value = session?.minimumSendIntervalUnit || 'minutes';
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
+  $('simplified-tab-ready').value = String(session?.tabReadyDelaySeconds ?? 0);
+  $('simplified-post-send').value = String(session?.postSendDelaySeconds ?? 5);
   $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
   $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
   const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
@@ -3990,7 +3989,7 @@ function showSimplifiedSession(session) {
   updateSimplifiedMode();
   $('simplified-list').value = session?.id || '';
   $('simplified-state').textContent = session
-    ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
+    ? `Стан: ${session.status?.displayRunState || session.runState}. Надіслано промптів: ${session.successfulSendCount || 0}.`
     : 'Сеанс не вибрано.';
   ui.simplifiedDirty = false;
   $('simplified-draft-status').textContent = 'Незбережених змін немає.';
@@ -4030,7 +4029,7 @@ async function refreshSimplifiedSessionStatus() {
     const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
     const session = data.session;
     ui.simplifiedSelected = clone(session);
-    $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+    $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Надіслано промптів: ${session.successfulSendCount || 0}.`;
     renderSimplifiedActions(session);
     renderSimplifiedLog(session);
   } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
@@ -4123,16 +4122,55 @@ function globalStateLabel(value) {
   })[value] || String(value || 'НЕВІДОМО');
 }
 
+async function openDashboardLaunch(kind, id) {
+  try {
+    if (kind === 'simplified') {
+      setUiMode('simplified');
+      await loadSessions();
+      await selectSimplifiedSession(id);
+      $('simplified-name').focus();
+    } else {
+      setUiMode('scenario-work');
+      await loadScenarioWork();
+      await openScenarioWorkTarget(id.startsWith('pool:') ? scenarioPoolListValue(id.slice(5)) : scenarioSingleListValue(id), { selectSingle: false });
+      setScenarioWorkPanel('state');
+      $('scenario-work-list').focus();
+    }
+  } catch (error) { $('global-launch-result').textContent = `Не вдалося відкрити запуск: ${error.message}`; }
+}
+
+async function stopDashboardLaunch(kind, id) {
+  try {
+    const pool = kind === 'scenario' && id.startsWith('pool:');
+    await core(kind === 'simplified' ? 'STOP_SESSION' : pool ? 'STOP_SCENARIO_CHAT_POOL' : 'STOP_SCENARIO_WORK',
+      kind === 'simplified' ? { sessionId: id } : { id: pool ? id.slice(5) : id });
+    $('global-launch-result').textContent = 'Вибраний запуск зупинено.';
+    await loadGlobalStatus();
+  } catch (error) { $('global-launch-result').textContent = `Не вдалося зупинити запуск: ${error.message}`; }
+}
+
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
   $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
   const scenarioPools = data.scenarioPools || [];
   $('global-scenario-summary').textContent = scenarioPools.length
-    ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} логічних Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший логічний Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Логічних Send у послідовностях: ${pool.sequenceVerifiedSends ?? pool.verifiedSends ?? 0}/${pool.plannedSends || 0}. Фізично підтверджених Send-спроб: ${pool.transportVerifiedSends ?? pool.verifiedSends ?? 0}. Повторних або replacement-спроб: ${pool.retryVerifiedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
-    : `Запущених сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
+    ? scenarioPools.map(pool => `${pool.name}. ${scenarioProgressText(pool)}`).join(' | ')
+    : 'Сценарні пули ще не запущено.';
+  renderLaunchList(document, $('global-simplified-sessions'), (data.simplifiedSessions || []).map(row => ({
+    id: row.id, name: row.name, description: `${row.name}: ${globalStateLabel(row.category)}. Надіслано промптів: ${row.verifiedSends}.`,
+  })), { open: id => openDashboardLaunch('simplified', id), stop: id => stopDashboardLaunch('simplified', id) });
+  const poolRows = scenarioPools.map(pool => ({ id: `pool:${pool.id}`, name: pool.name,
+    description: `${pool.name}. ${scenarioProgressText(pool)}` }));
+  const standalone = new Map();
+  for (const row of data.scenarioSlots || []) if (!row.poolId) {
+    const id = row.scenarioId || row.id.slice(0, row.id.lastIndexOf(':'));
+    if (!standalone.has(id)) standalone.set(id, { id, name: row.scenario,
+      description: `${row.scenario}: ${globalStateLabel(row.category)}.` });
+  }
+  renderLaunchList(document, $('global-scenario-slots'), [...poolRows, ...standalone.values()], {
+    open: id => openDashboardLaunch('scenario', id), stop: id => stopDashboardLaunch('scenario', id),
+  });
   const lists = [
-    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених Send ${row.verifiedSends}; завершених циклів надсилання ${row.completedCycles}; наступний Send не раніше ${row.nextAllowedSendAt ? new Date(row.nextAllowedSendAt).toLocaleString() : 'зараз'}`],
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}${row.slotIndex ? `, чат ${row.slotIndex}` : ''}: поточний логічний крок ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; логічних Send у послідовності ${row.sequenceVerifiedSends ?? row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; підтверджено завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; фізично підтверджених Send-спроб ${row.transportVerifiedSends ?? row.verifiedSends}; повторних або replacement-спроб ${row.retryVerifiedSends || 0}; стан ${globalStateLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
     ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
@@ -4372,6 +4410,8 @@ function portableDraftConfig(session) {
     minimumSendIntervalValue: session.minimumSendIntervalValue ?? session.minimumSendIntervalMinutes ?? 2,
     minimumSendIntervalUnit: session.minimumSendIntervalUnit || 'minutes',
     minimumSendIntervalMinutes: session.minimumSendIntervalMinutes,
+    tabReadyDelaySeconds: session.tabReadyDelaySeconds,
+    postSendDelaySeconds: session.postSendDelaySeconds,
     preSendDelaySeconds: session.preSendDelaySeconds,
     busyCheckDelaySeconds: session.busyCheckDelaySeconds,
     retryBackoffSeconds: session.retryBackoffSeconds,
@@ -4735,6 +4775,8 @@ function renderEditor() {
   $('minimum-send-interval-unit').value = intervalUnit;
   $('minimum-send-interval').value = ui.selected.minimumSendIntervalValue ?? (intervalUnit === 'seconds' ? (ui.selected.minimumSendIntervalSeconds ?? 120) : (ui.selected.minimumSendIntervalMinutes ?? 2));
   syncMinimumSendIntervalBounds();
+  $('tab-ready-delay').value = ui.selected.tabReadyDelaySeconds ?? 0;
+  $('post-send-delay').value = ui.selected.postSendDelaySeconds ?? 5;
   $('pre-send-delay').value = ui.selected.preSendDelaySeconds ?? 20;
   $('busy-check-delay').value = ui.selected.busyCheckDelaySeconds ?? 2;
   const retryBackoffSeconds = ui.selected.retryBackoffSeconds ?? 30;
@@ -4875,6 +4917,8 @@ function collectEditor() {
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
   s.minimumSendIntervalUnit = $('minimum-send-interval-unit').value === 'seconds' ? 'seconds' : 'minutes';
   s.minimumSendIntervalMinutes = s.minimumSendIntervalValue * (s.minimumSendIntervalUnit === 'seconds' ? 1 / 60 : 1);
+  s.tabReadyDelaySeconds = Number($('tab-ready-delay').value);
+  s.postSendDelaySeconds = Number($('post-send-delay').value);
   s.preSendDelaySeconds = Number($('pre-send-delay').value);
   s.busyCheckDelaySeconds = Number($('busy-check-delay').value);
   const retryBackoffUnit = $('retry-backoff-unit').value === 'minutes' ? 'minutes' : 'seconds';
@@ -4944,6 +4988,9 @@ function validate(session) {
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
   if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
+  for (const [field, id] of [['tabReadyDelaySeconds', 'tab-ready-delay'], ['postSendDelaySeconds', 'post-send-delay']]) {
+    if (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > 60) errors.push([id, 'Укажіть ціле число секунд від 0 до 60.']);
+  }
   if (!(session.preSendDelaySeconds >= 1 && session.preSendDelaySeconds <= 30)) errors.push(['pre-send-delay', 'Pre-send delay must be between 1 and 30 seconds.']);
   if (!(session.busyCheckDelaySeconds >= 1 && session.busyCheckDelaySeconds <= 30)) errors.push(['busy-check-delay', 'Busy-check delay must be between 1 and 30 seconds.']);
   if (!(session.retryBackoffSeconds >= 5 && session.retryBackoffSeconds <= 3600)) errors.push(['retry-backoff', 'Retry backoff must be between 5 seconds and 60 minutes.']);

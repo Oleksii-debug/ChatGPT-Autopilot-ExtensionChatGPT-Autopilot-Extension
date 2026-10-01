@@ -30,6 +30,8 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
   const intervalUnit = fields.intervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const interval = exactInteger(fields.interval, 1, intervalUnit === 'seconds' ? 86400 : 1440, 'Інтервал');
   const preSendDelaySeconds = exactInteger(fields.delay, 1, 30, 'Пауза перед Send');
+  const tabReadyDelaySeconds = exactInteger(fields.tabReady ?? 0, 0, 60, 'Пауза після відкриття вкладки');
+  const postSendDelaySeconds = exactInteger(fields.postSend ?? 5, 0, 60, 'Очікування після надсилання');
   const busyCheckDelaySeconds = exactInteger(fields.busy, 1, 30, 'Перевірка зайнятого чату');
   const retryUnit = fields.retryUnit === 'minutes' ? 'minutes' : 'seconds';
   const retryValue = exactInteger(
@@ -55,7 +57,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     tasks, configuredTaskCount,
     runMode: fields.runMode === 'one-pass' ? 'one-pass' : 'continuous',
     minimumSendIntervalValue: interval, minimumSendIntervalUnit: intervalUnit,
-    preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
+    tabReadyDelaySeconds, postSendDelaySeconds, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
     retryPolicy: fields.retryPolicy === 'manual' ? 'manual' : 'safe',
     busyChatBehavior: fields.busyBehavior === 'skip-next' ? 'skip-next' : 'skip-next',
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',

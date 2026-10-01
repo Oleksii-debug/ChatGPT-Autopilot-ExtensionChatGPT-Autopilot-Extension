@@ -104,14 +104,14 @@ export function createTask({ id, url, promptOverride = '', enabled = true, label
   return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '', lastConversationUrl: '', lastAssistantReport: '', lastAssistantReportAt: 0, lastAssistantBaselineCount: 0, lastAssistantBaselineKnown: false };
 }
 
-export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, configuredTaskCount = tasks.length, minimumSendIntervalMs = 120000, preSendDelayMs = 20000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
+export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, configuredTaskCount = tasks.length, minimumSendIntervalMs = 120000, preSendDelayMs = 20000, tabReadyDelayMs = 0, postSendDelayMs = 0, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
   if (!id || !name) throw new Error('Session id and name required');
   if (tasks.length < 1 || tasks.length > MAX_PHYSICAL_TASKS) throw new Error(`Session requires 1-${MAX_PHYSICAL_TASKS} physical tasks`);
   const logicalCount = Number(configuredTaskCount);
   if (!Number.isInteger(logicalCount) || logicalCount < 1 || logicalCount > MAX_LOGICAL_TASKS) throw new Error(`Session configuredTaskCount must be 1-${MAX_LOGICAL_TASKS}`);
   if (logicalCount < tasks.length) throw new Error('Session configuredTaskCount cannot be smaller than physical task count');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, promptCadence: defaultSessionPromptCadence(), drivePromptSources: defaultSessionDrivePromptSources(), runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
+  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, promptCadence: defaultSessionPromptCadence(), drivePromptSources: defaultSessionDrivePromptSources(), runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, tabReadyDelayMs, postSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
 }
 
 function validateTask(task, taskId) {
@@ -204,6 +204,9 @@ function validateSession(session, id) {
   requireRecord(session.tasksById, `session ${id} tasksById`);
   if (!Number.isInteger(session.currentTaskIndex) || session.currentTaskIndex < 0 || session.currentTaskIndex >= session.taskOrder.length) {
     throw new Error('Invalid currentTaskIndex');
+  }
+  for (const field of ['tabReadyDelayMs', 'postSendDelayMs']) {
+    if (session[field] !== undefined && (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > 60000)) throw new Error(`Invalid session ${id} ${field}`);
   }
   for (const field of ['minimumSendIntervalMs', 'preSendDelayMs', 'busyCheckDelayMs', 'retryBackoffMs', 'nextAllowedSendAt', 'lastActionAt', 'lastSuccessfulSendAt', 'createdAt', 'updatedAt']) {
     requireNonNegativeNumber(session[field], `session ${id} ${field}`);

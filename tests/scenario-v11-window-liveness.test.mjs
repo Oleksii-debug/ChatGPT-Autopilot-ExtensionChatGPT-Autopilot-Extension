@@ -138,7 +138,7 @@ test('scenario retains its sending tab and saved window across all response chec
         : { status: 'TEMPORARY_ERROR', safeDiagnosticCode: 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', tabRecoveryPending: true };
     } });
   await manager.create({ config: { steps: [{ prompt: 'ONE' }], closeTabsBetweenChecks: true } });
-  await manager.start('parked');
+  await manager.start('parked', { preferredWindowId: 11 });
   const sessionId = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sessionId].taskOrder[0];
   core.state.sessionsById[sessionId].operation = { phase: 'SENT_VERIFIED', taskId };

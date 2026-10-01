@@ -1694,6 +1694,11 @@
   }
 
   async function submitExisting(doc, request, start, deps) {
+    try { return await submitExistingImpl(doc, request, start, deps); }
+    finally { if (typeof deps.restore === 'function') await deps.restore(); }
+  }
+
+  async function submitExistingImpl(doc, request, start, deps) {
     // Duplicate delivery of the same operation may inspect, never click again.
     if (textEvidenceFor(request) || getAcceptedRepresentationEvidence(request)?.submitAttempted) {
       return verifyAfterUncertain(doc, request, start);
@@ -1751,7 +1756,7 @@
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
     let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && !isFormSubmitter && typeof deps.activate === 'function') {
+    if (backgroundDocument && (!isFormSubmitter || Number(request.postSendDelayMs || 0) > 0) && typeof deps.activate === 'function') {
       const activated = await deps.activate();
       if (activated) {
         for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
@@ -1807,7 +1812,7 @@
         throw error;
       } finally {
         send.removeAttribute('data-autopilot-native-target');
-        if (typeof deps.restore === 'function') await deps.restore();
+        // The content-script outer finally restores focus after dwell and acknowledgement.
       }
     } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
       submitMethod = 'FORM_REQUEST_SUBMIT';
@@ -1815,6 +1820,8 @@
     } else {
       send.click();
     }
+    const postSendDelay = Math.min(60000, Math.max(0, Number(request.postSendDelayMs || 0)));
+    if (postSendDelay > 0) await (deps.wait || wait)(postSendDelay);
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
     let observationPasses = 0;
