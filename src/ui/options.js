@@ -1881,11 +1881,15 @@ function renderScenarioWorkState(item) {
     const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
     addScenarioStateLine('Паралельних чатів', pool?.slots ?? '—');
     addScenarioStateLine(
-      'Успішно надіслано промптів',
+      'З цієї групи перший промпт уже надіслано',
+      pool?.firstPromptSent != null ? `${pool.firstPromptSent}/${pool.slots ?? '—'}` : '—',
+    );
+    addScenarioStateLine(
+      'Усього успішно надіслано промптів',
       pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—',
     );
     addScenarioStateLine(
-      'Отримано завершених відповідей',
+      'Усього отримано завершених відповідей',
       pool?.completedResponses != null ? `${pool.completedResponses}/${pool.plannedSends ?? '—'}` : '—',
     );
     addScenarioStateLine('Зараз чекають відповіді', pool?.waitingResponse ?? '—');
