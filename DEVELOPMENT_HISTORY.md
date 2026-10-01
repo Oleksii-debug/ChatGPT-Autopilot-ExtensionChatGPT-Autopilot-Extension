@@ -334,3 +334,9 @@ Final profile isolation checkpoint — 2026-10-01T20:39:24+02:00
 The local scope ID is also persisted as launch authority, not merely printed. A copied foreign runtime is paused before any operation; explicit restart in a different local scope is rejected even if numeric Chrome tab/window IDs coincide. Startup also fences orphan managed sessions. Scope creation is single-flight per Chrome API instance. Config-only JSON imports stay portable; runtime ownership is not portable. Import-and-start ordinary/simplified launches are pinned before Core execution. Standalone completed scenario restart preserves binding/scope.
 
 Final validation: full Core/Scenario/global/interaction/UI/release suite797 PASS; final targeted window/profile/UI/runtime wiring126 PASS. Counts concern automated models only. Installer archive byte/CRC/import/syntax validation is documented in QA-11.0.8.txt.
+
+## 11.0.9 — 2026-10-02T00:54+02:00
+
+Three 11.0.8 live reports at 22:38–22:39 UTC show five-chat pools with ambiguous hidden form submits and frozen/busy response reads. One pool confirmed six sends but no completed responses in its snapshot; another recorded zero verified sends after five physical attempts. Exact counts, evidence and limitations: INCIDENT-11.0.9.md.
+
+The hidden scenario form now activates its own tab before Send even with 0-second dwell. Read-only response probes can wake an owned frozen tab or refresh one stale background tab, at most once per 15 seconds per window, then restore the previous selection safely. Strict send and APSTEP correlation remain: an unsafe URL-only acknowledgement idea was rejected by an existing negative test and removed. 799 automated regression checks passed. No claim of live server delivery or physical Windows qualification. Installer and full source are versioned independently; private reports are omitted.

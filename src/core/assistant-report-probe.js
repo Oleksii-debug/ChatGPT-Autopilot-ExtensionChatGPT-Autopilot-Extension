@@ -1,5 +1,11 @@
 import { createChatTab, sameChatConversationUrl, isChatAuthUrl } from './tabs.js';
 
+// Chrome freezes background documents independently of their tab lifetime.
+// Wake only one owned tab per window per interval, so large pools cannot spin
+// through activation and make the browser unresponsive.
+const lastFrozenWakeByWindow = new Map();
+const FROZEN_WAKE_INTERVAL_MS = 15_000;
+
 function temporaryReport(code, extra = {}) {
   return {
     status: 'TEMPORARY_ERROR',
@@ -84,6 +90,9 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
   const persistentManagedTab = job?.persistentManagedTab === true;
   let tabId = null;
   let temporaryTab = false;
+  let restoreActiveTabId = null;
+  let wokeTabId = null;
+  let wokeWindowId = null;
 
   try {
     let hinted = await getTab(chromeApi, job?.managedTabId);
@@ -193,8 +202,28 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
         });
       }
 
-      if (persistentManagedTab && existing.frozen === true) {
-        return temporaryReport('ASSISTANT_RESPONSE_TAB_FROZEN', {
+      if (persistentManagedTab && (existing.frozen === true
+          || Number(job?.observationAgeMs || 0) >= 90_000 && existing.active !== true)) {
+        const windowId = existing.windowId;
+        const previousWake = lastFrozenWakeByWindow.get(windowId) || 0;
+        if (job?.managedTabOwned === true && Number.isInteger(windowId)
+            && (!Number.isInteger(job?.preferredWindowId) || windowId === job.preferredWindowId)
+            && Date.now() - previousWake >= FROZEN_WAKE_INTERVAL_MS
+            && chromeApi.tabs?.query && chromeApi.tabs?.update) {
+          lastFrozenWakeByWindow.set(windowId, Date.now());
+          try {
+            const active = await chromeApi.tabs.query({ active: true, windowId });
+            const previous = active?.[0];
+            if (previous?.id !== existing.id) {
+              const woken = await chromeApi.tabs.update(existing.id, { active: true });
+              wokeTabId = existing.id;
+              wokeWindowId = windowId;
+              restoreActiveTabId = previous?.id ?? null;
+              existing = woken || await getTab(chromeApi, existing.id);
+            } else existing = await getTab(chromeApi, existing.id);
+          } catch { /* never navigate, duplicate, or retry Send to wake a tab */ }
+        }
+        if (existing?.frozen === true) return temporaryReport('ASSISTANT_RESPONSE_TAB_FROZEN', {
           tabRecoveryPending: true,
           recoveryPending: true,
           recoveryCategory: 'TAB_FROZEN',
@@ -250,6 +279,12 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
     const report = await transport.execute(tabId, request);
     return { ...report, observedTabId: tabId };
   } finally {
+    if (wokeTabId != null && restoreActiveTabId != null && chromeApi.tabs?.update) {
+      try {
+        const active = await chromeApi.tabs.query({ active: true, windowId: wokeWindowId });
+        if (active?.[0]?.id === wokeTabId) await chromeApi.tabs.update(restoreActiveTabId, { active: true });
+      } catch { /* leave the user's newly selected tab alone */ }
+    }
     if (temporaryTab && tabId != null) {
       try { await chromeApi.tabs.remove(tabId); } catch (_) {}
     }

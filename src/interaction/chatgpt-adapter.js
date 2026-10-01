@@ -1756,7 +1756,8 @@
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
     let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && (!isFormSubmitter || Number(request.postSendDelayMs || 0) > 0) && typeof deps.activate === 'function') {
+    if (backgroundDocument && (!isFormSubmitter || Number(request.postSendDelayMs || 0) > 0
+        || request.requireGenerationAcknowledgement === true) && typeof deps.activate === 'function') {
       const activated = await deps.activate();
       if (activated) {
         for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {

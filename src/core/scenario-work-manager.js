@@ -1593,6 +1593,7 @@ export class ScenarioWorkManager {
         requireWindowBinding: scenario.runtime.windowBindingRequired === true,
         responseCorrelationToken: task.responseCorrelationToken,
         requireStableResponse: true, assistantBaselineKnown: false,
+        observationAgeMs: Math.max(0, now - operation.submitStartedAt),
       });
     } catch (error) {
       await this.recordAssistantObservation({ scenario, participant, task, error, now });
@@ -1707,6 +1708,7 @@ export class ScenarioWorkManager {
         submittedUserMessageKey: task.lastSubmittedUserMessageKey || '',
         responseCorrelationToken: task.responseCorrelationToken || '',
         submittedPromptText: task.responseCorrelationToken ? '' : task.promptOverride,
+        observationAgeMs: Math.max(0, now - Number(task.lastVerifiedSendAt || 0)),
         requireStableResponse: true,
         persistentManagedTab: true,
         requireWindowBinding: runtime.windowBindingRequired === true,

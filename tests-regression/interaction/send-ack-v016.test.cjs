@@ -163,6 +163,27 @@ test('hidden form submission wakes a deferred changed UI once and observes its e
   assert.equal(f.clicks(),0);
   assert.equal(activations,1);
 });
+
+test('managed hidden form is activated before physical Send and requires its appended turn', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/managed'});
+  let activated=0;
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
+    activated++;f.document.visibilityState='visible';return true;
+  }});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(activated,1);
+  assert.equal(f.submits(),1);
+  assert.equal(f.clicks(),0);
+});
+
+test('managed hidden form cannot send when activation fails', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/'});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>false});
+  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(f.submits(),0);
+  assert.equal(f.clicks(),0);
+});
 test('waking the same hidden tab preserves fresh-conversation acknowledgement without another submit',async()=>{
   const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,
     startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/no-turn'});
