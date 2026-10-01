@@ -93,7 +93,19 @@ function waitMs(ms) {
 
 async function protectManagedScenarioTab(chromeApi, session, tab, owned = false) {
   if (session?.scenarioWork?.managed !== true) return tab;
-  if (Number.isInteger(tab?.windowId)) session.scenarioWork.preferredWindowId = tab.windowId;
+  const expectedWindowId = session.scenarioWork.launchWindowId ?? session.scenarioWork.preferredWindowId;
+  if (!Number.isInteger(expectedWindowId)) {
+    throw new TabReadinessError(
+      'SCENARIO_LAUNCH_WINDOW_UNBOUND',
+      'Scenario execution has no immutable launch-window binding',
+    );
+  }
+  if (!Number.isInteger(tab?.windowId) || tab.windowId !== expectedWindowId) {
+    throw new TabReadinessError(
+      'SCENARIO_WRONG_WINDOW',
+      'Scenario-owned ChatGPT tab is outside the window that started this scenario',
+    );
+  }
   if (!owned || !chromeApi.tabs?.update || tab?.id == null) return tab;
   // Undo 11.0.3's residency override once. Chrome must remain free to reclaim
   // memory; polling never rotates active tabs to fight its memory pressure.
@@ -106,35 +118,45 @@ async function protectManagedScenarioTab(chromeApi, session, tab, owned = false)
 // Chrome puts a background tab in the focused window unless windowId is
 // explicit. A Scenario may be running in another window while the user browses.
 export async function createChatTab(chromeApi, url, preferredWindowId = null) {
+  if (Number.isInteger(preferredWindowId)) {
+    if (chromeApi.windows?.get) {
+      try { await chromeApi.windows.get(preferredWindowId); }
+      catch (error) {
+        throw new TabReadinessError(
+          'SCENARIO_LAUNCH_WINDOW_UNAVAILABLE',
+          'The Chrome window that owns this Scenario no longer exists',
+          error,
+        );
+      }
+    }
+    return chromeApi.tabs.create({ url, active: false, windowId: preferredWindowId });
+  }
+
+  // Non-Scenario callers retain the historical best-effort placement policy.
   let candidates = [];
   try { candidates = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' }) || []; } catch { /* fallback below */ }
   const counts = new Map();
   for (const tab of candidates) {
     if (Number.isInteger(tab?.windowId)) counts.set(tab.windowId, (counts.get(tab.windowId) || 0) + 1);
   }
-  let windowId = null;
-  if (Number.isInteger(preferredWindowId)) {
-    windowId = preferredWindowId;
-    if (!counts.has(preferredWindowId) && chromeApi.windows?.get) {
-      try { await chromeApi.windows.get(preferredWindowId); } catch { windowId = null; }
-    }
-  }
-  if (windowId == null && counts.size) {
-    windowId = [...counts].sort((a, b) => b[1] - a[1])[0][0];
-  }
+  const windowId = counts.size ? [...counts].sort((a, b) => b[1] - a[1])[0][0] : null;
   const options = { url, active: false };
   if (windowId != null) options.windowId = windowId;
-  try { return await chromeApi.tabs.create(options); }
-  catch (error) {
-    if (windowId == null || !/window.*(not found|invalid|no window)|no window with id/i.test(String(error?.message || error))) throw error;
-    return chromeApi.tabs.create({ url, active: false });
-  }
+  return chromeApi.tabs.create(options);
 }
 
 function createTaskChatTab(chromeApi, session, url) {
-  return session?.scenarioWork?.managed === true
-    ? createChatTab(chromeApi, url, session.scenarioWork.preferredWindowId)
-    : createChatTab(chromeApi, url, session?.tabWindowId);
+  if (session?.scenarioWork?.managed === true) {
+    const launchWindowId = session.scenarioWork.launchWindowId ?? session.scenarioWork.preferredWindowId;
+    if (!Number.isInteger(launchWindowId)) {
+      throw new TabReadinessError(
+        'SCENARIO_LAUNCH_WINDOW_UNBOUND',
+        'Scenario execution has no immutable launch-window binding',
+      );
+    }
+    return createChatTab(chromeApi, url, launchWindowId);
+  }
+  return createChatTab(chromeApi, url, session?.tabWindowId);
 }
 
 export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
