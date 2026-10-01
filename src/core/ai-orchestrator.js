@@ -364,6 +364,7 @@ export class AiOrchestrator {
           admittedReservation = await lifecycle.beforeProviderCall({
             context: providerCallBudgetContext,
             route: routeIdentity,
+            gatewayUrl: settings.gatewayUrl,
             prompt: callPrompt,
             systemPrompt: callSystem,
             maxOutputTokens: bounded,
