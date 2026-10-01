@@ -241,6 +241,7 @@ export class AutomaticSessionExecutor {
       taskId: task.id,
       providerId,
       mode,
+      requireGenerationAcknowledgement: session?.scenarioWork?.managed === true,
       expectedUrl: task.normalizedUrl || task.url,
       promptText,
       recoveryLaunchUrl: mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT'

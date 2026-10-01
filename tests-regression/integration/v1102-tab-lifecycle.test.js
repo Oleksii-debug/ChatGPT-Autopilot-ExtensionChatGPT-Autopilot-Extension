@@ -54,7 +54,8 @@ function fixture() {
       sends.push({operation:req.requestId,tabId:id,url:tab.url});
       return {status:'SENT_VERIFIED', normalizedObservedUrl:tab.url,assistantBaselineCount:0, submittedUserMessageKey:`message:${req.requestId}`};
     }
-    if (req.mode === 'READ_ASSISTANT_REPORT' && reportOverride) return structuredClone(reportOverride);
+    if (req.mode === 'READ_ASSISTANT_REPORT' && reportOverride) return typeof reportOverride==='function'
+      ? reportOverride(id,req,tab) : structuredClone(reportOverride);
     if (req.mode === 'READ_ASSISTANT_REPORT') return {status:'READY',assistantComplete:true,assistantText:'OK',safeDiagnosticCode:'ASSISTANT_RESPONSE_READY'};
     throw Error(`Unexpected ${req.mode}`);
   }};
@@ -255,4 +256,32 @@ test('restart drains a retired PRE_SEND_WAIT session and its exact held tab inst
   assert.ok(!f.tabs.has(hint.tabId));assert.notEqual((await f.repo.load()).sessionsById[sid]?.operation?.phase,'PRE_SEND_WAIT');
   assert.equal((await f.manager.get(id)).scenario.runtime.cleanupPendingSessionIds.length,0);
   assert.equal(f.sends.length,0);
+});
+
+
+test('five incident chats keep their physical documents when each provisional URL changes after Send',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:5,replacementBudget:0,config:{
+    steps:[{prompt:'Hello',repeat:2}],preSendDelaySeconds:1,pollSeconds:15}});
+  await f.manager.startChatPool(pool.pool.id);
+  f.setReport({status:'BUSY',assistantComplete:false,safeDiagnosticCode:'ASSISTANT_RESPONSE_STREAMING'});
+  for(let i=0;i<5 && f.sends.length<5;i++) {
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    f.advance(2000);
+  }
+  assert.equal(f.sends.length,5);
+  const firstIds=f.sends.map(x=>x.tabId);
+  for(const id of firstIds) f.tabs.get(id).url=`https://chatgpt.com/c/canonical-${id}`;
+  f.setReport((id,req,tab)=>({status:'READY',assistantComplete:true,assistantText:'Hello back',
+    responseAnchorMatched:true,correlationTokenMatched:true,responseAnchorKind:'STEP_MARKER',
+    normalizedObservedUrl:tab.url}));
+  await f.manager.cycleAll();
+  const core=await f.repo.load();
+  for(const scenario of (await f.manager.list()).scenarios) {
+    const session=core.sessionsById[scenario.runtime.chat.sessionId];const task=session.tasksById[session.taskOrder[0]];
+    const hint=core.tabHintsByTaskId[task.id];
+    assert.equal(task.normalizedUrl,`https://chatgpt.com/c/canonical-${hint.tabId}`);
+    assert.equal(task.lastConversationUrl,task.normalizedUrl);assert.equal(hint.normalizedUrl,task.normalizedUrl);
+    assert.equal(scenario.runtime.totalCompletedTurns,1);assert.ok(firstIds.includes(hint.tabId));
+  }
+  assert.equal(f.tabs.size,7);assert.equal(f.sends.length,5);
 });
