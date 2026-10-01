@@ -41,6 +41,14 @@ function requireExactProviderId(providerId) {
   return providerId;
 }
 
+function requestedLaunchUrl(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error('Agent provider launch URL must use exact text representation');
+  }
+  return value;
+}
+
 export function listAgentProviders() {
   return Object.values(DESCRIPTORS).map(item => ({ ...item, capabilities: [...item.capabilities] }));
 }
@@ -77,7 +85,7 @@ export function orchestrationProviderContract(providerId) {
 
 export function resolveAgentProviderLaunchUrl(providerId, requestedUrl = '') {
   const descriptor = orchestrationProviderContract(providerId);
-  const launchUrl = String(requestedUrl || '').trim() || String(descriptor.defaultLaunchUrl || '').trim();
+  const launchUrl = requestedLaunchUrl(requestedUrl, descriptor.defaultLaunchUrl);
   if (!launchUrl) throw new Error(`Agent provider ${descriptor.id} has no launch URL`);
   if (!descriptor.siteAdapterId) throw new Error(`Agent provider ${descriptor.id} has no site adapter for browser launch`);
   requireSiteAdapterUrl(descriptor.siteAdapterId, launchUrl);
