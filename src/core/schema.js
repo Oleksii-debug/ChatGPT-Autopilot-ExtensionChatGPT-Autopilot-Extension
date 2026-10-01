@@ -8,6 +8,7 @@ import {
   createTrustedOutcomeVerificationLedgerV1,
   validateTrustedOutcomeVerificationLedgerStateV1,
 } from './trusted-outcome-verification-ledger.js';
+import { validateOutcomeContractRegistryStateV1 } from './outcome-contract-control.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -65,7 +66,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRoutePoolRevision: 1, aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -73,6 +74,7 @@ export function createEmptyState(now = Date.now()) {
     logs: {},
     diagnostics: [],
     migrationHistory: [],
+    outcomeContractsById: {},
     trustedOutcomeVerificationLedger: structuredClone(createTrustedOutcomeVerificationLedgerV1()),
   };
 }
@@ -271,6 +273,10 @@ export function validateState(state) {
     requireString(normalizedLocalAi.model, 'profile localAi model');
     requireNonNegativeNumber(normalizedLocalAi.timeoutSeconds, 'profile localAi timeoutSeconds');
   }
+  if (state.profile.aiRoutePoolRevision !== undefined
+      && (!Number.isSafeInteger(state.profile.aiRoutePoolRevision) || state.profile.aiRoutePoolRevision < 1)) {
+    throw new Error('Invalid profile aiRoutePoolRevision');
+  }
   if (state.profile.aiRouter !== undefined) {
     requireRecord(state.profile.aiRouter, 'profile aiRouter');
     const normalizedAiRouter = normalizeAiRouterSettings(state.profile.aiRouter);
@@ -350,6 +356,7 @@ export function validateState(state) {
     throw new Error('Invalid diagnostics');
   }
   if (!Array.isArray(state.migrationHistory)) throw new Error('Invalid migrationHistory');
+  validateOutcomeContractRegistryStateV1(state);
   validateTrustedOutcomeVerificationLedgerStateV1(state);
 
   const sessionIds = Object.keys(state.sessionsById);

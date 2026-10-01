@@ -14,6 +14,7 @@ export const OutcomeEvidenceStatus = Object.freeze({
 
 const CRITERION_STATUSES = new Set(Object.values(OutcomeCriterionStatus));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_TEXT = 16_000;
 const MAX_ITEMS = 128;
 const MAX_CONCURRENCY = 128;
@@ -51,6 +52,7 @@ const SOURCE_KEYS = new Set([
   'sourceId',
   'location',
   'revisionId',
+  'contentSha256',
   'purpose',
 ]);
 
@@ -172,8 +174,15 @@ function timestamp(value, label) {
   return canonical;
 }
 
+function digest(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
+    throw new Error(`${label} must be an exact lowercase SHA-256 digest`);
+  }
+  return value;
+}
+
 function integer(value, label, min, max) {
-  if (!Number.isInteger(value) || value < min || value > max) {
+  if (!Number.isInteger(value) || Object.is(value, -0) || value < min || value > max) {
     throw new Error(`${label} must be an exact integer in ${min}..${max}`);
   }
   return value;
@@ -270,12 +279,17 @@ function normalizeCriterion(input) {
 function normalizeSource(input) {
   const raw = record(input, 'OutcomeSourceTruthV1');
   exactKeys(raw, SOURCE_KEYS, 'OutcomeSourceTruthV1');
-  return {
+  const normalized = {
     sourceId: id(own(raw, 'sourceId', 'OutcomeSourceTruthV1'), 'sourceId'),
     location: text(own(raw, 'location', 'OutcomeSourceTruthV1'), 'source location', { max: 8_000 }),
     revisionId: id(own(raw, 'revisionId', 'OutcomeSourceTruthV1'), 'revisionId'),
     purpose: text(own(raw, 'purpose', 'OutcomeSourceTruthV1'), 'source purpose', { max: 4_000 }),
   };
+  const contentSha256 = own(raw, 'contentSha256', 'OutcomeSourceTruthV1', { optional: true });
+  if (contentSha256 !== undefined) {
+    normalized.contentSha256 = digest(contentSha256, 'contentSha256');
+  }
+  return normalized;
 }
 
 function normalizeAuthority(input) {

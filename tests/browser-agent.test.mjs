@@ -119,6 +119,21 @@ test('native click never dispatches when the proven target disappears after debu
   assert.equal(detached, true);
 });
 
+async function enableSpecialistCapacity(manager, maxConcurrentAgents = 4) {
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: {
+      maxConcurrentAgents,
+      maxChildAgents: 16,
+      maxModelCalls: 100,
+      maxModelInputTokens: 100000,
+      maxModelOutputTokens: 100000,
+      maxRuntimeSeconds: 3600,
+      maxCostUsdMicros: 5000000,
+    },
+  });
+}
+
 function config(overrides = {}) {
   return normalizeBrowserAgentConfig({
     id: 'job-1',
@@ -275,6 +290,7 @@ test('job-to-Project resolver composes exact persisted AgentPlan identity and fa
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00.000Z') });
+  await enableSpecialistCapacity(manager);
   await manager.create({ id:'job-1', goal:'Complete a mixed-plane task' });
   await manager.update(store => {
     store.byId['job-1'].runtime.plan = {
@@ -305,7 +321,7 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
       verificationAuthorityId:'policy:archive',
       evidence:'Caller-created text claims fresh artifact evidence.',
     }),
-    /trusted verifier provenance/,
+    /unknown field: verifierId/,
   );
   const after = await manager.listSpecialistHandoffs('job-1');
   const durable = await manager.get('job-1');
@@ -318,6 +334,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
   const chrome = makeChrome();
   let clock = Date.parse('2026-09-23T12:00:00.000Z');
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
+  await enableSpecialistCapacity(manager);
   await manager.create({ id:'job-retry', goal:'Recover an ambiguous specialist effect' });
   await manager.update(store => {
     store.byId['job-retry'].runtime.plan = {
@@ -360,7 +377,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
     agentId,
     leaseId,
     verification,
-  }), /trusted verifier provenance/);
+  }), /unknown field: verification/);
 
   const durable = await manager.get('job-retry');
   assert.equal(durable.job.runtime.specialistHandoffs[0].state, 'LEASED');
@@ -380,6 +397,7 @@ test('product-wide specialist admission is durable across Browser Agent jobs and
   const chrome = makeChrome();
   const at = '2026-09-23T12:00:00.000Z';
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse(at) });
+  await enableSpecialistCapacity(manager);
   for (const jobId of ['job-1', 'job-2']) {
     await manager.create({ id:jobId, goal:`Complete ${jobId}` });
     await manager.update(store => {
