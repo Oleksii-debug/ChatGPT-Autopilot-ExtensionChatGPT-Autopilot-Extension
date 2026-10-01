@@ -672,19 +672,45 @@ function snapshotDefinitionBoundAgentRoutePayload(rawPayload) {
   return snapshot;
 }
 
+function snapshotBrowserAgentProviderBudgetContext(rawContext) {
+  if (rawContext == null) return null;
+  if (typeof rawContext !== 'object' || Array.isArray(rawContext)) {
+    throw new Error('Reusable Agent provider budget context must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(rawContext);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Reusable Agent provider budget context must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawContext);
+  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error('Reusable Agent provider budget context contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Reusable Agent provider budget context fields must be enumerable own data properties');
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+
 async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
-  if (providerCallBudgetContext?.kind !== 'browser-agent'
-      || typeof providerCallBudgetContext.jobId !== 'string') return null;
+  const budgetContext = snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext);
+  if (budgetContext?.kind !== 'browser-agent'
+      || typeof budgetContext.jobId !== 'string') return null;
   const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
-  if (!Number.isSafeInteger(providerCallBudgetContext.controlEpoch)
-      || Object.is(providerCallBudgetContext.controlEpoch, -0)
-      || providerCallBudgetContext.controlEpoch < 1) {
+  if (!Number.isSafeInteger(budgetContext.controlEpoch)
+      || Object.is(budgetContext.controlEpoch, -0)
+      || budgetContext.controlEpoch < 1) {
     throw new Error('Reusable Agent model dispatch requires a canonical positive controlEpoch');
   }
-  const current = await browserAgent.get(providerCallBudgetContext.jobId);
+  const current = await browserAgent.get(budgetContext.jobId);
   const job = current.job;
   if (!job?.definitionModelPolicyBinding) return null;
-  if (job.runtime?.controlEpoch !== providerCallBudgetContext.controlEpoch) {
+  if (job.runtime?.controlEpoch !== budgetContext.controlEpoch) {
     throw new Error('Reusable Agent controlEpoch drifted before model dispatch');
   }
 
@@ -755,7 +781,7 @@ async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudget
     Number.isSafeInteger(requestedCallCeiling) && requestedCallCeiling > 0
       ? Math.min(requestedCallCeiling, boundRouteCallCeiling)
       : boundRouteCallCeiling;
-  return { payload:sanitizedPayload, envelope };
+  return { payload:sanitizedPayload, envelope, providerCallBudgetContext:budgetContext };
 }
 
 function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
@@ -765,7 +791,7 @@ function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
       'RUN_AI_ROUTED_PROMPT',
       bound ? bound.payload : payload || {},
       {
-        providerCallBudgetContext,
+        providerCallBudgetContext: bound ? bound.providerCallBudgetContext : providerCallBudgetContext,
         ...(bound ? { agentModelOrchestratorEnvelope:bound.envelope } : {}),
       },
     );
