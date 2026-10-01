@@ -1113,10 +1113,16 @@ export class CoreCommandDispatcher {
         if (currentSettings.enabled !== true) {
           throw new Error('Current canonical AI Router is disabled before Agent model invocation');
         }
-        const currentRoutePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-          && state.profile.aiRoutePoolRevision > 0
-          ? state.profile.aiRoutePoolRevision
-          : 1;
+        const currentRoutePoolRevisionValue = state.profile?.aiRoutePoolRevision;
+        if (currentRoutePoolRevisionValue != null
+            && (!Number.isSafeInteger(currentRoutePoolRevisionValue)
+              || Object.is(currentRoutePoolRevisionValue, -0)
+              || currentRoutePoolRevisionValue < 1)) {
+          throw new Error('Current canonical AI route-pool revision is invalid before Agent model invocation');
+        }
+        const currentRoutePoolRevision = currentRoutePoolRevisionValue == null
+          ? 1
+          : currentRoutePoolRevisionValue;
         if (currentRoutePoolRevision !== internalEnvelope.routePoolRevision) {
           throw new Error('Agent model route-pool revision drifted before provider invocation');
         }
