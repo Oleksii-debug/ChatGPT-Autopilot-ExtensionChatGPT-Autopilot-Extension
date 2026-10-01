@@ -266,8 +266,8 @@
           <p>Створення зберігає нове завдання у стані STOPPED і не запускає Agent. Бюджет береться з поточних полів Safety / Budget нижче.</p>
           <label for="agent-definition-launch-goal">Завдання власника</label>
           <textarea id="agent-definition-launch-goal" rows="5" maxlength="50000" spellcheck="true"></textarea>
-          <label for="agent-definition-launch-project-id">Project ID — необов’язково</label>
-          <input id="agent-definition-launch-project-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="agent-definition-launch-project-id">Project ID — обов’язково для model authority</label>
+          <input id="agent-definition-launch-project-id" type="text" maxlength="180" autocomplete="off" spellcheck="false" required aria-required="true">
           <label for="agent-definition-launch-job-id">Job ID — необов’язково; якщо порожньо, буде створено автоматично</label>
           <input id="agent-definition-launch-job-id" type="text" maxlength="128" autocomplete="off" spellcheck="false">
 

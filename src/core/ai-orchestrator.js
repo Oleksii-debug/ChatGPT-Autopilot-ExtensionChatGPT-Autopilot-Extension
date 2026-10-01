@@ -338,7 +338,7 @@ export class AiOrchestrator {
       if (error && (typeof error === 'object' || typeof error === 'function')) nonProviderRouteFailures.add(error);
       return attachFailureRuntime(error);
     };
-    const invoke = async (route, callPrompt, callSystem, bounded) => {
+    const invoke = async (route, callPrompt, callSystem, bounded, requestedRole = taskRole) => {
       if (callCeiling && callsUsed >= callCeiling) {
         const error = new Error('AI model-call budget exhausted before another provider call');
         error.code = 'AI_MODEL_CALL_BUDGET_EXHAUSTED';
@@ -364,6 +364,10 @@ export class AiOrchestrator {
           admittedReservation = await lifecycle.beforeProviderCall({
             context: providerCallBudgetContext,
             route: routeIdentity,
+            gatewayUrl: settings.gatewayUrl,
+            taskRole: requestedRole,
+            capabilityIds: [...capabilityIds],
+            requiresVision: Boolean(clean(imageDataUrl)),
             prompt: callPrompt,
             systemPrompt: callSystem,
             maxOutputTokens: bounded,
@@ -445,6 +449,7 @@ export class AiOrchestrator {
           callPrompt,
           callSystem,
           bounded,
+          requestedRole,
         );
         return {
           ...admitted.value,
@@ -464,7 +469,7 @@ export class AiOrchestrator {
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
           const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
-          const admitted = await invoke(route, routePrompt, routeSystem, bounded);
+          const admitted = await invoke(route, routePrompt, routeSystem, bounded, requestedRole);
           const value = admitted.value;
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           selectedRouteId = route.routeId;

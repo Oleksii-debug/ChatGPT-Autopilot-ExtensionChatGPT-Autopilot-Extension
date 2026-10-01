@@ -405,8 +405,8 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
     },
   };
   const lifecycle = {
-    async beforeProviderCall({ context, route, maxOutputTokens, callNumber }) {
-      events.push(['before', context.jobId, route.model, maxOutputTokens, callNumber]);
+    async beforeProviderCall({ context, route, gatewayUrl, taskRole, capabilityIds, requiresVision, maxOutputTokens, callNumber }) {
+      events.push(['before', context.jobId, route.model, gatewayUrl, taskRole, capabilityIds, requiresVision, maxOutputTokens, callNumber]);
       return {
         reservationId:`${context.jobId}:model-budget:${callNumber}`,
         controlEpoch: context.controlEpoch,
@@ -433,10 +433,44 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
   );
   assert.equal(result.text, 'done');
   assert.deepEqual(events, [
-    ['before','job-1','qwen:8b',128,1],
+    ['before','job-1','qwen:8b','http://127.0.0.1:17621','planner',[],false,128,1],
     ['gateway','qwen:8b'],
     ['after','job-1','job-1:model-budget:1','qwen:8b',true,8],
   ]);
+});
+
+test('legacy strong-only provider lifecycle receives the requested strong task role', async () => {
+  const roles = [];
+  const gateway = new FakeGateway(['strong answer']);
+  const lifecycle = {
+    async beforeProviderCall({ context, route, taskRole, callNumber }) {
+      roles.push(taskRole);
+      return {
+        reservationId:`${context.jobId}:model-budget:${callNumber}`,
+        controlEpoch: context.controlEpoch,
+        callNumber,
+        routeId: route.routeId,
+        provider: route.provider,
+        model: route.model,
+        modelCalls: 1,
+      };
+    },
+    async afterProviderCall() {},
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 80_500 });
+  const result = await router.run(
+    settings({ mode:'strong' }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'task',
+    {
+      maxOutputTokens:128,
+      taskRole:'planner',
+      strongTaskRole:'verifier',
+      providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-strong-role', controlEpoch:2 },
+    },
+  );
+  assert.equal(result.text, 'strong answer');
+  assert.deepEqual(roles, ['verifier']);
 });
 
 test('provider-call lifecycle conservatively settles an admitted failed gateway attempt before failover logic continues', async () => {
