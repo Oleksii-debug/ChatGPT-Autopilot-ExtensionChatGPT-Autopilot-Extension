@@ -32,6 +32,7 @@ function managerFor(chrome, createId = () => 'job.generated') {
     routePrompt: async () => ({ text: '{}' }),
     readModelRouteContext: async () => ({
       routePoolRevision: 7,
+      gatewayUrl: 'http://127.0.0.1:3210',
       routePool: [{
         schemaVersion: 1,
         routeId: 'route.research',
@@ -177,6 +178,7 @@ test('definition-bound provider reservation revalidates current Router authority
   const { chrome } = makeChromeStorage();
   let routeContext = {
     routePoolRevision: 7,
+    gatewayUrl: 'http://127.0.0.1:3210',
     routePool: [{
       schemaVersion: 1,
       routeId: 'route.research',
@@ -217,6 +219,7 @@ test('definition-bound provider reservation revalidates current Router authority
       model:'research-local',
       endpointId:'',
     },
+    gatewayUrl:'http://127.0.0.1:3210',
     callNumber:1,
   });
 
@@ -243,6 +246,14 @@ test('definition-bound provider reservation revalidates current Router authority
   routeContext = {
     ...routeContext,
     routePool:[{ ...routeContext.routePool[0], model:'research-local' }],
+    gatewayUrl:'http://127.0.0.1:9999',
+  };
+  await assert.rejects(request, /Gateway identity drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    gatewayUrl:'http://127.0.0.1:3210',
   };
   const reservation = await request();
   assert.match(reservation.reservationId, /^job\.provider-revalidation:model-budget:/);
@@ -284,6 +295,7 @@ test('definition-bound provider reservation rejects a definition revision change
         model:'research-local',
         endpointId:'',
       },
+      gatewayUrl:'http://127.0.0.1:3210',
       callNumber:1,
     }),
     /definition authority drifted before provider admission/,
@@ -678,6 +690,8 @@ test('Core prepares definition-bound Browser Agent model calls through the canon
   assert.match(source, /snapshotDefinitionBoundAgentRoutePayload/);
   assert.match(source, /Object\.getOwnPropertyDescriptors\(rawPayload\)/);
   assert.match(source, /snapshotBrowserAgentProviderBudgetContext/);
+  assert.match(source, /gatewayUrl:\s*settings\.gatewayUrl/);
+  assert.match(source, /gatewayUrl,/);
   assert.match(source, /Object\.getOwnPropertyDescriptors\(rawContext\)/);
   assert.match(source, /controlEpoch drifted before model dispatch/);
   assert.match(source, /runState\?\. !== BrowserAgentRunState\.RUNNING|runState\s*!==\s*BrowserAgentRunState\.RUNNING/);
