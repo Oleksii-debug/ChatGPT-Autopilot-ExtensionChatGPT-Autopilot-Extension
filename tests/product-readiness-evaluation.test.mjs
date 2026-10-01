@@ -17,6 +17,10 @@ function currentReadiness(overrides = {}) {
     schemaVersion: 1,
     providerId: 'github/api',
     toolId: '',
+    sourceId: 'test.product-readiness-health',
+    sourceRevision: 1,
+    observedAt: '2026-09-25T10:04:00.000Z',
+    validThrough: '2026-09-25T23:59:59.999Z',
     health: 'READY',
     installationRequired: false,
     installed: true,
@@ -434,4 +438,19 @@ test('readiness report is deeply frozen and grants no policy, execution or relea
   assert.ok(Object.isFrozen(report.providerChecks[0]));
   assert.ok(Object.isFrozen(report.benchmarkChecks));
   assert.ok(Object.isFrozen(report.summary));
+});
+
+test('required provider readiness becomes UNKNOWN when base readiness is stale despite fresh canary evidence', () => {
+  const provider = providerCheck({
+    currentReadiness: currentReadiness({
+      observedAt: '2026-09-25T10:00:00.000Z',
+      validThrough: '2026-09-25T10:04:59.999Z',
+    }),
+  });
+  const report = buildProductReadinessEvaluationV1(request({ providerChecks: [provider] }));
+  assert.equal(report.status, ProductReadinessGateStatus.UNKNOWN);
+  assert.equal(report.providerChecks[0].health, 'UNKNOWN');
+  assert.equal(report.providerChecks[0].gateStatus, 'UNKNOWN');
+  assert.equal(report.providerChecks[0].reasonCode, 'PROVIDER_HEALTH_UNKNOWN');
+  assert.equal(report.providerChecks[0].sourceReasonCode, 'PROVIDER_STATE_STALE');
 });
