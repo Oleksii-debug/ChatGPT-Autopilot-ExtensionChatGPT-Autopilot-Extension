@@ -220,6 +220,67 @@ test('canonical route normalization preserves unknown pricing and metering rejec
   assert.equal(unusedUnknownOutput.costUsdMicros, 2);
 });
 
+test('signed zero is rejected at financial evidence boundaries while canonical positive zero remains valid', () => {
+  const freeRoute = route({
+    routeId: 'ollama-canonical-zero',
+    provider: 'ollama',
+    model: 'local-model',
+    locality: 'local',
+    costClass: 'free',
+    inputPricePerMillionUsd: 0,
+    outputPricePerMillionUsd: 0,
+  });
+  const canonical = meterAiRouteUsageV1({
+    route: freeRoute,
+    invocationId: 'invoke-canonical-zero',
+    inputTokens: 0,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  assert.equal(Object.is(canonical.inputTokens, 0), true);
+  assert.equal(Object.is(canonical.outputTokens, 0), true);
+  assert.equal(Object.is(canonical.inputPricePerMillionUsd, 0), true);
+  assert.equal(Object.is(canonical.outputPricePerMillionUsd, 0), true);
+  assert.equal(Object.is(canonical.costUsdMicros, 0), true);
+
+  assert.throws(() => meterAiRouteUsageV1({
+    route: freeRoute,
+    invocationId: 'invoke-negative-zero-input',
+    inputTokens: -0,
+    outputTokens: 0,
+    observedAt: AT,
+  }), /safe integer/);
+
+  assert.throws(() => meterAiRouteUsageV1({
+    route: freeRoute,
+    invocationId: 'invoke-negative-zero-output',
+    inputTokens: 0,
+    outputTokens: -0,
+    observedAt: AT,
+  }), /safe integer/);
+
+  assert.throws(
+    () => normalizeAiCostRecordV1({ ...canonical, costUsdMicros: -0 }),
+    /safe integer/,
+  );
+  assert.throws(
+    () => normalizeAiCostRecordV1({ ...canonical, inputPricePerMillionUsd: -0 }),
+    /input price is invalid/,
+  );
+  assert.throws(
+    () => normalizeAiCostRecordV1({ ...canonical, outputPricePerMillionUsd: -0 }),
+    /output price is invalid/,
+  );
+
+  assert.throws(() => meterAiRouteUsageV1({
+    route: { ...freeRoute, inputPricePerMillionUsd: -0 },
+    invocationId: 'invoke-negative-zero-route-price',
+    inputTokens: 0,
+    outputTokens: 0,
+    observedAt: AT,
+  }), /canonical number for cost metering|input price is invalid/);
+});
+
 test('persisted zero-cost evidence must carry an explicit costUsdMicros field', () => {
   const freeRecord = meterAiRouteUsageV1({
     route: route({
