@@ -3644,7 +3644,7 @@ export class BrowserAgentManager {
       throw error;
     }
     let reservation = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[jobId];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
