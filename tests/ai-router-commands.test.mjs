@@ -802,7 +802,7 @@ function internalAgentEnvelope(overrides = {}) {
     projectId: 'project.alpha',
     definitionModelPolicyBindingKey: 'definition.binding',
     modelPolicyBindingKey: 'model.binding',
-    routePoolRevision: 9,
+    routePoolRevision: 1,
     role: 'coder',
     capabilityIds: ['cap.reason'],
     requiresVision: false,
@@ -1368,6 +1368,30 @@ test('internal Agent envelope rejects route-state leakage before model invocatio
   assert.equal(calls, 0);
 });
 
+
+test('internal Agent envelope rechecks live route-pool revision before provider invocation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  repo.state.profile.aiRoutePoolRevision = envelope.routePoolRevision + 1;
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128, maxModelCallsForRequest: 1 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /route-pool revision drifted before provider invocation/u,
+  );
+  assert.equal(calls, 0);
+});
 
 test('internal Agent envelope rechecks live canonical Router deny before provider invocation', async () => {
   let calls = 0;
