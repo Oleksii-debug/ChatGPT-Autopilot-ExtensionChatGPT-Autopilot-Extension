@@ -571,6 +571,11 @@ export class ScenarioWorkManager {
         if (summary.replacementsUsed >= summary.replacementBudget) {
           if (completedSequence) {
             next.runState = ScenarioWorkRunState.COMPLETED;
+            // No replacement was admitted. Preserve the generation whose
+            // completed responses are being displayed instead of resetting
+            // the pool projection to an imaginary next chat.
+            next.generation = item.runtime.generation;
+            next.chat.generation = item.runtime.chat.generation;
             next.phase = 'COMPLETE';
             next.chat.state = ScenarioParticipantState.RETIRED;
             next.chat.chatUrl = '';
@@ -1149,6 +1154,26 @@ export class ScenarioWorkManager {
     const session = before.sessionsById?.[sessionId];
     if (!session?.scenarioWork?.managed) return { removed: true, pending: false, reason: 'ALREADY_GONE' };
 
+    if (forceSafe) {
+      // Only a durable timeout or explicit owner retirement authorizes this.
+      // Settle unknown effects without inventing Send/response success, and
+      // fence the executor BEFORE removing the physical document.
+      await this.coreRepository.update(state => {
+        const live = state.sessionsById?.[sessionId];
+        if (!live?.scenarioWork?.managed) return state;
+        live.enabled = false; live.runState = RunState.STOPPED;
+        if (live.operation && !SAFE_OPERATION_PHASES.has(live.operation.phase)) {
+          live.operation.phase = OperationPhase.FAILED_SAFE;
+          live.operation.updatedAt = this.now();
+          appendDiagnostic(state, { event: 'СЦЕНАРІЙ_НЕПІДТВЕРДЖЕНУ_ОПЕРАЦІЮ_ПРИПИНЕНО',
+            sessionId, code: 'SCENARIO_RETIRED_NO_RESEND',
+            message: 'Retirement authorized; unresolved effect is not counted or replayed.' }, { at: this.now() });
+        }
+        if (state.sendArbiter?.lease?.ownerSessionId === sessionId) state.sendArbiter.lease = null;
+        return state;
+      });
+    }
+
     const ownedHints = Object.entries(before.tabHintsByTaskId || {})
       .filter(([, hint]) => hint?.sessionId === sessionId && Number.isInteger(hint?.tabId) && hint?.ownedByExtension === true)
       .map(([key, hint]) => ({ key, tabId: hint.tabId }));
@@ -1299,7 +1324,8 @@ export class ScenarioWorkManager {
     const removed = [];
     const pending = [];
     for (const sessionId of ids) {
-      const result = await this.cleanupManagedSession(sessionId, { forceSafe });
+      const retired = !scenarioWorkParticipants(current.scenario.runtime).some(item => item.sessionId === sessionId);
+      const result = await this.cleanupManagedSession(sessionId, { forceSafe: forceSafe || retired });
       if (result.removed) removed.push(sessionId); else pending.push(sessionId);
     }
     if (removed.length) {
@@ -1438,7 +1464,28 @@ export class ScenarioWorkManager {
       const session = core.sessionsById?.[participant.sessionId];
       const participantTaskId = participant.taskIdCore || participant.taskId;
       const task = session?.tasksById?.[participantTaskId];
-      if (!session || !task || !task.lastVerifiedSendAt || !task.lastConversationUrl) continue;
+      if (!session || !task) continue;
+      if (!task.lastVerifiedSendAt) {
+        // Logical launch can wait behind Core admission/rate limits. No
+        // physical chat exists yet, so queue time cannot consume replacement
+        // budget. Once bound, give even an unconfirmed Send its hard timeout.
+        const hint = core.tabHintsByTaskId?.[participantTaskId];
+        const bound = hint?.sessionId === participant.sessionId && hint.ownedByExtension === true
+          && Number.isInteger(hint.tabId);
+        const desiredDeadline = bound
+          ? (participant.physicalDeadlineAt || now + scenario.config.responseTimeoutMinutes * 60_000) : 0;
+        if (participant.deadlineAt !== desiredDeadline || (bound && !participant.physicalDeadlineAt)) {
+          const pending = ensureManagerRuntimeFields(runtime);
+          const waiting = scenarioWorkParticipants(pending).find(item => item.key === participant.key);
+          waiting.deadlineAt = desiredDeadline;
+          if (bound) waiting.physicalDeadlineAt = desiredDeadline;
+          const checkpoint = await this.checkpointRuntime(scenario.id, pending, expectedOwnerEpoch, now);
+          if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
+          runtime = checkpoint.runtime;
+        }
+        continue;
+      }
+      if (!task.lastConversationUrl) continue;
       const freshVerifiedSend = participant.deadlineSendAt !== task.lastVerifiedSendAt;
       if (freshVerifiedSend) {
         const anchored = ensureManagerRuntimeFields(runtime);

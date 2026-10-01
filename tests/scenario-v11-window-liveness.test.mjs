@@ -84,7 +84,7 @@ test('login redirect before first Send retains the same owned Scenario tab', asy
   assert.equal(removes, 0);
 });
 
-test('an expired pre-Send draft is retired before a replacement is materialized', async () => {
+test('a launch with no physical tab waits without consuming timeout replacements', async () => {
   let now = 1000;
   const data = {};
   const chrome = { storage: { local: {
@@ -104,10 +104,10 @@ test('an expired pre-Send draft is retired before a replacement is materialized'
   await manager.cycleOne('same-tab');
   const live = (await manager.get('same-tab')).scenario.runtime;
   assert.equal(live.chat.sessionId, sessionId);
-  assert.equal(live.totalLaunches, 2);
-  assert.equal(core.state.sessionsById[sessionId].createdAt, now);
+  assert.equal(live.totalLaunches, 1);
+  assert.equal(core.state.sessionsById[sessionId].createdAt, 1000);
   assert.equal(core.state.sessionsById[sessionId].tasksById[taskId].lastVerifiedSendAt, 0);
-  assert.ok(live.chat.deadlineAt > now);
+  assert.equal(live.chat.deadlineAt, 0);
 });
 
 test('scenario retains its sending tab and saved window across all response checks', async () => {

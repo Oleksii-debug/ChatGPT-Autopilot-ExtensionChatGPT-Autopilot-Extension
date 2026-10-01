@@ -23,14 +23,17 @@ export async function createRecordedOwnedTab(repository, chromeApi, owner, optio
   const sessionBefore = before.sessionsById?.[sessionId];
   const transient = sessionBefore?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
     || sessionBefore?.scenarioWork?.managed === true;
-  if (transient) {
-    const limit = Math.max(1, Math.min(sessionBefore?.scenarioWork?.managed === true ? 3 : 1000,
+  // Resident Scenario documents are bounded by their durable participants,
+  // not the number of concurrent executor requests. A whole prompt sequence
+  // must remain open; an operation cap of 3/10 cannot admit a 15-chat pool.
+  if (transient && sessionBefore?.scenarioWork?.managed !== true) {
+    const limit = Math.max(1, Math.min(1000,
       Math.floor(Number(before.profile?.maxConcurrentSessionOperations) || 10)));
     let live = 0;
     for (const [key, hint] of Object.entries(before.tabHintsByTaskId || {})) {
       if (key === hintKey || hint.ownedByExtension !== true) continue;
       const other = before.sessionsById?.[hint.sessionId];
-      if (other?.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK && other?.scenarioWork?.managed !== true) continue;
+      if (other?.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK || other?.scenarioWork?.managed === true) continue;
       try { await chromeApi.tabs.get(hint.tabId); live += 1; }
       catch (error) { if (!tabAbsent(error)) throw error; }
     }

@@ -108,14 +108,14 @@ test('five scenario slots complete 17 turns and one replacement each with bounde
     if(i===62 || i===185) f.restart();
     const state=await f.repo.load(); const hints=Object.values(state.tabHintsByTaskId);
     const ids=hints.map(h=>h.tabId); assert.equal(new Set(ids).size,ids.length,'one physical owner per tab');
-    assert.ok(hints.length<=3,`hints=${hints.length}`);
+    assert.ok(hints.length<=5,`hints=${hints.length}`);
     for(const tab of f.tabs.values()) if(tab.id>2) {
       assert.equal(tab.windowId,11); assert.ok(hints.some(h=>h.tabId===tab.id),'no untracked probe or draft');
     }
     if(f.sends.length===170) break;
   }
   assert.equal(f.sends.length,170);
-  assert.ok(f.maxTabs<=5,`peak=${f.maxTabs}`);
+  assert.ok(f.maxTabs<=7,`peak=${f.maxTabs}`);
   for(let i=0;i<5;i++){f.advance();await f.manager.cycleAll();await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,now:()=>f.now});}
   assert.equal(f.tabs.size,2,'all owned scenario tabs retired');
 });
@@ -196,4 +196,63 @@ for (const minutes of [35, 45]) test(`scenario keeps its exact physical tab unti
   assert.notEqual(f.sends[1].tabId,sent.tabId);
   assert.notEqual(f.sends[1].url,sent.url,'replacement is a fresh conversation, not a report-only reopen');
   assert.equal(f.tabs.get(f.sends[1].tabId).windowId,11);
+});
+
+
+test('15 resident scenario chats advance independently with executor concurrency 3, restart and another focused window', async () => {
+  const f=fixture(); f.guardCycle(3);
+  await f.repo.update(state=>{state.profile.maxConcurrentSessionOperations=3;return state;});
+  const pool=await f.manager.createChatPool({count:15,replacementBudget:0,config:{mode:'CHAT_CYCLE',
+    steps:[{prompt:'Привіт',repeat:1},{prompt:'Як справи',repeat:1},{prompt:'Розкажи новини',repeat:1}],
+    responseTimeoutMinutes:45,preSendDelaySeconds:1,pollSeconds:15}});
+  await f.manager.startChatPool(pool.pool.id);
+  for(let i=0;i<30;i++) {
+    await f.manager.cycleAll();
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    f.advance(2000);
+    if(i===3) f.restart();
+    const core=await f.repo.load(); const hints=Object.values(core.tabHintsByTaskId);
+    assert.ok(hints.length<=15); assert.equal(new Set(hints.map(h=>h.tabId)).size,hints.length);
+    for(const tab of f.tabs.values()) if(tab.id>2) {
+      assert.equal(tab.windowId,11);assert.ok(hints.some(h=>h.tabId===tab.id));
+    }
+    if(f.sends.length===45) break;
+  }
+  assert.equal(f.sends.length,45);assert.equal(new Set(f.sends.map(x=>x.tabId)).size,15);
+  assert.ok(f.maxTabs<=17);
+  for(let i=0;i<4;i++){f.advance();await f.manager.cycleAll();}
+  assert.equal(f.tabs.size,2);
+  assert.equal((await f.manager.list()).pools[0].completedResponses,45);
+});
+
+test('queued launch waits past 45 minutes without spending replacements; admitted unconfirmed Send has a hard timeout',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{steps:[{prompt:'Hello',repeat:2}],responseTimeoutMinutes:45,preSendDelaySeconds:1}});
+  await f.manager.startChatPool(pool.pool.id);const id=pool.ids[0];
+  f.advance(46*60_000);await f.manager.cycleOne(id);f.restart();f.advance(46*60_000);await f.manager.cycleOne(id);
+  let scenario=(await f.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.chat.deadlineAt,0);assert.equal(scenario.runtime.poolReplacementsUsed,0);
+  const sid=scenario.runtime.chat.sessionId;await f.executor.runSessionOnce(sid);
+  await f.manager.cycleOne(id);scenario=(await f.manager.get(id)).scenario;
+  const hint=Object.values((await f.repo.load()).tabHintsByTaskId)[0];
+  const deadline=scenario.runtime.chat.deadlineAt;assert.equal(deadline,f.now+45*60_000);
+  f.advance(45*60_000-1);await f.manager.cycleOne(id);assert.ok(f.tabs.has(hint.tabId));
+  f.advance(2);await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(hint.tabId));assert.notEqual((await f.repo.load()).sessionsById[sid]?.operation?.phase,'PRE_SEND_WAIT');
+  assert.equal((await f.manager.get(id)).scenario.runtime.poolReplacementsUsed,1);
+  assert.equal(f.sends.length,0);
+});
+
+test('restart drains a retired PRE_SEND_WAIT session and its exact held tab instead of leaving a stopped owner forever',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{steps:[{prompt:'Hello',repeat:2}],preSendDelaySeconds:1}});
+  await f.manager.startChatPool(pool.pool.id);const id=pool.ids[0];
+  let scenario=(await f.manager.get(id)).scenario;const sid=scenario.runtime.chat.sessionId;
+  await f.executor.runSessionOnce(sid);const hint=Object.values((await f.repo.load()).tabHintsByTaskId)[0];
+  await f.manager.update(store=>{const r=store.byId[id].runtime;r.cleanupPendingSessionIds=[sid];
+    r.chat.sessionId='';r.chat.taskId='';r.chat.taskIdCore='';r.chat.state='NEW';return store;});
+  f.restart();await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(hint.tabId));assert.notEqual((await f.repo.load()).sessionsById[sid]?.operation?.phase,'PRE_SEND_WAIT');
+  assert.equal((await f.manager.get(id)).scenario.runtime.cleanupPendingSessionIds.length,0);
+  assert.equal(f.sends.length,0);
 });

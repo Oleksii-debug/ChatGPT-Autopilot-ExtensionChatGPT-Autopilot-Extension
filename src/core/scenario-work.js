@@ -507,6 +507,7 @@ export function applyScenarioLaunch(runtimeRaw, action, { sessionId, taskId, now
   item.sessionId = sessionId || item.sessionId;
   item.taskId = taskId || item.taskId;
   item.launchedAt = now;
+  item.physicalDeadlineAt = 0;
   item.deadlineAt = Number(action.deadlineAt || 0);
   item.completedAt = 0;
   item.lastError = '';

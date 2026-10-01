@@ -1229,6 +1229,7 @@
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
       ...doc.querySelectorAll('[data-testid="user-message"]'),
+      ...doc.querySelectorAll('[data-turn="user"]'),
     ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
@@ -1260,7 +1261,10 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key], [data-conversation-role="assistant"], [data-markdown-text-style="assistant-message"]'))
+    const candidates = [...new Set([
+      ...doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key], [data-conversation-role="assistant"], [data-markdown-text-style="assistant-message"]'),
+      ...doc.querySelectorAll('[data-turn="assistant"]'),
+    ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         // Work exposes separate keyed units for the user and assistant within

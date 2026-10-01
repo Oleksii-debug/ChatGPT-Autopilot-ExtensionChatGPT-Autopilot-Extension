@@ -1,0 +1,20 @@
+Пілот 11.0.6 High — QA, 2026-10-01T08:36:06+02:00
+
+PASS: 699 перевірок Scenario/Core, Interaction, UI та Release. Після фінального виправлення покоління повторно PASS 409 Scenario/Core. Окремо PASS 67 Integration. Набори перетинаються; це не 1175 унікальних тестів.
+
+Нові поведінкові перевірки:
+- 15 resident chats, 3 simultaneous Core operations: 45 verified Sends, 45 confirmed assistant responses, 15 unique physical tab IDs; worker restart, unrelated focused YouTube window, no orphan/draft duplicate; peak 17 tabs includes 2 unowned fixture tabs.
+- Queue without physical tab survives two 46-minute advances and restart without replacement consumption.
+- Bound unconfirmed pre-Send operation remains open until 45 minutes, then exact tab retires; unknown effect remains uncounted and never replayed.
+- Old retired PRE_SEND_WAIT cleanup obligation drains after restart, then next launch proceeds.
+- data-turn user/assistant divs without article wrappers yield correlated reply.
+- Completed zero-replacement pool keeps completed response count instead of displaying an imaginary next generation.
+
+Retained integration proof: ordinary open-close 35+ verified sends through restart/failed closes; 5 slots × 17 turns × 2 generations =170 Sends; exact scenario tab remains open until configured 35/45-minute timeout. High advisory up to3 attempts preserved.
+
+Reports analyzed: all four 2026-10-01 06:14–06:15 UTC attachments run 11.0.4. Fourth profile has15 Core sessions:11 RUNNING+CAPACITY_WAIT without bindings,2 WAITING_RESPONSE with verified Send,2 STOPPED with bindings. 523 capacity-code occurrences in retained1000-event slice. Snapshot shows4 bound IDs, not enough to prove the complete historical peak of5. Other scenario reports show repeated conversation identity loss and response probes with no recognized user/assistant turns; div-selector coverage is a tested improvement, not proof of the live site's exact DOM.
+Ordinary report: persisted67 verified sends; retained1000 events contain37 SENT runtime outcomes and37 fresh-conversation verification codes. Older30 are outside this retained event window; no claim of67 completed assistant responses.
+
+Tests use mocked Chrome APIs/DOM and real production scheduler/executor/manager; physical Windows/Chrome/NVDA unavailable. No real account sends executed here. Whole Agent platform remains unqualified with the previously documented33 baseline gaps; Agent UI11.0.5 preserved.
+
+Final archive check: CRC, all 227 packaged JavaScript syntax and local dependency closure PASS. Byte-identical source/ZIP and deterministic rebuild checked.
