@@ -100,8 +100,12 @@ function reportSession(session, state) {
     line('  поточне завдання', safeText(currentTask?.label || currentTask?.id || '', 160)),
     line('  стан завдання', currentTask?.status),
     line('  режим вкладок', session.tabStrategy),
-    line('  вікно запуску сценарію', session.scenarioWork?.launchWindowId ?? session.scenarioWork?.preferredWindowId),
-    line('  фактичне вікно вкладки', session.tabWindowId),
+    ...(session.scenarioWork?.managed === true
+      ? [
+          line('  вікно запуску сценарію', session.scenarioWork?.launchWindowId ?? session.scenarioWork?.preferredWindowId),
+          line('  фактичне вікно вкладки', session.tabWindowId),
+        ]
+      : [line('  робоче вікно', session.tabWindowId)]),
     line('  прив’язані вкладки', hints.map(hint => `${hint.tabId}; owned=${hint.ownedByExtension === true}; closing=${hint.retirePending === true}`).join(' | ')),
     line('  етап операції', session.operation?.phase || OperationPhase.NONE),
     line('  очікувана розмова', redactChatGptUrl(session.operation?.targetUrl || currentTask?.normalizedUrl || currentTask?.url)),
