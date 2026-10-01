@@ -41,6 +41,7 @@ import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orches
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
+import { normalizeSelfRepairCycleV1, assessSelfRepairCycleV1 } from './self-repair-cycle.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
@@ -109,6 +110,8 @@ const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
 const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
+const MAX_SELF_REPAIR_CYCLES = 32;
+const SELF_REPAIR_CYCLE_BINDING_VERSION = 1;
 const MAX_SPECIALIST_PROVIDER_CONFIG_IDENTITIES = 128;
 const MAX_SPECIALIST_AUTOMATION_CLAIM_ADMISSIONS = 256;
 const SPECIALIST_AUTOMATION_CLAIM_ADMISSION_KEYS = new Set([
@@ -1059,6 +1062,127 @@ function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0
   return out;
 }
 
+function validateSelfRepairCycleAgainstPlan(cycleInput, planInput, now = null) {
+  const cycle = normalizeSelfRepairCycleV1(cycleInput);
+  if (Number.isFinite(now) && Date.parse(cycle.updatedAt) > now) {
+    throw new Error('Self-repair cycle evidence cannot come from the future');
+  }
+  const plan = normalizeAgentPlanV1(planInput);
+  const subject = plan.nodes.find(node => node.nodeId === cycle.subjectId);
+  if (!subject) throw new Error('Self-repair cycle subject does not exist in the durable AgentPlan');
+  if (subject.state !== AgentPlanNodeState.FAILED) {
+    throw new Error('Self-repair cycle subject must remain FAILED in the durable AgentPlan');
+  }
+  if (cycle.baselineRevisionId !== subject.updatedAt) {
+    throw new Error('Self-repair cycle baselineRevisionId does not match the failed AgentPlan node revision');
+  }
+  const firstFailure = cycle.attempts[0]?.failure;
+  if (!firstFailure || firstFailure.subjectRevisionId !== subject.updatedAt) {
+    throw new Error('Self-repair cycle initial failure does not bind the failed AgentPlan node revision');
+  }
+  if (Date.parse(firstFailure.completedAt) < Date.parse(subject.updatedAt)) {
+    throw new Error('Self-repair cycle initial failure predates the failed AgentPlan node revision');
+  }
+  return cycle;
+}
+
+function normalizeSelfRepairOriginPlan(originPlanInput, currentPlanInput, cycleInput) {
+  const originPlan = normalizeAgentPlanV1(originPlanInput);
+  const currentPlan = normalizeAgentPlanV1(currentPlanInput);
+  const cycle = normalizeSelfRepairCycleV1(cycleInput);
+  if (originPlan.planId !== currentPlan.planId || originPlan.jobId !== currentPlan.jobId) {
+    throw new Error('Durable self-repair origin AgentPlan identity drifted');
+  }
+  if (originPlan.revision > currentPlan.revision) {
+    throw new Error('Durable self-repair origin AgentPlan revision exceeds current plan');
+  }
+  const originSubject = originPlan.nodes.find(node => node.nodeId === cycle.subjectId);
+  const currentSubject = currentPlan.nodes.find(node => node.nodeId === cycle.subjectId);
+  if (!originSubject || !currentSubject
+      || originSubject.state !== AgentPlanNodeState.FAILED
+      || JSON.stringify(originSubject) !== JSON.stringify(currentSubject)) {
+    throw new Error('Durable self-repair failed AgentPlan node drifted from origin');
+  }
+  if (originSubject.updatedAt !== cycle.baselineRevisionId) {
+    throw new Error('Durable self-repair origin AgentPlan does not bind cycle baseline');
+  }
+  return originPlan;
+}
+
+function assertSelfRepairCycleMonotonicUpdate(existingInput, nextInput) {
+  const existing = normalizeSelfRepairCycleV1(existingInput);
+  const next = normalizeSelfRepairCycleV1(nextInput);
+  for (const key of [
+    'cycleId', 'subjectId', 'actorId', 'verifierId', 'verifierPlanRevisionId',
+    'baselineRevisionId', 'maxAttempts', 'createdAt',
+  ]) {
+    if (existing[key] !== next[key]) {
+      throw new Error(`Browser Agent self-repair cycle update cannot rewrite ${key}`);
+    }
+  }
+  if (next.attempts.length < existing.attempts.length) {
+    throw new Error('Browser Agent self-repair cycle update cannot remove historical attempts');
+  }
+  for (let index = 0; index < existing.attempts.length; index += 1) {
+    const before = existing.attempts[index];
+    const after = next.attempts[index];
+    if (JSON.stringify(before.failure) !== JSON.stringify(after.failure)
+        || JSON.stringify(before.diagnosis) !== JSON.stringify(after.diagnosis)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite failure or diagnosis evidence');
+    }
+    if (before.repair !== null
+        && JSON.stringify(before.repair) !== JSON.stringify(after.repair)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite applied repair evidence');
+    }
+    if (before.retest !== null
+        && JSON.stringify(before.retest) !== JSON.stringify(after.retest)) {
+      throw new Error('Browser Agent self-repair cycle update cannot rewrite retest evidence');
+    }
+    if (before.repair === null && after.retest !== null && after.repair === null) {
+      throw new Error('Browser Agent self-repair cycle retest requires monotonic repair evidence');
+    }
+  }
+  return next;
+}
+
+function normalizePersistedSelfRepairCycles(raw, plan, now) {
+  if (raw == null) return { cycles: [], quarantinedCount: 0 };
+  if (!plan || !Array.isArray(raw)) {
+    return { cycles: [], quarantinedCount: Array.isArray(raw) ? raw.length : 1 };
+  }
+  const source = raw.slice(-MAX_SELF_REPAIR_CYCLES);
+  let quarantinedCount = Math.max(0, raw.length - source.length);
+  const validBindings = [];
+  const identityCounts = new Map();
+  for (const candidate of source) {
+    try {
+      const persisted = snapshotExactOwnDataRequest(
+        candidate,
+        new Set(['schemaVersion', 'planId', 'originPlan', 'cycle']),
+        'Persisted Browser Agent self-repair cycle binding',
+      );
+      if (!Object.hasOwn(persisted, 'schemaVersion') || !Object.hasOwn(persisted, 'planId') || !Object.hasOwn(persisted, 'originPlan') || !Object.hasOwn(persisted, 'cycle')) {
+        throw new Error('Persisted Browser Agent self-repair cycle binding is incomplete');
+      }
+      if (persisted.schemaVersion !== SELF_REPAIR_CYCLE_BINDING_VERSION) {
+        throw new Error('Persisted Browser Agent self-repair cycle binding schemaVersion is unsupported');
+      }
+      if (typeof persisted.planId !== 'string' || persisted.planId !== plan.planId) {
+        throw new Error('Persisted Browser Agent self-repair cycle plan identity drifted');
+      }
+      const cycle = validateSelfRepairCycleAgainstPlan(persisted.cycle, plan, now);
+      const originPlan = normalizeSelfRepairOriginPlan(persisted.originPlan, plan, cycle);
+      identityCounts.set(cycle.cycleId, (identityCounts.get(cycle.cycleId) || 0) + 1);
+      validBindings.push({ schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION, planId: plan.planId, originPlan, cycle });
+    } catch {
+      quarantinedCount += 1;
+    }
+  }
+  const cycles = validBindings.filter(binding => identityCounts.get(binding.cycle.cycleId) === 1);
+  quarantinedCount += validBindings.length - cycles.length;
+  return { cycles, quarantinedCount };
+}
+
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const reservationId = clean(raw.reservationId, 240);
@@ -1100,6 +1224,7 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const selfRepairState = normalizePersistedSelfRepairCycles(raw.selfRepairCycles, plan, now);
   const specialistDelegationAdmissions = normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions);
   let specialistProviderExecutionQuarantined = raw.specialistProviderExecutionQuarantined === true;
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
@@ -1128,6 +1253,8 @@ function normalizeRuntime(raw, now) {
     specialistHandoffs,
     specialistExecutionOwnerships,
     specialistDelegationAdmissions,
+    selfRepairCycles: selfRepairState.cycles,
+    selfRepairCycleQuarantinedCount: selfRepairState.quarantinedCount,
     specialistProviderExecutions,
     specialistProviderExecutionQuarantined,
     runState,
@@ -2221,6 +2348,125 @@ export class BrowserAgentManager {
         message: 'Durable reusable Agent profile selected the least-authority eligible specialist from the canonical persisted registry; execution remains unclaimed.',
       });
       result = { proposal: clone(proposal), assignment: clone(assignment), executionOwnership: clone(executionOwnership), reused: false };
+      return store;
+    });
+    return result;
+  }
+
+  async listSelfRepairCycles(id = '') {
+    const current = await this.get(id);
+    if (!current.job) {
+      return { selectedId: current.selectedId, jobId: '', planId: '', cycles: [], quarantinedCount: 0 };
+    }
+    const plan = current.job.runtime?.plan ? normalizeAgentPlanV1(current.job.runtime.plan) : null;
+    const cycles = Array.isArray(current.job.runtime?.selfRepairCycles)
+      ? current.job.runtime.selfRepairCycles.map(binding => ({
+        schemaVersion: binding.schemaVersion,
+        planId: binding.planId,
+        originPlan: clone(binding.originPlan),
+        cycle: clone(binding.cycle),
+        assessment: clone(assessSelfRepairCycleV1(binding.cycle)),
+      }))
+      : [];
+    return {
+      selectedId: current.selectedId,
+      jobId: current.job.id,
+      planId: plan?.planId || '',
+      cycles,
+      quarantinedCount: Math.max(0, Number(current.job.runtime?.selfRepairCycleQuarantinedCount || 0)),
+    };
+  }
+
+  async putSelfRepairCycle(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      new Set(['expectedPlanId', 'expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']),
+      'Browser Agent self-repair cycle persistence request',
+    );
+    for (const key of ['expectedPlanId', 'expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent self-repair cycle persistence request requires ${key}`);
+      }
+    }
+    if (typeof request.expectedPlanId !== 'string'
+        || !request.expectedPlanId
+        || request.expectedPlanId !== request.expectedPlanId.trim()) {
+      throw new Error('Browser Agent self-repair expectedPlanId must be exact non-empty text');
+    }
+    if (typeof request.expectedPlanRevision !== 'number'
+        || !Number.isSafeInteger(request.expectedPlanRevision)
+        || Object.is(request.expectedPlanRevision, -0)
+        || request.expectedPlanRevision < 1) {
+      throw new Error('Browser Agent self-repair expectedPlanRevision must be a positive safe integer');
+    }
+    if (request.expectedCycleUpdatedAt !== null) {
+      if (typeof request.expectedCycleUpdatedAt !== 'string'
+          || !request.expectedCycleUpdatedAt
+          || new Date(request.expectedCycleUpdatedAt).toISOString() !== request.expectedCycleUpdatedAt) {
+        throw new Error('Browser Agent self-repair expectedCycleUpdatedAt must be null or a canonical timestamp');
+      }
+    }
+    const cycleSnapshot = clone(normalizeSelfRepairCycleV1(request.cycle));
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
+      if (!job.runtime?.plan) throw new Error('Browser Agent self-repair requires a durable AgentPlan');
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      if (plan.jobId !== job.id) throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      if (plan.planId !== request.expectedPlanId) {
+        throw new Error('Browser Agent AgentPlan identity drifted before self-repair cycle persistence');
+      }
+      if (plan.revision !== request.expectedPlanRevision) {
+        throw new Error('Browser Agent AgentPlan revision drifted before self-repair cycle persistence');
+      }
+      const cycle = validateSelfRepairCycleAgainstPlan(cycleSnapshot, plan, this.now());
+      const cycles = Array.isArray(job.runtime.selfRepairCycles) ? job.runtime.selfRepairCycles : [];
+      const index = cycles.findIndex(item => item?.cycle?.cycleId === cycle.cycleId);
+      const existingBinding = index >= 0 ? cycles[index] : null;
+      const existing = existingBinding ? normalizeSelfRepairCycleV1(existingBinding.cycle) : null;
+      if (request.expectedCycleUpdatedAt === null) {
+        if (existing) throw new Error('Browser Agent self-repair cycle already exists');
+      } else {
+        if (!existing || existing.updatedAt !== request.expectedCycleUpdatedAt) {
+          throw new Error('Browser Agent self-repair cycle revision drifted before persistence');
+        }
+        if (JSON.stringify(existing) === JSON.stringify(cycle)) {
+          result = { cycle: clone(existing), assessment: clone(assessSelfRepairCycleV1(existing)), reused: true };
+          return store;
+        }
+        assertSelfRepairCycleMonotonicUpdate(existing, cycle);
+        if (Date.parse(cycle.updatedAt) <= Date.parse(existing.updatedAt)) {
+          throw new Error('Browser Agent self-repair cycle update must advance updatedAt');
+        }
+      }
+      const next = [...cycles];
+      const originPlan = existingBinding
+        ? normalizeSelfRepairOriginPlan(existingBinding.originPlan, plan, cycle)
+        : plan;
+      const durableBinding = {
+        schemaVersion: SELF_REPAIR_CYCLE_BINDING_VERSION,
+        planId: plan.planId,
+        originPlan,
+        cycle,
+      };
+      if (index >= 0) next[index] = durableBinding;
+      else {
+        if (next.length >= MAX_SELF_REPAIR_CYCLES) {
+          throw new Error('Browser Agent self-repair cycle capacity is exhausted');
+        }
+        next.push(durableBinding);
+      }
+      job.runtime.selfRepairCycles = next;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: index >= 0 ? 'self-repair-cycle-updated' : 'self-repair-cycle-created',
+        nodeId: cycle.subjectId,
+        cycleId: cycle.cycleId,
+        message: `Durable self-repair cycle ${cycle.cycleId} persisted as non-authorizing evidence state.`,
+      });
+      result = { cycle: clone(cycle), assessment: clone(assessSelfRepairCycleV1(cycle)), reused: false };
       return store;
     });
     return result;
