@@ -232,6 +232,26 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+function ownerAllowedRouteIdsForSettings(settings) {
+  const policy = settings.routePolicy;
+  const explicitAllow = policy.allowRouteIds.length
+    ? new Set(policy.allowRouteIds)
+    : null;
+  const deny = new Set(policy.denyRouteIds);
+  return settings.routes
+    .filter(route => route.enabled !== false)
+    .filter(route => !explicitAllow || explicitAllow.has(route.routeId))
+    .filter(route => !deny.has(route.routeId))
+    .filter(route => !policy.pinnedRouteId || route.routeId === policy.pinnedRouteId)
+    .filter(route => !policy.freeOnly || route.costClass === 'free')
+    .filter(route => policy.locality === 'any' || route.locality === policy.locality)
+    .filter(route => policy.maxInputPricePerMillionUsd == null
+      || (route.inputPriceKnown && route.inputPricePerMillionUsd <= policy.maxInputPricePerMillionUsd))
+    .filter(route => policy.maxOutputPricePerMillionUsd == null
+      || (route.outputPriceKnown && route.outputPricePerMillionUsd <= policy.maxOutputPricePerMillionUsd))
+    .map(route => route.routeId);
+}
+
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
@@ -245,7 +265,7 @@ const browserAgent = new BrowserAgentManager({
     return {
       routePool: structuredClone(settings.routes),
       routePoolRevision,
-      ownerAllowedRouteIds: settings.routes.map(route => route.routeId),
+      ownerAllowedRouteIds: ownerAllowedRouteIdsForSettings(settings),
     };
   },
   specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient]]),
