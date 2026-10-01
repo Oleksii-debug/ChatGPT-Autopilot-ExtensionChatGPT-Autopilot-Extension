@@ -241,3 +241,26 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 - Continued from the live #422 head after the simplified-session hotfix #425 merge. Added a native keyboard-select control listing saved AI routes for the Agent. `aiPinnedRouteId` persists through Browser Agent config and the versioned draft JSON; the background request passes it to Core. Core pins only an existing enabled route for that isolated request, rejects a conflicting global pin, and leaves the global settings/runtime intact. Normal route filtering still enforces global allow/deny, price/locality/free policy, role and backoff. Inherited route selection retains automatic failover.
 - Focused route test proves Mistral `endpointId` reaches Gateway even when a higher-priority Ollama route exists; missing/conflicting route fails before provider I/O. Browser Agent persistence/config, draft parser, UI contracts and release package tests pass. No production Orchestration change. Installed owner Chrome and Windows Gateway still require physical verification; no API secret in source or archive.
 - Follow-up Agent UI defect: its two-second status poll used to refill the entire policy form, discarding unsaved edits. New dirty/epoch guard preserves edits during polling and while a save is in flight; a later save response cannot clear newer typing. Selection of another job resets the guard and loads that job's saved policy. A native status element announces unsaved/saved state without repeating on every keystroke. The PR #426 initial archive predates this follow-up fix.
+
+
+## 11.0.6 — 2026-10-01T08:36:06+02:00
+
+Усі чотири отримані звіти — 11.0.4. Для нового15-chat профілю збережений стан:11 сценаріїв без вкладки з TAB_RESOURCE_CAPACITY_WAIT;2 сценарії з verified Send очікують завершення відповіді;2 STOPPED сценарії утримують вкладки. У1000-event зрізі523 згадки capacity error. Знімок має4 bound IDs; повний історичний максимум5 з цього зрізу не доведений.
+
+## Причини та рішення
+
+1. У11.0.4 був прихований resident cap3, прив'язаний до executor concurrency. Це суперечить15 одночасним чатам з вкладкою на всю послідовність. Resident Scenario identity тепер обмежена durable participant bindings, а profile concurrency регулює лише одночасні операції. Ordinary transient budget рахується окремо. Duplicate binding та write-before-navigation збережено.
+2. Запланований logical launch запускав45-minute deadline, ще до фізичної вкладки. Нова черга має deadline0; відкритий, але не підтверджений Send має durable hard deadline. Verified Send, як раніше, прив'язує response deadline до доказового Send.
+3. cleanupManagedSession приймав forceSafe, але не використовував його. При PRE_SEND_WAIT/SUBMITTING/AMBIGUOUS він закривав вкладку, лишав unsafe sessionSTOPPED і не міг завершити очищення. Authorized timeout/owner retirement тепер persistently fences session, settles effect FAILED_SAFE без успішного лічильника, звільняє її lease й закриває точну власну вкладку. Retired cleanup obligations відновлюються після restart.
+4. Semantic selector визначавdata-turn role лише середarticle абоlegacyauthor candidates. Додано окреміdata-turn selectors, deduplication та correlation збережені. ЖивийDOM у звітах відсутній, тому це не доведена єдина причина response misses.
+5. Завершення за вичерпаного replacement budget залишало generation+1 без створеного нового чату і показувало0 completedResponses. Завершення тепер зберігає фактичне generation.
+
+## Перевірено
+
+699 regression checks PASS; final Scenario/Core409 PASS; integration67 PASS.15×3 simple prompts =45 verified Sends/45 completedResponses in simulated Chrome, restart, another focused window; no excess tracked tabs. Full17-turn cycles і35/45-minute policies пройшли регресії. Приватні prompts/URLs та сирі reports не публікуються.
+
+## Межі
+
+Report counters distinguish verified Send from assistant completion. Ordinary67 verified counter supported by37 retained Send outcomes; older events rotated out. Live ChatGPT latency, account/model throttling та фізичнийWindows/NVDA не перевірені. Немає твердження, що весь Agent runtime або ПК freeze повністю кваліфіковано. Новий live report11.0.6 потрібний для перевірки поведінки у профілях користувача.
+
+Archive: releases/11.0.6/ChatGPT-Autopilot-11.0.6-HIGH-2026-10-01.zip. Source branch release/11.0.6-scenario-admission, based on11.0.5. Version, source, installer and chronological history retained; raw diagnostics stay local.

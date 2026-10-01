@@ -124,3 +124,21 @@ test('current data-turn articles correlate the simple reply after a reload witho
     assert.equal(stale.assistantComplete, false);
   } finally { globalThis.location = saved; Date.now = clock; }
 });
+
+
+test('role-marked div turns without article wrappers still produce a correlated completed reply',async()=>{
+  const saved=globalThis.location;globalThis.location={href:'https://chatgpt.com/c/div-turns'};
+  try {
+    const token='[APSTEP:div:1]';const base=currentDom(token);
+    const doc={querySelectorAll(selector){
+      if(selector.includes('[data-message-author-role="user"]')) return [];
+      if(selector==='[data-turn="user"]') return base.querySelectorAll('[data-message-author-role="user"]');
+      if(selector.includes('[data-message-author-role="assistant"]')) return [];
+      if(selector==='[data-turn="assistant"]') return base.querySelectorAll('[data-message-author-role="assistant"]');
+      return base.querySelectorAll(selector);
+    }};
+    const report=await adapter.execute({requestId:'div-read',taskId:'div-task',mode:'READ_ASSISTANT_REPORT',expectedUrl:globalThis.location.href,
+      assistantBaselineKnown:true,assistantBaselineCount:0,responseCorrelationToken:token},{document:doc});
+    assert.equal(report.assistantComplete,true);assert.equal(report.responseAnchorKind,'STEP_MARKER');
+  } finally {globalThis.location=saved;}
+});
