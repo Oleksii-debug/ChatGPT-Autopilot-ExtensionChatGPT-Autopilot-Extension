@@ -9,7 +9,7 @@
 - Transport/retry/replacement/recovery лічильники залишаються у діагностичному звіті.
 - ChatGPT Work recovery може підтвердити fresh Scenario Send без materialized user bubble лише коли збережено operation-local submit evidence, composer очищений, з'явився конкретний /c/... URL і незалежно підтверджено generation; другого physical Send немає.
 - Діагностика managed Scenario окремо записує вікно запуску і фактичне вікно вкладки.
-- Заморожена Scenario-вкладка більше не просто очікується до response timeout: вона входить у чинний bounded recovery — максимум один same-URL reload, cooldown, максимум один reopen, без постійного перемикання фокусу.
+- Заморожена Scenario-вкладка більше не просто очікується до response timeout: вона входить у чинний bounded recovery — максимум один same-URL reload, cooldown, потім fail-closed; reopen для цього Scenario path вимкнений, постійного перемикання фокусу немає.
 
 Джерело виправлення: живі діагностичні звіти 11.0.7 від 2026-10-01.
 HUMAN_TESTED=false
