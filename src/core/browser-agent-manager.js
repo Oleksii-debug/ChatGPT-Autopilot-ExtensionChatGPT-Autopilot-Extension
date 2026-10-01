@@ -3545,7 +3545,7 @@ export class BrowserAgentManager {
     return Math.max(0, Math.floor(limit));
   }
 
-  async assertDefinitionBoundProviderRouteCurrent(store, job, route = {}) {
+  async assertDefinitionBoundProviderRouteCurrent(store, job, route = {}, gatewayUrl = '') {
     if (!job?.definitionModelPolicyBinding) return;
     if (!this.readModelRouteContext) {
       throw new Error('Reusable Agent provider admission requires canonical AI route-pool context');
@@ -3561,6 +3561,12 @@ export class BrowserAgentManager {
         || routePoolRevision < 1
         || routePoolRevision !== binding.modelPolicyBinding.routePoolRevision) {
       throw new Error('Reusable Agent route-pool revision drifted before provider admission');
+    }
+
+    const expectedGatewayUrl = clean(gatewayUrl, 4096);
+    const currentGatewayUrl = clean(context.gatewayUrl, 4096);
+    if (expectedGatewayUrl && currentGatewayUrl !== expectedGatewayUrl) {
+      throw new Error('Reusable Agent Gateway identity drifted before provider admission');
     }
 
     const routeId = clean(route?.routeId, 180);
@@ -3599,7 +3605,7 @@ export class BrowserAgentManager {
     }
   }
 
-  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, gatewayUrl = '', callNumber = 1 } = {}) {
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
     const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
     if (pendingOutputTokens < 1) {
@@ -3616,7 +3622,7 @@ export class BrowserAgentManager {
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
         throw error;
       }
-      await this.assertDefinitionBoundProviderRouteCurrent(store, job, route);
+      await this.assertDefinitionBoundProviderRouteCurrent(store, job, route, gatewayUrl);
       if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
         const error = new Error('Browser Agent already has an unsettled model budget reservation');
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
