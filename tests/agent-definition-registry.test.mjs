@@ -275,7 +275,7 @@ test('materialization reuses Browser Agent config and binds model defaults under
   assert.equal(result.config.maxModelCalls, 20);
   assert.equal(result.config.maxRuntimeMinutes, 30);
   assert.equal(result.config.aiRoutingMode, 'primary');
-  assert.equal(Object.hasOwn(result.config, 'aiPinnedRouteId'), false);
+  assert.equal(result.config.aiPinnedRouteId, '', 'legacy compatibility field must remain inert; durable Router policy owns route authority');
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
   assert.equal(result.config.maxCostUsd, 5);
