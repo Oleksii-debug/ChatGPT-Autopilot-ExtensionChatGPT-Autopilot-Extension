@@ -1,0 +1,19 @@
+Пілот 11.0.8 High — QA checkpoint
+
+STATUS: AUTOMATED QUALIFICATION IN PROGRESS
+
+Нові regression contracts:
+- exact Scenario launch-window ID не може fallback-нути в інше Chrome window;
+- wrong-window owned hint відхиляється до page interaction;
+- два Scenario launch windows одного Chrome profile створюють вкладки тільки у своїх window IDs;
+- Start/Resume test harnesses передають explicit launchWindowId;
+- normal Scenario progress не показує transport/replacement/recovery counters;
+- diagnostics managed Scenario містить launch window і actual tab window окремо.
+
+Exact-head GitHub Core/UI/Release/Windows results мають бути terminal SUCCESS перед release qualification.
+Локальний clone у цьому execution environment не був доступний через відсутній DNS/network, тому локальний PASS не заявляється.
+
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+SECRETS=none
