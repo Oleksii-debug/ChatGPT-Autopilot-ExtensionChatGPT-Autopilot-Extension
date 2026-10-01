@@ -1154,7 +1154,11 @@ export class CoreCommandDispatcher {
         : routerOverride
           ? mergeAiRouterSettingsOverride(baseSettings, routerOverride)
           : baseSettings;
-      const isolatedRuntime = internalEnvelope ? true : payload.isolatedRuntime === true;
+      const hasOneShotRouterConfiguration = !internalEnvelope
+        && (Object.hasOwn(payload, 'settings') || routerOverride !== null);
+      const isolatedRuntime = internalEnvelope
+        ? true
+        : payload.isolatedRuntime === true || hasOneShotRouterConfiguration;
       const runtime = internalEnvelope
         ? internalEnvelope.runtime
         : isolatedRuntime
