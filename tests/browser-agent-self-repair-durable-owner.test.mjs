@@ -218,6 +218,49 @@ test('self-repair persistence is exact-CAS and exact replay is idempotent', asyn
   );
 });
 
+test('self-repair updates cannot rewrite historical evidence or cycle authority', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedJob(manager);
+  const initial = cycle();
+  await manager.putSelfRepairCycle('job.repair', {
+    expectedPlanRevision: 3,
+    expectedCycleUpdatedAt: null,
+    cycle: initial,
+  });
+
+  const rewrittenFailure = cycle({
+    updatedAt: '2026-10-01T12:02:00.000Z',
+    attempts: [{
+      ...cycle().attempts[0],
+      failure: {
+        ...cycle().attempts[0].failure,
+        evidenceSha256: H3,
+      },
+    }],
+  });
+  await assert.rejects(
+    () => manager.putSelfRepairCycle('job.repair', {
+      expectedPlanRevision: 3,
+      expectedCycleUpdatedAt: initial.updatedAt,
+      cycle: rewrittenFailure,
+    }),
+    /cannot rewrite failure or diagnosis evidence/,
+  );
+
+  await assert.rejects(
+    () => manager.putSelfRepairCycle('job.repair', {
+      expectedPlanRevision: 3,
+      expectedCycleUpdatedAt: initial.updatedAt,
+      cycle: cycle({
+        maxAttempts: 4,
+        updatedAt: '2026-10-01T12:02:00.000Z',
+      }),
+    }),
+    /cannot rewrite maxAttempts/,
+  );
+});
+
 test('self-repair cycle binds exact current plan revision and failed-node baseline', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
