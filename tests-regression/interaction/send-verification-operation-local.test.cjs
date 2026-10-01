@@ -218,3 +218,73 @@ test('Work surface does not count an old identical prompt or composer clearing a
   assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
   assert.match(result.safeDiagnosticMessage, /surface=chatgpt-work; mainExactMatches=1/);
 });
+
+
+test('Scenario recovery accepts fresh Work conversation generation without a materialized user bubble', async () => {
+  const { adapter, sandbox } = loadAdapter();
+  sandbox.location.href = 'https://chatgpt.com/';
+  let stopVisible = false;
+  const fx = fixture(PROMPT, {
+    onClick({ composer }) {
+      composer.value = '';
+      sandbox.location.href = 'https://chatgpt.com/c/work-generated';
+    }
+  });
+  const originalQuerySelectorAll = fx.document.querySelectorAll.bind(fx.document);
+  const stop = {
+    isConnected: true,
+    hidden: false,
+    disabled: false,
+    tagName: 'BUTTON',
+    innerText: '',
+    getAttribute(name) {
+      if (name === 'aria-label') return 'Stop generating';
+      if (name === 'data-testid') return 'stop-button';
+      return null;
+    },
+    getBoundingClientRect() { return { width: 20, height: 20 }; },
+    closest() { return null; },
+  };
+  fx.document.querySelectorAll = (selector) => {
+    const existing = originalQuerySelectorAll(selector);
+    if (selector === 'button, [role="button"]' && stopVisible) return [...existing, stop];
+    return existing;
+  };
+  fx.document.documentElement = {
+    getAttribute(name) { return name === 'data-codex-window-type' ? 'browser' : null; }
+  };
+  fx.document.querySelector = selector => selector === 'main, [role="main"]'
+    ? { querySelectorAll() { return []; } } : null;
+
+  const scenarioRequest = {
+    requestId: 'scenario-work-fresh-recovery',
+    taskId: 'scenario-task',
+    expectedUrl: 'https://chatgpt.com/',
+    recoveryLaunchUrl: 'https://chatgpt.com/',
+    promptText: PROMPT,
+    mode: 'SUBMIT_EXISTING',
+    requireGenerationAcknowledgement: true,
+  };
+  const first = await adapter.execute(scenarioRequest, {
+    document: fx.document,
+    wait: async () => {},
+  });
+  assert.equal(fx.clicks(), 1);
+  assert.equal(first.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+
+  stopVisible = true;
+  const recoveryRequest = {
+    ...scenarioRequest,
+    mode: 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
+  };
+  const pending = await adapter.execute(recoveryRequest, { document: fx.document });
+  assert.equal(pending.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(pending.safeDiagnosticCode, 'SCENARIO_GENERATION_STABILITY_PENDING');
+
+  const verified = await adapter.execute(recoveryRequest, { document: fx.document });
+  assert.equal(verified.status, adapter.STATUS.SENT_VERIFIED);
+  assert.equal(verified.safeDiagnosticCode, 'RECOVERY_SCENARIO_FRESH_GENERATION_VERIFIED');
+  assert.equal(verified.submissionEvidence, 'FRESH_CONVERSATION_GENERATION_STARTED');
+  assert.equal(fx.clicks(), 1, 'recovery must observe the original effect and never submit again');
+  assert.equal(fx.messages.length, 0, 'Work DOM may still omit canonical user bubbles');
+});

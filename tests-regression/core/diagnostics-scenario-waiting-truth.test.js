@@ -33,7 +33,8 @@ test('managed scenario transport that sent one prompt is reported as waiting for
           phase: 'SENT_VERIFIED',
           targetUrl: 'https://chatgpt.com/',
         },
-        scenarioWork: { managed: true, scenarioId: 'chess-1', generation: 1 },
+        tabWindowId: 11,
+        scenarioWork: { managed: true, scenarioId: 'chess-1', generation: 1, launchWindowId: 11, preferredWindowId: 11 },
         lastError: '',
       },
     },
@@ -43,4 +44,6 @@ test('managed scenario transport that sent one prompt is reported as waiting for
   assert.match(report, /стан: WAITING_RESPONSE/u);
   assert.match(report, /Scenario Work ще має підтвердити завершення відповіді ChatGPT/u);
   assert.doesNotMatch(report, /стан: COMPLETED/u);
+  assert.match(report, /вікно запуску сценарію: 11/u);
+  assert.match(report, /фактичне вікно вкладки: 11/u);
 });

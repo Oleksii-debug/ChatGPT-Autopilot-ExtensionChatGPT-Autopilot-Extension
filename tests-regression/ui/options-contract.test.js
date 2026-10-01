@@ -447,3 +447,19 @@ test('Orchestration Drive scalar controls are keyboard-native, explicit, and do 
   assert.match(js, /Drive scalar: \$\{driveScalarText\}/, 'runtime status must expose provider revision/slot state in normal text');
   assert.doesNotMatch(js, /drive[-_ ]?(?:access[-_ ]?)?token|Bearer\s+\$\{/i, 'UI must never own or render Drive access tokens');
 });
+
+
+test('Scenario owner progress stays factual and hides transport recovery counters', () => {
+  assert.match(js, /async function currentScenarioLaunchWindowId\(\)/, 'Scenario Start must capture the current Chrome window');
+  assert.match(js, /CREATE_SCENARIO_CHAT_POOL'[\s\S]*launchWindowId/, 'parallel Scenario launch must carry exact window identity');
+  assert.match(js, /'З цієї групи перший промпт уже надіслано'/, 'owner view must expose initial parallel cohort progress');
+  assert.match(js, /'З цієї групи відповідь уже отримано'/, 'owner view must expose first completed response progress for the current cohort');
+  assert.match(js, /'Усього успішно надіслано промптів'/, 'owner view must expose logical successful prompt count');
+  assert.match(js, /'Усього отримано завершених відповідей'/, 'owner view must expose completed response count');
+  assert.match(js, /'Зараз чекають відповіді'/, 'owner view must expose current reply wait count');
+  assert.doesNotMatch(js, /addScenarioStateLine\('Пул: фізично підтверджених Send-спроб'/, 'transport attempt count belongs in diagnostics only');
+  assert.doesNotMatch(js, /addScenarioStateLine\('Пул: повторних\/замінних Send-спроб'/, 'replacement/retry count belongs in diagnostics only');
+  assert.doesNotMatch(js, /addScenarioStateLine\('Пул: використано ліміт нових чатів'/, 'replacement budget belongs in diagnostics only');
+  assert.doesNotMatch(js, /addScenarioStateLine\('Цей слот: нових чатів після початкового'/, 'per-slot replacement progress belongs in diagnostics only');
+  assert.match(js, /Сценарій працює тільки у вікні Chrome, з якого його запущено/, 'owner view must state exact-window isolation');
+});

@@ -1724,6 +1724,13 @@ function scenarioWorkInt(id, min, max, label) {
   return parseStrictBoundedInteger($(id).value, { min, max, label });
 }
 
+async function currentScenarioLaunchWindowId() {
+  if (!chrome?.windows?.getCurrent) throw new Error('Chrome window API недоступний.');
+  const current = await chrome.windows.getCurrent();
+  if (!Number.isInteger(current?.id)) throw new Error('Не вдалося визначити вікно, з якого запускається сценарій.');
+  return current.id;
+}
+
 function syncScenarioInitialStaggerBounds() {
   const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
   $('scenario-cycle-initial-stagger').max = unit === 'minutes' ? '10080' : '604800';
@@ -1872,26 +1879,28 @@ function renderScenarioWorkState(item) {
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   if (item.pool) {
     const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
-    addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
-    addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
-    addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
-    addScenarioStateLine('Пул: перший Send підтверджено', pool ? `${pool.firstPromptSent ?? 0}/${pool.slots}` : '—');
-    addScenarioStateLine('Пул: ще не отримали перший Send', pool?.firstPromptPending ?? '—');
-    addScenarioStateLine('Пул: чекають завершення відповіді', pool?.waitingResponse ?? '—');
-    addScenarioStateLine('Пул: підтверджено завершених відповідей', pool?.completedResponses ?? '—');
-    addScenarioStateLine('Пул: логічних Send у послідовностях', pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—');
-    addScenarioStateLine('Пул: фізично підтверджених Send-спроб', pool?.transportVerifiedSends ?? pool?.verifiedSends ?? '—');
-    addScenarioStateLine('Пул: повторних/замінних Send-спроб', pool?.retryVerifiedSends ?? '—');
-    addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
-    addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
-    addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
-    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${pool?.replacementBudget ?? item.pool.replacementBudget}`);
-    addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
+    addScenarioStateLine('Паралельних чатів', pool?.slots ?? '—');
+    addScenarioStateLine(
+      'З цієї групи перший промпт уже надіслано',
+      pool?.firstPromptSent != null ? `${pool.firstPromptSent}/${pool.slots ?? '—'}` : '—',
+    );
+    addScenarioStateLine(
+      'З цієї групи відповідь уже отримано',
+      pool?.firstResponseReceived != null ? `${pool.firstResponseReceived}/${pool.slots ?? '—'}` : '—',
+    );
+    addScenarioStateLine(
+      'Усього успішно надіслано промптів',
+      pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—',
+    );
+    addScenarioStateLine(
+      'Усього отримано завершених відповідей',
+      pool?.completedResponses != null ? `${pool.completedResponses}/${pool.plannedSends ?? '—'}` : '—',
+    );
+    addScenarioStateLine('Зараз чекають відповіді', pool?.waitingResponse ?? '—');
     if (item.poolController === true) {
-      addScenarioStateLine('Керування', 'Дії на цій вкладці застосовуються до всіх фізичних чатів сценарію. Деталі кожного чату дивіться у «Сеансах» та діагностиці.');
-      return;
+      addScenarioStateLine('Керування', 'Сценарій працює тільки у вікні Chrome, з якого його запущено. Технічні retry/replacement/recovery деталі залишаються лише в діагностиці.');
     }
-    addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
+    return;
   }
   if (runtime.mode === 'CHAT_CYCLE') {
     const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
@@ -2366,8 +2375,9 @@ async function startParallelScenarioChats() {
       && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
       && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
     );
+    const launchWindowId = await currentScenarioLaunchWindowId();
     const result = await core('CREATE_SCENARIO_CHAT_POOL', {
-      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
+      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, launchWindowId, config,
     });
     const ids = result?.ids || [];
     if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
@@ -2441,13 +2451,23 @@ async function scenarioWorkLifecycle(command, successText) {
         STOP_SCENARIO_WORK: 'STOP_SCENARIO_CHAT_POOL',
       }[command];
       if (!poolCommand) throw new Error('Непідтримувана дія для пулу.');
-      const data = await core(poolCommand, { id: ui.selectedScenarioPoolId });
+      const launchWindowId = ['START_SCENARIO_WORK', 'RESUME_SCENARIO_WORK'].includes(command)
+        ? await currentScenarioLaunchWindowId() : null;
+      const data = await core(poolCommand, {
+        id: ui.selectedScenarioPoolId,
+        ...(launchWindowId == null ? {} : { launchWindowId }),
+      });
       const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
       if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
       fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
       await loadScenarioWork();
     } else {
-      const data = await core(command, { id });
+      const launchWindowId = ['START_SCENARIO_WORK', 'RESUME_SCENARIO_WORK'].includes(command)
+        ? await currentScenarioLaunchWindowId() : null;
+      const data = await core(command, {
+        id,
+        ...(launchWindowId == null ? {} : { launchWindowId }),
+      });
       fillScenarioWorkForm(data.scenario);
       await loadScenarioWork();
     }

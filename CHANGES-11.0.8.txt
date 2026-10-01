@@ -1,0 +1,18 @@
+Пілот 11.0.8 High — Scenario window isolation і простий прогрес
+
+- Scenario Start/Resume захоплює точне вікно Chrome, з якого власник запускає роботу.
+- Legacy RUNNING сценарії 11.0.7 без authoritative launchWindowId після оновлення читаються як PAUSED; старий learned preferredWindowId відкидається, а Resume явно прив'язує сценарій до поточного вікна.
+- Це launchWindowId є незмінною межею виконання для всього Scenario/пулу.
+- Створення, повторне відкриття, відновлення, прийняття та використання Scenario-вкладок в іншому вікні заборонене fail-closed.
+- Якщо початкове вікно Chrome зникло, Scenario не переходить у focused або інше вікно.
+- Два Scenario можуть працювати незалежно у двох різних вікнах одного Chrome-профілю.
+- Owner-facing прогрес пулу показує тільки кількість паралельних чатів, логічно успішно надіслані промпти, завершені відповіді та чати, що зараз чекають відповіді.
+- Transport/retry/replacement/recovery лічильники залишаються у діагностичному звіті.
+- ChatGPT Work recovery може підтвердити fresh Scenario Send без materialized user bubble лише коли збережено operation-local submit evidence, composer очищений, з'явився конкретний /c/... URL і незалежно підтверджено generation; другого physical Send немає.
+- Діагностика managed Scenario окремо записує вікно запуску і фактичне вікно вкладки.
+- Заморожена Scenario-вкладка більше не просто очікується до response timeout: вона входить у чинний bounded recovery — максимум один same-URL reload, cooldown, потім fail-closed; reopen для цього Scenario path вимкнений, постійного перемикання фокусу немає.
+
+Джерело виправлення: живі діагностичні звіти 11.0.7 від 2026-10-01.
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false

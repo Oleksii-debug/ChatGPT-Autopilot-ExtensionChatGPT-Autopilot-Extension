@@ -379,7 +379,7 @@ test('whole chat pool can pause, edit safe runtime knobs, and resume without los
     id: item.id, launches: item.runtime.totalLaunches, step: item.runtime.stepIndex, repeat: item.runtime.repeatIndex,
   })), before, 'editing runtime knobs must not reset progress');
 
-  await h.manager.resumeChatPool(poolId);
+  await h.manager.resumeChatPool(poolId, { launchWindowId: 11 });
   list = await h.manager.list();
   assert.equal(list.pools[0].runState, 'RUNNING');
 });

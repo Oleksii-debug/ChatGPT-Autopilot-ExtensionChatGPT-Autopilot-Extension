@@ -263,7 +263,7 @@ test('manager materializes scenario turns only as canonical one-pass core sessio
   const core = new CoreRepo();
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 's1', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
-  await manager.start('s1');
+  await manager.start('s1', { launchWindowId: 11 });
   const state = await core.load();
   const ids = state.sessionOrder.filter(id => id.startsWith('scenario-work:'));
   assert.equal(ids.length, 1);
@@ -281,7 +281,7 @@ test('manager waits for assistant completion, preserves conversation URL, and la
   let assistantReady = false;
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 's1', collectAssistantReport: async () => ({ status: assistantReady ? 'READY' : 'WAITING', assistantComplete: assistantReady }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 2, steps: [{ prompt: 'ONE' }, { prompt: 'TWO' }] } });
-  await manager.start('s1');
+  await manager.start('s1', { launchWindowId: 11 });
   let state = await core.load();
   let sid = state.sessionOrder.find(id => id.startsWith('scenario-work:'));
   await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/abc');
@@ -322,7 +322,7 @@ test('five independent chats each keep one Core Session and tab for 17 completed
       roundsPerGeneration: 1, maxGenerations: 0,
       steps: [{ prompt: 'BOOT' }, { prompt: 'CONT', repeat: 15 }, { prompt: 'FINAL' }],
     } });
-    await manager.start(id);
+    await manager.start(id, { launchWindowId: 11 });
     const session = (await core.load()).sessionOrder.find(sid => core.state.sessionsById[sid]?.scenarioWork?.scenarioId === id);
     sessionIds.set(id, session);
     const taskId = core.state.sessionsById[session].taskOrder[0];
@@ -382,7 +382,7 @@ test('timed-out verified Send remains in durable totals after its Core Session i
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: {
     steps: [{ prompt: 'FIRST' }, { prompt: 'SECOND' }], responseTimeoutMinutes: 1,
   } });
-  await manager.start('timeout-ledger');
+  await manager.start('timeout-ledger', { launchWindowId: 11 });
   const sid = core.state.sessionOrder[0];
   await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/timeout-ledger', now + 1);
   now += 61_000;
@@ -407,7 +407,7 @@ test('replayed launch never resets verified send or unresolved operation', async
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now,
     createId: () => 'replay', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }, { prompt: 'TWO' }] } });
-  await manager.start('replay');
+  await manager.start('replay', { launchWindowId: 11 });
   const sid = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sid].taskOrder[0];
   const firstAction = { participantKey: 'chat', generation: 1, stage: 'STEP:0:0:0', url: 'https://chatgpt.com/', prompt: 'ONE' };
@@ -432,7 +432,7 @@ test('restart between rearming a turn and its manager checkpoint reuses the same
     createId: () => 'checkpoint', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   let manager = build();
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'FIRST' }, { prompt: 'SECOND' }] } });
-  await manager.start('checkpoint');
+  await manager.start('checkpoint', { launchWindowId: 11 });
   const sid = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sid].taskOrder[0];
   await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/checkpoint');
@@ -462,7 +462,7 @@ test('pause survives alarm reconciliation and resume launches pending work immed
   const core = new CoreRepo();
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 's1', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
-  await manager.start('s1');
+  await manager.start('s1', { launchWindowId: 11 });
   await manager.pause('s1');
   const paused = await manager.get('s1');
   assert.equal(paused.scenario.runtime.runState, ScenarioWorkRunState.PAUSED);
@@ -470,7 +470,7 @@ test('pause survives alarm reconciliation and resume launches pending work immed
   now = 5000;
   await manager.cycleAll();
   assert.equal((await core.load()).sessionOrder.length, before);
-  await manager.resume('s1');
+  await manager.resume('s1', { launchWindowId: 11 });
   assert.equal((await manager.get('s1')).scenario.runtime.runState, ScenarioWorkRunState.RUNNING);
 });
 
@@ -510,7 +510,7 @@ test('AUDITOR_PIPELINE manager enforces worker-result -> verified allocation -> 
     barrierPolicy: 'WAIT_ALL_TERMINAL', minimumLaunchGapSeconds: 0,
     firstWorkerPrompt: 'FIRST', secondWorkerPrompt: 'SECOND', auditorPrompt: 'AUDIT',
   }});
-  await manager.start('pipe1');
+  await manager.start('pipe1', { launchWindowId: 11 });
   let sent = await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/f1');
   assert.match(sent.participantKey, /first-01/);
   reports.set(`scenario-work:pipe1:${sent.participantKey}`, { status: 'READY', assistantComplete: true, assistantText: semanticBlock({
@@ -545,7 +545,7 @@ test('AUDITOR_PIPELINE invalid worker final answer opens correction in same conv
   let report = { status: 'WAITING', assistantComplete: false };
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 'pipe2', collectAssistantReport: async () => report });
   await manager.create({ mode: ScenarioWorkMode.AUDITOR_PIPELINE, config: { firstCount: 1, secondCount: 1, roundsPerGeneration: 1, barrierPolicy:'WAIT_ALL_TERMINAL', firstWorkerPrompt:'FIRST' } });
-  await manager.start('pipe2');
+  await manager.start('pipe2', { launchWindowId: 11 });
   await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/fixme');
   report = { status:'READY', assistantComplete:true, assistantText:'Готово.' };
   now=1300; await manager.cycleOne('pipe2');
@@ -574,7 +574,7 @@ test('AUDITOR_PIPELINE auditor lease survives manager reconstruction and prevent
     firstCount:1, secondCount:1, roundsPerGeneration:1, maxGenerations:1,
     barrierPolicy:'WAIT_ALL_TERMINAL', minimumLaunchGapSeconds:0,
   }});
-  await manager.start('pipe-restart-auditor');
+  await manager.start('pipe-restart-auditor', { launchWindowId: 11 });
   const first = await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/restart-first');
   reports.set(`scenario-work:pipe-restart-auditor:${first.participantKey}`, { status:'READY', assistantComplete:true, assistantText: semanticBlock({
     scenario_id:'pipe-restart-auditor', generation:1, round:1, phase:'FIRST', slot:'FIRST-01', task_id:'F1', exclusive_key:'KF1', outcome:'DONE', slot_consumed:true, evidence_published:true, evidence_refs:['drive:f1'], dependencies_consumed:[], retry_required:false,
@@ -605,7 +605,7 @@ test('AUDITOR_PIPELINE dependency wait survives manager reconstruction without m
   });
   let manager=build();
   await manager.create({ mode:ScenarioWorkMode.AUDITOR_PIPELINE, config:{ firstCount:1, secondCount:2, roundsPerGeneration:1, maxGenerations:1, barrierPolicy:'WAIT_ALL_TERMINAL', minimumLaunchGapSeconds:0 }});
-  await manager.start('pipe-restart-deps');
+  await manager.start('pipe-restart-deps', { launchWindowId: 11 });
   let sent=await markOnlyManagedSessionSent(core,'https://chatgpt.com/c/d-first');
   reports.set(`scenario-work:pipe-restart-deps:${sent.participantKey}`,{status:'READY',assistantComplete:true,assistantText:semanticBlock({scenario_id:'pipe-restart-deps',generation:1,round:1,phase:'FIRST',slot:'FIRST-01',task_id:'F1',exclusive_key:'KF1',outcome:'DONE',slot_consumed:true,evidence_published:true,evidence_refs:['drive:f1'],dependencies_consumed:[],retry_required:false})});
   now=1300; await manager.cycleOne('pipe-restart-deps');
@@ -634,14 +634,14 @@ test('Scenario Pause/Resume/Stop synchronizes the actual managed Core Session li
   const core = new CoreRepo();
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 'life1', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
-  await manager.start('life1');
+  await manager.start('life1', { launchWindowId: 11 });
   let state = await core.load();
   const sid = state.sessionOrder.find(id => state.sessionsById[id]?.scenarioWork?.managed);
   assert.equal(state.sessionsById[sid].runState, 'RUNNING');
   await manager.pause('life1');
   state = await core.load();
   assert.equal(state.sessionsById[sid].runState, 'PAUSED');
-  await manager.resume('life1');
+  await manager.resume('life1', { launchWindowId: 11 });
   state = await core.load();
   assert.equal(state.sessionsById[sid].runState, 'RUNNING');
   await manager.stop('life1');
@@ -663,7 +663,7 @@ test('owner Pause racing assistant observation cannot be overwritten by stale Sc
     collectAssistantReport: async () => { enter(); await gate; return { status: 'READY', assistantComplete: true, assistantText: 'done' }; },
   });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 2, steps: [{ prompt: 'ONE' }, { prompt: 'TWO' }] } });
-  await manager.start('race1');
+  await manager.start('race1', { launchWindowId: 11 });
   let state = await core.load();
   const sid = state.sessionOrder.find(id => state.sessionsById[id]?.scenarioWork?.managed);
   const taskId = state.sessionsById[sid].taskOrder[0];
@@ -697,7 +697,7 @@ test('standalone CHAT_CYCLE completes one physical chat while retired tab cleanu
   const build = () => new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 'cleanup1', collectAssistantReport: async () => ({ status: ready ? 'READY' : 'WAITING', assistantComplete: ready, assistantText: ready ? 'done' : '' }) });
   let manager = build();
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 1, steps: [{ prompt: 'ONE' }] } });
-  await manager.start('cleanup1');
+  await manager.start('cleanup1', { launchWindowId: 11 });
   let state = await core.load();
   const sid = state.sessionOrder.find(id => state.sessionsById[id]?.scenarioWork?.managed);
   const taskId = state.sessionsById[sid].taskOrder[0];
@@ -735,7 +735,7 @@ test('deterministic managed Session replay fails closed on identity collision', 
   const core = new CoreRepo();
   const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 'identity1', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
-  await manager.start('identity1');
+  await manager.start('identity1', { launchWindowId: 11 });
   const current = (await manager.get('identity1')).scenario;
   const replay = structuredClone(current);
   replay.runtime.totalLaunches = 0;
@@ -825,4 +825,70 @@ test('manager bounds persisted collection length and recursive depth bombs', asy
   listed = await manager.list();
   assert.equal(listed.selectedId, '');
   assert.deepEqual(listed.scenarios, []);
+});
+
+
+test('paused Scenario cannot resume from a different Chrome window in the same profile', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  let idCounter = 0;
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000 + idCounter,
+    createId: () => `window-bound-${++idCounter}`,
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  const created = await manager.create({
+    name: 'Window-bound',
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    config: { steps: [{ prompt: 'ONE' }] },
+  });
+  const id = created.scenario.id;
+  await manager.start(id, { launchWindowId: 11 });
+  await manager.pause(id);
+  await assert.rejects(
+    () => manager.resume(id, { launchWindowId: 22 }),
+    /SCENARIO_LAUNCH_WINDOW_MISMATCH/u,
+  );
+  const after = await manager.get(id);
+  assert.equal(after.scenario.runtime.launchWindowId, 11);
+  assert.equal(after.scenario.runtime.runState, ScenarioWorkRunState.PAUSED);
+});
+
+
+test('11.0.8 does not trust legacy learned preferredWindowId for a running Scenario', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  let idCounter = 0;
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 2000 + idCounter,
+    createId: () => `legacy-window-${++idCounter}`,
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  const created = await manager.create({
+    name: 'Legacy window',
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    config: { steps: [{ prompt: 'ONE' }] },
+  });
+  const id = created.scenario.id;
+  const stored = structuredClone(chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY]);
+  stored.byId[id].runtime.runState = ScenarioWorkRunState.RUNNING;
+  stored.byId[id].runtime.preferredWindowId = 99;
+  delete stored.byId[id].runtime.launchWindowId;
+  await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+
+  const listed = await manager.list();
+  const legacy = listed.scenarios.find(item => item.id === id);
+  assert.equal(legacy.runtime.runState, ScenarioWorkRunState.PAUSED);
+  assert.equal(legacy.runtime.launchWindowId, null);
+  assert.equal(legacy.runtime.preferredWindowId, null);
+  assert.match(legacy.runtime.lastError, /resume it from the Chrome window/u);
+
+  await manager.resume(id, { launchWindowId: 11 });
+  const rebound = await manager.get(id);
+  assert.equal(rebound.scenario.runtime.launchWindowId, 11);
+  assert.equal(rebound.scenario.runtime.preferredWindowId, 11);
 });

@@ -677,11 +677,15 @@ export async function dispatchUiMessage(message) {
       staggerSeconds: message.payload?.staggerSeconds,
     });
   } else if (message.command === 'START_SCENARIO_CHAT_POOL') {
-    result = await scenarioWork.startChatPool(message.payload?.id || '');
+    result = await scenarioWork.startChatPool(message.payload?.id || '', {
+      launchWindowId: message.payload?.launchWindowId,
+    });
   } else if (message.command === 'PAUSE_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.pauseChatPool(message.payload?.id || '');
   } else if (message.command === 'RESUME_SCENARIO_CHAT_POOL') {
-    result = await scenarioWork.resumeChatPool(message.payload?.id || '');
+    result = await scenarioWork.resumeChatPool(message.payload?.id || '', {
+      launchWindowId: message.payload?.launchWindowId,
+    });
   } else if (message.command === 'STOP_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.stopChatPool(message.payload?.id || '');
   } else if (message.command === 'DELETE_SCENARIO_CHAT_POOL') {
@@ -691,11 +695,15 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'UPDATE_SCENARIO_WORK') {
     result = await scenarioWork.updateConfig(message.payload?.id || '', message.payload?.config || {});
   } else if (message.command === 'START_SCENARIO_WORK') {
-    result = await scenarioWork.start(message.payload?.id || '');
+    result = await scenarioWork.start(message.payload?.id || '', {
+      launchWindowId: message.payload?.launchWindowId,
+    });
   } else if (message.command === 'PAUSE_SCENARIO_WORK') {
     result = await scenarioWork.pause(message.payload?.id || '');
   } else if (message.command === 'RESUME_SCENARIO_WORK') {
-    result = await scenarioWork.resume(message.payload?.id || '');
+    result = await scenarioWork.resume(message.payload?.id || '', {
+      launchWindowId: message.payload?.launchWindowId,
+    });
   } else if (message.command === 'STOP_SCENARIO_WORK') {
     result = await scenarioWork.stop(message.payload?.id || '');
   } else if (message.command === 'DELETE_SCENARIO_WORK') {

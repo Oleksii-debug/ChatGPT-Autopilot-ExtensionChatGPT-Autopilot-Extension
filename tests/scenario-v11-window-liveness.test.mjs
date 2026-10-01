@@ -98,7 +98,7 @@ test('a launch with no physical tab waits without consuming timeout replacements
     now: () => now, createId: () => 'same-tab',
     collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
   await manager.create({ config: { steps: [{ prompt: 'ONE' }], responseTimeoutMinutes: 1 } });
-  await manager.start('same-tab');
+  await manager.start('same-tab', { launchWindowId: 11 });
   const sessionId = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sessionId].taskOrder[0];
   now += 61_000;
@@ -138,7 +138,7 @@ test('scenario retains its sending tab and saved window across all response chec
         : { status: 'TEMPORARY_ERROR', safeDiagnosticCode: 'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING', tabRecoveryPending: true };
     } });
   await manager.create({ config: { steps: [{ prompt: 'ONE' }], closeTabsBetweenChecks: true } });
-  await manager.start('parked');
+  await manager.start('parked', { launchWindowId: 11 });
   const sessionId = core.state.sessionOrder[0];
   const taskId = core.state.sessionsById[sessionId].taskOrder[0];
   core.state.sessionsById[sessionId].operation = { phase: 'SENT_VERIFIED', taskId };
@@ -188,11 +188,130 @@ test('a failed scenario cycle does not prevent the other four slots from running
   const manager=new ScenarioWorkManager({coreRepository:core,chromeApi:chrome,now:()=>1000,
     createId:()=>`isolated-${++serial}`,collectAssistantReport:async()=>({status:'WAITING'})});
   const pool=await manager.createChatPool({count:5,replacementBudget:1,config:{steps:[{prompt:'ONE'}]}});
-  await manager.startChatPool(pool.pool.id);
+  await manager.startChatPool(pool.pool.id, { launchWindowId: 11 });
   const called=[];
   manager.cycleOne=async id=>{called.push(id);if(id===pool.ids[1])throw Error('Synthetic one-slot fault');return {kind:'CYCLED'};};
   const result=await manager.cycleAll();
   assert.deepEqual(called,pool.ids);
   assert.equal(result.results.filter(item=>item.result?.kind==='RETRY_PENDING').length,1);
   assert.equal(result.results.filter(item=>item.result?.kind==='CYCLED').length,4);
+});
+
+
+test('exact Scenario window never falls back to another Chrome window', async () => {
+  let creates = 0;
+  const chrome = {
+    windows: { async get(id) { assert.equal(id, 11); throw new Error('No window with id 11'); } },
+    tabs: {
+      async query() { return [{ id: 90, windowId: 22, url: 'https://chatgpt.com/c/other' }]; },
+      async create() { creates += 1; throw new Error('must not create in another window'); },
+    },
+  };
+  await assert.rejects(
+    () => createChatTab(chrome, 'https://chatgpt.com/', 11),
+    /Scenario no longer exists|launch window|window.*exists|SCENARIO_LAUNCH_WINDOW_UNAVAILABLE/i,
+  );
+  assert.equal(creates, 0);
+});
+
+test('managed Scenario rejects a hinted tab from another window before page interaction', async () => {
+  const task = createTask({ id: 'task-wrong-window', url: 'https://chatgpt.com/' });
+  const session = createSession({ id: 'session-wrong-window', name: 'Window fence', tasks: [task], now: 1 });
+  session.scenarioWork = {
+    managed: true,
+    scenarioId: 'scenario-window-fence',
+    launchWindowId: 11,
+    preferredWindowId: 11,
+  };
+  const state = createEmptyState(1);
+  state.sessionsById[session.id] = session;
+  state.sessionOrder.push(session.id);
+  state.tabHintsByTaskId[task.id] = {
+    tabId: 77,
+    sessionId: session.id,
+    kind: 'TASK',
+    normalizedUrl: task.normalizedUrl,
+    ownedByExtension: true,
+  };
+  let creates = 0;
+  const chrome = {
+    tabs: {
+      async get(id) {
+        assert.equal(id, 77);
+        return { id, windowId: 22, url: 'https://chatgpt.com/', status: 'complete' };
+      },
+      async create() { creates += 1; return { id: 88, windowId: 11, url: task.normalizedUrl }; },
+      async remove() {},
+    },
+  };
+  await assert.rejects(
+    () => resolveTaskTab(chrome, state, session.id, task),
+    /outside the window|SCENARIO_WRONG_WINDOW/i,
+  );
+  assert.equal(creates, 0, 'wrong-window ownership must fail closed instead of replacing into a focused window');
+});
+
+test('two Scenario launch windows in one Chrome profile stay disjoint', async () => {
+  const created = [];
+  const chrome = {
+    windows: { async get(id) { return { id }; } },
+    tabs: {
+      async query() {
+        return [
+          { id: 1, windowId: 11, url: 'https://chatgpt.com/c/project-a' },
+          { id: 2, windowId: 22, url: 'https://chatgpt.com/c/project-b' },
+          { id: 3, windowId: 33, url: 'https://www.youtube.com/' },
+        ];
+      },
+      async create(options) {
+        created.push(structuredClone(options));
+        return { id: 100 + created.length, ...options };
+      },
+    },
+  };
+  await createChatTab(chrome, 'https://chatgpt.com/', 11);
+  await createChatTab(chrome, 'https://chatgpt.com/', 22);
+  assert.deepEqual(created.map(item => item.windowId), [11, 22]);
+  assert.ok(created.every(item => item.windowId !== 33), 'unrelated browsing window must never receive Scenario tabs');
+});
+
+
+test('wrong-window Scenario opening hint is fenced before navigation', async () => {
+  const task = createTask({ id: 'task-opening-wrong-window', url: 'https://chatgpt.com/' });
+  const session = createSession({ id: 'session-opening-wrong-window', name: 'Opening fence', tasks: [task], now: 1 });
+  session.scenarioWork = {
+    managed: true,
+    scenarioId: 'scenario-opening-fence',
+    launchWindowId: 11,
+    preferredWindowId: 11,
+  };
+  const state = createEmptyState(1);
+  state.sessionsById[session.id] = session;
+  state.sessionOrder.push(session.id);
+  state.tabHintsByTaskId[task.id] = {
+    tabId: 66,
+    sessionId: session.id,
+    kind: 'TASK',
+    normalizedUrl: task.normalizedUrl,
+    ownedByExtension: true,
+    opening: true,
+  };
+  let updates = 0;
+  const chrome = {
+    tabs: {
+      async get(id) {
+        assert.equal(id, 66);
+        return { id, windowId: 22, url: 'about:blank#autopilot-owned:test', status: 'complete' };
+      },
+      async update() {
+        updates += 1;
+        throw new Error('wrong-window opening tab must never be navigated');
+      },
+    },
+  };
+  await assert.rejects(
+    () => resolveTaskTab(chrome, state, session.id, task),
+    /outside the window|SCENARIO_WRONG_WINDOW/i,
+  );
+  assert.equal(updates, 0);
 });

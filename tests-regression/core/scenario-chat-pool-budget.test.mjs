@@ -27,7 +27,7 @@ test('a shared replacement budget follows whichever persistent chat finishes fir
     const created = (await first.get(id)).scenario;
     assert.equal(created.config.roundsPerGeneration, 1);
     assert.equal(created.config.maxGenerations, 0);
-    await first.start(id);
+    await first.start(id, { launchWindowId: 11 });
   }
   async function finish(id, expectedPrompt, expectedUrl) {
     const before = (await first.get(id)).scenario.runtime;
@@ -53,6 +53,7 @@ test('a shared replacement budget follows whichever persistent chat finishes fir
   const second = manager(); // simulates a restarted extension service worker
   let summary = (await second.list()).pools[0];
   assert.equal(summary.replacementsUsed, 1);
+  assert.equal(summary.firstResponseReceived, 0, 'new physical generation has not received its first reply yet');
   assert.equal((await second.get(ids[0])).scenario.runtime.generation, 2);
   await finish(ids[1], 'FIRST', initial);
   await finish(ids[1], 'CONTINUE', `https://chatgpt.com/c/chat-1-${ids[1]}`);

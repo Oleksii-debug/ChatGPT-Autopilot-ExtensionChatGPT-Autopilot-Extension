@@ -193,6 +193,16 @@ export class AutomaticSessionExecutor {
           throw new Error('Resolved tab ownership was not recorded in snapshot');
         }
 
+        if (session?.scenarioWork?.managed === true) {
+          const expectedWindowId = session.scenarioWork.launchWindowId ?? session.scenarioWork.preferredWindowId;
+          if (!Number.isInteger(expectedWindowId)) {
+            throw new Error('SCENARIO_LAUNCH_WINDOW_UNBOUND');
+          }
+          if (!Number.isInteger(tab?.windowId) || tab.windowId !== expectedWindowId) {
+            throw new Error('SCENARIO_WRONG_WINDOW');
+          }
+        }
+
         await this.repo.update(draft => {
           const live = requireSession(draft, sessionId);
           const liveTask = live.tasksById[taskId];
@@ -206,8 +216,13 @@ export class AutomaticSessionExecutor {
           draft.tabHintsByTaskId[hintKey] = { ...structuredClone(resolvedHint),
             boundAt: this.now(), boundSendCount: Number(live.successfulSendCount || 0), opening: false };
           if (Number.isInteger(tab.windowId)) {
+            if (live.scenarioWork?.managed === true) {
+              const expectedWindowId = live.scenarioWork.launchWindowId ?? live.scenarioWork.preferredWindowId;
+              if (!Number.isInteger(expectedWindowId) || tab.windowId !== expectedWindowId) {
+                throw new Error('SCENARIO_WRONG_WINDOW');
+              }
+            }
             live.tabWindowId = tab.windowId;
-            if (live.scenarioWork) live.scenarioWork.preferredWindowId = tab.windowId;
           }
           appendDiagnostic(draft, {
             event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
