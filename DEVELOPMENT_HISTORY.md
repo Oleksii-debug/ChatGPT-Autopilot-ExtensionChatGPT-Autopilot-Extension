@@ -340,3 +340,23 @@ Final validation: full Core/Scenario/global/interaction/UI/release suite797 PASS
 Three 11.0.8 live reports at 22:38–22:39 UTC show five-chat pools with ambiguous hidden form submits and frozen/busy response reads. One pool confirmed six sends but no completed responses in its snapshot; another recorded zero verified sends after five physical attempts. Exact counts, evidence and limitations: INCIDENT-11.0.9.md.
 
 The hidden scenario form now activates its own tab before Send even with 0-second dwell. Read-only response probes can wake an owned frozen tab or refresh one stale background tab, at most once per 15 seconds per window, then restore the previous selection safely. Strict send and APSTEP correlation remain: an unsafe URL-only acknowledgement idea was rejected by an existing negative test and removed. 799 automated regression checks passed. No claim of live server delivery or physical Windows qualification. Installer and full source are versioned independently; private reports are omitted.
+
+
+## 11.0.10 — 2026-10-02T01:17:36+02:00 — critical recheck
+
+11 ПІЛОТ HIGH — 11.0.10 — 2026-10-02T01:17:36+02:00
+
+Повторна критична перевірка виявила п’ять відтворюваних дефектів у 11.0.9:
+1. Перша заморожена вкладка могла забирати кожне наступне пробудження; решта 15 чатів не отримувала своєї черги. Тепер черга справедлива в межах конкретного вікна, максимум одне пробудження за 15 секунд.
+2. Перегляд відповіді міг забирати фокус під час надсилання чи очікування після Send. Тепер він перевіряє durable стан Send; зміни фокусу ділять одну чергу з активацією надсилання у цьому вікні. Звичайне фонове читання не утримує цю чергу.
+3. Chrome може підтверджувати активацію до фактичного розмороження документа. Тепер є обмежене асинхронне очікування до однієї секунди.
+4. Активація може замінити кнопку Send та проявити історію. Тепер кнопка, промпт і базова історія перевіряються заново після активації.
+5. Невдала активація до Send створювала хибний запис «спроба вже була». Тепер відмова до ефекту залишає перший Send доступним. Доведена втрата фокусу до native dispatch теж очищає цей запис.
+
+Сценарні вкладки зберігаються протягом заданої послідовності. Немає масового відкривання, перезавантаження чи повторного Send для читання відповіді. High залишається advisory: обмежені спроби вибору не забороняють відправлення. Ізоляція вікон та прості лічильники не змінені.
+
+Оновлюйте ту саму встановлену копію, розпакувавши поверх її папки та натиснувши «Оновити» у chrome://extensions. Перевірка на фізичних Windows Chrome та акаунтах користувача тут недоступна; автоматичні тести не доводять серверну доставку.
+
+Evidence and limitations: INCIDENT-11.0.10.md; QA-11.0.10.txt. Five newly added cases fail on unchanged 11.0.9 and pass after the fix. This supersedes broad confidence from the earlier 799 passing tests.
+
+Validation completed 2026-10-02T01:20:33+02:00: 784 production checks passed; 22 release checks passed after aligning version_name; 806 distinct final checks. Focused 66 passed. Five failures reproduced on unchanged 11.0.9. Full intermediate TAP and final reruns retained under validation/11.0.10. Physical Windows/server qualification remains unavailable.

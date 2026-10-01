@@ -17,7 +17,8 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   const leaf=(text)=>({...visible,innerText:text,children:[],closest:()=>null,getAttribute:n=>messageShape==='unlabeled'?null:n===(messageShape==='testid'?'data-testid':'data-message-author-role')?(messageShape==='testid'?'user-message':'user'):null,querySelectorAll:()=>[]});
   if(stale)messages.push(leaf(prompt));
   function attempt(){ sentAt=clock; sentText=composer.value; if(redirectAfterSend) sandbox.location.href=redirectAfterSend; }
-  const send={...visible,tagName:'BUTTON',type:formSubmit?'submit':'button',form,scrollIntoView(){},setAttribute(){},removeAttribute(){},
+  let send={...visible,tagName:'BUTTON',type:formSubmit?'submit':'button',form,scrollIntoView(){},contains(){return false;},
+    setAttribute(name,value){if(name==='data-autopilot-native-target')this.marked=value;},removeAttribute(){this.marked=undefined;},
     getAttribute:n=>n==='data-testid'?'send-button':null,click(){clicks++;if(!noOp)attempt();}};
   const stop={...visible,tagName:'BUTTON',type:'button',getAttribute:n=>n==='aria-label'&&sentAt!==null?'Stop generating':null};
   class Form { requestSubmit(button){assert.equal(this,form);assert.equal(button,send);submits++;attempt();} }
@@ -52,7 +53,9 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt && (!ackOnlyWhenVisible || document.visibilityState==='visible'))acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
   function reloadAdapter(){ vm.runInContext(source,sandbox); }
-  return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
+  function replaceSend(){ const old=send;send={...old,isConnected:true};old.isConnected=false;return old; }
+  return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,replaceSend,send:()=>send,
+    nativeSubmit(){nativeSubmits++;attempt();},clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
 }
 
 test('new-chat launch URL may transition from root to the created conversation after Send',async()=>{
@@ -183,6 +186,49 @@ test('managed hidden form cannot send when activation fails', async()=>{
   assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
   assert.equal(f.submits(),0);
   assert.equal(f.clicks(),0);
+});
+
+test('a proven no-effect activation failure leaves the same request eligible for its first Send', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/retry-no-effect'});
+  const failed=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>false});
+  assert.equal(failed.submissionEvidence,'PROVEN_NO_EFFECT');
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
+    f.document.visibilityState='visible';return true;
+  },submit:async()=>f.nativeSubmit()});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(f.nativeSubmits(),1);
+  assert.equal(f.submits(),0);
+  assert.equal(f.clicks(),0);
+});
+
+test('native scenario Send uses the current button and history after activation rerenders the document', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/native-rerender'});
+  let stale;
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
+    f.document.visibilityState='visible';stale=f.replaceSend();
+    return true;
+  },submit:async()=>{
+    assert.equal(stale.isConnected,false);
+    assert.equal(f.send().isConnected,true);
+    // Only the current physical target may carry this operation's marker.
+    assert.equal(f.send().marked,'op1');
+    f.nativeSubmit();
+  }});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(f.nativeSubmits(),1);
+});
+
+test('native pre-effect focus loss is retryable without replaying an actual Send', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/native-no-effect'});
+  f.document.visibilityState='visible';
+  const failed=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{submit:async()=>{
+    const error=new Error('focus lost before dispatch');error.safeDiagnosticCode='SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT';throw error;
+  }});
+  assert.equal(failed.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(f.nativeSubmits(),0);
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{submit:async()=>f.nativeSubmit()});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(f.nativeSubmits(),1);
 });
 test('waking the same hidden tab preserves fresh-conversation acknowledgement without another submit',async()=>{
   const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,

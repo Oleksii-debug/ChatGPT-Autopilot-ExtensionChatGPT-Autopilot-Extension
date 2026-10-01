@@ -183,6 +183,68 @@ test('a frozen owned response tab is read after one bounded activation and previ
   assert.equal(effects.length,2,'no busy activation loop');
 });
 
+function frozenPool(windowId, count = 5) {
+  const tabs = new Map([[1, { id: 1, windowId, active: true, url: 'https://chatgpt.com/' }]]);
+  const reads = [];
+  const effects = [];
+  for (let id = 10; id < 10 + count; id++) tabs.set(id, {
+    id, windowId, active: false, frozen: true, status: 'complete', url: `https://chatgpt.com/c/pool-${id}`,
+  });
+  const chrome = { tabs: {
+    async get(id) { return { ...tabs.get(id) }; },
+    async query({ windowId: requested, active }) { return [...tabs.values()].filter(t => t.windowId === requested && (!active || t.active)).map(t => ({ ...t })); },
+    async update(id, patch) {
+      effects.push({ id, ...patch });
+      if (patch.active) for (const t of tabs.values()) { t.active = t.id === id; if (t.id !== 1) t.frozen = !t.active; }
+      Object.assign(tabs.get(id), patch); return { ...tabs.get(id) };
+    },
+  } };
+  const job = id => ({ conversationUrl: tabs.get(id).url, persistentManagedTab: true,
+    managedTabId: id, managedTabOwned: true, preferredWindowId: windowId, requireWindowBinding: true });
+  const transport = { async execute(id) { reads.push(id); return { status: 'READY', assistantComplete: true, assistantText: 'answer' }; } };
+  return { chrome, tabs, reads, effects, job, transport };
+}
+
+test('all fifteen frozen slots receive a turn instead of waking the first slot forever', async t => {
+  const f = frozenPool(11010, 15);
+  let now = 1_000_000;
+  t.mock.method(Date, 'now', () => now);
+  for (let cycle = 0; cycle < 15; cycle++, now += 15_001) {
+    for (let id = 10; id < 25; id++) await probeAssistantConversation(f.chrome, f.transport, f.job(id), { now: () => now });
+  }
+  assert.deepEqual([...new Set(f.reads)].sort((a, b) => a - b), Array.from({ length: 15 }, (_, i) => i + 10));
+  assert.equal(f.effects.filter(effect => effect.id !== 1).length, 15, 'at most one activation per window per interval');
+});
+
+test('a response probe cannot steal focus from a Send awaiting acknowledgement or dwell', async () => {
+  const f = frozenPool(11011, 1);
+  const state = { sessionsById: { sending: { tabWindowId: 11011, operation: { phase: 'SUBMITTING', taskId: 'send' } } }, tabHintsByTaskId: {} };
+  const repository = { async load() { return structuredClone(state); } };
+  const result = await probeAssistantConversation(f.chrome, f.transport, f.job(10), { repository });
+  assert.equal(result.safeDiagnosticCode, 'ASSISTANT_RESPONSE_FOCUS_BUSY');
+  assert.deepEqual(f.effects, []);
+  assert.deepEqual(f.reads, []);
+  state.sessionsById.sending.operation.phase = 'SENT_VERIFIED';
+  assert.equal((await probeAssistantConversation(f.chrome, f.transport, f.job(10), { repository })).assistantComplete, true);
+});
+
+test('a frozen tab may thaw asynchronously after activation, with a bounded wait', async () => {
+  const f = frozenPool(11012, 1);
+  const update = f.chrome.tabs.update;
+  let elapsed = 0;
+  f.chrome.tabs.update = async (id, patch) => {
+    const result = await update(id, patch);
+    if (id === 10 && patch.active) { f.tabs.get(10).frozen = true; result.frozen = true; }
+    return result;
+  };
+  const result = await probeAssistantConversation(f.chrome, f.transport, f.job(10), { wait: async ms => {
+    elapsed += ms; if (elapsed >= 300) f.tabs.get(10).frozen = false;
+  } });
+  assert.equal(result.assistantComplete, true);
+  assert.ok(elapsed >= 300 && elapsed <= 1000);
+  assert.equal(f.tabs.get(1).active, true);
+});
+
 test('a failed scenario cycle does not prevent the other four slots from running', async () => {
   let serial=0;const data={};
   const chrome={storage:{local:{async get(key){return {[key]:structuredClone(data[key])};},

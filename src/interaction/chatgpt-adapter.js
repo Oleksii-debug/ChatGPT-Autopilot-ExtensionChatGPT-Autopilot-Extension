@@ -1706,6 +1706,38 @@
     const ready = prepareSend(doc, request, start);
     if (ready.status !== STATUS.READY) return ready;
 
+    // Activation can replace the composer/button and materialize history.
+    // Select the physical target and capture evidence only AFTER activation.
+    const initialComposer = findVisibleComposer(doc).element;
+    const initialSend = findSendButton(doc, initialComposer);
+    const initialForm = initialComposer?.closest?.('form');
+    const initialFormSubmitter = initialForm && initialSend?.form === initialForm
+      && String(initialSend?.type || '').toLowerCase() === 'submit';
+    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && (!initialFormSubmitter || Number(request.postSendDelayMs || 0) > 0
+        || request.requireGenerationAcknowledgement === true) && typeof deps.activate === 'function') {
+      const activated = await deps.activate();
+      if (activated) {
+        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
+          await (deps.wait || wait)(100);
+        }
+      }
+      if (!activated || doc.visibilityState !== 'visible') {
+        return resultBase(request, start, {
+          status:STATUS.TEMPORARY_ERROR,
+          submissionEvidence:'PROVEN_NO_EFFECT',
+          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+        });
+      }
+      backgroundDocument = false;
+      const activatedReady = prepareSend(doc, request, start);
+      if (activatedReady.status !== STATUS.READY) return activatedReady;
+    }
+    if (Number(request.executionDeadlineAt || 0) > 0 && nowMs() >= request.executionDeadlineAt) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
+        safeDiagnosticCode: 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT' });
+    }
+
     const found = findVisibleComposer(doc);
     if (!found.element || found.ambiguous) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
@@ -1755,28 +1787,6 @@
       && String(send.type || '').toLowerCase() === 'submit';
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
-    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && (!isFormSubmitter || Number(request.postSendDelayMs || 0) > 0
-        || request.requireGenerationAcknowledgement === true) && typeof deps.activate === 'function') {
-      const activated = await deps.activate();
-      if (activated) {
-        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
-          await (deps.wait || wait)(100);
-        }
-      }
-      if (!activated || doc.visibilityState !== 'visible') {
-        return resultBase(request, start, {
-          status:STATUS.TEMPORARY_ERROR,
-          submissionEvidence:'PROVEN_NO_EFFECT',
-          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
-        });
-      }
-      backgroundDocument = false;
-    }
-    if (Number(request.executionDeadlineAt || 0) > 0 && nowMs() >= request.executionDeadlineAt) {
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
-        safeDiagnosticCode: 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT' });
-    }
     if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
       // CDP mouse events are unreliable in a hidden background tab. A genuine
       // form submitter can be invoked through the page's own form semantics
@@ -1804,6 +1814,8 @@
         await deps.submit({ x, y });
       } catch (error) {
         if (error?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+          textSubmissionEvidence.delete(evidenceKey(request));
+          if (evidence) evidence.submitAttempted = false;
           return resultBase(request, start, {
             status: STATUS.TEMPORARY_ERROR,
             submissionEvidence: 'PROVEN_NO_EFFECT',

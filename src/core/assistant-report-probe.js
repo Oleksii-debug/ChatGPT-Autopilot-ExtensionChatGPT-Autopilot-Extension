@@ -1,10 +1,20 @@
 import { createChatTab, sameChatConversationUrl, isChatAuthUrl } from './tabs.js';
+import { withWindowFocus, windowHasPendingSend } from './window-focus.js';
 
 // Chrome freezes background documents independently of their tab lifetime.
 // Wake only one owned tab per window per interval, so large pools cannot spin
 // through activation and make the browser unresponsive.
-const lastFrozenWakeByWindow = new Map();
+const wakeQueuesByOwner = new WeakMap();
 const FROZEN_WAKE_INTERVAL_MS = 15_000;
+
+function wakeQueue(owner, windowId, now) {
+  let windows = wakeQueuesByOwner.get(owner);
+  if (!windows) { windows = new Map(); wakeQueuesByOwner.set(owner, windows); }
+  let queue = windows.get(windowId);
+  if (!queue) { queue = { lastWakeAt: -Infinity, pending: new Map() }; windows.set(windowId, queue); }
+  for (const [id, requestedAt] of queue.pending) if (now - requestedAt > 60_000) queue.pending.delete(id);
+  return queue;
+}
 
 function temporaryReport(code, extra = {}) {
   return {
@@ -83,7 +93,20 @@ async function reopenSameConversation(chromeApi, tab, conversationUrl, owned, pr
   return createChatTab(chromeApi, conversationUrl, preferredWindowId);
 }
 
-export async function probeAssistantConversation(chromeApi, transport, job) {
+export async function probeAssistantConversation(chromeApi, transport, job, options = {}) {
+  const owner = options.repository || chromeApi;
+  const hinted = job?.persistentManagedTab ? await getTab(chromeApi, job?.managedTabId) : undefined;
+  const windowId = hinted?.windowId;
+  const needsWake = job?.managedTabOwned === true && (hinted?.frozen === true
+    || Number(job?.observationAgeMs || 0) >= 90_000 && hinted?.active !== true);
+  if (needsWake && Number.isInteger(windowId)) {
+    return withWindowFocus(owner, windowId, () => probeAssistantConversationImpl(chromeApi, transport, job, options));
+  }
+  // Ordinary background reads do not hold the focus queue or delay a Send.
+  return probeAssistantConversationImpl(chromeApi, transport, job, { ...options, hinted });
+}
+
+async function probeAssistantConversationImpl(chromeApi, transport, job, options) {
   const conversationUrl = String(job?.conversationUrl || '').trim();
   if (!conversationUrl) throw new Error('Assistant report probe requires conversationUrl');
 
@@ -95,7 +118,7 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
   let wokeWindowId = null;
 
   try {
-    let hinted = await getTab(chromeApi, job?.managedTabId);
+    let hinted = options.hinted === undefined ? await getTab(chromeApi, job?.managedTabId) : options.hinted;
     if (persistentManagedTab && job?.requireWindowBinding && !Number.isInteger(job.preferredWindowId)) {
       return temporaryReport('SCENARIO_WINDOW_BINDING_REQUIRED');
     }
@@ -205,12 +228,20 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
       if (persistentManagedTab && (existing.frozen === true
           || Number(job?.observationAgeMs || 0) >= 90_000 && existing.active !== true)) {
         const windowId = existing.windowId;
-        const previousWake = lastFrozenWakeByWindow.get(windowId) || 0;
+        const now = (options.now || Date.now)();
+        const queue = wakeQueue(options.repository || chromeApi, windowId, now);
+        if (job?.managedTabOwned === true) queue.pending.set(existing.id, now);
         if (job?.managedTabOwned === true && Number.isInteger(windowId)
             && (!Number.isInteger(job?.preferredWindowId) || windowId === job.preferredWindowId)
-            && Date.now() - previousWake >= FROZEN_WAKE_INTERVAL_MS
+            && now - queue.lastWakeAt >= FROZEN_WAKE_INTERVAL_MS
+            && queue.pending.keys().next().value === existing.id
             && chromeApi.tabs?.query && chromeApi.tabs?.update) {
-          lastFrozenWakeByWindow.set(windowId, Date.now());
+          if (options.repository) {
+            const state = await options.repository.load();
+            if (windowHasPendingSend(state, windowId)) return temporaryReport('ASSISTANT_RESPONSE_FOCUS_BUSY');
+          }
+          queue.lastWakeAt = now;
+          queue.pending.delete(existing.id);
           try {
             const active = await chromeApi.tabs.query({ active: true, windowId });
             const previous = active?.[0];
@@ -221,6 +252,12 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
               restoreActiveTabId = previous?.id ?? null;
               existing = woken || await getTab(chromeApi, existing.id);
             } else existing = await getTab(chromeApi, existing.id);
+            // Chrome's tabs.update acknowledgement can precede thawing the
+            // document. Wait at most one second, never reload or repeat Send.
+            for (let attempt = 0; existing?.frozen === true && attempt < 10; attempt++) {
+              await (options.wait || (ms => new Promise(resolve => setTimeout(resolve, ms))))(100);
+              existing = await getTab(chromeApi, tabId);
+            }
           } catch { /* never navigate, duplicate, or retry Send to wake a tab */ }
         }
         if (existing?.frozen === true) return temporaryReport('ASSISTANT_RESPONSE_TAB_FROZEN', {
@@ -231,6 +268,8 @@ export async function probeAssistantConversation(chromeApi, transport, job) {
           retryButtonLabel: '',
           retryAvailable: false,
         });
+      } else if (persistentManagedTab) {
+        wakeQueue(options.repository || chromeApi, existing.windowId, (options.now || Date.now)()).pending.delete(existing.id);
       }
 
       if (persistentManagedTab && existing.status === 'loading'
