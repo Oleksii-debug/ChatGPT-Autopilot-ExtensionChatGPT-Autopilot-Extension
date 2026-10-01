@@ -2354,13 +2354,18 @@ export class BrowserAgentManager {
   async putSelfRepairCycle(id, payload = {}) {
     const request = snapshotExactOwnDataRequest(
       payload,
-      new Set(['expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']),
+      new Set(['expectedPlanId', 'expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']),
       'Browser Agent self-repair cycle persistence request',
     );
-    for (const key of ['expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']) {
+    for (const key of ['expectedPlanId', 'expectedPlanRevision', 'expectedCycleUpdatedAt', 'cycle']) {
       if (!Object.hasOwn(request, key)) {
         throw new Error(`Browser Agent self-repair cycle persistence request requires ${key}`);
       }
+    }
+    if (typeof request.expectedPlanId !== 'string'
+        || !request.expectedPlanId
+        || request.expectedPlanId !== request.expectedPlanId.trim()) {
+      throw new Error('Browser Agent self-repair expectedPlanId must be exact non-empty text');
     }
     if (typeof request.expectedPlanRevision !== 'number'
         || !Number.isSafeInteger(request.expectedPlanRevision)
@@ -2383,6 +2388,9 @@ export class BrowserAgentManager {
       if (!job.runtime?.plan) throw new Error('Browser Agent self-repair requires a durable AgentPlan');
       const plan = normalizeAgentPlanV1(job.runtime.plan);
       if (plan.jobId !== job.id) throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      if (plan.planId !== request.expectedPlanId) {
+        throw new Error('Browser Agent AgentPlan identity drifted before self-repair cycle persistence');
+      }
       if (plan.revision !== request.expectedPlanRevision) {
         throw new Error('Browser Agent AgentPlan revision drifted before self-repair cycle persistence');
       }
