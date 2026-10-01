@@ -14,7 +14,7 @@ function storage(){
 }
 
 function manager(chrome){
-  return new BrowserAgentManager({chromeApi:chrome,routePrompt:async()=>({text:'{}'})});
+  return new BrowserAgentManager({chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>Date.parse('2026-10-01T13:00:00.000Z')});
 }
 
 function plan(planId='plan.repair'){
@@ -85,4 +85,15 @@ test('Core: replacement AgentPlan cannot inherit prior self-repair evidence',asy
   assert.equal(state.planId,'plan.replacement');
   assert.equal(state.cycles.length,0);
   assert.equal(state.quarantinedCount,1);
+});
+
+
+test('Core: future self-repair evidence is rejected by the durable owner clock',async()=>{
+  const {chrome}=storage();const m=manager(chrome);await seed(m);
+  const future=cycle('2026-10-01T13:00:01.000Z');
+  future.attempts[0].diagnosis.createdAt='2026-10-01T13:00:01.000Z';
+  await assert.rejects(
+    ()=>m.putSelfRepairCycle('job.repair',{expectedPlanRevision:3,expectedCycleUpdatedAt:null,cycle:future}),
+    /cannot come from the future/,
+  );
 });
