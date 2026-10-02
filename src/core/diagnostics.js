@@ -103,6 +103,8 @@ function reportSession(session, state) {
     line('  робоче вікно', session.tabWindowId ?? session.scenarioWork?.preferredWindowId),
     line('  прив’язані вкладки', hints.map(hint => `${hint.tabId}; owned=${hint.ownedByExtension === true}; closing=${hint.retirePending === true}`).join(' | ')),
     line('  етап операції', session.operation?.phase || OperationPhase.NONE),
+    line('  DOM-відправлення зафіксовано', session.operation?.domSubmitDispatched === true ? 'так' : 'ні'),
+    line('  native-відправлення зафіксовано', session.operation?.nativeSubmitDispatched === true ? 'так' : 'ні'),
     line('  очікувана розмова', redactChatGptUrl(session.operation?.targetUrl || currentTask?.normalizedUrl || currentTask?.url)),
     line('  розмова останнього Send', redactChatGptUrl(currentTask?.lastConversationUrl)),
     line('  повторна спроба не раніше', formatTime(currentTask?.retryAfterAt)),
