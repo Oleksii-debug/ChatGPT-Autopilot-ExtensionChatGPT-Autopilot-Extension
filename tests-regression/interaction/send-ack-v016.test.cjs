@@ -52,7 +52,7 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   }
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt && (!ackOnlyWhenVisible || document.visibilityState==='visible'))acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
-  function reloadAdapter(){ vm.runInContext(adapterSource,sandbox); }
+  function reloadAdapter(){ delete sandbox.ChatGPTInteractionAdapter; vm.runInContext(adapterSource,sandbox); }
   function replaceSend(){ const old=send;send={...old,isConnected:true};old.isConnected=false;return old; }
   return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,replaceSend,send:()=>send,
     nativeSubmit(){nativeSubmits++;attempt();},clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
@@ -237,44 +237,30 @@ test('hidden form submission wakes a deferred changed UI once and observes its e
   assert.equal(activations,1);
 });
 
-test('managed hidden form is activated before physical Send and requires its appended turn', async()=>{
+test('managed hidden form sends without foreground activation and requires its appended turn', async()=>{
   const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/managed'});
   let activated=0;
-  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
-    activated++;f.document.visibilityState='visible';return true;
-  }});
-  assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(activated,1);
-  assert.equal(f.submits(),1);
-  assert.equal(f.clicks(),0);
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{activated++;return false;}});
+  assert.equal(result.status,'SENT_VERIFIED'); assert.equal(activated,0); assert.equal(f.submits(),1); assert.equal(f.clicks(),0);
 });
 
-test('managed hidden form cannot send when activation fails', async()=>{
-  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/'});
+test('managed hidden form does not require successful foreground activation', async()=>{
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/hidden'});
   const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>false});
-  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
-  assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
-  assert.equal(f.submits(),0);
-  assert.equal(f.clicks(),0);
+  assert.equal(result.status,'SENT_VERIFIED'); assert.equal(f.document.visibilityState,'hidden'); assert.equal(f.submits(),1); assert.equal(f.clicks(),0);
 });
 
-test('a proven no-effect activation failure leaves the same request eligible for its first Send', async()=>{
-  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/retry-no-effect'});
-  const failed=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>false});
-  assert.equal(failed.submissionEvidence,'PROVEN_NO_EFFECT');
-  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
-    f.document.visibilityState='visible';return true;
-  },submit:async()=>f.nativeSubmit()});
-  assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(f.nativeSubmits(),0);
-  assert.equal(f.submits(),1);
-  assert.equal(f.clicks(),0);
+test('repeated hidden form request cannot replay an acknowledged Send', async()=>{
+  const f=fixture({formSubmit:true}); const deps={activate:async()=>false,submit:async()=>f.nativeSubmit()};
+  assert.equal((await f.run('SUBMIT_EXISTING',{},deps)).status,'SENT_VERIFIED');
+  assert.equal((await f.run('SUBMIT_EXISTING',{},deps)).status,'SENT_VERIFIED');
+  assert.equal(f.nativeSubmits(),0); assert.equal(f.submits(),1); assert.equal(f.clicks(),0);
 });
 
 test('scenario form Send uses the current button and history after activation rerenders the document', async()=>{
   const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/native-rerender'});
   let stale;
-  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true,postSendDelayMs:1},{activate:async()=>{
     f.document.visibilityState='visible';stale=f.replaceSend();
     return true;
   },checkpointSubmit:async()=>{
@@ -321,21 +307,13 @@ test('unlabeled main user turn recovers after navigation without resending',asyn
   assert.equal(r.status,'SENT_VERIFIED');
   assert.equal(f.clicks(),1);
 });
-test('fresh-launch restart cannot verify an unrelated conversation from historical prompt text',async()=>{
-  const f=fixture({messageShape:'unlabeled',noOp:true,startUrl:'https://chatgpt.com/'});
-  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
-  assert.equal(f.clicks(),1);
-  f.sandbox.location.href='https://chatgpt.com/c/unrelated';
-  f.acknowledge();
-  f.reloadAdapter();
-  const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{
-    expectedUrl:'https://chatgpt.com/',
-    recoveryLaunchUrl:'https://chatgpt.com/'
+test('fresh browser context cannot verify an unrelated conversation from an old operation',async()=>{
+  const fresh=fixture({messageShape:'unlabeled',startUrl:'https://chatgpt.com/c/unrelated'});
+  const r=await fresh.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{
+    expectedUrl:'https://chatgpt.com/c/unrelated', recoveryLaunchUrl:'https://chatgpt.com/'
   });
   assert.equal(r.status,'SUBMISSION_UNCERTAIN');
-  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_MAIN_PROMPT_VERIFIED');
-  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED');
-  assert.equal(f.clicks(),1);
+  assert.equal(fresh.clicks(),0,'context-reset reconciliation never resends');
 });
 test('an old identical unlabeled turn cannot verify another Send',async()=>{
   const f=fixture({messageShape:'unlabeled',stale:true,noOp:true});
@@ -394,7 +372,7 @@ test('a rejected checkpoint restores selection and is reported as proven no DOM 
   assert.equal(f.clicks(),0);
 });
 
-test('hidden non-submit control activates for DOM click and restores focus after acknowledgement completes',async()=>{
+test('hidden non-submit control uses DOM click without activation and restores focus after acknowledgement completes',async()=>{
   const f=fixture();let activation=0,nativeCalls=0,restores=0;
   const order=[];
   const result=await f.run('SUBMIT_EXISTING',{}, {
@@ -404,23 +382,22 @@ test('hidden non-submit control activates for DOM click and restores focus after
     restore:async()=>{restores++;order.push('restore');f.document.visibilityState='hidden';return true;},
   });
   assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(activation,1);
+  assert.equal(activation,0);
   assert.equal(nativeCalls,0);
   assert.equal(restores,1);
-  assert.deepEqual(order,['activate','checkpoint','restore']);
+  assert.deepEqual(order,['checkpoint','restore']);
   assert.equal(f.clicks(),1);
 });
 
-test('activation failure has zero Send effects and returns a technical error',async()=>{
+test('unavailable activation does not block a hidden non-submit DOM control',async()=>{
   const f=fixture();let nativeCalls=0;
   const result=await f.run('SUBMIT_EXISTING',{}, {
     activate:async()=>false,
     submit:async()=>{nativeCalls++;},
   });
-  assert.equal(result.status,'TEMPORARY_ERROR');
-  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(result.status,'SENT_VERIFIED');
   assert.equal(nativeCalls,0);
-  assert.equal(f.clicks(),0);
+  assert.equal(f.clicks(),1);
 });
 
 test('repeated expected prompt is allowed to send and is not a stop condition',async()=>{

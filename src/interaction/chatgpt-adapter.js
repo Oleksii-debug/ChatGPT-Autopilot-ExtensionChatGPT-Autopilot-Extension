@@ -12,7 +12,10 @@
  * INSERT_AND_SEND remains only as a compatibility mode for non-durable/manual callers.
  */
 (function (root, factory) {
-  const api = factory();
+  const buildVersion = '11.0.12';
+  const api = root?.ChatGPTInteractionAdapter?.buildVersion === buildVersion
+    ? root.ChatGPTInteractionAdapter : factory();
+  api.buildVersion = buildVersion;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.ChatGPTInteractionAdapter = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
@@ -922,6 +925,20 @@
       return { status: STATUS.TEMPORARY_ERROR, code: 'TEMPORARY_ERROR_SURFACE_VISIBLE' };
     }
 
+    // The Send button may return while a prior response is still streaming.
+    // Scope this signal to the active conversation so profile/sidebar work does
+    // not block the selected chat, and ignore hidden stale status nodes.
+    const main = doc.querySelector?.('main, [role="main"]');
+    const busy = Array.from(main?.querySelectorAll?.('[role="status"][aria-busy="true"]') || [])
+      .filter(isVisible)
+      .find((node) => {
+        if (node.closest?.('form, nav, aside, [data-user-message-bubble="true"]')) return false;
+        return Boolean(node.closest?.('[data-thread-user-message-navigation-content="true"]'))
+          || /chatgpt (?:is responding|responding|відповідає|отвечает)/iu.test(
+            `${accessibleName(node)} ${textOf(node)}`);
+      });
+    if (busy) return { status: STATUS.BUSY, code: 'CONVERSATION_BUSY_STATUS' };
+
     const stop = findVisibleButton(doc, (b) => {
       const label = (accessibleName(b) + ' ' + textOf(b)).trim().toLowerCase();
       return /stop generating|stop response|stop streaming|stop generation|stop-button|зупинити (?:генерацію|відповідь|створення)|остановить (?:генерацию|ответ)/.test(label)
@@ -1708,28 +1725,13 @@
 
     // Activation can replace the composer/button and materialize history.
     // Select the physical target and capture evidence only AFTER activation.
-    const initialComposer = findVisibleComposer(doc).element;
-    const initialSend = findSendButton(doc, initialComposer);
-    const initialForm = initialComposer?.closest?.('form');
-    const initialFormSubmitter = initialForm && initialSend?.form === initialForm
-      && String(initialSend?.type || '').toLowerCase() === 'submit';
-    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && (!initialFormSubmitter || Number(request.postSendDelayMs || 0) > 0
-        || request.requireGenerationAcknowledgement === true) && typeof deps.activate === 'function') {
-      const activated = await deps.activate();
-      if (activated) {
-        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
-          await (deps.wait || wait)(100);
-        }
-      }
-      if (!activated || doc.visibilityState !== 'visible') {
-        return resultBase(request, start, {
-          status:STATUS.TEMPORARY_ERROR,
-          submissionEvidence:'PROVEN_NO_EFFECT',
-          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
-        });
-      }
-      backgroundDocument = false;
+    // DOM form submission targets this exact owned tab; OS-window foreground
+    // state is not part of the Send precondition. Activate only when the user
+    // configured post-send dwell, and treat it as best-effort.
+    const backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && Number(request.postSendDelayMs || 0) > 0
+        && typeof deps.activate === 'function') {
+      try { await deps.activate(); } catch { /* observation/dwell still proceeds */ }
       const activatedReady = prepareSend(doc, request, start);
       if (activatedReady.status !== STATUS.READY) return activatedReady;
     }
@@ -1853,11 +1855,7 @@
         && nowMs() >= verifyDeadline - 13000
         && typeof deps.activate === 'function') {
         activatedForAcknowledgement = true;
-        if (await deps.activate({ observationOnly: true })) {
-          for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
-            await (deps.wait || wait)(100);
-          }
-        }
+        try { await deps.activate({ observationOnly: true }); } catch { /* continue bounded observation */ }
       }
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
