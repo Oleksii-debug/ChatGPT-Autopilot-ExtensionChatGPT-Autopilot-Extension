@@ -1,0 +1,15 @@
+11.0.11 — 2026-10-02T15:31:00+02:00
+
+Qualification completed 2026-10-02T15:36:25+02:00.
+
+Full Core/integration/scenario/window/status/interaction/UI/release suite: 813 PASS, 0 FAIL, 0 skipped (68.0 seconds).
+Final runner suite with one additional lost-DOM-checkpoint-acknowledgement case: 11 PASS, 0 FAIL. Ten of these cases overlap the full suite; aggregate distinct final cases: 814 PASS.
+Focused bridge/DOM/Core/recovery run: 201 PASS, 0 FAIL; these checks are included in the full suite, not added to its count.
+
+The unchanged pre-11 Pilot 10 adapter is archived as a byte-exact fixture from a4436cf3097c2a8faa6f99a04ad558837a746acd. Its ready hidden form submits even with an unavailable native callback. The equivalent 11.0.10 scenario failed before the correction; the corrected DOM path succeeds. A separate reinjection test failed before correction and succeeds after replacing the obsolete listener. Before-fix outputs are retained under validation/11.0.11.
+
+The real shipped content-script bridge and real Core repository/checkpoint/activation code are exercised against a modeled DOM, without a debugger API. Core writes the effect boundary before the single physical form submit; duplicate delivery and startup recovery do not authorize a second Send. The new checkpoint does not increase confirmed-success counters.
+
+No physical Windows Chrome, NVDA or logged-in ChatGPT test was performed. The old nightly report is unavailable. Passing these tests does not prove delivery on the user's accounts, identify the deleted incident's precise cause or certify an unattended night run. Native editor insertion still uses its existing separate native path.
+
+Installer qualification: 309 shipped files; all 231 JavaScript files pass node --check. ZIP CRC passes; every shipped file matches current source bytes. The installer includes this QA file, the dated history, changes and incident report; archived Pilot 10 test fixture is excluded from the installer. SHA256SUMS.txt records the final ZIP hash.

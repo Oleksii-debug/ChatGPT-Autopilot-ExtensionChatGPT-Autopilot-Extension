@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../src/interaction/chatgpt-adapter.js'), 'utf8');
 const prompt = 'Особистий промпт\nДругий рядок';
-function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false, messageShape='author-role', ackOnlyWhenVisible=false}={}) {
+function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false, messageShape='author-role', ackOnlyWhenVisible=false, adapterSource=source}={}) {
   let clock=1000, clicks=0, submits=0, nativeSubmits=0, sentAt=null, acknowledged=false, model='', sentText='';
   const messages=[];
   class Clock extends Date { static now() { return clock; } }
@@ -34,7 +34,7 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
     }};
   composer.ownerDocument=document;
   const sandbox={URL,Date:Clock,Event,InputEvent:Event,setTimeout,clearTimeout,location:{href:startUrl},getComputedStyle:()=>({display:'block',visibility:'visible'})};
-  vm.createContext(sandbox);vm.runInContext(source,sandbox);
+  vm.createContext(sandbox);vm.runInContext(adapterSource,sandbox);
   function acknowledge(){
     if(acknowledged)return;acknowledged=true;
     const deliveredText=deliveredTextOverride || sentText || prompt;
@@ -52,11 +52,81 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   }
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt && (!ackOnlyWhenVisible || document.visibilityState==='visible'))acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
-  function reloadAdapter(){ vm.runInContext(source,sandbox); }
+  function reloadAdapter(){ vm.runInContext(adapterSource,sandbox); }
   function replaceSend(){ const old=send;send={...old,isConnected:true};old.isConnected=false;return old; }
   return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,replaceSend,send:()=>send,
     nativeSubmit(){nativeSubmits++;attempt();},clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
 }
+
+test('the production submit callback must not turn a working Pilot 10 form into a debugger-dependent Send',async()=>{
+  const pre10=fs.readFileSync(path.join(__dirname,'../fixtures/chatgpt/pilot10-adapter.js'),'utf8');
+  let nativeCalls=0;
+  const unavailableNative=async()=>{nativeCalls++;const error=new Error('debugger unavailable');error.safeDiagnosticCode='NATIVE_INPUT_ATTACH_FAILED';throw error;};
+  const old=fixture({formSubmit:true,adapterSource:pre10});
+  assert.equal((await old.run('SUBMIT_EXISTING',{}, {submit:unavailableNative})).status,'SENT_VERIFIED');
+  assert.equal(old.submits(),1);
+  const current=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/pilot10-parity'});
+  const result=await current.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{submit:unavailableNative,
+    activate:async()=>{current.document.visibilityState='visible';return true;}});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(current.submits(),1);
+  assert.equal(nativeCalls,0);
+});
+
+test('the real content-script bridge checkpoints one form Send through Core with debugger unavailable', async()=>{
+  const {checkpointDomSubmit,activateOwnedSendTab,restoreOwnedSendTab}=await import('../../src/core/native-input.js');
+  const {createEmptyState,createSession,createTask}=await import('../../src/core/schema.js');
+  const {StorageRepository}=await import('../../src/core/storage.js');
+  const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/c/native'});
+  const task=createTask({id:'t',url:'https://chatgpt.com/c/native'});
+  const session=createSession({id:'s',name:'Real bridge',tasks:[task],sharedPrompt:prompt,now:1});
+  session.runState='RUNNING';session.tabWindowId=9;
+  session.operation={operationId:'op',sessionId:'s',taskId:'t',targetUrl:task.url,promptText:prompt,promptFingerprint:'fp',
+    phase:'SUBMITTING',createdAt:1,updatedAt:1,preSendDeadline:0,submitStartedAt:1,verificationDeadline:0};
+  const state=createEmptyState(1);state.sessionsById.s=session;state.sessionOrder=['s'];
+  state.tabHintsByTaskId.t={tabId:7,sessionId:'s',normalizedUrl:task.url,kind:'TASK',ownedByExtension:true};
+  let stored=state,activeId=3,listener;const messages=[];
+  const sender={id:'ext',frameId:0,tab:{id:7,windowId:9}};
+  const chrome={runtime:{id:'ext'},storage:{local:{async get(){return {autopilotState:structuredClone(stored)};},
+    async set(record){stored=structuredClone(record.autopilotState);}}},tabs:{
+    async get(id){return {id,windowId:9,active:id===activeId,url:id===7?task.url:'https://example.com/'};},
+    async query(){return [{id:activeId,windowId:9}];},
+    async update(id){activeId=id;f.document.visibilityState=id===7?'visible':'hidden';return this.get(id);},
+  }};
+  const repo=new StorageRepository(chrome);
+  const formPrototype=f.document.defaultView.HTMLFormElement.prototype;
+  const physicalSubmit=formPrototype.requestSubmit;
+  formPrototype.requestSubmit=function(button){
+    assert.equal(stored.sessionsById.s.operation.domSubmitDispatched,true,'Core persists the boundary before physical submit');
+    return physicalSubmit.call(this,button);
+  };
+  const runtime={onMessage:{addListener(fn){listener=fn;}},async sendMessage(message){
+    messages.push(message.channel);
+    if(message.channel==='autopilot-native-input')throw Error('Chrome debugger is unavailable');
+    if(message.channel==='autopilot-send-tab-activation') {
+      if(message.action==='activate')return {ok:true,data:await activateOwnedSendTab(chrome,repo,message,sender)};
+      await restoreOwnedSendTab(chrome,repo,message,sender);return {ok:true};
+    }
+    assert.equal(message.channel,'autopilot-dom-submit-checkpoint');
+    await checkpointDomSubmit(chrome,repo,message,sender);return {ok:true};
+  }};
+  f.sandbox.chrome={runtime};f.sandbox.document=f.document;
+  f.sandbox.setTimeout=(fn,ms)=>{Promise.resolve().then(()=>f.wait(ms)).then(fn);return 1;};
+  const bridgeSource=fs.readFileSync(path.join(__dirname,'../../src/interaction/content-script.js'),'utf8');
+  vm.runInContext(bridgeSource,f.sandbox);
+  const request={mode:'SUBMIT_EXISTING',requestId:'op',taskId:'t',expectedUrl:task.url,promptText:prompt,
+    expectedWindowId:9,requireGenerationAcknowledgement:true};
+  const invoke=()=>new Promise(resolve=>listener({channel:'autopilot-interaction',request},{},resolve));
+  const result=await invoke();
+  assert.equal(result.ok,true);assert.equal(result.data.status,'SENT_VERIFIED');
+  assert.equal(f.submits(),1);assert.equal(activeId,3);
+  assert.equal(messages.filter(m=>m==='autopilot-dom-submit-checkpoint').length,1);
+  assert.equal(messages.includes('autopilot-native-input'),false);
+  const repeated=await invoke();
+  assert.ok(['SENT_VERIFIED','SUBMISSION_UNCERTAIN'].includes(repeated.data.status));
+  assert.equal(f.submits(),1,'duplicate delivery must remain observation-only');
+  assert.equal(messages.filter(m=>m==='autopilot-dom-submit-checkpoint').length,1);
+});
 
 test('new-chat launch URL may transition from root to the created conversation after Send',async()=>{
   const f=fixture({startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/generated-123'});
@@ -196,39 +266,38 @@ test('a proven no-effect activation failure leaves the same request eligible for
     f.document.visibilityState='visible';return true;
   },submit:async()=>f.nativeSubmit()});
   assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(f.nativeSubmits(),1);
-  assert.equal(f.submits(),0);
+  assert.equal(f.nativeSubmits(),0);
+  assert.equal(f.submits(),1);
   assert.equal(f.clicks(),0);
 });
 
-test('native scenario Send uses the current button and history after activation rerenders the document', async()=>{
+test('scenario form Send uses the current button and history after activation rerenders the document', async()=>{
   const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/native-rerender'});
   let stale;
   const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{activate:async()=>{
     f.document.visibilityState='visible';stale=f.replaceSend();
     return true;
-  },submit:async()=>{
+  },checkpointSubmit:async()=>{
     assert.equal(stale.isConnected,false);
     assert.equal(f.send().isConnected,true);
-    // Only the current physical target may carry this operation's marker.
-    assert.equal(f.send().marked,'op1');
-    f.nativeSubmit();
   }});
   assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(f.nativeSubmits(),1);
+  assert.equal(f.nativeSubmits(),0);
+  assert.equal(f.submits(),1);
 });
 
-test('native pre-effect focus loss is retryable without replaying an actual Send', async()=>{
+test('a rejected DOM checkpoint is retryable without replaying an actual Send', async()=>{
   const f=fixture({formSubmit:true,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/native-no-effect'});
   f.document.visibilityState='visible';
-  const failed=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{submit:async()=>{
+  const failed=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{checkpointSubmit:async()=>{
     const error=new Error('focus lost before dispatch');error.safeDiagnosticCode='SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT';throw error;
   }});
   assert.equal(failed.submissionEvidence,'PROVEN_NO_EFFECT');
   assert.equal(f.nativeSubmits(),0);
-  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{submit:async()=>f.nativeSubmit()});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true},{checkpointSubmit:async()=>{}});
   assert.equal(result.status,'SENT_VERIFIED');
-  assert.equal(f.nativeSubmits(),1);
+  assert.equal(f.nativeSubmits(),0);
+  assert.equal(f.submits(),1);
 });
 test('waking the same hidden tab preserves fresh-conversation acknowledgement without another submit',async()=>{
   const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,
@@ -307,11 +376,11 @@ test('hidden tab bypasses Chrome native mouse submit and sends through DOM seman
   assert.equal(r.status,'SENT_VERIFIED');assert.equal(nativeCalls,0);assert.equal(f.clicks(),1);
 });
 
-test('focus reconciled away before native Send is reported as proven no effect',async()=>{
+test('a rejected checkpoint restores selection and is reported as proven no DOM Send effect',async()=>{
   const f=fixture();let restores=0;
   const result=await f.run('SUBMIT_EXISTING',{}, {
     activate:async()=>{f.document.visibilityState='visible';return true;},
-    submit:async()=>{
+    checkpointSubmit:async()=>{
       const error=new Error('owner focus already restored');
       error.safeDiagnosticCode='SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT';
       throw error;
@@ -320,25 +389,26 @@ test('focus reconciled away before native Send is reported as proven no effect',
   });
   assert.equal(result.status,'TEMPORARY_ERROR');
   assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
-  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(result.safeDiagnosticCode,'SEND_DOM_CHECKPOINT_REJECTED');
   assert.equal(restores,1);
   assert.equal(f.clicks(),0);
 });
 
-test('hidden non-submit control activates for native click and restores focus after acknowledgement completes',async()=>{
+test('hidden non-submit control activates for DOM click and restores focus after acknowledgement completes',async()=>{
   const f=fixture();let activation=0,nativeCalls=0,restores=0;
   const order=[];
   const result=await f.run('SUBMIT_EXISTING',{}, {
     activate:async()=>{activation++;order.push('activate');f.document.visibilityState='visible';return true;},
-    submit:async()=>{nativeCalls++;order.push('submit');f.acknowledge();},
+    submit:async()=>{nativeCalls++;throw Error('Debugger must not be used');},
+    checkpointSubmit:async()=>{order.push('checkpoint');},
     restore:async()=>{restores++;order.push('restore');f.document.visibilityState='hidden';return true;},
   });
   assert.equal(result.status,'SENT_VERIFIED');
   assert.equal(activation,1);
-  assert.equal(nativeCalls,1);
+  assert.equal(nativeCalls,0);
   assert.equal(restores,1);
-  assert.deepEqual(order,['activate','submit','restore']);
-  assert.equal(f.clicks(),0);
+  assert.deepEqual(order,['activate','checkpoint','restore']);
+  assert.equal(f.clicks(),1);
 });
 
 test('activation failure has zero Send effects and returns a technical error',async()=>{

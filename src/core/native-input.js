@@ -27,7 +27,24 @@ function authorizedOperation(state, message, sender, chromeApi, { allowSubmitted
   if (state.tabHintsByTaskId[hintKey]?.tabId !== sender.tab.id) fail('NATIVE_INPUT_TAB_NOT_OWNED');
   assertSessionWindow(session, sender.tab);
   if (message.kind === 'submit' && operation.nativeSubmitDispatched && !allowSubmitted) fail('NATIVE_SUBMIT_ALREADY_DISPATCHED');
+  if (message.kind === 'submit' && operation.domSubmitDispatched && !allowSubmitted) fail('DOM_SUBMIT_ALREADY_DISPATCHED');
   return { session, operation };
+}
+
+// Authorize and persist the DOM Send boundary without attaching a debugger.
+// The content script still validates the exact prompt and physical control.
+export async function checkpointDomSubmit(chromeApi, repository, message, sender) {
+  const request = { ...message, kind: 'submit' };
+  const { session, operation } = authorizedOperation(await repository.load(), request, sender, chromeApi);
+  const tab = await chromeApi.tabs.get(sender.tab.id);
+  assertSessionWindow(session, tab);
+  if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('DOM_SUBMIT_URL_MISMATCH');
+  await repository.update(state => {
+    const live = authorizedOperation(state, request, sender, chromeApi);
+    live.operation.domSubmitDispatched = true;
+    live.operation.postSendHoldUntil = Date.now() + Math.min(60000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+    return state;
+  });
 }
 
 // This function is serialized into Chrome's isolated world. No page-owned JS,
@@ -162,7 +179,8 @@ export async function activateOwnedSendTab(chromeApi, repository, message, sende
 
 async function activateOwnedSendTabImpl(chromeApi, repository, message, sender) {
   const state = await repository.load();
-  const { session, operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
+  const { session, operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi,
+    { allowSubmitted: message.observationOnly === true });
   const tab = await chromeApi.tabs.get(sender.tab.id);
   assertSessionWindow(session, tab);
   const observedUrl = normalizeChatUrl(tab.url);
@@ -184,7 +202,8 @@ async function activateOwnedSendTabImpl(chromeApi, repository, message, sender) 
   if (!previous || previous.id === tab.id || previous.windowId !== tab.windowId) fail('SEND_TAB_ACTIVATION_UNAVAILABLE');
 
   await repository.update(draft => {
-    const live = authorizedOperation(draft, { ...message, kind:'submit' }, sender, chromeApi);
+    const live = authorizedOperation(draft, { ...message, kind:'submit' }, sender, chromeApi,
+      { allowSubmitted: message.observationOnly === true });
     const priorTabId = Number(live.operation.previousSendTabId || 0);
     const priorWindowId = Number(live.operation.previousSendWindowId || 0);
     if (priorTabId > 0) {
@@ -198,6 +217,9 @@ async function activateOwnedSendTabImpl(chromeApi, repository, message, sender) 
     }
     live.operation.previousSendTabId = previous.id;
     live.operation.previousSendWindowId = tab.windowId;
+    // An observation wake may happen AFTER a legacy DOM Send. Its focus lease
+    // cannot prove zero effect on restart. Only a pre-Send activation can.
+    if (message.observationOnly !== true) live.operation.activationBeforeSubmit = true;
     return draft;
   });
 
