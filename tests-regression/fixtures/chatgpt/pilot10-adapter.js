@@ -31,15 +31,12 @@
 
   const MODES = new Set([
     'CHECK_ONLY',
-    'ENSURE_HIGH_EFFORT',
     'INSERT_ONLY',
     'PREPARE_SEND',
     'SUBMIT_EXISTING',
     'INSERT_AND_SEND',
     'VERIFY_AFTER_UNCERTAIN_SUBMIT',
-    'READ_ASSISTANT_REPORT',
-    'RECOVER_CHAT_ERROR_SURFACE',
-    'OPEN_SAVED_CONVERSATION_FROM_SIDEBAR'
+    'READ_ASSISTANT_REPORT'
   ]);
   const PROMPT_REQUIRED_MODES = new Set([
     'INSERT_ONLY',
@@ -56,7 +53,6 @@
   // Retain the pre-send baseline for late acknowledgement and worker restarts.
   // A page reload intentionally loses this evidence: history equality alone is unsafe.
   const textSubmissionEvidence = new Map();
-  const responseStability = new WeakMap();
 
   function evidenceUrlMatches(storedExpected, requestExpected) {
     const stored = normalizeUrl(storedExpected);
@@ -84,25 +80,6 @@
 
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-  function waitForSubmissionObservation(doc, deps, ready) {
-    if (ready()) return Promise.resolve();
-    if (deps.wait) return deps.wait(100);
-    const Observer = doc.defaultView?.MutationObserver || globalThis.MutationObserver;
-    if (!Observer || !doc.documentElement) return wait(100);
-    // Background-page timers can be throttled for a minute. DOM changes wake
-    // acknowledgement immediately without another physical Send or tab focus.
-    return new Promise(resolve => {
-      let timer;
-      const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(); };
-      const observer = new Observer(finish);
-      observer.observe(doc.documentElement, { childList: true, subtree: true, characterData: true,
-        attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'data-message-id',
-          'data-message-author-role', 'data-turn'] });
-      timer = setTimeout(finish, 100);
-      if (ready()) finish();
-    });
-  }
 
   function normalizeUrl(value) {
     try {
@@ -222,17 +199,6 @@
     return true;
   }
 
-  function isRenderedRecoveryControl(el) {
-    if (!el || !el.isConnected || isSemanticallyUnavailable(el)) return false;
-    const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
-    if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
-    if (typeof el.getBoundingClientRect === 'function') {
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return false;
-    }
-    return true;
-  }
-
   function textOf(el) {
     return String(el?.innerText ?? el?.textContent ?? el?.value ?? '');
   }
@@ -287,473 +253,6 @@
       .find(predicate) || null;
   }
 
-  const HIGH_EFFORT_LEVELS = new Set(['high', 'extra-high']);
-
-  function normalizeEffortText(value) {
-    let text = String(value || '').trim().toLowerCase();
-    try { text = text.normalize('NFKC'); } catch (_) {}
-    return text.replace(/[–—_]+/gu, '-').replace(/\s+/gu, ' ');
-  }
-
-  function classifyEffortLabel(value) {
-    const text = normalizeEffortText(value);
-    if (!text) return null;
-    if (/\b(?:extra[ -]?high|xhigh|very high)\b/u.test(text)
-        || /дуже висок|очень высок/u.test(text)) return 'extra-high';
-    if (/\bhigh\b/u.test(text)
-        || /(?:^|\s)(?:високий|высокий|vysoky|wysoki|hoch|eleve|alto)(?:\s|$)/u.test(text)) return 'high';
-    if (/\bmedium\b/u.test(text)
-        || /(?:^|\s)(?:середній|средний|stredny|stredni|sredni|mittel|moyen|medio)(?:\s|$)/u.test(text)) return 'medium';
-    if (/\blow\b/u.test(text)
-        || /(?:^|\s)(?:низький|низкий|nizky|niski|niedrig|faible|bajo)(?:\s|$)/u.test(text)) return 'low';
-    if (/\binstant\b/u.test(text)
-        || /миттєв|мгновенн/u.test(text)) return 'instant';
-    return null;
-  }
-
-  function declaredEffortLevel(el) {
-    const raw = normalizeEffortText(el?.getAttribute?.('data-selected-reasoning-effort'));
-    return classifyEffortLabel(raw);
-  }
-
-  function effortSemanticText(el) {
-    return normalizeEffortText([
-      el?.getAttribute?.('data-selected-reasoning-effort'),
-      el?.getAttribute?.('aria-label'),
-      el?.getAttribute?.('aria-valuetext'),
-      el?.getAttribute?.('data-testid'),
-      el?.getAttribute?.('name'),
-      el?.title,
-      textOf(el),
-    ].filter(Boolean).join(' '));
-  }
-
-  function effortSemanticHint(text) {
-    return /thinking|reasoning|effort|think level|thinking level|reasoning level|зусил|мислен|міркуван|размыш|усили/u.test(text);
-  }
-
-  function isInsideEffortChoiceSurface(el) {
-    const parent = el?.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"]');
-    return Boolean(parent);
-  }
-
-  function findEffortControl(doc) {
-    const declared = Array.from(doc.querySelectorAll(
-      '[data-selected-reasoning-effort][data-codex-intelligence-trigger="true"], '
-      + '[data-selected-reasoning-effort][data-composer-navigation-target="reasoning"]'
-    ) || []).filter(isVisible).filter((el) => !isInsideEffortChoiceSurface(el))
-      .map((element) => ({ element, level: declaredEffortLevel(element) }))
-      .filter((entry) => entry.level);
-    const uniqueDeclared = Array.from(new Set(declared.map((entry) => entry.element)))
-      .map((element) => declared.find((entry) => entry.element === element));
-    if (uniqueDeclared.length === 1) {
-      return { ...uniqueDeclared[0], score: 1000, ambiguous: false };
-    }
-    if (uniqueDeclared.length > 1) {
-      return { element: null, level: null, ambiguous: true };
-    }
-
-    const candidates = Array.from(doc.querySelectorAll(
-      'button, [role="button"], [role="combobox"], [role="slider"], input[type="range"]'
-    ) || []).filter(isVisible).map((el) => {
-      if (isInsideEffortChoiceSurface(el)) return null;
-      const identity = effortSemanticText(el);
-      const ariaValue = normalizeEffortText(el.getAttribute?.('aria-valuetext'));
-      const declaredLevel = declaredEffortLevel(el);
-      const level = declaredLevel || classifyEffortLabel(ariaValue) || classifyEffortLabel(identity);
-      const role = normalizeEffortText(el.getAttribute?.('role'));
-      const popup = normalizeEffortText(el.getAttribute?.('aria-haspopup'));
-      const testId = normalizeEffortText(el.getAttribute?.('data-testid'));
-      const semantic = effortSemanticHint(identity);
-      const hasPopup = popup === 'menu' || popup === 'listbox' || popup === 'dialog' || popup === 'true';
-      const modelPicker = hasPopup && (/\bmodel\b|модель|модел|gpt[- ]?\d/u.test(identity)
-        || /(model[-_](?:picker|selector|switcher)|model-switcher)/u.test(testId));
-      let score = 0;
-      if (declaredLevel) score += 500;
-      if (semantic) score += 100;
-      if (classifyEffortLabel(ariaValue)) score += 100;
-      if (/(thinking|reasoning|effort)/u.test(testId)) score += 80;
-      if (role === 'slider') score += 70;
-      if (level && hasPopup) score += 60;
-      if (level && semantic) score += 30;
-      if (modelPicker) score += 45;
-      if (!score) return null;
-      return { element: el, level, score };
-    }).filter(Boolean).sort((a, b) => b.score - a.score);
-
-    if (!candidates.length) return { element: null, level: null, ambiguous: false };
-    if (candidates.length > 1 && candidates[0].score === candidates[1].score) {
-      return { element: null, level: null, ambiguous: true };
-    }
-    return { ...candidates[0], ambiguous: false };
-  }
-
-  function effortOptionSelected(el) {
-    const ariaChecked = normalizeEffortText(el?.getAttribute?.('aria-checked'));
-    const ariaSelected = normalizeEffortText(el?.getAttribute?.('aria-selected'));
-    const dataState = normalizeEffortText(el?.getAttribute?.('data-state'));
-    const dataSelected = normalizeEffortText(el?.getAttribute?.('data-selected'));
-    return ariaChecked === 'true'
-      || ariaSelected === 'true'
-      || dataSelected === 'true'
-      || dataState === 'checked'
-      || dataState === 'on'
-      || dataState === 'selected';
-  }
-
-  function findSelectedEffortOption(doc) {
-    const options = Array.from(doc.querySelectorAll(
-      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"]'
-    ) || []).filter(isVisible).filter(effortOptionSelected)
-      .map((element) => ({ element, level: classifyEffortLabel(effortSemanticText(element)) }))
-      .filter((entry) => entry.level);
-    if (!options.length) return { element: null, level: null, ambiguous: false };
-    if (options.length > 1) return { element: null, level: null, ambiguous: true };
-    return { ...options[0], ambiguous: false };
-  }
-
-  function effortOptionScore(el) {
-    const identity = effortSemanticText(el);
-    if (classifyEffortLabel(identity) !== 'high') return 0;
-    const role = normalizeEffortText(el.getAttribute?.('role'));
-    const choiceRole = ['menuitemradio', 'option', 'radio', 'menuitem'].includes(role);
-    const choiceSurface = el.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]');
-    if (!choiceRole && !choiceSurface && !effortSemanticHint(identity)) return 0;
-    let score = 10;
-    if (choiceRole) score += 100;
-    if (effortOptionSelected(el)) score += 20;
-    if (choiceSurface) score += 30;
-    return score;
-  }
-
-  function findHighEffortOption(doc) {
-    const ranked = Array.from(doc.querySelectorAll(
-      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"], button, [role="button"]'
-    ) || []).filter(isVisible)
-      .map((element) => ({ element, score: effortOptionScore(element) }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score);
-    if (!ranked.length) return { element: null, ambiguous: false };
-    if (ranked.length > 1 && ranked[0].score === ranked[1].score) return { element: null, ambiguous: true };
-    return { element: ranked[0].element, ambiguous: false };
-  }
-
-  function effortChoiceSurfaceOpen(doc) {
-    if (findReasoningPowerSlider(doc).element) return true;
-    return Array.from(doc.querySelectorAll(
-      '[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]'
-    ) || []).filter(isVisible).some(isEffortPickerSurface);
-  }
-
-  function closeEffortPickerIfOpen(doc, control) {
-    if (!control) return;
-    const expanded = control.getAttribute?.('aria-expanded') === 'true'
-      || control.getAttribute?.('data-state') === 'open';
-    if (!expanded && !effortChoiceSurfaceOpen(doc)) return;
-    try { control.click?.(); } catch (_) {}
-  }
-
-  function isEffortPickerSurface(surface) {
-    const text = effortSemanticText(surface);
-    if (!text) return false;
-    const levels = ['instant', 'low', 'medium', 'high', 'extra-high']
-      .filter((level) => {
-        if (level === 'extra-high') return /extra[ -]?high|xhigh|very high|дуже висок|очень высок/u.test(text);
-        if (level === 'high') return /\bhigh\b|високий|высокий/u.test(text);
-        if (level === 'medium') return /\bmedium\b|середній|средний/u.test(text);
-        if (level === 'low') return /\blow\b|низький|низкий/u.test(text);
-        return /\binstant\b|миттєв|мгновенн/u.test(text);
-      });
-    return levels.length >= 2 && (effortSemanticHint(text) || /instant|medium|high/u.test(text));
-  }
-
-  // ChatGPT reasoning effort is keyboard-adjustable, but the number of
-  // positions is not a stable contract. Verify the result from the explicit
-  // data-selected-reasoning-effort state on the model/intelligence trigger.
-  function findReasoningPowerSlider(doc) {
-    const expandedTrigger = Array.from(doc.querySelectorAll(
-      '[data-selected-reasoning-effort][aria-expanded="true"][data-composer-navigation-target="reasoning"], '
-      + '[data-selected-reasoning-effort][aria-expanded="true"][data-codex-intelligence-trigger="true"]'
-    ) || []).filter(isVisible);
-    const rawNodes = [
-      ...Array.from(doc.querySelectorAll('[data-reasoning-slider="true"]') || [])
-        .map((node) => ({ node, explicitQuery: true })),
-      ...Array.from(doc.querySelectorAll('[role="slider"]') || [])
-        .map((node) => ({ node, explicitQuery: false })),
-    ];
-    const raw = rawNodes.map(({ node, explicitQuery }) => {
-      const thumb = normalizeEffortText(node.getAttribute?.('role')) === 'slider'
-        ? node : node.querySelector?.('[role="slider"]');
-      if (!thumb || thumb.isConnected === false) return null;
-      const row = node.closest?.('[role="menuitem"]')
-        || thumb.closest?.('[role="menuitem"]')
-        || node;
-      const surface = row.closest?.('[role="menu"], [role="listbox"], [role="dialog"]');
-      if (surface && !isVisible(surface)) return null;
-      const min = Number(thumb.getAttribute?.('aria-valuemin'));
-      const max = Number(thumb.getAttribute?.('aria-valuemax'));
-      const explicit = explicitQuery
-        || node.getAttribute?.('data-reasoning-slider') === 'true'
-        || thumb.getAttribute?.('data-reasoning-slider') === 'true';
-      const semanticSurface = (surface && effortSemanticHint(effortSemanticText(surface)))
-        || expandedTrigger.length === 1;
-      if (!explicit && (!surface || !semanticSurface || !Number.isFinite(min) || !Number.isFinite(max) || max <= min)) return null;
-      return { row, thumb, surface, keyboardTarget: explicit && node !== thumb ? node : thumb };
-    }).filter(Boolean);
-    const candidates = raw.filter((entry, index) => raw.findIndex(other => other.thumb === entry.thumb) === index);
-    if (candidates.length > 1) return { element: null, ambiguous: true };
-    if (!candidates.length) return { element: null, ambiguous: false };
-    const { row, thumb, surface, keyboardTarget } = candidates[0];
-    const valueRaw = thumb?.getAttribute?.('aria-valuenow');
-    const minRaw = thumb?.getAttribute?.('aria-valuemin');
-    const maxRaw = thumb?.getAttribute?.('aria-valuemax');
-    const value = valueRaw == null || valueRaw === '' ? null : Number(valueRaw);
-    const min = minRaw == null || minRaw === '' ? null : Number(minRaw);
-    const max = maxRaw == null || maxRaw === '' ? null : Number(maxRaw);
-    const ids = String(
-      thumb?.getAttribute?.('aria-describedby')
-      || row.getAttribute?.('aria-describedby')
-      || ''
-    ).split(/\s+/u).filter(Boolean);
-    const described = ids.map((id) => doc.getElementById?.(id)).filter(Boolean);
-    // Legacy ChatGPT exposed the slider's announced value through an
-    // accessibility-only role=status node. It may be visually hidden and is
-    // still authoritative because aria-describedby binds it to this control.
-    const surfaceStatuses = Array.from(surface?.querySelectorAll?.('[role="status"]') || [])
-      .filter((node) => classifyEffortLabel(textOf(node))
-        || /\b\d+\s*(?:of|из|із|з)\s*\d+\b/iu.test(textOf(node)));
-    const status = described.find((node) => normalizeEffortText(node.getAttribute?.('role')) === 'status')
-      || described.find((node) => isVisible(node))
-      || (surfaceStatuses.length === 1 ? surfaceStatuses[0] : null);
-    const statusText = textOf(status);
-    const legacyOrdinal = normalizeEffortText(statusText)
-      .match(/\b(\d+)\s*(?:of|из|із|з)\s*(\d+)\b/u);
-    const legacyShapeCompatible = !legacyOrdinal || Number(legacyOrdinal[2]) === 3;
-    const label = [
-      thumb?.getAttribute?.('aria-valuetext'),
-      row.getAttribute?.('aria-valuetext'),
-      legacyShapeCompatible ? statusText.replace(/[,.;:!?]+/gu, ' ') : '',
-    ].filter(Boolean).join(' ');
-    return {
-      // ChatGPT exposes an aria-hidden role=slider thumb inside a visible
-      // menuitem carrying data-reasoning-slider and aria-keyshortcuts. Send
-      // ArrowRight to that menuitem when available, then verify the explicit
-      // selected effort on the composer trigger.
-      element: keyboardTarget,
-      thumb,
-      value: Number.isFinite(value) ? value : null,
-      min: Number.isFinite(min) ? min : null,
-      max: Number.isFinite(max) ? max : null,
-      level: classifyEffortLabel(label),
-      ambiguous: false,
-    };
-  }
-
-  async function selectHighPowerSlider(doc, request, start, deps, control) {
-    const waitFn = deps?.wait || wait;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const declared = findEffortControl(doc);
-      if (!declared.ambiguous && HIGH_EFFORT_LEVELS.has(declared.level)) {
-        closeEffortPickerIfOpen(doc, control || declared.element);
-        return resultBase(request, start, {
-          status: STATUS.READY, effortLevel: declared.level,
-          safeDiagnosticCode: 'EFFORT_HIGH_DECLARED_STATE_CONFIRMED'
-        });
-      }
-      const slider = findReasoningPowerSlider(doc);
-      if (slider.ambiguous || !slider.element) {
-        closeEffortPickerIfOpen(doc, control);
-        return resultBase(request, start, {
-          status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SLIDER_UNRECOGNIZED'
-        });
-      }
-      if (HIGH_EFFORT_LEVELS.has(slider.level)) {
-        closeEffortPickerIfOpen(doc, control);
-        return resultBase(request, start, {
-          status: STATUS.READY, effortLevel: slider.level,
-          safeDiagnosticCode: 'EFFORT_HIGH_SLIDER_CONFIRMED'
-        });
-      }
-      const beforeValue = slider.value;
-      const beforeDeclaredLevel = declared.level;
-      try {
-        slider.element.focus?.();
-        slider.element.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true
-        }));
-      } catch (_) {
-        closeEffortPickerIfOpen(doc, control);
-        return resultBase(request, start, {
-          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_KEY_FAILED'
-        });
-      }
-      await waitFn(180);
-      const afterDeclared = findEffortControl(doc);
-      if (!afterDeclared.ambiguous && HIGH_EFFORT_LEVELS.has(afterDeclared.level)) {
-        closeEffortPickerIfOpen(doc, control || afterDeclared.element);
-        return resultBase(request, start, {
-          status: STATUS.READY, effortLevel: afterDeclared.level,
-          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED'
-        });
-      }
-      const changed = findReasoningPowerSlider(doc);
-      if (changed.ambiguous || !changed.element) {
-        closeEffortPickerIfOpen(doc, control);
-        return resultBase(request, start, {
-          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
-        });
-      }
-      const numericProgress = beforeValue != null && changed.value != null && changed.value > beforeValue;
-      const semanticProgress = beforeDeclaredLevel && afterDeclared.level
-        && beforeDeclaredLevel !== afterDeclared.level;
-      const internalSemanticProgress = slider.level && changed.level && slider.level !== changed.level;
-      if (!numericProgress && !semanticProgress && !internalSemanticProgress) {
-        const atMaximum = changed.value != null && changed.max != null && changed.value >= changed.max;
-        closeEffortPickerIfOpen(doc, control);
-        return resultBase(request, start, {
-          status: atMaximum ? STATUS.UNKNOWN_UI : STATUS.TEMPORARY_ERROR,
-          safeDiagnosticCode: atMaximum ? 'EFFORT_HIGH_STATE_NOT_RECOGNIZED' : 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
-        });
-      }
-    }
-    closeEffortPickerIfOpen(doc, control);
-    return resultBase(request, start, {
-      status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_HIGH_NOT_PROVEN'
-    });
-  }
-
-  async function ensureHighEffort(doc, request, start, deps) {
-    if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH_BEFORE_EFFORT' });
-    }
-    const blocking = detectBlockingState(doc);
-    if (blocking) return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + '_BEFORE_EFFORT' });
-
-    const current = findEffortControl(doc);
-    if (current.ambiguous) {
-      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_CONTROL_AMBIGUOUS' });
-    }
-    if (HIGH_EFFORT_LEVELS.has(current.level)) {
-      return resultBase(request, start, {
-        status: STATUS.READY,
-        effortLevel: current.level,
-        safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
-      });
-    }
-
-    const openSlider = findReasoningPowerSlider(doc);
-    if (openSlider.element || openSlider.ambiguous) {
-      return selectHighPowerSlider(doc, request, start, deps, current.element);
-    }
-
-    let highOption = findHighEffortOption(doc);
-    if (highOption.ambiguous) {
-      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
-    }
-
-    if (!highOption.element) {
-      if (!current.element) {
-        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_NOT_READY' });
-      }
-      try { current.element.focus?.(); current.element.click?.(); } catch (_) {
-        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_OPEN_FAILED' });
-      }
-
-      const deadline = nowMs() + 1500;
-      do {
-        await (deps?.wait || wait)(100);
-        const alreadySelected = findSelectedEffortOption(doc);
-        if (alreadySelected.ambiguous) {
-          closeEffortPickerIfOpen(doc, current.element);
-          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SELECTED_OPTION_AMBIGUOUS' });
-        }
-        if (HIGH_EFFORT_LEVELS.has(alreadySelected.level)) {
-          try { current.element.click?.(); } catch (_) {}
-          return resultBase(request, start, {
-            status: STATUS.READY,
-            effortLevel: alreadySelected.level,
-            safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED_IN_PICKER',
-          });
-        }
-        const slider = findReasoningPowerSlider(doc);
-        if (slider.element || slider.ambiguous) {
-          return selectHighPowerSlider(doc, request, start, deps, current.element);
-        }
-        highOption = findHighEffortOption(doc);
-        if (highOption.ambiguous) {
-          closeEffortPickerIfOpen(doc, current.element);
-          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
-        }
-        if (highOption.element) break;
-      } while (nowMs() < deadline);
-    }
-
-    if (!highOption.element) {
-      const refreshed = findEffortControl(doc);
-      if (!refreshed.ambiguous && HIGH_EFFORT_LEVELS.has(refreshed.level)) {
-        return resultBase(request, start, {
-          status: STATUS.READY,
-          effortLevel: refreshed.level,
-          safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
-        });
-      }
-      closeEffortPickerIfOpen(doc, current.element);
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_NOT_READY' });
-    }
-
-    try { highOption.element.focus?.(); highOption.element.click?.(); } catch (_) {
-      closeEffortPickerIfOpen(doc, current.element);
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_CLICK_FAILED' });
-    }
-
-    const verifyDeadline = nowMs() + 1800;
-    let reopenedForProof = false;
-    do {
-      await (deps?.wait || wait)(100);
-      const verified = findEffortControl(doc);
-      if (!verified.ambiguous && HIGH_EFFORT_LEVELS.has(verified.level)) {
-        return resultBase(request, start, {
-          status: STATUS.READY,
-          effortLevel: verified.level,
-          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
-        });
-      }
-      let selected = findHighEffortOption(doc);
-      if (!selected.ambiguous && selected.element
-          && effortOptionSelected(selected.element)) {
-        return resultBase(request, start, {
-          status: STATUS.READY,
-          effortLevel: 'high',
-          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
-        });
-      }
-
-      // Some ChatGPT layouts keep the top-level model picker labelled only with
-      // the model name (for example GPT-5.6) and hide the selected effort once
-      // the menu closes. Reopen that same semantic picker once and verify the
-      // High option's checked/selected state; then close the picker again.
-      if (!reopenedForProof && !verified.ambiguous && verified.element && !selected.element) {
-        reopenedForProof = true;
-        try { verified.element.click?.(); } catch (_) {}
-        await (deps?.wait || wait)(100);
-        selected = findHighEffortOption(doc);
-        if (!selected.ambiguous && selected.element
-            && effortOptionSelected(selected.element)) {
-          try { verified.element.click?.(); } catch (_) {}
-          return resultBase(request, start, {
-            status: STATUS.READY,
-            effortLevel: 'high',
-            safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
-          });
-        }
-        try { verified.element.click?.(); } catch (_) {}
-      }
-    } while (nowMs() < verifyDeadline);
-
-    closeEffortPickerIfOpen(doc, current.element);
-    return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_NOT_PROVEN' });
-  }
-
   function visibleStatusText(doc) {
     return Array.from(doc.querySelectorAll('[role="alert"], [role="status"], [aria-live="assertive"]'))
       .filter(isVisible)
@@ -771,135 +270,11 @@
     return Array.from(new Set(candidates)).filter(isVisible);
   }
 
-  const CHAT_RECOVERY_PATTERNS = Object.freeze([
-    {
-      category: 'CHAT_LOAD_FAILED',
-      label: 'Не вдалося завантажити цей чат',
-      pattern: /не вдалося завантажити (?:цей )?чат|could(?: not|n['’]t) load (?:this )?chat|unable to load (?:this )?(?:chat|conversation)|failed to load (?:this )?(?:chat|conversation)/iu,
-    },
-    {
-      category: 'MESSAGES_MISSING',
-      label: 'У цьому чаті не знайдено повідомлень ChatGPT',
-      pattern: /у цьому чаті не знайдено повідомлень chatgpt|no chatgpt messages (?:were )?found|no messages (?:are )?available to display/iu,
-    },
-    {
-      category: 'STREAM_RECOVERY_TIMEOUT',
-      label: 'ChatGPT stream recovery polling timed out',
-      pattern: /chatgpt stream recovery polling timed out|stream recovery (?:polling )?timed out/iu,
-    },
-    {
-      category: 'FETCH_FAILED',
-      label: 'Failed to fetch',
-      pattern: /failed to fetch|не вдалося (?:отримати|завантажити) дані/iu,
-    },
-    {
-      category: 'TEMPORARY_CHAT_ERROR',
-      label: 'Temporary ChatGPT error',
-      pattern: /something went wrong|network error|temporary error|error generating|failed to (?:load|generate)|please try again/iu,
-    },
-  ]);
-
-  const CHAT_RECOVERY_BUTTON = /^(?:спробувати ще раз|повторити спробу|повторити ще раз|retry|try again)$/iu;
-  const NON_CONVERSATION_RECOVERY = /не вдалося завантажити історію|failed to load history|could(?: not|n['’]t) load history/iu;
-
-  function recoveryButtonLabel(element) {
-    return (accessibleName(element) || textOf(element)).trim().slice(0, 80);
-  }
-
-  function recoverySurfaceContext(button) {
-    let current = button;
-    for (let depth = 0; depth < 7 && current; depth += 1, current = current.parentElement) {
-      const value = `${accessibleName(current)} ${textOf(current)}`.trim();
-      if (!value || NON_CONVERSATION_RECOVERY.test(value)) continue;
-      const match = CHAT_RECOVERY_PATTERNS.find(item => item.pattern.test(value));
-      if (match) return match;
-    }
-    return null;
-  }
-
-  function findChatRecoverySurface(doc) {
-    const candidates = Array.from(doc.querySelectorAll('button, [role="button"]'))
-      .filter(isRenderedRecoveryControl)
-      .map((button) => ({
-        button,
-        label: recoveryButtonLabel(button),
-      }))
-      // Reading seven ancestors of EVERY button repeatedly forces expensive
-      // layout/text work on the whole conversation. Only Retry needs context.
-      .filter(item => CHAT_RECOVERY_BUTTON.test(item.label))
-      .map(item => ({ ...item, context: recoverySurfaceContext(item.button) }))
-      .filter(item => item.context);
-    if (!candidates.length) return null;
-    const enabled = candidates.filter(item => !item.button.disabled && item.button.getAttribute?.('aria-disabled') !== 'true');
-    const selected = enabled[0] || candidates[0];
-    return {
-      element: selected.button,
-      retryAvailable: candidates.length === 1 && enabled.length === 1,
-      ambiguous: candidates.length > 1,
-      retryButtonLabel: selected.label,
-      recoveryCategory: selected.context.category,
-      recoveryErrorLabel: selected.context.label,
-    };
-  }
-
-  function chatRecoveryResult(request, start, surface, extra = {}) {
-    return resultBase(request, start, {
-      status: STATUS.TEMPORARY_ERROR,
-      assistantText: '',
-      assistantComplete: false,
-      safeDiagnosticCode: 'CHATGPT_ERROR_SURFACE_VISIBLE_REPORT',
-      chatRecoveryRequired: true,
-      recoveryCategory: surface.recoveryCategory,
-      retryButtonLabel: surface.retryButtonLabel,
-      recoveryErrorLabel: surface.recoveryErrorLabel,
-      retryAvailable: surface.retryAvailable,
-      recoveryAmbiguous: surface.ambiguous === true,
-      ...extra,
-    });
-  }
-
-  function recoverChatErrorSurface(doc, request, start) {
-    const surface = findChatRecoverySurface(doc);
-    if (!surface) {
-      return resultBase(request, start, {
-        status: STATUS.TEMPORARY_ERROR,
-        assistantText: '',
-        assistantComplete: false,
-        safeDiagnosticCode: 'CHATGPT_RECOVERY_SURFACE_NOT_FOUND',
-        chatRecoveryRequired: true,
-        retryAvailable: false,
-      });
-    }
-    if (!surface.retryAvailable) {
-      return chatRecoveryResult(request, start, surface, {
-        safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_UNAVAILABLE',
-      });
-    }
-    if (request.requireStableResponse === true
-        && !responseAnchor(doc, request, semanticAssistantMessages(doc)).responseAnchorMatched) {
-      return chatRecoveryResult(request, start, surface, {
-        safeDiagnosticCode: 'CHATGPT_RECOVERY_USER_ANCHOR_UNPROVEN', retryAvailable: false,
-      });
-    }
-    try {
-      surface.element.click?.();
-    } catch (_) {
-      return chatRecoveryResult(request, start, surface, {
-        safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_CLICK_FAILED',
-      });
-    }
-    return chatRecoveryResult(request, start, surface, {
-      safeDiagnosticCode: 'CHATGPT_RECOVERY_RETRY_CLICKED',
-      recoveryAction: 'RETRY_BUTTON_CLICK',
-      recoveryPending: true,
-    });
-  }
-
   function detectBlockingState(doc) {
     // Any visible semantic modal outranks page-underlay evidence. We do not auto-click
     // dialogs here: CAPTCHA/security/account/payment/confirmation and localized/unknown
     // modal surfaces all require manual review unless a future control is explicitly whitelisted.
-    const dialogs = visibleModalSurfaces(doc).filter((dialog) => !isEffortPickerSurface(dialog));
+    const dialogs = visibleModalSurfaces(doc);
     if (dialogs.length) {
       const dialogText = dialogs.map((dialog) => (accessibleName(dialog) + ' ' + textOf(dialog)).toLowerCase()).join('\n');
       if (/captcha|verify|verification|security|confirm|account|payment|billing|purchase|subscribe/.test(dialogText)) {
@@ -990,14 +365,7 @@
   function promptTextMatches(observed, expected) {
     const a = normalizePromptText(observed);
     const b = normalizePromptText(expected);
-    if (a === b) return true;
-    if (!a || !b) return false;
-    // ChatGPT/ProseMirror can preserve every non-whitespace character while
-    // reflowing paragraph/newline boundaries in contenteditable. That is a
-    // presentation change, not a prompt change. Accept only when the complete
-    // compacted text is identical; any changed/missing/extra non-whitespace
-    // character still fails closed.
-    return compactPromptText(a) === compactPromptText(b);
+    return a === b;
   }
 
   function repeatedUnit(value, unit, separator = '') {
@@ -1046,10 +414,7 @@
       `observedLength=${String(observed ?? '').length}`,
       `expectedNormalizedLength=${normalizePromptText(expected).length}`,
       `observedNormalizedLength=${normalizePromptText(observed).length}`,
-      `exactNormalizedMatch=${normalizePromptText(observed) === normalizePromptText(expected) ? 'yes' : 'no'}`,
-      `promptMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`,
-      `compactMatch=${compactPromptText(observed) === compactPromptText(expected) ? 'yes' : 'no'}`,
-      `nonWhitespaceMatch=${normalizePromptText(observed).replace(/\s+/gu, '') === normalizePromptText(expected).replace(/\s+/gu, '') ? 'yes' : 'no'}`
+      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`
     ].join('; ');
   }
 
@@ -1219,22 +584,17 @@
   }
 
   function semanticUserMessages(doc) {
-    // Work renders a user turn as a keyed bubble without the legacy author
-    // attributes. When these bubbles exist, article headings and assistant
-    // quotations must not be mistaken for additional user messages: the
-    // pre-send history and post-send history have to use the same units.
-    const workBubbles = Array.from(doc.querySelectorAll('[data-user-message-bubble="true"]'))
-      .filter(el => typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')));
-    if (workBubbles.length) return workBubbles.filter(el => !workBubbles.some(other => other !== el && el.contains?.(other)));
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
       ...doc.querySelectorAll('[data-testid="user-message"]'),
-      ...doc.querySelectorAll('[data-turn="user"]'),
+      // ChatGPT Work uses an explicit message bubble inside a keyed turn,
+      // without the older author-role attributes or article wrapper.
+      ...doc.querySelectorAll('[data-user-message-bubble="true"]'),
     ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || el.getAttribute?.('data-turn') === 'user'
-          || el.getAttribute?.('data-testid') === 'user-message'
+        return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
+          || el.getAttribute?.('data-user-message-bubble') === 'true'
           || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
@@ -1243,17 +603,10 @@
 
   function userMessageText(el) {
     // Read the message body without the turn heading, copy/edit buttons or footer.
-    if (el.getAttribute?.('data-user-message-bubble') === 'true') {
-      const body = el.querySelector?.('.whitespace-pre-wrap, [data-message-content]');
-      return String((body || el).textContent ?? textOf(body || el)).trim();
-    }
-    const bodies = [...new Set([
-      ...Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []),
-      ...Array.from(el.querySelectorAll?.('[data-user-message-bubble="true"]') || []),
-    ])];
+    if (el.getAttribute?.('data-user-message-bubble') === 'true') return textOf(el).trim();
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [data-user-message-bubble="true"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
-    return (roots.length ? roots.map(node => String(node.textContent ?? textOf(node))).join('\n')
-      : String(el.textContent ?? textOf(el))).trim();
+    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
 
   function latestUserMessages(doc) {
@@ -1261,25 +614,16 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = [...new Set([
-      ...doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key], [data-conversation-role="assistant"], [data-markdown-text-style="assistant-message"]'),
-      ...doc.querySelectorAll('[data-turn="assistant"]'),
-    ])]
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key]'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         // Work exposes separate keyed units for the user and assistant within
         // one turn. The assistant unit has a role marker even when its heading
         // is localized; an arbitrary non-user search unit is not a reply.
-        const workKey = String(el.getAttribute?.('data-chatgpt-search-unit-key') || '');
         const workUnit = el.hasAttribute?.('data-chatgpt-search-unit-key')
-          && (typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')))
-          && (el.querySelector?.('[data-conversation-role="assistant"]')
-            || /:assistant$/.test(workKey))
+          && el.querySelector?.('[data-conversation-role="assistant"]')
           && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
-        return role === 'assistant' || el.getAttribute?.('data-turn') === 'assistant'
-          || (el.getAttribute?.('data-conversation-role') === 'assistant'
-          || el.getAttribute?.('data-markdown-text-style') === 'assistant-message')
-          && Boolean(el.closest?.('main, [role="main"]')) || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
+        return role === 'assistant' || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
           || workUnit;
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
@@ -1288,54 +632,13 @@
   function assistantMessageText(el) {
     const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"], [data-markdown-text-style="assistant-message"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
-    return (roots.length ? roots.map(node => String(node.textContent ?? textOf(node))).join('\n')
-      : String(el.textContent ?? textOf(el))).trim();
+    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
 
   function latestAssistantText(doc) {
     const messages = semanticAssistantMessages(doc);
     const latest = messages[messages.length - 1];
     return latest ? assistantMessageText(latest) : '';
-  }
-
-  function stableMessageKey(el) {
-    const direct = el?.getAttribute?.('data-message-id');
-    if (direct) return `message:${direct}`;
-    const turn = el?.closest?.('[data-turn-key], [data-testid^="conversation-turn-"], article[id]');
-    const key = turn?.getAttribute?.('data-turn-key') || turn?.getAttribute?.('data-testid') || turn?.getAttribute?.('id');
-    return key ? `turn:${key}` : '';
-  }
-
-  function submittedUserKey(doc) {
-    const users = semanticUserMessages(doc);
-    return stableMessageKey(users[users.length - 1]);
-  }
-
-  function responseAnchor(doc, request, assistants) {
-    const users = semanticUserMessages(doc);
-    const user = users[users.length - 1];
-    const assistant = assistants[assistants.length - 1];
-    const key = String(request.submittedUserMessageKey || '');
-    const token = String(request.responseCorrelationToken || '');
-    const keyMatched = Boolean(key && user && stableMessageKey(user) === key);
-    // The persisted marker is unique to this physical scenario turn. Unlike a
-    // temporary turn index, it survives optimistic-ID replacement and reload.
-    const tokenMatched = Boolean(token && user && userMessageText(user).includes(token));
-    // Upgrade old fresh-chat sessions only when their sole user bubble is the
-    // exact submitted prompt. Never use this for repeated historical messages
-    // or to override a different canonical server message ID.
-    const legacyMatched = !token && !keyMatched && !key.startsWith('message:')
-      && users.length === 1 && Number(request.assistantBaselineCount || 0) === 0
-      && request.assistantBaselineKnown === true && request.submittedPromptText
-      && promptTextMatches(userMessageText(user), request.submittedPromptText);
-    const kind = tokenMatched ? 'STEP_MARKER' : keyMatched ? 'MESSAGE_KEY' : legacyMatched ? 'LEGACY_SINGLE_TURN' : '';
-    const position = user && assistant ? Number(user.compareDocumentPosition?.(assistant) || 0) : 0;
-    return {
-      responseAnchorMatched: Boolean(kind), responseAnchorKind: kind,
-      submittedKeyMatched: keyMatched, correlationTokenMatched: tokenMatched,
-      observedUserCount: users.length, observedAssistantCount: assistants.length,
-      paired: Boolean(kind && (position & 4) && !(position & 1)),
-    };
   }
 
   function userMessageHistorySnapshot(doc) {
@@ -1350,16 +653,13 @@
     if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
     // Once this page exposes canonical user bubbles, the unlabeled fallback
     // must not count an assistant quote or a sidebar copy of the same prompt.
-    if (semanticUserMessages(doc).length) return 0;
+    if (main.querySelector?.('[data-user-message-bubble="true"]')) return 0;
     let count = 0;
-    let inspected = 0;
     for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
-      if (++inspected > 1000) return 0; // no uncertain fallback proof on huge DOM
-      if (!promptTextMatches(String(node.textContent ?? textOf(node)), promptText)) continue;
-      if (node.closest?.('form, [contenteditable="true"], nav, aside, [data-turn="assistant"], [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
-      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(String(child.textContent ?? textOf(child)), promptText));
-      if (nestedMatch || !isVisible(node)) continue;
-      count += 1;
+      if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
+      if (!promptTextMatches(textOf(node), promptText)) continue;
+      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(textOf(child), promptText));
+      if (!nestedMatch) count += 1;
     }
     return count;
   }
@@ -1572,44 +872,6 @@
     } while (nowMs() < insertionDeadline);
 
     const finalElement = lastFound?.element || found?.element;
-    // On some background ProseMirror editors execCommand reports success yet
-    // the rendered long prompt differs from the requested text. Never Send
-    // that draft. Replace it once through the alternate paragraph/input path
-    // and accept only a fresh, exact, stable editor observation.
-    if (finalElement?.getAttribute?.('contenteditable') === 'true'
-        && !attachmentNodes(finalElement).length) {
-      const repairDoc = finalElement.ownerDocument;
-      const allowed = dispatchEditorEvent(finalElement, 'beforeinput', {
-        bubbles: true, composed: true, cancelable: true,
-        inputType: 'insertReplacementText', data: request.promptText
-      });
-      if (allowed !== false && replaceContentEditableText(finalElement, request.promptText, repairDoc)) {
-        dispatchEditorEvent(finalElement, 'input', {
-          bubbles: true, composed: true, inputType: 'insertReplacementText',
-          data: request.promptText
-        });
-        const repairDeadline = nowMs() + 1200;
-        let consecutiveMatches = 0;
-        do {
-          await (deps.wait || wait)(100);
-          const repaired = findVisibleComposer(doc);
-          if (repaired.ambiguous || repaired.element !== finalElement
-              || attachmentNodes(finalElement).length) break;
-          if (promptTextMatches(editorText(finalElement), request.promptText)) {
-            consecutiveMatches += 1;
-            if (consecutiveMatches >= 2) {
-              acceptedRepresentationEvidence.delete(evidenceKey(request));
-              return resultBase(request, start, {
-                status: STATUS.INSERTED_NOT_SENT,
-                composerState: 'VISIBLE_NONEMPTY',
-                safeDiagnosticCode: 'INSERTION_TEXT_PROVEN',
-                safeDiagnosticMessage: 'repair=alternate; ' + safeTextProofMessage(editorText(finalElement), request.promptText, finalElement)
-              });
-            }
-          } else consecutiveMatches = 0;
-        } while (nowMs() < repairDeadline);
-      }
-    }
     const finalText = finalElement ? editorText(finalElement) : '';
     return resultBase(request, start, {
       status: STATUS.INSERTED_NOT_SENT,
@@ -1694,65 +956,12 @@
   }
 
   async function submitExisting(doc, request, start, deps) {
-    try { return await submitExistingImpl(doc, request, start, deps); }
-    finally { if (typeof deps.restore === 'function') await deps.restore(); }
-  }
-
-  async function submitExistingImpl(doc, request, start, deps) {
     // Duplicate delivery of the same operation may inspect, never click again.
     if (textEvidenceFor(request) || getAcceptedRepresentationEvidence(request)?.submitAttempted) {
       return verifyAfterUncertain(doc, request, start);
     }
     const ready = prepareSend(doc, request, start);
     if (ready.status !== STATUS.READY) return ready;
-
-    // Activation can replace the composer/button and materialize history.
-    // Select the physical target and capture evidence only AFTER activation.
-    const initialComposer = findVisibleComposer(doc).element;
-    const initialSend = findSendButton(doc, initialComposer);
-    const initialForm = initialComposer?.closest?.('form');
-    const initialFormSubmitter = initialForm && initialSend?.form === initialForm
-      && String(initialSend?.type || '').toLowerCase() === 'submit';
-    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && (!initialFormSubmitter || Number(request.postSendDelayMs || 0) > 0
-        || request.requireGenerationAcknowledgement === true) && typeof deps.activate === 'function') {
-      const activated = await deps.activate();
-      if (activated) {
-        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
-          await (deps.wait || wait)(100);
-        }
-      }
-      if (!activated || doc.visibilityState !== 'visible') {
-        return resultBase(request, start, {
-          status:STATUS.TEMPORARY_ERROR,
-          submissionEvidence:'PROVEN_NO_EFFECT',
-          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
-        });
-      }
-      backgroundDocument = false;
-      const activatedReady = prepareSend(doc, request, start);
-      if (activatedReady.status !== STATUS.READY) return activatedReady;
-    }
-    if (Number(request.executionDeadlineAt || 0) > 0 && nowMs() >= request.executionDeadlineAt) {
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
-        safeDiagnosticCode: 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT' });
-    }
-    if (typeof deps.checkpointSubmit === 'function') {
-      try { await deps.checkpointSubmit(); }
-      catch (error) {
-        return resultBase(request, start, {
-          status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
-          safeDiagnosticCode: 'SEND_DOM_CHECKPOINT_REJECTED',
-          safeDiagnosticMessage: String(error?.safeDiagnosticCode || 'DOM_SUBMIT_CHECKPOINT_FAILED'),
-        });
-      }
-      // Awaiting storage may change the document. Capture the actual target and
-      // baseline afterward; a persisted boundary is never a successful Send.
-      const checkpointReady = prepareSend(doc, request, start);
-      if (checkpointReady.status !== STATUS.READY) return resultBase(request, start, {
-        status: STATUS.SUBMISSION_UNCERTAIN, safeDiagnosticCode: 'SEND_DOM_TARGET_CHANGED_AFTER_CHECKPOINT',
-      });
-    }
 
     const found = findVisibleComposer(doc);
     if (!found.element || found.ambiguous) {
@@ -1803,29 +1012,71 @@
       && String(send.type || '').toLowerCase() === 'submit';
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
-    if (isFormSubmitter && typeof nativeSubmit === 'function') {
-      // Keep Pilot 10's working DOM form path after activation too. A visible
-      // document must not gain a new debugger/coordinate-click dependency.
-      submitMethod = backgroundDocument ? 'BACKGROUND_FORM_REQUEST_SUBMIT' : 'FORM_REQUEST_SUBMIT';
+    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && !isFormSubmitter && typeof deps.activate === 'function') {
+      const activated = await deps.activate();
+      if (activated) {
+        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
+          await (deps.wait || wait)(100);
+        }
+      }
+      if (!activated || doc.visibilityState !== 'visible') {
+        return resultBase(request, start, {
+          status:STATUS.TEMPORARY_ERROR,
+          submissionEvidence:'PROVEN_NO_EFFECT',
+          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+        });
+      }
+      backgroundDocument = false;
+    }
+    if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
+      // CDP mouse events are unreliable in a hidden background tab. A genuine
+      // form submitter can be invoked through the page's own form semantics
+      // without activating the tab.
+      submitMethod = 'BACKGROUND_FORM_REQUEST_SUBMIT';
+      nativeSubmit.call(form, send);
+    } else if (backgroundDocument) {
+      submitMethod = 'BACKGROUND_DOM_CLICK';
+      send.click();
+    } else if (typeof deps.submit === 'function') {
+      submitMethod = 'CHROME_NATIVE_CLICK';
+      send.scrollIntoView({ block: 'center', inline: 'center' });
+      const rect = send.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const hit = doc.elementFromPoint(x, y);
+      if (hit !== send && !send.contains(hit)) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          safeDiagnosticCode: 'NATIVE_SEND_TARGET_OBSCURED'
+        });
+      }
+      send.setAttribute('data-autopilot-native-target', request.requestId);
+      try {
+        await deps.submit({ x, y });
+      } catch (error) {
+        if (error?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+          return resultBase(request, start, {
+            status: STATUS.TEMPORARY_ERROR,
+            submissionEvidence: 'PROVEN_NO_EFFECT',
+            safeDiagnosticCode: 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+          });
+        }
+        throw error;
+      } finally {
+        send.removeAttribute('data-autopilot-native-target');
+        if (typeof deps.restore === 'function') await deps.restore();
+      }
+    } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
+      submitMethod = 'FORM_REQUEST_SUBMIT';
       nativeSubmit.call(form, send);
     } else {
-      submitMethod = backgroundDocument ? 'BACKGROUND_DOM_CLICK' : 'DOM_CLICK';
       send.click();
     }
-    const postSendDelay = Math.min(60000, Math.max(0, Number(request.postSendDelayMs || 0)));
-    if (postSendDelay > 0) await (deps.wait || wait)(postSendDelay);
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
-    let observationPasses = 0;
-    let acknowledgedUrl = ''; let acknowledgementSeenAt = 0;
-    // Streaming/animation mutations can arrive faster than the timeout clock.
-    // Bound the DOM work too, then leave an uncertain Send for reconciliation.
-    while (nowMs() < verifyDeadline && observationPasses++ < 200) {
-      await waitForSubmissionObservation(doc, deps, () =>
-        (!isFreshLaunchSurface(request.expectedUrl) || isExclusiveConversationLocation(globalThis.location?.href || '')) && (
-        (exactTextPending && hasStrictAppendedPrompt(beforeTextMessages, userMessageHistorySnapshot(doc), submittedText))
-        || (evidence && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature))
-        || semanticAssistantMessages(doc).length > assistantBaselineCount));
+    while (nowMs() < verifyDeadline) {
+      await (deps.wait || wait)(100);
 
       if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
         return resultBase(request, start, {
@@ -1859,6 +1110,10 @@
           }
         }
       }
+      // URL transition, composer clearing and generation state do not identify
+      // the submitted prompt. Completion requires operation-local exact evidence.
+      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
+
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
         return resultBase(request, start, {
@@ -1867,52 +1122,6 @@
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
       }
-
-      if (request.requireGenerationAcknowledgement === true) {
-        // Scenario progress must not count a client-only optimistic bubble.
-        // Require this operation's appended message plus independent generation
-        // and a stable concrete identity, without performing a second Send.
-        const observedUrl = normalizeUrl(globalThis.location?.href || '');
-        const generationStarted = detectBlockingState(doc)?.status === STATUS.BUSY
-          || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        const appended = textVerified || unlabeledVerified || representationVerified;
-        if (!appended || !generationStarted || !isExclusiveConversationLocation(observedUrl)) {
-          acknowledgementSeenAt = 0; acknowledgedUrl = '';
-          await (deps.wait || wait)(250);
-          continue;
-        }
-        if (acknowledgedUrl !== observedUrl) { acknowledgedUrl = observedUrl; acknowledgementSeenAt = nowMs(); }
-        if (nowMs() - acknowledgementSeenAt < 1000) { await (deps.wait || wait)(250); continue; }
-      }
-
-      // On a fresh launch surface ChatGPT creates a unique /c/<id> at the same
-      // boundary as this operation's one physical submit. Some hidden Work
-      // tabs do not materialize user bubbles at all (messagesAfter=0), even
-      // while the Stop control proves generation. That exact transition plus
-      // an emptied composer and generation progress is operation-local proof.
-      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
-        const observedUrl = globalThis.location?.href || '';
-        const composerEmpty = !postFound.element || !compactPromptText(editorText(postFound.element));
-        const postBlocking = detectBlockingState(doc);
-        const generationStarted = postBlocking?.status === STATUS.BUSY
-          || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        if (!textVerified && !unlabeledVerified && !representationVerified
-            && afterTextMessages.length === 0
-            && isExclusiveConversationLocation(observedUrl) && composerEmpty && generationStarted) {
-          return resultBase(request, start, {
-            status: STATUS.SENT_VERIFIED,
-            submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
-            safeDiagnosticCode: 'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION',
-            assistantBaselineCount,
-            submittedUserMessageKey: submittedUserKey(doc),
-          });
-        }
-      }
-
-      // An existing conversation still requires an operation-bound appended
-      // message or representation. URL and composer state alone are historical.
-      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
-
       if (exactTextPending && postFound.element && promptTextMatches(editorText(postFound.element), submittedText)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
@@ -1948,8 +1157,7 @@
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
           safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION',
-          assistantBaselineCount,
-          submittedUserMessageKey: submittedUserKey(doc),
+          assistantBaselineCount
         });
       }
 
@@ -1961,8 +1169,7 @@
         safeDiagnosticCode: unlabeledVerified && !textVerified
           ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
           : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
-        assistantBaselineCount,
-        submittedUserMessageKey: submittedUserKey(doc),
+        assistantBaselineCount
       });
     }
 
@@ -2018,37 +1225,7 @@
       const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
         ? Number(textEvidence.assistantBaselineCount)
         : 0;
-      const recoveryLaunchUrl = normalizeUrl(request.recoveryLaunchUrl || '');
-      const observedUrl = globalThis.location?.href || '';
-      const freshConversationAccepted = isFreshLaunchSurface(recoveryLaunchUrl)
-        && expectedPostSendLocation(observedUrl, recoveryLaunchUrl)
-        && isExclusiveConversationLocation(observedUrl)
-        && !pending
-        && afterMessages.length === 0
-        && unlabeledPromptCount(doc, submittedText) === 0
-        && (!found.element || !compactPromptText(editorText(found.element)));
-      if (freshConversationAccepted && request.requireGenerationAcknowledgement !== true) {
-        return resultBase(request, start, {
-          status: STATUS.SENT_VERIFIED,
-          submissionEvidence: 'FRESH_CONVERSATION_TRANSITION_WITH_EMPTY_COMPOSER',
-          safeDiagnosticCode: 'RECOVERY_FRESH_CONVERSATION_VERIFIED',
-          assistantBaselineCount: baselineCount,
-          submittedUserMessageKey: submittedUserKey(doc),
-        });
-      }
-      const generationAcknowledged = request.requireGenerationAcknowledgement !== true
-        || blocking?.status === STATUS.BUSY || semanticAssistantMessages(doc).length > baselineCount;
-      if ((appended || unlabeledAppended) && !pending && generationAcknowledged) {
-        if (request.requireGenerationAcknowledgement === true) {
-          const currentUrl = normalizeUrl(observedUrl);
-          if (!isExclusiveConversationLocation(currentUrl)) return resultBase(request, start, {
-            status: STATUS.SUBMISSION_UNCERTAIN, safeDiagnosticCode: 'SCENARIO_GENERATION_IDENTITY_PENDING' });
-          if (textEvidence.acknowledgementUrl !== currentUrl) {
-            textEvidence.acknowledgementUrl = currentUrl; textEvidence.acknowledgementAt = nowMs();
-          }
-          if (nowMs() - textEvidence.acknowledgementAt < 1000) return resultBase(request, start, {
-            status: STATUS.SUBMISSION_UNCERTAIN, safeDiagnosticCode: 'SCENARIO_GENERATION_STABILITY_PENDING' });
-        }
+      if ((appended || unlabeledAppended) && !pending) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: unlabeledAppended && !appended
@@ -2057,8 +1234,7 @@
           safeDiagnosticCode: unlabeledAppended && !appended
             ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
             : 'RECOVERY_TEXT_OPERATION_VERIFIED',
-          assistantBaselineCount: baselineCount,
-          submittedUserMessageKey: submittedUserKey(doc),
+          assistantBaselineCount: baselineCount
         });
       }
       // Unchanged draft text does not prove that a request was never dispatched.
@@ -2103,8 +1279,7 @@
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
           safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED',
-          assistantBaselineCount: Number.isInteger(Number(evidence.assistantBaselineCount)) ? Number(evidence.assistantBaselineCount) : undefined,
-          submittedUserMessageKey: submittedUserKey(doc),
+          assistantBaselineCount: Number.isInteger(Number(evidence.assistantBaselineCount)) ? Number(evidence.assistantBaselineCount) : undefined
         });
       }
       return resultBase(request, start, {
@@ -2127,68 +1302,53 @@
   }
 
   function readAssistantReport(doc, request, start) {
-    const assistants = semanticAssistantMessages(doc);
-    const anchor = responseAnchor(doc, request, assistants);
-    const currentUrl = globalThis.location?.href || '';
-    const boundUrl = request.boundConversationUrl || request.expectedUrl;
-    const identityChanged = !expectedPostSendLocation(currentUrl, boundUrl);
-    const correlatedIdentity = request.allowCorrelatedConversationRebind === true
-      && Boolean(request.responseCorrelationToken) && anchor.correlationTokenMatched === true
-      && isExclusiveConversationLocation(currentUrl);
-    if ((!expectedPostSendLocation(currentUrl, request.expectedUrl) || identityChanged)
-        && !correlatedIdentity) {
-      return resultBase(request, start, { ...anchor, paired: undefined, status: STATUS.TEMPORARY_ERROR,
-        assistantComplete: false, safeDiagnosticCode: request.allowCorrelatedConversationRebind
-          ? 'ASSISTANT_BOUND_CONVERSATION_UNPROVEN' : 'REPORT_URL_MISMATCH' });
-    }
-    const latest = assistants[assistants.length - 1];
-    const text = latest ? assistantMessageText(latest) : '';
-    const baselineKnown = request.assistantBaselineKnown === true;
-    const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
-    const anchoredRequest = Boolean(request.submittedUserMessageKey || request.responseCorrelationToken);
-    const hasNewAssistantTurn = anchoredRequest ? anchor.paired : (anchor.paired || baselineKnown && assistants.length > baselineCount);
-    const metadata = { ...anchor, paired: undefined, correlatedConversationRebind: Boolean(identityChanged && correlatedIdentity) };
-    const recoverySurface = findChatRecoverySurface(doc);
-    if (recoverySurface) {
-      responseStability.delete(doc);
-      // Retry changes server state. It must be tied to this submitted user turn.
-      return { ...chatRecoveryResult(request, start, recoverySurface), ...metadata,
-        retryAvailable: anchor.responseAnchorMatched && recoverySurface.retryAvailable === true };
+    if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'REPORT_URL_MISMATCH' });
     }
     const blocking = detectBlockingState(doc);
-    if (blocking) {
-      responseStability.delete(doc);
+    const assistantMessages = semanticAssistantMessages(doc);
+    const text = latestAssistantText(doc);
+    const baselineKnown = request.assistantBaselineKnown === true;
+    const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
+    const hasNewAssistantTurn = baselineKnown && assistantMessages.length > baselineCount;
+    if (blocking?.status === STATUS.BUSY) {
       return resultBase(request, start, {
-        ...metadata, status: blocking.status,
-        assistantText: hasNewAssistantTurn ? text : '', assistantComplete: false,
-        safeDiagnosticCode: blocking.status === STATUS.BUSY ? 'ASSISTANT_RESPONSE_STREAMING' : `${blocking.code}_REPORT`
+        status: STATUS.BUSY,
+        assistantText: hasNewAssistantTurn ? text : '',
+        assistantComplete: false,
+        safeDiagnosticCode: 'ASSISTANT_RESPONSE_STREAMING'
       });
     }
-    if (!baselineKnown && !anchor.paired) {
-      return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
-        assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_BASELINE_UNKNOWN' });
+    if (blocking) {
+      return resultBase(request, start, {
+        status: blocking.status,
+        assistantText: hasNewAssistantTurn ? text : '',
+        assistantComplete: false,
+        safeDiagnosticCode: `${blocking.code}_REPORT`
+      });
+    }
+    if (!baselineKnown) {
+      return resultBase(request, start, {
+        status: STATUS.TEMPORARY_ERROR,
+        assistantText: '',
+        assistantComplete: false,
+        safeDiagnosticCode: 'ASSISTANT_BASELINE_UNKNOWN'
+      });
     }
     if (!hasNewAssistantTurn || !text) {
-      responseStability.delete(doc);
-      return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
-        assistantText: '', assistantComplete: false,
-        safeDiagnosticCode: hasNewAssistantTurn ? 'ASSISTANT_RESPONSE_NOT_READY' : 'ASSISTANT_NEW_RESPONSE_NOT_STARTED' });
+      return resultBase(request, start, {
+        status: STATUS.TEMPORARY_ERROR,
+        assistantText: '',
+        assistantComplete: false,
+        safeDiagnosticCode: hasNewAssistantTurn ? 'ASSISTANT_RESPONSE_NOT_READY' : 'ASSISTANT_NEW_RESPONSE_NOT_STARTED'
+      });
     }
-    if (request.requireStableResponse === true) {
-      const identity = `${request.expectedUrl}|${request.responseCorrelationToken || request.submittedUserMessageKey || ''}`;
-      const previous = responseStability.get(doc);
-      if (!previous || previous.identity !== identity || previous.text !== text) {
-        responseStability.set(doc, { identity, text, seenAt: nowMs() });
-        return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
-          assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_STABILITY_PENDING' });
-      }
-      if (nowMs() - previous.seenAt < 1000) {
-        return resultBase(request, start, { ...metadata, status: STATUS.TEMPORARY_ERROR,
-          assistantText: '', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_STABILITY_PENDING' });
-      }
-    }
-    return resultBase(request, start, { ...metadata, status: STATUS.READY,
-      assistantText: text, assistantComplete: true, safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY' });
+    return resultBase(request, start, {
+      status: STATUS.READY,
+      assistantText: text,
+      assistantComplete: true,
+      safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY'
+    });
   }
 
   async function insertAndSend(doc, request, start, deps) {
@@ -2207,18 +1367,12 @@
     if (!doc?.querySelectorAll) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'DOCUMENT_UNAVAILABLE' });
 
     if (request.mode === 'READ_ASSISTANT_REPORT') return readAssistantReport(doc, request, start);
-    if (request.mode === 'RECOVER_CHAT_ERROR_SURFACE') return recoverChatErrorSurface(doc, request, start);
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
-    if (request.mode === 'ENSURE_HIGH_EFFORT') return ensureHighEffort(doc, request, start, deps || {});
     if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
     if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
     if (request.mode === 'SUBMIT_EXISTING') return submitExisting(doc, request, start, deps || {});
     if (request.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT') return verifyAfterUncertain(doc, request, start);
-    if (request.mode === 'INSERT_AND_SEND') return insertAndSend(doc, request, start, deps || {});
-    return resultBase(request, start, {
-      status: STATUS.MANUAL_REVIEW_REQUIRED,
-      safeDiagnosticCode: 'MODE_NOT_IMPLEMENTED'
-    });
+    return insertAndSend(doc, request, start, deps || {});
   }
 
   return {
@@ -2229,9 +1383,6 @@
     normalizePromptText,
     promptTextMatches,
     findVisibleComposer,
-    classifyEffortLabel,
-    findEffortControl,
-    findChatRecoverySurface,
     detectBlockingState,
     execute
   };

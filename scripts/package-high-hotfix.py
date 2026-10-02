@@ -23,6 +23,9 @@ with zipfile.ZipFile(args.base) as old:
     assert old.testzip() is None
     files = {name.split('/', 1)[1] for name in old.namelist() if not name.endswith('/')}
 files.update({f'CHANGES-{version}.txt', f'QA-{version}.txt', 'HISTORY-2026-09-30.md'})
+incident = f'INCIDENT-{version}.md'
+if (ROOT / incident).is_file():
+    files.add(incident)
 # Discover newly introduced local dependencies from the product entry points.
 imports = re.compile(r'''(?:from\s*|import\s*\()(['"])([^'"]+)\1''')
 queue = list(files)

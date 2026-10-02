@@ -178,6 +178,8 @@ function validateOperation(operation, session) {
       throw new Error(`Invalid session ${session.id} operation ${field}`);
     }
   }
+  if (operation.domSubmitDispatched !== undefined) requireBoolean(operation.domSubmitDispatched, `session ${session.id} operation domSubmitDispatched`);
+  if (operation.activationBeforeSubmit !== undefined) requireBoolean(operation.activationBeforeSubmit, `session ${session.id} operation activationBeforeSubmit`);
 }
 
 function validateSession(session, id) {

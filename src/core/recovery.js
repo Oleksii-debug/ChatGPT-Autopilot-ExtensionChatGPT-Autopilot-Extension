@@ -74,7 +74,9 @@ export function healUnattendedManualHolds(session, now = Date.now(), { resumeMac
 
 function hasDurableNativePreEffectFocusLease(state, session) {
   const operation = session?.operation;
-  if (operation?.phase !== OperationPhase.SUBMITTING || operation.nativeSubmitDispatched === true) return false;
+  if (operation?.phase !== OperationPhase.SUBMITTING || operation.nativeSubmitDispatched === true
+      || operation.domSubmitDispatched === true) return false;
+  if (operation.activationBeforeSubmit !== true) return false;
 
   const previousTabId = Number(operation.previousSendTabId || 0);
   const previousWindowId = Number(operation.previousSendWindowId || 0);

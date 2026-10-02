@@ -13,7 +13,7 @@ import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-exec
 import { withTabLifecycle, createRecordedOwnedTab } from '../core/owned-tab-lifecycle.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
-import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
+import { performNativeInput, checkpointDomSubmit, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
 import { AiOrchestrator } from '../core/ai-orchestrator.js';
@@ -885,6 +885,15 @@ chrome.alarms.onAlarm.addListener(alarm => {
   if (scenarioWork.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const scenario = await scenarioWork.cycleAll(); const state = await reconcileRuntime(); return { scenario, state }; })());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.channel === 'autopilot-dom-submit-checkpoint') {
+    ensureColdStartReconciled()
+      .then(() => checkpointDomSubmit(chrome, repo, message, _sender))
+      .then(() => sendResponse({ ok: true }))
+      .catch(error => sendResponse({ ok: false, error: {
+        safeDiagnosticCode: error?.safeDiagnosticCode || 'DOM_SUBMIT_CHECKPOINT_FAILED',
+      } }));
+    return true;
+  }
   if (message?.channel === 'autopilot-send-tab-activation') {
     const action = message.action === 'activate' ? activateOwnedSendTab
       : message.action === 'restore' ? restoreOwnedSendTab : null;
