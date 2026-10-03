@@ -23,6 +23,7 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       task.lastVerifiedSendAt = now;
       task.lastVerifiedFingerprint = promptFingerprint;
       task.lastSubmittedUserMessageKey = String(result.submittedUserMessageKey || '');
+      task.lastFreshConversationGenerationVerified = result.submissionEvidence === 'FRESH_CONVERSATION_GENERATION_STARTED';
       task.retryAfterAt = 0;
       const observedConversation = typeof result?.normalizedObservedUrl === 'string' ? result.normalizedObservedUrl : '';
       if (observedConversation && isExclusiveConversationUrl(observedConversation)) task.lastConversationUrl = observedConversation;
@@ -51,10 +52,12 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       return { action: 'SENT_VERIFIED' };
     case InteractionResult.INSERTED_NOT_SENT:
       task.status = 'INSERTED_NOT_SENT';
+      task.lastFreshConversationGenerationVerified = false;
       if (session.operation) { session.operation.phase = OperationPhase.INSERTED; session.operation.updatedAt = now; }
       return { action: 'HOLD_INSERTED' };
     case InteractionResult.SUBMISSION_UNCERTAIN: {
       task.status = 'SUBMISSION_UNCERTAIN';
+      task.lastFreshConversationGenerationVerified = false;
       // A fresh ChatGPT launch surface can become a concrete /c/<id> URL at the
       // moment Send is attempted even when acknowledgement remains uncertain.
       // Persist that observed exclusive conversation as the recovery identity for

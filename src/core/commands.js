@@ -263,7 +263,7 @@ function requireSession(state, sessionId) {
 
 function taskFromUi(raw) {
   const id = raw?.id || crypto.randomUUID();
-  if (!raw?.url) return { id, enabled: raw?.enabled !== false, label: raw?.label || '', url: '', normalizedUrl: '', promptOverride: raw?.promptOverride || '', status:'IDLE', lastCheckedAt:0, lastVerifiedSendAt:0, lastVerifiedFingerprint:'', retryAfterAt:0, manualReviewReason:'', lastConversationUrl:'', lastAssistantReport:'', lastAssistantReportAt:0, lastAssistantBaselineCount:0, lastAssistantBaselineKnown:false };
+  if (!raw?.url) return { id, enabled: raw?.enabled !== false, label: raw?.label || '', url: '', normalizedUrl: '', promptOverride: raw?.promptOverride || '', status:'IDLE', lastCheckedAt:0, lastVerifiedSendAt:0, lastVerifiedFingerprint:'', retryAfterAt:0, manualReviewReason:'', lastConversationUrl:'', lastAssistantReport:'', lastAssistantReportAt:0, lastAssistantBaselineCount:0, lastAssistantBaselineKnown:false, lastFreshConversationGenerationVerified:false };
   return createTask({ id, enabled: raw.enabled !== false, label: raw.label || '', url: raw.url, promptOverride: raw.promptOverride || '' });
 }
 

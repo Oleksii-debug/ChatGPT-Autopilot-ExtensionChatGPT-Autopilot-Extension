@@ -1705,6 +1705,7 @@ export class ScenarioWorkManager {
         conversationUrl: task.lastConversationUrl,
         assistantBaselineCount: Number(task.lastAssistantBaselineCount || 0),
         assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
+        freshConversationGenerationVerified: task.lastFreshConversationGenerationVerified === true,
         submittedUserMessageKey: task.lastSubmittedUserMessageKey || '',
         responseCorrelationToken: task.responseCorrelationToken || '',
         submittedPromptText: task.responseCorrelationToken ? '' : task.promptOverride,

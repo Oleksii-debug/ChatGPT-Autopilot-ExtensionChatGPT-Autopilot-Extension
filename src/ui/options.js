@@ -1,5905 +1,1905 @@
-import { renderLaunchList } from './launch-list.js';
-import { scenarioProgressText } from './scenario-progress.js';
-import { focusAfterLifecycleSuccess } from './focus-policy.js';
-import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
-import { translateText } from './uk-localization.js';
-import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
-import { NativeCompanionClient } from '../core/native-companion.js';
-import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
-import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
-import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
-import { createAgentViewFenceV1, createAgentJobsReadGateV1, readAgentJobsWithDeadlineV1, describeAgentSpecialistProgressV1 } from './agent-owner-view.js';
-import {
-  agentDefinitionLaunchScopeTextV1,
-  buildAgentDefinitionLaunchRequestV1,
-} from './agent-definition-launch-form.js';
-
-const MAX_PHYSICAL_TASKS = 1000;
-const MAX_TASKS = 1_000_000;
-const VISIBLE_LOG_LIMIT = 100;
-const STATUS_REFRESH_DELAY_MS = 750;
-const DRAFT_SAVE_DELAY_MS = 250;
-const DIAGNOSTIC_SNAPSHOT_DELAY_MS = 10000;
-const DRAFT_KEY_PREFIX = 'chatgpt-autopilot-draft:';
-const LAST_SESSION_KEY = 'chatgpt-autopilot-last-session';
-const ui = {
-  sessions: [],
-  simplifiedSelectedId: '',
-  simplifiedSelected: null,
-  sessionListSignature: '',
-  selectedSessionId: null,
-  selected: null,
-  runTimeline: null,
-  deleteReturnFocus: null,
-  pendingPortableProfile: null,
-  pendingPortablePreview: null,
-  pendingOrchestrationProfile: null,
-  orchestrationV2Config: null,
-  orchestrationV2Orchestras: [],
-  selectedOrchestraId: '',
-  scenarioWorkScenarios: [],
-  scenarioWorkPools: [],
-  selectedScenarioWorkId: '',
-  selectedScenarioPoolId: '',
-  selectedScenarioWork: null,
-  browserAgentJobs: [],
-  selectedBrowserAgentId: '',
-  selectedBrowserAgent: null,
-  agentDefinitionRegistries: [],
-  selectedAgentDefinitionRegistryId: '',
-  selectedAgentDefinitionRegistry: null,
-  selectedAgentDefinitionId: '',
-  selectedAgentDefinition: null,
-  agentDefinitionMode: 'none',
-  agentDefinitionQuarantineCount: 0,
-  agentDefinitionLaunchDefinitionId: '',
-  specialistRegistries: [],
-  selectedSpecialistRegistryId: '',
-  selectedSpecialistRegistry: null,
-  selectedSpecialistId: '',
-  selectedSpecialist: null,
-  specialistMode: 'none',
-  specialistQuarantineCount: 0,
-  agentDraftActive: false,
-  agentPolicyDirty: false,
-  agentPolicyEditEpoch: 0,
-};
-
-const $ = (id) => document.getElementById(id);
-const agentViewFence = createAgentViewFenceV1();
-const agentOwnerOperations = new Set();
-let agentBackgroundRefresh = null;
-const agentJobsReadGate = createAgentJobsReadGateV1(() => core('LIST_BROWSER_AGENT_JOBS'));
-let agentOwnerOperationSequence = 0;
-let agentListProjection = '';
-function selectBrowserAgentView(id) {
-  ui.selectedBrowserAgentId = id || '';
-  return agentViewFence.select(ui.selectedBrowserAgentId);
-}
-function beginAgentOwnerOperation(command, id = ui.selectedBrowserAgentId) {
-  const key = `${command}:${id || ''}`;
-  if (agentOwnerOperations.has(key)) return null;
-  agentOwnerOperations.add(key);
-  agentJobsReadGate.invalidate();
-  return { key, ticket: selectBrowserAgentView(ui.selectedBrowserAgentId), sequence: ++agentOwnerOperationSequence };
-}
-function finishAgentOwnerOperation(operation) {
-  agentOwnerOperations.delete(operation.key);
-  agentJobsReadGate.invalidate();
-}
-function agentOwnerResult(operation, message) {
-  if (operation.sequence === agentOwnerOperationSequence) $('agent-command-result').textContent = message;
-}
-function refreshBrowserAgentJobs() {
-  const changingList = [...agentOwnerOperations].some(key => key.startsWith('CREATE:') || key.startsWith('DELETE:'));
-  if (agentBackgroundRefresh || changingList) return agentBackgroundRefresh;
-  const refresh = loadBrowserAgentJobs();
-  agentBackgroundRefresh = refresh;
-  const release = () => { if (agentBackgroundRefresh === refresh) agentBackgroundRefresh = null; };
-  refresh.then(release, release);
-  return refresh;
-}
-const announce = (text) => { $('live-announcer').textContent = ''; requestAnimationFrame(() => { $('live-announcer').textContent = text; }); };
-const formatTime = (value) => value ? new Date(value).toLocaleString() : 'Not available';
-const runtimeAvailable = () => Boolean(globalThis.chrome?.runtime?.sendMessage);
-const UI_MODE_KEY = 'chatgpt-autopilot-ui-mode';
-const UI_MODES = new Set(['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai']);
-const ORCHESTRATION_PANEL_KEY = 'chatgpt-autopilot-orchestration-panel';
-const ORCHESTRATION_PANELS = ['orchestras', 'settings', 'state'];
-const SCENARIO_WORK_PANEL_KEY = 'chatgpt-autopilot-scenario-work-panel';
-const SCENARIO_WORK_PANELS = ['cycle', 'pairs', 'group', 'state'];
-let orchestrationV2ActionEpoch = 0;
-function beginOrchestrationV2Action() { orchestrationV2ActionEpoch += 1; return orchestrationV2ActionEpoch; }
-function setOrchestrationPanel(panel, { focus = false } = {}) {
-  const next = ORCHESTRATION_PANELS.includes(panel) ? panel : 'orchestras';
-  storageSet(ORCHESTRATION_PANEL_KEY, next);
-  document.querySelectorAll('[data-orchestration-panel]').forEach(element => {
-    element.hidden = element.dataset.orchestrationPanel !== next;
-  });
-  for (const value of ORCHESTRATION_PANELS) {
-    const tab = $(`orchestration-v2-tab-${value}`);
-    if (!tab) continue;
-    tab.setAttribute('aria-selected', value === next ? 'true' : 'false');
-    tab.tabIndex = value === next ? 0 : -1;
-  }
-  if (focus) $(`orchestration-v2-tab-${next}`)?.focus();
-}
-
-
-function setScenarioWorkPanel(panel, { focus = false } = {}) {
-  const next = SCENARIO_WORK_PANELS.includes(panel) ? panel : 'cycle';
-  storageSet(SCENARIO_WORK_PANEL_KEY, next);
-  document.querySelectorAll('[data-scenario-work-panel]').forEach(element => {
-    element.hidden = element.dataset.scenarioWorkPanel !== next;
-  });
-  for (const value of SCENARIO_WORK_PANELS) {
-    const tab = $(`scenario-work-tab-${value}`);
-    if (!tab) continue;
-    tab.setAttribute('aria-selected', value === next ? 'true' : 'false');
-    tab.tabIndex = value === next ? 0 : -1;
-  }
-  if (focus) $(`scenario-work-tab-${next}`)?.focus();
-}
-
-function setUiMode(mode, { focus = false } = {}) {
-  const next = UI_MODES.has(mode) ? mode : 'sessions';
-  storageSet(UI_MODE_KEY, next);
-  document.querySelectorAll('[data-app-mode]').forEach((element) => {
-    element.hidden = element.dataset.appMode !== next;
-  });
-  document.querySelector('.layout')?.classList.toggle('single-column', next !== 'sessions');
-  for (const value of UI_MODES) {
-    const tab = $(`mode-${value}`);
-    if (!tab) continue;
-    tab.setAttribute('aria-selected', value === next ? 'true' : 'false');
-    tab.tabIndex = value === next ? 0 : -1;
-  }
-  if (focus) $(`mode-${next}`)?.focus();
-}
-
-async function loadProfileSettings() {
-  try {
-    const data = await core('GET_PROFILE_SETTINGS');
-    const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
-    const concurrency = Number(data?.maxConcurrentSessionOperations ?? 10);
-    $('rate-limit-cooldown-minutes').value = String(minutes);
-    if ($('simplified-rate-limit-cooldown-minutes')) $('simplified-rate-limit-cooldown-minutes').value = String(minutes);
-    if ($('simplified-max-concurrent-session-operations')) $('simplified-max-concurrent-session-operations').value = String(concurrency);
-    $('rate-limit-setting-status').textContent = `ÐÐºÑ‚Ð¸Ð²Ð½Ð° Ð¿Ð°ÑƒÐ·Ð°: ${minutes} Ñ…Ð².`;
-    if ($('simplified-profile-setting-status')) {
-      $('simplified-profile-setting-status').textContent = `ÐÐºÑ‚Ð¸Ð²Ð½Ð° Ð¿Ð°ÑƒÐ·Ð°: ${minutes} Ñ…Ð². ÐŸÐ°Ñ€Ð°Ð»ÐµÐ»ÑŒÐ½Ñ–ÑÑ‚ÑŒ: ${concurrency} Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… Ð¾Ð¿ÐµÑ€Ð°Ñ†Ñ–Ð¹.`;
-    }
-  } catch (error) {
-    $('rate-limit-setting-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ: ${error.message}`;
-    if ($('simplified-profile-setting-status')) $('simplified-profile-setting-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ: ${error.message}`;
-  }
-}
-
-async function saveProfileSettings() {
-  const minutes = Number($('rate-limit-cooldown-minutes').value);
-  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
-    $('rate-limit-setting-status').textContent = 'Ð’Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 0 Ð´Ð¾ 120 Ñ…Ð²Ð¸Ð»Ð¸Ð½.';
-    $('rate-limit-cooldown-minutes').focus();
-    return;
-  }
-  try {
-    await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    await loadProfileSettings();
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð¿Ð°ÑƒÐ·Ð¸ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('rate-limit-setting-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ: ${error.message}`;
-  }
-}
-
-async function saveSimplifiedProfileSettings() {
-  const minutes = Number($('simplified-rate-limit-cooldown-minutes').value);
-  const concurrency = Number($('simplified-max-concurrent-session-operations').value);
-  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
-    $('simplified-profile-setting-status').textContent = 'ÐŸÐ°ÑƒÐ·Ð°: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 0 Ð´Ð¾ 120.';
-    $('simplified-rate-limit-cooldown-minutes').focus();
-    return;
-  }
-  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 1000) {
-    $('simplified-profile-setting-status').textContent = 'ÐŸÐ°Ñ€Ð°Ð»ÐµÐ»ÑŒÐ½Ñ–ÑÑ‚ÑŒ: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 1 Ð´Ð¾ 1000.';
-    $('simplified-max-concurrent-session-operations').focus();
-    return;
-  }
-  try {
-    await core('UPDATE_PROFILE_SETTINGS', {
-      rateLimitCooldownMinutes: minutes,
-      maxConcurrentSessionOperations: concurrency,
-    });
-    await loadProfileSettings();
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('simplified-profile-setting-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ: ${error.message}`;
-  }
-}
-
-function orchestrationV2SettingsFromForm() {
-  const integer = (id, min, max, label) => parseStrictBoundedInteger($(id).value, { min, max, label });
-  const enabled = $('orchestration-v2-enabled').checked;
-  const absoluteMaxWorkers = integer('orchestration-v2-max-workers', 1, 200, 'ÐœÐ°ÐºÑ. workers');
-  const defaultDesiredWorkers = integer('orchestration-v2-desired-workers', 0, 200, 'Ð¡Ñ‚Ð°Ñ€Ñ‚ workers');
-  if (defaultDesiredWorkers > absoluteMaxWorkers) throw new Error('Ð¡Ñ‚Ð°Ñ€Ñ‚ workers Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð¿ÐµÑ€ÐµÐ²Ð¸Ñ‰ÑƒÐ²Ð°Ñ‚Ð¸ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼.');
-  const controlIssueRaw = $('orchestration-v2-control-issue').value.trim();
-  const controlCommentRaw = $('orchestration-v2-control-comment').value.trim();
-  return {
-    ...(ui.orchestrationV2Config || {}),
-    enabled,
-    projectId: $('orchestration-v2-project-id').value.trim(),
-    targetRepository: $('orchestration-v2-target-repository').value.trim(),
-    controlRepository: $('orchestration-v2-control-repository').value.trim(),
-    controlIssueNumber: controlIssueRaw ? integer('orchestration-v2-control-issue', 1, Number.MAX_SAFE_INTEGER, 'Control Issue') : 0,
-    controlCommentId: controlCommentRaw ? integer('orchestration-v2-control-comment', 0, Number.MAX_SAFE_INTEGER, 'Control comment') : 0,
-    bootstrapPinnedControlFirst: $('orchestration-v2-bootstrap-pinned-control').checked,
-    coordinatorAgentProviderId: $('orchestration-v2-coordinator-provider').value,
-    workerAgentProviderId: $('orchestration-v2-worker-provider').value,
-    coordinatorLaunchUrl: $('orchestration-v2-coordinator-url').value.trim(),
-    masterCoordinatorPrompt: $('orchestration-v2-master-prompt').value.trim(),
-    coordinatorTickPrompt: $('orchestration-v2-tick-prompt').value.trim(),
-    masterPromptVersion: integer('orchestration-v2-prompt-version', 1, 100000, 'Prompt version'),
-    // Reserved compatibility field: no runtime behavior in Orchestration V2. Keep fail-closed.
-    fallbackUniversalPromptEnabled: false,
-    defaultDesiredWorkers,
-    absoluteMaxWorkers,
-    maxLaunchesPerWindow: integer('orchestration-v2-max-launches-window', 0, 10000, 'Ð—Ð°Ð¿ÑƒÑÐºÑ–Ð² Ð·Ð° Ð²Ñ–ÐºÐ½Ð¾'),
-    launchWindowSeconds: integer('orchestration-v2-launch-window', 10, 86400, 'Ð’Ñ–ÐºÐ½Ð¾'),
-    minimumWorkerLaunchIntervalMs: integer('orchestration-v2-min-launch-gap', 0, 3600, 'ÐŸÐ°ÑƒÐ·Ð° Ð¼Ñ–Ð¶ ÑÑ‚Ð°Ñ€Ñ‚Ð°Ð¼Ð¸') * 1000,
-    workerProbeIntervalSeconds: integer('orchestration-v2-worker-probe', 30, 600, 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° workers'),
-    watchdogIntervalSeconds: integer('orchestration-v2-watchdog', 60, 3600, 'Watchdog'),
-    maxCoordinatorTurns: integer('orchestration-v2-max-turns', 1, 1000, 'Turns ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€Ð°'),
-    staleWorkerAfterSeconds: integer('orchestration-v2-stale-worker', 300, 86400, 'Stale worker'),
-    workerPreSendDelayMs: integer('orchestration-v2-worker-pre-send', 1, 30, 'Worker pre-send') * 1000,
-    workerBusyCheckDelayMs: integer('orchestration-v2-worker-busy', 1, 30, 'Worker busy-check') * 1000,
-    workerRetryBackoffMs: integer('orchestration-v2-worker-retry', 5, 3600, 'Worker retry') * 1000,
-    coordinatorPreSendDelayMs: integer('orchestration-v2-coordinator-pre-send', 1, 30, 'Coordinator pre-send') * 1000,
-    coordinatorRetryBackoffMs: integer('orchestration-v2-coordinator-retry', 5, 3600, 'Coordinator retry') * 1000,
-  };
-}
-
-function syncOrchestrationV2ActionAvailability({ busy = false } = {}) {
-  const selected = (ui.orchestrationV2Orchestras || []).find(item => item.id === ui.selectedOrchestraId) || null;
-  const hasSelected = Boolean(selected);
-  $('new-orchestration-v2-orchestra-button').disabled = Boolean(busy);
-  $('rename-orchestration-v2-orchestra-button').disabled = Boolean(busy) || !hasSelected;
-  $('start-orchestration-v2-orchestra-button').disabled = Boolean(busy) || !hasSelected || selected?.ownerPaused === true;
-  $('pause-orchestration-v2-orchestra-button').disabled = Boolean(busy) || !hasSelected || selected?.ownerPaused === true;
-  $('resume-orchestration-v2-orchestra-button').disabled = Boolean(busy) || !hasSelected || selected?.ownerPaused !== true;
-  $('delete-orchestration-v2-orchestra-button').disabled = Boolean(busy) || !hasSelected;
-  for (const id of ['save-orchestration-v2-button', 'save-start-orchestration-v2-button', 'test-orchestration-v2-button', 'run-orchestration-v2-button', 'stop-orchestration-v2-button', 'export-orchestration-v2-profile-button']) {
-    $(id).disabled = Boolean(busy) || !hasSelected;
-  }
-  $('import-orchestration-v2-profile-button').disabled = Boolean(busy) || !ui.pendingOrchestrationProfile;
-  $('configure-orchestration-v2-hierarchy-button').disabled = Boolean(busy) || !hasSelected;
-  $('authorize-orchestration-v2-drive-button').disabled = Boolean(busy);
-  $('orchestration-v2-tab-settings').disabled = Boolean(busy) || !hasSelected;
-  $('orchestration-v2-tab-state').disabled = Boolean(busy) || !hasSelected;
-}
-
-function setOrchestrationV2Busy(busy) {
-  syncOrchestrationV2ActionAvailability({ busy: Boolean(busy) });
-}
-
-function renderOrchestrationV2Orchestras(data = {}) {
-  const orchestras = Array.isArray(data.orchestras) ? data.orchestras : [];
-  ui.orchestrationV2Orchestras = clone(orchestras);
-  ui.selectedOrchestraId = data.selectedId || '';
-  const list = $('orchestration-v2-orchestra-list');
-  const previous = list.value;
-  list.replaceChildren();
-  for (const item of orchestras) {
-    const option = document.createElement('option');
-    option.value = item.id;
-    option.textContent = `${item.name}${item.ownerPaused ? ' â€” Ð¿Ð°ÑƒÐ·Ð°' : ''}`;
-    option.selected = item.id === ui.selectedOrchestraId;
-    list.append(option);
-  }
-  if (!list.value && previous && orchestras.some(item => item.id === previous)) list.value = previous;
-  const selected = orchestras.find(item => item.id === ui.selectedOrchestraId) || null;
-  $('orchestration-v2-orchestra-name').value = selected?.name || '';
-  $('orchestration-v2-orchestra-summary').textContent = selected
-    ? `${selected.name}. Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¿Ð°ÑƒÐ·Ð°: ${selected.ownerPaused ? 'Ñ‚Ð°Ðº' : 'Ð½Ñ–'}. ÐžÑ€ÐºÐµÑÑ‚Ñ€Ñ–Ð²: ${orchestras.length}.`
-    : 'ÐžÑ€ÐºÐµÑÑ‚Ñ€Ð¸ Ñ‰Ðµ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ñ–. Ð¡Ñ‚Ð²Ð¾Ñ€Ñ–Ñ‚ÑŒ Ð½Ð¾Ð²Ð¸Ð¹ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€ Ð°Ð±Ð¾ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ñ‚Ðµ JSON-Ñ„Ð°Ð¹Ð».';
-  syncOrchestrationV2ActionAvailability();
-}
-
-function renderOrchestrationV2Status(data = {}) {
-  renderOrchestrationV2Orchestras(data);
-  const config = data.config || {};
-  const runtime = data.runtime || {};
-  const coordinator = runtime.coordinator || {};
-  const provider = runtime.provider || {};
-  const counts = runtime.workerCounts || {};
-  ui.orchestrationV2Config = clone(config);
-  if (data.driveOAuth) ui.orchestrationDriveOAuth = clone(data.driveOAuth);
-  const driveOAuth = data.driveOAuth || ui.orchestrationDriveOAuth || {};
-  $('orchestration-v2-drive-auth-status').textContent = driveOAuth.configured
-    ? 'Google Drive OAuth Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¾. ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–Ñ Ð²Ð¸ÐºÐ¾Ð½ÑƒÑ”Ñ‚ÑŒÑÑ Ð»Ð¸ÑˆÐµ Ð¿Ñ–ÑÐ»Ñ ÑÐ²Ð½Ð¾Ð³Ð¾ Ð½Ð°Ñ‚Ð¸ÑÐºÐ°Ð½Ð½Ñ ÐºÐ½Ð¾Ð¿ÐºÐ¸; Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¸Ð¹ poll Ð½Ðµ Ð²Ñ–Ð´ÐºÑ€Ð¸Ð²Ð°Ñ” Ð²Ñ–ÐºÐ½Ð° Ð²Ñ…Ð¾Ð´Ñƒ.'
-    : driveOAuth.clientIdPresent
-      ? 'Google Drive OAuth Ð½ÐµÐ¿Ð¾Ð²Ð½Ð¸Ð¹: Ñƒ manifest Ð½ÐµÐ¼Ð°Ñ” scope drive.file.'
-      : 'Google Drive OAuth Ñ‰Ðµ Ð½Ðµ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¾ Ñ€ÐµÐ°Ð»ÑŒÐ½Ð¸Ð¼ client ID. Drive-ÐºÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ fail-closed Ñ– Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ñ” Workers.';
-  $('orchestration-v2-enabled').checked = config.enabled === true;
-  $('orchestration-v2-project-id').value = config.projectId || '';
-  $('orchestration-v2-target-repository').value = config.targetRepository || '';
-  $('orchestration-v2-control-repository').value = config.controlRepository || '';
-  $('orchestration-v2-control-issue').value = config.controlIssueNumber ? String(config.controlIssueNumber) : '';
-  $('orchestration-v2-control-comment').value = config.controlCommentId ? String(config.controlCommentId) : '';
-  $('orchestration-v2-bootstrap-pinned-control').checked = config.bootstrapPinnedControlFirst === true;
-  $('orchestration-v2-coordinator-provider').value = config.coordinatorAgentProviderId || 'chatgpt-browser';
-  $('orchestration-v2-worker-provider').value = config.workerAgentProviderId || 'chatgpt-browser';
-  $('orchestration-v2-coordinator-url').value = config.coordinatorLaunchUrl || 'https://chatgpt.com/';
-  $('orchestration-v2-master-prompt').value = config.masterCoordinatorPrompt || '';
-  $('orchestration-v2-tick-prompt').value = config.coordinatorTickPrompt || '';
-  $('orchestration-v2-prompt-version').value = String(config.masterPromptVersion ?? 1);
-  $('orchestration-v2-desired-workers').value = String(config.defaultDesiredWorkers ?? 5);
-  $('orchestration-v2-max-workers').value = String(config.absoluteMaxWorkers ?? 8);
-  $('orchestration-v2-max-launches-window').value = String(config.maxLaunchesPerWindow ?? 0);
-  $('orchestration-v2-launch-window').value = String(config.launchWindowSeconds ?? 300);
-  $('orchestration-v2-min-launch-gap').value = String(Math.round((config.minimumWorkerLaunchIntervalMs ?? 0) / 1000));
-  $('orchestration-v2-worker-probe').value = String(config.workerProbeIntervalSeconds ?? 30);
-  $('orchestration-v2-watchdog').value = String(config.watchdogIntervalSeconds ?? 300);
-  $('orchestration-v2-max-turns').value = String(config.maxCoordinatorTurns ?? 10);
-  $('orchestration-v2-stale-worker').value = String(config.staleWorkerAfterSeconds ?? 3600);
-  $('orchestration-v2-worker-pre-send').value = String(Math.round((config.workerPreSendDelayMs ?? 8000) / 1000));
-  $('orchestration-v2-worker-busy').value = String(Math.round((config.workerBusyCheckDelayMs ?? 2000) / 1000));
-  $('orchestration-v2-worker-retry').value = String(Math.round((config.workerRetryBackoffMs ?? 60000) / 1000));
-  $('orchestration-v2-coordinator-pre-send').value = String(Math.round((config.coordinatorPreSendDelayMs ?? 8000) / 1000));
-  $('orchestration-v2-coordinator-retry').value = String(Math.round((config.coordinatorRetryBackoffMs ?? 60000) / 1000));
-  const leaseText = coordinator.lease ? `turn ${coordinator.lease.turnId || '?'} / ${coordinator.lease.reason || 'reason unknown'}` : 'Ð½ÐµÐ¼Ð°Ñ”';
-  const providerText = provider.lastFetchAt ? new Date(provider.lastFetchAt).toLocaleString() : 'Ñ‰Ðµ Ð½Ðµ Ð±ÑƒÐ»Ð¾';
-  const ownerPauseText = data.ownerPaused ? 'Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¿Ð°ÑƒÐ·Ð° Ð²Ð»Ð°ÑÐ½Ð¸ÐºÐ°: Ñ‚Ð°Ðº.' : 'Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¿Ð°ÑƒÐ·Ð° Ð²Ð»Ð°ÑÐ½Ð¸ÐºÐ°: Ð½Ñ–.';
-  $('orchestration-v2-status').textContent = data.orchestra == null
-    ? 'ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.'
-    : config.enabled
-      ? `Orchestration V2 ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾. ${ownerPauseText} GitHub mode: ${runtime.mode || 'RUN'}. Coordinator: ${coordinator.status || 'IDLE'}. GitHub fetch: ${providerText}.${provider.lastFetchError ? ` ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ°: ${provider.lastFetchError}.` : ''}`
-      : `Orchestration V2 Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾. ${ownerPauseText} ÐÐ¾Ð²Ñ– coordinator/worker sends Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÑŽÑŽÑ‚ÑŒÑÑ.`;
-  const backpressureText = runtime.backpressureUntil && runtime.backpressureUntil > Date.now() ? new Date(runtime.backpressureUntil).toLocaleString() : 'Ð½ÐµÐ¼Ð°Ñ”';
-  const launchPolicy = runtime.launchPolicy || {};
-  const launchLimitText = config.maxLaunchesPerWindow ? String(config.maxLaunchesPerWindow) : 'Ð±ÐµÐ· Ð»Ñ–Ð¼Ñ–Ñ‚Ñƒ';
-  const controlCommentText = config.controlCommentId ? `pinned ${config.controlCommentId}` : (provider.canonicalCommentId ? `auto â†’ ${provider.canonicalCommentId}` : 'auto');
-  const controlSourceText = runtime.lastAppliedControlSource || 'Ñ‰Ðµ Ð½Ðµ Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²Ð°Ð½Ð¾';
-  const scalarProviders = Array.isArray(runtime.hierarchy?.providers) ? runtime.hierarchy.providers : [];
-  const driveScalarText = scalarProviders.length
-    ? scalarProviders.map(item => {
-      const revision = item.lastAcceptedRevision || 'Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”';
-      const error = item.lastErrorCode ? `, Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ° ${item.lastErrorCode}` : '';
-      return `${item.nodeId}: revision ${revision}, slots ${item.lastRequestedSlotCount || 0}/${item.maxSlots || 0}${error}`;
-    }).join('; ')
-    : 'Ð½Ðµ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¾';
-  const hierarchy = runtime.hierarchy;
-  const hierarchyText = hierarchy
-    ? `Ð†Ñ”Ñ€Ð°Ñ€Ñ…Ñ–Ñ: Ð²ÑƒÐ·Ð»Ñ–Ð² ${hierarchy.nodeCount || 0}; Director ${hierarchy.rootCount || 0}; Managers ${hierarchy.managerCount || 0}; Workers ${hierarchy.workerCount || 0}; Ñ€Ð°ÑƒÐ½Ð´ ${hierarchy.currentRound || 1}; Ñ€ÐµÐ¶Ð¸Ð¼ ${hierarchy.loopMode === 'CONTINUOUS' ? 'Ð‘Ð•Ð—ÐŸÐ•Ð Ð•Ð Ð’ÐÐ˜Ð™' : 'ÐžÐ”Ð˜Ð ÐŸÐ ÐžÐ¥Ð†Ð”'}${hierarchy.maxRounds ? ` Ð´Ð¾ ${hierarchy.maxRounds}` : ''}; Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ… Ð°ÐºÑ‚Ð¸Ð²Ð°Ñ†Ñ–Ð¹ ${hierarchy.activeActivationCount || 0}. Ð¤Ð°Ð·Ð¸: ${Object.entries(hierarchy.lifecycleCounts || {}).map(([key, value]) => `${key} ${value}`).join(', ') || 'Ð½ÐµÐ¼Ð°Ñ”'}. `
-    : '';
-  $('orchestration-v2-runtime').textContent = `${hierarchyText}Coordinator ${coordinator.generation || 1}: turns ${coordinator.turnsUsed || 0}/${coordinator.maxTurns || config.maxCoordinatorTurns || 10}. Legacy workers: queued ${counts.QUEUED || 0}, active ${counts.ACTIVE || 0}, busy ${counts.BUSY || 0}, complete ${counts.COMPLETED || 0}, failed ${counts.FAILED || 0}. Concurrency ${runtime.effectiveDesiredWorkers ?? 0}/${runtime.hardMaxWorkers ?? config.absoluteMaxWorkers ?? 0}. Launch window ${launchPolicy.launchesInWindow ?? 0}/${launchLimitText}. Control ${controlCommentText}. Revision ${runtime.lastAppliedControlRevision || 0}. Ð”Ð¶ÐµÑ€ÐµÐ»Ð¾ ÐºÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ: ${controlSourceText}. Backpressure: ${backpressureText}. Drive scalar: ${driveScalarText}.`;
-}
-
-async function loadOrchestrationV2Status() {
-  const epoch = orchestrationV2ActionEpoch;
-  try {
-    const data = await core('GET_ORCHESTRATION_V2_STATUS');
-    if (epoch !== orchestrationV2ActionEpoch) return;
-    renderOrchestrationV2Status(data);
-  } catch (error) {
-    if (epoch !== orchestrationV2ActionEpoch) return;
-    $('orchestration-v2-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Orchestration V2: ${error.message}`;
-  }
-}
-
-async function createOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    const name = $('orchestration-v2-orchestra-name').value.trim() || 'ÐÐ¾Ð²Ð¸Ð¹ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€';
-    const data = await core('CREATE_ORCHESTRATION_V2_ORCHESTRA', { name });
-    renderOrchestrationV2Status(data);
-    setOrchestrationPanel('settings');
-    announce('ÐÐ¾Ð²Ð¸Ð¹ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.');
-  } catch (error) { $('orchestration-v2-orchestra-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÑÑ‚Ð²Ð¾Ñ€Ð¸Ñ‚Ð¸ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€: ${error.message}`; }
-  finally { setOrchestrationV2Busy(false); }
-}
-async function selectOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  const id = $('orchestration-v2-orchestra-list').value;
-  if (!id) return;
-  try { renderOrchestrationV2Status(await core('SELECT_ORCHESTRATION_V2_ORCHESTRA', { id })); }
-  catch (error) { $('orchestration-v2-orchestra-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð²Ð¸Ð±Ñ€Ð°Ñ‚Ð¸ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€: ${error.message}`; }
-}
-async function renameOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  const id = ui.selectedOrchestraId; const name = $('orchestration-v2-orchestra-name').value.trim();
-  if (!id || !name) return;
-  try { renderOrchestrationV2Status(await core('RENAME_ORCHESTRATION_V2_ORCHESTRA', { id, name })); announce('ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð¿ÐµÑ€ÐµÐ¹Ð¼ÐµÐ½Ð¾Ð²Ð°Ð½Ð¾.'); }
-  catch (error) { $('orchestration-v2-orchestra-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿ÐµÑ€ÐµÐ¹Ð¼ÐµÐ½ÑƒÐ²Ð°Ñ‚Ð¸: ${error.message}`; }
-}
-async function startOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  if (!ui.selectedOrchestraId) return;
-  try {
-    setOrchestrationV2Busy(true);
-    $('orchestration-v2-status').textContent = 'Ð—Ð°Ð¿ÑƒÑÐºÐ°ÑŽ Coordinator-cycle Ð·Ð°Ñ€Ð°Ð·â€¦';
-    const data = await core('START_ORCHESTRATION_V2_ORCHESTRA', { id: ui.selectedOrchestraId });
-    renderOrchestrationV2Status(data.status || data);
-    setOrchestrationPanel('state');
-    announce('ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾. ÐŸÐµÑ€ÑˆÐ¸Ð¹ Coordinator-cycle Ñ€Ð¾Ð·Ð¿Ð¾Ñ‡Ð°Ñ‚Ð¾ Ð·Ð°Ñ€Ð°Ð·.');
-  } catch (error) {
-    $('orchestration-v2-orchestra-summary').textContent = `Ð—Ð°Ð¿ÑƒÑÐº Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-    announce('ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚Ð¸ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€.');
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function pauseOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  if (!ui.selectedOrchestraId) return;
-  try { renderOrchestrationV2Status(await core('PAUSE_ORCHESTRATION_V2_ORCHESTRA', { id: ui.selectedOrchestraId })); announce('ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð¿Ñ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾. ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð¼Ð¾Ð¶Ð½Ð° Ð·Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸.'); }
-  catch (error) { $('orchestration-v2-orchestra-summary').textContent = `ÐŸÐ°ÑƒÐ·Ð° Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð°: ${error.message}`; }
-}
-async function resumeOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  if (!ui.selectedOrchestraId) return;
-  try { renderOrchestrationV2Status(await core('RESUME_ORCHESTRATION_V2_ORCHESTRA', { id: ui.selectedOrchestraId })); announce('ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð¿Ñ€Ð¾Ð´Ð¾Ð²Ð¶ÐµÐ½Ð¾; recovery/reconciliation Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾ Ð·Ð°Ñ€Ð°Ð·.'); }
-  catch (error) { $('orchestration-v2-orchestra-summary').textContent = `ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶ÐµÐ½Ð½Ñ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`; }
-}
-async function deleteOrchestrationV2Orchestra() {
-  beginOrchestrationV2Action();
-  if (!ui.selectedOrchestraId) return;
-  try {
-    const data = await core('DELETE_ORCHESTRATION_V2_ORCHESTRA', { id: ui.selectedOrchestraId });
-    renderOrchestrationV2Status(data);
-    setOrchestrationPanel('orchestras');
-    announce('ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  } catch (error) { $('orchestration-v2-orchestra-summary').textContent = `Ð’Ð¸Ð´Ð°Ð»ÐµÐ½Ð½Ñ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`; }
-}
-
-async function saveOrchestrationV2Settings() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    const settings = orchestrationV2SettingsFromForm();
-    const data = await core('UPDATE_ORCHESTRATION_V2_SETTINGS', { settings });
-    renderOrchestrationV2Status(data.status || { config: data.config });
-    announce(data.startedNow ? 'Orchestration V2 Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾ Ð¹ Ð¿ÐµÑ€ÑˆÐ¸Ð¹ Coordinator-cycle Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾ Ð·Ð°Ñ€Ð°Ð·.' : 'Orchestration V2 Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Orchestration V2: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Orchestration V2.');
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function saveAndStartOrchestrationV2Now() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    $('orchestration-v2-enabled').checked = true;
-    const settings = { ...orchestrationV2SettingsFromForm(), enabled: true };
-    $('orchestration-v2-status').textContent = 'Ð—Ð±ÐµÑ€Ñ–Ð³Ð°ÑŽ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð¹ Ð·Ð°Ð¿ÑƒÑÐºÐ°ÑŽ Coordinator-cycle Ð·Ð°Ñ€Ð°Ð·â€¦';
-    const data = await core('SAVE_AND_START_ORCHESTRATION_V2', { settings });
-    renderOrchestrationV2Status(data.status || data);
-    setOrchestrationPanel('state');
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾. ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾ Ð·Ð°Ñ€Ð°Ð·.');
-  } catch (error) {
-    $('orchestration-v2-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð¹ Ð·Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚Ð¸ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Ð·Ð°Ð¿ÑƒÑÐºÑƒ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€Ñƒ.');
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function testOrchestrationV2Control() {
-  try {
-    setOrchestrationV2Busy(true);
-    const settings = orchestrationV2SettingsFromForm();
-    $('orchestration-v2-status').textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ GitHub control read-onlyâ€¦';
-    const result = await core('TEST_ORCHESTRATION_V2_CONTROL', { settings });
-    const selected = result?.selected;
-    if (selected?.control) {
-      $('orchestration-v2-status').textContent = `GitHub control Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: revision ${selected.control.revision}, coordinator generation ${selected.control.coordinator_generation}, comment ${selected.commentId || result.commentId || 'discovery'}. Ð–Ð¾Ð´ÐµÐ½ worker/Session Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.`;
-    } else {
-      const diagnostic = result?.diagnostics?.[0]?.message || 'Ð”Ð»Ñ Ñ†ÑŒÐ¾Ð³Ð¾ project/generation Ð²Ð°Ð»Ñ–Ð´Ð½Ð¾Ð³Ð¾ control Ð·Ð°Ñ€Ð°Ð· Ð½ÐµÐ¼Ð°Ñ”.';
-      $('orchestration-v2-status').textContent = `GitHub endpoint Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹, Ð°Ð»Ðµ executable control Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾: ${diagnostic}`;
-    }
-    announce('ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÑƒ GitHub control Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-status').textContent = `GitHub control test Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸ GitHub control.');
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function runOrchestrationV2Now() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    $('orchestration-v2-status').textContent = 'Ð’Ð¸ÐºÐ¾Ð½ÑƒÑŽ completion/watchdog reconciliation Ð·Ð°Ñ€Ð°Ð·â€¦';
-    await core('RUN_ORCHESTRATION_V2_NOW');
-    await loadOrchestrationV2Status();
-    announce('Orchestration V2 reconciliation Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-status').textContent = `Orchestration V2 cycle Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function emergencyStopOrchestrationV2() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    const data = await core('EMERGENCY_STOP_ORCHESTRATION_V2');
-    renderOrchestrationV2Status(data.status || { config: data.config });
-    announce('Emergency STOP V2 Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²Ð°Ð½Ð¾. ÐÐ¾Ð²Ñ– sends Ð·Ð°Ð±Ð¾Ñ€Ð¾Ð½ÐµÐ½Ñ–; recovery evidence Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-status').textContent = `Emergency STOP Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function onOrchestrationProfileFileChange() {
-  ui.pendingOrchestrationProfile = null;
-  syncOrchestrationV2ActionAvailability();
-  const file = $('orchestration-v2-profile-file').files?.[0];
-  if (!file) { $('orchestration-v2-profile-preview').textContent = 'Ð¤Ð°Ð¹Ð» Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.'; return; }
-  try {
-    const profile = JSON.parse(await file.text());
-    const data = await core('PREVIEW_ORCHESTRATION_V2_PROFILE', { profile });
-    ui.pendingOrchestrationProfile = profile;
-    const preview = data.preview || {};
-    const comment = preview.controlCommentId ? `comment ${preview.controlCommentId}` : 'auto comment';
-    const launch = preview.maxLaunchesPerWindow ? `${preview.maxLaunchesPerWindow}/${preview.launchWindowSeconds}s` : 'Ð±ÐµÐ· window limit';
-    const bootstrap = preview.bootstrapPinnedControlFirst ? 'Ñ€Ð°Ð½Ð½Ñ” Ð·Ð°ÐºÑ€Ñ–Ð¿Ð»ÐµÐ½Ðµ ÐºÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ: Ñ‚Ð°Ðº' : 'Ñ€Ð°Ð½Ð½Ñ” Ð·Ð°ÐºÑ€Ñ–Ð¿Ð»ÐµÐ½Ðµ ÐºÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ: Ð½Ñ–';
-    const hierarchy = preview.hierarchy
-      ? `; Ñ–Ñ”Ñ€Ð°Ñ€Ñ…Ñ–Ñ ${preview.hierarchy.nodeCount} Ð²ÑƒÐ·Ð»Ñ–Ð², ${preview.hierarchy.rootCount} ÐºÐ¾Ñ€ÐµÐ½Ñ–Ð², ${preview.hierarchy.promptProfileCount} Ð¿Ñ€Ð¾Ñ„Ñ–Ð»Ñ–Ð² Ð¿Ñ€Ð¾Ð¼Ñ‚Ñ–Ð², epoch ${preview.hierarchy.controlEpoch}`
-      : '';
-    $('orchestration-v2-profile-preview').textContent = `${preview.projectId || 'ÐŸÑ€Ð¾Ñ”ÐºÑ‚'}; workers ${preview.initialWorkers ?? 0}/${preview.maxActiveWorkers ?? 0}; launch ${launch}, gap ${preview.minimumLaunchIntervalSeconds ?? 0}s; ${preview.coordinatorProviderId || '?'} â†’ ${preview.workerProviderId || '?'}; Issue ${preview.controlIssueNumber || 0}, ${comment}; ${bootstrap}${hierarchy}.`;
-    syncOrchestrationV2ActionAvailability();
-  } catch (error) {
-    $('orchestration-v2-profile-preview').textContent = `ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ°: ${error.message}`;
-  }
-}
-
-async function importOrchestrationProfile() {
-  beginOrchestrationV2Action();
-  if (!ui.pendingOrchestrationProfile) return;
-  try {
-    setOrchestrationV2Busy(true);
-    const data = await core('IMPORT_ORCHESTRATION_V2_PROFILE', { profile: ui.pendingOrchestrationProfile });
-    const status = data.status || await core('GET_ORCHESTRATION_V2_STATUS');
-    renderOrchestrationV2Status(status);
-    $('orchestration-v2-profile-preview').textContent = `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾: ${data.preview?.name || status.orchestra?.name || 'Ð¾Ñ€ÐºÐµÑÑ‚Ñ€'}. ÐžÑ€ÐºÐµÑÑ‚Ñ€ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾/Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾ Ñ– Ð·Ð°Ð»Ð¸ÑˆÐµÐ½Ð¾ Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¸Ð¼ Ð´Ð¾ Ñ€ÑƒÑ‡Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑƒÑÐºÑƒ.`;
-    ui.pendingOrchestrationProfile = null;
-    $('orchestration-v2-profile-file').value = '';
-    syncOrchestrationV2ActionAvailability();
-    $('orchestration-v2-orchestra-summary').focus?.();
-    announce('JSON Ð¾Ñ€ÐºÐµÑÑ‚Ñ€Ñƒ Ñ–Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾. ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑƒÑÐºÑƒ Ð½Ðµ Ð±ÑƒÐ»Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-profile-preview').textContent = `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-  } finally { setOrchestrationV2Busy(false); }
-}
-
-async function exportOrchestrationProfile() {
-  try {
-    const data = await core('EXPORT_ORCHESTRATION_V2_PROFILE', { name: ui.orchestrationV2Config?.projectId || 'Orchestration' });
-    downloadJson(data.profile, `${safeFileName(data.profile.name || 'Orchestration')}-orchestration.json`);
-  } catch (error) {
-    $('orchestration-v2-profile-preview').textContent = `Ð•ÐºÑÐ¿Ð¾Ñ€Ñ‚ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-  }
-}
-
-function orchestrationHierarchyDomainsFromForm() {
-  const lines = $('orchestration-v2-hierarchy-domains').value
-    .split(/\r?\n/u)
-    .map(line => line.trim())
-    .filter(Boolean);
-  if (!lines.length) throw new Error('Ð”Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ñ…Ð¾Ñ‡Ð° Ð± Ð¾Ð´Ð½Ð¾Ð³Ð¾ Manager Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– ID | Ð¾Ð±Ð»Ð°ÑÑ‚ÑŒ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð°Ð»ÑŒÐ½Ð¾ÑÑ‚Ñ–.');
-  return lines.map((line, index) => {
-    const separator = line.indexOf('|');
-    if (separator <= 0 || separator >= line.length - 1) {
-      throw new Error(`Ð ÑÐ´Ð¾Ðº ${index + 1}: Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ ID | Ð¾Ð±Ð»Ð°ÑÑ‚ÑŒ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð°Ð»ÑŒÐ½Ð¾ÑÑ‚Ñ–.`);
-    }
-    const id = line.slice(0, separator).trim();
-    const scope = line.slice(separator + 1).trim();
-    if (!id || !scope) throw new Error(`Ð ÑÐ´Ð¾Ðº ${index + 1}: ID Ñ‚Ð° Ð¾Ð±Ð»Ð°ÑÑ‚ÑŒ Ð½Ðµ Ð¼Ð¾Ð¶ÑƒÑ‚ÑŒ Ð±ÑƒÑ‚Ð¸ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ–Ð¼Ð¸.`);
-    return { id, scope };
-  });
-}
-
-function orchestrationDriveScalarSourcesFromForm(domains) {
-  const lines = $('orchestration-v2-hierarchy-drive-sources').value
-    .split(/\r?\n/u)
-    .map(line => line.trim())
-    .filter(Boolean);
-  if (!lines.length) return {};
-  const allowed = new Set(domains.map(domain => String(domain.id || '').trim().toLowerCase()));
-  const out = {};
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const separator = line.indexOf('|');
-    if (separator <= 0 || separator >= line.length - 1) {
-      throw new Error(`Drive Ñ€ÑÐ´Ð¾Ðº ${index + 1}: Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Manager ID | Google Drive Ñ„Ð°Ð¹Ð».`);
-    }
-    const managerId = line.slice(0, separator).trim().toLowerCase();
-    const source = line.slice(separator + 1).trim();
-    if (!allowed.has(managerId)) {
-      throw new Error(`Drive Ñ€ÑÐ´Ð¾Ðº ${index + 1}: Manager ${managerId || '?'} Ð½Ðµ Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¸Ð¹ Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ Ð²Ð¸Ñ‰Ðµ.`);
-    }
-    if (Object.hasOwn(out, managerId)) {
-      throw new Error(`Drive Ñ€ÑÐ´Ð¾Ðº ${index + 1}: Manager ${managerId} ÑƒÐ¶Ðµ Ð¼Ð°Ñ” Drive-Ñ„Ð°Ð¹Ð».`);
-    }
-    if (!source) throw new Error(`Drive Ñ€ÑÐ´Ð¾Ðº ${index + 1}: Ñ„Ð°Ð¹Ð» Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð±ÑƒÑ‚Ð¸ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ–Ð¼.`);
-    out[managerId] = source;
-  }
-  return out;
-}
-
-
-function orchestrationDriveFolderSourcesFromForm(domains) {
-  const lines = $('orchestration-v2-hierarchy-drive-folders').value
-    .split(/\r?\n/u)
-    .map(line => line.trim())
-    .filter(Boolean);
-  if (!lines.length) return {};
-  const allowed = new Set(domains.map(domain => String(domain.id || '').trim().toLowerCase()));
-  const out = {};
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const separator = line.indexOf('|');
-    if (separator <= 0 || separator >= line.length - 1) {
-      throw new Error('Drive folder Ñ€ÑÐ´Ð¾Ðº ' + (index + 1) + ': Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Manager ID | Google Drive Ð¿Ð°Ð¿ÐºÐ°.');
-    }
-    const managerId = line.slice(0, separator).trim().toLowerCase();
-    const source = line.slice(separator + 1).trim();
-    if (!allowed.has(managerId)) {
-      throw new Error('Drive folder Ñ€ÑÐ´Ð¾Ðº ' + (index + 1) + ': Manager ' + (managerId || '?') + ' Ð½Ðµ Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¸Ð¹ Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ Ð²Ð¸Ñ‰Ðµ.');
-    }
-    if (Object.hasOwn(out, managerId)) {
-      throw new Error('Drive folder Ñ€ÑÐ´Ð¾Ðº ' + (index + 1) + ': Manager ' + managerId + ' ÑƒÐ¶Ðµ Ð¼Ð°Ñ” dispatch-Ð¿Ð°Ð¿ÐºÑƒ.');
-    }
-    if (!source) throw new Error('Drive folder Ñ€ÑÐ´Ð¾Ðº ' + (index + 1) + ': Ð¿Ð°Ð¿ÐºÐ° Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð±ÑƒÑ‚Ð¸ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½ÑŒÐ¾ÑŽ.');
-    out[managerId] = source;
-  }
-  return out;
-}
-
-async function authorizeSessionDrive() {
-  try {
-    $('authorize-session-drive-button').disabled = true;
-    $('drive-prompt-status').textContent = 'Ð’Ñ–Ð´ÐºÑ€Ð¸Ð²Ð°ÑŽ Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Google Driveâ€¦';
-    await core('AUTHORIZE_ORCHESTRATION_V2_DRIVE');
-    $('drive-prompt-status').textContent = 'Google Drive Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð»Ñ Autopilot. Ð—Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ Session, Ñ‰Ð¾Ð± ÑƒÐ²Ñ–Ð¼ÐºÐ½ÑƒÑ‚Ð¸ ÑÐ¸Ð½Ñ…Ñ€Ð¾Ð½Ñ–Ð·Ð°Ñ†Ñ–ÑŽ.';
-    announce('Google Drive Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð¾Ð²Ð°Ð½Ð¾.');
-  } catch (error) {
-    $('drive-prompt-status').textContent = `ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Drive Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-    announce('ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Google Drive Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾.');
-  } finally {
-    $('authorize-session-drive-button').disabled = false;
-  }
-}
-
-async function authorizeOrchestrationDrive() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    $('orchestration-v2-drive-auth-status').textContent = 'Ð’Ñ–Ð´ÐºÑ€Ð¸Ð²Ð°ÑŽ Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Google Driveâ€¦';
-    await core('AUTHORIZE_ORCHESTRATION_V2_DRIVE');
-    $('orchestration-v2-drive-auth-status').textContent = 'Google Drive Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð»Ñ Autopilot.';
-    announce('Google Drive Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð¾Ð²Ð°Ð½Ð¾.');
-    await loadOrchestrationV2Status();
-  } catch (error) {
-    $('orchestration-v2-drive-auth-status').textContent = `ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Drive Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-    announce('ÐÐ²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–ÑŽ Google Drive Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾.');
-  } finally {
-    setOrchestrationV2Busy(false);
-  }
-}
-
-async function configureOrchestrationHierarchyTemplate() {
-  beginOrchestrationV2Action();
-  try {
-    setOrchestrationV2Busy(true);
-    const domains = orchestrationHierarchyDomainsFromForm();
-    const workersPerManager = parseStrictBoundedInteger(
-      $('orchestration-v2-hierarchy-workers').value,
-      { min: 1, max: 40, label: 'Workers Ð½Ð° Ð¾Ð´Ð½Ð¾Ð³Ð¾ Manager' },
-    );
-    const driveScalarSources = orchestrationDriveScalarSourcesFromForm(domains);
-    const drivePollMinutes = parseStrictBoundedInteger(
-      $('orchestration-v2-hierarchy-drive-poll').value,
-      { min: 1, max: 1440, label: 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸ Drive, Ñ…Ð²' },
-    );
-    const data = await core('CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE', {
-      domains,
-      workersPerManager,
-      includeIntegrationManager: $('orchestration-v2-hierarchy-integration').checked,
-      includeQaRedTeam: $('orchestration-v2-hierarchy-qa').checked,
-      driveScalarSources,
-      driveScalarPollIntervalMs: drivePollMinutes * 60 * 1000,
-    });
-    renderOrchestrationV2Status(data.status || await core('GET_ORCHESTRATION_V2_STATUS'));
-    const hierarchy = data.hierarchy || {};
-    $('orchestration-v2-hierarchy-template-status').textContent =
-      `Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ ${hierarchy.nodeCount || 0} Ð²ÑƒÐ·Ð»Ñ–Ð²: Managers ${hierarchy.managerCount || 0}, Workers ${hierarchy.workerCount || 0}, Drive-ÐºÐµÑ€Ð¾Ð²Ð°Ð½Ð¸Ñ… Managers ${hierarchy.driveScalarProviderCount || 0}, Ð¿Ñ€Ð¾Ñ„Ñ–Ð»Ñ–Ð² Ð¿Ñ€Ð¾Ð¼Ñ‚Ñ–Ð² ${hierarchy.promptProfileCount || 0}. ÐžÑ€ÐºÐµÑÑ‚Ñ€ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾.`;
-    announce('Ð†Ñ”Ñ€Ð°Ñ€Ñ…Ñ–ÑŽ Ð¾Ñ€ÐºÐµÑÑ‚Ñ€Ñƒ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾. ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑƒÑÐºÑƒ Ð½Ðµ Ð±ÑƒÐ»Ð¾.');
-  } catch (error) {
-    $('orchestration-v2-hierarchy-template-status').textContent = `Ð†Ñ”Ñ€Ð°Ñ€Ñ…Ñ–ÑŽ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ Ñ–Ñ”Ñ€Ð°Ñ€Ñ…Ñ–Ñ—.');
-  } finally {
-    setOrchestrationV2Busy(false);
-  }
-}
-
-function remoteDispatchSettingsFromForm() {
-  const integer = (id, min, max, label) => {
-    const value = Number($(id).value);
-    if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-    return value;
-  };
-  const enabled = $('remote-dispatch-enabled').checked;
-  const rawIssue = $('remote-dispatch-issue').value.trim();
-  const issueNumber = rawIssue ? integer('remote-dispatch-issue', 1, Number.MAX_SAFE_INTEGER, 'Issue number') : 0;
-  return {
-    enabled,
-    intakePaused: $('remote-dispatch-intake-paused').checked,
-    provider: 'github-issue',
-    projectId: $('remote-dispatch-project-id').value.trim(),
-    repository: $('remote-dispatch-repository').value.trim(),
-    issueNumber,
-    minimumPollIntervalSeconds: integer('remote-dispatch-poll', 180, 3600, 'GitHub poll interval'),
-    fallbackEnabled: $('remote-dispatch-fallback-enabled').checked,
-    fallbackSessionId: $('remote-dispatch-fallback-session').value,
-    fallbackAfterSeconds: integer('remote-dispatch-fallback-after', 180, 86400, 'Fallback threshold'),
-    autoStart: $('remote-dispatch-auto-start').checked,
-  };
-}
-
-function setRemoteDispatchBusy(busy) {
-  for (const id of ['save-remote-dispatch-button', 'test-remote-dispatch-button', 'run-remote-dispatch-button']) $(id).disabled = Boolean(busy);
-}
-
-function renderRemoteFallbackSessionOptions(selectedId = '') {
-  const select = $('remote-dispatch-fallback-session');
-  const wanted = selectedId || select.value || '';
-  select.replaceChildren();
-  const none = document.createElement('option');
-  none.value = ''; none.textContent = 'ÐÐµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ñ‚Ð¸ fallback Session'; select.append(none);
-  for (const session of (ui.sessions || []).filter(item => !item.managedKind)) {
-    const option = document.createElement('option');
-    option.value = session.id;
-    option.textContent = session.name || session.id;
-    select.append(option);
-  }
-  if ([...select.options].some(option => option.value === wanted)) select.value = wanted;
-}
-
-function renderRemoteDispatchStatus(data = {}) {
-  const config = data.config || {};
-  const feed = data.feed || {};
-  const ledger = data.ledger || {};
-  const runtime = data.runtime || {};
-  $('remote-dispatch-enabled').checked = config.enabled === true;
-  $('remote-dispatch-intake-paused').checked = config.intakePaused === true;
-  $('remote-dispatch-project-id').value = config.projectId || '';
-  $('remote-dispatch-repository').value = config.repository || '';
-  $('remote-dispatch-issue').value = config.issueNumber ? String(config.issueNumber) : '121';
-  $('remote-dispatch-poll').value = String(config.minimumPollIntervalSeconds || 300);
-  $('remote-dispatch-fallback-enabled').checked = config.fallbackEnabled !== false;
-  renderRemoteFallbackSessionOptions(config.fallbackSessionId || '');
-  $('remote-dispatch-fallback-after').value = String(config.fallbackAfterSeconds || 900);
-  $('remote-dispatch-auto-start').checked = config.autoStart !== false;
-  const state = !config.enabled ? 'Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾' : config.intakePaused ? 'intake Ð½Ð° Ð¿Ð°ÑƒÐ·Ñ–' : 'ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾';
-  const fetchText = ledger.lastFetchAt ? new Date(ledger.lastFetchAt).toLocaleString() : 'Ñ‰Ðµ Ð½Ðµ Ð±ÑƒÐ»Ð¾';
-  const expiry = feed.expiresAt ? new Date(feed.expiresAt).toLocaleString() : 'Ð½ÐµÐ¼Ð°Ñ”';
-  $('remote-dispatch-status').textContent = `Remote Dispatch ${state}. ÐžÑÑ‚Ð°Ð½Ð½Ñ–Ð¹ GitHub poll: ${fetchText}.${ledger.lastFetchError ? ` ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ°: ${ledger.lastFetchError}.` : ''}`;
-  $('remote-dispatch-runtime').textContent = `Dispatch: ${feed.dispatchId || 'Ð½ÐµÐ¼Ð°Ñ”'}; revision: ${feed.strategyRevision || 0}; Ð¿Ñ€Ð¸Ð´Ð°Ñ‚Ð½Ð¸Ð¹ Ð·Ð°Ñ€Ð°Ð·: ${feed.applicable ? 'Ñ‚Ð°Ðº' : `Ð½Ñ– (${feed.reason || 'Ð½ÐµÐ¼Ð°Ñ” cache'})`}; expires: ${expiry}; remote Sessions: ${runtime.remoteSessionCount || 0}; Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ…: ${runtime.activeRemoteSessionCount || 0}; fallback: ${ledger.fallbackActive ? 'Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ð¹' : 'Ð½ÐµÐ°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ð¹'}.`;
-}
-
-async function loadRemoteDispatchStatus() {
-  try { renderRemoteDispatchStatus(await core('GET_REMOTE_DISPATCH_STATUS')); }
-  catch (error) { $('remote-dispatch-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Remote Dispatch: ${error.message}`; }
-}
-
-async function saveRemoteDispatchSettings() {
-  try {
-    setRemoteDispatchBusy(true);
-    const settings = remoteDispatchSettingsFromForm();
-    const data = await core('UPDATE_REMOTE_DISPATCH_SETTINGS', { settings });
-    renderRemoteDispatchStatus(data.status || { config: data.settings });
-    announce('Remote Dispatch Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('remote-dispatch-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Remote Dispatch: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Remote Dispatch.');
-  } finally { setRemoteDispatchBusy(false); }
-}
-
-async function testRemoteDispatchFeed() {
-  try {
-    setRemoteDispatchBusy(true);
-    const settings = remoteDispatchSettingsFromForm();
-    $('remote-dispatch-status').textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ GitHub dispatch feed Ð±ÐµÐ· Ð·Ð°Ð¿ÑƒÑÐºÑƒâ€¦';
-    const data = await core('TEST_REMOTE_DISPATCH_FEED', { settings });
-    $('remote-dispatch-status').textContent = data.selected
-      ? `Feed Ð²Ð°Ð»Ñ–Ð´Ð½Ð¸Ð¹. Dispatch ${data.selected.dispatchId}, revision ${data.selected.strategyRevision}, expires ${new Date(data.selected.expiresAt).toLocaleString()}.`
-      : `GitHub Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹, Ð°Ð»Ðµ Ð²Ð°Ð»Ñ–Ð´Ð½Ð¾Ð³Ð¾ dispatch Ð´Ð»Ñ project_id Ð½Ðµ Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾. Ð”Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ðº: ${(data.diagnostics || []).length}.`;
-  } catch (error) { $('remote-dispatch-status').textContent = `ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° feed Ð½Ðµ Ð¿Ñ€Ð¾Ð¹ÑˆÐ»Ð°: ${error.message}`; }
-  finally { setRemoteDispatchBusy(false); }
-}
-
-async function runRemoteDispatchNow() {
-  try {
-    setRemoteDispatchBusy(true);
-    $('remote-dispatch-status').textContent = 'ÐžÑ‚Ñ€Ð¸Ð¼ÑƒÑŽ Ñ‚Ð° Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²ÑƒÑŽ Remote Dispatchâ€¦';
-    const data = await core('RUN_REMOTE_DISPATCH_NOW');
-    await loadRemoteDispatchStatus();
-    announce(`Remote Dispatch: ${data?.remote?.kind || 'Ñ†Ð¸ÐºÐ» Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾'}.`);
-  } catch (error) { $('remote-dispatch-status').textContent = `Remote Dispatch Ð½Ðµ Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²Ð°Ð½Ð¾: ${error.message}`; }
-  finally { setRemoteDispatchBusy(false); }
-}
-
-const LOCAL_AI_DEFAULT_URLS = Object.freeze({
-  ollama: 'http://127.0.0.1:11434',
-  'openai-compatible': 'http://127.0.0.1:1234/v1',
-});
-
-function localAiSettingsFromForm() {
-  const providerType = $('local-ai-provider').value;
-  const timeoutSeconds = Number($('local-ai-timeout').value);
-  if (!['ollama', 'openai-compatible'].includes(providerType)) throw new Error('ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ñ‚Ð¸Ð¿ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ AI-ÑÐµÑ€Ð²ÐµÑ€Ð°.');
-  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 5 || timeoutSeconds > 600) {
-    throw new Error('Ð¢Ð°Ð¹Ð¼-Ð°ÑƒÑ‚ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñ†Ñ–Ð»Ð¸Ð¼ Ñ‡Ð¸ÑÐ»Ð¾Ð¼ Ð²Ñ–Ð´ 5 Ð´Ð¾ 600 ÑÐµÐºÑƒÐ½Ð´.');
-  }
-  return {
-    enabled: $('local-ai-enabled').checked,
-    providerType,
-    baseUrl: $('local-ai-base-url').value.trim(),
-    model: $('local-ai-model').value.trim(),
-    timeoutSeconds,
-  };
-}
-
-function setLocalAiBusy(busy) {
-  for (const id of ['save-local-ai-button', 'test-local-ai-button', 'run-local-ai-test-button']) {
-    $(id).disabled = Boolean(busy);
-  }
-}
-
-function renderLocalAiModels(models = []) {
-  const datalist = $('local-ai-model-list');
-  datalist.replaceChildren();
-  for (const model of models) {
-    const option = document.createElement('option');
-    option.value = model;
-    datalist.append(option);
-  }
-}
-
-async function loadLocalAiSettings() {
-  try {
-    const data = await core('GET_LOCAL_AI_SETTINGS');
-    const settings = data?.settings || {};
-    $('local-ai-enabled').checked = settings.enabled === true;
-    $('local-ai-provider').value = settings.providerType || 'ollama';
-    $('local-ai-base-url').value = settings.baseUrl || LOCAL_AI_DEFAULT_URLS[$('local-ai-provider').value];
-    $('local-ai-model').value = settings.model || '';
-    $('local-ai-timeout').value = String(settings.timeoutSeconds || 90);
-    $('local-ai-status').textContent = settings.enabled
-      ? 'ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð¨Ð† Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ð¿Ñ–Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð½Ñ Ð¿ÐµÑ€ÐµÐ´ Ð²Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð°Ð½Ð½ÑÐ¼.'
-      : 'Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ Ð¨Ð† Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾. ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð¼Ð¾Ð¶Ð½Ð° Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ð¸Ñ‚Ð¸ Ð±ÐµÐ· ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð½Ñ.';
-  } catch (error) {
-    $('local-ai-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð¨Ð†: ${error.message}`;
-  }
-}
-
-async function saveLocalAiSettings() {
-  try {
-    const settings = localAiSettingsFromForm();
-    setLocalAiBusy(true);
-    const data = await core('UPDATE_LOCAL_AI_SETTINGS', { settings });
-    const saved = data.settings;
-    $('local-ai-base-url').value = saved.baseUrl;
-    $('local-ai-status').textContent = `ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: ${saved.providerType}, Ð¼Ð¾Ð´ÐµÐ»ÑŒ ${saved.model || 'Ñ‰Ðµ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð°'}.`;
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð¨Ð† Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('local-ai-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ Ð¨Ð†: ${error.message}`;
-    announce('ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð¨Ð†.');
-  } finally {
-    setLocalAiBusy(false);
-  }
-}
-
-async function testLocalAiConnection() {
-  try {
-    const settings = localAiSettingsFromForm();
-    setLocalAiBusy(true);
-    $('local-ai-status').textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ AI-ÑÐµÑ€Ð²ÐµÑ€â€¦';
-    const data = await core('TEST_LOCAL_AI_CONNECTION', { settings });
-    const result = data.result;
-    renderLocalAiModels(result.models || []);
-    if (!$('local-ai-model').value && result.models?.length === 1) $('local-ai-model').value = result.models[0];
-    const modelNote = result.configuredModel
-      ? (result.configuredModelAvailable === false ? ' Ð’ÐºÐ°Ð·Ð°Ð½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ– Ð½ÐµÐ¼Ð°Ñ” Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ ÑÐµÑ€Ð²ÐµÑ€Ð°.' : ' Ð’ÐºÐ°Ð·Ð°Ð½Ñƒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾.')
-      : ' Ð’Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð·Ñ– ÑÐ¿Ð¸ÑÐºÑƒ Ð°Ð±Ð¾ Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ð½Ð°Ð·Ð²Ñƒ Ð²Ñ€ÑƒÑ‡Ð½Ñƒ.';
-    $('local-ai-status').textContent = `ÐŸÑ–Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð½Ñ ÑƒÑÐ¿Ñ–ÑˆÐ½Ðµ. Ð—Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹: ${result.models.length}.${modelNote}`;
-    announce('Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ AI-ÑÐµÑ€Ð²ÐµÑ€ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð°Ñ”.');
-  } catch (error) {
-    renderLocalAiModels([]);
-    $('local-ai-status').textContent = `ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Ð¿Ñ–Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð½Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ð¨Ð†: ${error.message}`;
-    announce('Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ AI-ÑÐµÑ€Ð²ÐµÑ€ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹.');
-  } finally {
-    setLocalAiBusy(false);
-  }
-}
-
-async function runLocalAiTestPrompt() {
-  const prompt = $('local-ai-test-prompt').value.trim();
-  if (!prompt) {
-    $('local-ai-status').textContent = 'Ð’Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ‚ÐµÑÑ‚Ð¾Ð²Ð¸Ð¹ Ð·Ð°Ð¿Ð¸Ñ‚ Ð´Ð¾ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ–.';
-    $('local-ai-test-prompt').focus();
-    return;
-  }
-  try {
-    const settings = localAiSettingsFromForm();
-    setLocalAiBusy(true);
-    $('local-ai-test-response').textContent = '';
-    $('local-ai-status').textContent = 'Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð³ÐµÐ½ÐµÑ€ÑƒÑ” Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´ÑŒâ€¦';
-    const data = await core('RUN_LOCAL_AI_PROMPT', { settings, prompt });
-    $('local-ai-test-response').textContent = data.result.text;
-    $('local-ai-status').textContent = `Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð»Ð°: ${data.result.model}.`;
-    announce('ÐžÑ‚Ñ€Ð¸Ð¼Ð°Ð½Ð¾ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´ÑŒ Ð²Ñ–Ð´ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ–.');
-  } catch (error) {
-    $('local-ai-status').textContent = `Ð›Ð¾ÐºÐ°Ð»ÑŒÐ½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð»Ð° Ð·Ð°Ð¿Ð¸Ñ‚: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ–.');
-  } finally {
-    setLocalAiBusy(false);
-  }
-}
-
-function onLocalAiProviderChanged() {
-  const provider = $('local-ai-provider').value;
-  const current = $('local-ai-base-url').value.trim();
-  const knownDefaults = new Set(Object.values(LOCAL_AI_DEFAULT_URLS));
-  if (!current || knownDefaults.has(current)) $('local-ai-base-url').value = LOCAL_AI_DEFAULT_URLS[provider];
-  renderLocalAiModels([]);
-}
-
-const AI_ROUTE_ROLES = Object.freeze(['planner', 'coder', 'fast-worker', 'verifier', 'critic', 'vision']);
-
-function routeNumber(card, field, min, max, label) {
-  const value = Number(card.querySelector(`[data-route-field="${field}"]`).value);
-  if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-  return value;
-}
-
-function selectedValues(id) {
-  return [...$(id).selectedOptions].map(option => option.value);
-}
-
-function aiRouterRoutesFromForm({ validate = true } = {}) {
-  return [...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map((card, index) => {
-    const text = field => card.querySelector(`[data-route-field="${field}"]`).value.trim();
-    const exactText = field => card.querySelector(`[data-route-field="${field}"]`).value;
-    const provider = text('provider');
-    const routeId = text('routeId');
-    const model = text('model');
-    if (validate && !routeId) throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${index + 1}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ ID.`);
-    if (validate && !model) throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${index + 1}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ.`);
-    const capabilityIds = text('capabilityIds').split(',').map(value => value.trim()).filter(Boolean);
-    if (new Set(capabilityIds).size !== capabilityIds.length) throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}: capabilities Ð¼Ñ–ÑÑ‚ÑÑ‚ÑŒ Ð´ÑƒÐ±Ð»Ñ–ÐºÐ°Ñ‚Ð¸.`);
-    return {
-      routeId,
-      provider,
-      model,
-      displayName:text('displayName'),
-      systemPrompt:exactText('systemPrompt'),
-      workerPrompt:exactText('workerPrompt'),
-      ...(provider === 'openai-compatible' && text('endpointId') ? { endpointId:text('endpointId') } : {}),
-      roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
-      capabilityIds,
-      priority:routeNumber(card, 'priority', 0, 1_000_000, `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}, Ð¿Ñ€Ñ–Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚`),
-      maxWorkers:routeNumber(card, 'maxWorkers', 0, 200, `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}, Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ workers`),
-      enabled:card.querySelector('[data-route-field="enabled"]').checked,
-      locality:text('locality'),
-      costClass:text('costClass'),
-      inputPricePerMillionUsd:routeNumber(card, 'inputPricePerMillionUsd', 0, 1_000_000, `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}, input price`),
-      outputPricePerMillionUsd:routeNumber(card, 'outputPricePerMillionUsd', 0, 1_000_000, `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}, output price`),
-      supportsVision:card.querySelector('[data-route-field="supportsVision"]').checked,
-    };
-  });
-}
-
-function renderAiRouterRouteSelects(policy = {}) {
-  const routeIds = [...$('ai-router-route-list').querySelectorAll('[data-route-field="routeId"]')].map(input => input.value.trim()).filter(Boolean);
-  const configs = [
-    ['ai-router-pinned-route', policy.pinnedRouteId ? [policy.pinnedRouteId] : []],
-    ['ai-router-allow-routes', policy.allowRouteIds || []],
-    ['ai-router-deny-routes', policy.denyRouteIds || []],
-  ];
-  for (const [id, selected] of configs) {
-    const select = $(id);
-    const prior = new Set(selected.length ? selected : selectedValues(id));
-    select.replaceChildren();
-    if (id === 'ai-router-pinned-route') {
-      const option = document.createElement('option'); option.value = ''; option.textContent = 'ÐÐµ Ð·Ð°ÐºÑ€Ñ–Ð¿Ð»ÑŽÐ²Ð°Ñ‚Ð¸'; select.append(option);
-    }
-    for (const routeId of routeIds) {
-      const option = document.createElement('option'); option.value = routeId; option.textContent = routeId; option.selected = prior.has(routeId); select.append(option);
-    }
-  }
-}
-
-function selectAiModelPriceTab(kind, focus = false) {
-  for (const value of ['free', 'paid']) {
-    const selected = kind === value;
-    const tab = $(`ai-model-${value}-tab`);
-    tab.setAttribute('aria-selected', String(selected));
-    tab.tabIndex = selected ? 0 : -1;
-    $(`ai-model-${value}-panel`).hidden = !selected;
-    if (selected && focus) tab.focus();
-  }
-}
-
-function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
-  const groups = { free: [], paid: [], unknown: [] };
-  for (const route of routes) {
-    const kind = ['free', 'paid'].includes(route.costClass) ? route.costClass : 'unknown';
-    const health = routeStates[route.routeId] || {};
-    groups[kind].push(`${route.displayName ? `${route.displayName}; ` : ''}${route.provider}, ${route.model || 'Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾'}; Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ ${route.routeId}; ${route.enabled === false ? 'Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾' : 'ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾'}; Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ workers ${Number(route.maxWorkers || 0) || 'Ð·Ð°Ð³Ð°Ð»ÑŒÐ½Ð° Ð¼ÐµÐ¶Ð°'}; Ð¿Ð¾Ð¼Ð¸Ð»Ð¾Ðº ${Number(health.failures || 0)}; Ð¾Ð±Ð¼ÐµÐ¶ÐµÐ½Ð½Ñ Ð´Ð¾ ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'Ð½ÐµÐ¼Ð°Ñ”'}`);
-  }
-  for (const kind of ['free', 'paid', 'unknown']) {
-    const list = $(`ai-model-${kind}-list`);
-    list.replaceChildren();
-    for (const description of groups[kind]) {
-      const item = document.createElement('li');
-      item.textContent = description;
-      list.append(item);
-    }
-    if (!groups[kind].length) {
-      const item = document.createElement('li');
-      item.textContent = 'Ð—Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ñ… Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹ Ð½ÐµÐ¼Ð°Ñ”.';
-      list.append(item);
-    }
-  }
-}
-
-function manualWorkerCountsFromCards() {
-  return Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => [
-    card.querySelector('[data-route-field="routeId"]').value.trim(),
-    Number(card.querySelector('[data-route-field="manualWorkers"]').value),
-  ]).filter(([id]) => id));
-}
-
-function aiRouteDisplayLabel(route = {}) {
-  const routeId = String(route.routeId || '').trim() || 'Ð±ÐµÐ· ID';
-  const displayName = String(route.displayName || '').trim();
-  return displayName ? `${displayName} (${routeId})` : routeId;
-}
-
-function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
-  const list = $('ai-router-route-list');
-  list.replaceChildren();
-  for (const [index, route] of routes.entries()) {
-    const card = $('ai-router-route-template').content.firstElementChild.cloneNode(true);
-    card.querySelector('[data-route-legend]').textContent = `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${index + 1}: ${aiRouteDisplayLabel(route)}`;
-    for (const label of card.querySelectorAll('[data-label-for]')) {
-      const field = label.dataset.labelFor;
-      const control = card.querySelector(`[data-route-field="${field}"]`);
-      control.id = `ai-route-${index}-${field}`;
-      label.htmlFor = control.id;
-    }
-    const values = {
-      routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
-      displayName:route.displayName || '', systemPrompt:route.systemPrompt || '', workerPrompt:route.workerPrompt || '',
-      capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
-      maxWorkers:route.maxWorkers ?? 0, manualWorkers:workerPolicy.manualRouteWorkers?.[route.routeId] ?? 0,
-      locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
-      inputPricePerMillionUsd:route.inputPricePerMillionUsd ?? 0, outputPricePerMillionUsd:route.outputPricePerMillionUsd ?? 0,
-    };
-    for (const [field, value] of Object.entries(values)) card.querySelector(`[data-route-field="${field}"]`).value = String(value);
-    card.querySelector('[data-route-field="enabled"]').checked = route.enabled !== false;
-    card.querySelector('[data-route-field="supportsVision"]').checked = route.supportsVision === true;
-    for (const role of route.roles || []) card.querySelector(`[data-route-role="${role}"]`)?.setAttribute('checked', '');
-    const health = routeStates?.[route.routeId] || {};
-    card.querySelector('[data-route-health]').textContent = `Ð£ÑÐ¿Ñ–Ñ…Ñ–Ð²: ${Number(health.successes || 0)}; Ð¿Ð¾Ð¼Ð¸Ð»Ð¾Ðº: ${Number(health.failures || 0)}; Ð¿Ð¾ÑÐ¿Ñ–Ð»ÑŒ: ${Number(health.consecutiveFailures || 0)}; backoff Ð´Ð¾: ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'Ð½ÐµÐ¼Ð°Ñ”'}; circuit Ð´Ð¾: ${health.circuitOpenUntil ? new Date(health.circuitOpenUntil).toLocaleString() : 'Ð·Ð°ÐºÑ€Ð¸Ñ‚Ð¸Ð¹'}; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ°: ${health.lastErrorCode || 'Ð½ÐµÐ¼Ð°Ñ”'}; latency: ${Number(health.lastLatencyMs || 0)} Ð¼Ñ.`;
-    list.append(card);
-  }
-  renderAiRouterRouteSelects(policy);
-}
-
-function addAiRouterRoute() {
-  const current = aiRouterRoutesFromForm({ validate:false });
-  if (current.length >= 32) throw new Error('ÐŸÑƒÐ» Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñ–Ð² Ð¾Ð±Ð¼ÐµÐ¶ÐµÐ½Ð¾ 32 Ð·Ð°Ð¿Ð¸ÑÐ°Ð¼Ð¸.');
-  current.push({ routeId:`route-${current.length + 1}`, provider:'ollama', model:'', roles:['planner'], priority:Math.max(0, 100 - current.length), enabled:true, locality:'local', costClass:'free' });
-  renderAiRouterRoutes(current, {}, {
-    pinnedRouteId:$('ai-router-pinned-route').value,
-    allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-  }, { manualRouteWorkers:manualWorkerCountsFromCards() });
-  $('ai-router-route-list').lastElementChild?.querySelector('[data-route-field="routeId"]')?.focus();
-}
-
-function handleAiRouterRouteAction(event) {
-  const button = event.target.closest('[data-route-action]');
-  if (!button) return;
-  const card = button.closest('[data-ai-route]');
-  const list = $('ai-router-route-list');
-  const action = button.dataset.routeAction;
-  if (action === 'discover-models') {
-    void discoverAiRouteModels(card, button);
-    return;
-  }
-  if (action === 'remove') {
-    const nextFocus = card.nextElementSibling?.querySelector('button, input, select') || card.previousElementSibling?.querySelector('button, input, select') || $('ai-router-add-route-button');
-    card.remove();
-    renderAiRouterRouteSelects();
-    nextFocus?.focus();
-    announce('ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾ Ð· Ñ„Ð¾Ñ€Ð¼Ð¸. ÐÐ°Ñ‚Ð¸ÑÐ½Ñ–Ñ‚ÑŒ Â«Ð—Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸Â», Ñ‰Ð¾Ð± Ð·Ð°ÑÑ‚Ð¾ÑÑƒÐ²Ð°Ñ‚Ð¸ Ð·Ð¼Ñ–Ð½Ð¸.');
-    return;
-  }
-  if (action === 'up' && card.previousElementSibling) list.insertBefore(card, card.previousElementSibling);
-  if (action === 'down' && card.nextElementSibling) list.insertBefore(card.nextElementSibling, card);
-  renderAiRouterRouteSelects();
-  button.focus();
-  announce(action === 'up' ? 'ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ Ð¿ÐµÑ€ÐµÐ¼Ñ–Ñ‰ÐµÐ½Ð¾ Ð²Ð¸Ñ‰Ðµ.' : 'ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ Ð¿ÐµÑ€ÐµÐ¼Ñ–Ñ‰ÐµÐ½Ð¾ Ð½Ð¸Ð¶Ñ‡Ðµ.');
-}
-
-async function discoverAiRouteModels(card, button) {
-  const provider = card.querySelector('[data-route-field="provider"]').value;
-  const endpointId = card.querySelector('[data-route-field="endpointId"]').value.trim();
-  const picker = card.querySelector('[data-route-field="discoveredModel"]');
-  if (provider === 'openai-compatible' && !endpointId) {
-    $('ai-router-status').textContent = 'Ð£ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ Endpoint ID, Ð½Ð°Ð¿Ñ€Ð¸ÐºÐ»Ð°Ð´ mistral, Ð¿ÐµÑ€ÐµÐ´ Ð¾Ñ‚Ñ€Ð¸Ð¼Ð°Ð½Ð½ÑÐ¼ Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹.';
-    return;
-  }
-  button.disabled = true;
-  try {
-    const data = await core('LIST_AI_ROUTER_MODELS', { provider, endpointId });
-    const models = [...new Set((data.result?.models || []).filter(model => typeof model === 'string' && model))];
-    picker.replaceChildren();
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ð·Ñ– ÑÐ¿Ð¸ÑÐºÑƒ';
-    picker.append(placeholder);
-    for (const model of models) {
-      const option = document.createElement('option');
-      option.value = model;
-      option.textContent = model;
-      picker.append(option);
-    }
-    $('ai-router-status').textContent = `ÐŸÐ¾ÑÑ‚Ð°Ñ‡Ð°Ð»ÑŒÐ½Ð¸Ðº ${endpointId || provider}: Ð·Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹ ${models.length}. ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ Ñ– Ð·Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ.`;
-    picker.focus();
-  } catch (error) {
-    $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¾Ñ‚Ñ€Ð¸Ð¼Ð°Ñ‚Ð¸ Ð¼Ð¾Ð´ÐµÐ»Ñ– ${endpointId || provider}: ${error.message}`;
-  } finally {
-    button.disabled = false;
-  }
-}
-
-
-function aiRouterSettingsFromForm() {
-  const integer = (id, min, max, label) => {
-    const value = Number($(id).value);
-    if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-    return value;
-  };
-  const optionalPriceCap = (id, label) => {
-    const text = $(id).value.trim();
-    if (!text) return null;
-    const value = Number(text);
-    if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 0 Ð´Ð¾ 1000000 Ð°Ð±Ð¾ Ð·Ð°Ð»Ð¸ÑˆÑ‚Ðµ Ð¿Ð¾Ð»Ðµ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ–Ð¼.`);
-    return value;
-  };
-  const routes = aiRouterRoutesFromForm();
-  const allowRouteIds = selectedValues('ai-router-allow-routes');
-  const denyRouteIds = selectedValues('ai-router-deny-routes');
-  if (allowRouteIds.some(routeId => denyRouteIds.includes(routeId))) throw new Error('ÐžÐ´Ð¸Ð½ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¾ Ð±ÑƒÑ‚Ð¸ Ð² allowlist Ñ– denylist.');
-  return {
-    enabled: $('ai-router-enabled').checked,
-    gatewayUrl: $('ai-router-gateway-url').value.trim(),
-    timeoutSeconds: integer('ai-router-timeout', 5, 900, 'Ð¢Ð°Ð¹Ð¼-Ð°ÑƒÑ‚'),
-    mode: $('ai-router-mode').value,
-    primary: {
-      provider: $('ai-router-primary-provider').value,
-      model: $('ai-router-primary-model').value.trim(),
-    },
-    strong: {
-      provider: $('ai-router-strong-provider').value,
-      model: $('ai-router-strong-model').value.trim(),
-    },
-    strongEveryNRequests: integer('ai-router-every-n', 0, 10000, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» ÑÐ¸Ð»ÑŒÐ½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ– Ð·Ð° ÐºÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŽ Ð·Ð°Ð¿Ð¸Ñ‚Ñ–Ð²'),
-    strongEveryMinutes: integer('ai-router-every-minutes', 0, 10080, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» ÑÐ¸Ð»ÑŒÐ½Ð¾Ñ— Ð¼Ð¾Ð´ÐµÐ»Ñ– Ð·Ð° Ñ‡Ð°ÑÐ¾Ð¼'),
-    strongMinGapMinutes: integer('ai-router-strong-min-gap', 0, 1440, 'ÐœÑ–Ð½Ñ–Ð¼Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ñ–Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¼Ñ–Ð¶ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¸Ð¼Ð¸ ÑÐ¸Ð»ÑŒÐ½Ð¸Ð¼Ð¸ Ð¿Ñ€Ð¾Ñ…Ð¾Ð´Ð°Ð¼Ð¸'),
-    strongMaxPerHour: integer('ai-router-strong-max-hour', 0, 1000, 'ÐœÐ°ÐºÑÐ¸Ð¼ÑƒÐ¼ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¸Ñ… ÑÐ¸Ð»ÑŒÐ½Ð¸Ñ… Ð¿Ñ€Ð¾Ñ…Ð¾Ð´Ñ–Ð² Ð·Ð° Ð³Ð¾Ð´Ð¸Ð½Ñƒ'),
-    carryStrongResultToPrimary: $('ai-router-carry-strong').checked,
-    fallbackToStrongOnPrimaryError: $('ai-router-fallback-strong').checked,
-    keepPrimaryIfStrongFails: $('ai-router-keep-primary').checked,
-    handoffMaxChars: integer('ai-router-handoff-max', 1000, 50000, 'Ð Ð¾Ð·Ð¼Ñ–Ñ€ handoff'),
-    routes,
-    routePolicy: {
-      autoSwitch:$('ai-router-auto-switch').checked,
-      pinnedRouteId:$('ai-router-pinned-route').value,
-      orderedRouteIds:routes.map(route => route.routeId),
-      allowRouteIds,
-      denyRouteIds,
-      freeOnly:$('ai-router-free-only').checked,
-      locality:$('ai-router-locality').value,
-      maxInputPricePerMillionUsd:optionalPriceCap('ai-router-max-input-price', 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð° input-Ñ†Ñ–Ð½Ð°'),
-      maxOutputPricePerMillionUsd:optionalPriceCap('ai-router-max-output-price', 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð° output-Ñ†Ñ–Ð½Ð°'),
-      retryBackoffSeconds:integer('ai-router-backoff-seconds', 1, 86400, 'Backoff'),
-      circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'ÐŸÐ¾Ñ€Ñ–Ð³ circuit breaker'),
-      circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Ð¢Ñ€Ð¸Ð²Ð°Ð»Ñ–ÑÑ‚ÑŒ circuit breaker'),
-    },
-    workerPolicy: {
-      allocationMode:$('ai-worker-count-manual').checked ? 'manual' : 'auto',
-      minWorkers:integer('ai-worker-min', 1, 200, 'ÐœÑ–Ð½Ñ–Ð¼ÑƒÐ¼ workers'),
-      maxParallelWorkers:integer('ai-worker-max-parallel', 1, 200, 'ÐœÐ°ÐºÑÐ¸Ð¼ÑƒÐ¼ Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… workers'),
-      manualRouteWorkers:Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => {
-        const routeId = card.querySelector('[data-route-field="routeId"]').value.trim();
-        const value = Number(card.querySelector('[data-route-field="manualWorkers"]').value);
-        if (!Number.isInteger(value) || value < 0 || value > 200) throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId}: workers Ð²Ñ€ÑƒÑ‡Ð½Ñƒ Ð²Ñ–Ð´ 0 Ð´Ð¾ 200.`);
-        return [routeId, value];
-      })),
-    },
-  };
-}
-
-function setAiRouterBusy(busy) {
-  for (const id of [
-    'save-ai-router-button', 'test-ai-gateway-button', 'reset-ai-router-runtime-button',
-    'ai-router-primary-models-button', 'ai-router-strong-models-button',
-    'run-ai-router-test-button', 'run-ai-router-strong-button',
-    'ai-router-add-route-button', 'ai-router-add-mistral-button', 'ai-router-add-openrouter-button',
-  ]) $(id).disabled = Boolean(busy);
-  $('ai-router-route-list').querySelectorAll('button, input, select').forEach(control => { control.disabled = Boolean(busy); });
-}
-
-function renderAiRouterRuntime(runtime = {}) {
-  const started = Number(runtime.startedAt || 0) ? new Date(runtime.startedAt).toLocaleString() : 'Ñ‰Ðµ Ð½Ðµ ÑÑ‚Ð°Ñ€Ñ‚ÑƒÐ²Ð°Ð²';
-  const lastStrong = Number(runtime.lastStrongAt || 0)
-    ? new Date(runtime.lastStrongAt).toLocaleString()
-    : 'Ñ‰Ðµ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ð»Ð°ÑÑŒ';
-  const strongLastHour = (Array.isArray(runtime.strongHistoryAt) ? runtime.strongHistoryAt : []).filter(at => Date.now() - Number(at || 0) < 60 * 60_000).length;
-  const failover = (runtime.lastFailoverChain || []).map(item => `${item.routeId}: ${item.outcome}${item.code ? ` (${item.code})` : ''}`).join(' â†’ ') || 'Ð½ÐµÐ¼Ð°Ñ”';
-  $('ai-router-runtime').textContent = `Ð¡Ñ‚Ð°Ñ€Ñ‚ Ñ†Ð¸ÐºÐ»Ñƒ: ${started}; Ð·Ð°Ð¿Ð¸Ñ‚Ñ–Ð²: ${Number(runtime.requestCount || 0)}; Ð¾ÑÐ½Ð¾Ð²Ð½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ: ${Number(runtime.primaryCount || 0)}; ÑÐ¸Ð»ÑŒÐ½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ: ${Number(runtime.strongCount || 0)}; ÑÐ¸Ð»ÑŒÐ½Ð¸Ñ… Ð·Ð° Ð¾ÑÑ‚Ð°Ð½Ð½ÑŽ Ð³Ð¾Ð´Ð¸Ð½Ñƒ: ${strongLastHour}; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ–Ð¹ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚: ${runtime.lastRouteId || runtime.lastRoute || 'Ð½ÐµÐ¼Ð°Ñ”'}; failover: ${failover}; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ ÑÐ¸Ð»ÑŒÐ½Ð°: ${lastStrong}.`;
-}
-
-const OPENAI_MODEL_PRESETS = Object.freeze([
-  Object.freeze({ id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol â€” Ð½Ð°Ð¹ÑÐ¸Ð»ÑŒÐ½Ñ–ÑˆÐ° Ð´Ð»Ñ ÑÐºÐ»Ð°Ð´Ð½Ð¾Ð³Ð¾ reasoning Ñ– coding' }),
-  Object.freeze({ id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra â€” Ð±Ð°Ð»Ð°Ð½Ñ ÑÐºÐ¾ÑÑ‚Ñ–, ÑˆÐ²Ð¸Ð´ÐºÐ¾ÑÑ‚Ñ– Ñ‚Ð° Ð²Ð°Ñ€Ñ‚Ð¾ÑÑ‚Ñ–' }),
-  Object.freeze({ id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna â€” ÑˆÐ²Ð¸Ð´ÐºÐ° Ñ‚Ð° ÐµÐºÐ¾Ð½Ð¾Ð¼Ð½Ð° Ð´Ð»Ñ Ð¼Ð°ÑÐ¾Ð²Ð¸Ñ… Ð·Ð°Ð´Ð°Ñ‡' }),
-]);
-
-function uniqueModelIds(models = []) {
-  return [...new Set((Array.isArray(models) ? models : []).map(value => String(value || '').trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b));
-}
-
-function fillModelSelect(id, provider, models = [], selected = '') {
-  const select = $(id);
-  const wanted = String(selected || '').trim();
-  select.replaceChildren();
-
-  const empty = document.createElement('option');
-  empty.value = '';
-  empty.textContent = provider === 'openai' ? 'ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ OpenAI Ð¼Ð¾Ð´ÐµÐ»ÑŒ' : 'ÐžÐ½Ð¾Ð²Ñ–Ñ‚ÑŒ ÑÐ¿Ð¸ÑÐ¾Ðº Ñ– Ð¾Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Ð¼Ð¾Ð´ÐµÐ»ÑŒ';
-  select.append(empty);
-
-  const seen = new Set();
-  if (provider === 'openai') {
-    const group = document.createElement('optgroup');
-    group.label = 'Ð ÐµÐºÐ¾Ð¼ÐµÐ½Ð´Ð¾Ð²Ð°Ð½Ñ– OpenAI';
-    for (const preset of OPENAI_MODEL_PRESETS) {
-      const option = document.createElement('option');
-      option.value = preset.id;
-      option.textContent = preset.label;
-      group.append(option);
-      seen.add(preset.id);
-    }
-    select.append(group);
-  }
-
-  const discovered = uniqueModelIds(models).filter(model => !seen.has(model));
-  if (discovered.length) {
-    const group = document.createElement('optgroup');
-    group.label = provider === 'openai' ? 'ÐœÐ¾Ð´ÐµÐ»Ñ–, Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ– API-Ð°ÐºÐ°ÑƒÐ½Ñ‚Ñƒ' : 'ÐœÐ¾Ð´ÐµÐ»Ñ– ÑÐµÑ€Ð²ÐµÑ€Ð°';
-    for (const model of discovered) {
-      const option = document.createElement('option');
-      option.value = model;
-      option.textContent = model;
-      group.append(option);
-    }
-    select.append(group);
-  }
-
-  if (wanted && ![...select.options].some(option => option.value === wanted)) {
-    const option = document.createElement('option');
-    option.value = wanted;
-    option.textContent = `${wanted} â€” Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð° Ð¼Ð¾Ð´ÐµÐ»ÑŒ`;
-    select.append(option);
-  }
-  select.value = wanted;
-}
-
-function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
-  const primary = slot === 'primary';
-  const providerId = primary ? 'ai-router-primary-provider' : 'ai-router-strong-provider';
-  const modelId = primary ? 'ai-router-primary-model' : 'ai-router-strong-model';
-  const selected = preserve ? $(modelId).value : '';
-  fillModelSelect(modelId, $(providerId).value, [], selected);
-}
-
-function browserAgentRoutePolicyBlockReason(route, policy = {}) {
-  if (route?.enabled === false) return 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾ Ñƒ Ð²ÐºÐ»Ð°Ð´Ñ†Ñ– Â«ÐœÐ¾Ð´ÐµÐ»Ñ–Â»';
-  const roles = Array.isArray(route?.roles) ? route.roles : [];
-  if (roles.length && !roles.includes('planner')) return 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð½Ðµ Ð´Ð¾Ð·Ð²Ð¾Ð»ÑÑ” Ñ€Ð¾Ð»ÑŒ planner, Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ñƒ Ð´Ð»Ñ Ð·Ð°Ð¿ÑƒÑÐºÑƒ Agent';
-  const routeId = String(route?.routeId || '');
-  const allow = new Set(Array.isArray(policy?.allowRouteIds) ? policy.allowRouteIds : []);
-  const deny = new Set(Array.isArray(policy?.denyRouteIds) ? policy.denyRouteIds : []);
-  if (policy?.pinnedRouteId && policy.pinnedRouteId !== routeId) return `Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¾ Ð·Ð°ÐºÑ€Ñ–Ð¿Ð»ÐµÐ½Ð¾ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ ${policy.pinnedRouteId}`;
-  if (allow.size && !allow.has(routeId)) return 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð½Ðµ Ð²Ñ…Ð¾Ð´Ð¸Ñ‚ÑŒ Ð´Ð¾ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¾Ð³Ð¾ allow-ÑÐ¿Ð¸ÑÐºÑƒ';
-  if (deny.has(routeId)) return 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð·Ð°Ð±Ð¾Ñ€Ð¾Ð½ÐµÐ½Ð¾ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¸Ð¼ deny-ÑÐ¿Ð¸ÑÐºÐ¾Ð¼';
-  if (policy?.freeOnly === true && route?.costClass !== 'free') return 'Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð° Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ° Ð´Ð¾Ð·Ð²Ð¾Ð»ÑÑ” Ð»Ð¸ÑˆÐµ Ð±ÐµÐ·ÐºÐ¾ÑˆÑ‚Ð¾Ð²Ð½Ñ– Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ð¸';
-  if (route?.costClass !== 'free' && route?.costClass !== 'paid') return 'ÐºÐ»Ð°Ñ Ð²Ð°Ñ€Ñ‚Ð¾ÑÑ‚Ñ– Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñƒ Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾';
-  if (route?.costClass === 'paid' && (route?.inputPriceKnown !== true || route?.outputPriceKnown !== true)) {
-    return 'Ð´Ð»Ñ Ð¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñƒ Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾ input/output Ñ†Ñ–Ð½Ð¸';
-  }
-  const locality = typeof policy?.locality === 'string' && policy.locality ? policy.locality : 'any';
-  if (locality !== 'any' && route?.locality !== locality) return `Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð° Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ° Ð´Ð¾Ð·Ð²Ð¾Ð»ÑÑ” Ð»Ð¸ÑˆÐµ ${locality}`;
-  if (policy?.maxInputPricePerMillionUsd != null
-      && Number(route?.inputPricePerMillionUsd) > Number(policy.maxInputPricePerMillionUsd)) {
-    return 'input-Ñ†Ñ–Ð½Ð° Ð¿ÐµÑ€ÐµÐ²Ð¸Ñ‰ÑƒÑ” Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ð»Ñ–Ð¼Ñ–Ñ‚';
-  }
-  if (policy?.maxOutputPricePerMillionUsd != null
-      && Number(route?.outputPricePerMillionUsd) > Number(policy.maxOutputPricePerMillionUsd)) {
-    return 'output-Ñ†Ñ–Ð½Ð° Ð¿ÐµÑ€ÐµÐ²Ð¸Ñ‰ÑƒÑ” Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ð»Ñ–Ð¼Ñ–Ñ‚';
-  }
-  return '';
-}
-
-function syncBrowserAgentRouteBindingStatus() {
-  const select = $('agent-ai-pinned-route-id');
-  const status = $('agent-route-binding-status');
-  const routeId = select.value;
-  let nextText;
-  if (!routeId) {
-    nextText = 'Agent ÑƒÑÐ¿Ð°Ð´ÐºÐ¾Ð²ÑƒÑ” Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ñƒ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñ–Ð² Ñ– Ð¼Ð¾Ð¶Ðµ Ð²Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð¾Ð²ÑƒÐ²Ð°Ñ‚Ð¸ Ñ—Ñ— Ð´Ð¾Ð·Ð²Ð¾Ð»ÐµÐ½Ð¸Ð¹ fallback.';
-  } else {
-    const option = [...select.options].find(item => item.value === routeId);
-    const blockReason = option?.dataset?.blockReason || '';
-    nextText = blockReason
-      ? `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId} Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ð¹ Ð´Ð»Ñ Ñ†ÑŒÐ¾Ð³Ð¾ Agent, Ð°Ð»Ðµ Ð·Ð°Ñ€Ð°Ð· Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: ${blockReason}. Ð’Ð¸ÐºÐ»Ð¸Ðº Ð·Ð°Ð²ÐµÑ€ÑˆÐ¸Ñ‚ÑŒÑÑ Ð´Ð¾ provider I/O; Ð¿Ñ€Ð¸Ñ…Ð¾Ð²Ð°Ð½Ð¾Ð³Ð¾ fallback Ð½Ðµ Ð±ÑƒÐ´Ðµ.`
-      : `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId} Ð·Ð°ÐºÑ€Ñ–Ð¿Ð»ÐµÐ½Ð¸Ð¹ Ð»Ð¸ÑˆÐµ Ð·Ð° Ñ†Ð¸Ð¼ Agent. Ð“Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ñ– role/capability/budget/backoff Ð¿Ñ€Ð°Ð²Ð¸Ð»Ð° Ð·Ð°Ð»Ð¸ÑˆÐ°ÑŽÑ‚ÑŒÑÑ Ñ‡Ð¸Ð½Ð½Ð¸Ð¼Ð¸; Ð¿Ñ€Ð¸Ñ…Ð¾Ð²Ð°Ð½Ð¾Ð³Ð¾ fallback Ð½ÐµÐ¼Ð°Ñ”.`;
-  }
-  if (status.textContent !== nextText) status.textContent = nextText;
-}
-
-function assertBrowserAgentRouteReadyForLaunch() {
-  const select = $('agent-ai-pinned-route-id');
-  const routeId = select.value;
-  if (!routeId) return;
-  const option = [...select.options].find(item => item.value === routeId);
-  const blockReason = option?.dataset?.blockReason || '';
-  if (blockReason) {
-    throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId} Ð·Ð°Ñ€Ð°Ð· Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: ${blockReason}. ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð°Ð±Ð¾ ÑƒÑÐ¿Ð°Ð´ÐºÑƒÐ¹Ñ‚Ðµ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ñƒ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ.`);
-  }
-  const acceptanceCriteria = browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value);
-  if (acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false') {
-    throw new Error(`ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${routeId} Ð½Ðµ Ð´Ð¾Ð·Ð²Ð¾Ð»ÑÑ” Ñ€Ð¾Ð»ÑŒ verifier, Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ñƒ Ð´Ð»Ñ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸ Ð·Ð°Ð´Ð°Ð½Ð¸Ñ… ÐºÑ€Ð¸Ñ‚ÐµÑ€Ñ–Ñ—Ð² Ð¿Ñ€Ð¸Ð¹Ð½ÑÑ‚Ñ‚Ñ. ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ñ–Ð½ÑˆÐ¸Ð¹ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð°Ð±Ð¾ ÑƒÑÐ¿Ð°Ð´ÐºÑƒÐ¹Ñ‚Ðµ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ñƒ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ.`);
-  }
-}
-
-function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
-  const select = $('agent-ai-pinned-route-id');
-  const selected = select.value;
-  select.replaceChildren();
-  const inherited = document.createElement('option');
-  inherited.value = '';
-  inherited.textContent = 'Ð£ÑÐ¿Ð°Ð´ÐºÑƒÐ²Ð°Ñ‚Ð¸ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ñƒ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñ–Ð²';
-  select.append(inherited);
-  for (const route of routes) {
-    const option = document.createElement('option');
-    option.value = route.routeId;
-    const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
-    const roles = Array.isArray(route?.roles) ? route.roles : [];
-    option.dataset.blockReason = blockReason;
-    option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'));
-    option.disabled = Boolean(blockReason);
-    option.textContent = `${aiRouteDisplayLabel(route)}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` â€” Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: ${blockReason}` : ''}`;
-    select.append(option);
-  }
-  if (selected && ![...select.options].some(option => option.value === selected)) {
-    const unavailable = document.createElement('option');
-    unavailable.value = selected;
-    unavailable.dataset.blockReason = 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ñ–Ð´ÑÑƒÑ‚Ð½Ñ–Ð¹ Ñƒ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾Ð¼Ñƒ Ð¿ÑƒÐ»Ñ–';
-    unavailable.disabled = true;
-    unavailable.textContent = `${selected} â€” Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ñ–Ð´ÑÑƒÑ‚Ð½Ñ–Ð¹ Ñƒ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾Ð¼Ñƒ Ð¿ÑƒÐ»Ñ–`;
-    select.append(unavailable);
-  }
-  select.value = selected;
-  syncBrowserAgentRouteBindingStatus();
-}
-
-async function loadAiRouterSettings() {
-  try {
-    const data = await core('GET_AI_ROUTER_SETTINGS');
-    const settings = data.settings || {};
-    $('ai-router-enabled').checked = settings.enabled === true;
-    $('ai-router-gateway-url').value = settings.gatewayUrl || 'http://127.0.0.1:17621';
-    $('ai-router-timeout').value = String(settings.timeoutSeconds || 180);
-    $('ai-router-mode').value = settings.mode || 'primary';
-    $('ai-router-primary-provider').value = settings.primary?.provider || 'ollama';
-    $('ai-router-strong-provider').value = settings.strong?.provider || 'openai';
-    fillModelSelect('ai-router-primary-model', $('ai-router-primary-provider').value, [], settings.primary?.model || '');
-    fillModelSelect('ai-router-strong-model', $('ai-router-strong-provider').value, [], settings.strong?.model || '');
-    $('ai-router-every-n').value = String(settings.strongEveryNRequests ?? 10);
-    $('ai-router-every-minutes').value = String(settings.strongEveryMinutes ?? 120);
-    $('ai-router-strong-min-gap').value = String(settings.strongMinGapMinutes ?? 0);
-    $('ai-router-strong-max-hour').value = String(settings.strongMaxPerHour ?? 0);
-    $('ai-router-carry-strong').checked = settings.carryStrongResultToPrimary !== false;
-    $('ai-router-fallback-strong').checked = settings.fallbackToStrongOnPrimaryError !== false;
-    $('ai-router-keep-primary').checked = settings.keepPrimaryIfStrongFails !== false;
-    $('ai-router-handoff-max').value = String(settings.handoffMaxChars || 12000);
-    const policy = settings.routePolicy || {};
-    $('ai-router-auto-switch').checked = policy.autoSwitch !== false;
-    $('ai-router-free-only').checked = policy.freeOnly === true;
-    $('ai-router-locality').value = policy.locality || 'any';
-    $('ai-router-max-input-price').value = policy.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
-    $('ai-router-max-output-price').value = policy.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
-    $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
-    $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
-    $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
-    const workerPolicy = settings.workerPolicy || {};
-    $('ai-worker-count-auto').checked = workerPolicy.allocationMode !== 'manual';
-    $('ai-worker-count-manual').checked = workerPolicy.allocationMode === 'manual';
-    $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
-    $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
-    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
-    renderBrowserAgentRouteChoices(settings.routes || [], policy);
-    renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
-    renderAiRouterRuntime(data.runtime || {});
-    $('ai-router-status').textContent = settings.enabled
-      ? 'AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Gateway Ñ– Ð¼Ð¾Ð´ÐµÐ»Ñ–.'
-      : 'AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾; Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ–.';
-  } catch (error) {
-    $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€: ${error.message}`;
-  }
-}
-
-async function saveAiRouterSettings() {
-  try {
-    setAiRouterBusy(true);
-    const settings = aiRouterSettingsFromForm();
-    const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
-    renderBrowserAgentRouteChoices(data.settings?.routes || [], data.settings?.routePolicy || {});
-    $('ai-router-status').textContent = `AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: Ñ€ÐµÐ¶Ð¸Ð¼ ${data.settings.mode}.`;
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€Ð° Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€: ${error.message}`;
-  } finally {
-    setAiRouterBusy(false);
-  }
-}
-
-async function testAiGateway() {
-  try {
-    setAiRouterBusy(true);
-    const settings = aiRouterSettingsFromForm();
-    $('ai-router-status').textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ AI Gatewayâ€¦';
-    const data = await core('TEST_AI_GATEWAY', { settings });
-    const result = data.result || {};
-    const providerStatus = Array.isArray(result.providerStatus) ? result.providerStatus : [];
-    const providerText = providerStatus.length
-      ? providerStatus.map(item => `${item.endpointId || item.provider}: ${item.ok ? `Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ð¹ (${item.models || 0} Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹)` : (item.configured === false ? 'Ð½Ðµ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¸Ð¹' : 'Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹')}`).join('; ')
-      : ((result.providers || []).join(', ') || 'Ð½Ðµ Ð²ÐºÐ°Ð·Ð°Ð½Ð¾');
-    const endpointStatus = Array.isArray(result.compatibleEndpoints)
-      ? result.compatibleEndpoints.map(item => {
-        const name = item.endpointId === 'mistral' ? 'ÐœÑ–ÑÑ‚Ñ€Ð°Ð»ÑŒ' : (item.endpointId || 'endpoint');
-        return `${name}: ${item.apiKeyConfigured ? 'ÐºÐ»ÑŽÑ‡ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¸Ð¹ Ñƒ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ Gateway' : 'ÐºÐ»ÑŽÑ‡ Ð½Ðµ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¸Ð¹ Ñƒ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¸Ð¹ Gateway'}`;
-      }).join('; ')
-      : '';
-    $('ai-router-provider-key-status').textContent = endpointStatus
-      ? `ÐšÐ»ÑŽÑ‡Ñ– Ð¿Ð¾ÑÑ‚Ð°Ñ‡Ð°Ð»ÑŒÐ½Ð¸ÐºÑ–Ð²: ${endpointStatus}.`
-      : 'ÐšÐ»ÑŽÑ‡Ñ– Ð¿Ð¾ÑÑ‚Ð°Ñ‡Ð°Ð»ÑŒÐ½Ð¸ÐºÑ–Ð²: Gateway Ð½Ðµ Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð¸Ð² Ð¿Ñ€Ð¾ Ð¾ÐºÑ€ÐµÐ¼Ñ– endpoint-Ð¸.';
-    const compatibleCredential = result.compatibleApiKeyConfigured
-      ? 'compatible key Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¸Ð¹ Ñƒ Gateway'
-      : 'compatible key Ð½Ðµ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ð¹ (Ð´Ð»Ñ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾Ð³Ð¾ ÑÐµÑ€Ð²ÐµÑ€Ð° Ð±ÐµÐ· Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·Ð°Ñ†Ñ–Ñ— Ñ†Ðµ Ð½Ð¾Ñ€Ð¼Ð°Ð»ÑŒÐ½Ð¾)';
-    const compatibleEndpoint = result.compatibleBaseUrl ? `OpenAI-compatible endpoint: ${result.compatibleBaseUrl}` : 'OpenAI-compatible endpoint Ð½Ðµ Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½Ð¾';
-    const openaiStatus = result.openaiConfigured ? 'Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¸Ð¹ Ñƒ Windows DPAPI / Gateway' : 'Ð½Ðµ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¸Ð¹';
-    $('ai-router-openai-key-status').textContent = `OpenAI API key: ${openaiStatus}.`;
-    $('ai-router-status').textContent = `Gateway ${result.version || ''} Ð¿Ñ€Ð°Ñ†ÑŽÑ”. ${providerText}. OpenAI API: ${result.openaiConfigured ? 'ÐºÐ»ÑŽÑ‡ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¸Ð¹ Ñƒ Gateway' : 'ÐºÐ»ÑŽÑ‡ Ñ‰Ðµ Ð½Ðµ Ð½Ð°Ð»Ð°ÑˆÑ‚Ð¾Ð²Ð°Ð½Ð¸Ð¹ Ñƒ Gateway'}. ${compatibleEndpoint}; ${compatibleCredential}.`;
-    announce('AI Gateway Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð°Ñ”.');
-  } catch (error) {
-    $('ai-router-openai-key-status').textContent = 'OpenAI API key: Ð½Ðµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ð¸Ñ‚Ð¸, Ð±Ð¾ Gateway Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹.';
-    $('ai-router-provider-key-status').textContent = 'ÐšÐ»ÑŽÑ‡Ñ– ÐœÑ–ÑÑ‚Ñ€Ð°Ð»ÑŒ Ñ‚Ð° Ñ–Ð½ÑˆÐ¸Ñ… Ð¿Ð¾ÑÑ‚Ð°Ñ‡Ð°Ð»ÑŒÐ½Ð¸ÐºÑ–Ð²: Gateway Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹, ÑÑ‚Ð°Ñ‚ÑƒÑ Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¸Ð¹.';
-    $('ai-router-status').textContent = `AI Gateway Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: ${error.message}`;
-  } finally {
-    setAiRouterBusy(false);
-  }
-}
-
-async function loadAiRouterModels(slot) {
-  const primary = slot === 'primary';
-  const providerId = primary ? 'ai-router-primary-provider' : 'ai-router-strong-provider';
-  const modelId = primary ? 'ai-router-primary-model' : 'ai-router-strong-model';
-  const provider = $(providerId).value;
-  const selectedBefore = $(modelId).value;
-  try {
-    setAiRouterBusy(true);
-    const settings = aiRouterSettingsFromForm();
-    $('ai-router-status').textContent = `ÐžÑ‚Ñ€Ð¸Ð¼ÑƒÑŽ ÑÐ¿Ð¸ÑÐ¾Ðº Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹ ${provider}â€¦`;
-    const data = await core('LIST_AI_ROUTER_MODELS', { settings, provider });
-    const models = data.result?.models || [];
-    fillModelSelect(modelId, provider, models, selectedBefore);
-    if (!$(modelId).value && models.length === 1) $(modelId).value = models[0];
-    const recommended = provider === 'openai' ? ' Ð ÐµÐºÐ¾Ð¼ÐµÐ½Ð´Ð¾Ð²Ð°Ð½Ñ– GPT-5.6 Ñ‚Ð°ÐºÐ¾Ð¶ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ– Ñƒ Ð²ÐµÑ€Ñ…Ð½Ñ–Ð¹ Ð³Ñ€ÑƒÐ¿Ñ– ÑÐ¿Ð¸ÑÐºÑƒ.' : '';
-    $('ai-router-status').textContent = `Ð—Ð½Ð°Ð¹Ð´ÐµÐ½Ð¾ Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹ ${provider}: ${models.length}.${recommended}`;
-  } catch (error) {
-    fillModelSelect(modelId, provider, [], selectedBefore);
-    $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¾Ñ‚Ñ€Ð¸Ð¼Ð°Ñ‚Ð¸ ÑÐ¿Ð¸ÑÐ¾Ðº Ð¼Ð¾Ð´ÐµÐ»ÐµÐ¹: ${error.message}`;
-  } finally {
-    setAiRouterBusy(false);
-  }
-}
-
-async function runAiRouterPrompt(forceStrong = false) {
-  const prompt = $('ai-router-test-prompt').value.trim();
-  if (!prompt) {
-    $('ai-router-status').textContent = 'Ð’Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ‚ÐµÑÑ‚Ð¾Ð²Ðµ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€Ñƒ.';
-    $('ai-router-test-prompt').focus();
-    return;
-  }
-  try {
-    setAiRouterBusy(true);
-    const settings = aiRouterSettingsFromForm();
-    $('ai-router-test-response').textContent = '';
-    $('ai-router-status').textContent = forceStrong ? 'Ð—Ð°Ð¿ÑƒÑÐºÐ°ÑŽ ÑÐ¸Ð»ÑŒÐ½Ñƒ Ð¼Ð¾Ð´ÐµÐ»ÑŒâ€¦' : 'AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð²Ð¸ÐºÐ¾Ð½ÑƒÑ” Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñâ€¦';
-    const data = await core('RUN_AI_ROUTED_PROMPT', { settings, prompt, forceStrong });
-    const result = data.result;
-    $('ai-router-test-response').textContent = result.text;
-    renderAiRouterRuntime(result.runtime || {});
-    const primary = result.primary ? `${result.primary.provider}/${result.primary.model}` : 'Ð½Ðµ Ð²Ð¸ÐºÐ»Ð¸ÐºÐ°Ð»Ð°ÑÑŒ';
-    const strong = result.strong ? `${result.strong.provider}/${result.strong.model}` : 'Ð½Ðµ Ð²Ð¸ÐºÐ»Ð¸ÐºÐ°Ð»Ð°ÑÑŒ';
-    $('ai-router-status').textContent = `Ð“Ð¾Ñ‚Ð¾Ð²Ð¾. ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚: ${result.route}; Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ð°: ${result.trigger}; Ð¾ÑÐ½Ð¾Ð²Ð½Ð°: ${primary}; ÑÐ¸Ð»ÑŒÐ½Ð°: ${strong}.`;
-    announce(`AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð·Ð°Ð²ÐµÑ€ÑˆÐ¸Ð² Ð·Ð°Ð¿Ð¸Ñ‚ Ñ‡ÐµÑ€ÐµÐ· ${result.route === 'strong' ? 'ÑÐ¸Ð»ÑŒÐ½Ñƒ' : 'Ð¾ÑÐ½Ð¾Ð²Ð½Ñƒ'} Ð¼Ð¾Ð´ÐµÐ»ÑŒ.`);
-  } catch (error) {
-    $('ai-router-status').textContent = `AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð² Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ: ${error.message}`;
-  } finally {
-    setAiRouterBusy(false);
-  }
-}
-
-async function resetAiRouterRuntime() {
-  try {
-    setAiRouterBusy(true);
-    const data = await core('RESET_AI_ROUTER_RUNTIME');
-    renderAiRouterRuntime(data.runtime || {});
-    $('ai-router-status').textContent = 'Ð›Ñ–Ñ‡Ð¸Ð»ÑŒÐ½Ð¸ÐºÐ¸ Ñ‚Ð° ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Ð³Ñ–Ð±Ñ€Ð¸Ð´Ñƒ ÑÐºÐ¸Ð½ÑƒÑ‚Ð¾.';
-  } catch (error) {
-    $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÑÐºÐ¸Ð½ÑƒÑ‚Ð¸ Ð»Ñ–Ñ‡Ð¸Ð»ÑŒÐ½Ð¸ÐºÐ¸: ${error.message}`;
-  } finally {
-    setAiRouterBusy(false);
-  }
-}
-
-function aiManagerSettingsFromForm() {
-  const integer = (id, min, max, label) => {
-    const value = Number($(id).value);
-    if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-    return value;
-  };
-  return {
-    enabled: $('ai-manager-enabled').checked,
-    autoApplySafeActions: $('ai-manager-auto-apply').checked,
-    triggerEveryNSends: integer('ai-manager-every-n', 0, 10000, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» AI Manager Ð·Ð° Send'),
-    triggerEveryMinutes: integer('ai-manager-every-minutes', 0, 10080, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» AI Manager Ð·Ð° Ñ‡Ð°ÑÐ¾Ð¼'),
-    triggerOnComplete: $('ai-manager-on-complete').checked,
-    triggerOnErrors: $('ai-manager-on-errors').checked,
-    errorThreshold: integer('ai-manager-error-threshold', 1, 100, 'ÐŸÐ¾Ñ€Ñ–Ð³ Ð¿Ð¾Ð¼Ð¸Ð»Ð¾Ðº'),
-    appendHandoffToNextPrompt: $('ai-manager-handoff-enabled').checked,
-    allowRestartCompletedOnePass: $('ai-manager-restart-completed').checked,
-    allowSessionTuning: $('ai-manager-session-tuning').checked,
-    handoffMaxChars: integer('ai-manager-handoff-max', 500, 50000, 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð¸Ð¹ handoff'),
-    contextMaxChars: integer('ai-manager-context-max', 2000, 100000, 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð¸Ð¹ ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚'),
-    failureRetrySeconds: integer('ai-manager-failure-retry', 10, 3600, 'ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ AI Manager Ð¿Ñ–ÑÐ»Ñ Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ¸'),
-    maxPendingEvents: 200,
-    captureWebReports: $('ai-manager-capture-web-reports').checked,
-    triggerOnWebReport: $('ai-manager-on-web-report').checked,
-    webReportPollSeconds: integer('ai-manager-report-poll', 5, 3600, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸ web-Ð·Ð²Ñ–Ñ‚Ñƒ'),
-    webReportMaxWaitMinutes: integer('ai-manager-report-max-wait', 1, 1440, 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ñ‡Ð°Ñ Ð¾Ñ‡Ñ–ÐºÑƒÐ²Ð°Ð½Ð½Ñ web-Ð·Ð²Ñ–Ñ‚Ñƒ'),
-    webReportMaxChars: integer('ai-manager-report-max-chars', 1000, 100000, 'ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð¸Ð¹ web-Ð·Ð²Ñ–Ñ‚'),
-  };
-}
-
-function setAiManagerBusy(busy) {
-  for (const id of ['save-ai-manager-button', 'run-ai-manager-now-button', 'reset-ai-manager-runtime-button']) {
-    $(id).disabled = Boolean(busy);
-  }
-}
-
-function renderAiManagerRuntime(runtime = {}) {
-  const last = Number(runtime.lastDecisionAt || 0) ? new Date(runtime.lastDecisionAt).toLocaleString() : 'Ñ‰Ðµ Ð½Ðµ Ð±ÑƒÐ»Ð¾';
-  const error = runtime.lastError ? `; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ°: ${runtime.lastError}` : '';
-  $('ai-manager-runtime').textContent = `ÐŸÐ¾Ð´Ñ–Ð¹ Ñƒ Ñ‡ÐµÑ€Ð·Ñ–: ${(runtime.pendingEvents || []).length}; Ð¾Ñ‡Ñ–ÐºÑƒÑ”Ñ‚ÑŒÑÑ web-Ð·Ð²Ñ–Ñ‚Ñ–Ð²: ${(runtime.pendingReports || []).length}; Send Ð²Ñ–Ð´ Ð¾ÑÑ‚Ð°Ð½Ð½ÑŒÐ¾Ð³Ð¾ Ð°Ð½Ð°Ð»Ñ–Ð·Ñƒ: ${Number(runtime.sentSinceDecision || 0)}; Ñ€Ñ–ÑˆÐµÐ½ÑŒ: ${Number(runtime.decisionCount || 0)}; Ð¾Ð±Ñ€Ð¾Ð±Ð»ÐµÐ½Ð¾ Ð¿Ð¾Ð´Ñ–Ð¹: ${Number(runtime.processedEventCount || 0)}; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ–Ð¹ Ð°Ð½Ð°Ð»Ñ–Ð·: ${last}; Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚: ${runtime.lastDecisionRoute || 'Ð½ÐµÐ¼Ð°Ñ”'}; Ð²Ð¸ÑÐ½Ð¾Ð²Ð¾Ðº: ${runtime.lastDecisionSummary || 'Ð½ÐµÐ¼Ð°Ñ”'}${error}`;
-
-  const history = $('ai-manager-history');
-  history.textContent = '';
-  const entries = Array.isArray(runtime.decisionHistory) ? runtime.decisionHistory.slice(-20).reverse() : [];
-  if (!entries.length) {
-    const li = document.createElement('li');
-    li.textContent = 'Ð Ñ–ÑˆÐµÐ½ÑŒ Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”.';
-    history.appendChild(li);
-    return;
-  }
-  for (const item of entries) {
-    const li = document.createElement('li');
-    const when = Number(item.at || 0) ? new Date(item.at).toLocaleString() : 'Ñ‡Ð°Ñ Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¸Ð¹';
-    const applied = Array.isArray(item.applied) && item.applied.length
-      ? item.applied.map(action => `${action.type}${action.sessionId ? ` (${action.sessionId})` : ''}`).join(', ')
-      : 'Ð½ÐµÐ¼Ð°Ñ”';
-    const skipped = Array.isArray(item.skipped) && item.skipped.length
-      ? item.skipped.map(action => `${action.type}${action.reason ? ` â€” ${action.reason}` : ''}`).join(', ')
-      : 'Ð½ÐµÐ¼Ð°Ñ”';
-    li.textContent = `${when}; Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ð°: ${item.dueReason || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾'}; Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚: ${item.route || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾'}; Ð²Ð¸ÑÐ½Ð¾Ð²Ð¾Ðº: ${item.summary || 'Ð±ÐµÐ· Ñ‚ÐµÐºÑÑ‚Ñƒ'}; Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²Ð°Ð½Ð¾: ${applied}; Ð¿Ñ€Ð¾Ð¿ÑƒÑ‰ÐµÐ½Ð¾: ${skipped}.`;
-    history.appendChild(li);
-  }
-}
-
-async function loadAiManagerSettings() {
-  try {
-    const data = await core('GET_AI_MANAGER_SETTINGS');
-    const settings = data.settings || {};
-    $('ai-manager-enabled').checked = settings.enabled === true;
-    $('ai-manager-auto-apply').checked = settings.autoApplySafeActions !== false;
-    $('ai-manager-every-n').value = String(settings.triggerEveryNSends ?? 10);
-    $('ai-manager-every-minutes').value = String(settings.triggerEveryMinutes ?? 120);
-    $('ai-manager-on-complete').checked = settings.triggerOnComplete !== false;
-    $('ai-manager-on-errors').checked = settings.triggerOnErrors !== false;
-    $('ai-manager-error-threshold').value = String(settings.errorThreshold ?? 3);
-    $('ai-manager-handoff-enabled').checked = settings.appendHandoffToNextPrompt !== false;
-    $('ai-manager-restart-completed').checked = settings.allowRestartCompletedOnePass === true;
-    $('ai-manager-session-tuning').checked = settings.allowSessionTuning === true;
-    $('ai-manager-handoff-max').value = String(settings.handoffMaxChars ?? 8000);
-    $('ai-manager-context-max').value = String(settings.contextMaxChars ?? 24000);
-    $('ai-manager-failure-retry').value = String(settings.failureRetrySeconds ?? 60);
-    $('ai-manager-capture-web-reports').checked = settings.captureWebReports !== false;
-    $('ai-manager-on-web-report').checked = settings.triggerOnWebReport !== false;
-    $('ai-manager-report-poll').value = String(settings.webReportPollSeconds ?? 30);
-    $('ai-manager-report-max-wait').value = String(settings.webReportMaxWaitMinutes ?? 60);
-    $('ai-manager-report-max-chars').value = String(settings.webReportMaxChars ?? 20000);
-    renderAiManagerRuntime(data.runtime || {});
-    $('ai-manager-status').textContent = settings.enabled
-      ? 'ÐÐ²Ñ‚Ð¾Ð½Ð¾Ð¼Ð½Ð¸Ð¹ AI Manager ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾. Ð”Ð»Ñ Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸ Ñ‚Ð°ÐºÐ¾Ð¶ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¸Ð¹ AI-ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð¾Ñ€ Ð²Ð¸Ñ‰Ðµ.'
-      : 'AI Manager Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾; Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ–.';
-  } catch (error) {
-    $('ai-manager-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ AI Manager: ${error.message}`;
-  }
-}
-
-async function saveAiManagerSettings() {
-  try {
-    setAiManagerBusy(true);
-    const settings = aiManagerSettingsFromForm();
-    const data = await core('UPDATE_AI_MANAGER_SETTINGS', { settings });
-    $('ai-manager-status').textContent = data.settings.enabled ? 'AI Manager ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾.' : 'AI Manager Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾ Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¸Ð¼.';
-    announce('ÐÐ°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ Ð°Ð²Ñ‚Ð¾Ð½Ð¾Ð¼Ð½Ð¾Ð³Ð¾ AI Manager Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('ai-manager-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ AI Manager: ${error.message}`;
-  } finally {
-    setAiManagerBusy(false);
-  }
-}
-
-async function runAiManagerNow() {
-  try {
-    setAiManagerBusy(true);
-    await core('UPDATE_AI_MANAGER_SETTINGS', { settings: aiManagerSettingsFromForm() });
-    $('ai-manager-status').textContent = 'AI Manager Ð°Ð½Ð°Ð»Ñ–Ð·ÑƒÑ” Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ð¸Ð¹ ÑÑ‚Ð°Ð½â€¦';
-    const data = await core('RUN_AI_MANAGER_NOW');
-    await loadAiManagerSettings();
-    const decision = data.decision?.summary || data.error || data.kind || 'Ð°Ð½Ð°Ð»Ñ–Ð· Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾';
-    $('ai-manager-status').textContent = `AI Manager: ${decision}. Ð—Ð°ÑÑ‚Ð¾ÑÐ¾Ð²Ð°Ð½Ð¾ Ð´Ñ–Ð¹: ${(data.applied || []).length}; Ð¿Ñ€Ð¾Ð¿ÑƒÑ‰ÐµÐ½Ð¾: ${(data.skipped || []).length}.`;
-    announce('AI Manager Ð·Ð°Ð²ÐµÑ€ÑˆÐ¸Ð² Ð°Ð½Ð°Ð»Ñ–Ð·.');
-  } catch (error) {
-    $('ai-manager-status').textContent = `AI Manager Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð² Ð°Ð½Ð°Ð»Ñ–Ð·: ${error.message}`;
-  } finally {
-    setAiManagerBusy(false);
-  }
-}
-
-async function resetAiManagerRuntime() {
-  try {
-    setAiManagerBusy(true);
-    const data = await core('RESET_AI_MANAGER_RUNTIME');
-    renderAiManagerRuntime(data.runtime || {});
-    $('ai-manager-status').textContent = 'Ð§ÐµÑ€Ð³Ñƒ, Ð»Ñ–Ñ‡Ð¸Ð»ÑŒÐ½Ð¸ÐºÐ¸ Ð¹ Ñ–ÑÑ‚Ð¾Ñ€Ñ–ÑŽ Ñ€Ñ–ÑˆÐµÐ½ÑŒ AI Manager ÑÐºÐ¸Ð½ÑƒÑ‚Ð¾.';
-  } catch (error) {
-    $('ai-manager-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÑÐºÐ¸Ð½ÑƒÑ‚Ð¸ AI Manager: ${error.message}`;
-  } finally {
-    setAiManagerBusy(false);
-  }
-}
-
-
-const SCENARIO_WORK_MODE_LABELS = Object.freeze({
-  CHAT_CYCLE: 'Ð¦Ð¸ÐºÐ»Ð¸ Ð² Ñ‡Ð°Ñ‚Ñ–',
-  PAIRS: 'Ð”Ð²Ñ–Ð¹ÐºÐ¸',
-  AUDITOR_GROUP: 'ÐÑƒÐ´Ð¸Ñ‚Ð¾Ñ€ + Ð³Ñ€ÑƒÐ¿Ð°',
-  AUDITOR_PIPELINE: 'FIRST â†’ Ð°ÑƒÐ´Ð¸Ñ‚Ð¾Ñ€ â†’ SECOND',
-});
-const SCENARIO_WORK_MODE_PANELS = Object.freeze({
-  CHAT_CYCLE: 'cycle',
-  PAIRS: 'pairs',
-  AUDITOR_GROUP: 'group',
-  AUDITOR_PIPELINE: 'group',
-});
-
-function scenarioWorkInt(id, min, max, label) {
-  return parseStrictBoundedInteger($(id).value, { min, max, label });
-}
-
-function syncScenarioInitialStaggerBounds() {
-  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
-  $('scenario-cycle-initial-stagger').max = unit === 'minutes' ? '10080' : '604800';
-}
-
-function scenarioInitialStaggerSecondsFromForm() {
-  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
-  const value = scenarioWorkInt(
-    'scenario-cycle-initial-stagger',
-    0,
-    unit === 'minutes' ? 10080 : 604800,
-    'ÐŸÐ°ÑƒÐ·Ð° Ð¼Ñ–Ð¶ Ð¿ÐµÑ€ÑˆÐ¸Ð¼Ð¸ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ð°Ð¼Ð¸',
-  );
-  return value * (unit === 'minutes' ? 60 : 1);
-}
-
-function setScenarioInitialStaggerForm(rawSeconds) {
-  const seconds = Math.max(0, Math.min(604800, Math.floor(Number(rawSeconds) || 0)));
-  const useMinutes = seconds >= 60 && seconds % 60 === 0;
-  $('scenario-cycle-initial-stagger-unit').value = useMinutes ? 'minutes' : 'seconds';
-  syncScenarioInitialStaggerBounds();
-  $('scenario-cycle-initial-stagger').value = String(useMinutes ? seconds / 60 : seconds);
-}
-
-function formatScenarioInitialStagger(seconds) {
-  const value = Math.max(0, Math.floor(Number(seconds) || 0));
-  if (value > 0 && value % 60 === 0) return `${value / 60} Ñ…Ð²`;
-  return `${value} Ñ`;
-}
-
-function setScenarioWorkBusy(busy) {
-  for (const id of [
-    'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
-    'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
-    'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
-    'scenario-work-run-now', 'scenario-cycle-start-parallel',
-    'scenario-work-template-button', 'scenario-work-import-button', 'scenario-work-export-button',
-  ]) {
-    const element = $(id);
-    if (element) element.disabled = busy;
-  }
-  if (!busy) syncScenarioWorkButtons();
-}
-
-function setScenarioPoolStructuralControlsDisabled(disabled) {
-  for (const id of ['scenario-cycle-url', 'scenario-cycle-parallel-count', 'scenario-cycle-add-step']) {
-    const element = $(id);
-    if (element) element.disabled = disabled;
-  }
-  $('scenario-cycle-steps').querySelectorAll('[data-scenario-step-repeat], [data-scenario-step-prompt], button').forEach(element => {
-    element.disabled = disabled;
-  });
-}
-
-function syncScenarioWorkButtons() {
-  const item = ui.selectedScenarioWork;
-  const pool = ui.selectedScenarioPoolId
-    ? (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId)
-    : null;
-  const state = pool?.runState || item?.runtime?.runState || '';
-  const has = Boolean(item);
-  const isPool = Boolean(pool);
-  const running = state === 'RUNNING';
-  const paused = state === 'PAUSED';
-  const stopped = state === 'STOPPED';
-  const completed = state === 'COMPLETED';
-  const error = state === 'ERROR';
-
-  $('save-scenario-work-button').textContent = isPool ? 'Ð—Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ð¸ Ð²ÑÑŒÐ¾Ð³Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ' : 'Ð—Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸';
-  $('start-scenario-work-button').textContent = isPool ? 'Ð—Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚Ð¸ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹' : 'Ð—Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚Ð¸';
-  $('pause-scenario-work-button').textContent = isPool ? 'ÐŸÑ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½Ð¸Ñ‚Ð¸ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹' : 'ÐŸÑ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½Ð¸Ñ‚Ð¸';
-  $('resume-scenario-work-button').textContent = isPool ? 'ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶Ð¸Ñ‚Ð¸ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹' : 'ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶Ð¸Ñ‚Ð¸';
-  $('stop-scenario-work-button').textContent = isPool ? 'Ð—ÑƒÐ¿Ð¸Ð½Ð¸Ñ‚Ð¸ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹' : 'Ð—ÑƒÐ¿Ð¸Ð½Ð¸Ñ‚Ð¸';
-  $('delete-scenario-work-button').textContent = isPool ? 'Ð’Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹' : 'Ð’Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸';
-
-  $('save-scenario-work-button').disabled = !has || running || error || completed || (!isPool && paused);
-  $('start-scenario-work-button').disabled = !has || running || paused || completed || error;
-  $('pause-scenario-work-button').disabled = !has || !running;
-  $('resume-scenario-work-button').disabled = !has || !paused;
-  $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running || paused;
-  $('scenario-work-run-now').disabled = !has || !running;
-  $('scenario-cycle-start-parallel').disabled = !has || isPool || item?.config?.mode !== 'CHAT_CYCLE';
-  setScenarioPoolStructuralControlsDisabled(isPool);
-
-  if ($('scenario-work-control-help')) {
-    $('scenario-work-control-help').textContent = !has
-      ? 'Ð’Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð·Ñ– ÑÐ¿Ð¸ÑÐºÑƒ.'
-      : isPool
-        ? running
-          ? 'ÐšÐµÑ€ÑƒÑ”Ñ‚ÑŒÑÑ Ð²ÐµÑÑŒ Ð¿ÑƒÐ». Ð©Ð¾Ð± Ð·Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ‚Ð°Ð¹Ð¼Ð°ÑƒÑ‚Ð¸ Ñ‚Ð° Ñ–Ð½ÑˆÑ– runtime-Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ð¸, ÑÐ¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð¿Ñ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½Ñ–Ñ‚ÑŒ Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹.'
-          : paused
-            ? 'Ð’ÐµÑÑŒ Ð¿ÑƒÐ» Ð¿Ñ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾. ÐœÐ¾Ð¶Ð½Ð° Ð·Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ‚Ð°Ð¹Ð¼Ð°ÑƒÑ‚Ð¸, Ñ–Ð½Ñ‚ÐµÑ€Ð²Ð°Ð»Ð¸ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸, retry, Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ timeout, Ð´Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ñ– Ñ‡Ð°Ñ‚Ð¸ Ñ‚Ð° ÑÑ‚Ð°Ñ€Ñ‚Ð¾Ð²Ñƒ Ð¿Ð°ÑƒÐ·Ñƒ; ÑÑ‚Ñ€ÑƒÐºÑ‚ÑƒÑ€Ð° Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ñ–Ð² Ð½Ðµ Ð·Ð¼Ñ–Ð½ÑŽÑ”Ñ‚ÑŒÑÑ.'
-            : stopped
-              ? 'ÐŸÑƒÐ» Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾. Runtime-Ð¿Ð°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ð¸ Ð¼Ð¾Ð¶Ð½Ð° Ð·Ð¼Ñ–Ð½Ð¸Ñ‚Ð¸ Ñ– Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð±ÐµÐ· ÑÐºÐ¸Ð´Ð°Ð½Ð½Ñ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑƒ.'
-              : 'ÐšÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²ÑƒÑ”Ñ‚ÑŒÑÑ Ð´Ð¾ Ð²ÑÑ–Ñ… Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð² Ñ†ÑŒÐ¾Ð³Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ.'
-        : 'ÐšÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²ÑƒÑ”Ñ‚ÑŒÑÑ Ð´Ð¾ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾Ð³Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ.';
-  }
-}
-
-function clearScenarioWorkState() {
-  ui.selectedScenarioWorkId = '';
-  ui.selectedScenarioPoolId = '';
-  ui.selectedScenarioWork = null;
-  $('scenario-work-name').value = '';
-  $('scenario-work-mode-label').textContent = 'Ð¤Ð¾Ñ€Ð¼Ð°Ñ‚ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.';
-  $('scenario-work-state').replaceChildren();
-  $('scenario-work-summary').textContent = 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.';
-  syncScenarioWorkButtons();
-}
-
-function addScenarioStateLine(term, value) {
-  const dt = document.createElement('dt');
-  dt.textContent = term;
-  const dd = document.createElement('dd');
-  dd.textContent = String(value ?? 'â€”');
-  $('scenario-work-state').append(dt, dd);
-}
-
-function scenarioParticipantsForUi(runtime = {}) {
-  if (runtime.mode === 'CHAT_CYCLE') return runtime.chat ? [runtime.chat] : [];
-  if (runtime.mode === 'PAIRS') {
-    return Object.values(runtime.pairs || {}).flatMap(pair => [pair.auditor, pair.worker].filter(Boolean));
-  }
-  if (runtime.mode === 'AUDITOR_GROUP') {
-    return [runtime.group?.auditor, ...Object.values(runtime.group?.workers || {})].filter(Boolean);
-  }
-  if (runtime.mode === 'AUDITOR_PIPELINE') {
-    return [runtime.auditor, ...Object.values(runtime.firstSlots || {}), ...Object.values(runtime.secondSlots || {})].filter(Boolean);
-  }
-  return [];
-}
-
-function renderScenarioWorkState(item) {
-  const box = $('scenario-work-state');
-  box.replaceChildren();
-  if (!item) {
-    addScenarioStateLine('Ð¡Ñ‚Ð°Ð½', 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾');
-    return;
-  }
-  const runtime = item.runtime || {};
-  const selectedPool = item.poolController === true
-    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === item.pool?.id))
-    : null;
-  addScenarioStateLine('Ð¡Ñ‚Ð°Ð½', selectedPool?.runState || runtime.runState || 'STOPPED');
-  addScenarioStateLine('Ð¤Ð¾Ñ€Ð¼Ð°Ñ‚', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || 'â€”');
-  if (item.pool) {
-    const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
-    addScenarioStateLine('ÐŸÐ°Ñ€Ð°Ð»ÐµÐ»ÑŒÐ½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²', pool?.slots ?? 'â€”');
-    addScenarioStateLine('ÐŸÑ€Ð¾Ð³Ñ€ÐµÑ ÑƒÑÑŒÐ¾Ð³Ð¾ Ð¿ÑƒÐ»Ñƒ', scenarioProgressText(pool));
-    if (item.poolController === true) {
-      addScenarioStateLine('ÐšÐµÑ€ÑƒÐ²Ð°Ð½Ð½Ñ', 'Ð”Ñ–Ñ— Ð½Ð° Ñ†Ñ–Ð¹ Ð²ÐºÐ»Ð°Ð´Ñ†Ñ– Ð·Ð°ÑÑ‚Ð¾ÑÐ¾Ð²ÑƒÑŽÑ‚ÑŒÑÑ Ð´Ð¾ Ð²ÑÑ–Ñ… Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð² ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ. Ð”ÐµÑ‚Ð°Ð»Ñ– ÐºÐ¾Ð¶Ð½Ð¾Ð³Ð¾ Ñ‡Ð°Ñ‚Ñƒ Ð´Ð¸Ð²Ñ–Ñ‚ÑŒÑÑ Ñƒ Â«Ð¡ÐµÐ°Ð½ÑÐ°Ñ…Â» Ñ‚Ð° Ð´Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ†Ñ–.');
-      return;
-    }
-
-  }
-  if (runtime.mode === 'CHAT_CYCLE') {
-    const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
-    const totalMessages = steps.reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
-    const stepIndex = Math.max(0, Math.min(steps.length - 1, Number(runtime.stepIndex || 0)));
-    const repeatIndex = Math.max(0, Number(runtime.repeatIndex || 0));
-    const beforeCurrent = steps.slice(0, stepIndex).reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
-    const currentMessage = totalMessages ? Math.min(totalMessages, beforeCurrent + repeatIndex + 1) : 0;
-    const currentRepeatTotal = Math.max(0, Number(steps[stepIndex]?.repeat || 0));
-    if (!item.pool) {
-      addScenarioStateLine('ÐŸÑ€Ð¾Ð³Ñ€ÐµÑ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ', scenarioProgressText({
-        totalSentPrompts: item.verifiedSends?.confirmedOverall ?? 0,
-        totalReceivedResponses: runtime.totalCompletedTurns ?? 0,
-      }));
-    }
-  } else if (runtime.mode === 'AUDITOR_GROUP') {
-    addScenarioStateLine('ÐŸÐ¾ÐºÐ¾Ð»Ñ–Ð½Ð½Ñ', runtime.generation ?? 1);
-    addScenarioStateLine('Ð¤Ð°Ð·Ð°', runtime.phase || 'â€”');
-    addScenarioStateLine('ÐšÐ¾Ð»Ð¾ Ð³Ñ€ÑƒÐ¿Ð¸', `${runtime.group?.round ?? 0}/${item.config?.roundsPerGeneration ?? 0}`);
-  } else if (runtime.mode === 'PAIRS') {
-    addScenarioStateLine('ÐŸÐ¾ÐºÐ¾Ð»Ñ–Ð½Ð½Ñ', runtime.generation ?? 1);
-    addScenarioStateLine('Ð¤Ð°Ð·Ð°', runtime.phase || 'â€”');
-    const rounds = Object.values(runtime.pairs || {}).map(pair => `â„–${pair.index}: ${pair.round ?? 0}`).join('; ');
-    addScenarioStateLine('ÐšÐ¾Ð»Ð° Ð´Ð²Ñ–Ð¹Ð¾Ðº', rounds || 'â€”');
-  } else if (runtime.mode === 'AUDITOR_PIPELINE') {
-    addScenarioStateLine('ÐŸÐ¾ÐºÐ¾Ð»Ñ–Ð½Ð½Ñ', runtime.generation ?? 1);
-    addScenarioStateLine('Ð¤Ð°Ð·Ð°', runtime.phase || 'â€”');
-    const first = Object.values(runtime.firstSlots || {});
-    const second = Object.values(runtime.secondSlots || {});
-    const firstVerified = first.filter(slot => slot.state === 'COMPLETE').length;
-    const secondVerified = second.filter(slot => slot.state === 'COMPLETE').length;
-    const completed = new Set(runtime.completedTaskIds || []);
-    for (const slot of [...first, ...second]) if (slot.state === 'COMPLETE' && slot.taskId) completed.add(slot.taskId);
-    const dependencyBlocked = [...first, ...second].filter(slot => slot.state === 'READY' && (slot.dependencies || []).some(id => !completed.has(id))).length;
-    addScenarioStateLine('Ð Ð°ÑƒÐ½Ð´ pipeline', runtime.round ?? 1);
-    addScenarioStateLine('FIRST Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð¾', `${firstVerified}/${first.length}`);
-    addScenarioStateLine('SECOND Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð¾', `${secondVerified}/${second.length}`);
-    addScenarioStateLine('Ð—Ð°Ð±Ð»Ð¾ÐºÐ¾Ð²Ð°Ð½Ð¾ Ð·Ð°Ð»ÐµÐ¶Ð½Ð¾ÑÑ‚ÑÐ¼Ð¸', dependencyBlocked);
-    addScenarioStateLine('Allocation', runtime.allocation?.allocationId || 'Ñ‰Ðµ Ð½Ðµ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð°');
-    addScenarioStateLine('ÐžÑ€ÐµÐ½Ð´Ð° Ð°ÑƒÐ´Ð¸Ñ‚Ð¾Ñ€Ð°', runtime.auditorLease?.active === true ? 'Ð°ÐºÑ‚Ð¸Ð²Ð½Ð°' : 'Ð²Ñ–Ð»ÑŒÐ½Ð°');
-    addScenarioStateLine('ÐÐµÐ²Ð°Ð»Ñ–Ð´Ð½Ð¸Ñ… Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ñ–Ð² Ð²Ð¾Ñ€ÐºÐµÑ€Ñ–Ð²', runtime.diagnostics?.invalidWorkerResults || 0);
-    addScenarioStateLine('ÐÐµÐ²Ð°Ð»Ñ–Ð´Ð½Ð¸Ñ… allocation Ð°ÑƒÐ´Ð¸Ñ‚Ð¾Ñ€Ð°', runtime.diagnostics?.invalidAuditorAllocations || 0);
-    addScenarioStateLine('Ð’Ñ–Ð´ÑÑ–Ñ‡ÐµÐ½Ð¾ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ñ… Ð°ÑƒÐ´Ð¸Ñ‚Ð¾Ñ€Ñ–Ð²', runtime.diagnostics?.duplicateAuditorPrevented || 0);
-  }
-  addScenarioStateLine('Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ Ñ€Ð¾Ð±Ñ–Ñ‚', runtime.totalLaunches ?? 0);
-  addScenarioStateLine('Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´ÐµÐ¹', runtime.totalCompletedTurns ?? 0);
-  if (runtime.lastError) addScenarioStateLine('ÐžÑÑ‚Ð°Ð½Ð½Ñ Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ°', runtime.lastError);
-  const participants = scenarioParticipantsForUi(runtime);
-  if (participants.length) {
-    addScenarioStateLine('Ð£Ñ‡Ð°ÑÐ½Ð¸ÐºÐ¸', participants.map(participant => {
-      const role = participant.role === 'AUDITOR' ? 'Ð°ÑƒÐ´Ð¸Ñ‚Ð¾Ñ€' : participant.role === 'WORKER' ? 'Ñ€Ð¾Ð·Ñ€Ð¾Ð±Ð½Ð¸Ðº' : 'Ñ‡Ð°Ñ‚';
-      const index = participant.index ? ` ${participant.index}` : '';
-      const chat = participant.chatUrl ? 'Ñ‡Ð°Ñ‚ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾' : 'Ð½Ð¾Ð²Ð¸Ð¹ Ñ‡Ð°Ñ‚';
-      return `${role}${index}: ${participant.state || 'NEW'}, ${participant.stage || 'NONE'}, ${chat}`;
-    }).join(' | '));
-  }
-}
-
-function createScenarioCycleStep(step = {}, index = 0) {
-  const fieldset = document.createElement('fieldset');
-  fieldset.className = 'settings-group scenario-cycle-step';
-  fieldset.dataset.scenarioStep = 'true';
-  fieldset.dataset.stepId = step.id || `step-${index + 1}`;
-  const legend = document.createElement('legend');
-  legend.textContent = `ÐŸÑ€Ð¾Ð¼Ð¿Ñ‚ ${index + 1}`;
-  const repeatId = `scenario-step-repeat-${crypto.randomUUID()}`;
-  const promptId = `scenario-step-prompt-${crypto.randomUUID()}`;
-  const repeatLabel = document.createElement('label');
-  repeatLabel.htmlFor = repeatId;
-  repeatLabel.textContent = 'Ð¡ÐºÑ–Ð»ÑŒÐºÐ¸ Ñ€Ð°Ð·Ñ–Ð² Ð¿Ð¾ÑÐ¿Ñ–Ð»ÑŒ';
-  const repeat = document.createElement('input');
-  repeat.id = repeatId;
-  repeat.type = 'number';
-  repeat.min = '1';
-  repeat.max = '10000';
-  repeat.step = '1';
-  repeat.inputMode = 'numeric';
-  repeat.value = String(step.repeat ?? 1);
-  repeat.dataset.scenarioStepRepeat = 'true';
-  const promptLabel = document.createElement('label');
-  promptLabel.htmlFor = promptId;
-  promptLabel.textContent = 'Ð¢ÐµÐºÑÑ‚ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ð°';
-  const prompt = document.createElement('textarea');
-  prompt.id = promptId;
-  prompt.rows = 5;
-  prompt.value = step.prompt ?? '';
-  prompt.dataset.scenarioStepPrompt = 'true';
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.textContent = 'Ð’Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸ Ñ†ÐµÐ¹ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚';
-  remove.addEventListener('click', () => {
-    const container = $('scenario-cycle-steps');
-    if (container.querySelectorAll('[data-scenario-step]').length <= 1) {
-      announce('Ð£ Ñ†Ð¸ÐºÐ»Ñ– Ð¼Ð°Ñ” Ð·Ð°Ð»Ð¸ÑˆÐ°Ñ‚Ð¸ÑÑ Ñ‰Ð¾Ð½Ð°Ð¹Ð¼ÐµÐ½ÑˆÐµ Ð¾Ð´Ð¸Ð½ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚.');
-      return;
-    }
-    const nextFocus = fieldset.nextElementSibling?.querySelector?.('textarea, input, button')
-      || fieldset.previousElementSibling?.querySelector?.('textarea, input, button')
-      || $('scenario-cycle-add-step');
-    fieldset.remove();
-    renumberScenarioCycleSteps();
-    updateScenarioCycleMessageCount();
-    nextFocus?.focus();
-    announce('ÐŸÑ€Ð¾Ð¼Ð¿Ñ‚ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  });
-  fieldset.append(legend, repeatLabel, repeat, promptLabel, prompt, remove);
-  return fieldset;
-}
-
-function renumberScenarioCycleSteps() {
-  [...$('scenario-cycle-steps').querySelectorAll('[data-scenario-step]')].forEach((row, index) => {
-    const legend = row.querySelector('legend');
-    if (legend) legend.textContent = `ÐŸÑ€Ð¾Ð¼Ð¿Ñ‚ ${index + 1}`;
-  });
-}
-
-function updateScenarioCycleMessageCount() {
-  const rows = [...$('scenario-cycle-steps').querySelectorAll('[data-scenario-step]')];
-  const total = rows.reduce((sum, row) => {
-    const value = Number(row.querySelector('[data-scenario-step-repeat]')?.value);
-    return sum + (Number.isSafeInteger(value) && value > 0 ? value : 0);
-  }, 0);
-  $('scenario-cycle-message-count').textContent = total
-    ? `ÐŸÐ¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½ÑŒ Ñƒ ÐºÐ¾Ð¶Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñ–: ${total}.`
-    : 'ÐŸÐ¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½ÑŒ Ñƒ ÐºÐ¾Ð¶Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñ–: Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÐºÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ñ–Ð².';
-}
-
-function renderScenarioCycleSteps(steps = []) {
-  const container = $('scenario-cycle-steps');
-  container.replaceChildren();
-  const actual = steps.length ? steps : [{ prompt: 'ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶ÑƒÐ¹.', repeat: 1 }];
-  actual.forEach((step, index) => container.append(createScenarioCycleStep(step, index)));
-  renumberScenarioCycleSteps();
-  updateScenarioCycleMessageCount();
-}
-
-function readScenarioCycleSteps() {
-  const rows = [...$('scenario-cycle-steps').querySelectorAll('[data-scenario-step]')];
-  if (!rows.length) throw new Error('Ð”Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ñ‰Ð¾Ð½Ð°Ð¹Ð¼ÐµÐ½ÑˆÐµ Ð¾Ð´Ð¸Ð½ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚.');
-  return rows.map((row, index) => {
-    const prompt = row.querySelector('[data-scenario-step-prompt]')?.value || '';
-    if (!prompt.trim()) throw new Error(`ÐŸÑ€Ð¾Ð¼Ð¿Ñ‚ ${index + 1} Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ–Ð¹.`);
-    return {
-      id: row.dataset.stepId || `step-${index + 1}`,
-      label: `ÐŸÑ€Ð¾Ð¼Ð¿Ñ‚ ${index + 1}`,
-      prompt,
-      repeat: parseStrictBoundedInteger(row.querySelector('[data-scenario-step-repeat]')?.value, { min: 1, max: 10000, label: `ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ñ–Ð² Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ð° ${index + 1}` }),
-    };
-  });
-}
-
-function scenarioWorkConfigFromForm() {
-  const current = ui.selectedScenarioWork;
-  if (!current) throw new Error('Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð²Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹.');
-  const mode = current.config?.mode;
-  const common = {
-    ...current.config,
-    id: current.id,
-    name: $('scenario-work-name').value.trim() || current.name || 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ð½Ð° Ñ€Ð¾Ð±Ð¾Ñ‚Ð°',
-    mode,
-    roundsPerGeneration: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-rounds', 1, 10000, 'ÐšÑ–Ð» Ñƒ Ð¿Ð¾ÐºÐ¾Ð»Ñ–Ð½Ð½Ñ–'),
-    maxGenerations: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-generations', 0, 10000, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð¿Ð¾ÐºÐ¾Ð»Ñ–Ð½ÑŒ'),
-    responseTimeoutMinutes: scenarioWorkInt('scenario-work-timeout', 1, 1440, 'Ð§Ð°Ñ Ð¾Ñ‡Ñ–ÐºÑƒÐ²Ð°Ð½Ð½Ñ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ñ–'),
-    pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸'),
-    minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'ÐŸÐ°ÑƒÐ·Ð° Ð¿Ñ–ÑÐ»Ñ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½Ñ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ñ–'),
-    tabReadyDelaySeconds: scenarioWorkInt('scenario-work-tab-ready', 0, 60, 'ÐŸÐ°ÑƒÐ·Ð° Ð¿Ñ–ÑÐ»Ñ Ð²Ñ–Ð´ÐºÑ€Ð¸Ñ‚Ñ‚Ñ Ð²ÐºÐ»Ð°Ð´ÐºÐ¸'),
-    postSendDelaySeconds: scenarioWorkInt('scenario-work-post-send', 0, 60, 'ÐžÑ‡Ñ–ÐºÑƒÐ²Ð°Ð½Ð½Ñ Ð¿Ñ–ÑÐ»Ñ Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½Ñ'),
-    preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'ÐŸÐ°ÑƒÐ·Ð° Ð¿ÐµÑ€ÐµÐ´ Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½ÑÐ¼'),
-    busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð½Ð° Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° Ð·Ð°Ð¹Ð½ÑÑ‚Ð¾Ð³Ð¾ Ñ‡Ð°Ñ‚Ñƒ'),
-    retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ Ð¿Ñ–ÑÐ»Ñ Ñ‚ÐµÑ…Ð½Ñ–Ñ‡Ð½Ð¾Ñ— Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ¸'),
-    closeTabsBetweenChecks: false,
-    reopenOnceAfterProbeError: false,
-    timeoutPolicy: $('scenario-work-timeout-policy').value,
-  };
-  if (mode === 'CHAT_CYCLE') {
-    return {
-      ...common,
-      launchUrl: $('scenario-cycle-url').value.trim(),
-      restartCurrentRoundOnTimeout: $('scenario-cycle-restart-round-timeout').checked,
-      steps: readScenarioCycleSteps(),
-    };
-  }
-  const prefix = mode === 'PAIRS' ? 'scenario-pair' : 'scenario-group';
-  const role = {
-    auditorLaunchUrl: $(`${prefix}-auditor-url`).value.trim(),
-    workerLaunchUrl: $(`${prefix}-worker-url`).value.trim(),
-    auditorBootstrapPrompt: $(`${prefix}-auditor-bootstrap`).value,
-    workerBootstrapPrompt: $(`${prefix}-worker-bootstrap`).value,
-    auditorCyclePrompt: $(`${prefix}-auditor-cycle`).value,
-    workerCyclePrompt: $(`${prefix}-worker-cycle`).value,
-    timeoutAuditorPrompt: $(`${prefix}-timeout-auditor`).value,
-    replacementAuditorPrompt: $(`${prefix}-replacement-auditor`).value,
-  };
-  if (mode === 'PAIRS') {
-    return { ...common, ...role, pairCount: scenarioWorkInt('scenario-pair-count', 1, 100, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð´Ð²Ñ–Ð¹Ð¾Ðº') };
-  }
-  if (mode === 'AUDITOR_PIPELINE') {
-    return {
-      ...common, ...role,
-      firstCount: scenarioWorkInt('scenario-pipeline-first-count', 1, 100, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ FIRST-Ð²Ð¾Ñ€ÐºÐµÑ€Ñ–Ð²'),
-      secondCount: scenarioWorkInt('scenario-pipeline-second-count', 0, 100, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ SECOND-Ð²Ð¾Ñ€ÐºÐµÑ€Ñ–Ð²'),
-      barrierPolicy: $('scenario-pipeline-barrier-policy').value,
-      auditTimeboxMinutes: scenarioWorkInt('scenario-pipeline-audit-timebox', 1, 1440, 'Ð›Ñ–Ð¼Ñ–Ñ‚ Ð´Ð¾ Ð°ÑƒÐ´Ð¸Ñ‚Ñƒ'),
-      maxCorrectionAttempts: scenarioWorkInt('scenario-pipeline-max-corrections', 0, 10, 'ÐœÐ°ÐºÑÐ¸Ð¼ÑƒÐ¼ Ð²Ð¸Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½ÑŒ'),
-      firstWorkerPrompt: $('scenario-pipeline-first-prompt').value,
-      secondWorkerPrompt: $('scenario-pipeline-second-prompt').value,
-      auditorPrompt: $('scenario-pipeline-auditor-prompt').value,
-      workerCorrectionPrompt: $('scenario-pipeline-worker-correction').value,
-      auditorCorrectionPrompt: $('scenario-pipeline-auditor-correction').value,
-    };
-  }
-  return { ...common, ...role, workerCount: scenarioWorkInt('scenario-group-worker-count', 1, 200, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ñ€Ð¾Ð·Ñ€Ð¾Ð±Ð½Ð¸ÐºÑ–Ð²') };
-}
-
-function fillScenarioWorkForm(item) {
-  if (!item) { clearScenarioWorkState(); return; }
-  ui.selectedScenarioWorkId = item.id;
-  ui.selectedScenarioPoolId = item.poolController === true ? (item.poolSummary?.id || item.pool?.id || '') : '';
-  ui.selectedScenarioWork = clone(item);
-  const config = item.config || {};
-  const runtime = item.runtime || {};
-  const selectedPool = ui.selectedScenarioPoolId
-    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId))
-    : null;
-  $('scenario-work-name').value = selectedPool?.name || item.name || config.name || '';
-  $('scenario-work-mode-label').textContent = `Ð¤Ð¾Ñ€Ð¼Ð°Ñ‚: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¸Ð¹'}.`;
-  $('scenario-work-round-generation-settings').hidden = config.mode === 'CHAT_CYCLE';
-  $('scenario-work-rounds').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.roundsPerGeneration ?? 10));
-  $('scenario-work-generations').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.maxGenerations ?? 0));
-  $('scenario-work-timeout').value = String(config.responseTimeoutMinutes ?? 40);
-  $('scenario-work-poll').value = String(config.pollSeconds ?? 180);
-  $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
-  $('scenario-work-tab-ready').value = String(config.tabReadyDelaySeconds ?? 0);
-  $('scenario-work-post-send').value = String(config.postSendDelaySeconds ?? 5);
-  $('scenario-work-pre-send').value = String(config.preSendDelaySeconds ?? 10);
-  $('scenario-work-busy-check').value = String(config.busyCheckDelaySeconds ?? 3);
-  $('scenario-work-retry').value = String(config.retryBackoffSeconds ?? 30);
-  $('scenario-work-close-tabs-between-checks').checked = config.closeTabsBetweenChecks === true;
-  $('scenario-work-reopen-on-probe-error').checked = config.reopenOnceAfterProbeError === true;
-  $('scenario-work-timeout-policy').value = config.timeoutPolicy || 'REPLACE_MEMBER';
-  $('scenario-pipeline-settings').hidden = config.mode !== 'AUDITOR_PIPELINE';
-  if (config.mode === 'CHAT_CYCLE') {
-    $('scenario-cycle-url').value = config.launchUrl || 'https://chatgpt.com/';
-    $('scenario-cycle-restart-round-timeout').checked = config.restartCurrentRoundOnTimeout !== false;
-    renderScenarioCycleSteps(config.steps || []);
-    const pool = selectedPool || (item.pool ? (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id) : null);
-    if (item.pool) {
-      $('scenario-cycle-parallel-count').value = String(pool?.slots ?? 1);
-      $('scenario-cycle-replacement-budget').value = String(pool?.replacementBudget ?? item.pool.replacementBudget ?? 0);
-      setScenarioInitialStaggerForm(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0);
-    } else {
-      $('scenario-cycle-parallel-count').value = '1';
-      $('scenario-cycle-replacement-budget').value = '0';
-      setScenarioInitialStaggerForm(0);
-    }
-  } else {
-    const prefix = config.mode === 'PAIRS' ? 'scenario-pair' : 'scenario-group';
-    if (config.mode === 'PAIRS') $('scenario-pair-count').value = String(config.pairCount ?? 1);
-    else if (config.mode === 'AUDITOR_PIPELINE') {
-      $('scenario-pipeline-first-count').value = String(config.firstCount ?? 10);
-      $('scenario-pipeline-second-count').value = String(config.secondCount ?? 9);
-      $('scenario-pipeline-barrier-policy').value = config.barrierPolicy || 'TIMEBOXED_AUDIT';
-      $('scenario-pipeline-audit-timebox').value = String(config.auditTimeboxMinutes ?? 30);
-      $('scenario-pipeline-max-corrections').value = String(config.maxCorrectionAttempts ?? 2);
-      $('scenario-pipeline-first-prompt').value = config.firstWorkerPrompt || 'Ð„ Ð½Ð° Drive. Ð’Ð¸ÐºÐ¾Ð½Ð°Ð¹ Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ð¸Ð¹ FIRST slot.';
-      $('scenario-pipeline-second-prompt').value = config.secondWorkerPrompt || 'Ð„ Ð½Ð° Drive. Ð’Ð¸ÐºÐ¾Ð½Ð°Ð¹ Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ð¸Ð¹ SECOND slot.';
-      $('scenario-pipeline-auditor-prompt').value = config.auditorPrompt || 'Ð„ Ð½Ð° Drive. ÐŸÑ€Ð¾Ð°ÑƒÐ´Ð¸Ñ‚ÑƒÐ¹ Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ð¸Ð¹ Ñ€Ð°ÑƒÐ½Ð´ Ñ– ÑÑ‚Ð²Ð¾Ñ€Ð¸ Ð½Ð°ÑÑ‚ÑƒÐ¿Ð½Ñƒ allocation.';
-      $('scenario-pipeline-worker-correction').value = config.workerCorrectionPrompt || '';
-      $('scenario-pipeline-auditor-correction').value = config.auditorCorrectionPrompt || '';
-    } else $('scenario-group-worker-count').value = String(config.workerCount ?? 5);
-    $(`${prefix}-auditor-url`).value = config.auditorLaunchUrl || 'https://chatgpt.com/';
-    $(`${prefix}-worker-url`).value = config.workerLaunchUrl || 'https://chatgpt.com/';
-    $(`${prefix}-auditor-bootstrap`).value = config.auditorBootstrapPrompt || '';
-    $(`${prefix}-worker-bootstrap`).value = config.workerBootstrapPrompt || '';
-    $(`${prefix}-auditor-cycle`).value = config.auditorCyclePrompt || 'Ð„ Ð½Ð° Drive.';
-    $(`${prefix}-worker-cycle`).value = config.workerCyclePrompt || 'Ð„ Ð½Ð° Drive.';
-    $(`${prefix}-timeout-auditor`).value = config.timeoutAuditorPrompt || '';
-    $(`${prefix}-replacement-auditor`).value = config.replacementAuditorPrompt || '';
-  }
-  renderScenarioWorkState(item);
-  const panel = SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle';
-  if (storageGet(SCENARIO_WORK_PANEL_KEY) !== 'state') setScenarioWorkPanel(panel);
-  $('scenario-work-summary').textContent = selectedPool
-    ? `${selectedPool.name}. Ð’ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${selectedPool.slots} Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð². Ð¡Ñ‚Ð°Ð½: ${selectedPool.runState || 'STOPPED'}.`
-    : `${item.name}. Ð¡Ñ‚Ð°Ð½: ${item.runtime?.runState || 'STOPPED'}.`;
-  syncScenarioWorkButtons();
-}
-
-function scenarioPoolListValue(id) { return `pool:${id}`; }
-function scenarioSingleListValue(id) { return `scenario:${id}`; }
-
-function renderScenarioWorkList(data = {}) {
-  const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
-  const pools = Array.isArray(data.pools) ? data.pools : [];
-  ui.scenarioWorkPools = pools.map(item => clone(item));
-  ui.scenarioWorkScenarios = scenarios.map(item => clone(item));
-  const pooledScenarioIds = new Set(scenarios.filter(item => item.pool?.id).map(item => item.id));
-  const unpooled = scenarios.filter(item => !pooledScenarioIds.has(item.id));
-  const list = $('scenario-work-list');
-  list.replaceChildren();
-
-  for (const pool of pools) {
-    const option = document.createElement('option');
-    option.value = scenarioPoolListValue(pool.id);
-    option.textContent = `${pool.name} â€” Ð²ÐµÑÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${pool.slots} Ñ‡Ð°Ñ‚Ñ–Ð² â€” ${pool.runState || 'STOPPED'}`;
-    list.append(option);
-  }
-  for (const item of unpooled) {
-    const option = document.createElement('option');
-    option.value = scenarioSingleListValue(item.id);
-    option.textContent = `${item.name} â€” ${SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || 'Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚'}`;
-    list.append(option);
-  }
-
-  let selected = '';
-  if (ui.selectedScenarioPoolId && pools.some(item => item.id === ui.selectedScenarioPoolId)) {
-    selected = scenarioPoolListValue(ui.selectedScenarioPoolId);
-  } else if (ui.selectedScenarioWorkId && unpooled.some(item => item.id === ui.selectedScenarioWorkId)) {
-    selected = scenarioSingleListValue(ui.selectedScenarioWorkId);
-  } else if (data.selectedId) {
-    const selectedScenario = scenarios.find(item => item.id === data.selectedId);
-    selected = selectedScenario?.pool?.id
-      ? scenarioPoolListValue(selectedScenario.pool.id)
-      : selectedScenario ? scenarioSingleListValue(selectedScenario.id) : '';
-  }
-  if (!selected) selected = list.options[0]?.value || '';
-  list.value = selected;
-  if (!selected) clearScenarioWorkState();
-  return selected;
-}
-
-async function loadScenarioWork({ preservePanel = true } = {}) {
-  try {
-    const listData = await core('LIST_SCENARIO_WORK');
-    const selected = renderScenarioWorkList(listData);
-    if (!selected) return;
-    await openScenarioWorkTarget(selected, { selectSingle: false });
-    if (!preservePanel && ui.selectedScenarioWork) {
-      setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[ui.selectedScenarioWork.config?.mode] || 'cycle');
-    }
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ð½Ñƒ Ñ€Ð¾Ð±Ð¾Ñ‚Ñƒ: ${error.message}`;
-  }
-}
-
-async function openScenarioWorkTarget(value, { selectSingle = true } = {}) {
-  if (!value) { clearScenarioWorkState(); return; }
-  try {
-    if (value.startsWith('pool:')) {
-      const poolId = value.slice(5);
-      const data = await core('GET_SCENARIO_CHAT_POOL', { id: poolId });
-      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === poolId);
-      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
-      else ui.scenarioWorkPools.push(clone(data.pool));
-      const item = { ...data.scenario, poolController: true, poolSummary: data.pool };
-      ui.selectedScenarioPoolId = poolId;
-      fillScenarioWorkForm(item);
-      $('scenario-work-list').value = scenarioPoolListValue(poolId);
-      return;
-    }
-    const id = value.startsWith('scenario:') ? value.slice(9) : value;
-    const data = selectSingle
-      ? await core('SELECT_SCENARIO_WORK', { id })
-      : await core('GET_SCENARIO_WORK', { id });
-    ui.selectedScenarioPoolId = '';
-    fillScenarioWorkForm(data.scenario);
-    $('scenario-work-list').value = scenarioSingleListValue(id);
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð²Ñ–Ð´ÐºÑ€Ð¸Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${error.message}`;
-  }
-}
-
-async function openScenarioWork(id) {
-  if (!id) { clearScenarioWorkState(); return; }
-  return openScenarioWorkTarget(scenarioSingleListValue(id));
-}
-
-async function createScenarioWork(mode) {
-  const label = SCENARIO_WORK_MODE_LABELS[mode] || 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ð½Ð° Ñ€Ð¾Ð±Ð¾Ñ‚Ð°';
-  try {
-    setScenarioWorkBusy(true);
-    const config = mode === 'CHAT_CYCLE' ? { roundsPerGeneration: 1, maxGenerations: 1 } : {};
-    const data = await core('CREATE_SCENARIO_WORK', { name: `ÐÐ¾Ð²Ð¸Ð¹: ${label}`, mode, config });
-    await loadScenarioWork({ preservePanel: false });
-    if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
-    setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[mode] || 'cycle');
-    $('scenario-work-name').focus();
-    announce(`Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${label}.`);
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÑÑ‚Ð²Ð¾Ñ€Ð¸Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${error.message}`;
-  } finally { setScenarioWorkBusy(false); }
-}
-
-async function importScenarioWorkProfile() {
-  const status = $('scenario-work-profile-status');
-  const file = $('scenario-work-profile-file').files?.[0];
-  if (!file) {
-    status.textContent = 'Ð’Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ JSON-Ñ„Ð°Ð¹Ð» ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ.';
-    $('scenario-work-profile-file').focus();
-    return;
-  }
-  try {
-    if (file.size > 10_000_000) throw new Error('Ð¤Ð°Ð¹Ð» ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ Ð¿ÐµÑ€ÐµÐ²Ð¸Ñ‰ÑƒÑ” 10 ÐœÐ‘.');
-    setScenarioWorkBusy(true);
-    const { config, pool } = parseScenarioWorkProfileDocument(await file.text());
-    const data = await core('CREATE_SCENARIO_WORK', { name: config.name, mode: config.mode, config });
-    await loadScenarioWork({ preservePanel: false });
-    if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
-    if (pool && config.mode === 'CHAT_CYCLE') {
-      $('scenario-cycle-parallel-count').value = String(pool.count);
-      $('scenario-cycle-replacement-budget').value = String(pool.replacementBudget);
-      setScenarioInitialStaggerForm(pool.staggerSeconds);
-    }
-    setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
-    const messageCount = config.mode === 'CHAT_CYCLE'
-      ? config.steps.reduce((sum, step) => sum + step.repeat, 0)
-      : 0;
-    status.textContent = config.mode === 'CHAT_CYCLE'
-      ? `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾ Ð½Ð¾Ð²Ð¸Ð¹ Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¸Ð¹ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${config.name}. ÐŸÐ¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½ÑŒ Ñƒ ÐºÐ¾Ð¶Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñ–: ${messageCount}.${pool ? ` ÐŸÐ°Ñ€Ð°Ð»ÐµÐ»ÑŒÐ½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²: ${pool.count}; Ð´Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²: ${pool.replacementBudget}; Ð¿Ð°ÑƒÐ·Ð° Ð»Ð¸ÑˆÐµ Ð¼Ñ–Ð¶ Ð¿ÐµÑ€ÑˆÐ¸Ð¼Ð¸ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ð°Ð¼Ð¸: ${formatScenarioInitialStagger(pool.staggerSeconds)}.` : ''}`
-      : `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾ Ð½Ð¾Ð²Ð¸Ð¹ Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¸Ð¹ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${config.name}.`;
-    $('scenario-work-list').focus();
-  } catch (error) {
-    status.textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ñ–Ð¼Ð¿Ð¾Ñ€Ñ‚ÑƒÐ²Ð°Ñ‚Ð¸: ${error.message}`;
-  } finally {
-    setScenarioWorkBusy(false);
-  }
-}
-
-function exportScenarioWorkProfile() {
-  const status = $('scenario-work-profile-status');
-  if (!ui.selectedScenarioWork?.config) {
-    status.textContent = 'Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð²Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹.';
-    return;
-  }
-  try {
-    const pool = ui.selectedScenarioWork.config.mode === 'CHAT_CYCLE' ? {
-      count: scenarioWorkInt('scenario-cycle-parallel-count', 1, 10000, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²'),
-      replacementBudget: scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Ð”Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ñ– Ñ‡Ð°Ñ‚Ð¸'),
-      staggerSeconds: scenarioInitialStaggerSecondsFromForm(),
-    } : null;
-    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config, { pool });
-    downloadJson(profile, `${safeFileName(profile.config.name)}-ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹.json`);
-    status.textContent = 'ÐšÐ¾Ð½Ñ„Ñ–Ð³ÑƒÑ€Ð°Ñ†Ñ–ÑŽ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾Ð³Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾.';
-  } catch (error) {
-    status.textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚ÑƒÐ²Ð°Ñ‚Ð¸: ${error.message}`;
-  }
-}
-
-function downloadScenarioWorkTemplate() {
-  const status = $('scenario-work-profile-status');
-  try {
-    const profile = makeScenarioWorkTemplate();
-    downloadJson(profile, 'Ð¨Ð°Ð±Ð»Ð¾Ð½-ÑÑ†ÐµÐ½Ð°Ñ€Ð½Ð¾Ñ—-Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸-12-Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½ÑŒ.json');
-    status.textContent = 'Ð¨Ð°Ð±Ð»Ð¾Ð½ JSON Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾: 12 Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½ÑŒ Ñƒ ÐºÐ¾Ð¶Ð½Ð¾Ð¼Ñƒ Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñ–.';
-  } catch (error) {
-    status.textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ ÑÑ‚Ð²Ð¾Ñ€Ð¸Ñ‚Ð¸ ÑˆÐ°Ð±Ð»Ð¾Ð½: ${error.message}`;
-  }
-}
-
-async function startParallelScenarioChats() {
-  if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
-  try {
-    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 10000, 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²');
-    const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Ð”Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ñ– Ñ‡Ð°Ñ‚Ð¸');
-    const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
-    const config = scenarioWorkConfigFromForm();
-    const baseName = String(config.name || 'Ð¦Ð¸ÐºÐ» Ñƒ Ñ‡Ð°Ñ‚Ñ–').slice(0, 105);
-    setScenarioWorkBusy(true);
-    const sourceScenarioId = ui.selectedScenarioWorkId;
-    const sourceIsDormantTemplate = Boolean(
-      sourceScenarioId
-      && !ui.selectedScenarioWork?.pool?.id
-      && ui.selectedScenarioWork?.runtime?.runState === 'STOPPED'
-      && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
-      && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
-    );
-    const result = await core('CREATE_SCENARIO_CHAT_POOL', {
-      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
-    });
-    const ids = result?.ids || [];
-    if (ids.length !== count) throw new Error('ÐŸÑƒÐ» ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ Ð½Ðµ Ð¿Ð¾Ð²Ð½Ñ–ÑÑ‚ÑŽ. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÑÑ‚Ð°Ð½ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾ÑŽ ÑÐ¿Ñ€Ð¾Ð±Ð¾ÑŽ.');
-    if (Number(result?.pool?.slots) !== count) throw new Error('Core Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² Ñ–Ð½ÑˆÑƒ ÐºÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð², Ð½Ñ–Ð¶ Ð±ÑƒÐ»Ð¾ Ð·Ð°Ð´Ð°Ð½Ð¾.');
-    if (Number(result?.pool?.initialStaggerSeconds) !== staggerSeconds) throw new Error('Core Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² Ñ–Ð½ÑˆÑƒ Ð¿Ð°ÑƒÐ·Ñƒ Ð¼Ñ–Ð¶ Ð¿ÐµÑ€ÑˆÐ¸Ð¼Ð¸ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ð°Ð¼Ð¸, Ð½Ñ–Ð¶ Ð±ÑƒÐ»Ð¾ Ð·Ð°Ð´Ð°Ð½Ð¾. Ð—Ð°Ð¿ÑƒÑÐº Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾ ÑÐº Ð½ÐµÐ¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¸Ð¹.');
-    // The imported/configuration-only CHAT_CYCLE source is consumed by the
-    // physical pool. Keeping it as an eleventh "scenario" made a 10-chat launch
-    // look like 11. Delete only a never-started unpooled source; never touch a
-    // real/previously-run scenario.
-    if (sourceIsDormantTemplate && !ids.includes(sourceScenarioId)) {
-      try { await core('DELETE_SCENARIO_WORK', { id: sourceScenarioId }); }
-      catch (_) { /* Global projection still excludes this dormant template. */ }
-    }
-    await loadScenarioWork();
-    if (result?.pool?.id) {
-      $('scenario-work-list').value = scenarioPoolListValue(result.pool.id);
-      await openScenarioWorkTarget(scenarioPoolListValue(result.pool.id), { selectSingle: false });
-    }
-    setScenarioWorkPanel('state');
-    announce(`Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾: ${ids.length} Ð¿Ð°Ñ€Ð°Ð»ÐµÐ»ÑŒÐ½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð² Ñƒ Ñ†ÑŒÐ¾Ð¼Ñƒ Ð²Ñ–ÐºÐ½Ñ–.`);
-  } catch (error) {
-    await loadScenarioWork();
-    const message = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚Ð¸ Ð·Ð°Ð¿ÑƒÑÐº Ð¿ÑƒÐ»Ñƒ. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÑÐ¿Ð¸ÑÐ¾Ðº ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ñ—Ð²: ${error.message}`;
-    $('scenario-work-summary').textContent = message;
-    announce(message);
-  } finally { setScenarioWorkBusy(false); }
-}
-
-async function saveScenarioWork() {
-  const id = ui.selectedScenarioWorkId;
-  if (!id) return;
-  try {
-    setScenarioWorkBusy(true);
-    const config = scenarioWorkConfigFromForm();
-    if (ui.selectedScenarioPoolId) {
-      const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Ð”Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ñ– Ñ‡Ð°Ñ‚Ð¸');
-      const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
-      const data = await core('UPDATE_SCENARIO_CHAT_POOL', {
-        id: ui.selectedScenarioPoolId,
-        config,
-        replacementBudget,
-        staggerSeconds,
-      });
-      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
-      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
-      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
-      await loadScenarioWork();
-      announce('ÐŸÐ°Ñ€Ð°Ð¼ÐµÑ‚Ñ€Ð¸ Ð²ÑÑŒÐ¾Ð³Ð¾ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾ Ð±ÐµÐ· ÑÐºÐ¸Ð´Ð°Ð½Ð½Ñ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑƒ Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð².');
-    } else {
-      const data = await core('UPDATE_SCENARIO_WORK', { id, config });
-      fillScenarioWorkForm(data.scenario);
-      await loadScenarioWork();
-      announce('Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-    }
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${error.message}`;
-    announce('ÐŸÐ¾Ð¼Ð¸Ð»ÐºÐ° Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð½Ñ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–ÑŽ.');
-  } finally { setScenarioWorkBusy(false); }
-}
-
-async function scenarioWorkLifecycle(command, successText) {
-  const id = ui.selectedScenarioWorkId;
-  if (!id) return;
-  try {
-    setScenarioWorkBusy(true);
-    if (ui.selectedScenarioPoolId) {
-      const poolCommand = {
-        START_SCENARIO_WORK: 'START_SCENARIO_CHAT_POOL',
-        PAUSE_SCENARIO_WORK: 'PAUSE_SCENARIO_CHAT_POOL',
-        RESUME_SCENARIO_WORK: 'RESUME_SCENARIO_CHAT_POOL',
-        STOP_SCENARIO_WORK: 'STOP_SCENARIO_CHAT_POOL',
-      }[command];
-      if (!poolCommand) throw new Error('ÐÐµÐ¿Ñ–Ð´Ñ‚Ñ€Ð¸Ð¼ÑƒÐ²Ð°Ð½Ð° Ð´Ñ–Ñ Ð´Ð»Ñ Ð¿ÑƒÐ»Ñƒ.');
-      const data = await core(poolCommand, { id: ui.selectedScenarioPoolId });
-      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
-      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
-      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
-      await loadScenarioWork();
-    } else {
-      const data = await core(command, { id });
-      fillScenarioWorkForm(data.scenario);
-      await loadScenarioWork();
-    }
-    if (command === 'START_SCENARIO_WORK' || command === 'RESUME_SCENARIO_WORK') setScenarioWorkPanel('state');
-    announce(successText);
-  } catch (error) {
-    $('scenario-work-summary').textContent = `${successText} Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-  } finally { setScenarioWorkBusy(false); }
-}
-
-async function deleteScenarioWork() {
-  const id = ui.selectedScenarioWorkId;
-  if (!id) return;
-  try {
-    setScenarioWorkBusy(true);
-    if (ui.selectedScenarioPoolId) {
-      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioPoolId });
-      ui.selectedScenarioPoolId = '';
-    } else await core('DELETE_SCENARIO_WORK', { id });
-    await loadScenarioWork({ preservePanel: false });
-    $('scenario-work-list').focus();
-    announce('Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð²Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ñ–Ð¹: ${error.message}`;
-  } finally { setScenarioWorkBusy(false); }
-}
-
-async function runScenarioWorkNow() {
-  try {
-    setScenarioWorkBusy(true);
-    await core('RUN_SCENARIO_WORK_NOW');
-    await loadScenarioWork();
-    setScenarioWorkPanel('state');
-    announce('Ð¡Ñ‚Ð°Ð½ ÑÑ†ÐµÐ½Ð°Ñ€Ð½Ð¾Ñ— Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð¾ Ð·Ð°Ñ€Ð°Ð·.');
-  } catch (error) {
-    $('scenario-work-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ð¸Ñ‚Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ð½Ñƒ Ñ€Ð¾Ð±Ð¾Ñ‚Ñƒ: ${error.message}`;
-  } finally { setScenarioWorkBusy(false); }
-}
-
-
-function agentDefinitionLines(values = []) {
-  return Array.isArray(values) ? values.join('\n') : '';
-}
-
-function setAgentDefinitionFormEnabled(enabled) {
-  const group = $('agent-definition-form-group');
-  if (group) group.disabled = !enabled;
-  $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
-}
-
-function agentDefinitionModelPolicySummary(definition) {
-  const policy = definition?.modelRoutePolicy;
-  if (!policy) return 'Model policy: global Models settings.';
-  const parts = [];
-  if (policy.pinnedRouteId) parts.push('route ' + policy.pinnedRouteId);
-  if (Array.isArray(policy.allowRouteIds) && policy.allowRouteIds.length) {
-    parts.push('allowed routes ' + policy.allowRouteIds.join(', '));
-  }
-  if (policy.freeOnly) parts.push('free only');
-  if (policy.locality && policy.locality !== 'any') parts.push(policy.locality + ' only');
-  if (policy.autoSwitch === false) parts.push('automatic failover off');
-  if (policy.maxInputPricePerMillionUsd != null) parts.push('input price cap ' + policy.maxInputPricePerMillionUsd);
-  if (policy.maxOutputPricePerMillionUsd != null) parts.push('output price cap ' + policy.maxOutputPricePerMillionUsd);
-  return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
-}
-
-function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
-  const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
-  setAgentDefinitionFormEnabled(hasRegistry);
-  const idField = $('agent-definition-id');
-  idField.readOnly = Boolean(definition) && !create;
-  idField.value = definition?.agentDefinitionId || '';
-  $('agent-definition-label').value = definition?.label || '';
-  $('agent-definition-description').value = definition?.description || '';
-  $('agent-definition-instructions').value = definition?.instructions || '';
-  $('agent-definition-capabilities').value = agentDefinitionLines(definition?.capabilityIds);
-  $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
-  $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
-  $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
-  $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
-  $('agent-definition-revision').textContent = definition
-    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
-    : (hasRegistry ? `ÐÐ¾Ð²Ð° definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Ð ÐµÑ”ÑÑ‚Ñ€ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.');
-  $('agent-definition-save-button').disabled = !hasRegistry;
-  $('agent-definition-toggle-enabled-button').disabled = !definition;
-  $('agent-definition-delete-button').disabled = !definition;
-  fillAgentDefinitionLaunchForm(definition);
-}
-
-function fillAgentDefinitionLaunchForm(definition = null) {
-  const group = $('agent-definition-launch-group');
-  const button = $('agent-definition-launch-button');
-  const status = $('agent-definition-launch-status');
-  const launchable = Boolean(definition?.enabled === true && ui.selectedAgentDefinitionRegistry);
-  group.disabled = !launchable;
-  button.disabled = !launchable;
-
-  if (!definition) {
-    ui.agentDefinitionLaunchDefinitionId = '';
-    $('agent-definition-launch-owner-capabilities').value = '';
-    $('agent-definition-launch-owner-tools').value = '';
-    $('agent-definition-launch-requested-capabilities').value = '';
-    $('agent-definition-launch-requested-tools').value = '';
-    status.textContent = 'ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ñƒ Agent definition. Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ñ” Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ.';
-    return;
-  }
-
-  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
-  if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
-    const scope = agentDefinitionLaunchScopeTextV1(definition);
-    $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
-    $('agent-definition-launch-owner-tools').value = scope.ownerToolIdsText;
-    $('agent-definition-launch-requested-capabilities').value = scope.requestedCapabilityIdsText;
-    $('agent-definition-launch-requested-tools').value = scope.requestedToolIdsText;
-    ui.agentDefinitionLaunchDefinitionId = definitionLaunchKey;
-  }
-
-  status.textContent = definition.enabled === true
-    ? 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¾ Ð´Ð¾ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ STOPPED-Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ owner grants, narrowing Ñ– Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ð¸Ð¹ Ð±ÑŽÐ´Ð¶ÐµÑ‚ Agent.'
-    : 'Ð¦Ñ Agent definition Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð°. Ð£Ð²Ñ–Ð¼ÐºÐ½Ñ–Ñ‚ÑŒ Ñ—Ñ— Ð¿ÐµÑ€ÐµÐ´ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½ÑÐ¼ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ.';
-}
-
-function browserAgentOwnerBudgetPolicyFromForm() {
-  return {
-    maxSteps: browserAgentInteger('agent-max-steps', 1, 10000, 'Safety ceiling Ð´Ñ–Ð¹'),
-    maxModelCalls: browserAgentInteger('agent-max-model-calls', 0, 1000000, 'Model calls'),
-    maxInputTokens: browserAgentInteger('agent-max-input-tokens', 0, 2000000000, 'Ð’Ñ…Ñ–Ð´Ð½Ñ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxOutputTokens: browserAgentInteger('agent-max-output-tokens', 0, 2000000000, 'Ð’Ð¸Ñ…Ñ–Ð´Ð½Ñ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxTotalTokens: browserAgentInteger('agent-max-total-tokens', 0, 2000000000, 'Ð£ÑÑ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxOutputTokensPerCall: browserAgentInteger('agent-max-output-per-call', 128, 200000, 'Output tokens Ð½Ð° model call'),
-    maxRuntimeMinutes: browserAgentInteger('agent-max-runtime-minutes', 0, 525600, 'Ð§Ð°Ñ Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸'),
-    maxCostUsd: browserAgentNumber('agent-max-cost-usd', 0, 1000000, 'Ð‘ÑŽÐ´Ð¶ÐµÑ‚ USD'),
-    inputPricePerMillionUsd: browserAgentNumber('agent-input-price', 0, 1000000, 'Ð¦Ñ–Ð½Ð° input'),
-    outputPricePerMillionUsd: browserAgentNumber('agent-output-price', 0, 1000000, 'Ð¦Ñ–Ð½Ð° output'),
-  };
-}
-
-function agentDefinitionLaunchFormValue() {
-  return {
-    goal: $('agent-definition-launch-goal').value,
-    projectId: $('agent-definition-launch-project-id').value,
-    jobId: $('agent-definition-launch-job-id').value,
-    ownerCapabilityIdsText: $('agent-definition-launch-owner-capabilities').value,
-    ownerToolIdsText: $('agent-definition-launch-owner-tools').value,
-    requestedCapabilityIdsText: $('agent-definition-launch-requested-capabilities').value,
-    requestedToolIdsText: $('agent-definition-launch-requested-tools').value,
-  };
-}
-
-async function createBrowserAgentFromDefinition() {
-  const registry = ui.selectedAgentDefinitionRegistry;
-  const definition = ui.selectedAgentDefinition;
-  const button = $('agent-definition-launch-button');
-  const status = $('agent-definition-launch-status');
-  if (!registry || !definition) {
-    status.textContent = 'Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð¾Ð±ÐµÑ€Ñ–Ñ‚ÑŒ reusable Agent definition.';
-    return;
-  }
-  const operation = beginAgentOwnerOperation('CREATE', '');
-  if (!operation) return;
-  let createdId = '';
-  try {
-    const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
-      registry, definition, ownerPolicy: browserAgentOwnerBudgetPolicyFromForm(),
-    });
-    button.disabled = true;
-    status.textContent = 'Ð¡Ñ‚Ð²Ð¾Ñ€ÑŽÑŽ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ðµ STOPPED-Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ. Ð’Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ñ”Ñ‚ÑŒÑÑâ€¦';
-    const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
-    const id = created?.job?.id || created?.selectedId;
-    if (!id) throw new Error('Core Ð½Ðµ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² id ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾Ð³Ð¾ Agent job.');
-    createdId = id;
-    agentJobsReadGate.invalidate();
-    const runState = created?.job?.runtime?.runState || '';
-    if (runState !== 'STOPPED') throw new Error(`Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ð²Ð¶Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾, Ð°Ð»Ðµ Core Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² ÑÑ‚Ð°Ð½ ${runState || 'UNKNOWN'}`);
-    const message = `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${id} ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ Ð· ${definition.label} Ñƒ ÑÑ‚Ð°Ð½Ñ– STOPPED. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ð¹Ð¾Ð³Ð¾ Ñ– Ð·Ð°Ð¿ÑƒÑÐºÐ°Ð¹Ñ‚Ðµ Ð¾ÐºÑ€ÐµÐ¼Ð¾.`;
-    agentOwnerResult(operation, message);
-    status.textContent = message;
-    if (!agentViewFence.current(operation.ticket)) return;
-    operation.ticket = selectBrowserAgentView(id);
-    ui.agentDraftActive = false;
-    ui.agentPolicyDirty = false;
-    renderBrowserAgentJob(created.job);
-    const refreshed = await loadBrowserAgentJobs({ selectId: id });
-    if (refreshed.error) status.textContent = `${message} ÐžÐ½Ð¾Ð²Ð»ÐµÐ½Ð½Ñ ÑÐ¿Ð¸ÑÐºÑƒ Ð½Ðµ Ð²Ð´Ð°Ð»Ð¾ÑÑ: ${refreshed.error.message}`;
-    if (agentViewFence.current(operation.ticket)) $('agent-job-list').focus();
-    announce('Reusable Agent Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾ Ñƒ ÑÑ‚Ð°Ð½Ñ– STOPPED. Ð’Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ð»Ð¾ÑÑ.');
-  } catch (error) {
-    if (createdId) {
-      status.textContent = `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${createdId} Ð²Ð¶Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° ÑÑ‚Ð°Ð½Ñƒ Ð½Ðµ Ð²Ð´Ð°Ð»Ð°ÑÑ: ${error.message}. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ð¹Ð¾Ð³Ð¾ Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ð¼ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½ÑÐ¼.`;
-    } else if (/revision drifted/i.test(String(error?.message || ''))) {
-      await loadAgentDefinitionRegistries({ selectRegistryId: registry.registryId, selectDefinitionId: definition.agentDefinitionId });
-      status.textContent = 'Definition Ð·Ð¼Ñ–Ð½Ð¸Ð»Ð°ÑÑ Ð´Ð¾ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ñ– Ð´Ð°Ð½Ñ– Ð¿ÐµÑ€ÐµÐ·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾; Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ grants Ñ– Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ñ–Ñ‚ÑŒ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ.';
-    } else status.textContent = `Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ Ð· definition Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾: ${error.message}. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÑÐ¿Ð¸ÑÐ¾Ðº Ð·Ð°Ð²Ð´Ð°Ð½ÑŒ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ð¼ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½ÑÐ¼.`;
-    agentOwnerResult(operation, status.textContent);
-  } finally {
-    finishAgentOwnerOperation(operation);
-    button.disabled = !(ui.selectedAgentDefinition?.enabled === true && ui.selectedAgentDefinitionRegistry);
-  }
-}
-
-function renderAgentDefinitionRegistryList() {
-  const select = $('agent-definition-registry-list');
-  select.replaceChildren();
-  for (const registry of ui.agentDefinitionRegistries) {
-    const option = document.createElement('option');
-    option.value = registry.registryId;
-    option.textContent = `${registry.registryId} â€” revision ${registry.revision}`;
-    option.selected = registry.registryId === ui.selectedAgentDefinitionRegistryId;
-    select.append(option);
-  }
-  $('agent-definition-quarantine-status').textContent = ui.agentDefinitionQuarantineCount
-    ? `Ð£ ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½Ñ– Ð¿Ð¾ÑˆÐºÐ¾Ð´Ð¶ÐµÐ½Ð¸Ñ… reusable-Agent Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð²: ${ui.agentDefinitionQuarantineCount}. Ð‡Ñ…Ð½Ñ–Ð¹ Ð²Ð¼Ñ–ÑÑ‚ Ð½Ðµ Ð¿Ð¾ÐºÐ°Ð·ÑƒÑ”Ñ‚ÑŒÑÑ Ñ– Ð½Ðµ Ð¿ÐµÑ€ÐµÐ·Ð°Ð¿Ð¸ÑÑƒÑ”Ñ‚ÑŒÑÑ.`
-    : 'ÐŸÐ¾ÑˆÐºÐ¾Ð´Ð¶ÐµÐ½Ð¸Ñ… reusable-Agent Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð² Ñƒ ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½Ñ– Ð½ÐµÐ¼Ð°Ñ”.';
-}
-
-function renderAgentDefinitionList() {
-  const select = $('agent-definition-list');
-  select.replaceChildren();
-  const definitions = ui.selectedAgentDefinitionRegistry?.definitions || [];
-  for (const definition of definitions) {
-    const option = document.createElement('option');
-    option.value = definition.agentDefinitionId;
-    option.textContent = `${definition.label} â€” ${definition.agentDefinitionId} â€” rev ${definition.definitionRevision}${definition.enabled ? '' : ' â€” Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾'}`;
-    option.selected = definition.agentDefinitionId === ui.selectedAgentDefinitionId;
-    select.append(option);
-  }
-}
-
-async function loadAgentDefinitionRegistries({ selectRegistryId = '', selectDefinitionId = '' } = {}) {
-  ui.selectedAgentDefinitionRegistry = null;
-  ui.selectedAgentDefinition = null;
-  ui.agentDefinitionMode = 'none';
-  setAgentDefinitionFormEnabled(false);
-  try {
-    const data = await core('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES');
-    ui.agentDefinitionRegistries = Array.isArray(data?.registries) ? data.registries : [];
-    ui.agentDefinitionQuarantineCount = Array.isArray(data?.quarantinedRegistryIds) ? data.quarantinedRegistryIds.length : 0;
-    const requestedRegistryId = selectRegistryId || ui.selectedAgentDefinitionRegistryId;
-    ui.selectedAgentDefinitionRegistryId = ui.agentDefinitionRegistries.some(item => item.registryId === requestedRegistryId)
-      ? requestedRegistryId
-      : (ui.agentDefinitionRegistries[0]?.registryId || '');
-    renderAgentDefinitionRegistryList();
-
-    if (!ui.selectedAgentDefinitionRegistryId) {
-      ui.selectedAgentDefinitionRegistry = null;
-      ui.selectedAgentDefinitionId = '';
-      ui.selectedAgentDefinition = null;
-      ui.agentDefinitionMode = 'none';
-      renderAgentDefinitionList();
-      fillAgentDefinitionForm(null);
-      $('agent-definition-status').textContent = 'Reusable Agent Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð² Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”. Ð¡Ñ‚Ð²Ð¾Ñ€Ñ–Ñ‚ÑŒ Ñ€ÐµÑ”ÑÑ‚Ñ€, Ñ‰Ð¾Ð± Ð´Ð¾Ð´Ð°Ñ‚Ð¸ definition.';
-      return;
-    }
-
-    const detail = await core('GET_BROWSER_AGENT_DEFINITION_REGISTRY', {
-      registryId: ui.selectedAgentDefinitionRegistryId,
-    });
-    if (!detail?.registry) {
-      throw new Error(detail?.quarantined ? 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ð¸Ð¹ Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð¿ÐµÑ€ÐµÐ¼Ñ–Ñ‰ÐµÐ½Ð¾ Ð² ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½.' : 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ð¸Ð¹ Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð±Ñ–Ð»ÑŒÑˆÐµ Ð½Ðµ Ñ–ÑÐ½ÑƒÑ”.');
-    }
-    ui.selectedAgentDefinitionRegistry = detail.registry;
-    const requestedDefinitionId = selectDefinitionId || ui.selectedAgentDefinitionId;
-    ui.selectedAgentDefinitionId = ui.selectedAgentDefinitionRegistry.definitions.some(item => item.agentDefinitionId === requestedDefinitionId)
-      ? requestedDefinitionId
-      : (ui.selectedAgentDefinitionRegistry.definitions[0]?.agentDefinitionId || '');
-    ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry.definitions.find(item => item.agentDefinitionId === ui.selectedAgentDefinitionId) || null;
-    ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
-    renderAgentDefinitionList();
-    fillAgentDefinitionForm(ui.selectedAgentDefinition);
-    $('agent-definition-status').textContent = `Ð ÐµÑ”ÑÑ‚Ñ€ ${ui.selectedAgentDefinitionRegistry.registryId}, revision ${ui.selectedAgentDefinitionRegistry.revision}. Definitions: ${ui.selectedAgentDefinitionRegistry.definitions.length}.`;
-  } catch (error) {
-    ui.selectedAgentDefinitionRegistry = null;
-    ui.selectedAgentDefinitionId = '';
-    ui.selectedAgentDefinition = null;
-    ui.agentDefinitionMode = 'none';
-    renderAgentDefinitionList();
-    fillAgentDefinitionForm(null);
-    $('agent-definition-status').textContent = `Reusable Agent definitions Ð½Ðµ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-async function selectAgentDefinitionRegistry() {
-  const registryId = $('agent-definition-registry-list').value;
-  ui.selectedAgentDefinitionId = '';
-  await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
-}
-
-function selectAgentDefinition() {
-  const definitionId = $('agent-definition-list').value;
-  ui.selectedAgentDefinitionId = definitionId;
-  ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry?.definitions?.find(item => item.agentDefinitionId === definitionId) || null;
-  ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
-  fillAgentDefinitionForm(ui.selectedAgentDefinition);
-}
-
-async function createAgentDefinitionRegistry() {
-  const status = $('agent-definition-status');
-  try {
-    const registryId = parseCanonicalAgentIdentity($('agent-definition-create-registry-id').value, 'Registry ID');
-    await core('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY', { registryId });
-    $('agent-definition-create-registry-id').value = '';
-    await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
-    $('agent-definition-new-button').focus();
-    status.textContent = `Ð ÐµÑ”ÑÑ‚Ñ€ ${registryId} ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾. Ð”Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ð¿ÐµÑ€ÑˆÑƒ reusable Agent definition.`;
-    announce('Reusable Agent Ñ€ÐµÑ”ÑÑ‚Ñ€ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.');
-  } catch (error) {
-    status.textContent = `Ð ÐµÑ”ÑÑ‚Ñ€ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-function newAgentDefinition() {
-  if (!ui.selectedAgentDefinitionRegistry) return;
-  ui.selectedAgentDefinitionId = '';
-  ui.selectedAgentDefinition = null;
-  ui.agentDefinitionMode = 'create';
-  renderAgentDefinitionList();
-  fillAgentDefinitionForm(null, { create: true });
-  $('agent-definition-id').focus();
-  $('agent-definition-status').textContent = 'ÐÐ¾Ð²Ð° reusable Agent definition. Ð—Ð°Ð¿Ð¾Ð²Ð½Ñ–Ñ‚ÑŒ Ð¾Ð±Ð¾Ð²â€™ÑÐ·ÐºÐ¾Ð²Ñ– Ð¿Ð¾Ð»Ñ Ñ‚Ð° Ð·Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ.';
-}
-
-function agentDefinitionFormValue() {
-  return {
-    agentDefinitionId: $('agent-definition-id').value,
-    label: $('agent-definition-label').value,
-    description: $('agent-definition-description').value,
-    instructions: $('agent-definition-instructions').value,
-    capabilityIdsText: $('agent-definition-capabilities').value,
-    toolIdsText: $('agent-definition-tools').value,
-    tagsText: $('agent-definition-tags').value,
-    acceptanceCriteriaText: $('agent-definition-acceptance').value,
-    enabled: $('agent-definition-enabled').checked,
-  };
-}
-
-async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
-  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
-  const registryId = ui.selectedAgentDefinitionRegistryId;
-  await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
-  $('agent-definition-status').textContent = 'Ð ÐµÑ”ÑÑ‚Ñ€ Ð·Ð¼Ñ–Ð½Ð¸Ð²ÑÑ Ð² Ñ–Ð½ÑˆÑ–Ð¹ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ñ–Ñ—. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ñ– Ð´Ð°Ð½Ñ– Ð¿ÐµÑ€ÐµÐ·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾; Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ñ—Ñ… Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ð¼ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð½ÑÐ¼.';
-  announce('Reusable Agent definition Ð·Ð¼Ñ–Ð½Ð¸Ð»Ð°ÑÑ. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ñ– Ð´Ð°Ð½Ñ– Ð¿ÐµÑ€ÐµÐ·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.');
-  return true;
-}
-
-async function saveAgentDefinition() {
-  const registry = ui.selectedAgentDefinitionRegistry;
-  if (!registry) return;
-  const current = ui.agentDefinitionMode === 'edit' ? ui.selectedAgentDefinition : null;
-  try {
-    const definitionRevision = current ? current.definitionRevision + 1 : 1;
-    const definition = buildAgentDefinitionFromFormV1(agentDefinitionFormValue(), {
-      definitionRevision,
-      configDefaults: current?.configDefaults || {},
-      modelRoutePolicy: current?.modelRoutePolicy ?? null,
-    });
-    const payload = current
-      ? {
-          registryId: registry.registryId,
-          expectedRegistryRevision: registry.revision,
-          kind: 'UPDATE',
-          agentDefinitionId: current.agentDefinitionId,
-          expectedDefinitionRevision: current.definitionRevision,
-          definition,
-        }
-      : {
-          registryId: registry.registryId,
-          expectedRegistryRevision: registry.revision,
-          kind: 'CREATE',
-          definition,
-        };
-    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', payload);
-    await loadAgentDefinitionRegistries({
-      selectRegistryId: registry.registryId,
-      selectDefinitionId: definition.agentDefinitionId,
-    });
-    $('agent-definition-status').textContent = current ? 'Reusable Agent definition Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾.' : 'Reusable Agent definition ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.';
-    announce(current ? 'Reusable Agent definition Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾.' : 'Reusable Agent definition ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current?.agentDefinitionId || '' })) return;
-    $('agent-definition-status').textContent = `Definition Ð½Ðµ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-async function toggleAgentDefinitionEnabled() {
-  const registry = ui.selectedAgentDefinitionRegistry;
-  const current = ui.selectedAgentDefinition;
-  if (!registry || !current) return;
-  try {
-    const definition = {
-      ...current,
-      enabled: !current.enabled,
-      definitionRevision: current.definitionRevision + 1,
-    };
-    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
-      registryId: registry.registryId,
-      expectedRegistryRevision: registry.revision,
-      kind: 'UPDATE',
-      agentDefinitionId: current.agentDefinitionId,
-      expectedDefinitionRevision: current.definitionRevision,
-      definition,
-    });
-    await loadAgentDefinitionRegistries({
-      selectRegistryId: registry.registryId,
-      selectDefinitionId: current.agentDefinitionId,
-    });
-    $('agent-definition-status').textContent = definition.enabled ? 'Reusable Agent definition ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾.' : 'Reusable Agent definition Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.';
-    announce(definition.enabled ? 'Reusable Agent definition ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾.' : 'Reusable Agent definition Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
-    $('agent-definition-status').textContent = `Ð¡Ñ‚Ð°Ð½ definition Ð½Ðµ Ð·Ð¼Ñ–Ð½ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-async function deleteAgentDefinition() {
-  const registry = ui.selectedAgentDefinitionRegistry;
-  const current = ui.selectedAgentDefinition;
-  if (!registry || !current) return;
-  if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Ð’Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸ reusable Agent definition â€œ${current.label}â€?`)) return;
-  try {
-    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
-      registryId: registry.registryId,
-      expectedRegistryRevision: registry.revision,
-      kind: 'DELETE',
-      agentDefinitionId: current.agentDefinitionId,
-      expectedDefinitionRevision: current.definitionRevision,
-    });
-    ui.selectedAgentDefinitionId = '';
-    await loadAgentDefinitionRegistries({ selectRegistryId: registry.registryId });
-    $('agent-definition-status').textContent = 'Reusable Agent definition Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.';
-    announce('Reusable Agent definition Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
-    $('agent-definition-status').textContent = `Definition Ð½Ðµ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-function specialistIdsFromText(raw, label, { required = false } = {}) {
-  const values = String(raw || '')
-    .split(/\r?\n/u)
-    .map(value => value.trim())
-    .filter(Boolean)
-    .map(value => parseCanonicalAgentIdentity(value, label));
-  const unique = [...new Set(values)].sort();
-  if (required && !unique.length) throw new Error(`${label}: Ð´Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ñ‰Ð¾Ð½Ð°Ð¹Ð¼ÐµÐ½ÑˆÐµ Ð¾Ð´Ð¸Ð½ ID.`);
-  return unique;
-}
-
-function setSpecialistFormEnabled(enabled) {
-  $('agent-specialist-form-group').disabled = !enabled;
-  $('agent-specialist-new-button').disabled = !enabled;
-}
-
-function renderSpecialistRegistryList() {
-  const select = $('agent-specialist-registry-list');
-  select.replaceChildren();
-  for (const registry of ui.specialistRegistries) {
-    const option = document.createElement('option');
-    option.value = registry.registryId;
-    option.textContent = `${registry.registryId} â€” rev ${registry.revision} â€” ${registry.definitions.length} specialist`;
-    option.selected = registry.registryId === ui.selectedSpecialistRegistryId;
-    select.append(option);
-  }
-  $('agent-specialist-quarantine-status').textContent = ui.specialistQuarantineCount
-    ? `Ð£ ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½Ñ– specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð²: ${ui.specialistQuarantineCount}. Ð‡Ñ…Ð½Ñ– ÑÐ¸Ñ€Ñ– Ñ–Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ñ–ÐºÐ°Ñ‚Ð¾Ñ€Ð¸ Ð¿Ñ€Ð¸Ñ…Ð¾Ð²Ð°Ð½Ð¾.`
-    : 'ÐŸÐ¾ÑˆÐºÐ¾Ð´Ð¶ÐµÐ½Ð¸Ñ… specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð² Ñƒ ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½Ñ– Ð½ÐµÐ¼Ð°Ñ”.';
-}
-
-function renderSpecialistList() {
-  const select = $('agent-specialist-list');
-  select.replaceChildren();
-  for (const definition of ui.selectedSpecialistRegistry?.definitions || []) {
-    const option = document.createElement('option');
-    option.value = definition.specialistId;
-    option.textContent = `${definition.label} â€” ${definition.providerId}/${definition.executionPlane} â€” rev ${definition.definitionRevision}${definition.enabled ? '' : ' â€” Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾'}`;
-    option.selected = definition.specialistId === ui.selectedSpecialistId;
-    select.append(option);
-  }
-}
-
-function fillSpecialistForm(definition = null, { create = false } = {}) {
-  const hasRegistry = Boolean(ui.selectedSpecialistRegistry);
-  setSpecialistFormEnabled(hasRegistry);
-  $('agent-specialist-id').readOnly = Boolean(definition) && !create;
-  $('agent-specialist-id').value = definition?.specialistId || '';
-  $('agent-specialist-provider-id').value = definition?.providerId || '';
-  $('agent-specialist-label').value = definition?.label || '';
-  $('agent-specialist-description').value = definition?.description || '';
-  $('agent-specialist-plane').value = ['LOCAL', 'CLOUD', 'REMOTE'].includes(definition?.executionPlane)
-    ? definition.executionPlane
-    : 'LOCAL';
-  $('agent-specialist-capabilities').value = agentDefinitionLines(definition?.capabilityIds);
-  $('agent-specialist-tools').value = agentDefinitionLines(definition?.toolIds);
-  $('agent-specialist-result-contract').value = definition?.resultContractId || 'agent-result:v1';
-  $('agent-specialist-enabled').checked = definition ? definition.enabled === true : true;
-  $('agent-specialist-revision').textContent = definition
-    ? `Specialist revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedSpecialistRegistry?.revision || '?'}.`
-    : (hasRegistry ? `ÐÐ¾Ð²Ð¸Ð¹ specialist. Registry revision: ${ui.selectedSpecialistRegistry.revision}.` : 'Ð ÐµÑ”ÑÑ‚Ñ€ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.');
-  $('agent-specialist-save-button').disabled = !hasRegistry;
-  $('agent-specialist-toggle-enabled-button').disabled = !definition;
-  $('agent-specialist-delete-button').disabled = !definition;
-}
-
-async function loadSpecialistRegistries({ selectRegistryId = '', selectSpecialistId = '' } = {}) {
-  ui.selectedSpecialistRegistry = null;
-  ui.selectedSpecialist = null;
-  ui.specialistMode = 'none';
-  setSpecialistFormEnabled(false);
-  try {
-    const data = await core('LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES');
-    ui.specialistRegistries = Array.isArray(data?.registries) ? data.registries : [];
-    ui.specialistQuarantineCount = Array.isArray(data?.quarantinedRegistryIds) ? data.quarantinedRegistryIds.length : 0;
-    const requestedRegistryId = selectRegistryId || ui.selectedSpecialistRegistryId;
-    ui.selectedSpecialistRegistryId = ui.specialistRegistries.some(item => item.registryId === requestedRegistryId)
-      ? requestedRegistryId
-      : (ui.specialistRegistries[0]?.registryId || '');
-    renderSpecialistRegistryList();
-    if (!ui.selectedSpecialistRegistryId) {
-      ui.selectedSpecialistId = '';
-      renderSpecialistList();
-      fillSpecialistForm(null);
-      $('agent-specialist-status').textContent = 'Specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€Ñ–Ð² Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”. Ð¡Ñ‚Ð²Ð¾Ñ€Ñ–Ñ‚ÑŒ Ñ€ÐµÑ”ÑÑ‚Ñ€, Ñ‰Ð¾Ð± Ð´Ð¾Ð´Ð°Ñ‚Ð¸ ÑÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð°.';
-      renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {});
-      return;
-    }
-    const detail = await core('GET_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: ui.selectedSpecialistRegistryId });
-    if (!detail?.registry) throw new Error(detail?.quarantined ? 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ð¸Ð¹ specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð¿ÐµÑ€ÐµÐ¼Ñ–Ñ‰ÐµÐ½Ð¾ Ð² ÐºÐ°Ñ€Ð°Ð½Ñ‚Ð¸Ð½.' : 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ð¸Ð¹ specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð±Ñ–Ð»ÑŒÑˆÐµ Ð½Ðµ Ñ–ÑÐ½ÑƒÑ”.');
-    ui.selectedSpecialistRegistry = detail.registry;
-    const requestedSpecialistId = selectSpecialistId || ui.selectedSpecialistId;
-    ui.selectedSpecialistId = detail.registry.definitions.some(item => item.specialistId === requestedSpecialistId)
-      ? requestedSpecialistId
-      : (detail.registry.definitions[0]?.specialistId || '');
-    ui.selectedSpecialist = detail.registry.definitions.find(item => item.specialistId === ui.selectedSpecialistId) || null;
-    ui.specialistMode = ui.selectedSpecialist ? 'edit' : 'none';
-    renderSpecialistList();
-    fillSpecialistForm(ui.selectedSpecialist);
-    $('agent-specialist-status').textContent = `Ð ÐµÑ”ÑÑ‚Ñ€ ${detail.registry.registryId}, revision ${detail.registry.revision}. Specialists: ${detail.registry.definitions.length}.`;
-    renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {});
-  } catch (error) {
-    ui.selectedSpecialistRegistry = null;
-    ui.selectedSpecialistId = '';
-    ui.selectedSpecialist = null;
-    ui.specialistMode = 'none';
-    renderSpecialistList();
-    fillSpecialistForm(null);
-    $('agent-specialist-status').textContent = `Specialist definitions Ð½Ðµ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾: ${error.message}`;
-    renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {});
-  }
-}
-
-async function selectSpecialistRegistry() {
-  ui.selectedSpecialistId = '';
-  await loadSpecialistRegistries({ selectRegistryId: $('agent-specialist-registry-list').value });
-}
-
-function selectSpecialist() {
-  ui.selectedSpecialistId = $('agent-specialist-list').value;
-  ui.selectedSpecialist = ui.selectedSpecialistRegistry?.definitions?.find(item => item.specialistId === ui.selectedSpecialistId) || null;
-  ui.specialistMode = ui.selectedSpecialist ? 'edit' : 'none';
-  fillSpecialistForm(ui.selectedSpecialist);
-}
-
-async function createSpecialistRegistry() {
-  try {
-    const registryId = parseCanonicalAgentIdentity($('agent-specialist-create-registry-id').value, 'Registry ID');
-    await core('CREATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId });
-    $('agent-specialist-create-registry-id').value = '';
-    await loadSpecialistRegistries({ selectRegistryId: registryId });
-    $('agent-specialist-new-button').focus();
-    $('agent-specialist-status').textContent = `Specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ ${registryId} ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.`;
-    announce('Specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('agent-specialist-status').textContent = `Specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-function newSpecialist() {
-  if (!ui.selectedSpecialistRegistry) return;
-  ui.selectedSpecialistId = '';
-  ui.selectedSpecialist = null;
-  ui.specialistMode = 'create';
-  renderSpecialistList();
-  fillSpecialistForm(null, { create: true });
-  $('agent-specialist-id').focus();
-  $('agent-specialist-status').textContent = 'ÐÐ¾Ð²Ð¸Ð¹ specialist. Ð—Ð°Ð¿Ð¾Ð²Ð½Ñ–Ñ‚ÑŒ Ð¾Ð±Ð¾Ð²â€™ÑÐ·ÐºÐ¾Ð²Ñ– Ð¿Ð¾Ð»Ñ Ñ‚Ð° Ð·Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ.';
-}
-
-function specialistDefinitionFromForm(definitionRevision) {
-  const label = $('agent-specialist-label').value.trim();
-  const description = $('agent-specialist-description').value.trim();
-  if (!label) throw new Error('ÐÐ°Ð·Ð²Ð° specialist Ð¾Ð±Ð¾Ð²â€™ÑÐ·ÐºÐ¾Ð²Ð°.');
-  return {
-    schemaVersion: 1,
-    specialistId: parseCanonicalAgentIdentity($('agent-specialist-id').value, 'Specialist ID'),
-    providerId: parseCanonicalAgentIdentity($('agent-specialist-provider-id').value, 'Provider ID'),
-    label,
-    description,
-    executionPlane: $('agent-specialist-plane').value,
-    capabilityIds: specialistIdsFromText($('agent-specialist-capabilities').value, 'Capability ID', { required: true }),
-    toolIds: specialistIdsFromText($('agent-specialist-tools').value, 'Tool ID'),
-    resultContractId: parseCanonicalAgentIdentity($('agent-specialist-result-contract').value, 'Result contract ID'),
-    enabled: $('agent-specialist-enabled').checked,
-    definitionRevision,
-  };
-}
-
-async function reloadAfterSpecialistDrift(error, { specialistId = '' } = {}) {
-  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
-  await loadSpecialistRegistries({ selectRegistryId: ui.selectedSpecialistRegistryId, selectSpecialistId: specialistId });
-  $('agent-specialist-status').textContent = 'Specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ Ð·Ð¼Ñ–Ð½Ð¸Ð²ÑÑ Ð² Ñ–Ð½ÑˆÑ–Ð¹ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ñ–Ñ—. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ñ– Ð´Ð°Ð½Ñ– Ð¿ÐµÑ€ÐµÐ·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.';
-  announce('Specialist definition Ð·Ð¼Ñ–Ð½Ð¸Ð»Ð°ÑÑ. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ñ– Ð´Ð°Ð½Ñ– Ð¿ÐµÑ€ÐµÐ·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.');
-  return true;
-}
-
-async function saveSpecialist() {
-  const registry = ui.selectedSpecialistRegistry;
-  if (!registry) return;
-  const current = ui.specialistMode === 'edit' ? ui.selectedSpecialist : null;
-  try {
-    const definition = specialistDefinitionFromForm(current ? current.definitionRevision + 1 : 1);
-    const payload = current
-      ? { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition }
-      : { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'CREATE', definition };
-    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', payload);
-    await loadSpecialistRegistries({ selectRegistryId: registry.registryId, selectSpecialistId: definition.specialistId });
-    $('agent-specialist-status').textContent = current ? 'Specialist definition Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾.' : 'Specialist definition ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.';
-    announce(current ? 'Specialist definition Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾.' : 'Specialist definition ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterSpecialistDrift(error, { specialistId: current?.specialistId || '' })) return;
-    $('agent-specialist-status').textContent = `Specialist Ð½Ðµ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-async function toggleSpecialistEnabled() {
-  const registry = ui.selectedSpecialistRegistry;
-  const current = ui.selectedSpecialist;
-  if (!registry || !current) return;
-  try {
-    const definition = { ...current, enabled: !current.enabled, definitionRevision: current.definitionRevision + 1 };
-    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition });
-    await loadSpecialistRegistries({ selectRegistryId: registry.registryId, selectSpecialistId: current.specialistId });
-    $('agent-specialist-status').textContent = definition.enabled ? 'Specialist ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾.' : 'Specialist Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.';
-    announce(definition.enabled ? 'Specialist ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾.' : 'Specialist Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterSpecialistDrift(error, { specialistId: current.specialistId })) return;
-    $('agent-specialist-status').textContent = `Ð¡Ñ‚Ð°Ð½ specialist Ð½Ðµ Ð·Ð¼Ñ–Ð½ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-async function deleteSpecialist() {
-  const registry = ui.selectedSpecialistRegistry;
-  const current = ui.selectedSpecialist;
-  if (!registry || !current) return;
-  if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Ð’Ð¸Ð´Ð°Ð»Ð¸Ñ‚Ð¸ specialist â€œ${current.label}â€?`)) return;
-  try {
-    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'DELETE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision });
-    ui.selectedSpecialistId = '';
-    await loadSpecialistRegistries({ selectRegistryId: registry.registryId });
-    $('agent-specialist-status').textContent = 'Specialist definition Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.';
-    announce('Specialist definition Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  } catch (error) {
-    if (await reloadAfterSpecialistDrift(error, { specialistId: current.specialistId })) return;
-    $('agent-specialist-status').textContent = `Specialist Ð½Ðµ Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾: ${error.message}`;
-  }
-}
-
-function browserAgentNameFromGoal(goal) {
-  const text = String(goal || '').replace(/\s+/g, ' ').trim();
-  return text ? text.slice(0, 90) : 'ÐÐ¾Ð²Ðµ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ð°Ð³ÐµÐ½Ñ‚Ð°';
-}
-
-function browserAgentInteger(id, min, max, label) {
-  const value = Number($(id).value);
-  if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-  return value;
-}
-
-function browserAgentNumber(id, min, max, label) {
-  const value = Number($(id).value);
-  if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${label}: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ‡Ð¸ÑÐ»Ð¾ ${min}-${max}.`);
-  return value;
-}
-
-function browserAgentDateTimeLocalToEpoch(id) {
-  const raw = $(id).value.trim();
-  if (!raw) return 0;
-  const value = new Date(raw).getTime();
-  if (!Number.isFinite(value)) throw new Error('ÐÐµÐºÐ¾Ñ€ÐµÐºÑ‚Ð½Ð° Ð´Ð°Ñ‚Ð° Ð°Ð±Ð¾ Ñ‡Ð°Ñ Ñƒ Ð¿Ð¾Ð»Ñ– Ñ€Ð¾Ð·ÐºÐ»Ð°Ð´Ñƒ Agent.');
-  return value;
-}
-
-function browserAgentEpochToDateTimeLocal(value) {
-  const time = Number(value || 0);
-  if (!time) return '';
-  const date = new Date(time);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = number => String(number).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function browserAgentSiteRulesFromText(raw) {
-  const lines = String(raw || '').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
-  if (lines.length > 100) throw new Error('ÐŸÑ€Ð°Ð²Ð¸Ð» ÑÐ°Ð¹Ñ‚Ñ–Ð² Ð¼Ð¾Ð¶Ðµ Ð±ÑƒÑ‚Ð¸ Ð½Ðµ Ð±Ñ–Ð»ÑŒÑˆÐµ 100.');
-  const allowed = new Set(['ALLOW', 'ASK', 'DENY', 'INHERIT']);
-  return lines.map((line, index) => {
-    const parts = line.split('|').map(part => part.trim());
-    const pattern = parts[0] || '';
-    const defaultDecision = (parts[1] || 'INHERIT').toUpperCase();
-    if (!pattern) throw new Error(`ÐŸÑ€Ð°Ð²Ð¸Ð»Ð¾ ÑÐ°Ð¹Ñ‚Ñƒ ${index + 1}: Ð²Ñ–Ð´ÑÑƒÑ‚Ð½Ñ–Ð¹ Ð´Ð¾Ð¼ÐµÐ½.`);
-    if (!allowed.has(defaultDecision)) throw new Error(`ÐŸÑ€Ð°Ð²Ð¸Ð»Ð¾ ÑÐ°Ð¹Ñ‚Ñƒ ${index + 1}: Ð²Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð°Ð¹Ñ‚Ðµ ALLOW, ASK Ð°Ð±Ð¾ DENY.`);
-    const actionDecisions = {};
-    if (parts[2]) {
-      for (const entry of parts[2].split(',').map(value => value.trim()).filter(Boolean)) {
-        const eq = entry.indexOf('=');
-        if (eq <= 0) throw new Error(`ÐŸÑ€Ð°Ð²Ð¸Ð»Ð¾ ÑÐ°Ð¹Ñ‚Ñƒ ${index + 1}: Ð²Ð¸Ð½ÑÑ‚Ð¾Ðº Ð¼Ð°Ñ” Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ Ð´Ñ–Ñ=ALLOW/ASK/DENY.`);
-        const key = entry.slice(0, eq).trim();
-        const decision = entry.slice(eq + 1).trim().toUpperCase();
-        if (!key || !allowed.has(decision) || decision === 'INHERIT') throw new Error(`ÐŸÑ€Ð°Ð²Ð¸Ð»Ð¾ ÑÐ°Ð¹Ñ‚Ñƒ ${index + 1}: Ð½ÐµÐºÐ¾Ñ€ÐµÐºÑ‚Ð½Ð¸Ð¹ Ð²Ð¸Ð½ÑÑ‚Ð¾Ðº ${entry}.`);
-        actionDecisions[key] = decision;
-      }
-    }
-    return { pattern, defaultDecision, actionDecisions };
-  });
-}
-
-function browserAgentSiteRulesToText(rules = []) {
-  return (Array.isArray(rules) ? rules : []).map(rule => {
-    const overrides = Object.entries(rule?.actionDecisions || {}).map(([key, value]) => `${key}=${value}`).join(',');
-    return [rule?.pattern || '', rule?.defaultDecision || 'INHERIT', overrides].filter((value, index) => index < 2 || value).join(' | ');
-  }).join('\n');
-}
-
-function browserAgentAcceptanceCriteriaFromText(raw) {
-  const criteria = String(raw || '').split(/\r?\n/u).map(line => line.trim()).filter(Boolean);
-  if (criteria.length > 20) throw new Error('ÐšÑ€Ð¸Ñ‚ÐµÑ€Ñ–Ñ—Ð² Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½Ñ Ð¼Ð¾Ð¶Ðµ Ð±ÑƒÑ‚Ð¸ Ð½Ðµ Ð±Ñ–Ð»ÑŒÑˆÐµ 20.');
-  if (criteria.some(criterion => criterion.length > 1000)) throw new Error('ÐšÐ¾Ð¶ÐµÐ½ ÐºÑ€Ð¸Ñ‚ÐµÑ€Ñ–Ð¹ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½Ñ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ð´Ð¾ 1000 ÑÐ¸Ð¼Ð²Ð¾Ð»Ñ–Ð².');
-  const seen = new Set();
-  for (const criterion of criteria) {
-    const key = criterion.toLocaleLowerCase();
-    if (seen.has(key)) throw new Error(`ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ÑŽÐ²Ð°Ð½Ð¸Ð¹ ÐºÑ€Ð¸Ñ‚ÐµÑ€Ñ–Ð¹ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½Ñ: ${criterion}`);
-    seen.add(key);
-  }
-  return criteria;
-}
-
-function browserAgentPolicyFromForm() {
-  const scheduleStartAt = browserAgentDateTimeLocalToEpoch('agent-schedule-start');
-  const scheduleEndAt = browserAgentDateTimeLocalToEpoch('agent-schedule-end');
-  if (scheduleStartAt && scheduleEndAt && scheduleEndAt <= scheduleStartAt) throw new Error('ÐšÑ–Ð½ÐµÑ†ÑŒ Ñ€Ð¾Ð·ÐºÐ»Ð°Ð´Ñƒ Agent Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ð¿Ñ–Ð·Ð½Ñ–ÑˆÐµ Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ.');
-  const activeWindowStart = $('agent-active-window-start').value.trim();
-  const activeWindowEnd = $('agent-active-window-end').value.trim();
-  if (Boolean(activeWindowStart) !== Boolean(activeWindowEnd)) throw new Error('Ð”Ð»Ñ Ñ‰Ð¾Ð´ÐµÐ½Ð½Ð¾Ð³Ð¾ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð³Ð¾ Ð²Ñ–ÐºÐ½Ð° Ð²ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ Ñ– Ð¿Ð¾Ñ‡Ð°Ñ‚Ð¾Ðº, Ñ– ÐºÑ–Ð½ÐµÑ†ÑŒ.');
-  return {
-    startUrl: $('agent-start-url').value.trim(),
-    startFromActiveTab: true,
-    maxSteps: browserAgentInteger('agent-max-steps', 1, 10000, 'Safety ceiling Ð´Ñ–Ð¹'),
-    stepDelayMs: browserAgentInteger('agent-step-delay-ms', 0, 60000, 'ÐŸÐ°ÑƒÐ·Ð° Ð¼Ñ–Ð¶ Ð´Ñ–ÑÐ¼Ð¸'),
-    allowCrossOriginNavigation: $('agent-allow-cross-origin').checked,
-    closeOwnedTabsOnStop: $('agent-close-tabs-on-stop').checked,
-    approvalMode: $('agent-approval-mode').value,
-    credentialDecision: $('agent-credential-decision').value,
-    siteRules: browserAgentSiteRulesFromText($('agent-site-rules').value),
-    visionOnDemand: $('agent-vision-on-demand').checked,
-    trustedScriptEnabled: $('agent-trusted-script-enabled').checked,
-    acceptanceCriteria: browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value),
-    repeatMode: $('agent-repeat-mode').value,
-    intervalSeconds: browserAgentInteger('agent-interval-seconds', 1, 604800, 'Ð†Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Agent'),
-    scheduleStartAt,
-    scheduleEndAt,
-    activeWindowStart,
-    activeWindowEnd,
-    aiRoutingMode: $('agent-ai-routing-mode').value,
-    aiPinnedRouteId: $('agent-ai-pinned-route-id').value,
-    aiPrimaryProvider: $('agent-ai-primary-provider').value,
-    aiPrimaryModel: $('agent-ai-primary-model').value.trim(),
-    aiStrongProvider: $('agent-ai-strong-provider').value,
-    aiStrongModel: $('agent-ai-strong-model').value.trim(),
-    maxModelCalls: browserAgentInteger('agent-max-model-calls', 0, 1000000, 'Model calls'),
-    maxInputTokens: browserAgentInteger('agent-max-input-tokens', 0, 2000000000, 'Ð’Ñ…Ñ–Ð´Ð½Ñ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxOutputTokens: browserAgentInteger('agent-max-output-tokens', 0, 2000000000, 'Ð’Ð¸Ñ…Ñ–Ð´Ð½Ñ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxTotalTokens: browserAgentInteger('agent-max-total-tokens', 0, 2000000000, 'Ð£ÑÑ– Ñ‚Ð¾ÐºÐµÐ½Ð¸'),
-    maxOutputTokensPerCall: browserAgentInteger('agent-max-output-per-call', 128, 200000, 'Output tokens Ð½Ð° model call'),
-    maxRuntimeMinutes: browserAgentInteger('agent-max-runtime-minutes', 0, 525600, 'Ð§Ð°Ñ Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸'),
-    maxCostUsd: browserAgentNumber('agent-max-cost-usd', 0, 1000000, 'Ð‘ÑŽÐ´Ð¶ÐµÑ‚ USD'),
-    inputPricePerMillionUsd: browserAgentNumber('agent-input-price', 0, 1000000, 'Ð¦Ñ–Ð½Ð° input'),
-    outputPricePerMillionUsd: browserAgentNumber('agent-output-price', 0, 1000000, 'Ð¦Ñ–Ð½Ð° output'),
-  };
-}
-
-function fillBrowserAgentPolicy(config = {}) {
-  $('agent-start-url').value = config.startUrl || '';
-  $('agent-max-steps').value = String(config.maxSteps ?? 500);
-  $('agent-step-delay-ms').value = String(config.stepDelayMs ?? 0);
-  $('agent-allow-cross-origin').checked = config.allowCrossOriginNavigation !== false;
-  $('agent-close-tabs-on-stop').checked = config.closeOwnedTabsOnStop === true;
-  $('agent-approval-mode').value = config.approvalMode === 'ALLOW_ALL' ? 'ALLOW_ALL' : 'CONSEQUENTIAL';
-  $('agent-credential-decision').value = ['ALLOW','ASK','DENY'].includes(config.credentialDecision) ? config.credentialDecision : 'ASK';
-  $('agent-site-rules').value = browserAgentSiteRulesToText(config.siteRules || []);
-  $('agent-vision-on-demand').checked = config.visionOnDemand !== false;
-  $('agent-trusted-script-enabled').checked = config.trustedScriptEnabled === true;
-  $('agent-acceptance-criteria').value = (config.acceptanceCriteria || []).join('\n');
-  $('agent-repeat-mode').value = ['ONCE','CONTINUOUS','INTERVAL'].includes(config.repeatMode) ? config.repeatMode : 'ONCE';
-  $('agent-interval-seconds').value = String(config.intervalSeconds ?? 60);
-  $('agent-schedule-start').value = browserAgentEpochToDateTimeLocal(config.scheduleStartAt);
-  $('agent-schedule-end').value = browserAgentEpochToDateTimeLocal(config.scheduleEndAt);
-  $('agent-active-window-start').value = config.activeWindowStart || '';
-  $('agent-active-window-end').value = config.activeWindowEnd || '';
-  $('agent-ai-routing-mode').value = ['inherit','primary','strong','hybrid-auto','hybrid-rules'].includes(config.aiRoutingMode) ? config.aiRoutingMode : 'inherit';
-  $('agent-ai-pinned-route-id').value = config.aiPinnedRouteId || '';
-  if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
-    const option = document.createElement('option');
-    option.value = config.aiPinnedRouteId;
-    option.dataset.blockReason = 'Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ñ–Ð´ÑÑƒÑ‚Ð½Ñ–Ð¹ Ñƒ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾Ð¼Ñƒ Ð¿ÑƒÐ»Ñ–';
-    option.disabled = true;
-    option.textContent = `${config.aiPinnedRouteId} â€” Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ð²Ñ–Ð´ÑÑƒÑ‚Ð½Ñ–Ð¹ Ñƒ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾Ð¼Ñƒ Ð¿ÑƒÐ»Ñ–`;
-    $('agent-ai-pinned-route-id').append(option);
-    $('agent-ai-pinned-route-id').value = option.value;
-  }
-  syncBrowserAgentRouteBindingStatus();
-  $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
-  $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
-  $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
-  $('agent-ai-strong-model').value = config.aiStrongModel || '';
-  $('agent-max-model-calls').value = String(config.maxModelCalls ?? 0);
-  $('agent-max-input-tokens').value = String(config.maxInputTokens ?? 0);
-  $('agent-max-output-tokens').value = String(config.maxOutputTokens ?? 0);
-  $('agent-max-total-tokens').value = String(config.maxTotalTokens ?? 0);
-  $('agent-max-output-per-call').value = String(config.maxOutputTokensPerCall ?? 4096);
-  $('agent-max-runtime-minutes').value = String(config.maxRuntimeMinutes ?? 0);
-  $('agent-max-cost-usd').value = String(config.maxCostUsd ?? 0);
-  $('agent-input-price').value = String(config.inputPricePerMillionUsd ?? 0);
-  $('agent-output-price').value = String(config.outputPricePerMillionUsd ?? 0);
-}
-
-function browserAgentStateLabel(value) {
-  return ({ RUNNING: 'Ð¿Ñ€Ð°Ñ†ÑŽÑ”', PAUSED: 'Ð¿Ð°ÑƒÐ·Ð°', STOPPED: 'Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾', COMPLETED: 'Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾', ERROR: 'Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ°', WAITING_PERMISSION: 'Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ð´Ð¾Ð·Ð²Ñ–Ð» ÑÐ°Ð¹Ñ‚Ñƒ', WAITING_CAPABILITY: 'Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ð´Ð¾Ð·Ð²Ñ–Ð» capability', WAITING_APPROVAL: 'Ð¾Ñ‡Ñ–ÐºÑƒÑ” Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð½Ñ Ð´Ñ–Ñ—', WAITING_SCHEDULE: 'Ð¾Ñ‡Ñ–ÐºÑƒÑ” Ñ€Ð¾Ð·ÐºÐ»Ð°Ð´Ñƒ' })[value] || value || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾';
-}
-
-function renderBrowserAgentPlan(runtime = {}) {
-  const plan = runtime.plan;
-  const nodes = Array.isArray(plan?.nodes) ? plan.nodes : [];
-  const planTree = $('agent-plan-tree');
-  planTree.replaceChildren();
-  if (!nodes.length) {
-    $('agent-plan-summary').textContent = 'Durable plan Ñ‰Ðµ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.';
-  } else {
-    const counts = Object.create(null);
-    for (const node of nodes) counts[node.state] = Number(counts[node.state] || 0) + 1;
-    $('agent-plan-summary').textContent = `Plan ${plan.planId}, revision ${plan.revision}. Ð’ÑƒÐ·Ð»Ñ–Ð²: ${nodes.length}; READY ${counts.READY || 0}; RUNNING ${counts.RUNNING || 0}; VERIFIED ${counts.VERIFIED || 0}; BLOCKED ${counts.BLOCKED || 0}; FAILED ${counts.FAILED || 0}.`;
-    for (const node of nodes) {
-      const item = document.createElement('li');
-      const dependencies = Array.isArray(node.dependsOn) && node.dependsOn.length ? `; Ð·Ð°Ð»ÐµÐ¶Ð¸Ñ‚ÑŒ Ð²Ñ–Ð´ ${node.dependsOn.join(', ')}` : '';
-      const owner = node.ownerId ? `; owner ${node.ownerId}` : '';
-      const evidence = node.evidence ? `; evidence: ${node.evidence}` : '';
-      item.textContent = `[${node.state}] ${node.title} (${node.executionPlane}, ${node.nodeId})${dependencies}${owner}${evidence}`;
-      planTree.append(item);
-    }
-  }
-
-  const handoffs = Array.isArray(runtime.specialistHandoffs) ? runtime.specialistHandoffs : [];
-  const handoffList = $('agent-specialist-handoff-list');
-  handoffList.replaceChildren();
-  $('agent-specialist-handoff-summary').textContent = handoffs.length
-    ? `Specialist handoff: ${handoffs.length}. ÐšÐ¾Ð¶ÐµÐ½ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚ Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑƒÑ” Ð½ÐµÐ·Ð°Ð»ÐµÐ¶Ð½Ð¾Ñ— Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ¸ Ð¿ÐµÑ€ÐµÐ´ Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½ÑÐ¼ plan node.`
-    : 'Specialist handoff Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”.';
-  for (const handoff of handoffs) {
-    const item = document.createElement('li');
-    const capabilities = Array.isArray(handoff.requestedCapabilityIds) && handoff.requestedCapabilityIds.length
-      ? `; capabilities ${handoff.requestedCapabilityIds.join(', ')}`
-      : '';
-    const artifacts = Array.isArray(handoff.resultArtifactIds) && handoff.resultArtifactIds.length
-      ? `; artifacts ${handoff.resultArtifactIds.join(', ')}`
-      : '';
-    const lease = handoff.leaseExpiresAt ? `; lease Ð´Ð¾ ${new Date(handoff.leaseExpiresAt).toLocaleString()}` : '';
-    const progress = describeAgentSpecialistProgressV1(runtime, handoff);
-    item.textContent = `[${progress.label}] ${handoff.specialistId} â€” ${handoff.purpose} (${handoff.agentId})${capabilities}${artifacts}${lease}${progress.details ? `; ${progress.details}` : ''}`;
-    handoffList.append(item);
-  }
-  renderSpecialistDelegationControls(runtime);
-}
-
-function renderSpecialistDelegationControls(runtime = {}) {
-  const job = ui.selectedBrowserAgent;
-  const plan = runtime.plan;
-  const externalNodes = Array.isArray(plan?.nodes)
-    ? plan.nodes.filter(node => node.state === 'READY' && ['LOCAL', 'CLOUD', 'REMOTE'].includes(node.executionPlane))
-    : [];
-  const nodes = externalNodes.filter(node => Array.isArray(node.requiredCapabilityIds) && node.requiredCapabilityIds.length);
-  const nodeSelect = $('agent-specialist-delegation-node');
-  const registrySelect = $('agent-specialist-delegation-registry');
-  const previousNode = nodeSelect.value;
-  const previousRegistry = registrySelect.value;
-  nodeSelect.replaceChildren();
-  registrySelect.replaceChildren();
-  for (const node of nodes) {
-    const option = document.createElement('option');
-    option.value = node.nodeId;
-    option.textContent = `${node.title} â€” ${node.executionPlane} â€” ${node.requiredCapabilityIds?.join(', ') || 'capabilities Ð½Ðµ Ð²ÐºÐ°Ð·Ð°Ð½Ñ–'}`;
-    nodeSelect.append(option);
-  }
-  for (const registry of ui.specialistRegistries) {
-    const option = document.createElement('option');
-    option.value = registry.registryId;
-    option.textContent = `${registry.registryId} â€” rev ${registry.revision}`;
-    registrySelect.append(option);
-  }
-  if (nodes.some(node => node.nodeId === previousNode)) nodeSelect.value = previousNode;
-  if (ui.specialistRegistries.some(registry => registry.registryId === previousRegistry)) registrySelect.value = previousRegistry;
-  else if (ui.selectedSpecialistRegistryId && ui.specialistRegistries.some(registry => registry.registryId === ui.selectedSpecialistRegistryId)) registrySelect.value = ui.selectedSpecialistRegistryId;
-  const selectedNode = nodes.find(node => node.nodeId === nodeSelect.value) || nodes[0] || null;
-  const hasScope = Boolean(job?.definitionScope);
-  const ready = Boolean(job && plan && selectedNode?.requiredCapabilityIds?.length && registrySelect.value && hasScope);
-  $('agent-specialist-delegation-group').disabled = !ready;
-  $('agent-specialist-delegation-prepare-button').disabled = !ready;
-  if (!job || !plan) $('agent-specialist-delegation-status').textContent = 'Durable plan Ñ‰Ðµ Ð½Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾.';
-  else if (!hasScope) $('agent-specialist-delegation-status').textContent = 'ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡Ð½Ð¸Ð¹ handoff Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑƒÑ” Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ, ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾Ð³Ð¾ Ð· reusable Agent definition scope.';
-  else if (!externalNodes.length) $('agent-specialist-delegation-status').textContent = 'ÐÐµÐ¼Ð°Ñ” READY LOCAL, CLOUD Ð°Ð±Ð¾ REMOTE node.';
-  else if (!nodes.length) $('agent-specialist-delegation-status').textContent = 'Ð—Ð¾Ð²Ð½Ñ–ÑˆÐ½Ñ–Ð¹ node Ð½Ðµ Ð¾Ð³Ð¾Ð»Ð¾ÑÐ¸Ð² requiredCapabilityIds; handoff Ð·Ð°Ð±Ð»Ð¾ÐºÐ¾Ð²Ð°Ð½Ð¾.';
-  else if (!registrySelect.value) $('agent-specialist-delegation-status').textContent = 'Ð¡Ñ‚Ð²Ð¾Ñ€Ñ–Ñ‚ÑŒ specialist-Ñ€ÐµÑ”ÑÑ‚Ñ€ Ñ–Ð· Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð½Ð¸Ð¼ provider.';
-  else $('agent-specialist-delegation-status').textContent = 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¾ Ð´Ð¾ least-authority selection. ÐŸÑ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÐ° Ð½Ðµ Ð·Ð°Ð¿ÑƒÑÐºÐ°Ñ” provider effect.';
-}
-
-async function prepareAutomaticSpecialistDelegation() {
-  const job = ui.selectedBrowserAgent;
-  const plan = job?.runtime?.plan;
-  const registry = ui.specialistRegistries.find(item => item.registryId === $('agent-specialist-delegation-registry').value) || null;
-  const nodeId = $('agent-specialist-delegation-node').value;
-  if (!job || !plan || !registry || !nodeId) return;
-  const minutes = Number($('agent-specialist-delegation-deadline-minutes').value);
-  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10080) {
-    $('agent-specialist-delegation-status').textContent = 'Deadline: Ð²Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 1 Ð´Ð¾ 10080 Ñ…Ð²Ð¸Ð»Ð¸Ð½.';
-    $('agent-specialist-delegation-deadline-minutes').focus();
-    return;
-  }
-  const operation = beginAgentOwnerOperation('SPECIALIST', job.id);
-  if (!operation) return;
-  const runNow = $('agent-specialist-delegation-run-now').checked;
-  let prepared = false;
-  try {
-    $('agent-specialist-delegation-prepare-button').disabled = true;
-    $('agent-specialist-delegation-status').textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ Ð¿Ð¾Ð²Ð½Ð¾Ð²Ð°Ð¶ÐµÐ½Ð½Ñ Ð¹ Ð²Ð¸Ð±Ð¸Ñ€Ð°ÑŽ ÑÐ¿ÐµÑ†Ñ–Ð°Ð»Ñ–ÑÑ‚Ð°â€¦';
-    const deadlineAt = new Date(Date.now() + minutes * 60_000).toISOString();
-    const result = await core('PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION', {
-      id: job.id,
-      delegation: { registryId: registry.registryId, expectedRegistryRevision: registry.revision,
-        expectedPlanRevision: plan.revision, nodeId, policyEnvelopeId: `browser-agent-policy:${job.id}`,
-        deadlineAt, priority: 0, autoRun: runNow },
-    });
-    prepared = true;
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `Ð¡ÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð° Ð´Ð»Ñ ${job.id} Ð¿Ñ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð»ÐµÐ½Ð¾.`);
-    if (!agentViewFence.current(operation.ticket)) return;
-    if (runNow) {
-      $('agent-specialist-delegation-status').textContent = 'Ð¡ÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð° Ð¿Ñ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð»ÐµÐ½Ð¾. ÐžÑ‡Ñ–ÐºÑƒÑŽ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ñ‚Ð° Ð½ÐµÐ·Ð°Ð»ÐµÐ¶Ð½Ñƒ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÑƒâ€¦';
-      await core('RUN_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF', {
-        id: job.id, run: { registryId: registry.registryId, expectedRegistryRevision: registry.revision,
-          expectedPlanRevision: result.plan.revision, agentId: result.handoff.agentId,
-          maxConcurrentHandoffs: 4, leaseSeconds: 900 },
-      });
-      agentJobsReadGate.invalidate();
-    }
-    if (!agentViewFence.current(operation.ticket)) return;
-    const refreshed = await loadBrowserAgentJobs({ selectId: job.id });
-    if (!agentViewFence.current(operation.ticket)) return;
-    const handoff = refreshed.job?.runtime?.specialistHandoffs?.find(item => item.agentId === result.handoff.agentId);
-    const progress = handoff ? describeAgentSpecialistProgressV1(refreshed.job.runtime, handoff) : null;
-    const message = progress
-      ? `Ð¡ÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚ ${result.handoff.agentId}: ${progress.label}${progress.details ? `; ${progress.details}` : ''}.`
-      : `Ð¡ÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð° ${result.handoff.agentId} Ð¿Ñ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð»ÐµÐ½Ð¾. ÐÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ð¸Ð¹ ÑÑ‚Ð°Ð½ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ñ‰Ðµ Ð½Ðµ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ð½Ð¾.`;
-    $('agent-specialist-delegation-status').textContent = message;
-    agentOwnerResult(operation, message);
-    announce(message);
-  } catch (error) {
-    const message = prepared ? `Ð¡ÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð° Ð´Ð»Ñ ${job.id} Ð¿Ñ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²Ð»ÐµÐ½Ð¾; Ð·Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð½Ñ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ðµ: ${error.message}`
-      : `ÐŸÑ–Ð´Ð³Ð¾Ñ‚Ð¾Ð²ÐºÐ° ÑÑƒÐ±Ð°Ð³ÐµÐ½Ñ‚Ð° Ð´Ð»Ñ ${job.id} Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð°: ${error.message}`;
-    agentOwnerResult(operation, message);
-    if (agentViewFence.current(operation.ticket)) {
-      await loadBrowserAgentJobs({ selectId: job.id });
-      if (agentViewFence.current(operation.ticket)) $('agent-specialist-delegation-status').textContent = message;
-    }
-  } finally {
-    finishAgentOwnerOperation(operation);
-    const previousStatus = $('agent-specialist-delegation-status').textContent;
-    renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {});
-    if (agentViewFence.current(operation.ticket)) $('agent-specialist-delegation-status').textContent = previousStatus;
-  }
-}
-
-function renderBrowserAgentJob(job) {
-  ui.selectedBrowserAgent = job || null;
-  const runtime = job?.runtime || {};
-  const config = job?.config || {};
-  const state = runtime.runState || 'STOPPED';
-  const exists = Boolean(job);
-  $('agent-pause-button').disabled = state !== 'RUNNING';
-  $('agent-resume-button').disabled = !exists || !['PAUSED','STOPPED','WAITING_PERMISSION','WAITING_CAPABILITY','WAITING_SCHEDULE'].includes(state);
-  $('agent-approve-action-button').disabled = state !== 'WAITING_APPROVAL';
-  $('agent-reject-action-button').disabled = state !== 'WAITING_APPROVAL';
-  $('agent-stop-button').disabled = !exists || state === 'STOPPED';
-  $('agent-step-button').disabled = !exists || !['PAUSED','STOPPED','WAITING_PERMISSION','WAITING_CAPABILITY','WAITING_SCHEDULE'].includes(state);
-  $('agent-run-now-button').disabled = !exists || state !== 'RUNNING';
-  $('agent-delete-button').disabled = !exists || state === 'RUNNING';
-  $('agent-send-follow-up-button').disabled = !exists;
-  $('agent-save-policy-button').disabled = !exists || state === 'RUNNING';
-  const pendingApproval = runtime.pendingApproval || null;
-  $('agent-approval-panel').hidden = state !== 'WAITING_APPROVAL' || !pendingApproval;
-  $('agent-approval-status').textContent = pendingApproval
-    ? `${pendingApproval.reason || 'ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð½Ñ.'} Ð¦Ñ–Ð»ÑŒ: ${pendingApproval.targetName || pendingApproval.action?.type || 'Ð´Ñ–Ñ'}.`
-    : 'ÐÐµÐ¼Ð°Ñ” Ð´Ñ–Ñ—, Ñ‰Ð¾ Ð¾Ñ‡Ñ–ÐºÑƒÑ” Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð½Ñ.';
-  const pendingScript = pendingApproval?.action?.type === 'trusted_script' ? String(pendingApproval.action.code || '') : '';
-  $('agent-approval-script').hidden = !pendingScript;
-  $('agent-approval-script').textContent = pendingScript ? `ÐœÐµÑ‚Ð°: ${pendingApproval.action.purpose || 'DOM/UI fallback'}
-Origin: ${pendingApproval.action.origin || ''}
-
-${pendingScript}` : '';
-  if (!job) {
-    $('agent-status').textContent = 'ÐÐ³ÐµÐ½Ñ‚ Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ð¹ Ð´Ð¾ Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ.';
-    $('agent-usage').textContent = 'Ð’Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð°Ð½Ð½Ñ Ð¼Ð¾Ð´ÐµÐ»Ñ–: Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”.';
-    $('agent-history').textContent = 'Ð†ÑÑ‚Ð¾Ñ€Ñ–Ñ— Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”.';
-    renderBrowserAgentPlan({});
-    return;
-  }
-  const url = runtime.currentUrl || config.startUrl || 'Ð°ÐºÑ‚Ð¸Ð²Ð½Ð° Ð²ÐºÐ»Ð°Ð´ÐºÐ°';
-  const result = runtime.resultSummary ? ` Ð ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚: ${runtime.resultSummary}` : '';
-  const verified = runtime.verifiedOutcome?.checks?.length ? ` ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð¾ ÐºÑ€Ð¸Ñ‚ÐµÑ€Ñ–Ñ—Ð²: ${runtime.verifiedOutcome.checks.length}/${config.acceptanceCriteria?.length || runtime.verifiedOutcome.checks.length}.` : '';
-  const error = runtime.lastError ? ` ${runtime.lastError}` : '';
-  const cycles = Number(runtime.completedCycles || 0);
-  const plan = runtime.plan;
-  const planStatus = plan?.nodes?.length ? ` ÐŸÐ»Ð°Ð½: ${plan.nodes.filter(node => node.state === 'READY').length} Ð³Ð¾Ñ‚Ð¾Ð²Ð¸Ñ…, ${plan.nodes.filter(node => node.state === 'RUNNING').length} Ñƒ Ñ€Ð¾Ð±Ð¾Ñ‚Ñ–, ${plan.nodes.filter(node => node.state === 'VERIFIED').length}/${plan.nodes.length} Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐµÐ½Ð¾.` : '';
-  const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` ÐÐ°ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹ Ð·Ð°Ð¿ÑƒÑÐº: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
-  const capability = runtime.capabilityPermission ? ` ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±Ð½Ð° capability: ${runtime.capabilityPermission}.` : '';
-  $('agent-status').textContent = `Ð¡Ñ‚Ð°Ð½: ${browserAgentStateLabel(state)}. ÐšÑ€Ð¾ÐºÑ–Ð²: ${Number(runtime.stepCount || 0)}. Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¸Ñ… Ñ†Ð¸ÐºÐ»Ñ–Ð²: ${cycles}. ÐŸÐ¾Ñ‚Ð¾Ñ‡Ð½Ð° ÑÑ‚Ð¾Ñ€Ñ–Ð½ÐºÐ°: ${url}.${nextWake}${capability}${planStatus}${result}${verified}${error}`;
-  const routerRuntime = runtime.aiRouterRuntime || {};
-  const actualRouteId = String(routerRuntime.lastRouteId || '').trim();
-  const actualProvider = String(routerRuntime.lastProvider || '').trim();
-  const actualModel = String(routerRuntime.lastModel || '').trim();
-  const actualEndpointId = String(routerRuntime.lastEndpointId || '').trim();
-  const failoverChain = Array.isArray(routerRuntime.lastFailoverChain) ? routerRuntime.lastFailoverChain.slice(-4) : [];
-  const actualIdentity = [actualProvider, actualModel].filter(Boolean).join('/') + (actualEndpointId ? ` @ ${actualEndpointId}` : '');
-  const routeEvidence = actualRouteId || actualIdentity
-    ? ` ÐžÑÑ‚Ð°Ð½Ð½Ñ Ñ„Ð°ÐºÑ‚Ð¸Ñ‡Ð½Ð° AI-Ð¼Ð¾Ð´ÐµÐ»ÑŒ: ${actualIdentity || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð°'}${actualRouteId ? `; Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ ${actualRouteId}` : ''}.${failoverChain.length ? ` ÐžÑÑ‚Ð°Ð½Ð½Ñ route-chain: ${failoverChain.map(item => `${item.routeId || 'legacy'}[${[item.provider, item.model].filter(Boolean).join('/') || '?'}${item.endpointId ? ` @ ${item.endpointId}` : ''}]:${item.outcome || '?'}`).join(' -> ')}.` : ''}`
-    : ' Ð¤Ð°ÐºÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ AI-Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚ Ñ‰Ðµ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ñ€Ð¸ÑÑ‚Ð¾Ð²ÑƒÐ²Ð°Ð²ÑÑ.';
-  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; Ð¾Ñ€Ñ–Ñ”Ð½Ñ‚Ð¾Ð²Ð½Ð° Ð²Ð°Ñ€Ñ‚Ñ–ÑÑ‚ÑŒ: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.${routeEvidence}`;
-  const history = Array.isArray(runtime.history) ? runtime.history : [];
-  $('agent-history').textContent = history.length
-    ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
-    : 'Ð†ÑÑ‚Ð¾Ñ€Ñ–Ñ— Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”.';
-  renderBrowserAgentPlan(runtime);
-  if (!ui.agentDraftActive && !ui.agentPolicyDirty) fillBrowserAgentPolicy(config);
-}
-
-function renderBrowserAgentList() {
-  const list = $('agent-job-list');
-  const selected = ui.selectedBrowserAgentId;
-  const projection = JSON.stringify(ui.browserAgentJobs.map(job => [job.id, job.config?.name, job.runtime?.runState]));
-  if (projection === agentListProjection) { list.value = selected; return; }
-  agentListProjection = projection;
-  list.replaceChildren();
-  for (const job of ui.browserAgentJobs) {
-    const option = document.createElement('option');
-    option.value = job.id;
-    option.textContent = `${job.config?.name || 'Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ'} â€” ${browserAgentStateLabel(job.runtime?.runState)}`;
-    option.selected = job.id === selected;
-    list.append(option);
-  }
-}
-
-async function loadBrowserAgentExecutionPolicy() {
-  try {
-    const policy = await core('GET_BROWSER_AGENT_EXECUTION_POLICY');
-    const value = Number(policy?.maxConcurrentAgents ?? 1);
-    $('agent-max-concurrent-agents').value = String(value);
-    $('agent-execution-policy-status').textContent = `ÐÐºÑ‚Ð¸Ð²Ð½Ð¸Ð¹ Ð³Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ð»Ñ–Ð¼Ñ–Ñ‚: ${value} Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… Agent.`;
-  } catch (error) {
-    $('agent-execution-policy-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð»Ñ–Ð¼Ñ–Ñ‚ Agent: ${error.message}`;
-  }
-}
-
-async function saveBrowserAgentExecutionPolicy() {
-  const value = Number($('agent-max-concurrent-agents').value);
-  if (!Number.isInteger(value) || value < 1 || value > 32) {
-    $('agent-execution-policy-status').textContent = 'Ð’Ð²ÐµÐ´Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ Ð²Ñ–Ð´ 1 Ð´Ð¾ 32.';
-    $('agent-max-concurrent-agents').focus();
-    return;
-  }
-  try {
-    const policy = await core('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', { maxConcurrentAgents: value });
-    $('agent-max-concurrent-agents').value = String(policy.maxConcurrentAgents);
-    $('agent-execution-policy-status').textContent = `Ð—Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ ${policy.maxConcurrentAgents} Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¸Ñ… Agent.`;
-    announce('Ð“Ð»Ð¾Ð±Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ð»Ñ–Ð¼Ñ–Ñ‚ Ð¾Ð´Ð½Ð¾Ñ‡Ð°ÑÐ½Ð¾Ð³Ð¾ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Agent Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.');
-  } catch (error) {
-    $('agent-execution-policy-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸ Ð»Ñ–Ð¼Ñ–Ñ‚ Agent: ${error.message}`;
-  }
-}
-
-async function loadBrowserAgentJobs({ selectId = '' } = {}) {
-  const ticket = agentViewFence.beginRead();
-  try {
-    let result;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      result = await readAgentJobsWithDeadlineV1(() => agentJobsReadGate.read());
-      if (!agentViewFence.currentRead(ticket)) return { applied: false };
-      if (agentJobsReadGate.current(result)) break;
-      result = null;
-    }
-    if (!result) return { applied: false };
-    const data = result.data;
-    const previousId = ui.selectedBrowserAgentId;
-    ui.browserAgentJobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    const requestedId = selectId || previousId || data?.selectedId || '';
-    const nextId = ui.browserAgentJobs.some(job => job.id === requestedId)
-      ? requestedId : ui.browserAgentJobs[0]?.id || '';
-    if (nextId !== previousId) selectBrowserAgentView(nextId);
-    if (previousId && previousId !== nextId) {
-      ui.agentPolicyDirty = false;
-      ui.agentPolicyEditEpoch += 1;
-      $('agent-policy-edit-status').textContent = 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ðµ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ð·Ð¼Ñ–Ð½Ð¸Ð»Ð¾ÑÑ; Ð¿Ð¾ÐºÐ°Ð·Ð°Ð½Ð¾ Ð¹Ð¾Ð³Ð¾ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñƒ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ.';
-    }
-    renderBrowserAgentList();
-    const job = ui.browserAgentJobs.find(item => item.id === nextId) || null;
-    renderBrowserAgentJob(job);
-    return { applied: true, job };
-  } catch (error) {
-    if (agentViewFence.currentRead(ticket)) $('agent-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Agent: ${error.message}`;
-    return { applied: false, error };
-  }
-}
-
-async function selectBrowserAgentJob() {
-  ui.agentDraftActive = false;
-  ui.agentPolicyDirty = false;
-  ui.agentPolicyEditEpoch += 1;
-  $('agent-policy-edit-status').textContent = 'Ð—Ð¼Ñ–Ð½ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ¸ Ð½ÐµÐ¼Ð°Ñ”.';
-  const id = $('agent-job-list').value;
-  const ticket = selectBrowserAgentView(id);
-  renderBrowserAgentJob(ui.browserAgentJobs.find(job => job.id === id) || null);
-  if (!id) return;
-  try {
-    const data = await core('SELECT_BROWSER_AGENT_JOB', { id });
-    if (!agentViewFence.current(ticket)) return;
-    if (data?.job && data.job.id !== id) throw new Error('Core Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² Ñ–Ð½ÑˆÐµ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Agent.');
-    renderBrowserAgentJob(data?.job || null);
-    renderBrowserAgentList();
-  } catch (error) {
-    if (agentViewFence.current(ticket)) $('agent-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð²Ñ–Ð´ÐºÑ€Ð¸Ñ‚Ð¸ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ: ${error.message}`;
-  }
-}
-
-async function runBrowserAgentPrompt() {
-  const goal = $('agent-prompt').value.trim();
-  if (!goal) { $('agent-status').textContent = 'ÐžÐ¿Ð¸ÑˆÑ–Ñ‚ÑŒ, Ñ‰Ð¾ Agent Ð¼Ð°Ñ” Ð·Ñ€Ð¾Ð±Ð¸Ñ‚Ð¸.'; $('agent-prompt').focus(); return; }
-  const operation = beginAgentOwnerOperation('CREATE', '');
-  if (!operation) return;
-  let createdId = '';
-  try {
-    assertBrowserAgentRouteReadyForLaunch();
-    $('agent-run-prompt-button').disabled = true;
-    $('agent-status').textContent = 'Ð¡Ñ‚Ð²Ð¾Ñ€ÑŽÑŽ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ð¹ Ð·Ð°Ð¿ÑƒÑÐºÐ°ÑŽ Agentâ€¦';
-    const created = await core('CREATE_BROWSER_AGENT_JOB', {
-      name: browserAgentNameFromGoal(goal), goal, ...browserAgentPolicyFromForm(),
-    });
-    createdId = created?.job?.id || created?.selectedId || '';
-    if (!createdId) throw new Error('Core Ð½Ðµ Ð¿Ð¾Ð²ÐµÑ€Ð½ÑƒÐ² id Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Agent.');
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${createdId} ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾. ÐÐ°Ð´ÑÐ¸Ð»Ð°ÑŽ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñƒ Ð·Ð°Ð¿ÑƒÑÐºÑƒâ€¦`);
-    if (agentViewFence.current(operation.ticket)) {
-      operation.ticket = selectBrowserAgentView(createdId);
-      ui.agentDraftActive = false;
-      ui.agentPolicyDirty = false;
-      $('agent-policy-edit-status').textContent = 'ÐŸÐ¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.';
-      if (created.job) renderBrowserAgentJob(created.job);
-    }
-    await core('START_BROWSER_AGENT_JOB', { id: createdId });
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${createdId} ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾; Core Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ð² ÐºÐ¾Ð¼Ð°Ð½Ð´Ñƒ Ð·Ð°Ð¿ÑƒÑÐºÑƒ.`);
-    if (!agentViewFence.current(operation.ticket)) return;
-    const refreshed = await loadBrowserAgentJobs({ selectId: createdId });
-    if (!refreshed.applied || !agentViewFence.current(operation.ticket)) return;
-    if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
-      $('agent-permission-status').textContent = 'ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ð´Ð¾Ð·Ð²Ñ–Ð» Chrome Ð½Ð° ÑÐ°Ð¹Ñ‚. ÐÐ°Ñ‚Ð¸ÑÐ½Ñ–Ñ‚ÑŒ Â«Ð”Ð¾Ð·Ð²Ð¾Ð»Ð¸Ñ‚Ð¸ Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ð¸Ð¹ ÑÐ°Ð¹Ñ‚Â».';
-      $('agent-allow-current-site-button').focus();
-    } else if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_CAPABILITY') {
-      $('agent-permission-status').textContent = `ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ Ð´Ð¾Ð´Ð°Ñ‚ÐºÐ¾Ð²Ð¸Ð¹ Ð´Ð¾Ð·Ð²Ñ–Ð» Chrome: ${ui.selectedBrowserAgent.runtime.capabilityPermission || 'capability'}.`;
-    } else $('agent-status').focus?.();
-  } catch (error) {
-    const message = createdId
-      ? `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${createdId} Ð²Ð¶Ðµ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð¾. Core Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ð² ÐºÐ¾Ð¼Ð°Ð½Ð´Ñƒ Ð·Ð°Ð¿ÑƒÑÐºÑƒ: ${error.message}. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ñ†Ðµ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ð¼ Ð·Ð°Ð¿ÑƒÑÐºÐ¾Ð¼.`
-      : `Ð¡Ñ‚Ð²Ð¾Ñ€ÐµÐ½Ð½Ñ Agent Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾: ${error.message}. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÑÐ¿Ð¸ÑÐ¾Ðº Ð·Ð°Ð²Ð´Ð°Ð½ÑŒ Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¸Ð¼ ÑÑ‚Ð²Ð¾Ñ€ÐµÐ½Ð½ÑÐ¼.`;
-    agentOwnerResult(operation, message);
-    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
-  } finally {
-    finishAgentOwnerOperation(operation);
-    $('agent-run-prompt-button').disabled = false;
-  }
-}
-
-async function importBrowserAgentDraft() {
-  const file = $('agent-import-file').files?.[0];
-  if (!file) { $('agent-import-status').textContent = 'ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ JSON-Ñ„Ð°Ð¹Ð» Ñ‡ÐµÑ€Ð½ÐµÑ‚ÐºÐ¸.'; return; }
-  try {
-    if (file.size > 1024 * 1024) throw new Error('Ð¤Ð°Ð¹Ð» Ñ‡ÐµÑ€Ð½ÐµÑ‚ÐºÐ¸ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ð½Ðµ Ð±Ñ–Ð»ÑŒÑˆÐ¸Ð¹ Ð·Ð° 1 ÐœÐ‘.');
-    const draft = parseAgentDraftProfile(parsePortableJson(await file.text()));
-    fillBrowserAgentPolicy(draft.policy);
-    $('agent-prompt').value = draft.goal;
-    ui.agentDraftActive = true;
-    ui.agentPolicyDirty = false;
-    $('agent-policy-edit-status').textContent = 'Ð§ÐµÑ€Ð½ÐµÑ‚ÐºÐ° Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð°; Agent Ð½Ðµ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾.';
-    $('agent-import-status').textContent = 'Ð§ÐµÑ€Ð½ÐµÑ‚ÐºÑƒ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾ Ñƒ Ñ„Ð¾Ñ€Ð¼Ñƒ. ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ Ñ—Ñ— Ñ‚Ð° Ð¾ÐºÑ€ÐµÐ¼Ð¾ Ð½Ð°Ñ‚Ð¸ÑÐ½Ñ–Ñ‚ÑŒ Â«Ð—Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚Ð¸ Ð°Ð³ÐµÐ½Ñ‚Ð°Â».';
-    $('agent-prompt').focus();
-  } catch (error) { $('agent-import-status').textContent = `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚ Ð½Ðµ Ð²Ð´Ð°Ð²ÑÑ: ${error.message}`; }
-}
-
-function exportBrowserAgentDraft() {
-  try {
-    const draft = makeAgentDraftProfile($('agent-prompt').value, browserAgentPolicyFromForm());
-    downloadJson(draft, 'ChatGPT-Autopilot-Agent-draft.json');
-    $('agent-import-status').textContent = 'Ð§ÐµÑ€Ð½ÐµÑ‚ÐºÑƒ ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾ Ð±ÐµÐ· ÐºÐ»ÑŽÑ‡Ñ–Ð² API Ñ‚Ð° ÑÑ‚Ð°Ð½Ñƒ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ.';
-  } catch (error) { $('agent-import-status').textContent = `Ð•ÐºÑÐ¿Ð¾Ñ€Ñ‚ Ð½Ðµ Ð²Ð´Ð°Ð²ÑÑ: ${error.message}`; }
-}
-
-async function browserAgentLifecycle(command) {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  const label = ({ PAUSE_BROWSER_AGENT_JOB: 'ÐŸÐ°ÑƒÐ·Ð°', RESUME_BROWSER_AGENT_JOB: 'ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶ÐµÐ½Ð½Ñ', STOP_BROWSER_AGENT_JOB: 'Stop', STEP_BROWSER_AGENT_JOB: 'ÐžÐ´Ð¸Ð½ ÐºÑ€Ð¾Ðº', RUN_BROWSER_AGENT_BURST: 'Ð’Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ', APPROVE_BROWSER_AGENT_ACTION: 'ÐŸÑ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð½Ñ Ð´Ñ–Ñ—', REJECT_BROWSER_AGENT_ACTION: 'Ð’Ñ–Ð´Ñ…Ð¸Ð»ÐµÐ½Ð½Ñ Ð´Ñ–Ñ—' })[command] || 'ÐšÐ¾Ð¼Ð°Ð½Ð´Ð°';
-  const operation = beginAgentOwnerOperation(command, id);
-  if (!operation) return;
-  try {
-    await core(command, { id });
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `${label}: Core Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ð² ÐºÐ¾Ð¼Ð°Ð½Ð´Ñƒ Ð´Ð»Ñ Ð·Ð°Ð²Ð´Ð°Ð½Ð½Ñ ${id}.`);
-    if (agentViewFence.current(operation.ticket)) await loadBrowserAgentJobs({ selectId: id });
-  } catch (error) {
-    const message = `${label} Ð´Ð»Ñ Agent ${id} Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾: ${error.message}.`;
-    agentOwnerResult(operation, message);
-    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
-  } finally { finishAgentOwnerOperation(operation); }
-}
-
-async function sendBrowserAgentFollowUp() {
-  const id = ui.selectedBrowserAgentId;
-  const text = $('agent-follow-up').value.trim();
-  if (!id || !text) { $('agent-follow-up').focus(); return; }
-  const operation = beginAgentOwnerOperation('FOLLOW_UP', id);
-  if (!operation) return;
-  let recorded = false;
-  try {
-    await core('ADD_BROWSER_AGENT_INSTRUCTION', { id, text });
-    recorded = true;
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `Ð£Ñ‚Ð¾Ñ‡Ð½ÐµÐ½Ð½Ñ Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ð¾ Ð´Ð»Ñ Agent ${id}.`);
-    if (!agentViewFence.current(operation.ticket)) return;
-    if ($('agent-follow-up').value.trim() === text) $('agent-follow-up').value = '';
-    const refreshed = await loadBrowserAgentJobs({ selectId: id });
-    if (!agentViewFence.current(operation.ticket)) return;
-    if (refreshed.job?.runtime?.runState === 'RUNNING') {
-      await core('RUN_BROWSER_AGENT_BURST', { id });
-      agentJobsReadGate.invalidate();
-      if (agentViewFence.current(operation.ticket)) await loadBrowserAgentJobs({ selectId: id });
-    }
-    if (agentViewFence.current(operation.ticket)) announce(`Ð£Ñ‚Ð¾Ñ‡Ð½ÐµÐ½Ð½Ñ Ð¿ÐµÑ€ÐµÐ´Ð°Ð½Ð¾ Agent ${id}.`);
-  } catch (error) {
-    const message = recorded ? `Ð£Ñ‚Ð¾Ñ‡Ð½ÐµÐ½Ð½Ñ Ð´Ð»Ñ Agent ${id} Ð·Ð°Ð¿Ð¸ÑÐ°Ð½Ð¾; Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð½Ñ ÑÑ‚Ð°Ð½Ñƒ Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ðµ: ${error.message}`
-      : `Ð—Ð°Ð¿Ð¸Ñ ÑƒÑ‚Ð¾Ñ‡Ð½ÐµÐ½Ð½Ñ Ð´Ð»Ñ Agent ${id} Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾: ${error.message}`;
-    agentOwnerResult(operation, message);
-    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
-  } finally { finishAgentOwnerOperation(operation); }
-}
-
-async function saveBrowserAgentPolicy() {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  const operation = beginAgentOwnerOperation('SAVE_POLICY', id);
-  if (!operation) return;
-  try {
-    assertBrowserAgentRouteReadyForLaunch();
-    const editEpoch = ui.agentPolicyEditEpoch;
-    await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `ÐŸÐ¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Agent ${id} Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.`);
-    if (!agentViewFence.current(operation.ticket)) return;
-    if (editEpoch === ui.agentPolicyEditEpoch) {
-      ui.agentPolicyDirty = false;
-      ui.agentDraftActive = false;
-      $('agent-policy-edit-status').textContent = 'ÐŸÐ¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Agent Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.';
-    } else $('agent-policy-edit-status').textContent = 'ÐŸÐ¾Ð¿ÐµÑ€ÐµÐ´Ð½Ñ– Ð·Ð¼Ñ–Ð½Ð¸ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾; Ð½Ð¾Ð²Ñ– Ð·Ð¼Ñ–Ð½Ð¸ Ñ‰Ðµ Ð½Ðµ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ–.';
-    await loadBrowserAgentJobs({ selectId: id });
-  } catch (error) {
-    agentOwnerResult(operation, `Ð—Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð½Ñ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ¸ Agent ${id} Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾: ${error.message}`);
-    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = `ÐŸÐ¾Ð»Ñ–Ñ‚Ð¸ÐºÑƒ Ð½Ðµ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾: ${error.message}`;
-  } finally { finishAgentOwnerOperation(operation); }
-}
-
-async function approveBrowserAgentAction() {
-  await browserAgentLifecycle('APPROVE_BROWSER_AGENT_ACTION');
-}
-
-async function rejectBrowserAgentAction() {
-  await browserAgentLifecycle('REJECT_BROWSER_AGENT_ACTION');
-}
-
-async function requestBrowserAgentPermission({ allSites = false } = {}) {
-  const id = ui.selectedBrowserAgentId;
-  const ticket = agentViewFence.capture();
-  try {
-    if (!globalThis.chrome?.permissions?.request) throw new Error('Chrome permissions API Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹.');
-    let origins;
-    if (allSites) origins = ['http://*/*', 'https://*/*'];
-    else {
-      const raw = ui.selectedBrowserAgent?.runtime?.currentUrl || ui.selectedBrowserAgent?.config?.startUrl || '';
-      if (!raw) throw new Error('Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð·Ð°Ð¿ÑƒÑÑ‚Ñ–Ñ‚ÑŒ Agent, Ñ‰Ð¾Ð± Ð²Ñ–Ð½ Ð²Ð¸Ð·Ð½Ð°Ñ‡Ð¸Ð² Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ð¸Ð¹ ÑÐ°Ð¹Ñ‚.');
-      const url = new URL(raw);
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±ÐµÐ½ HTTP/HTTPS ÑÐ°Ð¹Ñ‚.');
-      origins = [`${url.origin}/*`];
-    }
-    const granted = await chrome.permissions.request({ origins });
-    if (!agentViewFence.current(ticket)) return;
-    $('agent-permission-status').textContent = granted ? 'Ð”Ð¾Ð·Ð²Ñ–Ð» Ð½Ð°Ð´Ð°Ð½Ð¾.' : 'Chrome Ð½Ðµ Ð½Ð°Ð´Ð°Ð² Ð´Ð¾Ð·Ð²Ñ–Ð».';
-    if (granted && id && agentViewFence.current(ticket) && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
-      await core('RESUME_BROWSER_AGENT_JOB', { id });
-      agentJobsReadGate.invalidate();
-      if (!agentViewFence.current(ticket)) return;
-      await loadBrowserAgentJobs({ selectId: id });
-    }
-  } catch (error) { $('agent-permission-status').textContent = `Ð”Ð¾Ð·Ð²Ñ–Ð» Ð½Ðµ Ð¾Ñ‚Ñ€Ð¸Ð¼Ð°Ð½Ð¾: ${error.message}`; }
-}
-
-async function requestBrowserAgentCapability(permission) {
-  const id = ui.selectedBrowserAgentId;
-  const ticket = agentViewFence.capture();
-  try {
-    if (!globalThis.chrome?.permissions?.request) throw new Error('Chrome permissions API Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹.');
-    const granted = await chrome.permissions.request({ permissions: [permission] });
-    if (!agentViewFence.current(ticket)) return;
-    $('agent-permission-status').textContent = granted ? `Capability ${permission} Ð´Ð¾Ð·Ð²Ð¾Ð»ÐµÐ½Ð¾.` : `Chrome Ð½Ðµ Ð½Ð°Ð´Ð°Ð² capability ${permission}.`;
-    if (granted && id && agentViewFence.current(ticket) && ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_CAPABILITY'
-      && ui.selectedBrowserAgent?.runtime?.capabilityPermission === permission) {
-      await core('RESUME_BROWSER_AGENT_JOB', { id });
-      agentJobsReadGate.invalidate();
-      if (!agentViewFence.current(ticket)) return;
-      await loadBrowserAgentJobs({ selectId: id });
-    }
-  } catch (error) { $('agent-permission-status').textContent = `Capability Ð½Ðµ Ð´Ð¾Ð·Ð²Ð¾Ð»ÐµÐ½Ð¾: ${error.message}`; }
-}
-
-async function checkNativeCompanion() {
-  const status = $('agent-native-companion-status');
-  const extensionId = globalThis.chrome?.runtime?.id || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¸Ð¹';
-  try {
-    status.textContent = 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ Native Companionâ€¦';
-    const client = new NativeCompanionClient({ chromeApi: globalThis.chrome });
-    const version = globalThis.chrome?.runtime?.getManifest?.()?.version || '';
-    const hello = await client.hello(version);
-    const capabilities = await client.capabilities();
-    const ids = Array.isArray(capabilities?.capabilities)
-      ? capabilities.capabilities.map(item => item?.capabilityId).filter(Boolean)
-      : [];
-    const roots = Array.isArray(capabilities?.roots)
-      ? capabilities.roots.map(item => item?.rootId).filter(Boolean)
-      : [];
-    const message = `Native Companion Ð¿Ñ–Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾. Host ${hello?.hostVersion || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾Ñ— Ð²ÐµÑ€ÑÑ–Ñ—'}, protocol ${hello?.protocolVersion || 1}. Capabilities: ${ids.join(', ') || 'Ð½Ðµ Ð¾Ð³Ð¾Ð»Ð¾ÑˆÐµÐ½Ð¾'}. Ð”Ð¾Ð·Ð²Ð¾Ð»ÐµÐ½Ñ– Ð¿Ð°Ð¿ÐºÐ¸: ${roots.join(', ') || 'Ð½ÐµÐ¼Ð°Ñ”'}. Extension ID: ${extensionId}.`;
-    status.textContent = message;
-    announce('Native Companion Ð¿Ñ–Ð´ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¾.');
-  } catch (error) {
-    status.textContent = `Native Companion Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹: ${error.message}. Extension ID Ð´Ð»Ñ Ð²ÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð½Ñ: ${extensionId}.`;
-    announce('Native Companion Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹.');
-  }
-}
-
-async function runBrowserAgentNow() {
-  await browserAgentLifecycle('RUN_BROWSER_AGENT_BURST');
-}
-
-async function deleteBrowserAgentJob() {
-  const id = ui.selectedBrowserAgentId;
-  if (!id) return;
-  const operation = beginAgentOwnerOperation('DELETE', id);
-  if (!operation) return;
-  try {
-    await core('DELETE_BROWSER_AGENT_JOB', { id });
-    agentJobsReadGate.invalidate();
-    agentOwnerResult(operation, `Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ Agent ${id} Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.`);
-    if (!agentViewFence.current(operation.ticket)) return;
-    selectBrowserAgentView('');
-    renderBrowserAgentJob(null);
-    await loadBrowserAgentJobs();
-    announce('Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ Agent Ð²Ð¸Ð´Ð°Ð»ÐµÐ½Ð¾.');
-  } catch (error) {
-    const message = `Ð’Ð¸Ð´Ð°Ð»ÐµÐ½Ð½Ñ Agent ${id} Ð½Ðµ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ðµ: ${error.message}`;
-    agentOwnerResult(operation, message);
-    if (agentViewFence.current(operation.ticket)) $('agent-status').textContent = message;
-  } finally { finishAgentOwnerOperation(operation); }
-}
-
-async function core(command, payload = {}) {
-  if (!runtimeAvailable()) throw new Error('Core runtime is not available yet.');
-  if (['CREATE_SCENARIO_CHAT_POOL', 'START_SCENARIO_CHAT_POOL', 'START_SCENARIO_WORK', 'START_SESSION', 'RESUME_SESSION'].includes(command) || (command === 'IMPORT_PORTABLE_PROFILE' && payload.confirmAutoStart === true)) {
-    const source = await chrome.tabs.getCurrent();
-    if (!Number.isInteger(source?.id)) throw new Error('Ð’Ñ–Ð´ÐºÑ€Ð¸Ð¹Ñ‚Ðµ ÐŸÑ–Ð»Ð¾Ñ‚ Ñƒ Ð²ÐºÐ»Ð°Ð´Ñ†Ñ– Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ð¾Ð³Ð¾ Ñ€Ð¾Ð±Ð¾Ñ‡Ð¾Ð³Ð¾ Ð²Ñ–ÐºÐ½Ð°.');
-    payload = { ...payload, sourceTabId: source.id };
-  }
-  const response = await chrome.runtime.sendMessage({ channel: 'autopilot-ui', command, payload });
-  if (!response || response.ok !== true) throw new Error(response?.error?.message || 'Core command failed.');
-  return response.data;
-}
-
-function blankTask() {
-  return { id: crypto.randomUUID(), enabled: true, label: '', url: '', promptOverride: '' };
-}
-
-function blankSession() {
-  return {
-    id: crypto.randomUUID(),
-    version: 0,
-    name: 'New session',
-    promptMode: 'shared',
-    urlMode: 'shared',
-    sharedPrompt: '',
-    defaultUniquePrompt: '',
-    runMode: 'continuous',
-    calendarSchedule: null,
-    calendarRuntime: {},
-    tasks: [blankTask()],
-    configuredTaskCount: 1,
-    minimumSendIntervalValue: 2,
-    minimumSendIntervalUnit: 'minutes',
-    minimumSendIntervalMinutes: 2,
-    preSendDelaySeconds: 20,
-    busyCheckDelaySeconds: 2,
-    retryBackoffSeconds: 30,
-    retryBackoffUnit: 'seconds',
-    retryPolicy: 'safe',
-    busyChatBehavior: 'skip-next',
-    tabStrategy: 'open-close',
-    runState: 'STOPPED',
-    actionAvailability: { start: true, pause: false, resume: false, stop: false },
-    status: {},
-    log: [],
-  };
-}
-
-function setAppStatus(text) {
-  const status = $('app-status');
-  if (status.textContent === text) return;
-  status.textContent = text;
-}
-function setCommandResult(text) { $('command-result').textContent = text; }
-function reportCommandResult(text) { setCommandResult(text); announce(text); }
-function clone(value) { return structuredClone(value); }
-
-function storageGet(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-function storageSet(key, value) {
-  try { localStorage.setItem(key, value); return true; } catch { return false; }
-}
-function storageRemove(key) {
-  try { localStorage.removeItem(key); } catch { /* unavailable local draft storage */ }
-}
-
-function sessionListSignature(sessions) {
-  return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.displayRunState || session.runState, session.enabledTaskCount, session.completedTaskCount, session.successfulSendCount, session.simplifiedSession]));
-}
-
-function simplifiedFields() {
-  const field = id => $(id).value;
-  return {
-    name: field('simplified-name'), mode: field('simplified-config-mode'),
-    url: field('simplified-url'), urls: field('simplified-urls'),
-    prompt: field('simplified-prompt'), prompts: field('simplified-prompts'),
-    runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
-    interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
-    tabReady: field('simplified-tab-ready'), postSend: field('simplified-post-send'),
-    delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
-    retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
-    busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
-  };
-}
-
-function updateSimplifiedMode() {
-  const mode = $('simplified-config-mode').value;
-  $('simplified-url-group').hidden = mode.startsWith('unique-');
-  $('simplified-prompt-group').hidden = mode.endsWith('-unique');
-  $('simplified-urls-group').hidden = !mode.startsWith('unique-');
-  $('simplified-prompts-group').hidden = !mode.endsWith('-unique');
-  $('simplified-cycles').disabled = mode !== 'shared-shared';
-}
-
-function renderSimplifiedLog(session) {
-  const entries = Array.isArray(session?.log) ? session.log : [];
-  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
-  $('simplified-log-count').textContent = `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ ${visible.length} Ñ–Ð· ${entries.length} Ð·Ð°Ð¿Ð¸ÑÑ–Ð² Ð¶ÑƒÑ€Ð½Ð°Ð»Ñƒ.`;
-  $('simplified-log-region').textContent = visible
-    .map(entry => typeof entry === 'string'
-      ? translateText(entry)
-      : `${formatTime(entry.at)} â€” ${translateText(entry.message)}`)
-    .join('\n');
-}
-
-function renderSimplifiedActions(session = ui.simplifiedSelected, { busy = false } = {}) {
-  const controls = {
-    start: $('simplified-start'),
-    pause: $('simplified-pause'),
-    resume: $('simplified-resume'),
-    stop: $('simplified-stop'),
-  };
-  if (busy) {
-    Object.values(controls).forEach((button) => { button.disabled = true; });
-    return;
-  }
-  if (!session?.id) {
-    Object.values(controls).forEach((button) => { button.disabled = true; });
-    return;
-  }
-  const state = session.runState || 'STOPPED';
-  const a = session.actionAvailability || {};
-  const active = state === 'RUNNING' || state === 'RECOVERING';
-  controls.start.disabled = active || state === 'PAUSED' || a.start === false;
-  controls.pause.disabled = !active || a.pause === false;
-  controls.resume.disabled = state !== 'PAUSED' || a.resume === false;
-  controls.stop.disabled = state === 'STOPPED' || a.stop === false;
-}
-
-function showSimplifiedSession(session) {
-  ui.simplifiedSelected = session ? clone(session) : null;
-  ui.simplifiedSelectedId = session?.id || '';
-  const tasks = session?.tasks || [];
-  $('simplified-name').value = session?.name || 'ÐÐ¾Ð²Ð¸Ð¹ ÑÐµÐ°Ð½Ñ';
-  $('simplified-config-mode').value = `${session?.urlMode || 'shared'}-${session?.promptMode || 'shared'}`;
-  $('simplified-url').value = tasks[0]?.url || 'https://chatgpt.com/';
-  $('simplified-urls').value = tasks.map(task => task.url).join('\n');
-  $('simplified-prompt').value = session?.sharedPrompt || '';
-  $('simplified-prompts').value = tasks.map(task => task.promptOverride).join('\n---\n');
-  $('simplified-run-mode').value = session?.runMode || 'continuous';
-  $('simplified-cycles').value = String(session?.configuredTaskCount || 1);
-  $('simplified-interval-unit').value = session?.minimumSendIntervalUnit || 'minutes';
-  $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
-  $('simplified-tab-ready').value = String(session?.tabReadyDelaySeconds ?? 0);
-  $('simplified-post-send').value = String(session?.postSendDelaySeconds ?? 5);
-  $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
-  $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
-  const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
-  $('simplified-retry-unit').value = retryUnit;
-  $('simplified-retry').value = String(retryUnit === 'minutes'
-    ? Math.max(1, Math.round(Number(session?.retryBackoffSeconds || 30) / 60))
-    : Number(session?.retryBackoffSeconds || 30));
-  $('simplified-retry-policy').value = session?.retryPolicy || 'safe';
-  $('simplified-busy-behavior').value = session?.busyChatBehavior || 'skip-next';
-  $('simplified-tabs').value = session?.tabStrategy || 'keep-open';
-  updateSimplifiedMode();
-  $('simplified-list').value = session?.id || '';
-  $('simplified-state').textContent = session
-    ? `Ð¡Ñ‚Ð°Ð½: ${session.status?.displayRunState || session.runState}. ÐÐ°Ð´Ñ–ÑÐ»Ð°Ð½Ð¾ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ñ–Ð²: ${session.successfulSendCount || 0}.`
-    : 'Ð¡ÐµÐ°Ð½Ñ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.';
-  ui.simplifiedDirty = false;
-  $('simplified-draft-status').textContent = 'ÐÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ñ… Ð·Ð¼Ñ–Ð½ Ð½ÐµÐ¼Ð°Ñ”.';
-  renderSimplifiedActions(session);
-  renderSimplifiedLog(session);
-}
-function renderSimplifiedList() {
-  const rows = ui.sessions.filter(item => item.simplifiedSession);
-  const signature = JSON.stringify(rows.map(row => [row.id, row.name, row.displayRunState, row.successfulSendCount]));
-  const list = $('simplified-list');
-  if (list.dataset.signature !== signature) {
-    list.dataset.signature = signature;
-    list.replaceChildren();
-    for (const row of rows) {
-      const option = document.createElement('option');
-      option.value = row.id;
-      option.textContent = `${row.name}: ${row.displayRunState || row.runState}; Send ${row.successfulSendCount || 0}`;
-      list.append(option);
-    }
-  }
-  if (ui.simplifiedSelectedId) list.value = ui.simplifiedSelectedId;
-  $('simplified-overview').textContent = `Ð¡ÐµÐ°Ð½ÑÑ–Ð²: ${rows.length}. ÐŸÑ€Ð°Ñ†ÑŽÑ”: ${rows.filter(row => row.runState === 'RUNNING').length}. Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾: ${rows.filter(row => row.isCompleted).length}. ÐŸÑ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾: ${rows.filter(row => row.runState === 'PAUSED').length}. ÐŸÐ¾Ð¼Ð¸Ð»Ð¾Ðº: ${rows.filter(row => row.runState === 'ERROR').length}. ÐŸÑ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¸Ñ… Send: ${rows.reduce((n, row) => n + Number(row.successfulSendCount || 0), 0)}.`;
-}
-
-async function selectSimplifiedSession(id) {
-  if (!id) { showSimplifiedSession(null); return; }
-  try {
-    const data = await core('GET_SESSION', { sessionId: id });
-    showSimplifiedSession(data.session);
-  } catch (error) { $('simplified-command-result').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚Ð¸ ÑÐµÐ°Ð½Ñ: ${error.message}`; }
-}
-
-async function refreshSimplifiedSessionStatus() {
-  await loadSessions();
-  if (!ui.simplifiedSelectedId) return;
-  try {
-    const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
-    const session = data.session;
-    ui.simplifiedSelected = clone(session);
-    $('simplified-state').textContent = `Ð¡Ñ‚Ð°Ð½: ${session.status?.displayRunState || session.runState}. ÐÐ°Ð´Ñ–ÑÐ»Ð°Ð½Ð¾ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ñ–Ð²: ${session.successfulSendCount || 0}.`;
-    renderSimplifiedActions(session);
-    renderSimplifiedLog(session);
-  } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
-}
-
-async function saveSimplifiedSession() {
-  try {
-    const config = buildSimplifiedSessionConfig(simplifiedFields(), ui.simplifiedSelected);
-    const data = ui.simplifiedSelected
-      ? await core('UPDATE_SESSION', { sessionId: config.id, expectedVersion: ui.simplifiedSelected.version, config })
-      : await core('CREATE_SESSION', { config });
-    ui.simplifiedSelectedId = data.session.id;
-    await loadSessions();
-    showSimplifiedSession(data.session);
-    $('simplified-draft-status').textContent = 'ÐÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ñ… Ð·Ð¼Ñ–Ð½ Ð½ÐµÐ¼Ð°Ñ”.';
-    $('simplified-command-result').textContent = 'Ð¡ÐµÐ°Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾.';
-  } catch (error) { $('simplified-command-result').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸: ${error.message}`; }
-}
-
-async function simplifiedAction(command) {
-  if (!ui.simplifiedSelectedId) {
-    $('simplified-command-result').textContent = 'Ð¡Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð·Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ ÑÐµÐ°Ð½Ñ.';
-    renderSimplifiedActions(null);
-    return;
-  }
-  renderSimplifiedActions(ui.simplifiedSelected, { busy: true });
-  $('simplified-command-result').textContent = 'ÐšÐ¾Ð¼Ð°Ð½Ð´Ñƒ Ð¿ÐµÑ€ÐµÐ´Ð°Ð½Ð¾ Coreâ€¦';
-  try {
-    if (ui.simplifiedDirty && ['START_SESSION', 'RESUME_SESSION'].includes(command)) {
-      const config = buildSimplifiedSessionConfig(simplifiedFields(), ui.simplifiedSelected);
-      const saved = await core('UPDATE_SESSION', { sessionId: config.id, expectedVersion: ui.simplifiedSelected.version, config });
-      ui.simplifiedSelected = clone(saved.session);
-      ui.simplifiedDirty = false;
-    }
-    const data = await core(command, { sessionId: ui.simplifiedSelectedId });
-    await loadSessions();
-    const session = data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session;
-    if (ui.simplifiedDirty) {
-      ui.simplifiedSelected = clone(session);
-      renderSimplifiedActions(session);
-      renderSimplifiedLog(session);
-    } else showSimplifiedSession(session);
-    $('simplified-command-result').textContent = `Core Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ð² Ð´Ñ–ÑŽ. Ð¡Ñ‚Ð°Ð½: ${session.runState}.`;
-  } catch (error) {
-    $('simplified-command-result').textContent = `Ð”Ñ–ÑŽ Ð½Ðµ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾: ${error.message}`;
-    try {
-      const current = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
-      if (ui.simplifiedDirty) {
-        ui.simplifiedSelected = clone(current.session);
-        renderSimplifiedActions(current.session);
-      } else showSimplifiedSession(current.session);
-    } catch {
-      renderSimplifiedActions(ui.simplifiedSelected);
-    }
-  }
-}
-
-async function importSimplifiedProfile(start) {
-  const file = $('simplified-import-file').files?.[0];
-  if (!file) { $('simplified-command-result').textContent = 'ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ JSON-Ñ„Ð°Ð¹Ð».'; return; }
-  try {
-    const profile = assertSimplifiedPortableProfile(parsePortableJson(await file.text()));
-    await core('PREVIEW_PORTABLE_PROFILE', { profile });
-    const data = await core('IMPORT_PORTABLE_PROFILE', { profile, confirmAutoStart: start });
-    const importedIds = data.summary?.importedSessionIds || [];
-    const alreadyStarted = new Set(data.summary?.startedSessionIds || []);
-    if (start) for (const sessionId of importedIds) {
-      if (!alreadyStarted.has(sessionId)) { await core('START_SESSION', { sessionId }); alreadyStarted.add(sessionId); }
-    }
-    await loadSessions();
-    const id = importedIds[0];
-    if (id) await selectSimplifiedSession(id);
-    $('simplified-command-result').textContent = `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾: ${importedIds.length}; Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾: ${alreadyStarted.size}.`;
-  } catch (error) { $('simplified-command-result').textContent = `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚ Ð½Ðµ Ð²Ð´Ð°Ð²ÑÑ: ${error.message}`; }
-}
-
-
-function globalStateLabel(value) {
-  return ({
-    RUNNING: 'ÐŸÐ ÐÐ¦Ð®Ð„',
-    WAITING_NEXT_SEND: 'Ð§Ð•ÐšÐÐ„ ÐÐÐ¡Ð¢Ð£ÐŸÐÐžÐ“Ðž SEND',
-    WAITING_RESPONSE: 'Ð§Ð•ÐšÐÐ„ Ð—ÐÐ’Ð•Ð Ð¨Ð•ÐÐÐ¯ Ð’Ð†Ð”ÐŸÐžÐ’Ð†Ð”Ð†',
-    READY: 'Ð“ÐžÐ¢ÐžÐ’Ðž',
-    PAUSED: 'ÐŸÐ Ð˜Ð—Ð£ÐŸÐ˜ÐÐ•ÐÐž',
-    RECOVERING: 'Ð’Ð†Ð”ÐÐžÐ’Ð›Ð®Ð„Ð¢Ð¬Ð¡Ð¯',
-    ERROR: 'ÐŸÐžÐœÐ˜Ð›ÐšÐ',
-    AMBIGUOUS_EFFECT: 'ÐŸÐžÐ¢Ð Ð†Ð‘ÐÐž Ð£Ð—Ð“ÐžÐ”Ð˜Ð¢Ð˜ ÐÐÐ”Ð¡Ð˜Ð›ÐÐÐÐ¯',
-    STOPPED: 'Ð—Ð£ÐŸÐ˜ÐÐ•ÐÐž',
-    COMPLETED: 'Ð—ÐÐ’Ð•Ð Ð¨Ð•ÐÐž',
-  })[value] || String(value || 'ÐÐ•Ð’Ð†Ð”ÐžÐœÐž');
-}
-
-async function openDashboardLaunch(kind, id) {
-  try {
-    if (kind === 'simplified') {
-      setUiMode('simplified');
-      await loadSessions();
-      await selectSimplifiedSession(id);
-      $('simplified-name').focus();
-    } else {
-      setUiMode('scenario-work');
-      await loadScenarioWork();
-      await openScenarioWorkTarget(id.startsWith('pool:') ? scenarioPoolListValue(id.slice(5)) : scenarioSingleListValue(id), { selectSingle: false });
-      setScenarioWorkPanel('state');
-      $('scenario-work-list').focus();
-    }
-  } catch (error) { $('global-launch-result').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð²Ñ–Ð´ÐºÑ€Ð¸Ñ‚Ð¸ Ð·Ð°Ð¿ÑƒÑÐº: ${error.message}`; }
-}
-
-async function stopDashboardLaunch(kind, id) {
-  try {
-    const pool = kind === 'scenario' && id.startsWith('pool:');
-    await core(kind === 'simplified' ? 'STOP_SESSION' : pool ? 'STOP_SCENARIO_CHAT_POOL' : 'STOP_SCENARIO_WORK',
-      kind === 'simplified' ? { sessionId: id } : { id: pool ? id.slice(5) : id });
-    $('global-launch-result').textContent = 'Ð’Ð¸Ð±Ñ€Ð°Ð½Ð¸Ð¹ Ð·Ð°Ð¿ÑƒÑÐº Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾.';
-    await loadGlobalStatus();
-  } catch (error) { $('global-launch-result').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·ÑƒÐ¿Ð¸Ð½Ð¸Ñ‚Ð¸ Ð·Ð°Ð¿ÑƒÑÐº: ${error.message}`; }
-}
-
-function renderGlobalStatus(data) {
-  const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Ð Ð¾Ð±Ð¾Ñ‡Ð¸Ñ… Ð¾Ð´Ð¸Ð½Ð¸Ñ†ÑŒ Ñƒ Ð²ÑÑŒÐ¾Ð¼Ñƒ Autopilot: ${summary.total || 0}. Ð—Ð²Ð¸Ñ‡Ð°Ð¹Ð½Ð¸Ñ… ÑÐµÐ°Ð½ÑÑ–Ð²: ${(data.sessions || []).length}. Ð¡Ð¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¸Ñ… ÑÐµÑÑ–Ð¹: ${(data.simplifiedSessions || []).length}. Ð¡Ñ†ÐµÐ½Ð°Ñ€Ð½Ð¸Ñ… Ñ„Ñ–Ð·Ð¸Ñ‡Ð½Ð¸Ñ… Ñ‡Ð°Ñ‚Ñ–Ð²: ${(data.scenarioSlots || []).length}. ÐžÑ€ÐºÐµÑÑ‚Ñ€Ð°Ñ†Ñ–Ð¹Ð½Ð¸Ñ… Ð¾Ð´Ð¸Ð½Ð¸Ñ†ÑŒ: ${(data.orchestration || []).length}. ÐÐ³ÐµÐ½Ñ‚Ñ–Ð²: ${(data.agents || []).length}. ÐŸÐ¾Ð¼Ð¸Ð»Ð¾Ðº: ${summary.ERROR || 0}. ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±Ð½Ð¾ ÑƒÐ·Ð³Ð¾Ð´Ð¸Ñ‚Ð¸ Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½Ñ: ${summary.AMBIGUOUS_EFFECT || 0}. Ð£ÑÑŒÐ¾Ð³Ð¾ Ð¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¸Ñ… Send${summary.verifiedSendHistoryComplete === false ? ' Ñ‰Ð¾Ð½Ð°Ð¹Ð¼ÐµÐ½ÑˆÐµ' : ''}: ${summary.verifiedSends || 0}. Ð”ÐµÑ‚Ð°Ð»ÑŒÐ½Ð¸Ð¹ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑ ÐºÐ¾Ð¶Ð½Ð¾Ð³Ð¾ Ñ‚Ð¸Ð¿Ñƒ Ñ€Ð¾Ð±Ð¾Ñ‚Ð¸ Ð½Ð°Ð²ÐµÐ´ÐµÐ½Ð¾ Ð½Ð¸Ð¶Ñ‡Ðµ Ð¾Ð´Ð¸Ð½ Ñ€Ð°Ð· Ñƒ Ð¹Ð¾Ð³Ð¾ Ð²Ð»Ð°ÑÐ½Ð¾Ð¼Ñƒ Ñ€Ð¾Ð·Ð´Ñ–Ð»Ñ–.`;
-  const scenarioPools = data.scenarioPools || [];
-  $('global-scenario-summary').textContent = scenarioPools.length
-    ? scenarioPools.map(pool => `${pool.name}. ${scenarioProgressText(pool)}`).join(' | ')
-    : 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ð½Ñ– Ð¿ÑƒÐ»Ð¸ Ñ‰Ðµ Ð½Ðµ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾.';
-  renderLaunchList(document, $('global-simplified-sessions'), (data.simplifiedSessions || []).map(row => ({
-    id: row.id, name: row.name, description: `${row.name}: ${globalStateLabel(row.category)}. ÐÐ°Ð´Ñ–ÑÐ»Ð°Ð½Ð¾ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ñ–Ð²: ${row.verifiedSends}.`,
-  })), { open: id => openDashboardLaunch('simplified', id), stop: id => stopDashboardLaunch('simplified', id) });
-  const poolRows = scenarioPools.map(pool => ({ id: `pool:${pool.id}`, name: pool.name,
-    description: `${pool.name}. ${scenarioProgressText(pool)}` }));
-  const standalone = new Map();
-  for (const row of data.scenarioSlots || []) if (!row.poolId) {
-    const id = row.scenarioId || row.id.slice(0, row.id.lastIndexOf(':'));
-    if (!standalone.has(id)) standalone.set(id, { id, name: row.scenario,
-      description: `${row.scenario}: ${globalStateLabel(row.category)}.` });
-  }
-  renderLaunchList(document, $('global-scenario-slots'), [...poolRows, ...standalone.values()], {
-    open: id => openDashboardLaunch('scenario', id), stop: id => stopDashboardLaunch('scenario', id),
-  });
-  const lists = [
-    ['global-orchestration', data.orchestration, row => `${row.name}: Ñ€Ð°ÑƒÐ½Ð´ ${row.round}; Director ${row.director} (Ð³Ð¾Ñ‚Ð¾Ð²Ð¾ ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (Ð³Ð¾Ñ‚Ð¾Ð²Ð¾ ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, Ñ‡ÐµÐºÐ°ÑŽÑ‚ÑŒ ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (Ð³Ð¾Ñ‚Ð¾Ð²Ð¾ ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, Ñ‡ÐµÐºÐ°ÑŽÑ‚ÑŒ ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); ÑÑ‚Ð°Ð½ ${row.phase}`],
-    ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
-    ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
-  ];
-  for (const [id, rows, describe] of lists) {
-    const list = $(id);
-    const signature = JSON.stringify((rows || []).map(describe));
-    if (list.dataset.signature === signature) continue;
-    list.dataset.signature = signature;
-    list.replaceChildren();
-    for (const row of rows || []) {
-      const li = document.createElement('li');
-      li.textContent = describe(row);
-      list.append(li);
-    }
-  }
-}
-
-async function loadGlobalStatus() {
-  if (document.visibilityState !== 'visible') return;
-  try { renderGlobalStatus(await core('GET_GLOBAL_STATUS')); }
-  catch (error) { $('global-runtime-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚Ð¸ ÑÑ‚Ð°Ð½ Autopilot: ${error.message}`; }
-}
-
-const ACTION_CENTER_ACTION_LABELS = Object.freeze({
-  APPROVE_OR_DENY: 'ÑÑ…Ð²Ð°Ð»Ð¸Ñ‚Ð¸ Ð°Ð±Ð¾ Ð²Ñ–Ð´Ñ…Ð¸Ð»Ð¸Ñ‚Ð¸',
-  RECONCILE: 'ÑƒÐ·Ð³Ð¾Ð´Ð¸Ñ‚Ð¸ Ð½ÐµÐ¾Ð´Ð½Ð¾Ð·Ð½Ð°Ñ‡Ð½Ð¸Ð¹ ÐµÑ„ÐµÐºÑ‚',
-  REVIEW: 'Ð¿ÐµÑ€ÐµÐ³Ð»ÑÐ½ÑƒÑ‚Ð¸',
-  CLARIFY: 'ÑƒÑ‚Ð¾Ñ‡Ð½Ð¸Ñ‚Ð¸',
-  TAKE_OVER: 'Ð²Ð·ÑÑ‚Ð¸ Ð¿Ñ–Ð´ ÐºÐ¾Ð½Ñ‚Ñ€Ð¾Ð»ÑŒ',
-  REAUTHENTICATE: 'Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾ Ð°Ð²Ñ‚Ð¾Ñ€Ð¸Ð·ÑƒÐ²Ð°Ñ‚Ð¸',
-});
-
-const ACTION_CENTER_SEVERITY_LABELS = Object.freeze({
-  BLOCKING: 'Ð±Ð»Ð¾ÐºÑƒÑ” Ñ€Ð¾Ð±Ð¾Ñ‚Ñƒ',
-  HIGH: 'Ð²Ð¸ÑÐ¾ÐºÐ¸Ð¹ Ð¿Ñ€Ñ–Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚',
-  NORMAL: 'Ð·Ð²Ð¸Ñ‡Ð°Ð¹Ð½Ð¸Ð¹ Ð¿Ñ€Ñ–Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚',
-  LOW: 'Ð½Ð¸Ð·ÑŒÐºÐ¸Ð¹ Ð¿Ñ€Ñ–Ð¾Ñ€Ð¸Ñ‚ÐµÑ‚',
-});
-
-async function decideActionCenterBrowserApproval(item, decision, container) {
-  const summary = $('action-center-summary');
-  const controls = [...container.querySelectorAll('button')];
-  controls.forEach(button => { button.disabled = true; });
-  try {
-    await core('DECIDE_ACTION_CENTER_BROWSER_APPROVAL', {
-      itemId: item.itemId,
-      sourceRevisionId: item.sourceRevisionId,
-      decision,
-    });
-    await loadActionCenter();
-    summary.focus();
-  } catch (error) {
-    summary.textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°ÑÑ‚Ð¾ÑÑƒÐ²Ð°Ñ‚Ð¸ Ñ€Ñ–ÑˆÐµÐ½Ð½Ñ: ${error.message}`;
-    controls.forEach(button => { button.disabled = false; });
-    summary.focus();
-  }
-}
-
-function renderActionCenter(data) {
-  const items = Array.isArray(data?.items) ? data.items.filter(item => item?.status === 'OPEN') : [];
-  const summary = data?.summary || {};
-  const runtimeSummary = data?.runtimeSummary || {};
-  const truncation = runtimeSummary.truncated
-    ? ` ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ ${runtimeSummary.projectedCount || items.length} Ñ–Ð· ${runtimeSummary.candidateCount || items.length}; ÑÐ¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð±Ð»Ð¾ÐºÑƒÑŽÑ‡Ñ– Ñ‚Ð° Ð½Ð°Ð¹ÑÑ‚Ð°Ñ€Ñ–ÑˆÑ– Ð¿Ð¸Ñ‚Ð°Ð½Ð½Ñ.`
-    : '';
-  $('action-center-summary').textContent = items.length
-    ? `ÐŸÐ¾Ñ‚Ñ€ÐµÐ±ÑƒÑŽÑ‚ÑŒ ÑƒÐ²Ð°Ð³Ð¸: ${summary.openCount || items.length}. Ð‘Ð»Ð¾ÐºÑƒÑŽÑ‚ÑŒ Ñ€Ð¾Ð±Ð¾Ñ‚Ñƒ: ${summary.blockingOpenCount || 0}.${truncation} ÐžÑ‡Ñ–ÐºÑƒÐ²Ð°Ð½Ñ– Ð´Ñ–Ñ— Browser Agent Ð¼Ð¾Ð¶Ð½Ð° ÑÑ…Ð²Ð°Ð»Ð¸Ñ‚Ð¸ Ð°Ð±Ð¾ Ð²Ñ–Ð´Ñ…Ð¸Ð»Ð¸Ñ‚Ð¸ Ñ‚ÑƒÑ‚; Ñ–Ð½ÑˆÑ– Ð¿Ð¸Ñ‚Ð°Ð½Ð½Ñ Ð²Ð¸Ñ€Ñ–ÑˆÑƒÑŽÑ‚ÑŒÑÑ Ñƒ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð½Ð¾Ð¼Ñƒ ÐºÐ°Ð½Ð¾Ð½Ñ–Ñ‡Ð½Ð¾Ð¼Ñƒ Ñ€Ð¾Ð·Ð´Ñ–Ð»Ñ–.`
-    : 'Ð—Ð°Ñ€Ð°Ð· Ð½ÐµÐ¼Ð°Ñ” Ð¿Ð¸Ñ‚Ð°Ð½ÑŒ, ÑÐºÑ– Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑƒÑŽÑ‚ÑŒ Ð²Ð°ÑˆÐ¾Ñ— Ð´Ñ–Ñ—.';
-  const list = $('action-center-list');
-  const signature = JSON.stringify(items.map(item => [
-    item.itemId, item.sourceRevisionId, item.severity, item.ownerActionKind, item.title, item.materialityReason,
-  ]));
-  if (list.dataset.signature === signature) return;
-  list.dataset.signature = signature;
-  list.replaceChildren();
-  for (const item of items) {
-    const li = document.createElement('li');
-    const severity = ACTION_CENTER_SEVERITY_LABELS[item.severity] || item.severity;
-    const action = ACTION_CENTER_ACTION_LABELS[item.ownerActionKind] || item.ownerActionKind;
-    const description = document.createElement('span');
-    description.textContent = `${severity}. ${item.title}. ÐŸÐ¾Ñ‚Ñ€Ñ–Ð±Ð½Ð¾: ${action}. ${item.materialityReason}`;
-    li.append(description);
-    if (item.ownerActionKind === 'APPROVE_OR_DENY' && item.sourceKind === 'APPROVAL') {
-      const approve = document.createElement('button');
-      approve.type = 'button';
-      approve.textContent = 'Ð¡Ñ…Ð²Ð°Ð»Ð¸Ñ‚Ð¸';
-      approve.setAttribute('aria-label', `Ð¡Ñ…Ð²Ð°Ð»Ð¸Ñ‚Ð¸: ${item.title}`);
-      approve.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'APPROVE', li); });
-      const reject = document.createElement('button');
-      reject.type = 'button';
-      reject.textContent = 'Ð’Ñ–Ð´Ñ…Ð¸Ð»Ð¸Ñ‚Ð¸';
-      reject.setAttribute('aria-label', `Ð’Ñ–Ð´Ñ…Ð¸Ð»Ð¸Ñ‚Ð¸: ${item.title}`);
-      reject.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'REJECT', li); });
-      li.append(' ', approve, ' ', reject);
-    }
-    list.append(li);
-  }
-}
-
-async function loadActionCenter() {
-  if (document.visibilityState !== 'visible') return;
-  try { renderActionCenter(await core('GET_ACTION_CENTER')); }
-  catch (error) { $('action-center-summary').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚Ð¸ Ñ†ÐµÐ½Ñ‚Ñ€ ÑƒÐ²Ð°Ð³Ð¸: ${error.message}`; }
-}
-
-function renderProjectWorkspaceSummary(data) {
-  const projects = Array.isArray(data?.projects) ? data.projects : [];
-  const totals = data?.summary || {};
-  $('project-workspace-summary').textContent = projects.length
-    ? `ÐŸÑ€Ð¾Ñ”ÐºÑ‚Ñ–Ð²: ${projects.length}. Ð”Ð¶ÐµÑ€ÐµÐ»: ${totals.sourceCount || 0}. ÐÑ€Ñ‚ÐµÑ„Ð°ÐºÑ‚Ñ–Ð²: ${totals.artifactCount || 0}. ÐšÐ°Ð¿ÑÑƒÐ» ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚Ñƒ: ${totals.capsuleCount || 0}. Ð—Ð°ÑÑ‚Ð°Ñ€Ñ–Ð»Ð¸Ñ… Ð·Ð° Ñ€ÐµÐ²Ñ–Ð·Ñ–Ñ”ÑŽ ÐºÐ°Ð¿ÑÑƒÐ»: ${totals.staleRevisionCapsuleCount || 0}.`
-    : 'Ð£ ÑÑ…Ð¾Ð²Ð¸Ñ‰Ñ– Ð¿Ñ€Ð¾Ñ”ÐºÑ‚Ñ–Ð² Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ” Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ñ… Ð¿Ñ€Ð¾Ñ”ÐºÑ‚Ñ–Ð².';
-
-  const list = $('project-workspace-list');
-  const signature = JSON.stringify(projects.map(project => [
-    project.projectId,
-    project.projectRevisionId,
-    project.sourceCount,
-    project.artifactCount,
-    project.sensitiveArtifactCount,
-    project.capsuleCount,
-    project.staleRevisionCapsuleCount,
-    project.provenanceCount,
-  ]));
-  if (list.dataset.signature === signature) return;
-  list.dataset.signature = signature;
-  list.replaceChildren();
-  for (const project of projects) {
-    const li = document.createElement('li');
-    const capsuleState = project.capsuleRevisionStatus === 'HAS_STALE'
-      ? 'Ñ” ÐºÐ°Ð¿ÑÑƒÐ»Ð¸ Ð²Ñ–Ð´ Ð¿Ð¾Ð¿ÐµÑ€ÐµÐ´Ð½ÑŒÐ¾Ñ— Ñ€ÐµÐ²Ñ–Ð·Ñ–Ñ—'
-      : project.capsuleRevisionStatus === 'CURRENT'
-        ? 'ÐºÐ°Ð¿ÑÑƒÐ»Ð¸ Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´Ð°ÑŽÑ‚ÑŒ Ð¿Ð¾Ñ‚Ð¾Ñ‡Ð½Ñ–Ð¹ Ñ€ÐµÐ²Ñ–Ð·Ñ–Ñ—'
-        : 'ÐºÐ°Ð¿ÑÑƒÐ» Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”';
-    li.textContent = `ÐŸÑ€Ð¾Ñ”ÐºÑ‚ ${project.projectId}; Ñ€ÐµÐ²Ñ–Ð·Ñ–Ñ ${project.projectRevisionId}; Ð´Ð¶ÐµÑ€ÐµÐ» ${project.sourceCount}; Ð°Ñ€Ñ‚ÐµÑ„Ð°ÐºÑ‚Ñ–Ð² ${project.artifactCount}; ÐºÐ°Ð¿ÑÑƒÐ» ${project.capsuleCount}; provenance-Ð·Ð°Ð¿Ð¸ÑÑ–Ð² ${project.provenanceCount}; ${capsuleState}.`;
-    list.append(li);
-  }
-}
-
-async function loadProjectWorkspace({ focusSummary = false } = {}) {
-  if (document.visibilityState !== 'visible') return;
-  const summary = $('project-workspace-summary');
-  try {
-    renderProjectWorkspaceSummary(await core('GET_PROJECT_WORKSPACE_SUMMARY'));
-  } catch (error) {
-    const list = $('project-workspace-list');
-    list.dataset.signature = '';
-    list.replaceChildren();
-    summary.textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¿Ñ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚Ð¸ ÑÑ…Ð¾Ð²Ð¸Ñ‰Ðµ Ð¿Ñ€Ð¾Ñ”ÐºÑ‚Ñ–Ð²: ${error.message}`;
-  }
-  if (focusSummary) summary.focus();
-}
-
-async function loadSessions({ preserveFocus = true } = {}) {
-  const active = preserveFocus ? document.activeElement : null;
-  const activeId = preserveFocus ? active?.id || null : null;
-  try {
-    const data = await core('LIST_SESSIONS');
-    const nextSessions = (Array.isArray(data?.sessions) ? data.sessions : []).filter(session => !session.managedKind);
-    const nextSignature = sessionListSignature(nextSessions);
-    ui.sessions = nextSessions;
-    renderSimplifiedList();
-    renderRemoteFallbackSessionOptions();
-    if (nextSignature !== ui.sessionListSignature) {
-      ui.sessionListSignature = nextSignature;
-      renderSessionList();
-    }
-    setAppStatus('Connected to Core.');
-    if (active?.isConnected) active.focus();
-    else if (activeId) $(activeId)?.focus();
-  } catch (error) {
-    setAppStatus(error.message);
-    if (!ui.sessionListSignature) renderSessionList();
-  }
-}
-
-function renderSessionList() {
-  const list = $('session-list');
-  list.replaceChildren();
-  const ordinarySessions = ui.sessions.filter(session => !session.simplifiedSession);
-  for (const session of ordinarySessions) {
-    const li = document.createElement('li');
-    const open = document.createElement('button');
-    open.type = 'button'; open.id = `session-select-${session.id}`;
-    open.textContent = session.name || 'Unnamed session';
-    open.setAttribute('aria-label', `Open session ${session.name || 'Unnamed session'}`);
-    open.addEventListener('click', () => openSession(session.id));
-    const state = document.createElement('span');
-    state.id = `session-state-${session.id}`; state.textContent = ` State: ${session.displayRunState || session.runState || 'STOPPED'}.`;
-    const count = document.createElement('span');
-    count.id = `session-enabled-count-${session.id}`; count.textContent = ` Successfully sent: ${session.successfulSendCount ?? 0}. Completed: ${session.completedTaskCount ?? 0}/${session.enabledTaskCount ?? 0}. Remaining: ${session.remainingTaskCount ?? session.enabledTaskCount ?? 0}.`;
-    const sessionName = session.name || 'Unnamed session';
-    const rename = button(`session-rename-${session.id}`, 'Rename', () => renameSession(session.id));
-    rename.setAttribute('aria-label', `Rename session ${sessionName}`);
-    const duplicate = button(`session-duplicate-${session.id}`, 'Duplicate', () => duplicateSession(session.id));
-    duplicate.setAttribute('aria-label', `Duplicate session ${sessionName}`);
-    const del = button(`session-delete-${session.id}`, 'Delete', (event) => openDeleteDialog(session.id, event.currentTarget));
-    del.setAttribute('aria-label', `Delete session ${sessionName}`);
-    li.append(open, state, count, rename, duplicate, del);
-    list.append(li);
-  }
-  const total = ordinarySessions.length;
-  const running = ordinarySessions.filter(s => ['RUNNING','RECOVERING'].includes(s.runState)).length;
-  const completed = ordinarySessions.filter(s => s.isCompleted).length;
-  const paused = ordinarySessions.filter(s => s.runState === 'PAUSED').length;
-  const errors = ordinarySessions.filter(s => s.runState === 'ERROR').length;
-  const sent = ordinarySessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
-  if ($('session-overview')) $('session-overview').textContent = `Ð—Ð²Ð¸Ñ‡Ð°Ð¹Ð½Ð¸Ñ… Ñ€ÑƒÑ‡Ð½Ð¸Ñ… ÑÐµÐ°Ð½ÑÑ–Ð² Ñƒ Ñ†ÑŒÐ¾Ð¼Ñƒ ÑÐ¿Ð¸ÑÐºÑƒ: ${total}. ÐŸÑ€Ð°Ñ†ÑŽÑ”: ${running}. Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¾: ${completed}. ÐŸÑ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾: ${paused}. ÐŸÐ¾Ð¼Ð¸Ð»Ð¾Ðº: ${errors}. Ð£ÑÐ¿Ñ–ÑˆÐ½Ð¾ Ð½Ð°Ð´Ñ–ÑÐ»Ð°Ð½Ð¾ Ñ†Ð¸Ð¼Ð¸ Ð·Ð²Ð¸Ñ‡Ð°Ð¹Ð½Ð¸Ð¼Ð¸ ÑÐµÐ°Ð½ÑÐ°Ð¼Ð¸: ${sent}. Ð¡Ð¿Ñ€Ð¾Ñ‰ÐµÐ½Ñ– Ð¹ ÑÑ†ÐµÐ½Ð°Ñ€Ð½Ñ– Ñ‡Ð°Ñ‚Ð¸ Ñ€Ð°Ñ…ÑƒÑŽÑ‚ÑŒÑÑ Ñƒ Ð·Ð²ÐµÐ´ÐµÐ½Ð½Ñ– Â«Ð’ÐµÑÑŒ Autopilot Ð·Ð°Ñ€Ð°Ð·Â» Ð²Ð¸Ñ‰Ðµ.`;
-  syncCurrentSessionMarker();
-}
-
-function syncCurrentSessionMarker() {
-  document.querySelectorAll('#session-list [aria-current="page"]').forEach((element) => element.removeAttribute('aria-current'));
-  if (ui.selectedSessionId) $(`session-select-${ui.selectedSessionId}`)?.setAttribute('aria-current', 'page');
-}
-
-function button(id, text, handler) {
-  const b = document.createElement('button'); b.id = id; b.type = 'button'; b.textContent = text; b.addEventListener('click', handler); return b;
-}
-
-function portableDraftConfig(session) {
-  return {
-    id: session.id,
-    version: session.version,
-    name: session.name,
-    simplifiedSession: session.simplifiedSession === true,
-    promptMode: session.promptMode,
-    urlMode: session.urlMode,
-    sharedPrompt: session.sharedPrompt,
-    defaultUniquePrompt: session.defaultUniquePrompt,
-    promptCadence: clone(session.promptCadence || null),
-    drivePromptSources: clone(session.drivePromptSources || null),
-    calendarSchedule: clone(session.calendarSchedule || null),
-    runMode: session.runMode,
-    tasks: clone(session.tasks || []),
-    configuredTaskCount: Number(session.configuredTaskCount || session.tasks?.length || 1),
-    minimumSendIntervalValue: session.minimumSendIntervalValue ?? session.minimumSendIntervalMinutes ?? 2,
-    minimumSendIntervalUnit: session.minimumSendIntervalUnit || 'minutes',
-    minimumSendIntervalMinutes: session.minimumSendIntervalMinutes,
-    tabReadyDelaySeconds: session.tabReadyDelaySeconds,
-    postSendDelaySeconds: session.postSendDelaySeconds,
-    preSendDelaySeconds: session.preSendDelaySeconds,
-    busyCheckDelaySeconds: session.busyCheckDelaySeconds,
-    retryBackoffSeconds: session.retryBackoffSeconds,
-    retryBackoffUnit: session.retryBackoffUnit,
-    retryPolicy: session.retryPolicy,
-    busyChatBehavior: session.busyChatBehavior,
-    tabStrategy: session.tabStrategy,
-  };
-}
-
-function restoreDraft(canonical) {
-  const raw = storageGet(`${DRAFT_KEY_PREFIX}${canonical.id}`);
-  if (!raw) return canonical;
-  try {
-    const saved = JSON.parse(raw);
-    if (saved?.baseVersion !== canonical.version || saved?.config?.id !== canonical.id) {
-      storageRemove(`${DRAFT_KEY_PREFIX}${canonical.id}`);
-      return canonical;
-    }
-    const config = saved.config;
-    $('draft-status').textContent = 'Unsaved draft restored from this browser.';
-    return {
-      ...canonical,
-      ...clone(config),
-      version: canonical.version,
-      runState: canonical.runState,
-      actionAvailability: canonical.actionAvailability,
-      status: canonical.status,
-      log: canonical.log,
-    };
-  } catch {
-    storageRemove(`${DRAFT_KEY_PREFIX}${canonical.id}`);
-    return canonical;
-  }
-}
-
-function clearDraft(sessionId) {
-  if (!sessionId) return;
-  storageRemove(`${DRAFT_KEY_PREFIX}${sessionId}`);
-  if (ui.selectedSessionId === sessionId) $('draft-status').textContent = 'No unsaved draft changes.';
-}
-
-let draftSaveTimer = null;
-function persistCurrentDraft() {
-  if (!ui.selected || $('session-editor').hidden) return;
-  const selected = collectEditor();
-  const saved = {
-    baseVersion: selected.version,
-    savedAt: Date.now(),
-    config: portableDraftConfig(selected),
-  };
-  if (storageSet(`${DRAFT_KEY_PREFIX}${selected.id}`, JSON.stringify(saved))) {
-    $('draft-status').textContent = 'Unsaved changes are protected locally in this browser.';
-  }
-}
-function scheduleDraftPersistence() {
-  if (!ui.selected) return;
-  clearTimeout(draftSaveTimer);
-  draftSaveTimer = setTimeout(persistCurrentDraft, DRAFT_SAVE_DELAY_MS);
-}
-
-async function openSession(sessionId) {
-  try {
-    const data = await core('GET_SESSION', { sessionId });
-    ui.selectedSessionId = sessionId;
-    storageSet(LAST_SESSION_KEY, sessionId);
-    syncCurrentSessionMarker();
-    const canonical = clone(data.session);
-    ui.selected = restoreDraft(canonical);
-    ui.runTimeline = null;
-    renderEditor();
-    renderRunTimeline();
-    await refreshRunTimeline({ announceResult: false });
-    $('session-heading').focus();
-  } catch (error) { setAppStatus(error.message); announce(error.message); }
-}
-
-let lastRuntimeSignature = '';
-async function refreshSelectedSessionStatus(sessionId) {
-  if (!sessionId || sessionId !== ui.selectedSessionId || !ui.selected) return;
-  try {
-    const data = await core('GET_SESSION', { sessionId });
-    if (sessionId !== ui.selectedSessionId || !data?.session) return;
-    const latest = clone(data.session);
-    ui.selected.version = latest.version;
-    ui.selected.runState = latest.runState;
-    ui.selected.actionAvailability = latest.actionAvailability;
-    ui.selected.status = latest.status;
-    ui.selected.log = latest.log;
-    ui.selected.calendar = latest.calendar;
-    ui.selected.calendarRuntime = latest.calendarRuntime;
-
-    // Runtime Drive evidence is safe to refresh live, but never write it back
-    // into the visible draft inputs. The user may currently be editing another
-    // file/target locally; only the status line follows canonical runtime state.
-    const latestDriveBinding = latest.drivePromptSources?.bindings?.[0] || null;
-    renderDrivePromptRuntimeStatus(latestDriveBinding);
-    renderCalendarRuntimeStatus(ui.selected);
-
-    const signature = JSON.stringify([
-      latest.version,
-      latest.runState,
-      latest.actionAvailability,
-      latest.status,
-      latest.log?.length || 0,
-      latest.log?.at?.(-1)?.at || 0,
-      latest.log?.at?.(-1)?.message || '',
-      latestDriveBinding?.lastAcceptedVersion || '',
-      latestDriveBinding?.lastCheckedAt || 0,
-      latestDriveBinding?.nextCheckAt || 0,
-      latestDriveBinding?.lastErrorCode || '',
-      latest.calendar?.admissionState || '',
-      latest.calendar?.nextOccurrence?.scheduledFor || 0,
-      latest.calendarRuntime?.lastOccurrence?.state || '',
-      latest.calendarRuntime?.lastOccurrence?.scheduledFor || 0,
-      latest.calendarRuntime?.lastOccurrence?.executedAt || 0,
-    ]);
-    if (signature !== lastRuntimeSignature) {
-      lastRuntimeSignature = signature;
-      renderStatus();
-      renderLog();
-      renderActions();
-      await refreshRunTimeline({ announceResult: false });
-    }
-  } catch (error) {
-    setAppStatus(error.message);
-    announce(error.message);
-  }
-}
-
-function inferUrlMode(session) {
-  if (session?.urlMode === 'shared' || session?.urlMode === 'unique') return session.urlMode;
-  const urls = (session?.tasks || []).map((task) => String(task.url || '').trim()).filter(Boolean);
-  if (urls.length <= 1) return 'shared';
-  return new Set(urls).size === 1 ? 'shared' : 'unique';
-}
-
-function taskConfigurationModeFor(session) {
-  const urlMode = inferUrlMode(session);
-  const promptMode = session?.promptMode === 'unique' ? 'unique' : 'shared';
-  if (urlMode === 'shared' && promptMode === 'shared') return 'same-url-shared-prompt';
-  if (urlMode === 'shared' && promptMode === 'unique') return 'same-url-unique-prompts';
-  if (urlMode === 'unique' && promptMode === 'shared') return 'unique-urls-shared-prompt';
-  return 'unique-urls-unique-prompts';
-}
-
-function taskModeParts(mode = taskConfigurationModeFor(ui.selected)) {
-  return {
-    urlMode: mode.startsWith('same-url-') ? 'shared' : 'unique',
-    promptMode: mode.endsWith('-shared-prompt') ? 'shared' : 'unique',
-  };
-}
-
-function selectedTaskConfigurationMode() {
-  return document.querySelector('input[name="taskConfigurationMode"]:checked')?.value
-    || taskConfigurationModeFor(ui.selected);
-}
-
-function resizeTasks(rawCount) {
-  if (!ui.selected) return;
-  const requested = Math.min(MAX_TASKS, Math.max(1, Math.trunc(Number(rawCount) || 1)));
-  const mode = selectedTaskConfigurationMode();
-  const { urlMode, promptMode } = taskModeParts(mode);
-  const compactShared = urlMode === 'shared' && promptMode === 'shared';
-  const physicalCount = compactShared ? 1 : Math.min(MAX_PHYSICAL_TASKS, requested);
-  const sharedUrl = $('shared-task-url')?.value || ui.selected.tasks?.[0]?.url || '';
-  while (ui.selected.tasks.length < physicalCount) {
-    const task = blankTask();
-    if (urlMode === 'shared') task.url = sharedUrl;
-    ui.selected.tasks.push(task);
-  }
-  if (ui.selected.tasks.length > physicalCount) ui.selected.tasks.length = physicalCount;
-  ui.selected.tasks.forEach((task) => { task.enabled = true; });
-  ui.selected.configuredTaskCount = compactShared ? requested : physicalCount;
-  if ($('task-count')) $('task-count').value = String(ui.selected.configuredTaskCount);
-}
-
-function syncTaskModeVisibility() {
-  const mode = selectedTaskConfigurationMode();
-  const parts = taskModeParts(mode);
-  if (ui.selected) {
-    ui.selected.urlMode = parts.urlMode;
-    ui.selected.promptMode = parts.promptMode;
-  }
-  $('shared-url-container').hidden = parts.urlMode !== 'shared';
-  $('bulk-url-region').hidden = parts.urlMode !== 'unique';
-  $('shared-prompt-container').hidden = parts.promptMode !== 'shared';
-  $('unique-default-container').hidden = parts.promptMode !== 'unique';
-}
-
-function renderDrivePromptRuntimeStatus(binding) {
-  if (!$('drive-prompt-status')) return;
-  $('drive-prompt-status').textContent = binding
-    ? `Drive: ${binding.enabled ? 'ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾' : 'Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾'}; target ${binding.target || 'PRIMARY'}; accepted version ${binding.lastAcceptedVersion || 'Ñ‰Ðµ Ð½ÐµÐ¼Ð°Ñ”'}; Ð¾ÑÑ‚Ð°Ð½Ð½Ñ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° ${binding.lastCheckedAt ? new Date(binding.lastCheckedAt).toLocaleString() : 'Ñ‰Ðµ Ð½Ðµ Ð±ÑƒÐ»Ð¾'}; ${binding.lastErrorCode ? `Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ° ${binding.lastErrorCode}` : 'Ð¿Ð¾Ð¼Ð¸Ð»Ð¾Ðº Ð½ÐµÐ¼Ð°Ñ”'}.`
-    : 'Drive source Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.';
-}
-
-function defaultCalendarTimeZone() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
-  catch { return 'UTC'; }
-}
-function calendarLines(id) {
-  return String($(id)?.value || '').split(/[\n,;]+/u).map(value => value.trim()).filter(Boolean);
-}
-function collectCalendarSchedule() {
-  const kind = $('calendar-mode').value;
-  if (kind === 'NONE') return null;
-  const schedule = {
-    kind,
-    timeZone: $('calendar-time-zone').value.trim(),
-    catchUp: $('calendar-catch-up').checked ? 'ON' : 'OFF',
-  };
-  if (kind === 'ONE_TIME') {
-    schedule.date = $('calendar-one-time-date').value.trim();
-    schedule.time = $('calendar-one-time-time').value.trim();
-    return schedule;
-  }
-  if (kind === 'DAILY' || kind === 'WEEKLY') {
-    schedule.startDate = $('calendar-start-date').value.trim();
-    schedule.times = calendarLines('calendar-times');
-    const endDate = $('calendar-end-date').value.trim();
-    const maxOccurrences = $('calendar-max-occurrences').value.trim();
-    if (endDate) schedule.endDate = endDate;
-    if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
-    if (kind === 'WEEKLY') {
-      schedule.weekdays = Array.from({ length: 7 }, (_, index) => index + 1)
-        .filter(day => $(`calendar-weekday-${day}`).checked);
-    }
-    return schedule;
-  }
-  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map(line => {
-    const match = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)$/u.exec(line);
-    return match ? { date: match[1], time: match[2] } : { date: line, time: '' };
-  });
-  return schedule;
-}
-function syncCalendarVisibility() {
-  const kind = $('calendar-mode')?.value || 'NONE';
-  $('calendar-common-fields').hidden = kind === 'NONE';
-  $('calendar-one-time-fields').hidden = kind !== 'ONE_TIME';
-  $('calendar-recurring-fields').hidden = kind !== 'DAILY' && kind !== 'WEEKLY';
-  $('calendar-weekdays').hidden = kind !== 'WEEKLY';
-  $('calendar-explicit-fields').hidden = kind !== 'EXPLICIT';
-}
-function formatCalendarInstant(value) {
-  const instant = Number(value || 0);
-  return Number.isFinite(instant) && instant > 0 ? new Date(instant).toLocaleString() : 'Ð½ÐµÐ¼Ð°Ñ”';
-}
-function renderCalendarRuntimeStatus(session = ui.selected) {
-  const status = $('calendar-runtime-status');
-  if (!status || !session?.calendarSchedule) {
-    if (status) status.textContent = 'ÐšÐ°Ð»ÐµÐ½Ð´Ð°Ñ€Ð½Ð¸Ð¹ Ñ€Ð¾Ð·ÐºÐ»Ð°Ð´ Ð²Ð¸Ð¼ÐºÐ½ÐµÐ½Ð¾.';
-    return;
-  }
-  const projection = session.calendar || {};
-  const nextAt = projection.nextOccurrence?.scheduledFor || 0;
-  const last = session.calendarRuntime?.lastOccurrence || projection.lastOccurrence || null;
-  status.textContent = `Ð¡Ñ‚Ð°Ð½: ${projection.admissionState || 'Ð¾Ñ‡Ñ–ÐºÑƒÐ²Ð°Ð½Ð½Ñ'}. ÐÐ°ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹ Ð·Ð°Ð¿ÑƒÑÐº: ${formatCalendarInstant(nextAt)}. ÐžÑÑ‚Ð°Ð½Ð½Ñ–Ð¹ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚: ${last?.state || 'Ð½ÐµÐ¼Ð°Ñ”'}; Ð·Ð°Ð¿Ð»Ð°Ð½Ð¾Ð²Ð°Ð½Ð¾ ${formatCalendarInstant(last?.scheduledFor)}; Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð¾ ${formatCalendarInstant(last?.executedAt)}.`;
-}
-function renderCalendarEditor() {
-  const schedule = ui.selected?.calendarSchedule || null;
-  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
-  $('calendar-mode').value = kind;
-  $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
-  $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
-  $('calendar-revision-confirm').checked = false;
-  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
-  $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
-  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
-  $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
-  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.endDate || '') : '';
-  $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
-  const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
-  for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
-  $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
-    ? (schedule.occurrences || []).map(item => `${item.date} ${item.time}`).join('\n')
-    : '';
-  syncCalendarVisibility();
-  renderCalendarRuntimeStatus(ui.selected);
-}
-function validCalendarDate(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value || ''));
-  if (!match) return false;
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return date.getUTCFullYear() === Number(match[1])
-    && date.getUTCMonth() === Number(match[2]) - 1
-    && date.getUTCDate() === Number(match[3]);
-}
-function validCalendarTime(value) {
-  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/u.exec(String(value || ''));
-  return Boolean(match && Number(match[1]) <= 23 && Number(match[2]) <= 59 && Number(match[3] || 0) <= 59);
-}
-function validateCalendarScheduleUi(session, errors) {
-  const schedule = session.calendarSchedule;
-  if (!schedule) return;
-  try { new Intl.DateTimeFormat('uk-UA', { timeZone: schedule.timeZone }).format(0); }
-  catch { errors.push(['calendar-time-zone', 'Ð’ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ Ñ‡Ð¸Ð½Ð½Ð¸Ð¹ IANA Ñ‡Ð°ÑÐ¾Ð²Ð¸Ð¹ Ð¿Ð¾ÑÑ, Ð½Ð°Ð¿Ñ€Ð¸ÐºÐ»Ð°Ð´ Europe/Bratislava.']); }
-  if (schedule.kind === 'ONE_TIME') {
-    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Ð”Ð°Ñ‚Ð° Ð¾Ð´Ð½Ð¾Ñ€Ð°Ð·Ð¾Ð²Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑƒÑÐºÑƒ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– YYYY-MM-DD.']);
-    if (!validCalendarTime(schedule.time)) errors.push(['calendar-one-time-time', 'Ð§Ð°Ñ Ð¾Ð´Ð½Ð¾Ñ€Ð°Ð·Ð¾Ð²Ð¾Ð³Ð¾ Ð·Ð°Ð¿ÑƒÑÐºÑƒ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– HH:MM Ð°Ð±Ð¾ HH:MM:SS.']);
-    return;
-  }
-  if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
-    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Ð”Ð°Ñ‚Ð° Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– YYYY-MM-DD.']);
-    if (!Array.isArray(schedule.times) || schedule.times.length < 1 || schedule.times.length > 48 || schedule.times.some(value => !validCalendarTime(value))) {
-      errors.push(['calendar-times', 'Ð”Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ð²Ñ–Ð´ 1 Ð´Ð¾ 48 ÐºÐ¾Ñ€ÐµÐºÑ‚Ð½Ð¸Ñ… Ñ‡Ð°ÑÑ–Ð², Ð¿Ð¾ Ð¾Ð´Ð½Ð¾Ð¼Ñƒ Ð² Ñ€ÑÐ´ÐºÑƒ, Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– HH:MM.']);
-    }
-    if (schedule.kind === 'WEEKLY' && (!Array.isArray(schedule.weekdays) || schedule.weekdays.length < 1)) {
-      errors.push(['calendar-weekday-1', 'Ð”Ð»Ñ Ñ‰Ð¾Ñ‚Ð¸Ð¶Ð½ÐµÐ²Ð¾Ð³Ð¾ Ñ€Ð¾Ð·ÐºÐ»Ð°Ð´Ñƒ Ð²Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Ñ‰Ð¾Ð½Ð°Ð¹Ð¼ÐµÐ½ÑˆÐµ Ð¾Ð´Ð¸Ð½ Ð´ÐµÐ½ÑŒ Ñ‚Ð¸Ð¶Ð½Ñ.']);
-    }
-    if (schedule.endDate && !validCalendarDate(schedule.endDate)) errors.push(['calendar-end-date', 'ÐšÑ–Ð½Ñ†ÐµÐ²Ð° Ð´Ð°Ñ‚Ð° Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– YYYY-MM-DD.']);
-    if (schedule.endDate && validCalendarDate(schedule.endDate) && validCalendarDate(schedule.startDate) && schedule.endDate < schedule.startDate) {
-      errors.push(['calendar-end-date', 'ÐšÑ–Ð½Ñ†ÐµÐ²Ð° Ð´Ð°Ñ‚Ð° Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð¿ÐµÑ€ÐµÐ´ÑƒÐ²Ð°Ñ‚Ð¸ Ð´Ð°Ñ‚Ñ– Ð¿Ð¾Ñ‡Ð°Ñ‚ÐºÑƒ.']);
-    }
-    if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
-      errors.push(['calendar-max-occurrences', 'ÐšÑ–Ð»ÑŒÐºÑ–ÑÑ‚ÑŒ Ð·Ð°Ð¿ÑƒÑÐºÑ–Ð² Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñ†Ñ–Ð»Ð¸Ð¼ Ñ‡Ð¸ÑÐ»Ð¾Ð¼ Ð²Ñ–Ð´ 1 Ð´Ð¾ 1000000.']);
-    }
-    return;
-  }
-  if (schedule.kind === 'EXPLICIT') {
-    if (!Array.isArray(schedule.occurrences) || schedule.occurrences.length < 1 || schedule.occurrences.length > 10000
-      || schedule.occurrences.some(item => !validCalendarDate(item.date) || !validCalendarTime(item.time))) {
-      errors.push(['calendar-explicit-occurrences', 'Ð”Ð¾Ð´Ð°Ð¹Ñ‚Ðµ Ð²Ñ–Ð´ 1 Ð´Ð¾ 10000 Ñ€ÑÐ´ÐºÑ–Ð² Ñƒ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ñ– YYYY-MM-DD HH:MM.']);
-    }
-  }
-}
-
-function renderEditor() {
-  if (!ui.selected) return;
-  $('empty-state').hidden = true; $('session-editor').hidden = false;
-  $('session-heading').textContent = `Session: ${ui.selected.name || 'Unnamed session'}`;
-  $('session-name').value = ui.selected.name || '';
-  ui.selected.urlMode = inferUrlMode(ui.selected);
-  const mode = taskConfigurationModeFor(ui.selected);
-  const modeRadio = document.querySelector(`input[name="taskConfigurationMode"][value="${CSS.escape(mode)}"]`);
-  if (modeRadio) modeRadio.checked = true;
-  $('shared-task-url').value = ui.selected.tasks?.[0]?.url || '';
-  $('shared-prompt').value = ui.selected.sharedPrompt || '';
-  $('default-unique-prompt').value = ui.selected.defaultUniquePrompt || '';
-  const cadence = ui.selected.promptCadence || {};
-  const prompt2 = cadence.prompt2 || {};
-  const prompt3 = cadence.prompt3 || {};
-  $('prompt-2-enabled').checked = prompt2.enabled === true;
-  $('prompt-2-every').value = String(prompt2.everyN ?? 10);
-  $('prompt-2-text').value = prompt2.prompt || '';
-  $('prompt-3-enabled').checked = prompt3.enabled === true;
-  $('prompt-3-every').value = String(prompt3.everyN ?? 20);
-  $('prompt-3-text').value = prompt3.prompt || '';
-  const driveBinding = ui.selected.drivePromptSources?.bindings?.[0] || null;
-  $('drive-prompt-enabled').checked = driveBinding?.enabled === true;
-  $('drive-prompt-file').value = driveBinding?.fileId || '';
-  $('drive-prompt-target').value = driveBinding?.target || 'PRIMARY';
-  $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
-  $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
-  renderDrivePromptRuntimeStatus(driveBinding);
-  renderCalendarEditor();
-  $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
-  $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
-  $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
-  const intervalUnit = ui.selected.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
-  $('minimum-send-interval-unit').value = intervalUnit;
-  $('minimum-send-interval').value = ui.selected.minimumSendIntervalValue ?? (intervalUnit === 'seconds' ? (ui.selected.minimumSendIntervalSeconds ?? 120) : (ui.selected.minimumSendIntervalMinutes ?? 2));
-  syncMinimumSendIntervalBounds();
-  $('tab-ready-delay').value = ui.selected.tabReadyDelaySeconds ?? 0;
-  $('post-send-delay').value = ui.selected.postSendDelaySeconds ?? 5;
-  $('pre-send-delay').value = ui.selected.preSendDelaySeconds ?? 20;
-  $('busy-check-delay').value = ui.selected.busyCheckDelaySeconds ?? 2;
-  const retryBackoffSeconds = ui.selected.retryBackoffSeconds ?? 30;
-  const retryBackoffUnit = ui.selected.retryBackoffUnit
-    || (retryBackoffSeconds >= 60 && retryBackoffSeconds % 60 === 0 ? 'minutes' : 'seconds');
-  $('retry-backoff-unit').value = retryBackoffUnit;
-  $('retry-backoff').value = retryBackoffUnit === 'minutes' ? retryBackoffSeconds / 60 : retryBackoffSeconds;
-  syncRetryBackoffBounds();
-  document.querySelector(`input[name="retryPolicy"][value="${CSS.escape(ui.selected.retryPolicy || 'safe')}"]`)?.click();
-  $('busy-chat-behavior').value = ui.selected.busyChatBehavior || 'skip-next';
-  document.querySelector(`input[name="tabStrategy"][value="${CSS.escape(ui.selected.tabStrategy || 'keep-open')}"]`)?.click();
-  syncTaskModeVisibility();
-  renderTasks(); renderStatus(); renderLog(); renderActions();
-}
-
-function renderTasks(focusTaskId = null) {
-  const list = $('task-list'); list.replaceChildren();
-  const mode = selectedTaskConfigurationMode();
-  const { urlMode, promptMode } = taskModeParts(mode);
-  const physicalCount = ui.selected.tasks.length;
-  const logicalCount = Math.max(1, Number(ui.selected.configuredTaskCount || physicalCount));
-  $('generated-task-summary').textContent = urlMode === 'shared' && promptMode === 'shared'
-    ? `${logicalCount} logical cycle${logicalCount === 1 ? '' : 's'} will use one shared ChatGPT link and one shared prompt. Only ${physicalCount} physical task definition is stored, so large counts do not create millions of fields.`
-    : `${physicalCount} physical task editor${physicalCount === 1 ? '' : 's'} configured automatically. Distinct URL/prompt modes are limited to ${MAX_PHYSICAL_TASKS}.`;
-
-  const count = physicalCount;
-
-  if (urlMode === 'shared' && promptMode === 'shared') return;
-
-  ui.selected.tasks.forEach((task, index) => {
-    const ordinal = index + 1;
-    const li = document.createElement('li'); li.id = `task-${task.id}`;
-    const fieldset = document.createElement('fieldset'); fieldset.className = 'task-card';
-    const legend = document.createElement('legend'); legend.id = `task-heading-${task.id}`; legend.textContent = `Task ${ordinal}`;
-    fieldset.append(legend);
-    if (urlMode === 'unique') {
-      const urlInput = labeledInput(`task-url-${task.id}`, `Task ${ordinal} ChatGPT URL`, 'url', task.url || '', (value) => { task.url = value; scheduleDraftPersistence(); });
-      urlInput.input.autocomplete = 'off'; urlInput.input.spellcheck = false;
-      fieldset.append(urlInput.wrapper);
-    }
-    if (promptMode === 'unique') {
-      const prompt = labeledTextarea(`task-prompt-${task.id}`, `Prompt for Task ${ordinal}`, task.promptOverride || '', (value) => { task.promptOverride = value; scheduleDraftPersistence(); });
-      fieldset.append(prompt.wrapper);
-    }
-    li.append(fieldset); list.append(li);
-  });
-  if (focusTaskId) {
-    const target = urlMode === 'unique' ? $(`task-url-${focusTaskId}`) : $(`task-prompt-${focusTaskId}`);
-    target?.focus();
-  }
-}
-
-function labeledInput(id, labelText, type, value, onInput) {
-  const wrapper = document.createElement('div'); const label = document.createElement('label'); label.htmlFor = id; label.textContent = labelText;
-  const input = document.createElement('input'); input.id = id; input.type = type; input.value = value; input.addEventListener('input', () => onInput(input.value)); wrapper.append(label, input); return { wrapper, input };
-}
-function labeledTextarea(id, labelText, value, onInput) {
-  const wrapper = document.createElement('div'); const label = document.createElement('label'); label.htmlFor = id; label.textContent = labelText;
-  const input = document.createElement('textarea'); input.id = id; input.rows = 6; input.value = value; input.addEventListener('input', () => onInput(input.value)); wrapper.append(label, input); return { wrapper, input };
-}
-
-function runBulkUrlImport(replace) {
-  if (!ui.selected || inferUrlMode(ui.selected) !== 'unique') return;
-  const urls = extractChatGptUrls($('bulk-task-urls').value).slice(0, MAX_PHYSICAL_TASKS);
-  if (!urls.length) {
-    $('bulk-task-result').textContent = 'No valid ChatGPT links were recognized.';
-    $('bulk-task-result').focus();
-    return;
-  }
-  const existing = replace ? [] : ui.selected.tasks;
-  const result = mergeBulkUrls(existing, urls, { replace, maxTasks: MAX_PHYSICAL_TASKS });
-  if (!result.tasks.length) return;
-  ui.selected.tasks = result.tasks;
-  ui.selected.tasks.forEach((task) => { task.enabled = true; });
-  ui.selected.configuredTaskCount = ui.selected.tasks.length;
-  $('task-count').value = String(ui.selected.configuredTaskCount);
-  renderTasks();
-  scheduleDraftPersistence();
-  const truncated = result.truncated ? ` ${result.truncated} link(s) did not fit the ${MAX_PHYSICAL_TASKS}-physical-task limit.` : '';
-  $('bulk-task-result').textContent = `${result.recognized} unique ChatGPT link(s) recognized; ${result.added} new task(s) created.${truncated}`;
-  $('bulk-task-result').focus();
-}
-
-function collectEditor() {
-  const s = ui.selected;
-  s.name = $('session-name').value.trim();
-  const mode = selectedTaskConfigurationMode();
-  const parts = taskModeParts(mode);
-  s.urlMode = parts.urlMode;
-  s.promptMode = parts.promptMode;
-  resizeTasks($('task-count').value);
-  if (s.urlMode === 'shared') {
-    const sharedUrl = $('shared-task-url').value.trim();
-    s.tasks.forEach((task) => { task.url = sharedUrl; task.enabled = true; });
-  } else {
-    s.tasks.forEach((task) => { task.enabled = true; });
-  }
-  s.sharedPrompt = $('shared-prompt').value;
-  s.defaultUniquePrompt = $('default-unique-prompt').value;
-  s.promptCadence = {
-    schemaVersion: 1,
-    prompt2: {
-      enabled: $('prompt-2-enabled').checked,
-      everyN: Number($('prompt-2-every').value),
-      prompt: $('prompt-2-text').value,
-    },
-    prompt3: {
-      enabled: $('prompt-3-enabled').checked,
-      everyN: Number($('prompt-3-every').value),
-      prompt: $('prompt-3-text').value,
-    },
-  };
-  const driveEnabled = $('drive-prompt-enabled').checked;
-  const driveSourceText = $('drive-prompt-file').value.trim();
-  const driveTarget = $('drive-prompt-target').value;
-  const priorDrive = s.drivePromptSources?.bindings?.[0] || null;
-  const preserveDriveRuntime = priorDrive
-    && priorDrive.target === driveTarget
-    && priorDrive.fileId === driveSourceText;
-  s.drivePromptSources = {
-    schemaVersion: 1,
-    bindings: (driveEnabled || driveSourceText) ? [{
-      target: driveTarget,
-      enabled: driveEnabled,
-      fileId: driveSourceText,
-      pollIntervalMs: Number($('drive-prompt-interval').value) * 60000,
-      minChars: Number($('drive-prompt-min-chars').value),
-      lastAcceptedVersion: preserveDriveRuntime ? (priorDrive.lastAcceptedVersion || '') : '',
-      lastAcceptedHash: preserveDriveRuntime ? (priorDrive.lastAcceptedHash || '') : '',
-      lastCheckedAt: preserveDriveRuntime ? Number(priorDrive.lastCheckedAt || 0) : 0,
-      nextCheckAt: preserveDriveRuntime ? Number(priorDrive.nextCheckAt || 0) : 0,
-      lastErrorCode: preserveDriveRuntime ? (priorDrive.lastErrorCode || '') : '',
-    }] : [],
-  };
-  s.calendarSchedule = collectCalendarSchedule();
-  s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
-  s.configuredTaskCount = Number($('task-count').value);
-  s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
-  s.minimumSendIntervalUnit = $('minimum-send-interval-unit').value === 'seconds' ? 'seconds' : 'minutes';
-  s.minimumSendIntervalMinutes = s.minimumSendIntervalValue * (s.minimumSendIntervalUnit === 'seconds' ? 1 / 60 : 1);
-  s.tabReadyDelaySeconds = Number($('tab-ready-delay').value);
-  s.postSendDelaySeconds = Number($('post-send-delay').value);
-  s.preSendDelaySeconds = Number($('pre-send-delay').value);
-  s.busyCheckDelaySeconds = Number($('busy-check-delay').value);
-  const retryBackoffUnit = $('retry-backoff-unit').value === 'minutes' ? 'minutes' : 'seconds';
-  const retryBackoffAmount = Number($('retry-backoff').value);
-  s.retryBackoffSeconds = retryBackoffAmount * (retryBackoffUnit === 'minutes' ? 60 : 1);
-  s.retryBackoffUnit = retryBackoffUnit;
-  s.retryPolicy = document.querySelector('input[name="retryPolicy"]:checked')?.value || 'safe';
-  s.busyChatBehavior = $('busy-chat-behavior').value;
-  s.tabStrategy = document.querySelector('input[name="tabStrategy"]:checked')?.value || 'keep-open';
-  return s;
-}
-
-function validate(session) {
-  clearErrors(); const errors = [];
-  if (!session.name) errors.push(['session-name', 'Session name is required.']);
-  const logicalTaskCount = Number(session.configuredTaskCount || session.tasks.length);
-  const compactShared = session.urlMode === 'shared' && session.promptMode === 'shared';
-  if (!(logicalTaskCount >= 1 && logicalTaskCount <= MAX_TASKS && Number.isInteger(logicalTaskCount))) errors.push(['task-count', `Task / cycle count must be a whole number between 1 and ${MAX_TASKS}.`]);
-  if (!compactShared && logicalTaskCount > MAX_PHYSICAL_TASKS) errors.push(['task-count', `Separate URL/prompt modes support up to ${MAX_PHYSICAL_TASKS} physical tasks. Use one shared URL + one shared prompt for up to ${MAX_TASKS} cycles.`]);
-  if (!(session.tasks.length >= 1 && session.tasks.length <= MAX_PHYSICAL_TASKS)) errors.push(['task-count', `Physical task count must be between 1 and ${MAX_PHYSICAL_TASKS}.`]);
-  const hasEnabledTasks = session.tasks.some((task) => task.enabled);
-  const sharedUrlMode = session.urlMode === 'shared';
-  if (sharedUrlMode && hasEnabledTasks) {
-    const url = session.tasks[0]?.url || '';
-    if (!url) errors.push(['shared-task-url', 'ChatGPT link is required.']);
-    else { try { const u = new URL(url); if (u.protocol !== 'https:' || !['chatgpt.com','www.chatgpt.com'].includes(u.hostname)) throw new Error(); } catch { errors.push(['shared-task-url', 'Use a valid https://chatgpt.com URL.']); } }
-  }
-  session.tasks.forEach((task, i) => {
-    if (!task.enabled) return;
-    if (!sharedUrlMode) {
-      if (!task.url) errors.push([`task-url-${task.id}`, `Task ${i + 1} URL is required.`]);
-      else { try { const u = new URL(task.url); if (u.protocol !== 'https:' || !['chatgpt.com','www.chatgpt.com'].includes(u.hostname)) throw new Error(); } catch { errors.push([`task-url-${task.id}`, `Task ${i + 1} must use a valid https://chatgpt.com URL.`]); } }
-    }
-    if (session.promptMode === 'unique' && !task.promptOverride.trim()) errors.push([`task-prompt-${task.id}`, `Prompt for Task ${i + 1} is required.`]);
-  });
-  if (hasEnabledTasks && session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
-  const cadence = session.promptCadence || {};
-  for (const [ordinal, rule, everyId, textId] of [
-    [2, cadence.prompt2 || {}, 'prompt-2-every', 'prompt-2-text'],
-    [3, cadence.prompt3 || {}, 'prompt-3-every', 'prompt-3-text'],
-  ]) {
-    const everyN = Number(rule.everyN);
-    if (!Number.isInteger(everyN) || everyN < 2 || everyN > 1000000) {
-      errors.push([everyId, `Prompt ${ordinal}: N Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñ†Ñ–Ð»Ð¸Ð¼ Ñ‡Ð¸ÑÐ»Ð¾Ð¼ Ð²Ñ–Ð´ 2 Ð´Ð¾ 1000000.`]);
-    }
-    if (rule.enabled === true && !String(rule.prompt || '').trim()) {
-      errors.push([textId, `Prompt ${ordinal} ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¸Ð¹, Ð°Ð»Ðµ Ñ‚ÐµÐºÑÑ‚ Ð¿Ð¾Ñ€Ð¾Ð¶Ð½Ñ–Ð¹.`]);
-    }
-  }
-  const driveBinding = session.drivePromptSources?.bindings?.[0] || null;
-  if (driveBinding) {
-    const intervalMinutes = Number(driveBinding.pollIntervalMs) / 60000;
-    if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) {
-      errors.push(['drive-prompt-interval', 'Drive interval Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ñ†Ñ–Ð»Ð¸Ð¼ Ñ‡Ð¸ÑÐ»Ð¾Ð¼ Ð²Ñ–Ð´ 1 Ð´Ð¾ 1440 Ñ…Ð²Ð¸Ð»Ð¸Ð½.']);
-    }
-    if (!Number.isInteger(Number(driveBinding.minChars)) || Number(driveBinding.minChars) < 1 || Number(driveBinding.minChars) > 1000000) {
-      errors.push(['drive-prompt-min-chars', 'ÐœÑ–Ð½Ñ–Ð¼Ð°Ð»ÑŒÐ½Ð° Ð´Ð¾Ð²Ð¶Ð¸Ð½Ð° Drive prompt Ð¼Ð°Ñ” Ð±ÑƒÑ‚Ð¸ Ð²Ñ–Ð´ 1 Ð´Ð¾ 1000000 ÑÐ¸Ð¼Ð²Ð¾Ð»Ñ–Ð².']);
-    }
-    if (driveBinding.enabled && !String(driveBinding.fileId || '').trim()) {
-      errors.push(['drive-prompt-file', 'Ð”Ð»Ñ ÑƒÐ²Ñ–Ð¼ÐºÐ½ÐµÐ½Ð¾Ð³Ð¾ Drive source Ð¿Ð¾Ñ‚Ñ€Ñ–Ð±Ð½Ðµ Ð¿Ð¾ÑÐ¸Ð»Ð°Ð½Ð½Ñ Ð°Ð±Ð¾ file ID.']);
-    }
-    if (driveBinding.enabled && driveBinding.target === 'PRIMARY' && session.promptMode === 'unique') {
-      errors.push(['drive-prompt-target', 'Primary Drive prompt Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¸Ð¹ Ð»Ð¸ÑˆÐµ Ð´Ð»Ñ shared prompt mode. Ð”Ð»Ñ unique mode Ð²Ð¸Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Prompt 2 Ð°Ð±Ð¾ Prompt 3.']);
-    }
-  }
-  validateCalendarScheduleUi(session, errors);
-  const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
-  const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
-  if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
-  for (const [field, id] of [['tabReadyDelaySeconds', 'tab-ready-delay'], ['postSendDelaySeconds', 'post-send-delay']]) {
-    if (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > 60) errors.push([id, 'Ð£ÐºÐ°Ð¶Ñ–Ñ‚ÑŒ Ñ†Ñ–Ð»Ðµ Ñ‡Ð¸ÑÐ»Ð¾ ÑÐµÐºÑƒÐ½Ð´ Ð²Ñ–Ð´ 0 Ð´Ð¾ 60.']);
-  }
-  if (!(session.preSendDelaySeconds >= 1 && session.preSendDelaySeconds <= 30)) errors.push(['pre-send-delay', 'Pre-send delay must be between 1 and 30 seconds.']);
-  if (!(session.busyCheckDelaySeconds >= 1 && session.busyCheckDelaySeconds <= 30)) errors.push(['busy-check-delay', 'Busy-check delay must be between 1 and 30 seconds.']);
-  if (!(session.retryBackoffSeconds >= 5 && session.retryBackoffSeconds <= 3600)) errors.push(['retry-backoff', 'Retry backoff must be between 5 seconds and 60 minutes.']);
-  errors.forEach(([id, message]) => markError(id, message));
-  if (errors.length > 1) {
-    const summary = $('form-error-summary'); summary.hidden = false; summary.className = 'error-summary';
-    const heading = document.createElement('h3'); heading.textContent = 'Fix these configuration errors';
-    const ul = document.createElement('ul'); errors.forEach(([id, message]) => { const li = document.createElement('li'); const a = document.createElement('a'); a.href = `#${id}`; a.textContent = message; a.addEventListener('click', (e) => { e.preventDefault(); $(id)?.focus(); }); li.append(a); ul.append(li); });
-    summary.replaceChildren(heading, ul); summary.focus();
-  } else if (errors.length === 1) $(errors[0][0])?.focus();
-  return errors;
-}
-function markError(id, message) {
-  const field = $(id); if (!field) return; const error = document.createElement('p'); error.id = `${id}-error`; error.className = 'field-error'; error.textContent = message; field.setAttribute('aria-invalid', 'true');
-  const existing = field.getAttribute('aria-describedby'); field.setAttribute('aria-describedby', [existing, error.id].filter(Boolean).join(' ')); field.insertAdjacentElement('afterend', error);
-}
-function clearErrors() {
-  document.querySelectorAll('.field-error').forEach((e) => e.remove()); document.querySelectorAll('[aria-invalid="true"]').forEach((e) => { e.removeAttribute('aria-invalid'); const d = (e.getAttribute('aria-describedby') || '').split(/\s+/).filter((x) => x && !x.endsWith('-error')); d.length ? e.setAttribute('aria-describedby', d.join(' ')) : e.removeAttribute('aria-describedby'); }); $('form-error-summary').hidden = true; $('form-error-summary').replaceChildren();
-}
-
-async function saveSession() {
-  clearTimeout(draftSaveTimer);
-  const session = collectEditor(); const errors = validate(session); if (errors.length) { persistCurrentDraft(); announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
-  try {
-    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session, confirmCalendarRevisionChange: $('calendar-revision-confirm').checked });
-    clearDraft(session.id);
-    ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor(); await refreshRunTimeline({ announceResult: false });
-  } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }
-}
-
-async function createSession() {
-  try {
-    const data = await core('CREATE_SESSION', { config: blankSession() });
-    await loadSessions({ preserveFocus: false });
-  await loadOrchestrationV2Status();
-  await loadScenarioWork();
-  await loadBrowserAgentJobs();
-  await loadBrowserAgentExecutionPolicy();
-  await loadRemoteDispatchStatus();
-    await openSession(data.session.id);
-    $('session-name').focus();
-    $('session-name').select();
-    announce('Session created.');
-  } catch (error) { setAppStatus(error.message); announce(error.message); }
-}
-async function renameSession(id) { await openSession(id); $('session-name').focus(); $('session-name').select(); announce('Edit the session name, then save.'); }
-async function duplicateSession(id) { try { const data = await core('DUPLICATE_SESSION', { sessionId: id }); await loadSessions({ preserveFocus: false }); await openSession(data.session.id); announce('Session duplicated.'); } catch (e) { setAppStatus(e.message); announce(e.message); } }
-
-function openDeleteDialog(sessionId, returnFocus) {
-  const session = ui.sessions.find((candidate) => candidate.id === sessionId);
-  const sessionName = session?.name || 'Unnamed session';
-  ui.pendingDeleteSessionId = sessionId;
-  ui.deleteReturnFocus = returnFocus;
-  $('delete-dialog-description').textContent = `Delete session ${sessionName}. This removes the selected session configuration.`;
-  $('confirm-delete-button').setAttribute('aria-label', `Delete session ${sessionName}`);
-  const d = $('delete-dialog'); d.hidden = false; $('confirm-delete-button').focus();
-}
-function closeDeleteDialog({ restoreFocus = true } = {}) {
-  $('delete-dialog').hidden = true;
-  $('confirm-delete-button').removeAttribute('aria-label');
-  const target = ui.deleteReturnFocus;
-  ui.pendingDeleteSessionId = null;
-  ui.deleteReturnFocus = null;
-  if (restoreFocus && target?.isConnected) target.focus();
-}
-function deleteFocusTargetId(sessionId) {
-  if (storageGet(UI_MODE_KEY) === 'simplified') return 'simplified-new';
-  const index = ui.sessions.findIndex((session) => session.id === sessionId);
-  const next = index >= 0 ? ui.sessions[index + 1] || ui.sessions[index - 1] : null;
-  return next ? `session-select-${next.id}` : 'create-session-button';
-}
-async function confirmDelete() {
-  const id = ui.pendingDeleteSessionId;
-  const focusTargetId = deleteFocusTargetId(id);
-  try {
-    await core('DELETE_SESSION', { sessionId: id });
-    clearDraft(id);
-    closeDeleteDialog({ restoreFocus: false });
-    if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; storageRemove(LAST_SESSION_KEY); $('session-editor').hidden = true; $('empty-state').hidden = false; }
-    if (ui.simplifiedSelectedId === id) showSimplifiedSession(null);
-    await loadSessions({ preserveFocus: false });
-  await loadRemoteDispatchStatus();
-    ($(focusTargetId) || $('create-session-button')).focus();
-    announce('Session deleted.');
-  } catch (e) { setAppStatus(e.message); announce(e.message); }
-}
-
-function trapDialog(event) {
-  if ($('delete-dialog').hidden) return;
-  if (event.key === 'Escape') { event.preventDefault(); closeDeleteDialog(); return; }
-  if (event.key !== 'Tab') return;
-  const focusable = [$('confirm-delete-button'), $('cancel-delete-button')]; const first = focusable[0], last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-}
-
-async function action(command, label) {
-  if (!ui.selectedSessionId) return;
-  try {
-    const data = await core(command, { sessionId: ui.selectedSessionId });
-    ui.selected = clone(data.session);
-    renderEditor();
-    await refreshRunTimeline({ announceResult: false });
-    const state = ui.selected?.runState || 'UNKNOWN';
-    reportCommandResult(`Core acknowledged ${label}. Current state: ${state}.`);
-    focusAfterLifecycleSuccess(command, $);
-  } catch (error) {
-    setAppStatus(error.message);
-    reportCommandResult(`Command failed: ${error.message}`);
-  }
-}
-
-async function masterAction(command, label, expectedMasterPaused) {
-  try {
-    const data = await core(command);
-    if (data?.masterPaused !== expectedMasterPaused) throw new Error('Core returned an unexpected master-pause state.');
-    await loadSessions();
-    if (ui.selectedSessionId) await refreshSelectedSessionStatus(ui.selectedSessionId);
-    reportCommandResult(`Core acknowledged ${label}.`);
-  } catch (error) {
-    setAppStatus(error.message);
-    reportCommandResult(`Command failed: ${error.message}`);
-  }
-}
-
-function renderActions() {
-  const a = ui.selected.actionAvailability || {};
-  $('start-session-button').disabled = !a.start;
-  $('pause-session-button').disabled = !a.pause;
-  $('resume-session-button').disabled = !a.resume;
-  $('stop-session-button').disabled = !a.stop;
-}
-function renderStatus() {
-  const s = ui.selected.status || {}; const dl = document.createElement('dl');
-  const simplifiedWaitLabels = {
-    SESSION_INACTIVE: 'Ð¡ÐµÐ°Ð½Ñ Ð¿Ñ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¸Ð¹ Ð°Ð±Ð¾ Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¸Ð¹',
-    VERIFY_UNCERTAIN_SEND: 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÐºÐ° Ð½ÐµÐ¿Ñ–Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¶ÐµÐ½Ð¾Ð³Ð¾ Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½Ñ',
-    PRE_SEND_DELAY: 'ÐŸÐ°ÑƒÐ·Ð° Ð¿ÐµÑ€ÐµÐ´ Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½ÑÐ¼',
-    OPERATION_IN_PROGRESS: 'ÐŸÐ¾Ñ‚Ð¾Ñ‡Ð½Ðµ Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½Ð½Ñ Ð¾Ð±Ñ€Ð¾Ð±Ð»ÑÑ”Ñ‚ÑŒÑÑ',
-    PROFILE_RATE_LIMIT: 'Ð›Ñ–Ð¼Ñ–Ñ‚ Ð°ÐºÐ°ÑƒÐ½Ñ‚Ð° ChatGPT',
-    SEND_INTERVAL: 'Ð—Ð°Ð´Ð°Ð½Ð¸Ð¹ Ñ–Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» Ð¼Ñ–Ð¶ Ð¿Ð¾Ð²Ñ–Ð´Ð¾Ð¼Ð»ÐµÐ½Ð½ÑÐ¼Ð¸',
-    CHAT_BUSY: 'Ð§Ð°Ñ‚ Ñ‰Ðµ Ñ„Ð¾Ñ€Ð¼ÑƒÑ” Ð²Ñ–Ð´Ð¿Ð¾Ð²Ñ–Ð´ÑŒ',
-    RETRY_BACKOFF: 'ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ Ð¿Ñ–ÑÐ»Ñ Ñ‚Ð¸Ð¼Ñ‡Ð°ÑÐ¾Ð²Ð¾Ñ— Ð¿Ð¾Ð¼Ð¸Ð»ÐºÐ¸',
-    READY: 'Ð“Ð¾Ñ‚Ð¾Ð²Ð¸Ð¹ Ð´Ð¾ Ð½Ð°ÑÑ‚ÑƒÐ¿Ð½Ð¾Ñ— Ð´Ñ–Ñ—',
-  };
-  const recovery = $('uncertain-recovery');
-  const operationId = s.uncertainOperationId || '';
-  if (recovery.dataset.operationId !== operationId) {
-    recovery.dataset.operationId = operationId;
-    $('uncertain-confirm').checked = false;
-    $('uncertain-retry').disabled = true;
-    $('uncertain-skip').disabled = true;
-  }
-  recovery.hidden = !operationId;
-  [
-    ['Session state', s.displayRunState || ui.selected.runState || 'STOPPED'],
-    ['Successfully sent', String(s.successfulSendCount ?? 0)],
-    ['Completed tasks', `${s.completedTaskCount ?? 0} / ${s.enabledTaskCount ?? ui.selected.tasks.filter((t) => t.enabled).length}`],
-    ['Remaining tasks', String(s.remainingTaskCount ?? 0)],
-    ['Completed time', s.isCompleted ? formatTime(s.completedAt) : 'Not available'],
-    ['Current task', s.currentTaskLabel || s.currentTaskUrl || 'None'],
-    ['Current task status', s.currentTaskStatus || 'IDLE'],
-    ['Operation phase', s.operationPhase || 'NONE'],
-    ['Last action', s.lastAction || 'None'],
-    ['Last action time', formatTime(s.lastActionAt)],
-    ['Last successful send', formatTime(s.lastSuccessfulSendAt)],
-    ['Next allowed Send', formatTime(s.nextAllowedSendAt)],
-    ...(ui.selected.simplifiedSession === true ? [
-      ['Ð§Ð¾Ð¼Ñƒ Ñ‡ÐµÐºÐ°Ñ” ÑÐ¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¸Ð¹ ÑÐµÐ°Ð½Ñ', simplifiedWaitLabels[s.simplifiedWaitReason] || s.simplifiedWaitReason || 'ÐÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾'],
-      ['ÐÐ°ÑÑ‚ÑƒÐ¿Ð½Ð° Ð´Ñ–Ñ ÑÐ¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¾Ð³Ð¾ ÑÐµÐ°Ð½ÑÑƒ', formatTime(s.simplifiedWaitUntil)],
-    ] : []),
-    ['Retry or backoff until', formatTime(s.currentTaskRetryAt)],
-    ['Manual review reason', s.currentTaskManualReviewReason || 'None'],
-    ['Enabled tasks', String(s.enabledTaskCount ?? ui.selected.tasks.filter((t) => t.enabled).length)],
-    ['Last error', s.lastError || 'None']
-  ].forEach(([k,v]) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); });
-  $('session-status-region').replaceChildren(dl);
-}
-function renderLog() {
-  const entries = ui.selected.log || [];
-  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
-  $('session-log-count').textContent = `${visible.length} of ${entries.length} Core log entr${entries.length === 1 ? 'y' : 'ies'} shown.`;
-  $('session-log-region').textContent = visible.map((entry) => typeof entry === 'string' ? translateText(entry) : `${formatTime(entry.at)} â€” ${translateText(entry.message)}`).join('\n');
-}
-
-function appendTimelineField(list, label, value) {
-  if (!value) return;
-  const term = document.createElement('dt');
-  term.textContent = label;
-  const description = document.createElement('dd');
-  description.textContent = value;
-  list.append(term, description);
-}
-
-function renderRunTimeline() {
-  const timeline = ui.runTimeline;
-  const list = $('run-timeline-list');
-  if (!list) return;
-  list.replaceChildren();
-
-  if (!timeline) {
-    $('run-timeline-status').textContent = 'Ð¥Ñ€Ð¾Ð½Ð¾Ð»Ð¾Ð³Ñ–ÑŽ Ñ‰Ðµ Ð½Ðµ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.';
-    return;
-  }
-
-  const source = $('run-timeline-source-filter').value || 'ALL';
-  const entries = (timeline.entries || []).filter((entry) => source === 'ALL' || entry.source === source);
-  for (const entry of entries) {
-    const item = document.createElement('li');
-    item.className = 'run-timeline-entry';
-
-    const heading = document.createElement('p');
-    heading.className = 'run-timeline-entry-heading';
-    const time = document.createElement('time');
-    if (entry.at > 0) time.dateTime = new Date(entry.at).toISOString();
-    time.textContent = formatTime(entry.at);
-    const sourceLabel = document.createElement('strong');
-    sourceLabel.textContent = entry.source === 'DIAGNOSTIC' ? 'Ð”Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸ÐºÐ°' : 'Core log';
-    heading.append(time, document.createTextNode(' â€” '), sourceLabel);
-    if (entry.event && entry.event !== 'CORE_LOG') {
-      heading.append(document.createTextNode(` â€” ${entry.event}`));
-    }
-    item.append(heading);
-
-    if (entry.message) {
-      const message = document.createElement('p');
-      message.textContent = translateText(entry.message);
-      item.append(message);
-    }
-
-    const details = document.createElement('dl');
-    details.className = 'run-timeline-evidence';
-    appendTimelineField(details, 'Ð Ñ–Ð²ÐµÐ½ÑŒ', entry.level);
-    appendTimelineField(details, 'Ð—Ð°Ð²Ð´Ð°Ð½Ð½Ñ', entry.taskLabel);
-    appendTimelineField(details, 'Ð•Ñ‚Ð°Ð¿', entry.phase);
-    appendTimelineField(details, 'Ð ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚', entry.status);
-    appendTimelineField(details, 'ÐšÐ¾Ð´', entry.code);
-    appendTimelineField(details, 'Ð¦Ñ–Ð»ÑŒ', entry.target);
-    appendTimelineField(details, 'Ð¡Ð¿Ð¾ÑÑ‚ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾', entry.observed);
-    appendTimelineField(details, 'ÐžÐ¿ÐµÑ€Ð°Ñ†Ñ–Ñ', entry.operationIdSuffix);
-    appendTimelineField(details, 'Ð’Ñ–Ð´Ð±Ð¸Ñ‚Ð¾Ðº Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚Ñƒ', entry.promptFingerprint);
-    if (details.children.length) item.append(details);
-
-    list.append(item);
-  }
-
-  const bounded = timeline.truncated
-    ? ` ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ Ð»Ð¸ÑˆÐµ Ð¾ÑÑ‚Ð°Ð½Ð½Ñ– ${timeline.returnedEntries} Ñ–Ð· ${timeline.totalEntries} Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ñ… Ð¿Ð¾Ð´Ñ–Ð¹.`
-    : '';
-  $('run-timeline-status').textContent =
-    `ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ ${entries.length} Ð¿Ð¾Ð´Ñ–Ð¹ Ð´Ð»Ñ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾Ð³Ð¾ ÑÐµÐ°Ð½ÑÑƒ.${bounded}`;
-}
-
-async function refreshRunTimeline({ announceResult = false } = {}) {
-  const sessionId = ui.selectedSessionId;
-  if (!sessionId) {
-    ui.runTimeline = null;
-    renderRunTimeline();
-    return;
-  }
-  try {
-    const data = await core('GET_RUN_TIMELINE', { sessionId, limit: 200 });
-    if (sessionId !== ui.selectedSessionId) return;
-    ui.runTimeline = data?.timeline || null;
-    renderRunTimeline();
-    if (announceResult) announce('Ð¥Ñ€Ð¾Ð½Ð¾Ð»Ð¾Ð³Ñ–ÑŽ Ð²Ð¸ÐºÐ¾Ð½Ð°Ð½Ð½Ñ Ð¾Ð½Ð¾Ð²Ð»ÐµÐ½Ð¾.');
-  } catch {
-    if (sessionId !== ui.selectedSessionId) return;
-    ui.runTimeline = null;
-    $('run-timeline-list').replaceChildren();
-    const safeMessage = 'Ð¥Ñ€Ð¾Ð½Ð¾Ð»Ð¾Ð³Ñ–ÑŽ Ð½Ðµ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾. ÐžÐ½Ð¾Ð²Ñ–Ñ‚ÑŒ Ñ‰Ðµ Ñ€Ð°Ð· Ð°Ð±Ð¾ Ð¿ÐµÑ€ÐµÐ²Ñ–Ñ€Ñ‚Ðµ ÑÑ‚Ð°Ð½ Core.';
-    $('run-timeline-status').textContent = safeMessage;
-    if (announceResult) announce(safeMessage);
-  }
-}
-
-function onTaskConfigurationModeChange() {
-  if (!ui.selected) return;
-  const mode = selectedTaskConfigurationMode();
-  const parts = taskModeParts(mode);
-  ui.selected.urlMode = parts.urlMode;
-  ui.selected.promptMode = parts.promptMode;
-  resizeTasks($('task-count').value);
-  if (parts.urlMode === 'shared') {
-    const sharedUrl = $('shared-task-url').value || ui.selected.tasks.find((task) => task.url)?.url || '';
-    $('shared-task-url').value = sharedUrl;
-    ui.selected.tasks.forEach((task) => { task.url = sharedUrl; });
-  }
-  syncTaskModeVisibility();
-  renderTasks();
-  scheduleDraftPersistence();
-  announce('Task configuration mode updated.');
-}
-function onTaskCountChange() {
-  if (!ui.selected) return;
-  resizeTasks($('task-count').value);
-  if (inferUrlMode(ui.selected) === 'shared') {
-    const sharedUrl = $('shared-task-url').value;
-    ui.selected.tasks.forEach((task) => { task.url = sharedUrl; });
-  }
-  renderTasks();
-  scheduleDraftPersistence();
-  const logicalCount = Number(ui.selected.configuredTaskCount || ui.selected.tasks.length);
-  announce(`${logicalCount} task${logicalCount === 1 ? '' : 's'} / cycle${logicalCount === 1 ? '' : 's'} configured.`);
-}
-function onSharedUrlInput() {
-  if (!ui.selected) return;
-  const value = $('shared-task-url').value;
-  ui.selected.tasks.forEach((task) => { task.url = value; task.enabled = true; });
-  scheduleDraftPersistence();
-}
-function syncMinimumSendIntervalBounds() {
-  const seconds = $('minimum-send-interval-unit').value === 'seconds';
-  const input = $('minimum-send-interval');
-  input.min = '1';
-  input.max = seconds ? '86400' : '1440';
-  input.step = '1';
-}
-function onMinimumSendIntervalUnitChange() {
-  syncMinimumSendIntervalBounds();
-  scheduleDraftPersistence();
-}
-
-function syncRetryBackoffBounds() {
-  const minutes = $('retry-backoff-unit').value === 'minutes';
-  const input = $('retry-backoff');
-  input.min = minutes ? '1' : '5';
-  input.max = minutes ? '60' : '3600';
-  input.step = '1';
-}
-function onRetryBackoffUnitChange() {
-  const previousUnit = ui.selected?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
-  const nextUnit = $('retry-backoff-unit').value === 'minutes' ? 'minutes' : 'seconds';
-  const amount = Number($('retry-backoff').value);
-  const seconds = Number.isFinite(amount) ? amount * (previousUnit === 'minutes' ? 60 : 1) : 30;
-  const nextAmount = nextUnit === 'minutes' ? Math.max(1, Math.ceil(seconds / 60)) : Math.max(5, seconds);
-  $('retry-backoff').value = String(nextAmount);
-  if (ui.selected) {
-    ui.selected.retryBackoffUnit = nextUnit;
-    ui.selected.retryBackoffSeconds = nextAmount * (nextUnit === 'minutes' ? 60 : 1);
-  }
-  syncRetryBackoffBounds();
-  scheduleDraftPersistence();
-  announce(`Retry/backoff unit changed to ${nextUnit}. Current wait is ${nextAmount} ${nextUnit}.`);
-}
-function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); scheduleDraftPersistence(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
-
-function setPortableImportEnabled(enabled, allowStart = false) {
-  $('import-profile-button').disabled = !enabled;
-  $('import-profile-start-button').disabled = !enabled || !allowStart;
-}
-
-async function onPortableProfileFileChange() {
-  ui.pendingPortableProfile = null;
-  ui.pendingPortablePreview = null;
-  setPortableImportEnabled(false);
-  const file = $('portable-profile-file').files?.[0];
-  if (!file) {
-    $('portable-profile-preview').textContent = 'No configuration file selected.';
-    return;
-  }
-  try {
-    const profile = parsePortableJson(await file.text());
-    const data = await core('PREVIEW_PORTABLE_PROFILE', { profile });
-    ui.pendingPortableProfile = profile;
-    ui.pendingPortablePreview = data.preview;
-    const preview = data.preview;
-    $('portable-profile-preview').textContent = `Profile ${preview.profileName}: ${preview.sessionCount} Session(s), ${preview.taskCount} Task(s), ${preview.autoStartSessionCount} marked for automatic start.`;
-    setPortableImportEnabled(true, preview.autoStartSessionCount > 0);
-    $('portable-profile-preview').focus();
-  } catch (error) {
-    $('portable-profile-preview').textContent = `Configuration file error: ${error.message}`;
-    $('portable-profile-preview').focus();
-  }
-}
-
-async function importPortableProfile(confirmAutoStart) {
-  if (!ui.pendingPortableProfile) return;
-  try {
-    const data = await core('IMPORT_PORTABLE_PROFILE', {
-      profile: ui.pendingPortableProfile,
-      confirmAutoStart,
-    });
-    const importedIds = data?.summary?.importedSessionIds || [];
-    for (const id of importedIds) clearDraft(id);
-    ui.sessionListSignature = '';
-    await loadSessions({ preserveFocus: false });
-  await loadRemoteDispatchStatus();
-    if (importedIds[0]) await openSession(importedIds[0]);
-    const started = data?.summary?.startedSessionIds?.length || 0;
-    reportCommandResult(`Portable configuration imported: ${importedIds.length} Session(s). ${started} Session(s) started.`);
-  } catch (error) {
-    setAppStatus(error.message);
-    reportCommandResult(`Import failed: ${error.message}`);
-  }
-}
-
-function safeFileName(value) {
-  return String(value || 'ChatGPT-Autopilot-profile').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 100) || 'ChatGPT-Autopilot-profile';
-}
-function downloadJson(data, fileName) {
-  const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-async function exportPortableProfile() {
-  try {
-    const data = await core('EXPORT_PORTABLE_PROFILE', { profileName: 'ChatGPT ÐÐ²Ñ‚Ð¾Ð¿Ñ–Ð»Ð¾Ñ‚ â€” ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚' });
-    downloadJson(data.profile, `${safeFileName(data.profile.profileName)}.json`);
-    reportCommandResult(`Exported ${data.profile.sessions.length} Session(s) to JSON.`);
-  } catch (error) {
-    setAppStatus(error.message);
-    reportCommandResult(`Export failed: ${error.message}`);
-  }
-}
-
-function downloadText(data, fileName) {
-  const blob = new Blob([String(data || '')], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function diagnosticFileName() {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return `ChatGPT-ÐÐ²Ñ‚Ð¾Ð¿Ñ–Ð»Ð¾Ñ‚-Ð´Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸ÐºÐ°-${stamp}.txt`;
-}
-
-async function downloadDiagnosticReport() {
-  try {
-    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾';
-    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
-    downloadText(data.report, diagnosticFileName());
-    const message = 'Ð”Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ Ð·Ð²Ñ–Ñ‚ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.';
-    $('diagnostic-report-status').textContent = message;
-    reportCommandResult(message);
-  } catch (error) {
-    const message = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð´Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ Ð·Ð²Ñ–Ñ‚: ${error.message}`;
-    $('diagnostic-report-status').textContent = message;
-    setAppStatus(error.message);
-    announce(message);
-  }
-}
-
-async function downloadSimplifiedDiagnosticReport() {
-  try {
-    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'Ð½ÐµÐ²Ñ–Ð´Ð¾Ð¼Ð¾';
-    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
-    downloadText(data.report, diagnosticFileName());
-    $('simplified-diagnostic-report-status').textContent = 'Ð”Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ Ð·Ð²Ñ–Ñ‚ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.';
-    $('simplified-command-result').textContent = 'Ð”Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ Ð·Ð²Ñ–Ñ‚ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶ÐµÐ½Ð¾.';
-  } catch (error) {
-    $('simplified-diagnostic-report-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²Ð°Ð½Ñ‚Ð°Ð¶Ð¸Ñ‚Ð¸ Ð´Ñ–Ð°Ð³Ð½Ð¾ÑÑ‚Ð¸Ñ‡Ð½Ð¸Ð¹ Ð·Ð²Ñ–Ñ‚: ${error.message}`;
-  }
-}
-
-let diagnosticSnapshotInFlight = false;
-async function recordDashboardDiagnosticSnapshot() {
-  if (diagnosticSnapshotInFlight || !ui.selectedSessionId || !ui.selected) return;
-  if (!['RUNNING', 'RECOVERING'].includes(ui.selected.runState)) return;
-  diagnosticSnapshotInFlight = true;
-  try {
-    await core('RECORD_DIAGNOSTIC_SNAPSHOT', { sessionId: ui.selectedSessionId });
-  } catch {
-    // Diagnostics must never steal focus, announce repeatedly, or block execution.
-  } finally {
-    diagnosticSnapshotInFlight = false;
-  }
-}
-
-let statusRefreshTimer = null;
-let statusRefreshInFlight = false;
-let statusRefreshQueued = false;
-const dirtyStatusSessionIds = new Set();
-function queueStatusRefresh(sessionId) {
-  if (sessionId) dirtyStatusSessionIds.add(sessionId);
-  if (statusRefreshTimer || statusRefreshInFlight) {
-    statusRefreshQueued = true;
-    return;
-  }
-  statusRefreshTimer = setTimeout(flushStatusRefresh, STATUS_REFRESH_DELAY_MS);
-}
-async function flushStatusRefresh() {
-  statusRefreshTimer = null;
-  if (statusRefreshInFlight) { statusRefreshQueued = true; return; }
-  statusRefreshInFlight = true;
-  const dirty = new Set(dirtyStatusSessionIds);
-  dirtyStatusSessionIds.clear();
-  statusRefreshQueued = false;
-  try {
-    await loadSessions();
-    if (ui.selectedSessionId && dirty.has(ui.selectedSessionId)) {
-      await refreshSelectedSessionStatus(ui.selectedSessionId);
-    }
-  } finally {
-    statusRefreshInFlight = false;
-    if (statusRefreshQueued || dirtyStatusSessionIds.size) queueStatusRefresh();
-  }
-}
-
-$('mode-sessions').addEventListener('click', () => setUiMode('sessions', { focus: true }));
-$('mode-simplified').addEventListener('click', () => setUiMode('simplified', { focus: true }));
-$('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
-$('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
-$('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
-$('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
-$('agent-save-execution-policy-button').addEventListener('click', () => { void saveBrowserAgentExecutionPolicy(); });
-$('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
-$('mode-tabs').addEventListener('keydown', (event) => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const ordered = ['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai'];
-  const current = ordered.findIndex(value => $(`mode-${value}`)?.getAttribute('aria-selected') === 'true');
-  let index = current < 0 ? 0 : current;
-  if (event.key === 'Home') index = 0;
-  else if (event.key === 'End') index = ordered.length - 1;
-  else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + ordered.length) % ordered.length;
-  event.preventDefault();
-  setUiMode(ordered[index], { focus: true });
-});
-
-$('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
-$('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
-$('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
-$('simplified-list').addEventListener('change', () => { void selectSimplifiedSession($('simplified-list').value); });
-$('simplified-save').addEventListener('click', () => { void saveSimplifiedSession(); });
-for (const [id, command] of [
-  ['simplified-start', 'START_SESSION'], ['simplified-pause', 'PAUSE_SESSION'],
-  ['simplified-resume', 'RESUME_SESSION'], ['simplified-stop', 'STOP_SESSION'],
-]) $(id).addEventListener('click', () => { void simplifiedAction(command); });
-$('simplified-duplicate').addEventListener('click', async () => {
-  if (!ui.simplifiedSelectedId) return;
-  try {
-    const data = await core('DUPLICATE_SESSION', { sessionId: ui.simplifiedSelectedId });
-    await loadSessions(); showSimplifiedSession(data.session);
-    $('simplified-command-result').textContent = 'Ð¡ÐµÐ°Ð½Ñ Ð´ÑƒÐ±Ð»ÑŒÐ¾Ð²Ð°Ð½Ð¾.';
-  } catch (error) { $('simplified-command-result').textContent = error.message; }
-});
-$('simplified-delete').addEventListener('click', event => {
-  if (ui.simplifiedSelectedId) openDeleteDialog(ui.simplifiedSelectedId, event.currentTarget);
-});
-$('simplified-clear-log').addEventListener('click', async () => {
-  if (!ui.simplifiedSelectedId) {
-    $('simplified-command-result').textContent = 'Ð¡ÐµÐ°Ð½Ñ Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.';
-    return;
-  }
-  try {
-    const data = await core('CLEAR_LOG', { sessionId: ui.simplifiedSelectedId });
-    renderSimplifiedLog(data.session);
-    $('simplified-command-result').textContent = 'Ð–ÑƒÑ€Ð½Ð°Ð» Ð¾Ñ‡Ð¸Ñ‰ÐµÐ½Ð¾.';
-  } catch (error) {
-    $('simplified-command-result').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð¾Ñ‡Ð¸ÑÑ‚Ð¸Ñ‚Ð¸ Ð¶ÑƒÑ€Ð½Ð°Ð»: ${error.message}`;
-  }
-});
-$('simplified-import-file').addEventListener('change', () => {
-  const file = $('simplified-import-file').files?.[0];
-  $('simplified-import-status').textContent = file ? `Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚ JSON: ${file.name}` : 'Ð†Ð¼Ð¿Ð¾Ñ€Ñ‚ JSON: Ð¤Ð°Ð¹Ð» Ð½Ðµ Ð²Ð¸Ð±Ñ€Ð°Ð½Ð¾.';
-});
-$('simplified-import').addEventListener('click', () => { void importSimplifiedProfile(false); });
-$('simplified-import-start').addEventListener('click', () => { void importSimplifiedProfile(true); });
-$('simplified-export').addEventListener('click', async () => {
-  try {
-    if (!ui.simplifiedSelectedId) throw new Error('ÐžÐ±ÐµÑ€Ñ–Ñ‚ÑŒ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¸Ð¹ ÑÐµÐ°Ð½Ñ.');
-    const data = await core('EXPORT_PORTABLE_PROFILE', { sessionIds: [ui.simplifiedSelectedId], profileName: ui.simplifiedSelected?.name || 'Ð¡Ð¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¸Ð¹ ÑÐµÐ°Ð½Ñ' });
-    downloadJson(data.profile, `${safeFileName(data.profile.profileName)}.json`);
-    $('simplified-command-result').textContent = 'JSON ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾.';
-  } catch (error) { $('simplified-command-result').textContent = error.message; }
-});
-$('simplified-template').addEventListener('click', () => {
-  const config = buildSimplifiedSessionConfig({
-    name: 'ÐÐ¾Ð²Ð¸Ð¹ ÑÐµÐ°Ð½Ñ', mode: 'shared-shared', url: 'https://chatgpt.com/',
-    prompt: 'ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶ÑƒÐ¹ Ñ€Ð¾Ð·Ñ€Ð¾Ð±ÐºÑƒ.', runMode: 'continuous', cycles: '1',
-    interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2',
-    retry: '30', retryUnit: 'seconds', retryPolicy: 'safe',
-    busyBehavior: 'skip-next', tabs: 'keep-open',
-  });
-  downloadJson({ format: 'chatgpt-autopilot-profile', version: 1, profileName: 'Ð¡Ð¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¸Ð¹ ÑÐµÐ°Ð½Ñ', autoStart: false, sessions: [{ ...config, autoStart: false }] }, 'Ð¡Ð¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¸Ð¹-ÑÐµÐ°Ð½Ñ-ÑˆÐ°Ð±Ð»Ð¾Ð½.json');
-  $('simplified-command-result').textContent = 'Ð¨Ð°Ð±Ð»Ð¾Ð½ JSON ÐµÐºÑÐ¿Ð¾Ñ€Ñ‚Ð¾Ð²Ð°Ð½Ð¾.';
-});
-$('simplified-diagnostics').addEventListener('click', () => { void downloadSimplifiedDiagnosticReport(); });
-$('simplified-editor').addEventListener('input', event => {
-  if (event.target.closest('button')) return;
-  ui.simplifiedDirty = true;
-  $('simplified-draft-status').textContent = 'Ð„ Ð½ÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ– Ð·Ð¼Ñ–Ð½Ð¸.';
-});
-$('simplified-editor').addEventListener('change', event => {
-  if (event.target.closest('button')) return;
-  ui.simplifiedDirty = true;
-  $('simplified-draft-status').textContent = 'Ð„ Ð½ÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ– Ð·Ð¼Ñ–Ð½Ð¸.';
-});
-
-for (const panel of SCENARIO_WORK_PANELS) $('scenario-work-tab-' + panel).addEventListener('click', () => setScenarioWorkPanel(panel, { focus: true }));
-$('scenario-work-tabs').addEventListener('keydown', (event) => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const current = SCENARIO_WORK_PANELS.findIndex(value => $(`scenario-work-tab-${value}`).getAttribute('aria-selected') === 'true');
-  let index = current < 0 ? 0 : current;
-  if (event.key === 'Home') index = 0;
-  else if (event.key === 'End') index = SCENARIO_WORK_PANELS.length - 1;
-  else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + SCENARIO_WORK_PANELS.length) % SCENARIO_WORK_PANELS.length;
-  event.preventDefault();
-  setScenarioWorkPanel(SCENARIO_WORK_PANELS[index], { focus: true });
-});
-$('scenario-work-list').addEventListener('change', () => openScenarioWorkTarget($('scenario-work-list').value));
-$('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
-$('scenario-work-template-button').addEventListener('click', downloadScenarioWorkTemplate);
-$('scenario-work-import-button').addEventListener('click', importScenarioWorkProfile);
-$('scenario-work-export-button').addEventListener('click', exportScenarioWorkProfile);
-$('scenario-cycle-initial-stagger-unit').addEventListener('change', syncScenarioInitialStaggerBounds);
-$('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
-$('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
-$('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
-$('new-scenario-pipeline-button').addEventListener('click', () => createScenarioWork('AUDITOR_PIPELINE'));
-$('save-scenario-work-button').addEventListener('click', saveScenarioWork);
-$('start-scenario-work-button').addEventListener('click', () => scenarioWorkLifecycle('START_SCENARIO_WORK', 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð·Ð°Ð¿ÑƒÑ‰ÐµÐ½Ð¾.'));
-$('pause-scenario-work-button').addEventListener('click', () => scenarioWorkLifecycle('PAUSE_SCENARIO_WORK', 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð¿Ñ€Ð¸Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾.'));
-$('resume-scenario-work-button').addEventListener('click', () => scenarioWorkLifecycle('RESUME_SCENARIO_WORK', 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð¿Ñ€Ð¾Ð´Ð¾Ð²Ð¶ÐµÐ½Ð¾.'));
-$('stop-scenario-work-button').addEventListener('click', () => scenarioWorkLifecycle('STOP_SCENARIO_WORK', 'Ð¡Ñ†ÐµÐ½Ð°Ñ€Ñ–Ð¹ Ð·ÑƒÐ¿Ð¸Ð½ÐµÐ½Ð¾.'));
-$('delete-scenario-work-button').addEventListener('click', deleteScenarioWork);
-$('scenario-work-run-now').addEventListener('click', runScenarioWorkNow);
-$('scenario-cycle-add-step').addEventListener('click', () => {
-  const container = $('scenario-cycle-steps');
-  const row = createScenarioCycleStep({ prompt: '', repeat: 1 }, container.querySelectorAll('[data-scenario-step]').length);
-  container.append(row);
-  renumberScenarioCycleSteps();
-  updateScenarioCycleMessageCount();
-  row.querySelector('textarea')?.focus();
-  announce('Ð”Ð¾Ð´Ð°Ð½Ð¾ Ð½Ð¾Ð²Ð¸Ð¹ Ð¿Ñ€Ð¾Ð¼Ð¿Ñ‚.');
-});
-$('scenario-cycle-steps').addEventListener('input', updateScenarioCycleMessageCount);
-
-for (const panel of ORCHESTRATION_PANELS) $('orchestration-v2-tab-' + panel).addEventListener('click', () => setOrchestrationPanel(panel, { focus: true }));
-$('orchestration-v2-tabs').addEventListener('keydown', (event) => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const enabled = ORCHESTRATION_PANELS.filter(value => !$(`orchestration-v2-tab-${value}`).disabled);
-  const current = enabled.findIndex(value => $(`orchestration-v2-tab-${value}`).getAttribute('aria-selected') === 'true');
-  let index = current < 0 ? 0 : current;
-  if (event.key === 'Home') index = 0; else if (event.key === 'End') index = enabled.length - 1;
-  else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + enabled.length) % enabled.length;
-  event.preventDefault(); setOrchestrationPanel(enabled[index], { focus: true });
-});
-$('orchestration-v2-orchestra-list').addEventListener('change', selectOrchestrationV2Orchestra);
-$('new-orchestration-v2-orchestra-button').addEventListener('click', createOrchestrationV2Orchestra);
-$('rename-orchestration-v2-orchestra-button').addEventListener('click', renameOrchestrationV2Orchestra);
-$('start-orchestration-v2-orchestra-button').addEventListener('click', startOrchestrationV2Orchestra);
-$('pause-orchestration-v2-orchestra-button').addEventListener('click', pauseOrchestrationV2Orchestra);
-$('resume-orchestration-v2-orchestra-button').addEventListener('click', resumeOrchestrationV2Orchestra);
-$('delete-orchestration-v2-orchestra-button').addEventListener('click', deleteOrchestrationV2Orchestra);
-$('orchestration-v2-profile-file').addEventListener('change', onOrchestrationProfileFileChange);
-$('import-orchestration-v2-profile-button').addEventListener('click', importOrchestrationProfile);
-$('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
-$('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
-$('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
-$('agent-definition-registry-list').addEventListener('change', selectAgentDefinitionRegistry);
-$('agent-definition-create-registry-button').addEventListener('click', createAgentDefinitionRegistry);
-$('agent-definition-list').addEventListener('change', selectAgentDefinition);
-$('agent-definition-new-button').addEventListener('click', newAgentDefinition);
-$('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
-$('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
-$('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
-$('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
-$('agent-specialist-registry-list').addEventListener('change', selectSpecialistRegistry);
-$('agent-specialist-create-registry-button').addEventListener('click', createSpecialistRegistry);
-$('agent-specialist-list').addEventListener('change', selectSpecialist);
-$('agent-specialist-new-button').addEventListener('click', newSpecialist);
-$('agent-specialist-save-button').addEventListener('click', saveSpecialist);
-$('agent-specialist-toggle-enabled-button').addEventListener('click', toggleSpecialistEnabled);
-$('agent-specialist-delete-button').addEventListener('click', deleteSpecialist);
-$('agent-specialist-delegation-prepare-button').addEventListener('click', prepareAutomaticSpecialistDelegation);
-$('agent-specialist-delegation-node').addEventListener('change', () => renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {}));
-$('agent-specialist-delegation-registry').addEventListener('change', () => renderSpecialistDelegationControls(ui.selectedBrowserAgent?.runtime || {}));
-$('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
-$('agent-import-button').addEventListener('click', importBrowserAgentDraft);
-$('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
-$('agent-job-list').addEventListener('change', selectBrowserAgentJob);
-$('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
-$('agent-resume-button').addEventListener('click', () => browserAgentLifecycle('RESUME_BROWSER_AGENT_JOB'));
-$('agent-stop-button').addEventListener('click', () => browserAgentLifecycle('STOP_BROWSER_AGENT_JOB'));
-$('agent-step-button').addEventListener('click', () => browserAgentLifecycle('STEP_BROWSER_AGENT_JOB'));
-$('agent-run-now-button').addEventListener('click', runBrowserAgentNow);
-$('agent-delete-button').addEventListener('click', deleteBrowserAgentJob);
-$('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollowUp);
-$('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
-$('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
-$('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
-$('agent-ai-pinned-route-id').addEventListener('change', syncBrowserAgentRouteBindingStatus);
-$('agent-policy-details').addEventListener('input', () => {
-  ui.agentPolicyEditEpoch += 1;
-  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Ð„ Ð½ÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ– Ð·Ð¼Ñ–Ð½Ð¸ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ¸ Agent.';
-  ui.agentPolicyDirty = true;
-});
-$('agent-policy-details').addEventListener('change', () => {
-  ui.agentPolicyEditEpoch += 1;
-  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Ð„ Ð½ÐµÐ·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ñ– Ð·Ð¼Ñ–Ð½Ð¸ Ð¿Ð¾Ð»Ñ–Ñ‚Ð¸ÐºÐ¸ Agent.';
-  ui.agentPolicyDirty = true;
-});
-$('agent-native-companion-check-button').addEventListener('click', checkNativeCompanion);
-$('agent-allow-current-site-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: false }));
-$('agent-allow-all-sites-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: true }));
-$('agent-allow-downloads-button').addEventListener('click', () => requestBrowserAgentCapability('downloads'));
-$('agent-allow-notifications-button').addEventListener('click', () => requestBrowserAgentCapability('notifications'));
-$('save-rate-limit-cooldown-button').addEventListener('click', saveProfileSettings);
-$('save-orchestration-v2-button').addEventListener('click', saveOrchestrationV2Settings);
-$('save-start-orchestration-v2-button').addEventListener('click', saveAndStartOrchestrationV2Now);
-$('test-orchestration-v2-button').addEventListener('click', testOrchestrationV2Control);
-$('run-orchestration-v2-button').addEventListener('click', runOrchestrationV2Now);
-$('stop-orchestration-v2-button').addEventListener('click', emergencyStopOrchestrationV2);
-$('save-remote-dispatch-button').addEventListener('click', saveRemoteDispatchSettings);
-$('test-remote-dispatch-button').addEventListener('click', testRemoteDispatchFeed);
-$('run-remote-dispatch-button').addEventListener('click', runRemoteDispatchNow);
-$('save-local-ai-button').addEventListener('click', saveLocalAiSettings);
-$('test-local-ai-button').addEventListener('click', testLocalAiConnection);
-$('run-local-ai-test-button').addEventListener('click', runLocalAiTestPrompt);
-$('local-ai-provider').addEventListener('change', onLocalAiProviderChanged);
-$('save-ai-router-button').addEventListener('click', saveAiRouterSettings);
-$('test-ai-gateway-button').addEventListener('click', testAiGateway);
-$('reset-ai-router-runtime-button').addEventListener('click', resetAiRouterRuntime);
-$('ai-router-primary-provider').addEventListener('change', () => resetAiRouterModelSlot('primary'));
-$('ai-router-strong-provider').addEventListener('change', () => resetAiRouterModelSlot('strong'));
-$('ai-router-primary-models-button').addEventListener('click', () => loadAiRouterModels('primary'));
-$('ai-router-strong-models-button').addEventListener('click', () => loadAiRouterModels('strong'));
-$('ai-router-add-route-button').addEventListener('click', () => {
-  try { addAiRouterRoute(); }
-  catch (error) { $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð´Ð¾Ð´Ð°Ñ‚Ð¸ Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚: ${error.message}`; }
-});
-function addNamedCompatibleRoute(endpointId, label) {
-  try {
-    const routes = aiRouterRoutesFromForm({ validate:false });
-    const existing = routes.findIndex(route => route.provider === 'openai-compatible' && route.endpointId === endpointId);
-    if (existing >= 0) {
-      $('ai-router-route-list').children[existing]?.querySelector('[data-route-field="model"]')?.focus();
-      $('ai-router-status').textContent = `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${label} ÑƒÐ¶Ðµ Ñ”. ÐžÑ‚Ñ€Ð¸Ð¼Ð°Ð¹Ñ‚Ðµ Ð¼Ð¾Ð´ÐµÐ»Ñ– Ð°Ð±Ð¾ Ð¾Ð±ÐµÑ€Ñ–Ñ‚ÑŒ Ñ–ÑÐ½ÑƒÑŽÑ‡Ñƒ.`;
-      return;
-    }
-    if (routes.length >= 32) throw new Error('ÐŸÑƒÐ» Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ñ–Ð² Ð¾Ð±Ð¼ÐµÐ¶ÐµÐ½Ð¾ 32 Ð·Ð°Ð¿Ð¸ÑÐ°Ð¼Ð¸.');
-    let number = 1;
-    while (routes.some(route => route.routeId === `${endpointId}-${number}`)) number++;
-    routes.push({ routeId:`${endpointId}-${number}`, provider:'openai-compatible', endpointId, model:'', roles:['coder'], priority:50, enabled:false, locality:'remote', costClass:'unknown' });
-    renderAiRouterRoutes(routes, {}, {
-      pinnedRouteId:$('ai-router-pinned-route').value,
-      allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-    }, { manualRouteWorkers:manualWorkerCountsFromCards() });
-    $('ai-router-route-list').lastElementChild?.querySelector('[data-route-action="discover-models"]')?.focus();
-    $('ai-router-status').textContent = `ÐœÐ°Ñ€ÑˆÑ€ÑƒÑ‚ ${label} Ð´Ð¾Ð´Ð°Ð½Ð¾ Ð´Ð¾ Ñ„Ð¾Ñ€Ð¼Ð¸. ÐžÑ‚Ñ€Ð¸Ð¼Ð°Ð¹Ñ‚Ðµ Ð¼Ð¾Ð´ÐµÐ»Ñ–, Ð²Ð¸Ð·Ð½Ð°Ñ‡Ñ‚Ðµ Ð²Ð°Ñ€Ñ‚Ñ–ÑÑ‚ÑŒ Ñ– Ð·Ð±ÐµÑ€ÐµÐ¶Ñ–Ñ‚ÑŒ Ð½Ð°Ð»Ð°ÑˆÑ‚ÑƒÐ²Ð°Ð½Ð½Ñ.`;
-  } catch (error) { $('ai-router-status').textContent = `ÐÐµ Ð²Ð´Ð°Ð»Ð¾ÑÑ Ð´Ð¾Ð´Ð°Ñ‚Ð¸ ${label}: ${error.message}`; }
-}
-$('ai-router-add-mistral-button').addEventListener('click', () => addNamedCompatibleRoute('mistral', 'ÐœÑ–ÑÑ‚Ñ€Ð°Ð»ÑŒ'));
-$('ai-router-add-openrouter-button').addEventListener('click', () => addNamedCompatibleRoute('openrouter', 'OpenRouter'));
-$('ai-router-route-list').addEventListener('click', handleAiRouterRouteAction);
-$('ai-model-free-tab').addEventListener('click', () => selectAiModelPriceTab('free', true));
-$('ai-model-paid-tab').addEventListener('click', () => selectAiModelPriceTab('paid', true));
-$('ai-model-price-tabs').addEventListener('keydown', event => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  event.preventDefault();
-  selectAiModelPriceTab(event.key === 'Home' ? 'free' : event.key === 'End' ? 'paid' : $('ai-model-free-tab').getAttribute('aria-selected') === 'true' ? 'paid' : 'free', true);
-});
-$('ai-router-route-list').addEventListener('change', event => {
-  if (event.target.matches('[data-route-field="discoveredModel"]') && event.target.value) {
-    event.target.closest('[data-ai-route]').querySelector('[data-route-field="model"]').value = event.target.value;
-    $('ai-router-status').textContent = `ÐžÐ±Ñ€Ð°Ð½Ð¾ Ð¼Ð¾Ð´ÐµÐ»ÑŒ ${event.target.value}. ÐÐ°Ñ‚Ð¸ÑÐ½Ñ–Ñ‚ÑŒ Â«Ð—Ð±ÐµÑ€ÐµÐ³Ñ‚Ð¸Â», Ñ‰Ð¾Ð± Ð·Ð°ÑÑ‚Ð¾ÑÑƒÐ²Ð°Ñ‚Ð¸.`;
-  }
-  if (event.target.matches('[data-route-field="routeId"]')) renderAiRouterRouteSelects();
-  if (event.target.matches('[data-route-field="provider"]')) {
-    const card = event.target.closest('[data-ai-route]');
-    const local = event.target.value === 'ollama';
-    card.querySelector('[data-route-field="locality"]').value = local ? 'local' : 'remote';
-    card.querySelector('[data-route-field="costClass"]').value = local ? 'free' : 'unknown';
-  }
-});
-$('run-ai-router-test-button').addEventListener('click', () => runAiRouterPrompt(false));
-$('run-ai-router-strong-button').addEventListener('click', () => runAiRouterPrompt(true));
-$('save-ai-manager-button').addEventListener('click', saveAiManagerSettings);
-$('run-ai-manager-now-button').addEventListener('click', runAiManagerNow);
-$('reset-ai-manager-runtime-button').addEventListener('click', resetAiManagerRuntime);
-$('project-workspace-refresh-button').addEventListener('click', () => { void loadProjectWorkspace({ focusSummary: true }); });
-$('create-session-button').addEventListener('click', createSession);
-$('master-pause-button').addEventListener('click', () => masterAction('MASTER_PAUSE', 'master pause', true));
-$('master-resume-button').addEventListener('click', () => masterAction('MASTER_RESUME', 'master resume', false));
-$('bulk-add-urls-button').addEventListener('click', () => runBulkUrlImport(false));
-$('bulk-replace-urls-button').addEventListener('click', () => runBulkUrlImport(true));
-document.querySelectorAll('input[name="taskConfigurationMode"]').forEach((input) => input.addEventListener('change', onTaskConfigurationModeChange));
-$('task-count').addEventListener('change', onTaskCountChange);
-$('task-count').addEventListener('input', () => { if ($('task-count').value) onTaskCountChange(); });
-$('shared-task-url').addEventListener('input', onSharedUrlInput);
-for (const id of [
-  'shared-prompt',
-  'default-unique-prompt',
-  'prompt-2-enabled',
-  'prompt-2-every',
-  'prompt-2-text',
-  'prompt-3-enabled',
-  'prompt-3-every',
-  'prompt-3-text',
-  'drive-prompt-enabled',
-  'drive-prompt-file',
-  'drive-prompt-target',
-  'drive-prompt-interval',
-  'drive-prompt-min-chars',
-]) {
-  const field = $(id);
-  const eventName = field?.tagName === 'SELECT' || field?.type === 'checkbox' ? 'change' : 'input';
-  field?.addEventListener(eventName, scheduleDraftPersistence);
-}
-$('calendar-mode').addEventListener('change', () => { syncCalendarVisibility(); renderCalendarRuntimeStatus(ui.selected); });
-$('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
-$('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
-$('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
-$('authorize-session-drive-button').addEventListener('click', authorizeSessionDrive);
-$('save-session-button').addEventListener('click', saveSession);
-$('start-session-button').addEventListener('click', () => action('START_SESSION', 'Start'));
-$('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION', 'Pause'));
-$('resume-session-button').addEventListener('click', () => action('RESUME_SESSION', 'Resume'));
-$('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 'Stop'));
-$('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Clear log'));
-$('refresh-run-timeline-button').addEventListener('click', () => refreshRunTimeline({ announceResult: true }));
-$('run-timeline-source-filter').addEventListener('change', renderRunTimeline);
-$('confirm-delete-button').addEventListener('click', confirmDelete);
-$('cancel-delete-button').addEventListener('click', closeDeleteDialog);
-$('portable-profile-file').addEventListener('change', onPortableProfileFileChange);
-$('import-profile-button').addEventListener('click', () => importPortableProfile(false));
-$('import-profile-start-button').addEventListener('click', () => importPortableProfile(true));
-$('export-profile-button').addEventListener('click', exportPortableProfile);
-$('download-diagnostic-report-button').addEventListener('click', downloadDiagnosticReport);
-$('uncertain-confirm').addEventListener('change', () => {
-  $('uncertain-retry').disabled = !$('uncertain-confirm').checked;
-  $('uncertain-skip').disabled = !$('uncertain-confirm').checked;
-});
-async function resolveUncertain(resolution) {
-  try {
-    const data = await core('RESOLVE_UNCERTAIN', {
-      sessionId: ui.selectedSessionId,
-      operationId: ui.selected?.status?.uncertainOperationId,
-      resolution,
-      confirmed: $('uncertain-confirm').checked,
-    });
-    ui.selected = data.session;
-    clearDraft(ui.selectedSessionId);
-    await openSession(ui.selectedSessionId);
-    reportCommandResult(resolution === 'check'
-      ? 'ÐŸÐµÑ€ÐµÐ²Ñ–Ñ€ÑÑŽ Ð¿Ð¾Ð¿ÐµÑ€ÐµÐ´Ð½Ñ” Ð½Ð°Ð´ÑÐ¸Ð»Ð°Ð½Ð½Ñ. ÐÐ¾Ð²Ð¾Ð³Ð¾ Ð½Ð°Ñ‚Ð¸ÑÐºÐ°Ð½Ð½Ñ Ð½ÐµÐ¼Ð°Ñ”.'
-      : 'Ð Ñ–ÑˆÐµÐ½Ð½Ñ Ð·Ð±ÐµÑ€ÐµÐ¶ÐµÐ½Ð¾. ÐÐ°Ñ‚Ð¸ÑÐ½Ñ–Ñ‚ÑŒ ÐŸÑ€Ð¾Ð´Ð¾Ð²Ð¶Ð¸Ñ‚Ð¸ Ð´Ð»Ñ Ð¿Ñ€Ð¾Ð´Ð¾Ð²Ð¶ÐµÐ½Ð½Ñ.');
-    if (resolution !== 'check') $('resume-session-button').focus();
-  } catch (error) {
-    reportCommandResult(error.message);
-  }
-}
-$('uncertain-check').addEventListener('click', () => resolveUncertain('check'));
-$('uncertain-retry').addEventListener('click', () => resolveUncertain('retry'));
-$('uncertain-skip').addEventListener('click', () => resolveUncertain('skip'));
-document.addEventListener('keydown', trapDialog);
-document.addEventListener('input', (event) => {
-  if (ui.selected && event.target?.closest?.('#session-editor') && event.target.id !== 'bulk-task-urls' && !event.target.closest?.('#uncertain-recovery')) scheduleDraftPersistence();
-});
-document.addEventListener('change', (event) => {
-  if (ui.selected && event.target?.closest?.('#session-editor') && !event.target.closest?.('#uncertain-recovery')) scheduleDraftPersistence();
-});
-
-if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
-  if (message?.channel !== 'autopilot-core' || message?.type !== 'STATUS_CHANGED') return;
-  queueStatusRefresh(message.sessionId);
-});
-
-async function initialLoad() {
-  syncScenarioInitialStaggerBounds();
-  setUiMode(storageGet(UI_MODE_KEY) || 'sessions');
-  setOrchestrationPanel(storageGet(ORCHESTRATION_PANEL_KEY) || 'orchestras');
-  setScenarioWorkPanel(storageGet(SCENARIO_WORK_PANEL_KEY) || 'cycle');
-  await loadProfileSettings();
-  await loadLocalAiSettings();
-  await loadAiRouterSettings();
-  await loadAiManagerSettings();
-  await loadSessions({ preserveFocus: false });
-  const firstSimplified = ui.sessions.find(session => session.simplifiedSession);
-  if (firstSimplified) await selectSimplifiedSession(firstSimplified.id);
-  else showSimplifiedSession(null);
-  await loadGlobalStatus();
-  await loadActionCenter();
-  await loadProjectWorkspace();
-  await loadOrchestrationV2Status();
-  await loadScenarioWork();
-  await loadBrowserAgentJobs();
-  await loadBrowserAgentExecutionPolicy();
-  await loadAgentDefinitionRegistries();
-  await loadSpecialistRegistries();
-  await loadRemoteDispatchStatus();
-  const lastSessionId = storageGet(LAST_SESSION_KEY);
-  if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
-}
-void initialLoad();
-window.setInterval(() => { void recordDashboardDiagnosticSnapshot(); }, DIAGNOSTIC_SNAPSHOT_DELAY_MS);
-window.setInterval(() => {
-  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void refreshBrowserAgentJobs();
-}, 5000);
-
-window.setInterval(() => {
-  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') {
-    void loadGlobalStatus();
-    void loadActionCenter();
-  }
-}, 5000);
-window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
-
-export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×]öÓDèµ©hºÚn¶X§zÍZ[\ÜÈ™[™\“][˜Ú\ÝHœ›ÛH	Ë‹Û][˜Ú[\ÝšœÉÎÂš[\ÜÈØÙ[˜\š[Ô›ÙÜ™\ÜÕ^Hœ›ÛH	Ë‹ÜØÙ[˜\š[Ë\›ÙÜ™\ÜËšœÉÎÂš[\ÜÈ›ØÝ\ÐY\“Y™XÞXÛTÝXØÙ\ÜÈHœ›ÛH	Ë‹Ù›ØÝ\Ë\ÛXÞKšœÉÎÂš[\ÜÈXZÙTØÙ[˜\š[ÕÛÜšÔ›Ùš[KXZÙTØÙ[˜\š[ÕÛÜšÕ[\]K\œÙTØÙ[˜\š[ÕÛÜšÔ›Ùš[QØÝ[Y[Hœ›ÛH	Ë‹ÜØÙ[˜\š[Ë]ÛÜšË\›Ùš[KšœÉÎÂš[\ÜÈ˜[œÛ]U^Hœ›ÛH	Ë‹ÝZË[ØØ[^˜][Û‹šœÉÎÂš[\ÜÈ^˜XÝÚ]Ü\›ËY\™ÙP[Õ\›Ë\œÙTÜX›RœÛÛ‹\œÙTÝšXÝ›Ý[™Y[YÙ\ˆHœ›ÛH	Ë‹ØÛÛ™šYË]ÛÛËšœÉÎÂš[\ÜÈ˜]]™PÛÛ\[š[ÛÛY[Hœ›ÛH	Ë‹‹ØÛÜ™KÛ˜]]™KXÛÛ\[š[Û‹šœÉÎÂš[\ÜÈ\ÜÙ\Ú[\YšYYÜX›T›Ùš[KZ[Ú[\YšYYÙ\ÜÚ[ÛÛÛ™šYÈHœ›ÛH	Ë‹ÜÚ[\YšYY\Ù\ÜÚ[Û‹XÛÛ™šYËšœÉÎÂš[\ÜÈXZÙPYÙ[˜Y›Ùš[K\œÙPYÙ[˜Y›Ùš[HHœ›ÛH	Ë‹ØYÙ[Y˜Y\›Ùš[KšœÉÎÂš[\ÜÈZ[YÙ[Yš[š][Û‘œ›ÛQ›Ü›UŒK\œÙPØ[›ÛšXØ[YÙ[Y[]HHœ›ÛH	Ë‹ØYÙ[YYš[š][Û‹Y›Ü›KšœÉÎÂš[\ÜÈÜ™X]PYÙ[šY]Ñ™[˜ÙUŒKÜ™X]PYÙ[›ØœÔ™XYØ]UŒK™XYYÙ[›ØœÕÚ]XY[™UŒK\ØÜšX™PYÙ[ÜXÚX[\Ý›ÙÜ™\ÜÕŒHHœ›ÛH	Ë‹ØYÙ[[ÝÛ™\‹]šY]ËšœÉÎÂš[\ÜÂˆYÙ[Yš[š][Û“][˜ÚØÛÜU^ŒKˆZ[YÙ[Yš[š][Û“][˜Ú™\]Y\ÝŒKŸHœ›ÛH	Ë‹ØYÙ[YYš[š][Û‹[][˜ÚY›Ü›KšœÉÎÂ‚˜ÛÛœÝPVÔTÒPÐSÕTÒÔÈHLÂ˜ÛÛœÝPVÕTÒÔÈHWÌÌÂ˜ÛÛœÝ’TÒP“WÓÑ×ÓSRUHLÂ˜ÛÛœÝÕUT×Ô‘Q”‘TÒÑSVWÓTÈHÍLÂ˜ÛÛœÝQ•ÔÐU‘WÑSVWÓTÈHLÂ˜ÛÛœÝPQÓ“ÔÕP×ÔÓTÒÕÑSVWÓTÈHLÂ˜ÛÛœÝQ•ÒÑVWÔ‘Q’VH	ØÚ]ÜX]]Ü[ÝY˜Y‰ÎÂ˜ÛÛœÝTÕÔÑTÔÒSÓ—ÒÑVHH	ØÚ]ÜX]]Ü[Ý[\Ý\Ù\ÜÚ[Û‰ÎÂ˜ÛÛœÝZHHÂˆÙ\ÜÚ[ÛœÎˆ×KˆÚ[\YšYYÙ[XÝYYˆ	ÉËˆÚ[\YšYYÙ[XÝYˆ[ˆÙ\ÜÚ[Û“\ÝÚYÛ˜]\™Nˆ	ÉËˆÙ[XÝYÙ\ÜÚ[Û’Yˆ[ˆÙ[XÝYˆ[ˆ[•[Y[[™Nˆ[ˆ[]T™]\›‘›ØÝ\Îˆ[ˆ[™[™ÔÜX›T›Ùš[Nˆ[ˆ[™[™ÔÜX›T™]šY]Îˆ[ˆ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[Nˆ[ˆÜ˜Ú\Ý˜][Û•ŒÛÛ™šYÎˆ[ˆÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜\Îˆ×KˆÙ[XÝYÜ˜Ú\Ý˜RYˆ	ÉËˆØÙ[˜\š[ÕÛÜšÔØÙ[˜\š[ÜÎˆ×KˆØÙ[˜\š[ÕÛÜšÔÛÛÎˆ×KˆÙ[XÝYØÙ[˜\š[ÕÛÜšÒYˆ	ÉËˆÙ[XÝYØÙ[˜\š[ÔÛÛYˆ	ÉËˆÙ[XÝYØÙ[˜\š[ÕÛÜšÎˆ[ˆœ›ÝÜÙ\YÙ[›ØœÎˆ×KˆÙ[XÝYœ›ÝÜÙ\YÙ[Yˆ	ÉËˆÙ[XÝYœ›ÝÜÙ\YÙ[ˆ[ˆYÙ[Yš[š][Û”™YÚ\ÝšY\Îˆ×KˆÙ[XÝYYÙ[Yš[š][Û”™YÚ\ÝžRYˆ	ÉËˆÙ[XÝYYÙ[Yš[š][Û”™YÚ\ÝžNˆ[ˆÙ[XÝYYÙ[Yš[š][Û’Yˆ	ÉËˆÙ[XÝYYÙ[Yš[š][ÛŽˆ[ˆYÙ[Yš[š][Û“[ÙNˆ	Û›Û™IËˆYÙ[Yš[š][Û”]X\˜[[™PÛÝ[ˆˆYÙ[Yš[š][Û“][˜ÚYš[š][Û’Yˆ	ÉËˆÜXÚX[\Ý™YÚ\ÝšY\Îˆ×KˆÙ[XÝYÜXÚX[\Ý™YÚ\ÝžRYˆ	ÉËˆÙ[XÝYÜXÚX[\Ý™YÚ\ÝžNˆ[ˆÙ[XÝYÜXÚX[\ÝYˆ	ÉËˆÙ[XÝYÜXÚX[\Ýˆ[ˆÜXÚX[\Ý[ÙNˆ	Û›Û™IËˆÜXÚX[\Ý]X\˜[[™PÛÝ[ˆˆYÙ[˜YXÝ]™Nˆ˜[ÙKˆYÙ[ÛXÞQ\Nˆ˜[ÙKˆYÙ[ÛXÞQY]\ØÚˆŸNÂ‚˜ÛÛœÝ	H
+Y
+HOˆØÝ[Y[™Ù][[Y[žRY
+Y
+NÂ˜ÛÛœÝYÙ[šY]Ñ™[˜ÙHHÜ™X]PYÙ[šY]Ñ™[˜ÙUŒJ
+NÂ˜ÛÛœÝYÙ[ÝÛ™\“Ü\˜][ÛœÈH™]ÈÙ]
+
+NÂ›]YÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚH[Â˜ÛÛœÝYÙ[›ØœÔ™XYØ]HHÜ™X]PYÙ[›ØœÔ™XYØ]UŒJ
+
+HOˆÛÜ™J	ÓTÕÐ”“ÕÔÑT—ÐQÑS•Ò“Ð”ÉÊJNÂ›]YÙ[ÝÛ™\“Ü\˜][Û”Ù\]Y[˜ÙHHÂ›]YÙ[\Ý›Ú™XÝ[ÛˆH	ÉÎÂ™[˜Ý[ÛˆÙ[XÝœ›ÝÜÙ\YÙ[šY]ÊY
+HÂˆZKœÙ[XÝYœ›ÝÜÙ\YÙ[YHY	ÉÎÂˆ™]\›ˆYÙ[šY]Ñ™[˜ÙKœÙ[XÝ
+ZKœÙ[XÝYœ›ÝÜÙ\YÙ[Y
+NÂŸB™[˜Ý[Ûˆ™YÚ[YÙ[ÝÛ™\“Ü\˜][ÛŠÛÛ[X[™YHZKœÙ[XÝYœ›ÝÜÙ\YÙ[Y
+HÂˆÛÛœÝÙ^HH	ØÛÛ[X[™N‰ÚY	ÉßXÂˆYˆ
+YÙ[ÝÛ™\“Ü\˜][ÛœËš\ÊÙ^JJH™]\›ˆ[ÂˆYÙ[ÝÛ™\“Ü\˜][ÛœË˜Y
+Ù^JNÂˆYÙ[›ØœÔ™XYØ]Kš[˜[Y]J
+NÂˆ™]\›ˆÈÙ^KXÚÙ]ˆÙ[XÝœ›ÝÜÙ\YÙ[šY]ÊZKœÙ[XÝYœ›ÝÜÙ\YÙ[Y
+KÙ\]Y[˜ÙNˆ
+ÊØYÙ[ÝÛ™\“Ü\˜][Û”Ù\]Y[˜ÙHNÂŸB™[˜Ý[Ûˆš[š\ÚYÙ[ÝÛ™\“Ü\˜][ÛŠÜ\˜][ÛŠHÂˆYÙ[ÝÛ™\“Ü\˜][ÛœË™[]JÜ\˜][Û‹šÙ^JNÂˆYÙ[›ØœÔ™XYØ]Kš[˜[Y]J
+NÂŸB™[˜Ý[ÛˆYÙ[ÝÛ™\”™\Ý[
+Ü\˜][Û‹Y\ÜØYÙJHÂˆYˆ
+Ü\˜][Û‹œÙ\]Y[˜ÙHOOHYÙ[ÝÛ™\“Ü\˜][Û”Ù\]Y[˜ÙJH	
+	ØYÙ[XÛÛ[X[™\™\Ý[	ÊK^ÛÛ[HY\ÜØYÙNÂŸB™[˜Ý[Ûˆ™Yœ™\Úœ›ÝÜÙ\YÙ[›ØœÊ
+HÂˆÛÛœÝÚ[™Ú[™Ó\ÝHË‹‹˜YÙ[ÝÛ™\“Ü\˜][Ûœ×KœÛÛYJÙ^HOˆÙ^KœÝ\ÕÚ]
+	ÐÔ‘PUN‰ÊHÙ^KœÝ\ÕÚ]
+	ÑSUN‰ÊJNÂˆYˆ
+YÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚÚ[™Ú[™Ó\Ý
+H™]\›ˆYÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚÂˆÛÛœÝ™Yœ™\ÚHØYœ›ÝÜÙ\YÙ[›ØœÊ
+NÂˆYÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚH™Yœ™\ÚÂˆÛÛœÝ™[X\ÙHH
+
+HOˆÈYˆ
+YÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚOOH™Yœ™\Ú
+HYÙ[˜XÚÙÜ›Ý[™™Yœ™\ÚH[ÈNÂˆ™Yœ™\Ú[Š™[X\ÙK™[X\ÙJNÂˆ™]\›ˆ™Yœ™\ÚÂŸB˜ÛÛœÝ[››Ý[˜ÙHH
+^
+HOˆÈ	
+	Û]™KX[››Ý[˜Ù\‰ÊK^ÛÛ[H	ÉÎÈ™\]Y\Ý[š[X][Û‘œ˜[YJ
+
+HOˆÈ	
+	Û]™KX[››Ý[˜Ù\‰ÊK^ÛÛ[H^ÈJNÈNÂ˜ÛÛœÝ›Ü›X][YHH
+˜[YJHOˆ˜[YHÈ™]È]J˜[YJKÓØØ[TÝš[™Ê
+Hˆ	Ó›Ý]˜Z[X›IÎÂ˜ÛÛœÝ[[YP]˜Z[X›HH
+
+HOˆ›ÛÛX[ŠÛØ˜[\Ë˜Ú›ÛYOËœ[[YOËœÙ[™Y\ÜØYÙJNÂ˜ÛÛœÝRWÓSÑWÒÑVHH	ØÚ]ÜX]]Ü[Ý]ZK[[ÙIÎÂ˜ÛÛœÝRWÓSÑTÈH™]ÈÙ]
+ÉÜÙ\ÜÚ[ÛœÉË	ÜÚ[\YšYY	Ë	ÛÜ˜Ú\Ý˜][Û‰Ë	ÜØÙ[˜\š[Ë]ÛÜšÉË	ØYÙ[	Ë	ØZI×JNÂ˜ÛÛœÝÔÒTÕUSÓ—ÔS‘SÒÑVHH	ØÚ]ÜX]]Ü[Ý[Ü˜Ú\Ý˜][Û‹\[™[	ÎÂ˜ÛÛœÝÔÒTÕUSÓ—ÔS‘SÈHÉÛÜ˜Ú\Ý˜\ÉË	ÜÙ][™ÜÉË	ÜÝ]I×NÂ˜ÛÛœÝÐÑST’S×ÕÓÔ’×ÔS‘SÒÑVHH	ØÚ]ÜX]]Ü[Ý\ØÙ[˜\š[Ë]ÛÜšË\[™[	ÎÂ˜ÛÛœÝÐÑST’S×ÕÓÔ’×ÔS‘SÈHÉØÞXÛIË	ÜZ\œÉË	ÙÜ›Ý\	Ë	ÜÝ]I×NÂ›]Ü˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚHÂ™[˜Ý[Ûˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+HÈÜ˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚ
+ÏHNÈ™]\›ˆÜ˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚÈB™[˜Ý[ÛˆÙ]Ü˜Ú\Ý˜][Û”[™[
+[™[È›ØÝ\ÈH˜[ÙHHHßJHÂˆÛÛœÝ™^HÔÒTÕUSÓ—ÔS‘SËš[˜ÛY\Ê[™[
+HÈ[™[ˆ	ÛÜ˜Ú\Ý˜\ÉÎÂˆÝÜ˜YÙTÙ]
+ÔÒTÕUSÓ—ÔS‘SÒÑVK™^
+NÂˆØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	ÖÙ]K[Ü˜Ú\Ý˜][Û‹\[™[IÊK™›Ü‘XXÚ
+[[Y[OˆÂˆ[[Y[šY[ˆH[[Y[™]\Ù]›Ü˜Ú\Ý˜][Û”[™[OOH™^ÂˆJNÂˆ›Üˆ
+ÛÛœÝ˜[YHÙˆÔÒTÕUSÓ—ÔS‘SÊHÂˆÛÛœÝXˆH	
+Ü˜Ú\Ý˜][Û‹]Œ‹]X‹IÝ˜[Y_X
+NÂˆYˆ
+]XŠHÛÛ[YNÂˆX‹œÙ]]šX]J	Ø\šXK\Ù[XÝY	Ë˜[YHOOH™^È	ÝYIÈˆ	Ù˜[ÙIÊNÂˆX‹X’[™^H˜[YHOOH™^ÈˆLNÂˆBˆYˆ
+›ØÝ\ÊH	
+Ü˜Ú\Ý˜][Û‹]Œ‹]X‹IÛ™^X
+OË™›ØÝ\Ê
+NÂŸB‚‚™[˜Ý[ÛˆÙ]ØÙ[˜\š[ÕÛÜšÔ[™[
+[™[È›ØÝ\ÈH˜[ÙHHHßJHÂˆÛÛœÝ™^HÐÑST’S×ÕÓÔ’×ÔS‘SËš[˜ÛY\Ê[™[
+HÈ[™[ˆ	ØÞXÛIÎÂˆÝÜ˜YÙTÙ]
+ÐÑST’S×ÕÓÔ’×ÔS‘SÒÑVK™^
+NÂˆØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	ÖÙ]K\ØÙ[˜\š[Ë]ÛÜšË\[™[IÊK™›Ü‘XXÚ
+[[Y[OˆÂˆ[[Y[šY[ˆH[[Y[™]\Ù]œØÙ[˜\š[ÕÛÜšÔ[™[OOH™^ÂˆJNÂˆ›Üˆ
+ÛÛœÝ˜[YHÙˆÐÑST’S×ÕÓÔ’×ÔS‘SÊHÂˆÛÛœÝXˆH	
+ØÙ[˜\š[Ë]ÛÜšË]X‹IÝ˜[Y_X
+NÂˆYˆ
+]XŠHÛÛ[YNÂˆX‹œÙ]]šX]J	Ø\šXK\Ù[XÝY	Ë˜[YHOOH™^È	ÝYIÈˆ	Ù˜[ÙIÊNÂˆX‹X’[™^H˜[YHOOH™^ÈˆLNÂˆBˆYˆ
+›ØÝ\ÊH	
+ØÙ[˜\š[Ë]ÛÜšË]X‹IÛ™^X
+OË™›ØÝ\Ê
+NÂŸB‚™[˜Ý[ÛˆÙ]ZS[ÙJ[ÙKÈ›ØÝ\ÈH˜[ÙHHHßJHÂˆÛÛœÝ™^HRWÓSÑTËš\Ê[ÙJHÈ[ÙHˆ	ÜÙ\ÜÚ[ÛœÉÎÂˆÝÜ˜YÙTÙ]
+RWÓSÑWÒÑVK™^
+NÂˆØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	ÖÙ]KX\[[ÙWIÊK™›Ü‘XXÚ
+
+[[Y[
+HOˆÂˆ[[Y[šY[ˆH[[Y[™]\Ù]˜\[ÙHOOH™^ÂˆJNÂˆØÝ[Y[œ]Y\žTÙ[XÝÜŠ	Ë›^[Ý]	ÊOË˜Û\ÜÓ\ÝÙÙÛJ	ÜÚ[™ÛKXÛÛ[[‰Ë™^OOH	ÜÙ\ÜÚ[ÛœÉÊNÂˆ›Üˆ
+ÛÛœÝ˜[YHÙˆRWÓSÑTÊHÂˆÛÛœÝXˆH	
+[ÙKIÝ˜[Y_X
+NÂˆYˆ
+]XŠHÛÛ[YNÂˆX‹œÙ]]šX]J	Ø\šXK\Ù[XÝY	Ë˜[YHOOH™^È	ÝYIÈˆ	Ù˜[ÙIÊNÂˆX‹X’[™^H˜[YHOOH™^ÈˆLNÂˆBˆYˆ
+›ØÝ\ÊH	
+[ÙKIÛ™^X
+OË™›ØÝ\Ê
+NÂŸB‚˜\Þ[˜È[˜Ý[ÛˆØY›Ùš[TÙ][™ÜÊ
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÔ“Ñ’SWÔÑUS‘ÔÉÊNÂˆÛÛœÝZ[]\ÈH[X™\Š]OËœ˜]S[Z]ÛÛÛÝÛ“Z[]\ÈÏÈ
+NÂˆÛÛœÝÛÛ˜Ý\œ™[˜ÞHH[X™\Š]OË›X^ÛÛ˜Ý\œ™[Ù\ÜÚ[Û“Ü\˜][ÛœÈÏÈL
+NÂˆ	
+	Ü˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK˜[YHHÝš[™ÊZ[]\ÊNÂˆYˆ
+	
+	ÜÚ[\YšYY\˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊJH	
+	ÜÚ[\YšYY\˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK˜[YHHÝš[™ÊZ[]\ÊNÂˆYˆ
+	
+	ÜÚ[\YšYY[X^XÛÛ˜Ý\œ™[\Ù\ÜÚ[Û‹[Ü\˜][ÛœÉÊJH	
+	ÜÚ[\YšYY[X^XÛÛ˜Ý\œ™[\Ù\ÜÚ[Û‹[Ü\˜][ÛœÉÊK˜[YHHÝš[™ÊÛÛ˜Ý\œ™[˜ÞJNÂˆ	
+	Ü˜]K[[Z]\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4$4.´`´.4,´/t,4/ô,4`ô-ô,ˆ	ÛZ[]\ßH4at,‹˜ÂˆYˆ
+	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊJHÂˆ	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4$4.´`´.4,´/t,4/ô,4`ô-ô,ˆ	ÛZ[]\ßH4at,‹ˆ4'ô,4`4,4.ô-t.ôc4/te´`t`´cˆ	ØÛÛ˜Ý\œ™[˜Þ_H4/´-4/t/´aô,4`t/t.4aH4/´/ô-t`4,4a´e´.K˜ÂˆBˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	Ü˜]K[[Z]\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÎˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆYˆ
+	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊJH	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÎˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™T›Ùš[TÙ][™ÜÊ
+HÂˆÛÛœÝZ[]\ÈH[X™\Š	
+	Ü˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK˜[YJNÂˆYˆ
+S[X™\‹š\Ò[YÙ\ŠZ[]\ÊHZ[]\ÈZ[]\ÈˆLŒ
+HÂˆ	
+	Ü˜]K[[Z]\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H	ô$´,´-t-4e´`´c4a´e´.ô-H4aô.4`t.ô/ˆ4,´e´-4-4/ˆLŒ4at,´.4.ô.4/K‰ÎÂˆ	
+	Ü˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK™›ØÝ\Ê
+NÂˆ™]\›ŽÂˆBˆžHÂˆ]ØZ]ÛÜ™J	ÕTUWÔ“Ñ’SWÔÑUS‘ÔÉËÈ˜]S[Z]ÛÛÛÝÛ“Z[]\ÎˆZ[]\ÈJNÂˆ]ØZ]ØY›Ùš[TÙ][™ÜÊ
+NÂˆ[››Ý[˜ÙJ	ô't,4.ô,4b4`´`ô,´,4/t/tcÈ4/ô,4`ô-ô.4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	Ü˜]K[[Z]\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÎˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™TÚ[\YšYY›Ùš[TÙ][™ÜÊ
+HÂˆÛÛœÝZ[]\ÈH[X™\Š	
+	ÜÚ[\YšYY\˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK˜[YJNÂˆÛÛœÝÛÛ˜Ý\œ™[˜ÞHH[X™\Š	
+	ÜÚ[\YšYY[X^XÛÛ˜Ý\œ™[\Ù\ÜÚ[Û‹[Ü\˜][ÛœÉÊK˜[YJNÂˆYˆ
+S[X™\‹š\Ò[YÙ\ŠZ[]\ÊHZ[]\ÈZ[]\ÈˆLŒ
+HÂˆ	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H	ô'ô,4`ô-ô,ˆ4,´,´-t-4e´`´c4a´e´.ô-H4aô.4`t.ô/ˆ4,´e´-4-4/ˆLŒ‰ÎÂˆ	
+	ÜÚ[\YšYY\˜]K[[Z]XÛÛÛÝÛ‹[Z[]\ÉÊK™›ØÝ\Ê
+NÂˆ™]\›ŽÂˆBˆYˆ
+S[X™\‹š\Ò[YÙ\ŠÛÛ˜Ý\œ™[˜ÞJHÛÛ˜Ý\œ™[˜ÞHHÛÛ˜Ý\œ™[˜ÞHˆL
+HÂˆ	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H	ô'ô,4`4,4.ô-t.ôc4/te´`t`´cˆ4,´,´-t-4e´`´c4a´e´.ô-H4aô.4`t.ô/ˆ4,´e´-H4-4/ˆL‰ÎÂˆ	
+	ÜÚ[\YšYY[X^XÛÛ˜Ý\œ™[\Ù\ÜÚ[Û‹[Ü\˜][ÛœÉÊK™›ØÝ\Ê
+NÂˆ™]\›ŽÂˆBˆžHÂˆ]ØZ]ÛÜ™J	ÕTUWÔ“Ñ’SWÔÑUS‘ÔÉËÂˆ˜]S[Z]ÛÛÛÝÛ“Z[]\ÎˆZ[]\ËˆX^ÛÛ˜Ý\œ™[Ù\ÜÚ[Û“Ü\˜][ÛœÎˆÛÛ˜Ý\œ™[˜ÞKˆJNÂˆ]ØZ]ØY›Ùš[TÙ][™ÜÊ
+NÂˆ[››Ý[˜ÙJ	ô't,4.ô,4b4`´`ô,´,4/t/tcÈ4,´.4.´/´/t,4/t/tcÈ4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÜÚ[\YšYY\›Ùš[K\Ù][™Ë\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÎˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚™[˜Ý[ÛˆÜ˜Ú\Ý˜][Û•Œ”Ù][™ÜÑœ›ÛQ›Ü›J
+HÂˆÛÛœÝ[YÙ\ˆH
+YZ[‹X^X™[
+HOˆ\œÙTÝšXÝ›Ý[™Y[YÙ\Š	
+Y
+K˜[YKÈZ[‹X^X™[JNÂˆÛÛœÝ[˜X›YH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Y[˜X›Y	ÊK˜ÚXÚÙYÂˆÛÛœÝXœÛÛ]SX^ÛÜšÙ\œÈH[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^]ÛÜšÙ\œÉËKŒ	ô'4,4.´`KˆÛÜšÙ\œÉÊNÂˆÛÛœÝY˜][\Ú\™YÛÜšÙ\œÈH[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Y\Ú\™Y]ÛÜšÙ\œÉËŒ	ô(t`´,4`4`ˆÛÜšÙ\œÉÊNÂˆYˆ
+Y˜][\Ú\™YÛÜšÙ\œÈˆXœÛÛ]SX^ÛÜšÙ\œÊH›ÝÈ™]È\œ›ÜŠ	ô(t`´,4`4`ˆÛÜšÙ\œÈ4/t-H4/4/´-´-H4/ô-t`4-t,´.4bt`ô,´,4`´.4.ô/´.´,4.ôc4/t.4.H4/4,4.´`t.4/4`ô/‰ÊNÂˆÛÛœÝÛÛ›Û\ÜÝYT˜]ÈH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛZ\ÜÝYIÊK˜[YKš[J
+NÂˆÛÛœÝÛÛ›ÛÛÛ[Y[˜]ÈH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛXÛÛ[Y[	ÊK˜[YKš[J
+NÂˆ™]\›ˆÂˆ‹‹ŠZK›Ü˜Ú\Ý˜][Û•ŒÛÛ™šYÈßJKˆ[˜X›Yˆ›Ú™XÝYˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ú™XÝZY	ÊK˜[YKš[J
+Kˆ\™Ù]™\ÜÚ]ÜžNˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]\™Ù]\™\ÜÚ]ÜžIÊK˜[YKš[J
+KˆÛÛ›Û™\ÜÚ]ÜžNˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›Û\™\ÜÚ]ÜžIÊK˜[YKš[J
+KˆÛÛ›Û\ÜÝYS[X™\ŽˆÛÛ›Û\ÜÝYT˜]ÈÈ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛZ\ÜÝYIËK[X™\‹“PVÔÐQ‘WÒS•QÑT‹	ÐÛÛ›Û\ÜÝYIÊHˆˆÛÛ›ÛÛÛ[Y[YˆÛÛ›ÛÛÛ[Y[˜]ÈÈ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛXÛÛ[Y[	Ë[X™\‹“PVÔÐQ‘WÒS•QÑT‹	ÐÛÛ›ÛÛÛ[Y[	ÊHˆˆ›ÛÝÝ˜\[›™YÛÛ›Ûš\œÝˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹X›ÛÝÝ˜\\[›™YXÛÛ›Û	ÊK˜ÚXÚÙYˆÛÛÜ™[˜]ÜYÙ[›ÝšY\’Yˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\›ÝšY\‰ÊK˜[YKˆÛÜšÙ\YÙ[›ÝšY\’Yˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\›ÝšY\‰ÊK˜[YKˆÛÛÜ™[˜]Ü“][˜Ú\›ˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹]\›	ÊK˜[YKš[J
+KˆX\Ý\ÛÛÜ™[˜]Ü”›Û\ˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X\Ý\‹\›Û\	ÊK˜[YKš[J
+KˆÛÛÜ™[˜]Ü•XÚÔ›Û\ˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]XÚË\›Û\	ÊK˜[YKš[J
+KˆX\Ý\”›Û\™\œÚ[ÛŽˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Û\]™\œÚ[Û‰ËKL	Ô›Û\™\œÚ[Û‰ÊKˆËÈ™\Ù\™YÛÛ\]Xš[]HšY[ˆ›È[[YH™Z]š[Üˆ[ˆÜ˜Ú\Ý˜][ÛˆŒ‹ˆÙY\˜Z[XÛÜÙY‚ˆ˜[˜XÚÕ[š]™\œØ[›Û\[˜X›Yˆ˜[ÙKˆY˜][\Ú\™YÛÜšÙ\œËˆXœÛÛ]SX^ÛÜšÙ\œËˆX^][˜Ú\Ô\•Ú[™ÝÎˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^[][˜Ú\Ë]Ú[™ÝÉËL	ô%ô,4/ô`ô`t.´e´,ˆ4-ô,4,´e´.´/t/‰ÊKˆ][˜ÚÚ[™ÝÔÙXÛÛ™Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[][˜Ú]Ú[™ÝÉËL	ô$´e´.´/t/‰ÊKˆZ[š[][UÛÜšÙ\“][˜Ú[\˜[\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Z[‹[][˜ÚYØ\	ËÍŒ	ô'ô,4`ô-ô,4/4e´-ˆ4`t`´,4`4`´,4/4.	ÊH
+ˆLˆÛÜšÙ\”›Ø™R[\˜[ÙXÛÛ™Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\›Ø™IËÌŒ	ô'ô-t`4-t,´e´`4.´,ÛÜšÙ\œÉÊKˆØ]ÚÙÒ[\˜[ÙXÛÛ™Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]Ø]ÚÙÉËŒÍŒ	ÕØ]ÚÙÉÊKˆX^ÛÛÜ™[˜]Ü•\›œÎˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^]\›œÉËKL	Õ\›œÈ4.´/´/´`4-4.4/t,4`´/´`4,	ÊKˆÝ[UÛÜšÙ\Y\”ÙXÛÛ™Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý[K]ÛÜšÙ\‰ËÌ	ÔÝ[HÛÜšÙ\‰ÊKˆÛÜšÙ\”™TÙ[™[^S\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\™K\Ù[™	ËKÌ	ÕÛÜšÙ\ˆ™K\Ù[™	ÊH
+ˆLˆÛÜšÙ\\ÞPÚXÚÑ[^S\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹X\ÞIËKÌ	ÕÛÜšÙ\ˆ\ÞKXÚXÚÉÊH
+ˆLˆÛÜšÙ\”™]žP˜XÚÛÙ™“\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\™]žIËKÍŒ	ÕÛÜšÙ\ˆ™]žIÊH
+ˆLˆÛÛÜ™[˜]Ü”™TÙ[™[^S\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\™K\Ù[™	ËKÌ	ÐÛÛÜ™[˜]Üˆ™K\Ù[™	ÊH
+ˆLˆÛÛÜ™[˜]Ü”™]žP˜XÚÛÙ™“\Îˆ[YÙ\Š	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\™]žIËKÍŒ	ÐÛÛÜ™[˜]Üˆ™]žIÊH
+ˆLˆNÂŸB‚™[˜Ý[ÛˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]JÈ\ÞHH˜[ÙHHHßJHÂˆÛÛœÝÙ[XÝYH
+ZK›Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜\È×JK™š[™
+][HOˆ][KšYOOHZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H[ÂˆÛÛœÝ\ÔÙ[XÝYH›ÛÛX[ŠÙ[XÝY
+NÂˆ	
+	Û™]Ë[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJNÂˆ	
+	Ü™[˜[YK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂˆ	
+	ÜÝ\[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÙ[XÝYË›ÝÛ™\”]\ÙYOOHYNÂˆ	
+	Ü]\ÙK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÙ[XÝYË›ÝÛ™\”]\ÙYOOHYNÂˆ	
+	Ü™\Ý[YK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÙ[XÝYË›ÝÛ™\”]\ÙYOOHYNÂˆ	
+	Ù[]K[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂˆ›Üˆ
+ÛÛœÝYÙˆÉÜØ]™K[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰Ë	ÜØ]™K\Ý\[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰Ë	Ý\Ý[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰Ë	Ü[‹[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰Ë	ÜÝÜ[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰Ë	Ù^Ü[Ü˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KX]Û‰×JHÂˆ	
+Y
+K™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂˆBˆ	
+	Ú[\Ü[Ü˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJH]ZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[NÂˆ	
+	ØÛÛ™šYÝ\™K[Ü˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂˆ	
+	Ø]]Üš^™K[Ü˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]Û‰ÊK™\ØX›YH›ÛÛX[Š\ÞJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]X‹\Ù][™ÜÉÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]X‹\Ý]IÊK™\ØX›YH›ÛÛX[Š\ÞJHZ\ÔÙ[XÝYÂŸB‚™[˜Ý[ÛˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ\ÞJHÂˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]JÈ\ÞNˆ›ÛÛX[Š\ÞJHJNÂŸB‚™[˜Ý[Ûˆ™[™\“Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜\Ê]HHßJHÂˆÛÛœÝÜ˜Ú\Ý˜\ÈH\œ˜^Kš\Ð\œ˜^J]K›Ü˜Ú\Ý˜\ÊHÈ]K›Ü˜Ú\Ý˜\Èˆ×NÂˆZK›Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜\ÈHÛÛ™JÜ˜Ú\Ý˜\ÊNÂˆZKœÙ[XÝYÜ˜Ú\Ý˜RYH]KœÙ[XÝYY	ÉÎÂˆÛÛœÝ\ÝH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[\Ý	ÊNÂˆÛÛœÝ™]š[Ý\ÈH\Ý˜[YNÂˆ\Ýœ™\XÙPÚ[™[Š
+NÂˆ›Üˆ
+ÛÛœÝ][HÙˆÜ˜Ú\Ý˜\ÊHÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÂˆÜ[Û‹˜[YHH][KšYÂˆÜ[Û‹^ÛÛ[H	Ú][K›˜[Y_IÚ][K›ÝÛ™\”]\ÙYÈ	È8 %4/ô,4`ô-ô,	Èˆ	ÉßXÂˆÜ[Û‹œÙ[XÝYH][KšYOOHZKœÙ[XÝYÜ˜Ú\Ý˜RYÂˆ\Ý˜\[™
+Ü[ÛŠNÂˆBˆYˆ
+[\Ý˜[YH	‰ˆ™]š[Ý\È	‰ˆÜ˜Ú\Ý˜\ËœÛÛYJ][HOˆ][KšYOOH™]š[Ý\ÊJH\Ý˜[YHH™]š[Ý\ÎÂˆÛÛœÝÙ[XÝYHÜ˜Ú\Ý˜\Ë™š[™
+][HOˆ][KšYOOHZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H[Âˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[˜[YIÊK˜[YHHÙ[XÝYË›˜[YH	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[HÙ[XÝYˆÈ	ÜÙ[XÝY›˜[Y_Kˆ4&ô/´.´,4.ôc4/t,4/ô,4`ô-ô,ˆ	ÜÙ[XÝY›ÝÛ™\”]\ÙYÈ	ô`´,4.‰Èˆ	ô/te‰ßKˆ4'´`4.´-t`t`´`4e´,Žˆ	ÛÜ˜Ú\Ý˜\Ë›[™ÝK˜ˆˆ	ô'´`4.´-t`t`´`4.4bt-H4/t-H4`t`´,´/´`4-t/te‹ˆ4(t`´,´/´`4e´`´c4/t/´,´.4.H4/´`4.´-t`t`´`4,4,t/ˆ4-ô,4,´,4/t`´,4-´`´-H”ÓÓ‹ta4,4.t.Ë‰ÎÂˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]J
+NÂŸB‚™[˜Ý[Ûˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]HHßJHÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜\Ê]JNÂˆÛÛœÝÛÛ™šYÈH]K˜ÛÛ™šYÈßNÂˆÛÛœÝ[[YHH]Kœ[[YHßNÂˆÛÛœÝÛÛÜ™[˜]ÜˆH[[YK˜ÛÛÜ™[˜]ÜˆßNÂˆÛÛœÝ›ÝšY\ˆH[[YKœ›ÝšY\ˆßNÂˆÛÛœÝÛÝ[ÈH[[YKÛÜšÙ\ÛÝ[ÈßNÂˆZK›Ü˜Ú\Ý˜][Û•ŒÛÛ™šYÈHÛÛ™JÛÛ™šYÊNÂˆYˆ
+]K™š]™SÐ]]
+HZK›Ü˜Ú\Ý˜][Û‘š]™SÐ]]HÛÛ™J]K™š]™SÐ]]
+NÂˆÛÛœÝš]™SÐ]]H]K™š]™SÐ]]ZK›Ü˜Ú\Ý˜][Û‘š]™SÐ]]ßNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]]\Ý]\ÉÊK^ÛÛ[Hš]™SÐ]]˜ÛÛ™šYÝ\™YˆÈ	ÑÛÛÙÛHš]™HÐ]]4/t,4.ô,4b4`´/´,´,4/t/‹ˆ4$4,´`´/´`4.4-ô,4a´e´cÈ4,´.4.´/´/t`ôe4`´c4`tcÈ4.ô.4b4-H4/ôe´`t.ôcÈ4cô,´/t/´,ô/ˆ4/t,4`´.4`t.´,4/t/tcÈ4.´/t/´/ô.´.È4,4,´`´/´/4,4`´.4aô/t.4.HÛ4/t-H4,´e´-4.´`4.4,´,4e4,´e´.´/t,4,´at/´-4`Ë‰Âˆˆš]™SÐ]]˜ÛY[Y™\Ù[ˆÈ	ÑÛÛÙÛHš]™HÐ]]4/t-t/ô/´,´/t.4.Nˆ4`ÈX[šY™\Ý4/t-t/4,4eØÛÜHš]™K™š[K‰Âˆˆ	ÑÛÛÙÛHš]™HÐ]]4bt-H4/t-H4/t,4.ô,4b4`´/´,´,4/t/ˆ4`4-t,4.ôc4/t.4/ÛY[Qˆš]™Kt.´-t`4`ô,´,4/t/tcÈ˜Z[XÛÜÙY4eˆ4/t-H4-ô,4/ô`ô`t.´,4eÛÜšÙ\œË‰ÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Y[˜X›Y	ÊK˜ÚXÚÙYHÛÛ™šYË™[˜X›YOOHYNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ú™XÝZY	ÊK˜[YHHÛÛ™šYËœ›Ú™XÝY	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]\™Ù]\™\ÜÚ]ÜžIÊK˜[YHHÛÛ™šYË\™Ù]™\ÜÚ]ÜžH	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›Û\™\ÜÚ]ÜžIÊK˜[YHHÛÛ™šYË˜ÛÛ›Û™\ÜÚ]ÜžH	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛZ\ÜÝYIÊK˜[YHHÛÛ™šYË˜ÛÛ›Û\ÜÝYS[X™\ˆÈÝš[™ÊÛÛ™šYË˜ÛÛ›Û\ÜÝYS[X™\ŠHˆ	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛ›ÛXÛÛ[Y[	ÊK˜[YHHÛÛ™šYË˜ÛÛ›ÛÛÛ[Y[YÈÝš[™ÊÛÛ™šYË˜ÛÛ›ÛÛÛ[Y[Y
+Hˆ	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹X›ÛÝÝ˜\\[›™YXÛÛ›Û	ÊK˜ÚXÚÙYHÛÛ™šYË˜›ÛÝÝ˜\[›™YÛÛ›Ûš\œÝOOHYNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\›ÝšY\‰ÊK˜[YHHÛÛ™šYË˜ÛÛÜ™[˜]ÜYÙ[›ÝšY\’Y	ØÚ]ÜXœ›ÝÜÙ\‰ÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\›ÝšY\‰ÊK˜[YHHÛÛ™šYËÛÜšÙ\YÙ[›ÝšY\’Y	ØÚ]ÜXœ›ÝÜÙ\‰ÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹]\›	ÊK˜[YHHÛÛ™šYË˜ÛÛÜ™[˜]Ü“][˜Ú\›	ÚÎ‹ËØÚ]Ü˜ÛÛKÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X\Ý\‹\›Û\	ÊK˜[YHHÛÛ™šYË›X\Ý\ÛÛÜ™[˜]Ü”›Û\	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]XÚË\›Û\	ÊK˜[YHHÛÛ™šYË˜ÛÛÜ™[˜]Ü•XÚÔ›Û\	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Û\]™\œÚ[Û‰ÊK˜[YHHÝš[™ÊÛÛ™šYË›X\Ý\”›Û\™\œÚ[ÛˆÏÈJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Y\Ú\™Y]ÛÜšÙ\œÉÊK˜[YHHÝš[™ÊÛÛ™šYË™Y˜][\Ú\™YÛÜšÙ\œÈÏÈJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^]ÛÜšÙ\œÉÊK˜[YHHÝš[™ÊÛÛ™šYË˜XœÛÛ]SX^ÛÜšÙ\œÈÏÈ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^[][˜Ú\Ë]Ú[™ÝÉÊK˜[YHHÝš[™ÊÛÛ™šYË›X^][˜Ú\Ô\•Ú[™ÝÈÏÈ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[][˜Ú]Ú[™ÝÉÊK˜[YHHÝš[™ÊÛÛ™šYË›][˜ÚÚ[™ÝÔÙXÛÛ™ÈÏÈÌ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Z[‹[][˜ÚYØ\	ÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYË›Z[š[][UÛÜšÙ\“][˜Ú[\˜[\ÈÏÈ
+HÈL
+JNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\›Ø™IÊK˜[YHHÝš[™ÊÛÛ™šYËÛÜšÙ\”›Ø™R[\˜[ÙXÛÛ™ÈÏÈÌ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]Ø]ÚÙÉÊK˜[YHHÝš[™ÊÛÛ™šYËØ]ÚÙÒ[\˜[ÙXÛÛ™ÈÏÈÌ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[X^]\›œÉÊK˜[YHHÝš[™ÊÛÛ™šYË›X^ÛÛÜ™[˜]Ü•\›œÈÏÈL
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý[K]ÛÜšÙ\‰ÊK˜[YHHÝš[™ÊÛÛ™šYËœÝ[UÛÜšÙ\Y\”ÙXÛÛ™ÈÏÈÍŒ
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\™K\Ù[™	ÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYËÛÜšÙ\”™TÙ[™[^S\ÈÏÈ
+HÈL
+JNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹X\ÞIÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYËÛÜšÙ\\ÞPÚXÚÑ[^S\ÈÏÈŒ
+HÈL
+JNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]ÛÜšÙ\‹\™]žIÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYËÛÜšÙ\”™]žP˜XÚÛÙ™“\ÈÏÈŒ
+HÈL
+JNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\™K\Ù[™	ÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYË˜ÛÛÜ™[˜]Ü”™TÙ[™[^S\ÈÏÈ
+HÈL
+JNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹XÛÛÜ™[˜]Ü‹\™]žIÊK˜[YHHÝš[™ÊX]œ›Ý[™
+
+ÛÛ™šYË˜ÛÛÜ™[˜]Ü”™]žP˜XÚÛÙ™“\ÈÏÈŒ
+HÈL
+JNÂˆÛÛœÝX\ÙU^HÛÛÜ™[˜]Ü‹›X\ÙHÈ\›ˆ	ØÛÛÜ™[˜]Ü‹›X\ÙK\›’Y	ÏÉßHÈ	ØÛÛÜ™[˜]Ü‹›X\ÙKœ™X\ÛÛˆ	Ü™X\ÛÛˆ[šÛ›ÝÛ‰ßXˆ	ô/t-t/4,4e	ÎÂˆÛÛœÝ›ÝšY\•^H›ÝšY\‹›\Ý™]Ú]È™]È]J›ÝšY\‹›\Ý™]Ú]
+KÓØØ[TÝš[™Ê
+Hˆ	ôbt-H4/t-H4,t`ô.ô/‰ÎÂˆÛÛœÝÝÛ™\”]\ÙU^H]K›ÝÛ™\”]\ÙYÈ	ô&ô/´.´,4.ôc4/t,4/ô,4`ô-ô,4,´.ô,4`t/t.4.´,ˆ4`´,4.‹‰Èˆ	ô&ô/´.´,4.ôc4/t,4/ô,4`ô-ô,4,´.ô,4`t/t.4.´,ˆ4/te‹‰ÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H]K›Ü˜Ú\Ý˜HOH[ˆÈ	ô'´`4.´-t`t`´`4/t-H4,´.4,t`4,4/t/‹‰ÂˆˆÛÛ™šYË™[˜X›YˆÈÜ˜Ú\Ý˜][ÛˆŒˆ4`ô,´e´/4.´/t-t/t/‹ˆ	ÛÝÛ™\”]\ÙU^HÚ]Xˆ[ÙNˆ	Ü[[YK›[ÙH	Ô•S‰ßKˆÛÛÜ™[˜]ÜŽˆ	ØÛÛÜ™[˜]Ü‹œÝ]\È	ÒQIßKˆÚ]Xˆ™]Úˆ	Ü›ÝšY\•^K‰Ü›ÝšY\‹›\Ý™]Ú\œ›ÜˆÈ4'ô/´/4.4.ô.´,ˆ	Ü›ÝšY\‹›\Ý™]Ú\œ›ÜŸK˜ˆ	ÉßXˆˆÜ˜Ú\Ý˜][ÛˆŒˆ4,´.4/4.´/t-t/t/‹ˆ	ÛÝÛ™\”]\ÙU^H4't/´,´eˆÛÛÜ™[˜]Ü‹ÝÛÜšÙ\ˆÙ[™È4/t-H4`t`´,´/´`4c´c´`´c4`tcË˜ÂˆÛÛœÝ˜XÚÜ™\ÜÝ\™U^H[[YK˜˜XÚÜ™\ÜÝ\™U[[	‰ˆ[[YK˜˜XÚÜ™\ÜÝ\™U[[ˆ]K››ÝÊ
+HÈ™]È]J[[YK˜˜XÚÜ™\ÜÝ\™U[[
+KÓØØ[TÝš[™Ê
+Hˆ	ô/t-t/4,4e	ÎÂˆÛÛœÝ][˜ÚÛXÞHH[[YK›][˜ÚÛXÞHßNÂˆÛÛœÝ][˜Ú[Z]^HÛÛ™šYË›X^][˜Ú\Ô\•Ú[™ÝÈÈÝš[™ÊÛÛ™šYË›X^][˜Ú\Ô\•Ú[™ÝÊHˆ	ô,t-t-È4.ôe´/4e´`´`ÉÎÂˆÛÛœÝÛÛ›ÛÛÛ[Y[^HÛÛ™šYË˜ÛÛ›ÛÛÛ[Y[YÈ[›™Y	ØÛÛ™šYË˜ÛÛ›ÛÛÛ[Y[YXˆ
+›ÝšY\‹˜Ø[›ÛšXØ[ÛÛ[Y[YÈ]]È8¡¤ˆ	Ü›ÝšY\‹˜Ø[›ÛšXØ[ÛÛ[Y[YXˆ	Ø]]ÉÊNÂˆÛÛœÝÛÛ›ÛÛÝ\˜ÙU^H[[YK›\Ý\YYÛÛ›ÛÛÝ\˜ÙH	ôbt-H4/t-H4-ô,4`t`´/´`t/´,´,4/t/‰ÎÂˆÛÛœÝØØ[\”›ÝšY\œÈH\œ˜^Kš\Ð\œ˜^J[[YKšY\˜\˜ÚOËœ›ÝšY\œÊHÈ[[YKšY\˜\˜ÚKœ›ÝšY\œÈˆ×NÂˆÛÛœÝš]™TØØ[\•^HØØ[\”›ÝšY\œË›[™ÝˆÈØØ[\”›ÝšY\œË›X\
+][HOˆÂˆÛÛœÝ™]š\Ú[ÛˆH][K›\ÝXØÙ\Y™]š\Ú[Ûˆ	ôbt-H4/t-t/4,4e	ÎÂˆÛÛœÝ\œ›ÜˆH][K›\Ý\œ›ÜÛÙHÈ4/ô/´/4.4.ô.´,	Ú][K›\Ý\œ›ÜÛÙ_Xˆ	ÉÎÂˆ™]\›ˆ	Ú][K››ÙRYNˆ™]š\Ú[Ûˆ	Ü™]š\Ú[ÛŸKÛÝÈ	Ú][K›\Ý™\]Y\ÝYÛÝÛÝ[KÉÚ][K›X^ÛÝÈIÙ\œ›ÜŸXÂˆJKš›Ú[Š	ÎÈ	ÊBˆˆ	ô/t-H4/t,4.ô,4b4`´/´,´,4/t/‰ÎÂˆÛÛœÝY\˜\˜ÚHH[[YKšY\˜\˜ÚNÂˆÛÛœÝY\˜\˜ÚU^HY\˜\˜ÚBˆÈ4!´e4`4,4`4ate´cÎˆ4,´`ô-ô.ôe´,ˆ	ÚY\˜\˜ÚK››ÙPÛÝ[NÈ\™XÝÜˆ	ÚY\˜\˜ÚKœ›ÛÝÛÝ[NÈX[˜YÙ\œÈ	ÚY\˜\˜ÚK›X[˜YÙ\ÛÝ[NÈÛÜšÙ\œÈ	ÚY\˜\˜ÚKÛÜšÙ\ÛÝ[NÈ4`4,4`ô/t-	ÚY\˜\˜ÚK˜Ý\œ™[›Ý[™_NÈ4`4-t-´.4/	ÚY\˜\˜ÚK›ÛÜ[ÙHOOH	ÐÓÓ•S•SÕTÉÈÈ	ô$t%t%ô'ô%t(4%t(4$´'t&4&IÈˆ	ô'´%4&4'H4'ô(4'´)t!´%	ßIÚY\˜\˜ÚK›X^›Ý[™ÈÈ4-4/ˆ	ÚY\˜\˜ÚK›X^›Ý[™ßXˆ	ÉßNÈ4,4.´`´.4,´/t.4aH4,4.´`´.4,´,4a´e´.H	ÚY\˜\˜ÚK˜XÝ]™PXÝ]˜][ÛÛÝ[Kˆ4)4,4-ô.ˆ	ÓØš™XÝ™[šY\ÊY\˜\˜ÚK›Y™XÞXÛPÛÝ[ÈßJK›X\
+
+ÚÙ^K˜[YWJHOˆ	ÚÙ^_H	Ý˜[Y_X
+Kš›Ú[Š	Ë	ÊH	ô/t-t/4,4e	ßKˆˆˆ	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\[[YIÊK^ÛÛ[H	ÚY\˜\˜ÚU^PÛÛÜ™[˜]Üˆ	ØÛÛÜ™[˜]Ü‹™Ù[™\˜][Ûˆ_Nˆ\›œÈ	ØÛÛÜ™[˜]Ü‹\›œÕ\ÙYKÉØÛÛÜ™[˜]Ü‹›X^\›œÈÛÛ™šYË›X^ÛÛÜ™[˜]Ü•\›œÈLKˆYØXÞHÛÜšÙ\œÎˆ]Y]YY	ØÛÝ[Ë”UQUQQKXÝ]™H	ØÛÝ[ËPÕU‘HK\ÞH	ØÛÝ[Ë•TÖHKÛÛ\]H	ØÛÝ[ËÓÓTUQK˜Z[Y	ØÛÝ[Ë‘RSQKˆÛÛ˜Ý\œ™[˜ÞH	Ü[[YK™Y™™XÝ]™Q\Ú\™YÛÜšÙ\œÈÏÈKÉÜ[[YKš\™X^ÛÜšÙ\œÈÏÈÛÛ™šYË˜XœÛÛ]SX^ÛÜšÙ\œÈÏÈKˆ][˜ÚÚ[™ÝÈ	Û][˜ÚÛXÞK›][˜Ú\Ò[•Ú[™ÝÈÏÈKÉÛ][˜Ú[Z]^KˆÛÛ›Û	ØÛÛ›ÛÛÛ[Y[^Kˆ™]š\Ú[Ûˆ	Ü[[YK›\Ý\YYÛÛ›Û™]š\Ú[ÛˆKˆ4%4-´-t`4-t.ô/ˆ4.´-t`4`ô,´,4/t/tcÎˆ	ØÛÛ›ÛÛÝ\˜ÙU^Kˆ˜XÚÜ™\ÜÝ\™Nˆ	Ø˜XÚÜ™\ÜÝ\™U^Kˆš]™HØØ[\Žˆ	Ùš]™TØØ[\•^K˜ÂŸB‚˜\Þ[˜È[˜Ý[ÛˆØYÜ˜Ú\Ý˜][Û•Œ”Ý]\Ê
+HÂˆÛÛœÝ\ØÚHÜ˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÓÔÒTÕUSÓ—ÕŒ—ÔÕUTÉÊNÂˆYˆ
+\ØÚOOHÜ˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚ
+H™]\›ŽÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]JNÂˆHØ]Ú
+\œ›ÜŠHÂˆYˆ
+\ØÚOOHÜ˜Ú\Ý˜][Û•ŒXÝ[Û‘\ØÚ
+H™]\›ŽÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.Ü˜Ú\Ý˜][ÛˆŒŽˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆÜ™X]SÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝ˜[YHH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[˜[YIÊK˜[YKš[J
+H	ô't/´,´.4.H4/´`4.´-t`t`´`	ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÐÔ‘PUWÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈ˜[YHJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]JNÂˆÙ]Ü˜Ú\Ý˜][Û”[™[
+	ÜÙ][™ÜÉÊNÂˆ[››Ý[˜ÙJ	ô't/´,´.4.H4/´`4.´-t`t`´`4`t`´,´/´`4-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4`t`´,´/´`4.4`´.4/´`4.´-t`t`´`ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBˆš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB˜\Þ[˜È[˜Ý[ÛˆÙ[XÝÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆÛÛœÝYH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[\Ý	ÊK˜[YNÂˆYˆ
+ZY
+H™]\›ŽÂˆžHÈ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]ØZ]ÛÜ™J	ÔÑSPÕÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈYJJNÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4,´.4,t`4,4`´.4/´`4.´-t`t`´`ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB˜\Þ[˜È[˜Ý[Ûˆ™[˜[YSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆÛÛœÝYHZKœÙ[XÝYÜ˜Ú\Ý˜RYÈÛÛœÝ˜[YHH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[˜[YIÊK˜[YKš[J
+NÂˆYˆ
+ZY[˜[YJH™]\›ŽÂˆžHÈ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]ØZ]ÛÜ™J	Ô‘SSQWÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈY˜[YHJJNÈ[››Ý[˜ÙJ	ô'´`4.´-t`t`´`4/ô-t`4-t.t/4-t/t/´,´,4/t/‹‰ÊNÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4/ô-t`4-t.t/4-t/t`ô,´,4`´.ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB˜\Þ[˜È[˜Ý[ÛˆÝ\Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆYˆ
+]ZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H™]\›ŽÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H	ô%ô,4/ô`ô`t.´,4cˆÛÛÜ™[˜]Ü‹XÞXÛH4-ô,4`4,4-ø )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÔÕT•ÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈYˆZKœÙ[XÝYÜ˜Ú\Ý˜RYJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]KœÝ]\È]JNÂˆÙ]Ü˜Ú\Ý˜][Û”[™[
+	ÜÝ]IÊNÂˆ[››Ý[˜ÙJ	ô'´`4.´-t`t`´`4-ô,4/ô`ôbt-t/t/‹ˆ4'ô-t`4b4.4.HÛÛÜ™[˜]Ü‹XÞXÛH4`4/´-ô/ô/´aô,4`´/ˆ4-ô,4`4,4-Ë‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4%ô,4/ô`ô`t.ˆ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô't-H4,´-4,4.ô/´`tcÈ4-ô,4/ô`ô`t`´.4`´.4/´`4.´-t`t`´`‰ÊNÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ]\ÙSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆYˆ
+]ZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H™]\›ŽÂˆžHÈ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]ØZ]ÛÜ™J	ÔUTÑWÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈYˆZKœÙ[XÝYÜ˜Ú\Ý˜RYJJNÈ[››Ý[˜ÙJ	ô'´`4.´-t`t`´`4/ô`4.4-ô`ô/ô.4/t-t/t/ˆ4.ô/´.´,4.ôc4/t/‹ˆ4't,4.ô,4b4`´`ô,´,4/t/tcÈ4/4/´-´/t,4-ô/4e´/t.4`´.‰ÊNÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4'ô,4`ô-ô,4/t-H4,´.4.´/´/t,4/t,ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB˜\Þ[˜È[˜Ý[Ûˆ™\Ý[YSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆYˆ
+]ZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H™]\›ŽÂˆžHÈ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]ØZ]ÛÜ™J	Ô‘TÕSQWÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈYˆZKœÙ[XÝYÜ˜Ú\Ý˜RYJJNÈ[››Ý[˜ÙJ	ô'´`4.´-t`t`´`4/ô`4/´-4/´,´-´-t/t/ŽÈ™XÛÝ™\žKÜ™XÛÛ˜Ú[X][Ûˆ4-ô,4/ô`ôbt-t/t/ˆ4-ô,4`4,4-Ë‰ÊNÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4'ô`4/´-4/´,´-´-t/t/tcÈ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB˜\Þ[˜È[˜Ý[Ûˆ[]SÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆYˆ
+]ZKœÙ[XÝYÜ˜Ú\Ý˜RY
+H™]\›ŽÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑSUWÓÔÒTÕUSÓ—ÕŒ—ÓÔÒTÕIËÈYˆZKœÙ[XÝYÜ˜Ú\Ý˜RYJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]JNÂˆÙ]Ü˜Ú\Ý˜][Û”[™[
+	ÛÜ˜Ú\Ý˜\ÉÊNÂˆ[››Ý[˜ÙJ	ô'´`4.´-t`t`´`4,´.4-4,4.ô-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK^ÛÛ[H4$´.4-4,4.ô-t/t/tcÈ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™SÜ˜Ú\Ý˜][Û•Œ”Ù][™ÜÊ
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝÙ][™ÜÈHÜ˜Ú\Ý˜][Û•Œ”Ù][™ÜÑœ›ÛQ›Ü›J
+NÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTUWÓÔÒTÕUSÓ—ÕŒ—ÔÑUS‘ÔÉËÈÙ][™ÜÈJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]KœÝ]\ÈÈÛÛ™šYÎˆ]K˜ÛÛ™šYÈJNÂˆ[››Ý[˜ÙJ]KœÝ\Y›ÝÈÈ	ÓÜ˜Ú\Ý˜][ÛˆŒˆ4-ô,t-t`4-t-´-t/t/ˆ4.H4/ô-t`4b4.4.HÛÛÜ™[˜]Ü‹XÞXÛH4-ô,4/ô`ôbt-t/t/ˆ4-ô,4`4,4-Ë‰Èˆ	ÓÜ˜Ú\Ý˜][ÛˆŒˆ4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.Ü˜Ú\Ý˜][ÛˆŒŽˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,Ü˜Ú\Ý˜][ÛˆŒ‹‰ÊNÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™P[™Ý\Ü˜Ú\Ý˜][Û•Œ“›ÝÊ
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Y[˜X›Y	ÊK˜ÚXÚÙYHYNÂˆÛÛœÝÙ][™ÜÈHÈ‹‹›Ü˜Ú\Ý˜][Û•Œ”Ù][™ÜÑœ›ÛQ›Ü›J
+K[˜X›YˆYHNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H	ô%ô,t-t`4e´,ô,4cˆ4/t,4.ô,4b4`´`ô,´,4/t/tcÈ4.H4-ô,4/ô`ô`t.´,4cˆÛÛÜ™[˜]Ü‹XÞXÛH4-ô,4`4,4-ø )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÔÐU‘WÐS‘ÔÕT•ÓÔÒTÕUSÓ—ÕŒ‰ËÈÙ][™ÜÈJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]KœÝ]\È]JNÂˆÙ]Ü˜Ú\Ý˜][Û”[™[
+	ÜÝ]IÊNÂˆ[››Ý[˜ÙJ	ô't,4.ô,4b4`´`ô,´,4/t/tcÈ4-ô,t-t`4-t-´-t/t/‹ˆ4'´`4.´-t`t`´`4-ô,4/ô`ôbt-t/t/ˆ4-ô,4`4,4-Ë‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.4.H4-ô,4/ô`ô`t`´.4`´.4/´`4.´-t`t`´`ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,4-ô,4/ô`ô`t.´`È4/´`4.´-t`t`´`4`Ë‰ÊNÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ\ÝÜ˜Ú\Ý˜][Û•ŒÛÛ›Û
+
+HÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝÙ][™ÜÈHÜ˜Ú\Ý˜][Û•Œ”Ù][™ÜÑœ›ÛQ›Ü›J
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H	ô'ô-t`4-t,´e´`4côcˆÚ]XˆÛÛ›Û™XY[Û›x )‰ÎÂˆÛÛœÝ™\Ý[H]ØZ]ÛÜ™J	ÕTÕÓÔÒTÕUSÓ—ÕŒ—ÐÓÓ•“Ó	ËÈÙ][™ÜÈJNÂˆÛÛœÝÙ[XÝYH™\Ý[ËœÙ[XÝYÂˆYˆ
+Ù[XÝYË˜ÛÛ›Û
+HÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[HÚ]XˆÛÛ›Û4-4/´`t`´`ô/ô/t.4.Nˆ™]š\Ú[Ûˆ	ÜÙ[XÝY˜ÛÛ›Ûœ™]š\Ú[ÛŸKÛÛÜ™[˜]ÜˆÙ[™\˜][Ûˆ	ÜÙ[XÝY˜ÛÛ›Û˜ÛÛÜ™[˜]Ü—ÙÙ[™\˜][ÛŸKÛÛ[Y[	ÜÙ[XÝY˜ÛÛ[Y[Y™\Ý[˜ÛÛ[Y[Y	Ù\ØÛÝ™\žIßKˆ4%´/´-4-t/HÛÜšÙ\‹ÔÙ\ÜÚ[Ûˆ4/t-H4`t`´,´/´`4-t/t/‹˜ÂˆH[ÙHÂˆÛÛœÝXYÛ›ÜÝXÈH™\Ý[Ë™XYÛ›ÜÝXÜÏË–ÌOË›Y\ÜØYÙH	ô%4.ôcÈ4a´c4/´,ô/ˆ›Ú™XÝÙÙ[™\˜][Ûˆ4,´,4.ôe´-4/t/´,ô/ˆÛÛ›Û4-ô,4`4,4-È4/t-t/4,4e‰ÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[HÚ]Xˆ[™Ú[4-4/´`t`´`ô/ô/t.4.K4,4.ô-H^XÝ]X›HÛÛ›Û4/t-H4,´.4,t`4,4/t/Žˆ	ÙXYÛ›ÜÝXßXÂˆBˆ[››Ý[˜ÙJ	ô'ô-t`4-t,´e´`4.´`ÈÚ]XˆÛÛ›Û4-ô,4,´-t`4b4-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[HÚ]XˆÛÛ›Û\Ý4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,4/ô-t`4-t,´e´`4.´.Ú]XˆÛÛ›Û‰ÊNÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[“Ü˜Ú\Ý˜][Û•Œ“›ÝÊ
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H	ô$´.4.´/´/t`ôcˆÛÛ\][Û‹ÝØ]ÚÙÈ™XÛÛ˜Ú[X][Ûˆ4-ô,4`4,4-ø )‰ÎÂˆ]ØZ]ÛÜ™J	Ô•S—ÓÔÒTÕUSÓ—ÕŒ—Ó“ÕÉÊNÂˆ]ØZ]ØYÜ˜Ú\Ý˜][Û•Œ”Ý]\Ê
+NÂˆ[››Ý[˜ÙJ	ÓÜ˜Ú\Ý˜][ÛˆŒˆ™XÛÛ˜Ú[X][Ûˆ4-ô,4,´-t`4b4-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[HÜ˜Ú\Ý˜][ÛˆŒˆÞXÛH4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[Y\™Ù[˜ÞTÝÜÜ˜Ú\Ý˜][Û•ŒŠ
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑSQT‘ÑSÖWÔÕÔÓÔÒTÕUSÓ—ÕŒ‰ÊNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]KœÝ]\ÈÈÛÛ™šYÎˆ]K˜ÛÛ™šYÈJNÂˆ[››Ý[˜ÙJ	Ñ[Y\™Ù[˜ÞHÕÔŒˆ4-ô,4`t`´/´`t/´,´,4/t/‹ˆ4't/´,´eˆÙ[™È4-ô,4,t/´`4/´/t-t/teŽÈ™XÛÝ™\žH]šY[˜ÙH4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\Ý]\ÉÊK^ÛÛ[H[Y\™Ù[˜ÞHÕÔ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆÛ“Ü˜Ú\Ý˜][Û”›Ùš[Qš[PÚ[™ÙJ
+HÂˆZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[HH[ÂˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]J
+NÂˆÛÛœÝš[HH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KYš[IÊK™š[\ÏË–ÌNÂˆYˆ
+Yš[JHÈ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H	ô)4,4.t.È4/t-H4,´.4,t`4,4/t/‹‰ÎÈ™]\›ŽÈBˆžHÂˆÛÛœÝ›Ùš[HH”ÓÓ‹œ\œÙJ]ØZ]š[K^
+
+JNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	Ô‘U’QU×ÓÔÒTÕUSÓ—ÕŒ—Ô“Ñ’SIËÈ›Ùš[HJNÂˆZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[HH›Ùš[NÂˆÛÛœÝ™]šY]ÈH]Kœ™]šY]ÈßNÂˆÛÛœÝÛÛ[Y[H™]šY]Ë˜ÛÛ›ÛÛÛ[Y[YÈÛÛ[Y[	Ü™]šY]Ë˜ÛÛ›ÛÛÛ[Y[YXˆ	Ø]]ÈÛÛ[Y[	ÎÂˆÛÛœÝ][˜ÚH™]šY]Ë›X^][˜Ú\Ô\•Ú[™ÝÈÈ	Ü™]šY]Ë›X^][˜Ú\Ô\•Ú[™ÝßKÉÜ™]šY]Ë›][˜ÚÚ[™ÝÔÙXÛÛ™ß\Øˆ	ô,t-t-ÈÚ[™ÝÈ[Z]	ÎÂˆÛÛœÝ›ÛÝÝ˜\H™]šY]Ë˜›ÛÝÝ˜\[›™YÛÛ›Ûš\œÝÈ	ô`4,4/t/te4-ô,4.´`4e´/ô.ô-t/t-H4.´-t`4`ô,´,4/t/tcÎˆ4`´,4.‰Èˆ	ô`4,4/t/te4-ô,4.´`4e´/ô.ô-t/t-H4.´-t`4`ô,´,4/t/tcÎˆ4/te‰ÎÂˆÛÛœÝY\˜\˜ÚHH™]šY]ËšY\˜\˜ÚBˆÈÈ4e´e4`4,4`4ate´cÈ	Ü™]šY]ËšY\˜\˜ÚK››ÙPÛÝ[H4,´`ô-ô.ôe´,‹	Ü™]šY]ËšY\˜\˜ÚKœ›ÛÝÛÝ[H4.´/´`4-t/te´,‹	Ü™]šY]ËšY\˜\˜ÚKœ›Û\›Ùš[PÛÝ[H4/ô`4/´a4e´.ôe´,ˆ4/ô`4/´/4`´e´,‹\ØÚ	Ü™]šY]ËšY\˜\˜ÚK˜ÛÛ›Û\ØÚXˆˆ	ÉÎÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H	Ü™]šY]Ëœ›Ú™XÝY	ô'ô`4/´e4.´`‰ßNÈÛÜšÙ\œÈ	Ü™]šY]Ëš[š]X[ÛÜšÙ\œÈÏÈKÉÜ™]šY]Ë›X^XÝ]™UÛÜšÙ\œÈÏÈNÈ][˜Ú	Û][˜ÚKØ\	Ü™]šY]Ë›Z[š[][S][˜Ú[\˜[ÙXÛÛ™ÈÏÈ\ÎÈ	Ü™]šY]Ë˜ÛÛÜ™[˜]Ü”›ÝšY\’Y	ÏÉßH8¡¤ˆ	Ü™]šY]ËÛÜšÙ\”›ÝšY\’Y	ÏÉßNÈ\ÜÝYH	Ü™]šY]Ë˜ÛÛ›Û\ÜÝYS[X™\ˆK	ØÛÛ[Y[NÈ	Ø›ÛÝÝ˜\IÚY\˜\˜Ú_K˜ÂˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]J
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H4'ô/´/4.4.ô.´,ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[\ÜÜ˜Ú\Ý˜][Û”›Ùš[J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆYˆ
+]ZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[JH™]\›ŽÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÒSTÔ•ÓÔÒTÕUSÓ—ÕŒ—Ô“Ñ’SIËÈ›Ùš[NˆZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[HJNÂˆÛÛœÝÝ]\ÈH]KœÝ]\È]ØZ]ÛÜ™J	ÑÑUÓÔÒTÕUSÓ—ÕŒ—ÔÕUTÉÊNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\ÊÝ]\ÊNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H4!´/4/ô/´`4`´/´,´,4/t/Žˆ	Ù]Kœ™]šY]ÏË›˜[YHÝ]\Ë›Ü˜Ú\Ý˜OË›˜[YH	ô/´`4.´-t`t`´`	ßKˆ4'´`4.´-t`t`´`4`t`´,´/´`4-t/t/‹ô/´/t/´,´.ô-t/t/ˆ4eˆ4-ô,4.ô.4b4-t/t/ˆ4,´.4/4.´/t-t/t.4/4-4/ˆ4`4`ôaô/t/´,ô/ˆ4-ô,4/ô`ô`t.´`Ë˜ÂˆZKœ[™[™ÓÜ˜Ú\Ý˜][Û”›Ùš[HH[Âˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KYš[IÊK˜[YHH	ÉÎÂˆÞ[˜ÓÜ˜Ú\Ý˜][Û•ŒXÝ[Û]˜Z[Xš[]J
+NÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K\Ý[[X\žIÊK™›ØÝ\ÏËŠ
+NÂˆ[››Ý[˜ÙJ	Ò”ÓÓˆ4/´`4.´-t`t`´`4`È4e´/4/ô/´`4`´/´,´,4/t/‹ˆ4$4,´`´/´/4,4`´.4aô/t/´,ô/ˆ4-ô,4/ô`ô`t.´`È4/t-H4,t`ô.ô/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H4!´/4/ô/´`4`ˆ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆHš[˜[HÈÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ^ÜÜ˜Ú\Ý˜][Û”›Ùš[J
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑVÔ•ÓÔÒTÕUSÓ—ÕŒ—Ô“Ñ’SIËÈ˜[YNˆZK›Ü˜Ú\Ý˜][Û•ŒÛÛ™šYÏËœ›Ú™XÝY	ÓÜ˜Ú\Ý˜][Û‰ÈJNÂˆÝÛ›ØYœÛÛŠ]Kœ›Ùš[K	ÜØY™Qš[S˜[YJ]Kœ›Ùš[K›˜[YH	ÓÜ˜Ú\Ý˜][Û‰Ê_K[Ü˜Ú\Ý˜][Û‹šœÛÛ˜
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[K\™]šY]ÉÊK^ÛÛ[H4%t.´`t/ô/´`4`ˆ4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚™[˜Ý[ÛˆÜ˜Ú\Ý˜][Û’Y\˜\˜ÚQÛXZ[œÑœ›ÛQ›Ü›J
+HÂˆÛÛœÝ[™\ÈH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKYÛXZ[œÉÊK˜[YBˆœÜ]
+××‹ÝJBˆ›X\
+[™HOˆ[™Kš[J
+JBˆ™š[\Š›ÛÛX[ŠNÂˆYˆ
+[[™\Ë›[™Ý
+H›ÝÈ™]È\œ›ÜŠ	ô%4/´-4,4.t`´-H4at/´aô,4,H4/´-4/t/´,ô/ˆX[˜YÙ\ˆ4`È4a4/´`4/4,4`´eˆQ4/´,t.ô,4`t`´c4,´e´-4/ô/´,´e´-4,4.ôc4/t/´`t`´e‹‰ÊNÂˆ™]\›ˆ[™\Ë›X\
+
+[™K[™^
+HOˆÂˆÛÛœÝÙ\\˜]ÜˆH[™Kš[™^ÙŠ	ß	ÊNÂˆYˆ
+Ù\\˜]ÜˆHÙ\\˜]ÜˆH[™K›[™ÝHJHÂˆ›ÝÈ™]È\œ›ÜŠ4(4cô-4/´.ˆ	Ú[™^
+È_Nˆ4/ô/´`´`4e´,t-t/H4a4/´`4/4,4`ˆQ4/´,t.ô,4`t`´c4,´e´-4/ô/´,´e´-4,4.ôc4/t/´`t`´e‹˜
+NÂˆBˆÛÛœÝYH[™KœÛXÙJÙ\\˜]ÜŠKš[J
+NÂˆÛÛœÝØÛÜHH[™KœÛXÙJÙ\\˜]Üˆ
+ÈJKš[J
+NÂˆYˆ
+ZY\ØÛÜJH›ÝÈ™]È\œ›ÜŠ4(4cô-4/´.ˆ	Ú[™^
+È_NˆQ4`´,4/´,t.ô,4`t`´c4/t-H4/4/´-´`ô`´c4,t`ô`´.4/ô/´`4/´-´/te´/4.˜
+NÂˆ™]\›ˆÈYØÛÜHNÂˆJNÂŸB‚™[˜Ý[ÛˆÜ˜Ú\Ý˜][Û‘š]™TØØ[\”ÛÝ\˜Ù\Ñœ›ÛQ›Ü›JÛXZ[œÊHÂˆÛÛœÝ[™\ÈH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKYš]™K\ÛÝ\˜Ù\ÉÊK˜[YBˆœÜ]
+××‹ÝJBˆ›X\
+[™HOˆ[™Kš[J
+JBˆ™š[\Š›ÛÛX[ŠNÂˆYˆ
+[[™\Ë›[™Ý
+H™]\›ˆßNÂˆÛÛœÝ[ÝÙYH™]ÈÙ]
+ÛXZ[œË›X\
+ÛXZ[ˆOˆÝš[™ÊÛXZ[‹šY	ÉÊKš[J
+KÓÝÙ\Ø\ÙJ
+JJNÂˆÛÛœÝÝ]HßNÂˆ›Üˆ
+][™^HÈ[™^[™\Ë›[™ÝÈ[™^
+ÏHJHÂˆÛÛœÝ[™HH[™\ÖÚ[™^NÂˆÛÛœÝÙ\\˜]ÜˆH[™Kš[™^ÙŠ	ß	ÊNÂˆYˆ
+Ù\\˜]ÜˆHÙ\\˜]ÜˆH[™K›[™ÝHJHÂˆ›ÝÈ™]È\œ›ÜŠš]™H4`4cô-4/´.ˆ	Ú[™^
+È_Nˆ4/ô/´`´`4e´,t-t/H4a4/´`4/4,4`ˆX[˜YÙ\ˆQÛÛÙÛHš]™H4a4,4.t.Ë˜
+NÂˆBˆÛÛœÝX[˜YÙ\’YH[™KœÛXÙJÙ\\˜]ÜŠKš[J
+KÓÝÙ\Ø\ÙJ
+NÂˆÛÛœÝÛÝ\˜ÙHH[™KœÛXÙJÙ\\˜]Üˆ
+ÈJKš[J
+NÂˆYˆ
+X[ÝÙYš\ÊX[˜YÙ\’Y
+JHÂˆ›ÝÈ™]È\œ›ÜŠš]™H4`4cô-4/´.ˆ	Ú[™^
+È_NˆX[˜YÙ\ˆ	ÛX[˜YÙ\’Y	ÏÉßH4/t-H4-ô/t,4.t-4-t/t.4.H4`È4`t/ô.4`t.´`È4,´.4bt-K˜
+NÂˆBˆYˆ
+Øš™XÝš\ÓÝÛŠÝ]X[˜YÙ\’Y
+JHÂˆ›ÝÈ™]È\œ›ÜŠš]™H4`4cô-4/´.ˆ	Ú[™^
+È_NˆX[˜YÙ\ˆ	ÛX[˜YÙ\’YH4`ô-´-H4/4,4eš]™Kta4,4.t.Ë˜
+NÂˆBˆYˆ
+\ÛÝ\˜ÙJH›ÝÈ™]È\œ›ÜŠš]™H4`4cô-4/´.ˆ	Ú[™^
+È_Nˆ4a4,4.t.È4/t-H4/4/´-´-H4,t`ô`´.4/ô/´`4/´-´/te´/˜
+NÂˆÝ]ÛX[˜YÙ\’YHHÛÝ\˜ÙNÂˆBˆ™]\›ˆÝ]ÂŸB‚‚™[˜Ý[ÛˆÜ˜Ú\Ý˜][Û‘š]™Q›Û\”ÛÝ\˜Ù\Ñœ›ÛQ›Ü›JÛXZ[œÊHÂˆÛÛœÝ[™\ÈH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKYš]™KY›Û\œÉÊK˜[YBˆœÜ]
+××‹ÝJBˆ›X\
+[™HOˆ[™Kš[J
+JBˆ™š[\Š›ÛÛX[ŠNÂˆYˆ
+[[™\Ë›[™Ý
+H™]\›ˆßNÂˆÛÛœÝ[ÝÙYH™]ÈÙ]
+ÛXZ[œË›X\
+ÛXZ[ˆOˆÝš[™ÊÛXZ[‹šY	ÉÊKš[J
+KÓÝÙ\Ø\ÙJ
+JJNÂˆÛÛœÝÝ]HßNÂˆ›Üˆ
+][™^HÈ[™^[™\Ë›[™ÝÈ[™^
+ÏHJHÂˆÛÛœÝ[™HH[™\ÖÚ[™^NÂˆÛÛœÝÙ\\˜]ÜˆH[™Kš[™^ÙŠ	ß	ÊNÂˆYˆ
+Ù\\˜]ÜˆHÙ\\˜]ÜˆH[™K›[™ÝHJHÂˆ›ÝÈ™]È\œ›ÜŠ	Ñš]™H›Û\ˆ4`4cô-4/´.ˆ	È
+È
+[™^
+ÈJH
+È	Îˆ4/ô/´`´`4e´,t-t/H4a4/´`4/4,4`ˆX[˜YÙ\ˆQÛÛÙÛHš]™H4/ô,4/ô.´,‰ÊNÂˆBˆÛÛœÝX[˜YÙ\’YH[™KœÛXÙJÙ\\˜]ÜŠKš[J
+KÓÝÙ\Ø\ÙJ
+NÂˆÛÛœÝÛÝ\˜ÙHH[™KœÛXÙJÙ\\˜]Üˆ
+ÈJKš[J
+NÂˆYˆ
+X[ÝÙYš\ÊX[˜YÙ\’Y
+JHÂˆ›ÝÈ™]È\œ›ÜŠ	Ñš]™H›Û\ˆ4`4cô-4/´.ˆ	È
+È
+[™^
+ÈJH
+È	ÎˆX[˜YÙ\ˆ	È
+È
+X[˜YÙ\’Y	ÏÉÊH
+È	È4/t-H4-ô/t,4.t-4-t/t.4.H4`È4`t/ô.4`t.´`È4,´.4bt-K‰ÊNÂˆBˆYˆ
+Øš™XÝš\ÓÝÛŠÝ]X[˜YÙ\’Y
+JHÂˆ›ÝÈ™]È\œ›ÜŠ	Ñš]™H›Û\ˆ4`4cô-4/´.ˆ	È
+È
+[™^
+ÈJH
+È	ÎˆX[˜YÙ\ˆ	È
+ÈX[˜YÙ\’Y
+È	È4`ô-´-H4/4,4e\Ü]Út/ô,4/ô.´`Ë‰ÊNÂˆBˆYˆ
+\ÛÝ\˜ÙJH›ÝÈ™]È\œ›ÜŠ	Ñš]™H›Û\ˆ4`4cô-4/´.ˆ	È
+È
+[™^
+ÈJH
+È	Îˆ4/ô,4/ô.´,4/t-H4/4/´-´-H4,t`ô`´.4/ô/´`4/´-´/tc4/´c‹‰ÊNÂˆÝ]ÛX[˜YÙ\’YHHÛÝ\˜ÙNÂˆBˆ™]\›ˆÝ]ÂŸB‚˜\Þ[˜È[˜Ý[Ûˆ]]Üš^™TÙ\ÜÚ[Û‘š]™J
+HÂˆžHÂˆ	
+	Ø]]Üš^™K\Ù\ÜÚ[Û‹Yš]™KX]Û‰ÊK™\ØX›YHYNÂˆ	
+	Ùš]™K\›Û\\Ý]\ÉÊK^ÛÛ[H	ô$´e´-4.´`4.4,´,4cˆ4,4,´`´/´`4.4-ô,4a´e´cˆÛÛÙÛHš]™x )‰ÎÂˆ]ØZ]ÛÜ™J	ÐUUÔ’V‘WÓÔÒTÕUSÓ—ÕŒ—Ñ’U‘IÊNÂˆ	
+	Ùš]™K\›Û\\Ý]\ÉÊK^ÛÛ[H	ÑÛÛÙÛHš]™H4,4,´`´/´`4.4-ô/´,´,4/t/ˆ4-4.ôcÈ]]Ü[Ýˆ4%ô,t-t`4-t-´e´`´cÙ\ÜÚ[Û‹4bt/´,H4`ô,´e´/4.´/t`ô`´.4`t.4/tat`4/´/te´-ô,4a´e´c‹‰ÎÂˆ[››Ý[˜ÙJ	ÑÛÛÙÛHš]™H4,4,´`´/´`4.4-ô/´,´,4/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	Ùš]™K\›Û\\Ý]\ÉÊK^ÛÛ[H4$4,´`´/´`4.4-ô,4a´e´cˆš]™H4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô$4,´`´/´`4.4-ô,4a´e´cˆÛÛÙÛHš]™H4/t-H4,´.4.´/´/t,4/t/‹‰ÊNÂˆHš[˜[HÂˆ	
+	Ø]]Üš^™K\Ù\ÜÚ[Û‹Yš]™KX]Û‰ÊK™\ØX›YH˜[ÙNÂˆBŸB‚˜\Þ[˜È[˜Ý[Ûˆ]]Üš^™SÜ˜Ú\Ý˜][Û‘š]™J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]]\Ý]\ÉÊK^ÛÛ[H	ô$´e´-4.´`4.4,´,4cˆ4,4,´`´/´`4.4-ô,4a´e´cˆÛÛÙÛHš]™x )‰ÎÂˆ]ØZ]ÛÜ™J	ÐUUÔ’V‘WÓÔÒTÕUSÓ—ÕŒ—Ñ’U‘IÊNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]]\Ý]\ÉÊK^ÛÛ[H	ÑÛÛÙÛHš]™H4,4,´`´/´`4.4-ô/´,´,4/t/ˆ4-4.ôcÈ]]Ü[Ý‰ÎÂˆ[››Ý[˜ÙJ	ÑÛÛÙÛHš]™H4,4,´`´/´`4.4-ô/´,´,4/t/‹‰ÊNÂˆ]ØZ]ØYÜ˜Ú\Ý˜][Û•Œ”Ý]\Ê
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]]\Ý]\ÉÊK^ÛÛ[H4$4,´`´/´`4.4-ô,4a´e´cˆš]™H4/t-H4,´.4.´/´/t,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô$4,´`´/´`4.4-ô,4a´e´cˆÛÛÙÛHš]™H4/t-H4,´.4.´/´/t,4/t/‹‰ÊNÂˆHš[˜[HÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆÛÛ™šYÝ\™SÜ˜Ú\Ý˜][Û’Y\˜\˜ÚU[\]J
+HÂˆ™YÚ[“Ü˜Ú\Ý˜][Û•ŒXÝ[ÛŠ
+NÂˆžHÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJYJNÂˆÛÛœÝÛXZ[œÈHÜ˜Ú\Ý˜][Û’Y\˜\˜ÚQÛXZ[œÑœ›ÛQ›Ü›J
+NÂˆÛÛœÝÛÜšÙ\œÔ\“X[˜YÙ\ˆH\œÙTÝšXÝ›Ý[™Y[YÙ\Šˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚK]ÛÜšÙ\œÉÊK˜[YKˆÈZ[ŽˆKX^ˆX™[ˆ	ÕÛÜšÙ\œÈ4/t,4/´-4/t/´,ô/ˆX[˜YÙ\‰ÈKˆ
+NÂˆÛÛœÝš]™TØØ[\”ÛÝ\˜Ù\ÈHÜ˜Ú\Ý˜][Û‘š]™TØØ[\”ÛÝ\˜Ù\Ñœ›ÛQ›Ü›JÛXZ[œÊNÂˆÛÛœÝš]™TÛZ[]\ÈH\œÙTÝšXÝ›Ý[™Y[YÙ\Šˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKYš]™K\Û	ÊK˜[YKˆÈZ[ŽˆKX^ˆMX™[ˆ	ô!´/t`´-t`4,´,4.È4/ô-t`4-t,´e´`4.´.š]™K4at,‰ÈKˆ
+NÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÐÓÓ‘’QÕT‘WÓÔÒTÕUSÓ—ÕŒ—ÒQTTÒWÕSTUIËÂˆÛXZ[œËˆÛÜšÙ\œÔ\“X[˜YÙ\‹ˆ[˜ÛYR[YÜ˜][Û“X[˜YÙ\Žˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKZ[YÜ˜][Û‰ÊK˜ÚXÚÙYˆ[˜ÛYTXT™YX[Nˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚK\XIÊK˜ÚXÚÙYˆš]™TØØ[\”ÛÝ\˜Ù\Ëˆš]™TØØ[\”Û[\˜[\Îˆš]™TÛZ[]\È
+ˆŒ
+ˆLˆJNÂˆ™[™\“Ü˜Ú\Ý˜][Û•Œ”Ý]\Ê]KœÝ]\È]ØZ]ÛÜ™J	ÑÑUÓÔÒTÕUSÓ—ÕŒ—ÔÕUTÉÊJNÂˆÛÛœÝY\˜\˜ÚHH]KšY\˜\˜ÚHßNÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚK][\]K\Ý]\ÉÊK^ÛÛ[Bˆ4(t`´,´/´`4-t/t/ˆ	ÚY\˜\˜ÚK››ÙPÛÝ[H4,´`ô-ô.ôe´,ŽˆX[˜YÙ\œÈ	ÚY\˜\˜ÚK›X[˜YÙ\ÛÝ[KÛÜšÙ\œÈ	ÚY\˜\˜ÚKÛÜšÙ\ÛÝ[Kš]™Kt.´-t`4/´,´,4/t.4aHX[˜YÙ\œÈ	ÚY\˜\˜ÚK™š]™TØØ[\”›ÝšY\ÛÝ[K4/ô`4/´a4e´.ôe´,ˆ4/ô`4/´/4`´e´,ˆ	ÚY\˜\˜ÚKœ›Û\›Ùš[PÛÝ[Kˆ4'´`4.´-t`t`´`4/t-H4-ô,4/ô`ôbt-t/t/‹˜Âˆ[››Ý[˜ÙJ	ô!´e4`4,4`4ate´cˆ4/´`4.´-t`t`´`4`È4`t`´,´/´`4-t/t/‹ˆ4$4,´`´/´/4,4`´.4aô/t/´,ô/ˆ4-ô,4/ô`ô`t.´`È4/t-H4,t`ô.ô/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚK][\]K\Ý]\ÉÊK^ÛÛ[H4!´e4`4,4`4ate´cˆ4/t-H4`t`´,´/´`4-t/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,4`t`´,´/´`4-t/t/tcÈ4e´e4`4,4`4ate´eË‰ÊNÂˆHš[˜[HÂˆÙ]Ü˜Ú\Ý˜][Û•Œ\ÞJ˜[ÙJNÂˆBŸB‚™[˜Ý[Ûˆ™[[ÝQ\Ü]ÚÙ][™ÜÑœ›ÛQ›Ü›J
+HÂˆÛÛœÝ[YÙ\ˆH
+YZ[‹X^X™[
+HOˆÂˆÛÛœÝ˜[YHH[X™\Š	
+Y
+K˜[YJNÂˆYˆ
+S[X™\‹š\Ò[YÙ\Š˜[YJH˜[YHZ[ˆ˜[YHˆX^
+H›ÝÈ™]È\œ›ÜŠ	ÛX™[Nˆ4,´,´-t-4e´`´c4a´e´.ô-H4aô.4`t.ô/ˆ	ÛZ[ŸKIÛX^K˜
+NÂˆ™]\›ˆ˜[YNÂˆNÂˆÛÛœÝ[˜X›YH	
+	Ü™[[ÝKY\Ü]ÚY[˜X›Y	ÊK˜ÚXÚÙYÂˆÛÛœÝ˜]Ò\ÜÝYHH	
+	Ü™[[ÝKY\Ü]ÚZ\ÜÝYIÊK˜[YKš[J
+NÂˆÛÛœÝ\ÜÝYS[X™\ˆH˜]Ò\ÜÝYHÈ[YÙ\Š	Ü™[[ÝKY\Ü]ÚZ\ÜÝYIËK[X™\‹“PVÔÐQ‘WÒS•QÑT‹	Ò\ÜÝYH[X™\‰ÊHˆÂˆ™]\›ˆÂˆ[˜X›Yˆ[ZÙT]\ÙYˆ	
+	Ü™[[ÝKY\Ü]ÚZ[ZÙK\]\ÙY	ÊK˜ÚXÚÙYˆ›ÝšY\Žˆ	ÙÚ]X‹Z\ÜÝYIËˆ›Ú™XÝYˆ	
+	Ü™[[ÝKY\Ü]Ú\›Ú™XÝZY	ÊK˜[YKš[J
+Kˆ™\ÜÚ]ÜžNˆ	
+	Ü™[[ÝKY\Ü]Ú\™\ÜÚ]ÜžIÊK˜[YKš[J
+Kˆ\ÜÝYS[X™\‹ˆZ[š[][TÛ[\˜[ÙXÛÛ™Îˆ[YÙ\Š	Ü™[[ÝKY\Ü]Ú\Û	ËNÍŒ	ÑÚ]XˆÛ[\˜[	ÊKˆ˜[˜XÚÑ[˜X›Yˆ	
+	Ü™[[ÝKY\Ü]ÚY˜[˜XÚËY[˜X›Y	ÊK˜ÚXÚÙYˆ˜[˜XÚÔÙ\ÜÚ[Û’Yˆ	
+	Ü™[[ÝKY\Ü]ÚY˜[˜XÚË\Ù\ÜÚ[Û‰ÊK˜[YKˆ˜[˜XÚÐY\”ÙXÛÛ™Îˆ[YÙ\Š	Ü™[[ÝKY\Ü]ÚY˜[˜XÚËXY\‰ËN	Ñ˜[˜XÚÈ™\ÚÛ	ÊKˆ]]ÔÝ\ˆ	
+	Ü™[[ÝKY\Ü]ÚX]]Ë\Ý\	ÊK˜ÚXÚÙYˆNÂŸB‚™[˜Ý[ÛˆÙ]™[[ÝQ\Ü]Ú\ÞJ\ÞJHÂˆ›Üˆ
+ÛÛœÝYÙˆÉÜØ]™K\™[[ÝKY\Ü]ÚX]Û‰Ë	Ý\Ý\™[[ÝKY\Ü]ÚX]Û‰Ë	Ü[‹\™[[ÝKY\Ü]ÚX]Û‰×JH	
+Y
+K™\ØX›YH›ÛÛX[Š\ÞJNÂŸB‚™[˜Ý[Ûˆ™[™\”™[[ÝQ˜[˜XÚÔÙ\ÜÚ[Û“Ü[ÛœÊÙ[XÝYYH	ÉÊHÂˆÛÛœÝÙ[XÝH	
+	Ü™[[ÝKY\Ü]ÚY˜[˜XÚË\Ù\ÜÚ[Û‰ÊNÂˆÛÛœÝØ[YHÙ[XÝYYÙ[XÝ˜[YH	ÉÎÂˆÙ[XÝœ™\XÙPÚ[™[Š
+NÂˆÛÛœÝ›Û™HHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÂˆ›Û™K˜[YHH	ÉÎÈ›Û™K^ÛÛ[H	ô't-H4-ô,4/ô`ô`t.´,4`´.˜[˜XÚÈÙ\ÜÚ[Û‰ÎÈÙ[XÝ˜\[™
+›Û™JNÂˆ›Üˆ
+ÛÛœÝÙ\ÜÚ[ÛˆÙˆ
+ZKœÙ\ÜÚ[ÛœÈ×JK™š[\Š][HOˆZ][K›X[˜YÙYÚ[™
+JHÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÂˆÜ[Û‹˜[YHHÙ\ÜÚ[Û‹šYÂˆÜ[Û‹^ÛÛ[HÙ\ÜÚ[Û‹›˜[YHÙ\ÜÚ[Û‹šYÂˆÙ[XÝ˜\[™
+Ü[ÛŠNÂˆBˆYˆ
+Ë‹‹œÙ[XÝ›Ü[Ûœ×KœÛÛYJÜ[ÛˆOˆÜ[Û‹˜[YHOOHØ[Y
+JHÙ[XÝ˜[YHHØ[YÂŸB‚™[˜Ý[Ûˆ™[™\”™[[ÝQ\Ü]ÚÝ]\Ê]HHßJHÂˆÛÛœÝÛÛ™šYÈH]K˜ÛÛ™šYÈßNÂˆÛÛœÝ™YYH]K™™YYßNÂˆÛÛœÝYÙ\ˆH]K›YÙ\ˆßNÂˆÛÛœÝ[[YHH]Kœ[[YHßNÂˆ	
+	Ü™[[ÝKY\Ü]ÚY[˜X›Y	ÊK˜ÚXÚÙYHÛÛ™šYË™[˜X›YOOHYNÂˆ	
+	Ü™[[ÝKY\Ü]ÚZ[ZÙK\]\ÙY	ÊK˜ÚXÚÙYHÛÛ™šYËš[ZÙT]\ÙYOOHYNÂˆ	
+	Ü™[[ÝKY\Ü]Ú\›Ú™XÝZY	ÊK˜[YHHÛÛ™šYËœ›Ú™XÝY	ÉÎÂˆ	
+	Ü™[[ÝKY\Ü]Ú\™\ÜÚ]ÜžIÊK˜[YHHÛÛ™šYËœ™\ÜÚ]ÜžH	ÉÎÂˆ	
+	Ü™[[ÝKY\Ü]ÚZ\ÜÝYIÊK˜[YHHÛÛ™šYËš\ÜÝYS[X™\ˆÈÝš[™ÊÛÛ™šYËš\ÜÝYS[X™\ŠHˆ	ÌLŒIÎÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Û	ÊK˜[YHHÝš[™ÊÛÛ™šYË›Z[š[][TÛ[\˜[ÙXÛÛ™ÈÌ
+NÂˆ	
+	Ü™[[ÝKY\Ü]ÚY˜[˜XÚËY[˜X›Y	ÊK˜ÚXÚÙYHÛÛ™šYË™˜[˜XÚÑ[˜X›YOOH˜[ÙNÂˆ™[™\”™[[ÝQ˜[˜XÚÔÙ\ÜÚ[Û“Ü[ÛœÊÛÛ™šYË™˜[˜XÚÔÙ\ÜÚ[Û’Y	ÉÊNÂˆ	
+	Ü™[[ÝKY\Ü]ÚY˜[˜XÚËXY\‰ÊK˜[YHHÝš[™ÊÛÛ™šYË™˜[˜XÚÐY\”ÙXÛÛ™ÈL
+NÂˆ	
+	Ü™[[ÝKY\Ü]ÚX]]Ë\Ý\	ÊK˜ÚXÚÙYHÛÛ™šYË˜]]ÔÝ\OOH˜[ÙNÂˆÛÛœÝÝ]HHXÛÛ™šYË™[˜X›YÈ	ô,´.4/4.´/t-t/t/‰ÈˆÛÛ™šYËš[ZÙT]\ÙYÈ	Ú[ZÙH4/t,4/ô,4`ô-ôe‰Èˆ	ô`ô,´e´/4.´/t-t/t/‰ÎÂˆÛÛœÝ™]Ú^HYÙ\‹›\Ý™]Ú]È™]È]JYÙ\‹›\Ý™]Ú]
+KÓØØ[TÝš[™Ê
+Hˆ	ôbt-H4/t-H4,t`ô.ô/‰ÎÂˆÛÛœÝ^\žHH™YY™^\™\Ð]È™]È]J™YY™^\™\Ð]
+KÓØØ[TÝš[™Ê
+Hˆ	ô/t-t/4,4e	ÎÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H™[[ÝH\Ü]Ú	ÜÝ]_Kˆ4'´`t`´,4/t/te´.HÚ]XˆÛˆ	Ù™]Ú^K‰ÛYÙ\‹›\Ý™]Ú\œ›ÜˆÈ4'ô/´/4.4.ô.´,ˆ	ÛYÙ\‹›\Ý™]Ú\œ›ÜŸK˜ˆ	ÉßXÂˆ	
+	Ü™[[ÝKY\Ü]Ú\[[YIÊK^ÛÛ[H\Ü]Úˆ	Ù™YY™\Ü]ÚY	ô/t-t/4,4e	ßNÈ™]š\Ú[ÛŽˆ	Ù™YYœÝ˜]YÞT™]š\Ú[ÛˆNÈ4/ô`4.4-4,4`´/t.4.H4-ô,4`4,4-Îˆ	Ù™YY˜\XØX›HÈ	ô`´,4.‰Èˆ4/teˆ
+	Ù™YYœ™X\ÛÛˆ	ô/t-t/4,4eØXÚIßJXNÈ^\™\Îˆ	Ù^\ž_NÈ™[[ÝHÙ\ÜÚ[ÛœÎˆ	Ü[[YKœ™[[ÝTÙ\ÜÚ[ÛÛÝ[NÈ4,4.´`´.4,´/t.4aNˆ	Ü[[YK˜XÝ]™T™[[ÝTÙ\ÜÚ[ÛÛÝ[NÈ˜[˜XÚÎˆ	ÛYÙ\‹™˜[˜XÚÐXÝ]™HÈ	ô,4.´`´.4,´/t.4.IÈˆ	ô/t-t,4.´`´.4,´/t.4.IßK˜ÂŸB‚˜\Þ[˜È[˜Ý[ÛˆØY™[[ÝQ\Ü]ÚÝ]\Ê
+HÂˆžHÈ™[™\”™[[ÝQ\Ü]ÚÝ]\Ê]ØZ]ÛÜ™J	ÑÑUÔ‘SSÕWÑTÔUÒÔÕUTÉÊJNÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.™[[ÝH\Ü]Úˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™T™[[ÝQ\Ü]ÚÙ][™ÜÊ
+HÂˆžHÂˆÙ]™[[ÝQ\Ü]Ú\ÞJYJNÂˆÛÛœÝÙ][™ÜÈH™[[ÝQ\Ü]ÚÙ][™ÜÑœ›ÛQ›Ü›J
+NÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTUWÔ‘SSÕWÑTÔUÒÔÑUS‘ÔÉËÈÙ][™ÜÈJNÂˆ™[™\”™[[ÝQ\Ü]ÚÝ]\Ê]KœÝ]\ÈÈÛÛ™šYÎˆ]KœÙ][™ÜÈJNÂˆ[››Ý[˜ÙJ	Ô™[[ÝH\Ü]Ú4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.™[[ÝH\Ü]Úˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,™[[ÝH\Ü]Ú‰ÊNÂˆHš[˜[HÈÙ]™[[ÝQ\Ü]Ú\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ\Ý™[[ÝQ\Ü]Ú™YY
+
+HÂˆžHÂˆÙ]™[[ÝQ\Ü]Ú\ÞJYJNÂˆÛÛœÝÙ][™ÜÈH™[[ÝQ\Ü]ÚÙ][™ÜÑœ›ÛQ›Ü›J
+NÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H	ô'ô-t`4-t,´e´`4côcˆÚ]Xˆ\Ü]Ú™YY4,t-t-È4-ô,4/ô`ô`t.´`ø )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTÕÔ‘SSÕWÑTÔUÒÑ‘QQ	ËÈÙ][™ÜÈJNÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H]KœÙ[XÝYˆÈ™YY4,´,4.ôe´-4/t.4.Kˆ\Ü]Ú	Ù]KœÙ[XÝY™\Ü]ÚYK™]š\Ú[Ûˆ	Ù]KœÙ[XÝYœÝ˜]YÞT™]š\Ú[ÛŸK^\™\È	Û™]È]J]KœÙ[XÝY™^\™\Ð]
+KÓØØ[TÝš[™Ê
+_K˜ˆˆÚ]Xˆ4-4/´`t`´`ô/ô/t.4.K4,4.ô-H4,´,4.ôe´-4/t/´,ô/ˆ\Ü]Ú4-4.ôcÈ›Ú™XÝÚY4/t-H4-ô/t,4.t-4-t/t/‹ˆ4%4e´,4,ô/t/´`t`´.4.Žˆ	Ê]K™XYÛ›ÜÝXÜÈ×JK›[™ÝK˜ÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H4'ô-t`4-t,´e´`4.´,™YY4/t-H4/ô`4/´.tb4.ô,ˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBˆš[˜[HÈÙ]™[[ÝQ\Ü]Ú\ÞJ˜[ÙJNÈBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[”™[[ÝQ\Ü]Ú›ÝÊ
+HÂˆžHÂˆÙ]™[[ÝQ\Ü]Ú\ÞJYJNÂˆ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H	ô'´`´`4.4/4`ôcˆ4`´,4-ô,4`t`´/´`t/´,´`ôcˆ™[[ÝH\Ü]Ú8 )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	Ô•S—Ô‘SSÕWÑTÔUÒÓ“ÕÉÊNÂˆ]ØZ]ØY™[[ÝQ\Ü]ÚÝ]\Ê
+NÂˆ[››Ý[˜ÙJ™[[ÝH\Ü]Úˆ	Ù]OËœ™[[ÝOËšÚ[™	ôa´.4.´.È4-ô,4,´-t`4b4-t/t/‰ßK˜
+NÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	Ü™[[ÝKY\Ü]Ú\Ý]\ÉÊK^ÛÛ[H™[[ÝH\Ü]Ú4/t-H4-ô,4`t`´/´`t/´,´,4/t/Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBˆš[˜[HÈÙ]™[[ÝQ\Ü]Ú\ÞJ˜[ÙJNÈBŸB‚˜ÛÛœÝÐÐSÐRWÑQUSÕT“ÈHØš™XÝ™œ™Y^™JÂˆÛ[XNˆ	Ú‹ËÌLËŒŒŒNŒLMÍ	Ëˆ	ÛÜ[˜ZKXÛÛ\]X›IÎˆ	Ú‹ËÌLËŒŒŒNŒLŒÍÝŒIËŸJNÂ‚™[˜Ý[ÛˆØØ[ZTÙ][™ÜÑœ›ÛQ›Ü›J
+HÂˆÛÛœÝ›ÝšY\•\HH	
+	ÛØØ[XZK\›ÝšY\‰ÊK˜[YNÂˆÛÛœÝ[Y[Ý]ÙXÛÛ™ÈH[X™\Š	
+	ÛØØ[XZK][Y[Ý]	ÊK˜[YJNÂˆYˆ
+VÉÛÛ[XIË	ÛÜ[˜ZKXÛÛ\]X›I×Kš[˜ÛY\Ê›ÝšY\•\JJH›ÝÈ™]È\œ›ÜŠ	ô'´,t-t`4e´`´c4`´.4/È4.ô/´.´,4.ôc4/t/´,ô/ˆRKt`t-t`4,´-t`4,‰ÊNÂˆYˆ
+S[X™\‹š\Ò[YÙ\Š[Y[Ý]ÙXÛÛ™ÊH[Y[Ý]ÙXÛÛ™ÈH[Y[Ý]ÙXÛÛ™ÈˆŒ
+HÂˆ›ÝÈ™]È\œ›ÜŠ	ô(´,4.t/t,4`ô`ˆ4/4,4e4,t`ô`´.4a´e´.ô.4/4aô.4`t.ô/´/4,´e´-H4-4/ˆŒ4`t-t.´`ô/t-‰ÊNÂˆBˆ™]\›ˆÂˆ[˜X›Yˆ	
+	ÛØØ[XZKY[˜X›Y	ÊK˜ÚXÚÙYˆ›ÝšY\•\Kˆ˜\ÙU\›ˆ	
+	ÛØØ[XZKX˜\ÙK]\›	ÊK˜[YKš[J
+Kˆ[Ù[ˆ	
+	ÛØØ[XZK[[Ù[	ÊK˜[YKš[J
+Kˆ[Y[Ý]ÙXÛÛ™ËˆNÂŸB‚™[˜Ý[ÛˆÙ]ØØ[ZP\ÞJ\ÞJHÂˆ›Üˆ
+ÛÛœÝYÙˆÉÜØ]™K[ØØ[XZKX]Û‰Ë	Ý\Ý[ØØ[XZKX]Û‰Ë	Ü[‹[ØØ[XZK]\ÝX]Û‰×JHÂˆ	
+Y
+K™\ØX›YH›ÛÛX[Š\ÞJNÂˆBŸB‚™[˜Ý[Ûˆ™[™\“ØØ[ZS[Ù[Ê[Ù[ÈH×JHÂˆÛÛœÝ][\ÝH	
+	ÛØØ[XZK[[Ù[[\Ý	ÊNÂˆ][\Ýœ™\XÙPÚ[™[Š
+NÂˆ›Üˆ
+ÛÛœÝ[Ù[Ùˆ[Ù[ÊHÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÂˆÜ[Û‹˜[YHH[Ù[Âˆ][\Ý˜\[™
+Ü[ÛŠNÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆØYØØ[ZTÙ][™ÜÊ
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÓÐÐSÐRWÔÑUS‘ÔÉÊNÂˆÛÛœÝÙ][™ÜÈH]OËœÙ][™ÜÈßNÂˆ	
+	ÛØØ[XZKY[˜X›Y	ÊK˜ÚXÚÙYHÙ][™ÜË™[˜X›YOOHYNÂˆ	
+	ÛØØ[XZK\›ÝšY\‰ÊK˜[YHHÙ][™ÜËœ›ÝšY\•\H	ÛÛ[XIÎÂˆ	
+	ÛØØ[XZKX˜\ÙK]\›	ÊK˜[YHHÙ][™ÜË˜˜\ÙU\›ÐÐSÐRWÑQUSÕT“ÖÉ
+	ÛØØ[XZK\›ÝšY\‰ÊK˜[YWNÂˆ	
+	ÛØØ[XZK[[Ù[	ÊK˜[YHHÙ][™ÜË›[Ù[	ÉÎÂˆ	
+	ÛØØ[XZK][Y[Ý]	ÊK˜[YHHÝš[™ÊÙ][™ÜË[Y[Ý]ÙXÛÛ™ÈL
+NÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[HÙ][™ÜË™[˜X›YˆÈ	ô't,4.ô,4b4`´`ô,´,4/t/tcÈ4.ô/´.´,4.ôc4/t/´,ô/ˆ4*4!ˆ4-ô,4,´,4/t`´,4-´-t/t/‹ˆ4'ô-t`4-t,´e´`4`´-H4/ôe´-4.´.ôc´aô-t/t/tcÈ4/ô-t`4-t-4,´.4.´/´`4.4`t`´,4/t/tcô/‰Âˆˆ	ô&ô/´.´,4.ôc4/t.4.H4*4!ˆ4,´.4/4.´/t-t/t/‹ˆ4't,4.ô,4b4`´`ô,´,4/t/tcÈ4/4/´-´/t,4/ô-t`4-t,´e´`4.4`´.4,t-t-È4`ô,´e´/4.´/t-t/t/tcË‰ÎÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÈ4.ô/´.´,4.ôc4/t/´,ô/ˆ4*4!Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™SØØ[ZTÙ][™ÜÊ
+HÂˆžHÂˆÛÛœÝÙ][™ÜÈHØØ[ZTÙ][™ÜÑœ›ÛQ›Ü›J
+NÂˆÙ]ØØ[ZP\ÞJYJNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTUWÓÐÐSÐRWÔÑUS‘ÔÉËÈÙ][™ÜÈJNÂˆÛÛœÝØ]™YH]KœÙ][™ÜÎÂˆ	
+	ÛØØ[XZKX˜\ÙK]\›	ÊK˜[YHHØ]™Y˜˜\ÙU\›Âˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4't,4.ô,4b4`´`ô,´,4/t/tcÈ4-ô,t-t`4-t-´-t/t/Žˆ	ÜØ]™Yœ›ÝšY\•\_K4/4/´-4-t.ôc	ÜØ]™Y›[Ù[	ôbt-H4/t-H4,´.4,t`4,4/t,	ßK˜Âˆ[››Ý[˜ÙJ	ô't,4.ô,4b4`´`ô,´,4/t/tcÈ4.ô/´.´,4.ôc4/t/´,ô/ˆ4*4!ˆ4-ô,t-t`4-t-´-t/t/‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.4.ô/´.´,4.ôc4/t.4.H4*4!Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô't-H4,´-4,4.ô/´`tcÈ4-ô,t-t`4-t,ô`´.4/t,4.ô,4b4`´`ô,´,4/t/tcÈ4.ô/´.´,4.ôc4/t/´,ô/ˆ4*4!‹‰ÊNÂˆHš[˜[HÂˆÙ]ØØ[ZP\ÞJ˜[ÙJNÂˆBŸB‚˜\Þ[˜È[˜Ý[Ûˆ\ÝØØ[ZPÛÛ›™XÝ[ÛŠ
+HÂˆžHÂˆÛÛœÝÙ][™ÜÈHØØ[ZTÙ][™ÜÑœ›ÛQ›Ü›J
+NÂˆÙ]ØØ[ZP\ÞJYJNÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H	ô'ô-t`4-t,´e´`4côcˆ4.ô/´.´,4.ôc4/t.4.HRKt`t-t`4,´-t`8 )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTÕÓÐÐSÐRWÐÓÓ“‘PÕSÓ‰ËÈÙ][™ÜÈJNÂˆÛÛœÝ™\Ý[H]Kœ™\Ý[Âˆ™[™\“ØØ[ZS[Ù[Ê™\Ý[›[Ù[È×JNÂˆYˆ
+I
+	ÛØØ[XZK[[Ù[	ÊK˜[YH	‰ˆ™\Ý[›[Ù[ÏË›[™ÝOOHJH	
+	ÛØØ[XZK[[Ù[	ÊK˜[YHH™\Ý[›[Ù[ÖÌNÂˆÛÛœÝ[Ù[›ÝHH™\Ý[˜ÛÛ™šYÝ\™Y[Ù[ˆÈ
+™\Ý[˜ÛÛ™šYÝ\™Y[Ù[]˜Z[X›HOOH˜[ÙHÈ	È4$´.´,4-ô,4/t/´eÈ4/4/´-4-t.ôeˆ4/t-t/4,4e4`È4`t/ô.4`t.´`È4`t-t`4,´-t`4,‰Èˆ	È4$´.´,4-ô,4/t`È4/4/´-4-t.ôc4-ô/t,4.t-4-t/t/‹‰ÊBˆˆ	È4$´.4,t-t`4e´`´c4/4/´-4-t.ôc4-ôeˆ4`t/ô.4`t.´`È4,4,t/ˆ4,´,´-t-4e´`´c4/t,4-ô,´`È4,´`4`ôaô/t`Ë‰ÎÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4'ôe´-4.´.ôc´aô-t/t/tcÈ4`ô`t/ôe´b4/t-Kˆ4%ô/t,4.t-4-t/t/ˆ4/4/´-4-t.ô-t.Nˆ	Ü™\Ý[›[Ù[Ë›[™ÝK‰Û[Ù[›Ý_XÂˆ[››Ý[˜ÙJ	ô&ô/´.´,4.ôc4/t.4.HRKt`t-t`4,´-t`4,´e´-4/ô/´,´e´-4,4e‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ™[™\“ØØ[ZS[Ù[Ê×JNÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4'ô/´/4.4.ô.´,4/ôe´-4.´.ôc´aô-t/t/tcÈ4.ô/´.´,4.ôc4/t/´,ô/ˆ4*4!Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô&ô/´.´,4.ôc4/t.4.HRKt`t-t`4,´-t`4/t-t-4/´`t`´`ô/ô/t.4.K‰ÊNÂˆHš[˜[HÂˆÙ]ØØ[ZP\ÞJ˜[ÙJNÂˆBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[“ØØ[ZU\Ý›Û\
+
+HÂˆÛÛœÝ›Û\H	
+	ÛØØ[XZK]\Ý\›Û\	ÊK˜[YKš[J
+NÂˆYˆ
+\›Û\
+HÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H	ô$´,´-t-4e´`´c4`´-t`t`´/´,´.4.H4-ô,4/ô.4`ˆ4-4/ˆ4.ô/´.´,4.ôc4/t/´eÈ4/4/´-4-t.ôe‹‰ÎÂˆ	
+	ÛØØ[XZK]\Ý\›Û\	ÊK™›ØÝ\Ê
+NÂˆ™]\›ŽÂˆBˆžHÂˆÛÛœÝÙ][™ÜÈHØØ[ZTÙ][™ÜÑœ›ÛQ›Ü›J
+NÂˆÙ]ØØ[ZP\ÞJYJNÂˆ	
+	ÛØØ[XZK]\Ý\™\ÜÛœÙIÊK^ÛÛ[H	ÉÎÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H	ô&ô/´.´,4.ôc4/t,4/4/´-4-t.ôc4,ô-t/t-t`4`ôe4,´e´-4/ô/´,´e´-4c8 )‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	Ô•S—ÓÐÐSÐRWÔ“ÓT	ËÈÙ][™ÜË›Û\JNÂˆ	
+	ÛØØ[XZK]\Ý\™\ÜÛœÙIÊK^ÛÛ[H]Kœ™\Ý[^Âˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4&ô/´.´,4.ôc4/t,4/4/´-4-t.ôc4,´e´-4/ô/´,´e´.ô,ˆ	Ù]Kœ™\Ý[›[Ù[K˜Âˆ[››Ý[˜ÙJ	ô'´`´`4.4/4,4/t/ˆ4,´e´-4/ô/´,´e´-4c4,´e´-4.ô/´.´,4.ôc4/t/´eÈ4/4/´-4-t.ôe‹‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÛØØ[XZK\Ý]\ÉÊK^ÛÛ[H4&ô/´.´,4.ôc4/t,4/4/´-4-t.ôc4/t-H4,´.4.´/´/t,4.ô,4-ô,4/ô.4`Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ[››Ý[˜ÙJ	ô'ô/´/4.4.ô.´,4.ô/´.´,4.ôc4/t/´eÈ4/4/´-4-t.ôe‹‰ÊNÂˆHš[˜[HÂˆÙ]ØØ[ZP\ÞJ˜[ÙJNÂˆBŸB‚™[˜Ý[ÛˆÛ“ØØ[ZT›ÝšY\Ú[™ÙY
+
+HÂˆÛÛœÝ›ÝšY\ˆH	
+	ÛØØ[XZK\›ÝšY\‰ÊK˜[YNÂˆÛÛœÝÝ\œ™[H	
+	ÛØØ[XZKX˜\ÙK]\›	ÊK˜[YKš[J
+NÂˆÛÛœÝÛ›ÝÛ‘Y˜][ÈH™]ÈÙ]
+Øš™XÝ˜[Y\ÊÐÐSÐRWÑQUSÕT“ÊJNÂˆYˆ
+XÝ\œ™[Û›ÝÛ‘Y˜][Ëš\ÊÝ\œ™[
+JH	
+	ÛØØ[XZKX˜\ÙK]\›	ÊK˜[YHHÐÐSÐRWÑQUSÕT“ÖÜ›ÝšY\—NÂˆ™[™\“ØØ[ZS[Ù[Ê×JNÂŸB‚˜ÛÛœÝRWÔ“ÕUWÔ“ÓTÈHØš™XÝ™œ™Y^™JÉÜ[›™\‰Ë	ØÛÙ\‰Ë	Ù˜\Ý]ÛÜšÙ\‰Ë	Ý™\šYšY\‰Ë	ØÜš]XÉË	Ýš\Ú[Û‰×JNÂ‚™[˜Ý[Ûˆ›Ý]S[X™\ŠØ\™šY[Z[‹X^X™[
+HÂˆÛÛœÝ˜[YHH[X™\ŠØ\™œ]Y\žTÙ[XÝÜŠÙ]K\›Ý]KYšY[H‰ÙšY[H—X
+K˜[YJNÂˆYˆ
+S[X™\‹š\Ñš[š]J˜[YJH˜[YHZ[ˆ˜[YHˆX^
+H›ÝÈ™]È\œ›ÜŠ	ÛX™[Nˆ4,´,´-t-4e´`´c4aô.4`t.ô/ˆ	ÛZ[ŸKIÛX^K˜
+NÂˆ™]\›ˆ˜[YNÂŸB‚™[˜Ý[ÛˆÙ[XÝY˜[Y\ÊY
+HÂˆ™]\›ˆË‹‹‰
+Y
+KœÙ[XÝYÜ[Ûœ×K›X\
+Ü[ÛˆOˆÜ[Û‹˜[YJNÂŸB‚™[˜Ý[ÛˆZT›Ý]\”›Ý]\Ñœ›ÛQ›Ü›JÈ˜[Y]HHYHHHßJHÂˆ™]\›ˆË‹‹‰
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊKœ]Y\žTÙ[XÝÜ[
+	ÖÙ]KXZK\›Ý]WIÊWK›X\
+
+Ø\™[™^
+HOˆÂˆÛÛœÝ^HšY[OˆØ\™œ]Y\žTÙ[XÝÜŠÙ]K\›Ý]KYšY[H‰ÙšY[H—X
+K˜[YKš[J
+NÂˆÛÛœÝ^XÝ^HšY[OˆØ\™œ]Y\žTÙ[XÝÜŠÙ]K\›Ý]KYšY[H‰ÙšY[H—X
+K˜[YNÂˆÛÛœÝ›ÝšY\ˆH^
+	Ü›ÝšY\‰ÊNÂˆÛÛœÝ›Ý]RYH^
+	Ü›Ý]RY	ÊNÂˆÛÛœÝ[Ù[H^
+	Û[Ù[	ÊNÂˆYˆ
+˜[Y]H	‰ˆ\›Ý]RY
+H›ÝÈ™]È\œ›ÜŠ4'4,4`4b4`4`ô`ˆ	Ú[™^
+È_Nˆ4,´,´-t-4e´`´cQ˜
+NÂˆYˆ
+˜[Y]H	‰ˆ[[Ù[
+H›ÝÈ™]È\œ›ÜŠ4'4,4`4b4`4`ô`ˆ	Ú[™^
+È_Nˆ4,´,´-t-4e´`´c4/4/´-4-t.ôc˜
+NÂˆÛÛœÝØ\Xš[]RYÈH^
+	ØØ\Xš[]RYÉÊKœÜ]
+	Ë	ÊK›X\
+˜[YHOˆ˜[YKš[J
+JK™š[\Š›ÛÛX[ŠNÂˆYˆ
+™]ÈÙ]
+Ø\Xš[]RYÊKœÚ^™HOOHØ\Xš[]RYË›[™Ý
+H›ÝÈ™]È\œ›ÜŠ4'4,4`4b4`4`ô`ˆ	Ü›Ý]RYNˆØ\Xš[]Y\È4/4e´`t`´cô`´c4-4`ô,t.ôe´.´,4`´.˜
+NÂˆ™]\›ˆÂˆ›Ý]RYˆ›ÝšY\‹ˆ[Ù[ˆ\Ü^S˜[YN^
+	Ù\Ü^S˜[YIÊKˆÞ\Ý[T›Û\™^XÝ^
+	ÜÞ\Ý[T›Û\	ÊKˆÛÜšÙ\”›Û\™^XÝ^
+	ÝÛÜšÙ\”›Û\	ÊKˆ‹‹Š›ÝšY\ˆOOH	ÛÜ[˜ZKXÛÛ\]X›IÈ	‰ˆ^
+	Ù[™Ú[Y	ÊHÈÈ[™Ú[Y^
+	Ù[™Ú[Y	ÊHHˆßJKˆ›Û\ÎRWÔ“ÕUWÔ“ÓTË™š[\Š›ÛHOˆØ\™œ]Y\žTÙ[XÝÜŠÙ]K\›Ý]K\›ÛOH‰Ü›Û_H—X
+K˜ÚXÚÙY
+KˆØ\Xš[]RYËˆš[Üš]Nœ›Ý]S[X™\ŠØ\™	Üš[Üš]IËWÌÌ4'4,4`4b4`4`ô`ˆ	Ü›Ý]RYK4/ô`4e´/´`4.4`´-t`˜
+KˆX^ÛÜšÙ\œÎœ›Ý]S[X™\ŠØ\™	ÛX^ÛÜšÙ\œÉËŒ4'4,4`4b4`4`ô`ˆ	Ü›Ý]RYK4/4,4.´`t.4/4`ô/ÛÜšÙ\œØ
+Kˆ[˜X›Y˜Ø\™œ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[H™[˜X›Y—IÊK˜ÚXÚÙYˆØØ[]N^
+	ÛØØ[]IÊKˆÛÜÝÛ\ÜÎ^
+	ØÛÜÝÛ\ÜÉÊKˆ[œ]šXÙT\“Z[[Û•\Ùœ›Ý]S[X™\ŠØ\™	Ú[œ]šXÙT\“Z[[Û•\Ù	ËWÌÌ4'4,4`4b4`4`ô`ˆ	Ü›Ý]RYK[œ]šXÙX
+KˆÝ]]šXÙT\“Z[[Û•\Ùœ›Ý]S[X™\ŠØ\™	ÛÝ]]šXÙT\“Z[[Û•\Ù	ËWÌÌ4'4,4`4b4`4`ô`ˆ	Ü›Ý]RYKÝ]]šXÙX
+KˆÝ\ÜÕš\Ú[ÛŽ˜Ø\™œ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[HœÝ\ÜÕš\Ú[Ûˆ—IÊK˜ÚXÚÙYˆNÂˆJNÂŸB‚™[˜Ý[Ûˆ™[™\ZT›Ý]\”›Ý]TÙ[XÝÊÛXÞHHßJHÂˆÛÛœÝ›Ý]RYÈHË‹‹‰
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊKœ]Y\žTÙ[XÝÜ[
+	ÖÙ]K\›Ý]KYšY[Hœ›Ý]RY—IÊWK›X\
+[œ]Oˆ[œ]˜[YKš[J
+JK™š[\Š›ÛÛX[ŠNÂˆÛÛœÝÛÛ™šYÜÈHÂˆÉØZK\›Ý]\‹\[›™Y\›Ý]IËÛXÞKœ[›™Y›Ý]RYÈÜÛXÞKœ[›™Y›Ý]RYHˆ×WKˆÉØZK\›Ý]\‹X[ÝË\›Ý]\ÉËÛXÞK˜[ÝÔ›Ý]RYÈ×WKˆÉØZK\›Ý]\‹Y[žK\›Ý]\ÉËÛXÞK™[žT›Ý]RYÈ×WKˆNÂˆ›Üˆ
+ÛÛœÝÚYÙ[XÝYHÙˆÛÛ™šYÜÊHÂˆÛÛœÝÙ[XÝH	
+Y
+NÂˆÛÛœÝš[ÜˆH™]ÈÙ]
+Ù[XÝY›[™ÝÈÙ[XÝYˆÙ[XÝY˜[Y\ÊY
+JNÂˆÙ[XÝœ™\XÙPÚ[™[Š
+NÂˆYˆ
+YOOH	ØZK\›Ý]\‹\[›™Y\›Ý]IÊHÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÈÜ[Û‹˜[YHH	ÉÎÈÜ[Û‹^ÛÛ[H	ô't-H4-ô,4.´`4e´/ô.ôc´,´,4`´.	ÎÈÙ[XÝ˜\[™
+Ü[ÛŠNÂˆBˆ›Üˆ
+ÛÛœÝ›Ý]RYÙˆ›Ý]RYÊHÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛÜ[Û‰ÊNÈÜ[Û‹˜[YHH›Ý]RYÈÜ[Û‹^ÛÛ[H›Ý]RYÈÜ[Û‹œÙ[XÝYHš[Ü‹š\Ê›Ý]RY
+NÈÙ[XÝ˜\[™
+Ü[ÛŠNÂˆBˆBŸB‚™[˜Ý[ÛˆÙ[XÝZS[Ù[šXÙUXŠÚ[™›ØÝ\ÈH˜[ÙJHÂˆ›Üˆ
+ÛÛœÝ˜[YHÙˆÉÙœ™YIË	ÜZY	×JHÂˆÛÛœÝÙ[XÝYHÚ[™OOH˜[YNÂˆÛÛœÝXˆH	
+ZK[[Ù[IÝ˜[Y_K]X˜
+NÂˆX‹œÙ]]šX]J	Ø\šXK\Ù[XÝY	ËÝš[™ÊÙ[XÝY
+JNÂˆX‹X’[™^HÙ[XÝYÈˆLNÂˆ	
+ZK[[Ù[IÝ˜[Y_K\[™[
+KšY[ˆH\Ù[XÝYÂˆYˆ
+Ù[XÝY	‰ˆ›ØÝ\ÊHX‹™›ØÝ\Ê
+NÂˆBŸB‚™[˜Ý[Ûˆ™[™\ZS[Ù[šXÙPØ][ÙÊ›Ý]\ÈH×K›Ý]TÝ]\ÈHßJHÂˆÛÛœÝÜ›Ý\ÈHÈœ™YNˆ×KZYˆ×K[šÛ›ÝÛŽˆ×HNÂˆ›Üˆ
+ÛÛœÝ›Ý]HÙˆ›Ý]\ÊHÂˆÛÛœÝÚ[™HÉÙœ™YIË	ÜZY	×Kš[˜ÛY\Ê›Ý]K˜ÛÜÝÛ\ÜÊHÈ›Ý]K˜ÛÜÝÛ\ÜÈˆ	Ý[šÛ›ÝÛ‰ÎÂˆÛÛœÝX[H›Ý]TÝ]\ÖÜ›Ý]Kœ›Ý]RYHßNÂˆÜ›Ý\ÖÚÚ[™Kœ\Ú
+	Ü›Ý]K™\Ü^S˜[YHÈ	Ü›Ý]K™\Ü^S˜[Y_NÈˆ	ÉßIÜ›Ý]Kœ›ÝšY\ŸK	Ü›Ý]K›[Ù[	ô/4/´-4-t.ôc4/t-H4,´.4,t`4,4/t/‰ßNÈ4/4,4`4b4`4`ô`ˆ	Ü›Ý]Kœ›Ý]RYNÈ	Ü›Ý]K™[˜X›YOOH˜[ÙHÈ	ô,´.4/4.´/t-t/t/‰Èˆ	ô`ô,´e´/4.´/t-t/t/‰ßNÈ4/4,4.´`t.4/4`ô/ÛÜšÙ\œÈ	Ó[X™\Š›Ý]K›X^ÛÜšÙ\œÈ
+H	ô-ô,4,ô,4.ôc4/t,4/4-t-´,	ßNÈ4/ô/´/4.4.ô/´.ˆ	Ó[X™\ŠX[™˜Z[\™\È
+_NÈ4/´,t/4-t-´-t/t/tcÈ4-4/ˆ	ÚX[˜˜XÚÛÙ™•[[È™]È]JX[˜˜XÚÛÙ™•[[
+KÓØØ[TÝš[™Ê
+Hˆ	ô/t-t/4,4e	ßX
+NÂˆBˆ›Üˆ
+ÛÛœÝÚ[™ÙˆÉÙœ™YIË	ÜZY	Ë	Ý[šÛ›ÝÛ‰×JHÂˆÛÛœÝ\ÝH	
+ZK[[Ù[IÚÚ[™K[\Ý
+NÂˆ\Ýœ™\XÙPÚ[™[Š
+NÂˆ›Üˆ
+ÛÛœÝ\ØÜš\[ÛˆÙˆÜ›Ý\ÖÚÚ[™JHÂˆÛÛœÝ][H{ßm4¶‰žËkºwµçZ[J
+NÂˆÛÛœÝš]™U\™Ù]H	
+	Ùš]™K\›Û\]\™Ù]	ÊK˜[YNÂˆÛÛœÝš[Ü‘š]™HHË™š]™T›Û\ÛÝ\˜Ù\ÏË˜š[™[™ÜÏË–ÌH[ÂˆÛÛœÝ™\Ù\™Qš]™T[[YHHš[Ü‘š]™Bˆ	‰ˆš[Ü‘š]™K\™Ù]OOHš]™U\™Ù]ˆ	‰ˆš[Ü‘š]™K™š[RYOOHš]™TÛÝ\˜ÙU^ÂˆË™š]™T›Û\ÛÝ\˜Ù\ÈHÂˆØÚ[XU™\œÚ[ÛŽˆKˆš[™[™ÜÎˆ
+š]™Q[˜X›Yš]™TÛÝ\˜ÙU^
+HÈÞÂˆ\™Ù]ˆš]™U\™Ù]ˆ[˜X›Yˆš]™Q[˜X›Yˆš[RYˆš]™TÛÝ\˜ÙU^ˆÛ[\˜[\Îˆ[X™\Š	
+	Ùš]™K\›Û\Z[\˜[	ÊK˜[YJH
+ˆŒˆZ[Ú\œÎˆ[X™\Š	
+	Ùš]™K\›Û\[Z[‹XÚ\œÉÊK˜[YJKˆ\ÝXØÙ\Y™\œÚ[ÛŽˆ™\Ù\™Qš]™T[[YHÈ
+š[Ü‘š]™K›\ÝXØÙ\Y™\œÚ[Ûˆ	ÉÊHˆ	ÉËˆ\ÝXØÙ\Y\Úˆ™\Ù\™Qš]™T[[YHÈ
+š[Ü‘š]™K›\ÝXØÙ\Y\Ú	ÉÊHˆ	ÉËˆ\ÝÚXÚÙY]ˆ™\Ù\™Qš]™T[[YHÈ[X™\Šš[Ü‘š]™K›\ÝÚXÚÙY]
+Hˆˆ™^ÚXÚÐ]ˆ™\Ù\™Qš]™T[[YHÈ[X™\Šš[Ü‘š]™K›™^ÚXÚÐ]
+Hˆˆ\Ý\œ›ÜÛÙNˆ™\Ù\™Qš]™T[[YHÈ
+š[Ü‘š]™K›\Ý\œ›ÜÛÙH	ÉÊHˆ	ÉËˆWHˆ×KˆNÂˆË˜Ø[[™\”ØÚY[HHÛÛXÝØ[[™\”ØÚY[J
+NÂˆËœ[“[ÙHHØÝ[Y[œ]Y\žTÙ[XÝÜŠ	Ú[œ]Û˜[YOHœ[“[ÙH—N˜ÚXÚÙY	ÊOË˜[YH	ØÛÛ[[Ý\ÉÎÂˆË˜ÛÛ™šYÝ\™Y\ÚÐÛÝ[H[X™\Š	
+	Ý\ÚËXÛÝ[	ÊK˜[YJNÂˆË›Z[š[][TÙ[™[\˜[˜[YHH[X™\Š	
+	ÛZ[š[][K\Ù[™Z[\˜[	ÊK˜[YJNÂˆË›Z[š[][TÙ[™[\˜[[š]H	
+	ÛZ[š[][K\Ù[™Z[\˜[][š]	ÊK˜[YHOOH	ÜÙXÛÛ™ÉÈÈ	ÜÙXÛÛ™ÉÈˆ	ÛZ[]\ÉÎÂˆË›Z[š[][TÙ[™[\˜[Z[]\ÈHË›Z[š[][TÙ[™[\˜[˜[YH
+ˆ
+Ë›Z[š[][TÙ[™[\˜[[š]OOH	ÜÙXÛÛ™ÉÈÈHÈŒˆJNÂˆËX”™XYQ[^TÙXÛÛ™ÈH[X™\Š	
+	ÝX‹\™XYKY[^IÊK˜[YJNÂˆËœÜÝÙ[™[^TÙXÛÛ™ÈH[X™\Š	
+	ÜÜÝ\Ù[™Y[^IÊK˜[YJNÂˆËœ™TÙ[™[^TÙXÛÛ™ÈH[X™\Š	
+	Ü™K\Ù[™Y[^IÊK˜[YJNÂˆË˜\ÞPÚXÚÑ[^TÙXÛÛ™ÈH[X™\Š	
+	Ø\ÞKXÚXÚËY[^IÊK˜[YJNÂˆÛÛœÝ™]žP˜XÚÛÙ™•[š]H	
+	Ü™]žKX˜XÚÛÙ™‹][š]	ÊK˜[YHOOH	ÛZ[]\ÉÈÈ	ÛZ[]\ÉÈˆ	ÜÙXÛÛ™ÉÎÂˆÛÛœÝ™]žP˜XÚÛÙ™[[Ý[H[X™\Š	
+	Ü™]žKX˜XÚÛÙ™‰ÊK˜[YJNÂˆËœ™]žP˜XÚÛÙ™”ÙXÛÛ™ÈH™]žP˜XÚÛÙ™[[Ý[
+ˆ
+™]žP˜XÚÛÙ™•[š]OOH	ÛZ[]\ÉÈÈŒˆJNÂˆËœ™]žP˜XÚÛÙ™•[š]H™]žP˜XÚÛÙ™•[š]ÂˆËœ™]žTÛXÞHHØÝ[Y[œ]Y\žTÙ[XÝÜŠ	Ú[œ]Û˜[YOHœ™]žTÛXÞH—N˜ÚXÚÙY	ÊOË˜[YH	ÜØY™IÎÂˆË˜\ÞPÚ]™Z]š[ÜˆH	
+	Ø\ÞKXÚ]X™Z]š[Ü‰ÊK˜[YNÂˆËX”Ý˜]YÞHHØÝ[Y[œ]Y\žTÙ[XÝÜŠ	Ú[œ]Û˜[YOHX”Ý˜]YÞH—N˜ÚXÚÙY	ÊOË˜[YH	ÚÙY\[Ü[‰ÎÂˆ™]\›ˆÎÂŸB‚™[˜Ý[Ûˆ˜[Y]JÙ\ÜÚ[ÛŠHÂˆÛX\‘\œ›ÜœÊ
+NÈÛÛœÝ\œ›ÜœÈH×NÂˆYˆ
+\Ù\ÜÚ[Û‹›˜[YJH\œ›ÜœËœ\Ú
+ÉÜÙ\ÜÚ[Û‹[˜[YIË	ÔÙ\ÜÚ[Ûˆ˜[YH\È™\]Z\™Y‰×JNÂˆÛÛœÝÙÚXØ[\ÚÐÛÝ[H[X™\ŠÙ\ÜÚ[Û‹˜ÛÛ™šYÝ\™Y\ÚÐÛÝ[Ù\ÜÚ[Û‹\ÚÜË›[™Ý
+NÂˆÛÛœÝÛÛ\XÝÚ\™YHÙ\ÜÚ[Û‹\›[ÙHOOH	ÜÚ\™Y	È	‰ˆÙ\ÜÚ[Û‹œ›Û\[ÙHOOH	ÜÚ\™Y	ÎÂˆYˆ
+JÙÚXØ[\ÚÐÛÝ[HH	‰ˆÙÚXØ[\ÚÐÛÝ[HPVÕTÒÔÈ	‰ˆ[X™\‹š\Ò[YÙ\ŠÙÚXØ[\ÚÐÛÝ[
+JJH\œ›ÜœËœ\Ú
+ÉÝ\ÚËXÛÝ[	Ë\ÚÈÈÞXÛHÛÝ[]\Ý™HHÚÛH[X™\ˆ™]ÙY[ˆH[™	ÓPVÕTÒÔßK˜JNÂˆYˆ
+XÛÛ\XÝÚ\™Y	‰ˆÙÚXØ[\ÚÐÛÝ[ˆPVÔTÒPÐSÕTÒÔÊH\œ›ÜœËœ\Ú
+ÉÝ\ÚËXÛÝ[	ËÙ\\˜]HT“Ü›Û\[Ù\ÈÝ\Ü\È	ÓPVÔTÒPÐSÕTÒÔßH\ÚXØ[\ÚÜËˆ\ÙHÛ™HÚ\™YT“
+ÈÛ™HÚ\™Y›Û\›Üˆ\È	ÓPVÕTÒÔßHÞXÛ\Ë˜JNÂˆYˆ
+JÙ\ÜÚ[Û‹\ÚÜË›[™ÝHH	‰ˆÙ\ÜÚ[Û‹\ÚÜË›[™ÝHPVÔTÒPÐSÕTÒÔÊJH\œ›ÜœËœ\Ú
+ÉÝ\ÚËXÛÝ[	Ë\ÚXØ[\ÚÈÛÝ[]\Ý™H™]ÙY[ˆH[™	ÓPVÔTÒPÐSÕTÒÔßK˜JNÂˆÛÛœÝ\Ñ[˜X›Y\ÚÜÈHÙ\ÜÚ[Û‹\ÚÜËœÛÛYJ
+\ÚÊHOˆ\ÚË™[˜X›Y
+NÂˆÛÛœÝÚ\™Y\›[ÙHHÙ\ÜÚ[Û‹\›[ÙHOOH	ÜÚ\™Y	ÎÂˆYˆ
+Ú\™Y\›[ÙH	‰ˆ\Ñ[˜X›Y\ÚÜÊHÂˆÛÛœÝ\›HÙ\ÜÚ[Û‹\ÚÜÖÌOË\›	ÉÎÂˆYˆ
+]\›
+H\œ›ÜœËœ\Ú
+ÉÜÚ\™Y]\ÚË]\›	Ë	ÐÚ]Ô[šÈ\È™\]Z\™Y‰×JNÂˆ[ÙHÈžHÈÛÛœÝHH™]ÈT“
+\›
+NÈYˆ
+Kœ›ÝØÛÛOOH	ÚÎ‰ÈVÉØÚ]Ü˜ÛÛIË	ÝÝÝË˜Ú]Ü˜ÛÛI×Kš[˜ÛY\ÊKšÜÝ˜[YJJH›ÝÈ™]È\œ›ÜŠ
+NÈHØ]ÚÈ\œ›ÜœËœ\Ú
+ÉÜÚ\™Y]\ÚË]\›	Ë	Õ\ÙHH˜[YÎ‹ËØÚ]Ü˜ÛÛHT“‰×JNÈHBˆBˆÙ\ÜÚ[Û‹\ÚÜË™›Ü‘XXÚ
+
+\ÚËJHOˆÂˆYˆ
+]\ÚË™[˜X›Y
+H™]\›ŽÂˆYˆ
+\Ú\™Y\›[ÙJHÂˆYˆ
+]\ÚË\›
+H\œ›ÜœËœ\Ú
+Ø\ÚË]\›IÝ\ÚËšYX\ÚÈ	ÚH
+È_HT“\È™\]Z\™Y˜JNÂˆ[ÙHÈžHÈÛÛœÝHH™]ÈT“
+\ÚË\›
+NÈYˆ
+Kœ›ÝØÛÛOOH	ÚÎ‰ÈVÉØÚ]Ü˜ÛÛIË	ÝÝÝË˜Ú]Ü˜ÛÛI×Kš[˜ÛY\ÊKšÜÝ˜[YJJH›ÝÈ™]È\œ›ÜŠ
+NÈHØ]ÚÈ\œ›ÜœËœ\Ú
+Ø\ÚË]\›IÝ\ÚËšYX\ÚÈ	ÚH
+È_H]\Ý\ÙHH˜[YÎ‹ËØÚ]Ü˜ÛÛHT“˜JNÈHBˆBˆYˆ
+Ù\ÜÚ[Û‹œ›Û\[ÙHOOH	Ý[š\]YIÈ	‰ˆ]\ÚËœ›Û\Ý™\œšYKš[J
+JH\œ›ÜœËœ\Ú
+Ø\ÚË\›Û\IÝ\ÚËšYX›Û\›Üˆ\ÚÈ	ÚH
+È_H\È™\]Z\™Y˜JNÂˆJNÂˆYˆ
+\Ñ[˜X›Y\ÚÜÈ	‰ˆÙ\ÜÚ[Û‹œ›Û\[ÙHOOH	ÜÚ\™Y	È	‰ˆ\Ù\ÜÚ[Û‹œÚ\™Y›Û\š[J
+JH\œ›ÜœËœ\Ú
+ÉÜÚ\™Y\›Û\	Ë	ÔÚ\™Y›Û\\È™\]Z\™Y‰×JNÂˆÛÛœÝØY[˜ÙHHÙ\ÜÚ[Û‹œ›Û\ØY[˜ÙHßNÂˆ›Üˆ
+ÛÛœÝÛÜ™[˜[[K]™\žRY^YHÙˆÂˆÌ‹ØY[˜ÙKœ›Û\ˆßK	Ü›Û\L‹Y]™\žIË	Ü›Û\L‹]^	×KˆÌËØY[˜ÙKœ›Û\ÈßK	Ü›Û\LËY]™\žIË	Ü›Û\LË]^	×KˆJHÂˆÛÛœÝ]™\žSˆH[X™\Š[K™]™\žSŠNÂˆYˆ
+S[X™\‹š\Ò[YÙ\Š]™\žSŠH]™\žSˆˆ]™\žSˆˆL
+HÂˆ\œ›ÜœËœ\Ú
+Ù]™\žRY›Û\	ÛÜ™[˜[Nˆˆ4/4,4e4,t`ô`´.4a´e´.ô.4/4aô.4`t.ô/´/4,´e´-ˆ4-4/ˆL˜JNÂˆBˆYˆ
+[K™[˜X›YOOHYH	‰ˆTÝš[™Ê[Kœ›Û\	ÉÊKš[J
+JHÂˆ\œ›ÜœËœ\Ú
+Ý^Y›Û\	ÛÜ™[˜[H4`ô,´e´/4.´/t-t/t.4.K4,4.ô-H4`´-t.´`t`ˆ4/ô/´`4/´-´/te´.K˜JNÂˆBˆBˆÛÛœÝš]™Pš[™[™ÈHÙ\ÜÚ[Û‹™š]™T›Û\ÛÝ\˜Ù\ÏË˜š[™[™ÜÏË–ÌH[ÂˆYˆ
+š]™Pš[™[™ÊHÂˆÛÛœÝ[\˜[Z[]\ÈH[X™\Šš]™Pš[™[™ËœÛ[\˜[\ÊHÈŒÂˆYˆ
+S[X™\‹š\Ò[YÙ\Š[\˜[Z[]\ÊH[\˜[Z[]\ÈH[\˜[Z[]\ÈˆM
+HÂˆ\œ›ÜœËœ\Ú
+ÉÙš]™K\›Û\Z[\˜[	Ë	Ñš]™H[\˜[4/4,4e4,t`ô`´.4a´e´.ô.4/4aô.4`t.ô/´/4,´e´-H4-4/ˆM4at,´.4.ô.4/K‰×JNÂˆBˆYˆ
+S[X™\‹š\Ò[YÙ\Š[X™\Šš]™Pš[™[™Ë›Z[Ú\œÊJH[X™\Šš]™Pš[™[™Ë›Z[Ú\œÊHH[X™\Šš]™Pš[™[™Ë›Z[Ú\œÊHˆL
+HÂˆ\œ›ÜœËœ\Ú
+ÉÙš]™K\›Û\[Z[‹XÚ\œÉË	ô'4e´/te´/4,4.ôc4/t,4-4/´,´-´.4/t,š]™H›Û\4/4,4e4,t`ô`´.4,´e´-H4-4/ˆL4`t.4/4,´/´.ôe´,‹‰×JNÂˆBˆYˆ
+š]™Pš[™[™Ë™[˜X›Y	‰ˆTÝš[™Êš]™Pš[™[™Ë™š[RY	ÉÊKš[J
+JHÂˆ\œ›ÜœËœ\Ú
+ÉÙš]™K\›Û\Yš[IË	ô%4.ôcÈ4`ô,´e´/4.´/t-t/t/´,ô/ˆš]™HÛÝ\˜ÙH4/ô/´`´`4e´,t/t-H4/ô/´`t.4.ô,4/t/tcÈ4,4,t/ˆš[HQ‰×JNÂˆBˆYˆ
+š]™Pš[™[™Ë™[˜X›Y	‰ˆš]™Pš[™[™Ë\™Ù]OOH	Ô’SPT–IÈ	‰ˆÙ\ÜÚ[Û‹œ›Û\[ÙHOOH	Ý[š\]YIÊHÂˆ\œ›ÜœËœ\Ú
+ÉÙš]™K\›Û\]\™Ù]	Ë	Ôš[X\žHš]™H›Û\4-4/´`t`´`ô/ô/t.4.H4.ô.4b4-H4-4.ôcÈÚ\™Y›Û\[ÙKˆ4%4.ôcÈ[š\]YH[ÙH4,´.4,t-t`4e´`´c›Û\ˆ4,4,t/ˆ›Û\Ë‰×JNÂˆBˆBˆ˜[Y]PØ[[™\”ØÚY[UZJÙ\ÜÚ[Û‹\œ›ÜœÊNÂˆÛÛœÝ[\˜[[š]HÙ\ÜÚ[Û‹›Z[š[][TÙ[™[\˜[[š]OOH	ÜÙXÛÛ™ÉÈÈ	ÜÙXÛÛ™ÉÈˆ	ÛZ[]\ÉÎÂˆÛÛœÝ[\˜[X^H[\˜[[š]OOH	ÜÙXÛÛ™ÉÈÈˆMÂˆYˆ
+JÙ\ÜÚ[Û‹›Z[š[][TÙ[™[\˜[˜[YHHH	‰ˆÙ\ÜÚ[Û‹›Z[š[][TÙ[™[\˜[˜[YHH[\˜[X^
+JH\œ›ÜœËœ\Ú
+ÉÛZ[š[][K\Ù[™Z[\˜[	ËZ[š[][HÙ[™[\˜[]\Ý™H™]ÙY[ˆH[™	Ú[\˜[X^H	Ú[\˜[[š]K˜JNÂˆ›Üˆ
+ÛÛœÝÙšY[YHÙˆÖÉÝX”™XYQ[^TÙXÛÛ™ÉË	ÝX‹\™XYKY[^I×KÉÜÜÝÙ[™[^TÙXÛÛ™ÉË	ÜÜÝ\Ù[™Y[^I×WJHÂˆYˆ
+S[X™\‹š\Ò[YÙ\ŠÙ\ÜÚ[Û–ÙšY[JHÙ\ÜÚ[Û–ÙšY[HÙ\ÜÚ[Û–ÙšY[HˆŒ
+H\œ›ÜœËœ\Ú
+ÚY	ô(ô.´,4-´e´`´c4a´e´.ô-H4aô.4`t.ô/ˆ4`t-t.´`ô/t-4,´e´-4-4/ˆŒ‰×JNÂˆBˆYˆ
+JÙ\ÜÚ[Û‹œ™TÙ[™[^TÙXÛÛ™ÈHH	‰ˆÙ\ÜÚ[Û‹œ™TÙ[™[^TÙXÛÛ™ÈHÌ
+JH\œ›ÜœËœ\Ú
+ÉÜ™K\Ù[™Y[^IË	Ô™K\Ù[™[^H]\Ý™H™]ÙY[ˆH[™ÌÙXÛÛ™Ë‰×JNÂˆYˆ
+JÙ\ÜÚ[Û‹˜\ÞPÚXÚÑ[^TÙXÛÛ™ÈHH	‰ˆÙ\ÜÚ[Û‹˜\ÞPÚXÚÑ[^TÙXÛÛ™ÈHÌ
+JH\œ›ÜœËœ\Ú
+ÉØ\ÞKXÚXÚËY[^IË	Ð\ÞKXÚXÚÈ[^H]\Ý™H™]ÙY[ˆH[™ÌÙXÛÛ™Ë‰×JNÂˆYˆ
+JÙ\ÜÚ[Û‹œ™]žP˜XÚÛÙ™”ÙXÛÛ™ÈHH	‰ˆÙ\ÜÚ[Û‹œ™]žP˜XÚÛÙ™”ÙXÛÛ™ÈHÍŒ
+JH\œ›ÜœËœ\Ú
+ÉÜ™]žKX˜XÚÛÙ™‰Ë	Ô™]žH˜XÚÛÙ™ˆ]\Ý™H™]ÙY[ˆHÙXÛÛ™È[™ŒZ[]\Ë‰×JNÂˆ\œ›ÜœË™›Ü‘XXÚ
+
+ÚYY\ÜØYÙWJHOˆX\šÑ\œ›ÜŠYY\ÜØYÙJJNÂˆYˆ
+\œ›ÜœË›[™ÝˆJHÂˆÛÛœÝÝ[[X\žHH	
+	Ù›Ü›KY\œ›Ü‹\Ý[[X\žIÊNÈÝ[[X\žKšY[ˆH˜[ÙNÈÝ[[X\žK˜Û\ÜÓ˜[YHH	Ù\œ›Ü‹\Ý[[X\žIÎÂˆÛÛœÝXY[™ÈHØÝ[Y[˜Ü™X]Q[[Y[
+	ÚÉÊNÈXY[™Ë^ÛÛ[H	Ñš^\ÙHÛÛ™šYÝ\˜][Ûˆ\œ›ÜœÉÎÂˆÛÛœÝ[HØÝ[Y[˜Ü™X]Q[[Y[
+	Ý[	ÊNÈ\œ›ÜœË™›Ü‘XXÚ
+
+ÚYY\ÜØYÙWJHOˆÈÛÛœÝHHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛIÊNÈÛÛœÝHHØÝ[Y[˜Ü™X]Q[[Y[
+	ØIÊNÈKš™YˆHÉÚYXÈK^ÛÛ[HY\ÜØYÙNÈK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+JHOˆÈKœ™]™[Y˜][
+
+NÈ	
+Y
+OË™›ØÝ\Ê
+NÈJNÈK˜\[™
+JNÈ[˜\[™
+JNÈJNÂˆÝ[[X\žKœ™\XÙPÚ[™[ŠXY[™Ë[
+NÈÝ[[X\žK™›ØÝ\Ê
+NÂˆH[ÙHYˆ
+\œ›ÜœË›[™ÝOOHJH	
+\œ›ÜœÖÌVÌJOË™›ØÝ\Ê
+NÂˆ™]\›ˆ\œ›ÜœÎÂŸB™[˜Ý[ÛˆX\šÑ\œ›ÜŠYY\ÜØYÙJHÂˆÛÛœÝšY[H	
+Y
+NÈYˆ
+YšY[
+H™]\›ŽÈÛÛœÝ\œ›ÜˆHØÝ[Y[˜Ü™X]Q[[Y[
+	Ü	ÊNÈ\œ›Ü‹šYH	ÚYKY\œ›Ü˜È\œ›Ü‹˜Û\ÜÓ˜[YHH	ÙšY[Y\œ›Ü‰ÎÈ\œ›Ü‹^ÛÛ[HY\ÜØYÙNÈšY[œÙ]]šX]J	Ø\šXKZ[˜[Y	Ë	ÝYIÊNÂˆÛÛœÝ^\Ý[™ÈHšY[™Ù]]šX]J	Ø\šXKY\ØÜšX™YžIÊNÈšY[œÙ]]šX]J	Ø\šXKY\ØÜšX™YžIËÙ^\Ý[™Ë\œ›Ü‹šYK™š[\Š›ÛÛX[ŠKš›Ú[Š	È	ÊJNÈšY[š[œÙ\Y˜XÙ[[[Y[
+	ØY\™[™	Ë\œ›ÜŠNÂŸB™[˜Ý[ÛˆÛX\‘\œ›ÜœÊ
+HÂˆØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	Ë™šY[Y\œ›Ü‰ÊK™›Ü‘XXÚ
+
+JHOˆKœ™[[Ý™J
+JNÈØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	ÖØ\šXKZ[˜[YHYH—IÊK™›Ü‘XXÚ
+
+JHOˆÈKœ™[[Ý™P]šX]J	Ø\šXKZ[˜[Y	ÊNÈÛÛœÝH
+K™Ù]]šX]J	Ø\šXKY\ØÜšX™YžIÊH	ÉÊKœÜ]
+×ÊËÊK™š[\Š
+
+HOˆ	‰ˆ^™[™ÕÚ]
+	ËY\œ›Ü‰ÊJNÈ›[™ÝÈKœÙ]]šX]J	Ø\šXKY\ØÜšX™YžIËš›Ú[Š	È	ÊJHˆKœ™[[Ý™P]šX]J	Ø\šXKY\ØÜšX™YžIÊNÈJNÈ	
+	Ù›Ü›KY\œ›Ü‹\Ý[[X\žIÊKšY[ˆHYNÈ	
+	Ù›Ü›KY\œ›Ü‹\Ý[[X\žIÊKœ™\XÙPÚ[™[Š
+NÂŸB‚˜\Þ[˜È[˜Ý[ÛˆØ]™TÙ\ÜÚ[ÛŠ
+HÂˆÛX\•[Y[Ý]
+˜YØ]™U[Y\ŠNÂˆÛÛœÝÙ\ÜÚ[ÛˆHÛÛXÝY]ÜŠ
+NÈÛÛœÝ\œ›ÜœÈH˜[Y]JÙ\ÜÚ[ÛŠNÈYˆ
+\œ›ÜœË›[™Ý
+HÈ\œÚ\ÝÝ\œ™[˜Y
+
+NÈ[››Ý[˜ÙJ	Ù\œ›ÜœË›[™ÝHÛÛ™šYÝ\˜][Ûˆ\œ›Ü‰Ù\œ›ÜœË›[™ÝOOHHÈ	ÉÈˆ	ÜÉßK˜
+NÈ™]\›ŽÈBˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÕTUWÔÑTÔÒSÓ‰ËÈÙ\ÜÚ[Û’YˆÙ\ÜÚ[Û‹šY^XÝY™\œÚ[ÛŽˆÙ\ÜÚ[Û‹™\œÚ[Û‹ÛÛ™šYÎˆÙ\ÜÚ[Û‹ÛÛ™š\›PØ[[™\”™]š\Ú[ÛÚ[™ÙNˆ	
+	ØØ[[™\‹\™]š\Ú[Û‹XÛÛ™š\›IÊK˜ÚXÚÙYJNÂˆÛX\‘˜Y
+Ù\ÜÚ[Û‹šY
+NÂˆZKœÙ[XÝYHÛÛ™J]KœÙ\ÜÚ[ÛŠNÈ[››Ý[˜ÙJ	ÔÙ\ÜÚ[ÛˆØ]™Y‰ÊNÈ]ØZ]ØYÙ\ÜÚ[ÛœÊ
+NÈ™[™\‘Y]ÜŠ
+NÈ]ØZ]™Yœ™\Ú[•[Y[[™JÈ[››Ý[˜ÙT™\Ý[ˆ˜[ÙHJNÂˆHØ]Ú
+\œ›ÜŠHÈ\œÚ\ÝÝ\œ™[˜Y
+
+NÈÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÈ[››Ý[˜ÙJ\œ›Ü‹›Y\ÜØYÙJNÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆÜ™X]TÙ\ÜÚ[ÛŠ
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÐÔ‘PUWÔÑTÔÒSÓ‰ËÈÛÛ™šYÎˆ›[šÔÙ\ÜÚ[ÛŠ
+HJNÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊÈ™\Ù\™Q›ØÝ\Îˆ˜[ÙHJNÂˆ]ØZ]ØYÜ˜Ú\Ý˜][Û•Œ”Ý]\Ê
+NÂˆ]ØZ]ØYØÙ[˜\š[ÕÛÜšÊ
+NÂˆ]ØZ]ØYœ›ÝÜÙ\YÙ[›ØœÊ
+NÂˆ]ØZ]ØYœ›ÝÜÙ\YÙ[^XÝ][Û”ÛXÞJ
+NÂˆ]ØZ]ØY™[[ÝQ\Ü]ÚÝ]\Ê
+NÂˆ]ØZ]Ü[”Ù\ÜÚ[ÛŠ]KœÙ\ÜÚ[Û‹šY
+NÂˆ	
+	ÜÙ\ÜÚ[Û‹[˜[YIÊK™›ØÝ\Ê
+NÂˆ	
+	ÜÙ\ÜÚ[Û‹[˜[YIÊKœÙ[XÝ
+
+NÂˆ[››Ý[˜ÙJ	ÔÙ\ÜÚ[ÛˆÜ™X]Y‰ÊNÂˆHØ]Ú
+\œ›ÜŠHÈÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÈ[››Ý[˜ÙJ\œ›Ü‹›Y\ÜØYÙJNÈBŸB˜\Þ[˜È[˜Ý[Ûˆ™[˜[YTÙ\ÜÚ[ÛŠY
+HÈ]ØZ]Ü[”Ù\ÜÚ[ÛŠY
+NÈ	
+	ÜÙ\ÜÚ[Û‹[˜[YIÊK™›ØÝ\Ê
+NÈ	
+	ÜÙ\ÜÚ[Û‹[˜[YIÊKœÙ[XÝ
+
+NÈ[››Ý[˜ÙJ	ÑY]HÙ\ÜÚ[Ûˆ˜[YK[ˆØ]™K‰ÊNÈB˜\Þ[˜È[˜Ý[Ûˆ\XØ]TÙ\ÜÚ[ÛŠY
+HÈžHÈÛÛœÝ]HH]ØZ]ÛÜ™J	ÑTPÐUWÔÑTÔÒSÓ‰ËÈÙ\ÜÚ[Û’YˆYJNÈ]ØZ]ØYÙ\ÜÚ[ÛœÊÈ™\Ù\™Q›ØÝ\Îˆ˜[ÙHJNÈ]ØZ]Ü[”Ù\ÜÚ[ÛŠ]KœÙ\ÜÚ[Û‹šY
+NÈ[››Ý[˜ÙJ	ÔÙ\ÜÚ[Ûˆ\XØ]Y‰ÊNÈHØ]Ú
+JHÈÙ]\Ý]\ÊK›Y\ÜØYÙJNÈ[››Ý[˜ÙJK›Y\ÜØYÙJNÈHB‚™[˜Ý[ÛˆÜ[‘[]QX[ÙÊÙ\ÜÚ[Û’Y™]\›‘›ØÝ\ÊHÂˆÛÛœÝÙ\ÜÚ[ÛˆHZKœÙ\ÜÚ[ÛœË™š[™
+
+Ø[™Y]JHOˆØ[™Y]KšYOOHÙ\ÜÚ[Û’Y
+NÂˆÛÛœÝÙ\ÜÚ[Û“˜[YHHÙ\ÜÚ[ÛË›˜[YH	Õ[›˜[YYÙ\ÜÚ[Û‰ÎÂˆZKœ[™[™Ñ[]TÙ\ÜÚ[Û’YHÙ\ÜÚ[Û’YÂˆZK™[]T™]\›‘›ØÝ\ÈH™]\›‘›ØÝ\ÎÂˆ	
+	Ù[]KYX[ÙËY\ØÜš\[Û‰ÊK^ÛÛ[H[]HÙ\ÜÚ[Ûˆ	ÜÙ\ÜÚ[Û“˜[Y_Kˆ\È™[[Ý™\ÈHÙ[XÝYÙ\ÜÚ[ÛˆÛÛ™šYÝ\˜][Û‹˜Âˆ	
+	ØÛÛ™š\›KY[]KX]Û‰ÊKœÙ]]šX]J	Ø\šXK[X™[	Ë[]HÙ\ÜÚ[Ûˆ	ÜÙ\ÜÚ[Û“˜[Y_X
+NÂˆÛÛœÝH	
+	Ù[]KYX[ÙÉÊNÈšY[ˆH˜[ÙNÈ	
+	ØÛÛ™š\›KY[]KX]Û‰ÊK™›ØÝ\Ê
+NÂŸB™[˜Ý[ÛˆÛÜÙQ[]QX[ÙÊÈ™\ÝÜ™Q›ØÝ\ÈHYHHHßJHÂˆ	
+	Ù[]KYX[ÙÉÊKšY[ˆHYNÂˆ	
+	ØÛÛ™š\›KY[]KX]Û‰ÊKœ™[[Ý™P]šX]J	Ø\šXK[X™[	ÊNÂˆÛÛœÝ\™Ù]HZK™[]T™]\›‘›ØÝ\ÎÂˆZKœ[™[™Ñ[]TÙ\ÜÚ[Û’YH[ÂˆZK™[]T™]\›‘›ØÝ\ÈH[ÂˆYˆ
+™\ÝÜ™Q›ØÝ\È	‰ˆ\™Ù]Ëš\ÐÛÛ›™XÝY
+H\™Ù]™›ØÝ\Ê
+NÂŸB™[˜Ý[Ûˆ[]Q›ØÝ\Õ\™Ù]Y
+Ù\ÜÚ[Û’Y
+HÂˆYˆ
+ÝÜ˜YÙQÙ]
+RWÓSÑWÒÑVJHOOH	ÜÚ[\YšYY	ÊH™]\›ˆ	ÜÚ[\YšYY[™]ÉÎÂˆÛÛœÝ[™^HZKœÙ\ÜÚ[ÛœË™š[™[™^
+
+Ù\ÜÚ[ÛŠHOˆÙ\ÜÚ[Û‹šYOOHÙ\ÜÚ[Û’Y
+NÂˆÛÛœÝ™^H[™^HÈZKœÙ\ÜÚ[ÛœÖÚ[™^
+ÈWHZKœÙ\ÜÚ[ÛœÖÚ[™^HWHˆ[Âˆ™]\›ˆ™^ÈÙ\ÜÚ[Û‹\Ù[XÝIÛ™^šYXˆ	ØÜ™X]K\Ù\ÜÚ[Û‹X]Û‰ÎÂŸB˜\Þ[˜È[˜Ý[ÛˆÛÛ™š\›Q[]J
+HÂˆÛÛœÝYHZKœ[™[™Ñ[]TÙ\ÜÚ[Û’YÂˆÛÛœÝ›ØÝ\Õ\™Ù]YH[]Q›ØÝ\Õ\™Ù]Y
+Y
+NÂˆžHÂˆ]ØZ]ÛÜ™J	ÑSUWÔÑTÔÒSÓ‰ËÈÙ\ÜÚ[Û’YˆYJNÂˆÛX\‘˜Y
+Y
+NÂˆÛÜÙQ[]QX[ÙÊÈ™\ÝÜ™Q›ØÝ\Îˆ˜[ÙHJNÂˆYˆ
+ZKœÙ[XÝYÙ\ÜÚ[Û’YOOHY
+HÈZKœÙ[XÝYÙ\ÜÚ[Û’YH[ÈZKœÙ[XÝYH[ÈÝÜ˜YÙT™[[Ý™JTÕÔÑTÔÒSÓ—ÒÑVJNÈ	
+	ÜÙ\ÜÚ[Û‹YY]Ü‰ÊKšY[ˆHYNÈ	
+	Ù[\K\Ý]IÊKšY[ˆH˜[ÙNÈBˆYˆ
+ZKœÚ[\YšYYÙ[XÝYYOOHY
+HÚÝÔÚ[\YšYYÙ\ÜÚ[ÛŠ[
+NÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊÈ™\Ù\™Q›ØÝ\Îˆ˜[ÙHJNÂˆ]ØZ]ØY™[[ÝQ\Ü]ÚÝ]\Ê
+NÂˆ
+	
+›ØÝ\Õ\™Ù]Y
+H	
+	ØÜ™X]K\Ù\ÜÚ[Û‹X]Û‰ÊJK™›ØÝ\Ê
+NÂˆ[››Ý[˜ÙJ	ÔÙ\ÜÚ[Ûˆ[]Y‰ÊNÂˆHØ]Ú
+JHÈÙ]\Ý]\ÊK›Y\ÜØYÙJNÈ[››Ý[˜ÙJK›Y\ÜØYÙJNÈBŸB‚™[˜Ý[Ûˆ˜\X[ÙÊ]™[
+HÂˆYˆ
+	
+	Ù[]KYX[ÙÉÊKšY[ŠH™]\›ŽÂˆYˆ
+]™[šÙ^HOOH	Ñ\ØØ\IÊHÈ]™[œ™]™[Y˜][
+
+NÈÛÜÙQ[]QX[ÙÊ
+NÈ™]\›ŽÈBˆYˆ
+]™[šÙ^HOOH	ÕX‰ÊH™]\›ŽÂˆÛÛœÝ›ØÝ\ØX›HHÉ
+	ØÛÛ™š\›KY[]KX]Û‰ÊK	
+	ØØ[˜Ù[Y[]KX]Û‰ÊWNÈÛÛœÝš\œÝH›ØÝ\ØX›VÌK\ÝH›ØÝ\ØX›VÙ›ØÝ\ØX›K›[™ÝHWNÂˆYˆ
+]™[œÚYÙ^H	‰ˆØÝ[Y[˜XÝ]™Q[[Y[OOHš\œÝ
+HÈ]™[œ™]™[Y˜][
+
+NÈ\Ý™›ØÝ\Ê
+NÈBˆ[ÙHYˆ
+Y]™[œÚYÙ^H	‰ˆØÝ[Y[˜XÝ]™Q[[Y[OOH\Ý
+HÈ]™[œ™]™[Y˜][
+
+NÈš\œÝ™›ØÝ\Ê
+NÈBŸB‚˜\Þ[˜È[˜Ý[ÛˆXÝ[ÛŠÛÛ[X[™X™[
+HÂˆYˆ
+]ZKœÙ[XÝYÙ\ÜÚ[Û’Y
+H™]\›ŽÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™JÛÛ[X[™ÈÙ\ÜÚ[Û’YˆZKœÙ[XÝYÙ\ÜÚ[Û’YJNÂˆZKœÙ[XÝYHÛÛ™J]KœÙ\ÜÚ[ÛŠNÂˆ™[™\‘Y]ÜŠ
+NÂˆ]ØZ]™Yœ™\Ú[•[Y[[™JÈ[››Ý[˜ÙT™\Ý[ˆ˜[ÙHJNÂˆÛÛœÝÝ]HHZKœÙ[XÝYËœ[”Ý]H	ÕS’Ó“ÕÓ‰ÎÂˆ™\ÜÛÛ[X[™™\Ý[
+ÛÜ™HXÚÛ›ÝÛYÙY	ÛX™[KˆÝ\œ™[Ý]Nˆ	ÜÝ]_K˜
+NÂˆ›ØÝ\ÐY\“Y™XÞXÛTÝXØÙ\ÜÊÛÛ[X[™	
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÂˆ™\ÜÛÛ[X[™™\Ý[
+ÛÛ[X[™˜Z[Yˆ	Ù\œ›Ü‹›Y\ÜØYÙ_X
+NÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆX\Ý\XÝ[ÛŠÛÛ[X[™X™[^XÝYX\Ý\”]\ÙY
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™JÛÛ[X[™
+NÂˆYˆ
+]OË›X\Ý\”]\ÙYOOH^XÝYX\Ý\”]\ÙY
+H›ÝÈ™]È\œ›ÜŠ	ÐÛÜ™H™]\›™Y[ˆ[™^XÝYX\Ý\‹\]\ÙHÝ]K‰ÊNÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊ
+NÂˆYˆ
+ZKœÙ[XÝYÙ\ÜÚ[Û’Y
+H]ØZ]™Yœ™\ÚÙ[XÝYÙ\ÜÚ[Û”Ý]\ÊZKœÙ[XÝYÙ\ÜÚ[Û’Y
+NÂˆ™\ÜÛÛ[X[™™\Ý[
+ÛÜ™HXÚÛ›ÝÛYÙY	ÛX™[K˜
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÂˆ™\ÜÛÛ[X[™™\Ý[
+ÛÛ[X[™˜Z[Yˆ	Ù\œ›Ü‹›Y\ÜØYÙ_X
+NÂˆBŸB‚™[˜Ý[Ûˆ™[™\XÝ[ÛœÊ
+HÂˆÛÛœÝHHZKœÙ[XÝY˜XÝ[Û]˜Z[Xš[]HßNÂˆ	
+	ÜÝ\\Ù\ÜÚ[Û‹X]Û‰ÊK™\ØX›YHXKœÝ\Âˆ	
+	Ü]\ÙK\Ù\ÜÚ[Û‹X]Û‰ÊK™\ØX›YHXKœ]\ÙNÂˆ	
+	Ü™\Ý[YK\Ù\ÜÚ[Û‹X]Û‰ÊK™\ØX›YHXKœ™\Ý[YNÂˆ	
+	ÜÝÜ\Ù\ÜÚ[Û‹X]Û‰ÊK™\ØX›YHXKœÝÜÂŸB™[˜Ý[Ûˆ™[™\”Ý]\Ê
+HÂˆÛÛœÝÈHZKœÙ[XÝYœÝ]\ÈßNÈÛÛœÝHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÂˆÛÛœÝÚ[\YšYYØZ]X™[ÈHÂˆÑTÔÒSÓ—ÒSPÕU‘Nˆ	ô(t-t,4/t`H4/ô`4.4-ô`ô/ô.4/t-t/t.4.H4,4,t/ˆ4-ô`ô/ô.4/t-t/t.4.IËˆ‘T’Q–WÕSÑT•RS—ÔÑS‘ˆ	ô'ô-t`4-t,´e´`4.´,4/t-t/ôe´-4`´,´-t`4-4-´-t/t/´,ô/ˆ4/t,4-4`t.4.ô,4/t/tcÉËˆ‘WÔÑS‘ÑSVNˆ	ô'ô,4`ô-ô,4/ô-t`4-t-4/t,4-4`t.4.ô,4/t/tcô/	ËˆÔTUSÓ—ÒS—Ô“ÑÔ‘TÔÎˆ	ô'ô/´`´/´aô/t-H4/ô/´,´e´-4/´/4.ô-t/t/tcÈ4/´,t`4/´,t.ôcôe4`´c4`tcÉËˆ“Ñ’SWÔUWÓSRUˆ	ô&ôe´/4e´`ˆ4,4.´,4`ô/t`´,Ú]Ô	ËˆÑS‘ÒS•T•Sˆ	ô%ô,4-4,4/t.4.H4e´/t`´-t`4,´,4.È4/4e´-ˆ4/ô/´,´e´-4/´/4.ô-t/t/tcô/4.	ËˆÒUÐ•TÖNˆ	ô)ô,4`ˆ4bt-H4a4/´`4/4`ôe4,´e´-4/ô/´,´e´-4c	Ëˆ‘U–WÐPÒÓÑ‘Žˆ	ô'ô/´,´`´/´`4/ôe´`t.ôcÈ4`´.4/4aô,4`t/´,´/´eÈ4/ô/´/4.4.ô.´.	Ëˆ‘PQNˆ	ô$ô/´`´/´,´.4.H4-4/ˆ4/t,4`t`´`ô/ô/t/´eÈ4-4e´eÉËˆNÂˆÛÛœÝ™XÛÝ™\žHH	
+	Ý[˜Ù\Z[‹\™XÛÝ™\žIÊNÂˆÛÛœÝÜ\˜][Û’YHË[˜Ù\Z[“Ü\˜][Û’Y	ÉÎÂˆYˆ
+™XÛÝ™\žK™]\Ù]›Ü\˜][Û’YOOHÜ\˜][Û’Y
+HÂˆ™XÛÝ™\žK™]\Ù]›Ü\˜][Û’YHÜ\˜][Û’YÂˆ	
+	Ý[˜Ù\Z[‹XÛÛ™š\›IÊK˜ÚXÚÙYH˜[ÙNÂˆ	
+	Ý[˜Ù\Z[‹\™]žIÊK™\ØX›YHYNÂˆ	
+	Ý[˜Ù\Z[‹\ÚÚ\	ÊK™\ØX›YHYNÂˆBˆ™XÛÝ™\žKšY[ˆH[Ü\˜][Û’YÂˆÂˆÉÔÙ\ÜÚ[ÛˆÝ]IËË™\Ü^T[”Ý]HZKœÙ[XÝYœ[”Ý]H	ÔÕÔQ	×KˆÉÔÝXØÙ\ÜÙ[HÙ[	ËÝš[™ÊËœÝXØÙ\ÜÙ[Ù[™ÛÝ[ÏÈ
+WKˆÉÐÛÛ\]Y\ÚÜÉË	ÜË˜ÛÛ\]Y\ÚÐÛÝ[ÏÈHÈ	ÜË™[˜X›Y\ÚÐÛÝ[ÏÈZKœÙ[XÝY\ÚÜË™š[\Š
+
+HOˆ™[˜X›Y
+K›[™ÝXKˆÉÔ™[XZ[š[™È\ÚÜÉËÝš[™ÊËœ™[XZ[š[™Õ\ÚÐÛÝ[ÏÈ
+WKˆÉÐÛÛ\]Y[YIËËš\ÐÛÛ\]YÈ›Ü›X][YJË˜ÛÛ\]Y]
+Hˆ	Ó›Ý]˜Z[X›I×KˆÉÐÝ\œ™[\ÚÉËË˜Ý\œ™[\ÚÓX™[Ë˜Ý\œ™[\ÚÕ\›	Ó›Û™I×KˆÉÐÝ\œ™[\ÚÈÝ]\ÉËË˜Ý\œ™[\ÚÔÝ]\È	ÒQI×KˆÉÓÜ\˜][Ûˆ\ÙIËË›Ü\˜][Û”\ÙH	Ó“Ó‘I×KˆÉÓ\ÝXÝ[Û‰ËË›\ÝXÝ[Ûˆ	Ó›Û™I×KˆÉÓ\ÝXÝ[Ûˆ[YIË›Ü›X][YJË›\ÝXÝ[Û]
+WKˆÉÓ\ÝÝXØÙ\ÜÙ[Ù[™	Ë›Ü›X][YJË›\ÝÝXØÙ\ÜÙ[Ù[™]
+WKˆÉÓ™^[ÝÙYÙ[™	Ë›Ü›X][YJË›™^[ÝÙYÙ[™]
+WKˆ‹‹ŠZKœÙ[XÝYœÚ[\YšYYÙ\ÜÚ[ÛˆOOHYHÈÂˆÉô)ô/´/4`È4aô-t.´,4e4`t/ô`4/´bt-t/t.4.H4`t-t,4/t`IËÚ[\YšYYØZ]X™[ÖÜËœÚ[\YšYYØZ]™X\ÛÛ—HËœÚ[\YšYYØZ]™X\ÛÛˆ	ô't-t,´e´-4/´/4/‰×KˆÉô't,4`t`´`ô/ô/t,4-4e´cÈ4`t/ô`4/´bt-t/t/´,ô/ˆ4`t-t,4/t`t`ÉË›Ü›X][YJËœÚ[\YšYYØZ][[
+WKˆHˆ×JKˆÉÔ™]žHÜˆ˜XÚÛÙ™ˆ[[	Ë›Ü›X][YJË˜Ý\œ™[\ÚÔ™]žP]
+WKˆÉÓX[X[™]šY]È™X\ÛÛ‰ËË˜Ý\œ™[\ÚÓX[X[™]šY]Ô™X\ÛÛˆ	Ó›Û™I×KˆÉÑ[˜X›Y\ÚÜÉËÝš[™ÊË™[˜X›Y\ÚÐÛÝ[ÏÈZKœÙ[XÝY\ÚÜË™š[\Š
+
+HOˆ™[˜X›Y
+K›[™Ý
+WKˆÉÓ\Ý\œ›Ü‰ËË›\Ý\œ›Üˆ	Ó›Û™I×BˆK™›Ü‘XXÚ
+
+ÚË—JHOˆÈÛÛœÝHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÈ^ÛÛ[HÎÈÛÛœÝHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÈ^ÛÛ[HŽÈ˜\[™
+
+NÈJNÂˆ	
+	ÜÙ\ÜÚ[Û‹\Ý]\Ë\™YÚ[Û‰ÊKœ™\XÙPÚ[™[Š
+NÂŸB™[˜Ý[Ûˆ™[™\“ÙÊ
+HÂˆÛÛœÝ[šY\ÈHZKœÙ[XÝY›ÙÈ×NÂˆÛÛœÝš\ÚX›HH[šY\ËœÛXÙJU’TÒP“WÓÑ×ÓSRU
+NÂˆ	
+	ÜÙ\ÜÚ[Û‹[ÙËXÛÝ[	ÊK^ÛÛ[H	Ýš\ÚX›K›[™ÝHÙˆ	Ù[šY\Ë›[™ÝHÛÜ™HÙÈ[‰Ù[šY\Ë›[™ÝOOHHÈ	ÞIÈˆ	ÚY\ÉßHÚÝÛ‹˜Âˆ	
+	ÜÙ\ÜÚ[Û‹[ÙË\™YÚ[Û‰ÊK^ÛÛ[Hš\ÚX›K›X\
+
+[žJHOˆ\[Ùˆ[žHOOH	ÜÝš[™ÉÈÈ˜[œÛ]U^
+[žJHˆ	Ù›Ü›X][YJ[žK˜]
+_H8 %	Ý˜[œÛ]U^
+[žK›Y\ÜØYÙJ_X
+Kš›Ú[Š	×‰ÊNÂŸB‚™[˜Ý[Ûˆ\[™[Y[[™QšY[
+\ÝX™[˜[YJHÂˆYˆ
+]˜[YJH™]\›ŽÂˆÛÛœÝ\›HHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÂˆ\›K^ÛÛ[HX™[ÂˆÛÛœÝ\ØÜš\[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÂˆ\ØÜš\[Û‹^ÛÛ[H˜[YNÂˆ\Ý˜\[™
+\›K\ØÜš\[ÛŠNÂŸB‚™[˜Ý[Ûˆ™[™\”[•[Y[[™J
+HÂˆÛÛœÝ[Y[[™HHZKœ[•[Y[[™NÂˆÛÛœÝ\ÝH	
+	Ü[‹][Y[[™K[\Ý	ÊNÂˆYˆ
+[\Ý
+H™]\›ŽÂˆ\Ýœ™\XÙPÚ[™[Š
+NÂ‚ˆYˆ
+][Y[[™JHÂˆ	
+	Ü[‹][Y[[™K\Ý]\ÉÊK^ÛÛ[H	ô)t`4/´/t/´.ô/´,ôe´cˆ4bt-H4/t-H4-ô,4,´,4/t`´,4-´-t/t/‹‰ÎÂˆ™]\›ŽÂˆB‚ˆÛÛœÝÛÝ\˜ÙHH	
+	Ü[‹][Y[[™K\ÛÝ\˜ÙKYš[\‰ÊK˜[YH	ÐS	ÎÂˆÛÛœÝ[šY\ÈH
+[Y[[™K™[šY\È×JK™š[\Š
+[žJHOˆÛÝ\˜ÙHOOH	ÐS	È[žKœÛÝ\˜ÙHOOHÛÝ\˜ÙJNÂˆ›Üˆ
+ÛÛœÝ[žHÙˆ[šY\ÊHÂˆÛÛœÝ][HHØÝ[Y[˜Ü™X]Q[[Y[
+	ÛIÊNÂˆ][K˜Û\ÜÓ˜[YHH	Ü[‹][Y[[™KY[žIÎÂ‚ˆÛÛœÝXY[™ÈHØÝ[Y[˜Ü™X]Q[[Y[
+	Ü	ÊNÂˆXY[™Ë˜Û\ÜÓ˜[YHH	Ü[‹][Y[[™KY[žKZXY[™ÉÎÂˆÛÛœÝ[YHHØÝ[Y[˜Ü™X]Q[[Y[
+	Ý[YIÊNÂˆYˆ
+[žK˜]ˆ
+H[YK™]U[YHH™]È]J[žK˜]
+KÒTÓÔÝš[™Ê
+NÂˆ[YK^ÛÛ[H›Ü›X][YJ[žK˜]
+NÂˆÛÛœÝÛÝ\˜ÙSX™[HØÝ[Y[˜Ü™X]Q[[Y[
+	ÜÝ›Û™ÉÊNÂˆÛÝ\˜ÙSX™[^ÛÛ[H[žKœÛÝ\˜ÙHOOH	ÑPQÓ“ÔÕPÉÈÈ	ô%4e´,4,ô/t/´`t`´.4.´,	Èˆ	ÐÛÜ™HÙÉÎÂˆXY[™Ë˜\[™
+[YKØÝ[Y[˜Ü™X]U^›ÙJ	È8 %	ÊKÛÝ\˜ÙSX™[
+NÂˆYˆ
+[žK™]™[	‰ˆ[žK™]™[OOH	ÐÓÔ‘WÓÑÉÊHÂˆXY[™Ë˜\[™
+ØÝ[Y[˜Ü™X]U^›ÙJ8 %	Ù[žK™]™[X
+JNÂˆBˆ][K˜\[™
+XY[™ÊNÂ‚ˆYˆ
+[žK›Y\ÜØYÙJHÂˆÛÛœÝY\ÜØYÙHHØÝ[Y[˜Ü™X]Q[[Y[
+	Ü	ÊNÂˆY\ÜØYÙK^ÛÛ[H˜[œÛ]U^
+[žK›Y\ÜØYÙJNÂˆ][K˜\[™
+Y\ÜØYÙJNÂˆB‚ˆÛÛœÝ]Z[ÈHØÝ[Y[˜Ü™X]Q[[Y[
+	Ù	ÊNÂˆ]Z[Ë˜Û\ÜÓ˜[YHH	Ü[‹][Y[[™KY]šY[˜ÙIÎÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô(4e´,´-t/tc	Ë[žK›]™[
+NÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô%ô,4,´-4,4/t/tcÉË[žK\ÚÓX™[
+NÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô%t`´,4/ÉË[žKœ\ÙJNÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô(4-t-ô`ô.ôc4`´,4`‰Ë[žKœÝ]\ÊNÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô&´/´-	Ë[žK˜ÛÙJNÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô)´e´.ôc	Ë[žK\™Ù]
+NÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô(t/ô/´`t`´-t`4-t-´-t/t/‰Ë[žK›ØœÙ\™Y
+NÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô'´/ô-t`4,4a´e´cÉË[žK›Ü\˜][Û’YÝY™š^
+NÂˆ\[™[Y[[™QšY[
+]Z[Ë	ô$´e´-4,t.4`´/´.ˆ4/ô`4/´/4/ô`´`ÉË[žKœ›Û\š[™Ù\œš[
+NÂˆYˆ
+]Z[Ë˜Ú[™[‹›[™Ý
+H][K˜\[™
+]Z[ÊNÂ‚ˆ\Ý˜\[™
+][JNÂˆB‚ˆÛÛœÝ›Ý[™YH[Y[[™K[˜Ø]YˆÈ4'ô/´.´,4-ô,4/t/ˆ4.ô.4b4-H4/´`t`´,4/t/teˆ	Ý[Y[[™Kœ™]\›™Y[šY\ßH4e´-È	Ý[Y[[™KÝ[[šY\ßH4-ô,t-t`4-t-´-t/t.4aH4/ô/´-4e´.K˜ˆˆ	ÉÎÂˆ	
+	Ü[‹][Y[[™K\Ý]\ÉÊK^ÛÛ[Bˆ4'ô/´.´,4-ô,4/t/ˆ	Ù[šY\Ë›[™ÝH4/ô/´-4e´.H4-4.ôcÈ4,´.4,t`4,4/t/´,ô/ˆ4`t-t,4/t`t`Ë‰Ø›Ý[™YXÂŸB‚˜\Þ[˜È[˜Ý[Ûˆ™Yœ™\Ú[•[Y[[™JÈ[››Ý[˜ÙT™\Ý[H˜[ÙHHHßJHÂˆÛÛœÝÙ\ÜÚ[Û’YHZKœÙ[XÝYÙ\ÜÚ[Û’YÂˆYˆ
+\Ù\ÜÚ[Û’Y
+HÂˆZKœ[•[Y[[™HH[Âˆ™[™\”[•[Y[[™J
+NÂˆ™]\›ŽÂˆBˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÔ•S—ÕSQSS‘IËÈÙ\ÜÚ[Û’Y[Z]ˆŒJNÂˆYˆ
+Ù\ÜÚ[Û’YOOHZKœÙ[XÝYÙ\ÜÚ[Û’Y
+H™]\›ŽÂˆZKœ[•[Y[[™HH]OË[Y[[™H[Âˆ™[™\”[•[Y[[™J
+NÂˆYˆ
+[››Ý[˜ÙT™\Ý[
+H[››Ý[˜ÙJ	ô)t`4/´/t/´.ô/´,ôe´cˆ4,´.4.´/´/t,4/t/tcÈ4/´/t/´,´.ô-t/t/‹‰ÊNÂˆHØ]ÚÂˆYˆ
+Ù\ÜÚ[Û’YOOHZKœÙ[XÝYÙ\ÜÚ[Û’Y
+H™]\›ŽÂˆZKœ[•[Y[[™HH[Âˆ	
+	Ü[‹][Y[[™K[\Ý	ÊKœ™\XÙPÚ[™[Š
+NÂˆÛÛœÝØY™SY\ÜØYÙHH	ô)t`4/´/t/´.ô/´,ôe´cˆ4/t-H4-ô,4,´,4/t`´,4-´-t/t/‹ˆ4'´/t/´,´e´`´c4bt-H4`4,4-È4,4,t/ˆ4/ô-t`4-t,´e´`4`´-H4`t`´,4/HÛÜ™K‰ÎÂˆ	
+	Ü[‹][Y[[™K\Ý]\ÉÊK^ÛÛ[HØY™SY\ÜØYÙNÂˆYˆ
+[››Ý[˜ÙT™\Ý[
+H[››Ý[˜ÙJØY™SY\ÜØYÙJNÂˆBŸB‚™[˜Ý[ÛˆÛ•\ÚÐÛÛ™šYÝ\˜][Û“[ÙPÚ[™ÙJ
+HÂˆYˆ
+]ZKœÙ[XÝY
+H™]\›ŽÂˆÛÛœÝ[ÙHHÙ[XÝY\ÚÐÛÛ™šYÝ\˜][Û“[ÙJ
+NÂˆÛÛœÝ\ÈH\ÚÓ[ÙT\Ê[ÙJNÂˆZKœÙ[XÝY\›[ÙHH\Ë\›[ÙNÂˆZKœÙ[XÝYœ›Û\[ÙHH\Ëœ›Û\[ÙNÂˆ™\Ú^™U\ÚÜÊ	
+	Ý\ÚËXÛÝ[	ÊK˜[YJNÂˆYˆ
+\Ë\›[ÙHOOH	ÜÚ\™Y	ÊHÂˆÛÛœÝÚ\™Y\›H	
+	ÜÚ\™Y]\ÚË]\›	ÊK˜[YHZKœÙ[XÝY\ÚÜË™š[™
+
+\ÚÊHOˆ\ÚË\›
+OË\›	ÉÎÂˆ	
+	ÜÚ\™Y]\ÚË]\›	ÊK˜[YHHÚ\™Y\›ÂˆZKœÙ[XÝY\ÚÜË™›Ü‘XXÚ
+
+\ÚÊHOˆÈ\ÚË\›HÚ\™Y\›ÈJNÂˆBˆÞ[˜Õ\ÚÓ[ÙUš\ÚXš[]J
+NÂˆ™[™\•\ÚÜÊ
+NÂˆØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂˆ[››Ý[˜ÙJ	Õ\ÚÈÛÛ™šYÝ\˜][Ûˆ[ÙH\]Y‰ÊNÂŸB™[˜Ý[ÛˆÛ•\ÚÐÛÝ[Ú[™ÙJ
+HÂˆYˆ
+]ZKœÙ[XÝY
+H™]\›ŽÂˆ™\Ú^™U\ÚÜÊ	
+	Ý\ÚËXÛÝ[	ÊK˜[YJNÂˆYˆ
+[™™\•\›[ÙJZKœÙ[XÝY
+HOOH	ÜÚ\™Y	ÊHÂˆÛÛœÝÚ\™Y\›H	
+	ÜÚ\™Y]\ÚË]\›	ÊK˜[YNÂˆZKœÙ[XÝY\ÚÜË™›Ü‘XXÚ
+
+\ÚÊHOˆÈ\ÚË\›HÚ\™Y\›ÈJNÂˆBˆ™[™\•\ÚÜÊ
+NÂˆØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂˆÛÛœÝÙÚXØ[ÛÝ[H[X™\ŠZKœÙ[XÝY˜ÛÛ™šYÝ\™Y\ÚÐÛÝ[ZKœÙ[XÝY\ÚÜË›[™Ý
+NÂˆ[››Ý[˜ÙJ	ÛÙÚXØ[ÛÝ[H\ÚÉÛÙÚXØ[ÛÝ[OOHHÈ	ÉÈˆ	ÜÉßHÈÞXÛIÛÙÚXØ[ÛÝ[OOHHÈ	ÉÈˆ	ÜÉßHÛÛ™šYÝ\™Y˜
+NÂŸB™[˜Ý[ÛˆÛ”Ú\™Y\›[œ]
+
+HÂˆYˆ
+]ZKœÙ[XÝY
+H™]\›ŽÂˆÛÛœÝ˜[YHH	
+	ÜÚ\™Y]\ÚË]\›	ÊK˜[YNÂˆZKœÙ[XÝY\ÚÜË™›Ü‘XXÚ
+
+\ÚÊHOˆÈ\ÚË\›H˜[YNÈ\ÚË™[˜X›YHYNÈJNÂˆØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂŸB™[˜Ý[ÛˆÞ[˜ÓZ[š[][TÙ[™[\˜[›Ý[™Ê
+HÂˆÛÛœÝÙXÛÛ™ÈH	
+	ÛZ[š[][K\Ù[™Z[\˜[][š]	ÊK˜[YHOOH	ÜÙXÛÛ™ÉÎÂˆÛÛœÝ[œ]H	
+	ÛZ[š[][K\Ù[™Z[\˜[	ÊNÂˆ[œ]›Z[ˆH	ÌIÎÂˆ[œ]›X^HÙXÛÛ™ÈÈ	Î	Èˆ	ÌM	ÎÂˆ[œ]œÝ\H	ÌIÎÂŸB™[˜Ý[ÛˆÛ“Z[š[][TÙ[™[\˜[[š]Ú[™ÙJ
+HÂˆÞ[˜ÓZ[š[][TÙ[™[\˜[›Ý[™Ê
+NÂˆØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂŸB‚™[˜Ý[ÛˆÞ[˜Ô™]žP˜XÚÛÙ™›Ý[™Ê
+HÂˆÛÛœÝZ[]\ÈH	
+	Ü™]žKX˜XÚÛÙ™‹][š]	ÊK˜[YHOOH	ÛZ[]\ÉÎÂˆÛÛœÝ[œ]H	
+	Ü™]žKX˜XÚÛÙ™‰ÊNÂˆ[œ]›Z[ˆHZ[]\ÈÈ	ÌIÈˆ	ÍIÎÂˆ[œ]›X^HZ[]\ÈÈ	ÍŒ	Èˆ	ÌÍŒ	ÎÂˆ[œ]œÝ\H	ÌIÎÂŸB™[˜Ý[ÛˆÛ”™]žP˜XÚÛÙ™•[š]Ú[™ÙJ
+HÂˆÛÛœÝ™]š[Ý\Õ[š]HZKœÙ[XÝYËœ™]žP˜XÚÛÙ™•[š]OOH	ÛZ[]\ÉÈÈ	ÛZ[]\ÉÈˆ	ÜÙXÛÛ™ÉÎÂˆÛÛœÝ™^[š]H	
+	Ü™]žKX˜XÚÛÙ™‹][š]	ÊK˜[YHOOH	ÛZ[]\ÉÈÈ	ÛZ[]\ÉÈˆ	ÜÙXÛÛ™ÉÎÂˆÛÛœÝ[[Ý[H[X™\Š	
+	Ü™]žKX˜XÚÛÙ™‰ÊK˜[YJNÂˆÛÛœÝÙXÛÛ™ÈH[X™\‹š\Ñš[š]J[[Ý[
+HÈ[[Ý[
+ˆ
+™]š[Ý\Õ[š]OOH	ÛZ[]\ÉÈÈŒˆJHˆÌÂˆÛÛœÝ™^[[Ý[H™^[š]OOH	ÛZ[]\ÉÈÈX]›X^
+KX]˜ÙZ[
+ÙXÛÛ™ÈÈŒ
+JHˆX]›X^
+KÙXÛÛ™ÊNÂˆ	
+	Ü™]žKX˜XÚÛÙ™‰ÊK˜[YHHÝš[™Ê™^[[Ý[
+NÂˆYˆ
+ZKœÙ[XÝY
+HÂˆZKœÙ[XÝYœ™]žP˜XÚÛÙ™•[š]H™^[š]ÂˆZKœÙ[XÝYœ™]žP˜XÚÛÙ™”ÙXÛÛ™ÈH™^[[Ý[
+ˆ
+™^[š]OOH	ÛZ[]\ÉÈÈŒˆJNÂˆBˆÞ[˜Ô™]žP˜XÚÛÙ™›Ý[™Ê
+NÂˆØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂˆ[››Ý[˜ÙJ™]žKØ˜XÚÛÙ™ˆ[š]Ú[™ÙYÈ	Û™^[š]KˆÝ\œ™[ØZ]\È	Û™^[[Ý[H	Û™^[š]K˜
+NÂŸB™[˜Ý[Ûˆ\QY˜][›Û\
+
+HÈÛÛœÝ˜[YHH	
+	ÙY˜][][š\]YK\›Û\	ÊK˜[YNÈ]Ú[™ÙYHÈZKœÙ[XÝY\ÚÜË™›Ü‘XXÚ
+
+\ÚÊHOˆÈYˆ
+]\ÚËœ›Û\Ý™\œšYKš[J
+JHÈ\ÚËœ›Û\Ý™\œšYHH˜[YNÈÚ[™ÙY
+ÊÎÈHJNÈ™[™\•\ÚÜÊ
+NÈØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÈ[››Ý[˜ÙJY˜][›Û\\YYÈ	ØÚ[™ÙYH[\H\ÚÉØÚ[™ÙYOOHHÈ	ÉÈˆ	ÜÉßK˜
+NÈB‚™[˜Ý[ÛˆÙ]ÜX›R[\Ü[˜X›Y
+[˜X›Y[ÝÔÝ\H˜[ÙJHÂˆ	
+	Ú[\Ü\›Ùš[KX]Û‰ÊK™\ØX›YHY[˜X›YÂˆ	
+	Ú[\Ü\›Ùš[K\Ý\X]Û‰ÊK™\ØX›YHY[˜X›YX[ÝÔÝ\ÂŸB‚˜\Þ[˜È[˜Ý[ÛˆÛ”ÜX›T›Ùš[Qš[PÚ[™ÙJ
+HÂˆZKœ[™[™ÔÜX›T›Ùš[HH[ÂˆZKœ[™[™ÔÜX›T™]šY]ÈH[ÂˆÙ]ÜX›R[\Ü[˜X›Y
+˜[ÙJNÂˆÛÛœÝš[HH	
+	ÜÜX›K\›Ùš[KYš[IÊK™š[\ÏË–ÌNÂˆYˆ
+Yš[JHÂˆ	
+	ÜÜX›K\›Ùš[K\™]šY]ÉÊK^ÛÛ[H	Ó›ÈÛÛ™šYÝ\˜][Ûˆš[HÙ[XÝY‰ÎÂˆ™]\›ŽÂˆBˆžHÂˆÛÛœÝ›Ùš[HH\œÙTÜX›RœÛÛŠ]ØZ]š[K^
+
+JNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	Ô‘U’QU×ÔÔ•P“WÔ“Ñ’SIËÈ›Ùš[HJNÂˆZKœ[™[™ÔÜX›T›Ùš[HH›Ùš[NÂˆZKœ[™[™ÔÜX›T™]šY]ÈH]Kœ™]šY]ÎÂˆÛÛœÝ™]šY]ÈH]Kœ™]šY]ÎÂˆ	
+	ÜÜX›K\›Ùš[K\™]šY]ÉÊK^ÛÛ[H›Ùš[H	Ü™]šY]Ëœ›Ùš[S˜[Y_Nˆ	Ü™]šY]ËœÙ\ÜÚ[ÛÛÝ[HÙ\ÜÚ[ÛŠÊK	Ü™]šY]Ë\ÚÐÛÝ[H\ÚÊÊK	Ü™]šY]Ë˜]]ÔÝ\Ù\ÜÚ[ÛÛÝ[HX\šÙY›Üˆ]]ÛX]XÈÝ\˜ÂˆÙ]ÜX›R[\Ü[˜X›Y
+YK™]šY]Ë˜]]ÔÝ\Ù\ÜÚ[ÛÛÝ[ˆ
+NÂˆ	
+	ÜÜX›K\›Ùš[K\™]šY]ÉÊK™›ØÝ\Ê
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÜÜX›K\›Ùš[K\™]šY]ÉÊK^ÛÛ[HÛÛ™šYÝ\˜][Ûˆš[H\œ›ÜŽˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ	
+	ÜÜX›K\›Ùš[K\™]šY]ÉÊK™›ØÝ\Ê
+NÂˆBŸB‚˜\Þ[˜È[˜Ý[Ûˆ[\ÜÜX›T›Ùš[JÛÛ™š\›P]]ÔÝ\
+HÂˆYˆ
+]ZKœ[™[™ÔÜX›T›Ùš[JH™]\›ŽÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÒSTÔ•ÔÔ•P“WÔ“Ñ’SIËÂˆ›Ùš[NˆZKœ[™[™ÔÜX›T›Ùš[KˆÛÛ™š\›P]]ÔÝ\ˆJNÂˆÛÛœÝ[\ÜYYÈH]OËœÝ[[X\žOËš[\ÜYÙ\ÜÚ[Û’YÈ×NÂˆ›Üˆ
+ÛÛœÝYÙˆ[\ÜYYÊHÛX\‘˜Y
+Y
+NÂˆZKœÙ\ÜÚ[Û“\ÝÚYÛ˜]\™HH	ÉÎÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊÈ™\Ù\™Q›ØÝ\Îˆ˜[ÙHJNÂˆ]ØZ]ØY™[[ÝQ\Ü]ÚÝ]\Ê
+NÂˆYˆ
+[\ÜYYÖÌJH]ØZ]Ü[”Ù\ÜÚ[ÛŠ[\ÜYYÖÌJNÂˆÛÛœÝÝ\YH]OËœÝ[[X\žOËœÝ\YÙ\ÜÚ[Û’YÏË›[™ÝÂˆ™\ÜÛÛ[X[™™\Ý[
+ÜX›HÛÛ™šYÝ\˜][Ûˆ[\ÜYˆ	Ú[\ÜYYË›[™ÝHÙ\ÜÚ[ÛŠÊKˆ	ÜÝ\YHÙ\ÜÚ[ÛŠÊHÝ\Y˜
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÂˆ™\ÜÛÛ[X[™™\Ý[
+[\Ü˜Z[Yˆ	Ù\œ›Ü‹›Y\ÜØYÙ_X
+NÂˆBŸB‚™[˜Ý[ÛˆØY™Qš[S˜[YJ˜[YJHÂˆ™]\›ˆÝš[™Ê˜[YH	ÐÚ]ÔP]]Ü[Ý\›Ùš[IÊKœ™\XÙJÖ×ÎŠÈŸJËÙË	ËIÊKœÛXÙJL
+H	ÐÚ]ÔP]]Ü[Ý\›Ùš[IÎÂŸB™[˜Ý[ÛˆÝÛ›ØYœÛÛŠ]Kš[S˜[YJHÂˆÛÛœÝ›ØˆH™]È›ØŠØ	Ò”ÓÓ‹œÝš[™ÚYžJ]K[Š_W˜KÈ\Nˆ	Ø\XØ][Û‹ÚœÛÛŽØÚ\œÙ]]]‹N	ÈJNÂˆÛÛœÝ\›HT“˜Ü™X]SØš™XÝT“
+›ØŠNÂˆÛÛœÝ[šÈHØÝ[Y[˜Ü™X]Q[[Y[
+	ØIÊNÂˆ[šËš™YˆH\›Âˆ[šË™ÝÛ›ØYHš[S˜[YNÂˆØÝ[Y[˜›ÙK˜\[™
+[šÊNÂˆ[šË˜ÛXÚÊ
+NÂˆ[šËœ™[[Ý™J
+NÂˆÙ][Y[Ý]
+
+
+HOˆT“œ™]›ÚÙSØš™XÝT“
+\›
+K
+NÂŸB˜\Þ[˜È[˜Ý[Ûˆ^ÜÜX›T›Ùš[J
+HÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑVÔ•ÔÔ•P“WÔ“Ñ’SIËÈ›Ùš[S˜[YNˆ	ÐÚ]Ô4$4,´`´/´/ôe´.ô/´`ˆ8 %4-t.´`t/ô/´`4`‰ÈJNÂˆÝÛ›ØYœÛÛŠ]Kœ›Ùš[K	ÜØY™Qš[S˜[YJ]Kœ›Ùš[Kœ›Ùš[S˜[YJ_KšœÛÛ˜
+NÂˆ™\ÜÛÛ[X[™™\Ý[
+^ÜY	Ù]Kœ›Ùš[KœÙ\ÜÚ[ÛœË›[™ÝHÙ\ÜÚ[ÛŠÊHÈ”ÓÓ‹˜
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÂˆ™\ÜÛÛ[X[™™\Ý[
+^Ü˜Z[Yˆ	Ù\œ›Ü‹›Y\ÜØYÙ_X
+NÂˆBŸB‚™[˜Ý[ÛˆÝÛ›ØY^
+]Kš[S˜[YJHÂˆÛÛœÝ›ØˆH™]È›ØŠÔÝš[™Ê]H	ÉÊWKÈ\Nˆ	Ý^ÜZ[ŽØÚ\œÙ]]]‹N	ÈJNÂˆÛÛœÝ\›HT“˜Ü™X]SØš™XÝT“
+›ØŠNÂˆÛÛœÝ[šÈHØÝ[Y[˜Ü™X]Q[[Y[
+	ØIÊNÂˆ[šËš™YˆH\›Âˆ[šË™ÝÛ›ØYHš[S˜[YNÂˆØÝ[Y[˜›ÙK˜\[™
+[šÊNÂˆ[šË˜ÛXÚÊ
+NÂˆ[šËœ™[[Ý™J
+NÂˆÙ][Y[Ý]
+
+
+HOˆT“œ™]›ÚÙSØš™XÝT“
+\›
+K
+NÂŸB‚™[˜Ý[ÛˆXYÛ›ÜÝXÑš[S˜[YJ
+HÂˆÛÛœÝÝ[\H™]È]J
+KÒTÓÔÝš[™Ê
+Kœ™\XÙJÖÎ‹—KÙË	ËIÊNÂˆ™]\›ˆÚ]Ôt$4,´`´/´/ôe´.ô/´`‹t-4e´,4,ô/t/´`t`´.4.´,IÜÝ[\KÂŸB‚˜\Þ[˜È[˜Ý[ÛˆÝÛ›ØYXYÛ›ÜÝXÔ™\Ü
+
+HÂˆžHÂˆÛÛœÝ^[œÚ[Û•™\œÚ[ÛˆHÛØ˜[\Ë˜Ú›ÛYOËœ[[YOË™Ù]X[šY™\ÝËŠ
+K™\œÚ[Ûˆ	ô/t-t,´e´-4/´/4/‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÑPQÓ“ÔÕP×Ô‘TÔ•	ËÈ^[œÚ[Û•™\œÚ[ÛˆJNÂˆÝÛ›ØY^
+]Kœ™\ÜXYÛ›ÜÝXÑš[S˜[YJ
+JNÂˆÛÛœÝY\ÜØYÙHH	ô%4e´,4,ô/t/´`t`´.4aô/t.4.H4-ô,´e´`ˆ4-ô,4,´,4/t`´,4-´-t/t/‹‰ÎÂˆ	
+	ÙXYÛ›ÜÝXË\™\Ü\Ý]\ÉÊK^ÛÛ[HY\ÜØYÙNÂˆ™\ÜÛÛ[X[™™\Ý[
+Y\ÜØYÙJNÂˆHØ]Ú
+\œ›ÜŠHÂˆÛÛœÝY\ÜØYÙHH4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.4-4e´,4,ô/t/´`t`´.4aô/t.4.H4-ô,´e´`Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆ	
+	ÙXYÛ›ÜÝXË\™\Ü\Ý]\ÉÊK^ÛÛ[HY\ÜØYÙNÂˆÙ]\Ý]\Ê\œ›Ü‹›Y\ÜØYÙJNÂˆ[››Ý[˜ÙJY\ÜØYÙJNÂˆBŸB‚˜\Þ[˜È[˜Ý[ÛˆÝÛ›ØYÚ[\YšYYXYÛ›ÜÝXÔ™\Ü
+
+HÂˆžHÂˆÛÛœÝ^[œÚ[Û•™\œÚ[ÛˆHÛØ˜[\Ë˜Ú›ÛYOËœ[[YOË™Ù]X[šY™\ÝËŠ
+K™\œÚ[Ûˆ	ô/t-t,´e´-4/´/4/‰ÎÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑÑUÑPQÓ“ÔÕP×Ô‘TÔ•	ËÈ^[œÚ[Û•™\œÚ[ÛˆJNÂˆÝÛ›ØY^
+]Kœ™\ÜXYÛ›ÜÝXÑš[S˜[YJ
+JNÂˆ	
+	ÜÚ[\YšYYYXYÛ›ÜÝXË\™\Ü\Ý]\ÉÊK^ÛÛ[H	ô%4e´,4,ô/t/´`t`´.4aô/t.4.H4-ô,´e´`ˆ4-ô,4,´,4/t`´,4-´-t/t/‹‰ÎÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	ô%4e´,4,ô/t/´`t`´.4aô/t.4.H4-ô,´e´`ˆ4-ô,4,´,4/t`´,4-´-t/t/‹‰ÎÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÜÚ[\YšYYYXYÛ›ÜÝXË\™\Ü\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-ô,4,´,4/t`´,4-´.4`´.4-4e´,4,ô/t/´`t`´.4aô/t.4.H4-ô,´e´`Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸB‚›]XYÛ›ÜÝXÔÛ˜\ÚÝ[‘›YÚH˜[ÙNÂ˜\Þ[˜È[˜Ý[Ûˆ™XÛÜ™\Ú›Ø\™XYÛ›ÜÝXÔÛ˜\ÚÝ
+
+HÂˆYˆ
+XYÛ›ÜÝXÔÛ˜\ÚÝ[‘›YÚ]ZKœÙ[XÝYÙ\ÜÚ[Û’Y]ZKœÙ[XÝY
+H™]\›ŽÂˆYˆ
+VÉÔ•S“’S‘ÉË	Ô‘PÓÕ‘T’S‘É×Kš[˜ÛY\ÊZKœÙ[XÝYœ[”Ý]JJH™]\›ŽÂˆXYÛ›ÜÝXÔÛ˜\ÚÝ[‘›YÚHYNÂˆžHÂˆ]ØZ]ÛÜ™J	Ô‘PÓÔ‘ÑPQÓ“ÔÕP×ÔÓTÒÕ	ËÈÙ\ÜÚ[Û’YˆZKœÙ[XÝYÙ\ÜÚ[Û’YJNÂˆHØ]ÚÂˆËÈXYÛ›ÜÝXÜÈ]\Ý™]™\ˆÝX[›ØÝ\Ë[››Ý[˜ÙH™\X]YKÜˆ›ØÚÈ^XÝ][Û‹‚ˆHš[˜[HÂˆXYÛ›ÜÝXÔÛ˜\ÚÝ[‘›YÚH˜[ÙNÂˆBŸB‚›]Ý]\Ô™Yœ™\Ú[Y\ˆH[Â›]Ý]\Ô™Yœ™\Ú[‘›YÚH˜[ÙNÂ›]Ý]\Ô™Yœ™\Ú]Y]YYH˜[ÙNÂ˜ÛÛœÝ\TÝ]\ÔÙ\ÜÚ[Û’YÈH™]ÈÙ]
+
+NÂ™[˜Ý[Ûˆ]Y]YTÝ]\Ô™Yœ™\Ú
+Ù\ÜÚ[Û’Y
+HÂˆYˆ
+Ù\ÜÚ[Û’Y
+H\TÝ]\ÔÙ\ÜÚ[Û’YË˜Y
+Ù\ÜÚ[Û’Y
+NÂˆYˆ
+Ý]\Ô™Yœ™\Ú[Y\ˆÝ]\Ô™Yœ™\Ú[‘›YÚ
+HÂˆÝ]\Ô™Yœ™\Ú]Y]YYHYNÂˆ™]\›ŽÂˆBˆÝ]\Ô™Yœ™\Ú[Y\ˆHÙ][Y[Ý]
+›\ÚÝ]\Ô™Yœ™\ÚÕUT×Ô‘Q”‘TÒÑSVWÓTÊNÂŸB˜\Þ[˜È[˜Ý[Ûˆ›\ÚÝ]\Ô™Yœ™\Ú
+
+HÂˆÝ]\Ô™Yœ™\Ú[Y\ˆH[ÂˆYˆ
+Ý]\Ô™Yœ™\Ú[‘›YÚ
+HÈÝ]\Ô™Yœ™\Ú]Y]YYHYNÈ™]\›ŽÈBˆÝ]\Ô™Yœ™\Ú[‘›YÚHYNÂˆÛÛœÝ\HH™]ÈÙ]
+\TÝ]\ÔÙ\ÜÚ[Û’YÊNÂˆ\TÝ]\ÔÙ\ÜÚ[Û’YË˜ÛX\Š
+NÂˆÝ]\Ô™Yœ™\Ú]Y]YYH˜[ÙNÂˆžHÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊ
+NÂˆYˆ
+ZKœÙ[XÝYÙ\ÜÚ[Û’Y	‰ˆ\Kš\ÊZKœÙ[XÝYÙ\ÜÚ[Û’Y
+JHÂˆ]ØZ]™Yœ™\ÚÙ[XÝYÙ\ÜÚ[Û”Ý]\ÊZKœÙ[XÝYÙ\ÜÚ[Û’Y
+NÂˆBˆHš[˜[HÂˆÝ]\Ô™Yœ™\Ú[‘›YÚH˜[ÙNÂˆYˆ
+Ý]\Ô™Yœ™\Ú]Y]YY\TÝ]\ÔÙ\ÜÚ[Û’YËœÚ^™JH]Y]YTÝ]\Ô™Yœ™\Ú
+
+NÂˆBŸB‚‰
+	Û[ÙK\Ù\ÜÚ[ÛœÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ÜÙ\ÜÚ[ÛœÉËÈ›ØÝ\ÎˆYHJJNÂ‰
+	Û[ÙK\Ú[\YšYY	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ÜÚ[\YšYY	ËÈ›ØÝ\ÎˆYHJJNÂ‰
+	Û[ÙK[Ü˜Ú\Ý˜][Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ÛÜ˜Ú\Ý˜][Û‰ËÈ›ØÝ\ÎˆYHJJNÂ‰
+	Û[ÙK\ØÙ[˜\š[Ë]ÛÜšÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ÜØÙ[˜\š[Ë]ÛÜšÉËÈ›ØÝ\ÎˆYHJJNÂ‰
+	Û[ÙKXYÙ[	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ØYÙ[	ËÈ›ØÝ\ÎˆYHJJNÂ‰
+	ØYÙ[]ÛÜšÙ\‹\ÛXÞK[[šÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈÙ]ZS[ÙJ	ØZIÊNÈ	
+	ØZK]ÛÜšÙ\‹XÛÝ[X]]ÉÊK™›ØÝ\Ê
+NÈJNÂ‰
+	ØYÙ[\Ø]™KY^XÝ][Û‹\ÛXÞKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYØ]™Pœ›ÝÜÙ\YÙ[^XÝ][Û”ÛXÞJ
+NÈJNÂ‰
+	Û[ÙKXZIÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ZS[ÙJ	ØZIËÈ›ØÝ\ÎˆYHJJNÂ‰
+	Û[ÙK]XœÉÊK˜Y]™[\Ý[™\Š	ÚÙ^YÝÛ‰Ë
+]™[
+HOˆÂˆYˆ
+VÉÐ\œ›ÝÓY	Ë	Ð\œ›ÝÔšYÚ	Ë	ÒÛYIË	Ñ[™	×Kš[˜ÛY\Ê]™[šÙ^JJH™]\›ŽÂˆÛÛœÝÜ™\™YHÉÜÙ\ÜÚ[ÛœÉË	ÜÚ[\YšYY	Ë	ÛÜ˜Ú\Ý˜][Û‰Ë	ÜØÙ[˜\š[Ë]ÛÜšÉË	ØYÙ[	Ë	ØZI×NÂˆÛÛœÝÝ\œ™[HÜ™\™Y™š[™[™^
+˜[YHOˆ	
+[ÙKIÝ˜[Y_X
+OË™Ù]]šX]J	Ø\šXK\Ù[XÝY	ÊHOOH	ÝYIÊNÂˆ][™^HÝ\œ™[ÈˆÝ\œ™[ÂˆYˆ
+]™[šÙ^HOOH	ÒÛYIÊH[™^HÂˆ[ÙHYˆ
+]™[šÙ^HOOH	Ñ[™	ÊH[™^HÜ™\™Y›[™ÝHNÂˆ[ÙH[™^H
+[™^
+È
+]™[šÙ^HOOH	Ð\œ›ÝÔšYÚ	ÈÈHˆLJH
+ÈÜ™\™Y›[™Ý
+H	HÜ™\™Y›[™ÝÂˆ]™[œ™]™[Y˜][
+
+NÂˆÙ]ZS[ÙJÜ™\™YÚ[™^KÈ›ØÝ\ÎˆYHJNÂŸJNÂ‚‰
+	ÜÚ[\YšYYXÛÛ™šYË[[ÙIÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË\]TÚ[\YšYY[ÙJNÂ‰
+	ÜÚ[\YšYY\›Ùš[KX\IÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYØ]™TÚ[\YšYY›Ùš[TÙ][™ÜÊ
+NÈJNÂ‰
+	ÜÚ[\YšYY[™]ÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈÚÝÔÚ[\YšYYÙ\ÜÚ[ÛŠ[
+NÈ	
+	ÜÚ[\YšYY[˜[YIÊK™›ØÝ\Ê
+NÈJNÂ‰
+	ÜÚ[\YšYY[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÈ›ÚYÙ[XÝÚ[\YšYYÙ\ÜÚ[ÛŠ	
+	ÜÚ[\YšYY[\Ý	ÊK˜[YJNÈJNÂ‰
+	ÜÚ[\YšYY\Ø]™IÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYØ]™TÚ[\YšYYÙ\ÜÚ[ÛŠ
+NÈJNÂ™›Üˆ
+ÛÛœÝÚYÛÛ[X[™HÙˆÂˆÉÜÚ[\YšYY\Ý\	Ë	ÔÕT•ÔÑTÔÒSÓ‰×KÉÜÚ[\YšYY\]\ÙIË	ÔUTÑWÔÑTÔÒSÓ‰×KˆÉÜÚ[\YšYY\™\Ý[YIË	Ô‘TÕSQWÔÑTÔÒSÓ‰×KÉÜÚ[\YšYY\ÝÜ	Ë	ÔÕÔÔÑTÔÒSÓ‰×K—JH	
+Y
+K˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYÚ[\YšYYXÝ[ÛŠÛÛ[X[™
+NÈJNÂ‰
+	ÜÚ[\YšYYY\XØ]IÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\Þ[˜È
+
+HOˆÂˆYˆ
+]ZKœÚ[\YšYYÙ[XÝYY
+H™]\›ŽÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑTPÐUWÔÑTÔÒSÓ‰ËÈÙ\ÜÚ[Û’YˆZKœÚ[\YšYYÙ[XÝYYJNÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊ
+NÈÚÝÔÚ[\YšYYÙ\ÜÚ[ÛŠ]KœÙ\ÜÚ[ÛŠNÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	ô(t-t,4/t`H4-4`ô,t.ôc4/´,´,4/t/‹‰ÎÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H\œ›Ü‹›Y\ÜØYÙNÈBŸJNÂ‰
+	ÜÚ[\YšYYY[]IÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË]™[OˆÂˆYˆ
+ZKœÚ[\YšYYÙ[XÝYY
+HÜ[‘[]QX[ÙÊZKœÚ[\YšYYÙ[XÝYY]™[˜Ý\œ™[\™Ù]
+NÂŸJNÂ‰
+	ÜÚ[\YšYYXÛX\‹[ÙÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\Þ[˜È
+
+HOˆÂˆYˆ
+]ZKœÚ[\YšYYÙ[XÝYY
+HÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	ô(t-t,4/t`H4/t-H4,´.4,t`4,4/t/‹‰ÎÂˆ™]\›ŽÂˆBˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÐÓPT—ÓÑÉËÈÙ\ÜÚ[Û’YˆZKœÚ[\YšYYÙ[XÝYYJNÂˆ™[™\”Ú[\YšYYÙÊ]KœÙ\ÜÚ[ÛŠNÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	ô%´`ô`4/t,4.È4/´aô.4bt-t/t/‹‰ÎÂˆHØ]Ú
+\œ›ÜŠHÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4/´aô.4`t`´.4`´.4-´`ô`4/t,4.Îˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÂˆBŸJNÂ‰
+	ÜÚ[\YšYYZ[\ÜYš[IÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÂˆÛÛœÝš[HH	
+	ÜÚ[\YšYYZ[\ÜYš[IÊK™š[\ÏË–ÌNÂˆ	
+	ÜÚ[\YšYYZ[\Ü\Ý]\ÉÊK^ÛÛ[Hš[HÈ4!´/4/ô/´`4`ˆ”ÓÓŽˆ	Ùš[K›˜[Y_Xˆ	ô!´/4/ô/´`4`ˆ”ÓÓŽˆ4)4,4.t.È4/t-H4,´.4,t`4,4/t/‹‰ÎÂŸJNÂ‰
+	ÜÚ[\YšYYZ[\Ü	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚY[\ÜÚ[\YšYY›Ùš[J˜[ÙJNÈJNÂ‰
+	ÜÚ[\YšYYZ[\Ü\Ý\	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚY[\ÜÚ[\YšYY›Ùš[JYJNÈJNÂ‰
+	ÜÚ[\YšYYY^Ü	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\Þ[˜È
+
+HOˆÂˆžHÂˆYˆ
+]ZKœÚ[\YšYYÙ[XÝYY
+H›ÝÈ™]È\œ›ÜŠ	ô'´,t-t`4e´`´c4-ô,t-t`4-t-´-t/t.4.H4`t-t,4/t`K‰ÊNÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	ÑVÔ•ÔÔ•P“WÔ“Ñ’SIËÈÙ\ÜÚ[Û’YÎˆÝZKœÚ[\YšYYÙ[XÝYYK›Ùš[S˜[YNˆZKœÚ[\YšYYÙ[XÝYË›˜[YH	ô(t/ô`4/´bt-t/t.4.H4`t-t,4/t`IÈJNÂˆÝÛ›ØYœÛÛŠ]Kœ›Ùš[K	ÜØY™Qš[S˜[YJ]Kœ›Ùš[Kœ›Ùš[S˜[YJ_KšœÛÛ˜
+NÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	Ò”ÓÓˆ4-t.´`t/ô/´`4`´/´,´,4/t/‹‰ÎÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H\œ›Ü‹›Y\ÜØYÙNÈBŸJNÂ‰
+	ÜÚ[\YšYY][\]IÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÂˆÛÛœÝÛÛ™šYÈHZ[Ú[\YšYYÙ\ÜÚ[ÛÛÛ™šYÊÂˆ˜[YNˆ	ô't/´,´.4.H4`t-t,4/t`IË[ÙNˆ	ÜÚ\™Y\Ú\™Y	Ë\›ˆ	ÚÎ‹ËØÚ]Ü˜ÛÛKÉËˆ›Û\ˆ	ô'ô`4/´-4/´,´-´`ô.H4`4/´-ô`4/´,t.´`Ë‰Ë[“[ÙNˆ	ØÛÛ[[Ý\ÉËÞXÛ\Îˆ	ÌIËˆ[\˜[ˆ	Ì‰Ë[\˜[[š]ˆ	ÛZ[]\ÉË[^Nˆ	ÌŒ	Ë\ÞNˆ	Ì‰Ëˆ™]žNˆ	ÌÌ	Ë™]žU[š]ˆ	ÜÙXÛÛ™ÉË™]žTÛXÞNˆ	ÜØY™IËˆ\ÞP™Z]š[ÜŽˆ	ÜÚÚ\[™^	ËXœÎˆ	ÚÙY\[Ü[‰ËˆJNÂˆÝÛ›ØYœÛÛŠÈ›Ü›X]ˆ	ØÚ]ÜX]]Ü[Ý\›Ùš[IË™\œÚ[ÛŽˆK›Ùš[S˜[YNˆ	ô(t/ô`4/´bt-t/t.4.H4`t-t,4/t`IË]]ÔÝ\ˆ˜[ÙKÙ\ÜÚ[ÛœÎˆÞÈ‹‹˜ÛÛ™šYË]]ÔÝ\ˆ˜[ÙHWHK	ô(t/ô`4/´bt-t/t.4.Kt`t-t,4/t`Ktb4,4,t.ô/´/KšœÛÛ‰ÊNÂˆ	
+	ÜÚ[\YšYYXÛÛ[X[™\™\Ý[	ÊK^ÛÛ[H	ô*4,4,t.ô/´/H”ÓÓˆ4-t.´`t/ô/´`4`´/´,´,4/t/‹‰ÎÂŸJNÂ‰
+	ÜÚ[\YšYYYXYÛ›ÜÝXÜÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYÝÛ›ØYÚ[\YšYYXYÛ›ÜÝXÔ™\Ü
+
+NÈJNÂ‰
+	ÜÚ[\YšYYYY]Ü‰ÊK˜Y]™[\Ý[™\Š	Ú[œ]	Ë]™[OˆÂˆYˆ
+]™[\™Ù]˜ÛÜÙ\Ý
+	Ø]Û‰ÊJH™]\›ŽÂˆZKœÚ[\YšYY\HHYNÂˆ	
+	ÜÚ[\YšYYY˜Y\Ý]\ÉÊK^ÛÛ[H	ô!4/t-t-ô,t-t`4-t-´-t/teˆ4-ô/4e´/t.‰ÎÂŸJNÂ‰
+	ÜÚ[\YšYYYY]Ü‰ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË]™[OˆÂˆYˆ
+]™[\™Ù]˜ÛÜÙ\Ý
+	Ø]Û‰ÊJH™]\›ŽÂˆZKœÚ[\YšYY\HHYNÂˆ	
+	ÜÚ[\YšYYY˜Y\Ý]\ÉÊK^ÛÛ[H	ô!4/t-t-ô,t-t`4-t-´-t/teˆ4-ô/4e´/t.‰ÎÂŸJNÂ‚™›Üˆ
+ÛÛœÝ[™[ÙˆÐÑST’S×ÕÓÔ’×ÔS‘SÊH	
+	ÜØÙ[˜\š[Ë]ÛÜšË]X‹IÈ
+È[™[
+K˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]ØÙ[˜\š[ÕÛÜšÔ[™[
+[™[È›ØÝ\ÎˆYHJJNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšË]XœÉÊK˜Y]™[\Ý[™\Š	ÚÙ^YÝÛ‰Ë
+]™[
+HOˆÂˆYˆ
+VÉÐ\œ›ÝÓY	Ë	Ð\œ›ÝÔšYÚ	Ë	ÒÛYIË	Ñ[™	×Kš[˜ÛY\Ê]™[šÙ^JJH™]\›ŽÂˆÛÛœÝÝ\œ™[HÐÑST’S×ÕÓÔ’×ÔS‘SË™š[™[™^
+˜[YHOˆ	
+ØÙ[˜\š[Ë]ÛÜšË]X‹IÝ˜[Y_X
+K™Ù]]šX]J	Ø\šXK\Ù[XÝY	ÊHOOH	ÝYIÊNÂˆ][™^HÝ\œ™[ÈˆÝ\œ™[ÂˆYˆ
+]™[šÙ^HOOH	ÒÛYIÊH[™^HÂˆ[ÙHYˆ
+]™[šÙ^HOOH	Ñ[™	ÊH[™^HÐÑST’S×ÕÓÔ’×ÔS‘SË›[™ÝHNÂˆ[ÙH[™^H
+[™^
+È
+]™[šÙ^HOOH	Ð\œ›ÝÔšYÚ	ÈÈHˆLJH
+ÈÐÑST’S×ÕÓÔ’×ÔS‘SË›[™Ý
+H	HÐÑST’S×ÕÓÔ’×ÔS‘SË›[™ÝÂˆ]™[œ™]™[Y˜][
+
+NÂˆÙ]ØÙ[˜\š[ÕÛÜšÔ[™[
+ÐÑST’S×ÕÓÔ’×ÔS‘SÖÚ[™^KÈ›ØÝ\ÎˆYHJNÂŸJNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšË[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÜ[”ØÙ[˜\š[ÕÛÜšÕ\™Ù]
+	
+	ÜØÙ[˜\š[Ë]ÛÜšË[\Ý	ÊK˜[YJJNÂ‰
+	Û™]Ë\ØÙ[˜\š[ËXÞXÛKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÜ™X]TØÙ[˜\š[ÕÛÜšÊ	ÐÒUÐÖPÓIÊJNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšË][\]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÝÛ›ØYØÙ[˜\š[ÕÛÜšÕ[\]JNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšËZ[\ÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[\ÜØÙ[˜\š[ÕÛÜšÔ›Ùš[JNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšËY^ÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË^ÜØÙ[˜\š[ÕÛÜšÔ›Ùš[JNÂ‰
+	ÜØÙ[˜\š[ËXÞXÛKZ[š]X[\ÝYÙÙ\‹][š]	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÞ[˜ÔØÙ[˜\š[Ò[š]X[ÝYÙÙ\›Ý[™ÊNÂ‰
+	ÜØÙ[˜\š[ËXÞXÛK\Ý\\\˜[[	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÝ\\˜[[ØÙ[˜\š[ÐÚ]ÊNÂ‰
+	Û™]Ë\ØÙ[˜\š[Ë\Z\œËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÜ™X]TØÙ[˜\š[ÕÛÜšÊ	ÔRT”ÉÊJNÂ‰
+	Û™]Ë\ØÙ[˜\š[ËYÜ›Ý\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÜ™X]TØÙ[˜\š[ÕÛÜšÊ	ÐUQUÔ—ÑÔ“ÕT	ÊJNÂ‰
+	Û™]Ë\ØÙ[˜\š[Ë\\[[™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÜ™X]TØÙ[˜\š[ÕÛÜšÊ	ÐUQUÔ—ÔTSS‘IÊJNÂ‰
+	ÜØ]™K\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™TØÙ[˜\š[ÕÛÜšÊNÂ‰
+	ÜÝ\\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØÙ[˜\š[ÕÛÜšÓY™XÞXÛJ	ÔÕT•ÔÐÑST’S×ÕÓÔ’ÉË	ô(ta´-t/t,4`4e´.H4-ô,4/ô`ôbt-t/t/‹‰ÊJNÂ‰
+	Ü]\ÙK\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØÙ[˜\š[ÕÛÜšÓY™XÞXÛJ	ÔUTÑWÔÐÑST’S×ÕÓÔ’ÉË	ô(ta´-t/t,4`4e´.H4/ô`4.4-ô`ô/ô.4/t-t/t/‹‰ÊJNÂ‰
+	Ü™\Ý[YK\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØÙ[˜\š[ÕÛÜšÓY™XÞXÛJ	Ô‘TÕSQWÔÐÑST’S×ÕÓÔ’ÉË	ô(ta´-t/t,4`4e´.H4/ô`4/´-4/´,´-´-t/t/‹‰ÊJNÂ‰
+	ÜÝÜ\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØÙ[˜\š[ÕÛÜšÓY™XÞXÛJ	ÔÕÔÔÐÑST’S×ÕÓÔ’ÉË	ô(ta´-t/t,4`4e´.H4-ô`ô/ô.4/t-t/t/‹‰ÊJNÂ‰
+	Ù[]K\ØÙ[˜\š[Ë]ÛÜšËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[]TØÙ[˜\š[ÕÛÜšÊNÂ‰
+	ÜØÙ[˜\š[Ë]ÛÜšË\[‹[›ÝÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[”ØÙ[˜\š[ÕÛÜšÓ›ÝÊNÂ‰
+	ÜØÙ[˜\š[ËXÞXÛKXY\Ý\	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÂˆÛÛœÝÛÛZ[™\ˆH	
+	ÜØÙ[˜\š[ËXÞXÛK\Ý\ÉÊNÂˆÛÛœÝ›ÝÈHÜ™X]TØÙ[˜\š[ÐÞXÛTÝ\
+È›Û\ˆ	ÉË™\X]ˆHKÛÛZ[™\‹œ]Y\žTÙ[XÝÜ[
+	ÖÙ]K\ØÙ[˜\š[Ë\Ý\IÊK›[™Ý
+NÂˆÛÛZ[™\‹˜\[™
+›ÝÊNÂˆ™[[X™\”ØÙ[˜\š[ÐÞXÛTÝ\Ê
+NÂˆ\]TØÙ[˜\š[ÐÞXÛSY\ÜØYÙPÛÝ[
+
+NÂˆ›ÝËœ]Y\žTÙ[XÝÜŠ	Ý^\™XIÊOË™›ØÝ\Ê
+NÂˆ[››Ý[˜ÙJ	ô%4/´-4,4/t/ˆ4/t/´,´.4.H4/ô`4/´/4/ô`‹‰ÊNÂŸJNÂ‰
+	ÜØÙ[˜\š[ËXÞXÛK\Ý\ÉÊK˜Y]™[\Ý[™\Š	Ú[œ]	Ë\]TØÙ[˜\š[ÐÞXÛSY\ÜØYÙPÛÝ[
+NÂ‚™›Üˆ
+ÛÛœÝ[™[ÙˆÔÒTÕUSÓ—ÔS‘SÊH	
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]X‹IÈ
+È[™[
+K˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ]Ü˜Ú\Ý˜][Û”[™[
+[™[È›ØÝ\ÎˆYHJJNÂ‰
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹]XœÉÊK˜Y]™[\Ý[™\Š	ÚÙ^YÝÛ‰Ë
+]™[
+HOˆÂˆYˆ
+VÉÐ\œ›ÝÓY	Ë	Ð\œ›ÝÔšYÚ	Ë	ÒÛYIË	Ñ[™	×Kš[˜ÛY\Ê]™[šÙ^JJH™]\›ŽÂˆÛÛœÝ[˜X›YHÔÒTÕUSÓ—ÔS‘SË™š[\Š˜[YHOˆI
+Ü˜Ú\Ý˜][Û‹]Œ‹]X‹IÝ˜[Y_X
+K™\ØX›Y
+NÂˆÛÛœÝÝ\œ™[H[˜X›Y™š[™[™^
+˜[YHOˆ	
+Ü˜Ú\Ý˜][Û‹]Œ‹]X‹IÝ˜[Y_X
+K™Ù]]šX]J	Ø\šXK\Ù[XÝY	ÊHOOH	ÝYIÊNÂˆ][™^HÝ\œ™[ÈˆÝ\œ™[ÂˆYˆ
+]™[šÙ^HOOH	ÒÛYIÊH[™^HÈ[ÙHYˆ
+]™[šÙ^HOOH	Ñ[™	ÊH[™^H[˜X›Y›[™ÝHNÂˆ[ÙH[™^H
+[™^
+È
+]™[šÙ^HOOH	Ð\œ›ÝÔšYÚ	ÈÈHˆLJH
+È[˜X›Y›[™Ý
+H	H[˜X›Y›[™ÝÂˆ]™[œ™]™[Y˜][
+
+NÈÙ]Ü˜Ú\Ý˜][Û”[™[
+[˜X›YÚ[™^KÈ›ØÝ\ÎˆYHJNÂŸJNÂ‰
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜K[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	Û™]Ë[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÜ™X]SÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	Ü™[˜[YK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™[˜[YSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	ÜÝ\[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÝ\Ü˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	Ü]\ÙK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË]\ÙSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	Ü™\Ý[YK[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™\Ý[YSÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	Ù[]K[Ü˜Ú\Ý˜][Û‹]Œ‹[Ü˜Ú\Ý˜KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[]SÜ˜Ú\Ý˜][Û•Œ“Ü˜Ú\Ý˜JNÂ‰
+	ÛÜ˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KYš[IÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ“Ü˜Ú\Ý˜][Û”›Ùš[Qš[PÚ[™ÙJNÂ‰
+	Ú[\Ü[Ü˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[\ÜÜ˜Ú\Ý˜][Û”›Ùš[JNÂ‰
+	Ù^Ü[Ü˜Ú\Ý˜][Û‹]Œ‹\›Ùš[KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË^ÜÜ˜Ú\Ý˜][Û”›Ùš[JNÂ‰
+	ØÛÛ™šYÝ\™K[Ü˜Ú\Ý˜][Û‹]Œ‹ZY\˜\˜ÚKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÛÛ™šYÝ\™SÜ˜Ú\Ý˜][Û’Y\˜\˜ÚU[\]JNÂ‰
+	Ø]]Üš^™K[Ü˜Ú\Ý˜][Û‹]Œ‹Yš]™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË]]Üš^™SÜ˜Ú\Ý˜][Û‘š]™JNÂ‰
+	ØYÙ[YYš[š][Û‹\™YÚ\ÝžK[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝYÙ[Yš[š][Û”™YÚ\ÝžJNÂ‰
+	ØYÙ[YYš[š][Û‹XÜ™X]K\™YÚ\ÝžKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÜ™X]PYÙ[Yš[š][Û”™YÚ\ÝžJNÂ‰
+	ØYÙ[YYš[š][Û‹[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝYÙ[Yš[š][ÛŠNÂ‰
+	ØYÙ[YYš[š][Û‹[™]ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™]ÐYÙ[Yš[š][ÛŠNÂ‰
+	ØYÙ[YYš[š][Û‹\Ø]™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™PYÙ[Yš[š][ÛŠNÂ‰
+	ØYÙ[YYš[š][Û‹]ÙÙÛKY[˜X›YX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÙÙÛPYÙ[Yš[š][Û‘[˜X›Y
+NÂ‰
+	ØYÙ[YYš[š][Û‹Y[]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[]PYÙ[Yš[š][ÛŠNÂ‰
+	ØYÙ[YYš[š][Û‹[][˜ÚX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÜ™X]Pœ›ÝÜÙ\YÙ[œ›ÛQYš[š][ÛŠNÂ‰
+	ØYÙ[\ÜXÚX[\Ý\™YÚ\ÝžK[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝÜXÚX[\Ý™YÚ\ÝžJNÂ‰
+	ØYÙ[\ÜXÚX[\ÝXÜ™X]K\™YÚ\ÝžKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÜ™X]TÜXÚX[\Ý™YÚ\ÝžJNÂ‰
+	ØYÙ[\ÜXÚX[\Ý[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝÜXÚX[\Ý
+NÂ‰
+	ØYÙ[\ÜXÚX[\Ý[™]ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™]ÔÜXÚX[\Ý
+NÂ‰
+	ØYÙ[\ÜXÚX[\Ý\Ø]™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™TÜXÚX[\Ý
+NÂ‰
+	ØYÙ[\ÜXÚX[\Ý]ÙÙÛKY[˜X›YX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÙÙÛTÜXÚX[\Ý[˜X›Y
+NÂ‰
+	ØYÙ[\ÜXÚX[\ÝY[]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[]TÜXÚX[\Ý
+NÂ‰
+	ØYÙ[\ÜXÚX[\ÝY[YØ][Û‹\™\\™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™\\™P]]ÛX]XÔÜXÚX[\Ý[YØ][ÛŠNÂ‰
+	ØYÙ[\ÜXÚX[\ÝY[YØ][Û‹[›ÙIÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆ™[™\”ÜXÚX[\Ý[YØ][ÛÛÛ›ÛÊZKœÙ[XÝYœ›ÝÜÙ\YÙ[Ëœ[[YHßJJNÂ‰
+	ØYÙ[\ÜXÚX[\ÝY[YØ][Û‹\™YÚ\ÝžIÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆ™[™\”ÜXÚX[\Ý[YØ][ÛÛÛ›ÛÊZKœÙ[XÝYœ›ÝÜÙ\YÙ[Ëœ[[YHßJJNÂ‰
+	ØYÙ[\[‹\›Û\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[œ›ÝÜÙ\YÙ[›Û\
+NÂ‰
+	ØYÙ[Z[\ÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[\Üœ›ÝÜÙ\YÙ[˜Y
+NÂ‰
+	ØYÙ[Y^ÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË^Üœ›ÝÜÙ\YÙ[˜Y
+NÂ‰
+	ØYÙ[Z›Ø‹[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÙ[XÝœ›ÝÜÙ\YÙ[›ØŠNÂ‰
+	ØYÙ[\]\ÙKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆœ›ÝÜÙ\YÙ[Y™XÞXÛJ	ÔUTÑWÐ”“ÕÔÑT—ÐQÑS•Ò“Ð‰ÊJNÂ‰
+	ØYÙ[\™\Ý[YKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆœ›ÝÜÙ\YÙ[Y™XÞXÛJ	Ô‘TÕSQWÐ”“ÕÔÑT—ÐQÑS•Ò“Ð‰ÊJNÂ‰
+	ØYÙ[\ÝÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆœ›ÝÜÙ\YÙ[Y™XÞXÛJ	ÔÕÔÐ”“ÕÔÑT—ÐQÑS•Ò“Ð‰ÊJNÂ‰
+	ØYÙ[\Ý\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆœ›ÝÜÙ\YÙ[Y™XÞXÛJ	ÔÕTÐ”“ÕÔÑT—ÐQÑS•Ò“Ð‰ÊJNÂ‰
+	ØYÙ[\[‹[›ÝËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[œ›ÝÜÙ\YÙ[›ÝÊNÂ‰
+	ØYÙ[Y[]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[]Pœ›ÝÜÙ\YÙ[›ØŠNÂ‰
+	ØYÙ[\Ù[™Y›ÛÝË]\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÙ[™œ›ÝÜÙ\YÙ[›ÛÝÕ\
+NÂ‰
+	ØYÙ[X\›Ý™KXXÝ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\›Ý™Pœ›ÝÜÙ\YÙ[XÝ[ÛŠNÂ‰
+	ØYÙ[\™Z™XÝXXÝ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™Z™XÝœ›ÝÜÙ\YÙ[XÝ[ÛŠNÂ‰
+	ØYÙ[\Ø]™K\ÛXÞKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™Pœ›ÝÜÙ\YÙ[ÛXÞJNÂ‰
+	ØYÙ[XZK\[›™Y\›Ý]KZY	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÞ[˜Ðœ›ÝÜÙ\YÙ[›Ý]Pš[™[™ÔÝ]\ÊNÂ‰
+	ØYÙ[\ÛXÞKY]Z[ÉÊK˜Y]™[\Ý[™\Š	Ú[œ]	Ë
+
+HOˆÂˆZK˜YÙ[ÛXÞQY]\ØÚ
+ÏHNÂˆYˆ
+]ZK˜YÙ[ÛXÞQ\JH	
+	ØYÙ[\ÛXÞKYY]\Ý]\ÉÊK^ÛÛ[H	ô!4/t-t-ô,t-t`4-t-´-t/teˆ4-ô/4e´/t.4/ô/´.ôe´`´.4.´.YÙ[‰ÎÂˆZK˜YÙ[ÛXÞQ\HHYNÂŸJNÂ‰
+	ØYÙ[\ÛXÞKY]Z[ÉÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÂˆZK˜YÙ[ÛXÞQY]\ØÚ
+ÏHNÂˆYˆ
+]ZK˜YÙ[ÛXÞQ\JH	
+	ØYÙ[\ÛXÞKYY]\Ý]\ÉÊK^ÛÛ[H	ô!4/t-t-ô,t-t`4-t-´-t/teˆ4-ô/4e´/t.4/ô/´.ôe´`´.4.´.YÙ[‰ÎÂˆZK˜YÙ[ÛXÞQ\HHYNÂŸJNÂ‰
+	ØYÙ[[˜]]™KXÛÛ\[š[Û‹XÚXÚËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÚXÚÓ˜]]™PÛÛ\[š[ÛŠNÂ‰
+	ØYÙ[X[ÝËXÝ\œ™[\Ú]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\]Y\Ýœ›ÝÜÙ\YÙ[\›Z\ÜÚ[ÛŠÈ[Ú]\Îˆ˜[ÙHJJNÂ‰
+	ØYÙ[X[ÝËX[\Ú]\ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\]Y\Ýœ›ÝÜÙ\YÙ[\›Z\ÜÚ[ÛŠÈ[Ú]\ÎˆYHJJNÂ‰
+	ØYÙ[X[ÝËYÝÛ›ØYËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\]Y\Ýœ›ÝÜÙ\YÙ[Ø\Xš[]J	ÙÝÛ›ØYÉÊJNÂ‰
+	ØYÙ[X[ÝË[›ÝYšXØ][ÛœËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\]Y\Ýœ›ÝÜÙ\YÙ[Ø\Xš[]J	Û›ÝYšXØ][ÛœÉÊJNÂ‰
+	ÜØ]™K\˜]K[[Z]XÛÛÛÝÛ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™T›Ùš[TÙ][™ÜÊNÂ‰
+	ÜØ]™K[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™SÜ˜Ú\Ý˜][Û•Œ”Ù][™ÜÊNÂ‰
+	ÜØ]™K\Ý\[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™P[™Ý\Ü˜Ú\Ý˜][Û•Œ“›ÝÊNÂ‰
+	Ý\Ý[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\ÝÜ˜Ú\Ý˜][Û•ŒÛÛ›Û
+NÂ‰
+	Ü[‹[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[“Ü˜Ú\Ý˜][Û•Œ“›ÝÊNÂ‰
+	ÜÝÜ[Ü˜Ú\Ý˜][Û‹]Œ‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[Y\™Ù[˜ÞTÝÜÜ˜Ú\Ý˜][Û•ŒŠNÂ‰
+	ÜØ]™K\™[[ÝKY\Ü]ÚX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™T™[[ÝQ\Ü]ÚÙ][™ÜÊNÂ‰
+	Ý\Ý\™[[ÝKY\Ü]ÚX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\Ý™[[ÝQ\Ü]Ú™YY
+NÂ‰
+	Ü[‹\™[[ÝKY\Ü]ÚX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[”™[[ÝQ\Ü]Ú›ÝÊNÂ‰
+	ÜØ]™K[ØØ[XZKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™SØØ[ZTÙ][™ÜÊNÂ‰
+	Ý\Ý[ØØ[XZKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\ÝØØ[ZPÛÛ›™XÝ[ÛŠNÂ‰
+	Ü[‹[ØØ[XZK]\ÝX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[“ØØ[ZU\Ý›Û\
+NÂ‰
+	ÛØØ[XZK\›ÝšY\‰ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ“ØØ[ZT›ÝšY\Ú[™ÙY
+NÂ‰
+	ÜØ]™KXZK\›Ý]\‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™PZT›Ý]\”Ù][™ÜÊNÂ‰
+	Ý\ÝXZKYØ]]Ø^KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\ÝZQØ]]Ø^JNÂ‰
+	Ü™\Ù]XZK\›Ý]\‹\[[YKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™\Ù]ZT›Ý]\”[[YJNÂ‰
+	ØZK\›Ý]\‹\š[X\žK\›ÝšY\‰ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆ™\Ù]ZT›Ý]\“[Ù[ÛÝ
+	Üš[X\žIÊJNÂ‰
+	ØZK\›Ý]\‹\Ý›Û™Ë\›ÝšY\‰ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆ™\Ù]ZT›Ý]\“[Ù[ÛÝ
+	ÜÝ›Û™ÉÊJNÂ‰
+	ØZK\›Ý]\‹\š[X\žK[[Ù[ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØYZT›Ý]\“[Ù[Ê	Üš[X\žIÊJNÂ‰
+	ØZK\›Ý]\‹\Ý›Û™Ë[[Ù[ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆØYZT›Ý]\“[Ù[Ê	ÜÝ›Û™ÉÊJNÂ‰
+	ØZK\›Ý]\‹XY\›Ý]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÂˆžHÈYZT›Ý]\”›Ý]J
+NÈBˆØ]Ú
+\œ›ÜŠHÈ	
+	ØZK\›Ý]\‹\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-4/´-4,4`´.4/4,4`4b4`4`ô`Žˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸJNÂ™[˜Ý[ÛˆY˜[YYÛÛ\]X›T›Ý]J[™Ú[YX™[
+HÂˆžHÂˆÛÛœÝ›Ý]\ÈHZT›Ý]\”›Ý]\Ñœ›ÛQ›Ü›JÈ˜[Y]N™˜[ÙHJNÂˆÛÛœÝ^\Ý[™ÈH›Ý]\Ë™š[™[™^
+›Ý]HOˆ›Ý]Kœ›ÝšY\ˆOOH	ÛÜ[˜ZKXÛÛ\]X›IÈ	‰ˆ›Ý]K™[™Ú[YOOH[™Ú[Y
+NÂˆYˆ
+^\Ý[™ÈH
+HÂˆ	
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊK˜Ú[™[–Ù^\Ý[™×OËœ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[H›[Ù[—IÊOË™›ØÝ\Ê
+NÂˆ	
+	ØZK\›Ý]\‹\Ý]\ÉÊK^ÛÛ[H4'4,4`4b4`4`ô`ˆ	ÛX™[H4`ô-´-H4eˆ4'´`´`4.4/4,4.t`´-H4/4/´-4-t.ôeˆ4,4,t/ˆ4/´,t-t`4e´`´c4e´`t/t`ôc´aô`Ë˜Âˆ™]\›ŽÂˆBˆYˆ
+›Ý]\Ë›[™ÝHÌŠH›ÝÈ™]È\œ›ÜŠ	ô'ô`ô.È4/4,4`4b4`4`ô`´e´,ˆ4/´,t/4-t-´-t/t/ˆÌˆ4-ô,4/ô.4`t,4/4.‰ÊNÂˆ][X™\ˆHNÂˆÚ[H
+›Ý]\ËœÛÛYJ›Ý]HOˆ›Ý]Kœ›Ý]RYOOH	Ù[™Ú[YKIÛ[X™\ŸX
+JH[X™\ŠÊÎÂˆ›Ý]\Ëœ\Ú
+È›Ý]RY˜	Ù[™Ú[YKIÛ[X™\ŸX›ÝšY\Ž‰ÛÜ[˜ZKXÛÛ\]X›IË[™Ú[Y[Ù[‰ÉË›Û\Î–ÉØÛÙ\‰×Kš[Üš]NL[˜X›Y™˜[ÙKØØ[]N‰Ü™[[ÝIËÛÜÝÛ\ÜÎ‰Ý[šÛ›ÝÛ‰ÈJNÂˆ™[™\ZT›Ý]\”›Ý]\Ê›Ý]\ËßKÂˆ[›™Y›Ý]RY‰
+	ØZK\›Ý]\‹\[›™Y\›Ý]IÊK˜[YKˆ[ÝÔ›Ý]RYÎœÙ[XÝY˜[Y\Ê	ØZK\›Ý]\‹X[ÝË\›Ý]\ÉÊK[žT›Ý]RYÎœÙ[XÝY˜[Y\Ê	ØZK\›Ý]\‹Y[žK\›Ý]\ÉÊKˆKÈX[X[›Ý]UÛÜšÙ\œÎ›X[X[ÛÜšÙ\ÛÝ[Ñœ›ÛPØ\™Ê
+HJNÂˆ	
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊK›\Ý[[Y[Ú[Ëœ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KXXÝ[ÛH™\ØÛÝ™\‹[[Ù[È—IÊOË™›ØÝ\Ê
+NÂˆ	
+	ØZK\›Ý]\‹\Ý]\ÉÊK^ÛÛ[H4'4,4`4b4`4`ô`ˆ	ÛX™[H4-4/´-4,4/t/ˆ4-4/ˆ4a4/´`4/4.ˆ4'´`´`4.4/4,4.t`´-H4/4/´-4-t.ôe‹4,´.4-ô/t,4aô`´-H4,´,4`4`´e´`t`´c4eˆ4-ô,t-t`4-t-´e´`´c4/t,4.ô,4b4`´`ô,´,4/t/tcË˜ÂˆHØ]Ú
+\œ›ÜŠHÈ	
+	ØZK\›Ý]\‹\Ý]\ÉÊK^ÛÛ[H4't-H4,´-4,4.ô/´`tcÈ4-4/´-4,4`´.	ÛX™[Nˆ	Ù\œ›Ü‹›Y\ÜØYÙ_XÈBŸB‰
+	ØZK\›Ý]\‹XY[Z\Ý˜[X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆY˜[YYÛÛ\]X›T›Ý]J	ÛZ\Ý˜[	Ë	ô'4e´`t`´`4,4.ôc	ÊJNÂ‰
+	ØZK\›Ý]\‹XY[Ü[œ›Ý]\‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆY˜[YYÛÛ\]X›T›Ý]J	ÛÜ[œ›Ý]\‰Ë	ÓÜ[”›Ý]\‰ÊJNÂ‰
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[™PZT›Ý]\”›Ý]PXÝ[ÛŠNÂ‰
+	ØZK[[Ù[Yœ™YK]X‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ[XÝZS[Ù[šXÙUXŠ	Ùœ™YIËYJJNÂ‰
+	ØZK[[Ù[\ZY]X‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÙ[XÝZS[Ù[šXÙUXŠ	ÜZY	ËYJJNÂ‰
+	ØZK[[Ù[\šXÙK]XœÉÊK˜Y]™[\Ý[™\Š	ÚÙ^YÝÛ‰Ë]™[OˆÂˆYˆ
+VÉÐ\œ›ÝÓY	Ë	Ð\œ›ÝÔšYÚ	Ë	ÒÛYIË	Ñ[™	×Kš[˜ÛY\Ê]™[šÙ^JJH™]\›ŽÂˆ]™[œ™]™[Y˜][
+
+NÂˆÙ[XÝZS[Ù[šXÙUXŠ]™[šÙ^HOOH	ÒÛYIÈÈ	Ùœ™YIÈˆ]™[šÙ^HOOH	Ñ[™	ÈÈ	ÜZY	Èˆ	
+	ØZK[[Ù[Yœ™YK]X‰ÊK™Ù]]šX]J	Ø\šXK\Ù[XÝY	ÊHOOH	ÝYIÈÈ	ÜZY	Èˆ	Ùœ™YIËYJNÂŸJNÂ‰
+	ØZK\›Ý]\‹\›Ý]K[\Ý	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË]™[OˆÂˆYˆ
+]™[\™Ù]›X]Ú\Ê	ÖÙ]K\›Ý]KYšY[H™\ØÛÝ™\™Y[Ù[—IÊH	‰ˆ]™[\™Ù]˜[YJHÂˆ]™[\™Ù]˜ÛÜÙ\Ý
+	ÖÙ]KXZK\›Ý]WIÊKœ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[H›[Ù[—IÊK˜[YHH]™[\™Ù]˜[YNÂˆ	
+	ØZK\›Ý]\‹\Ý]\ÉÊK^ÛÛ[H4'´,t`4,4/t/ˆ4/4/´-4-t.ôc	Ù]™[\™Ù]˜[Y_Kˆ4't,4`´.4`t/te´`´c0ªô%ô,t-t`4-t,ô`´.0®Ë4bt/´,H4-ô,4`t`´/´`t`ô,´,4`´.˜ÂˆBˆYˆ
+]™[\™Ù]›X]Ú\Ê	ÖÙ]K\›Ý]KYšY[Hœ›Ý]RY—IÊJH™[™\ZT›Ý]\”›Ý]TÙ[XÝÊ
+NÂˆYˆ
+]™[\™Ù]›X]Ú\Ê	ÖÙ]K\›Ý]KYšY[Hœ›ÝšY\ˆ—IÊJHÂˆÛÛœÝØ\™H]™[\™Ù]˜ÛÜÙ\Ý
+	ÖÙ]KXZK\›Ý]WIÊNÂˆÛÛœÝØØ[H]™[\™Ù]˜[YHOOH	ÛÛ[XIÎÂˆØ\™œ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[H›ØØ[]H—IÊK˜[YHHØØ[È	ÛØØ[	Èˆ	Ü™[[ÝIÎÂˆØ\™œ]Y\žTÙ[XÝÜŠ	ÖÙ]K\›Ý]KYšY[H˜ÛÜÝÛ\ÜÈ—IÊK˜[YHHØØ[È	Ùœ™YIÈˆ	Ý[šÛ›ÝÛ‰ÎÂˆBŸJNÂ‰
+	Ü[‹XZK\›Ý]\‹]\ÝX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[ZT›Ý]\”›Û\
+˜[ÙJJNÂ‰
+	Ü[‹XZK\›Ý]\‹\Ý›Û™ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[ZT›Ý]\”›Û\
+YJJNÂ‰
+	ÜØ]™KXZK[X[˜YÙ\‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™PZSX[˜YÙ\”Ù][™ÜÊNÂ‰
+	Ü[‹XZK[X[˜YÙ\‹[›ÝËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË[ZSX[˜YÙ\“›ÝÊNÂ‰
+	Ü™\Ù]XZK[X[˜YÙ\‹\[[YKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË™\Ù]ZSX[˜YÙ\”[[YJNÂ‰
+	Ü›Ú™XÝ]ÛÜšÜÜXÙK\™Yœ™\ÚX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆÈ›ÚYØY›Ú™XÝÛÜšÜÜXÙJÈ›ØÝ\ÔÝ[[X\žNˆYHJNÈJNÂ‰
+	ØÜ™X]K\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÜ™X]TÙ\ÜÚ[ÛŠNÂ‰
+	ÛX\Ý\‹\]\ÙKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆX\Ý\XÝ[ÛŠ	ÓPTÕT—ÔUTÑIË	ÛX\Ý\ˆ]\ÙIËYJJNÂ‰
+	ÛX\Ý\‹\™\Ý[YKX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆX\Ý\XÝ[ÛŠ	ÓPTÕT—Ô‘TÕSQIË	ÛX\Ý\ˆ™\Ý[YIË˜[ÙJJNÂ‰
+	Ø[ËXY]\›ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[[Õ\›[\Ü
+˜[ÙJJNÂ‰
+	Ø[Ë\™\XÙK]\›ËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[[Õ\›[\Ü
+YJJNÂ™ØÝ[Y[œ]Y\žTÙ[XÝÜ[
+	Ú[œ]Û˜[YOH\ÚÐÛÛ™šYÝ\˜][Û“[ÙH—IÊK™›Ü‘XXÚ
+
+[œ]
+HOˆ[œ]˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ•\ÚÐÛÛ™šYÝ\˜][Û“[ÙPÚ[™ÙJJNÂ‰
+	Ý\ÚËXÛÝ[	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ•\ÚÐÛÝ[Ú[™ÙJNÂ‰
+	Ý\ÚËXÛÝ[	ÊK˜Y]™[\Ý[™\Š	Ú[œ]	Ë
+
+HOˆÈYˆ
+	
+	Ý\ÚËXÛÝ[	ÊK˜[YJHÛ•\ÚÐÛÝ[Ú[™ÙJ
+NÈJNÂ‰
+	ÜÚ\™Y]\ÚË]\›	ÊK˜Y]™[\Ý[™\Š	Ú[œ]	ËÛ”Ú\™Y\›[œ]
+NÂ™›Üˆ
+ÛÛœÝYÙˆÂˆ	ÜÚ\™Y\›Û\	Ëˆ	ÙY˜][][š\]YK\›Û\	Ëˆ	Ü›Û\L‹Y[˜X›Y	Ëˆ	Ü›Û\L‹Y]™\žIËˆ	Ü›Û\L‹]^	Ëˆ	Ü›Û\LËY[˜X›Y	Ëˆ	Ü›Û\LËY]™\žIËˆ	Ü›Û\LË]^	Ëˆ	Ùš]™K\›Û\Y[˜X›Y	Ëˆ	Ùš]™K\›Û\Yš[IËˆ	Ùš]™K\›Û\]\™Ù]	Ëˆ	Ùš]™K\›Û\Z[\˜[	Ëˆ	Ùš]™K\›Û\[Z[‹XÚ\œÉË—JHÂˆÛÛœÝšY[H	
+Y
+NÂˆÛÛœÝ]™[˜[YHHšY[ËYÓ˜[YHOOH	ÔÑSPÕ	ÈšY[Ë\HOOH	ØÚXÚØ›Þ	ÈÈ	ØÚ[™ÙIÈˆ	Ú[œ]	ÎÂˆšY[Ë˜Y]™[\Ý[™\Š]™[˜[YKØÚY[Q˜Y\œÚ\Ý[˜ÙJNÂŸB‰
+	ØØ[[™\‹[[ÙIÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÈÞ[˜ÐØ[[™\•š\ÚXš[]J
+NÈ™[™\Ø[[™\”[[YTÝ]\ÊZKœÙ[XÝY
+NÈJNÂ‰
+	Ü™]žKX˜XÚÛÙ™‹][š]	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ”™]žP˜XÚÛÙ™•[š]Ú[™ÙJNÂ‰
+	ÛZ[š[][K\Ù[™Z[\˜[][š]	ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ“Z[š[][TÙ[™[\˜[[š]Ú[™ÙJNÂ‰
+	Ø\KYY˜][\›Û\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË\QY˜][›Û\
+NÂ‰
+	Ø]]Üš^™K\Ù\ÜÚ[Û‹Yš]™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË]]Üš^™TÙ\ÜÚ[Û‘š]™JNÂ‰
+	ÜØ]™K\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËØ]™TÙ\ÜÚ[ÛŠNÂ‰
+	ÜÝ\\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆXÝ[ÛŠ	ÔÕT•ÔÑTÔÒSÓ‰Ë	ÔÝ\	ÊJNÂ‰
+	Ü]\ÙK\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆXÝ[ÛŠ	ÔUTÑWÔÑTÔÒSÓ‰Ë	Ô]\ÙIÊJNÂ‰
+	Ü™\Ý[YK\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆXÝ[ÛŠ	Ô‘TÕSQWÔÑTÔÒSÓ‰Ë	Ô™\Ý[YIÊJNÂ‰
+	ÜÝÜ\Ù\ÜÚ[Û‹X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆXÝ[ÛŠ	ÔÕÔÔÑTÔÒSÓ‰Ë	ÔÝÜ	ÊJNÂ‰
+	ØÛX\‹[ÙËX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆXÝ[ÛŠ	ÐÓPT—ÓÑÉË	ÐÛX\ˆÙÉÊJNÂ‰
+	Ü™Yœ™\Ú\[‹][Y[[™KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™Yœ™\Ú[•[Y[[™JÈ[››Ý[˜ÙT™\Ý[ˆYHJJNÂ‰
+	Ü[‹][Y[[™K\ÛÝ\˜ÙKYš[\‰ÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË™[™\”[•[Y[[™JNÂ‰
+	ØÛÛ™š\›KY[]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÛÛ™š\›Q[]JNÂ‰
+	ØØ[˜Ù[Y[]KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÛÜÙQ[]QX[ÙÊNÂ‰
+	ÜÜX›K\›Ùš[KYš[IÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIËÛ”ÜX›T›Ùš[Qš[PÚ[™ÙJNÂ‰
+	Ú[\Ü\›Ùš[KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[\ÜÜX›T›Ùš[J˜[ÙJJNÂ‰
+	Ú[\Ü\›Ùš[K\Ý\X]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ[\ÜÜX›T›Ùš[JYJJNÂ‰
+	Ù^Ü\›Ùš[KX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË^ÜÜX›T›Ùš[JNÂ‰
+	ÙÝÛ›ØYYXYÛ›ÜÝXË\™\ÜX]Û‰ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉËÝÛ›ØYXYÛ›ÜÝXÔ™\Ü
+NÂ‰
+	Ý[˜Ù\Z[‹XÛÛ™š\›IÊK˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+
+HOˆÂˆ	
+	Ý[˜Ù\Z[‹\™]žIÊK™\ØX›YHI
+	Ý[˜Ù\Z[‹XÛÛ™š\›IÊK˜ÚXÚÙYÂˆ	
+	Ý[˜Ù\Z[‹\ÚÚ\	ÊK™\ØX›YHI
+	Ý[˜Ù\Z[‹XÛÛ™š\›IÊK˜ÚXÚÙYÂŸJNÂ˜\Þ[˜È[˜Ý[Ûˆ™\ÛÛ™U[˜Ù\Z[Š™\ÛÛ][ÛŠHÂˆžHÂˆÛÛœÝ]HH]ØZ]ÛÜ™J	Ô‘TÓÓ‘WÕSÑT•RS‰ËÂˆÙ\ÜÚ[Û’YˆZKœÙ[XÝYÙ\ÜÚ[Û’YˆÜ\˜][Û’YˆZKœÙ[XÝYËœÝ]\ÏË[˜Ù\Z[“Ü\˜][Û’Yˆ™\ÛÛ][Û‹ˆÛÛ™š\›YYˆ	
+	Ý[˜Ù\Z[‹XÛÛ™š\›IÊK˜ÚXÚÙYˆJNÂˆZKœÙ[XÝYH]KœÙ\ÜÚ[ÛŽÂˆÛX\‘˜Y
+ZKœÙ[XÝYÙ\ÜÚ[Û’Y
+NÂˆ]ØZ]Ü[”Ù\ÜÚ[ÛŠZKœÙ[XÝYÙ\ÜÚ[Û’Y
+NÂˆ™\ÜÛÛ[X[™™\Ý[
+™\ÛÛ][ÛˆOOH	ØÚXÚÉÂˆÈ	ô'ô-t`4-t,´e´`4côcˆ4/ô/´/ô-t`4-t-4/te4/t,4-4`t.4.ô,4/t/tcËˆ4't/´,´/´,ô/ˆ4/t,4`´.4`t.´,4/t/tcÈ4/t-t/4,4e‰Âˆˆ	ô(4e´b4-t/t/tcÈ4-ô,t-t`4-t-´-t/t/‹ˆ4't,4`´.4`t/te´`´c4'ô`4/´-4/´,´-´.4`´.4-4.ôcÈ4/ô`4/´-4/´,´-´-t/t/tcË‰ÊNÂˆYˆ
+™\ÛÛ][ÛˆOOH	ØÚXÚÉÊH	
+	Ü™\Ý[YK\Ù\ÜÚ[Û‹X]Û‰ÊK™›ØÝ\Ê
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆ™\ÜÛÛ[X[™™\Ý[
+\œ›Ü‹›Y\ÜØYÙJNÂˆBŸB‰
+	Ý[˜Ù\Z[‹XÚXÚÉÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\ÛÛ™U[˜Ù\Z[Š	ØÚXÚÉÊJNÂ‰
+	Ý[˜Ù\Z[‹\™]žIÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\ÛÛ™U[˜Ù\Z[Š	Ü™]žIÊJNÂ‰
+	Ý[˜Ù\Z[‹\ÚÚ\	ÊK˜Y]™[\Ý[™\Š	ØÛXÚÉË
+
+HOˆ™\ÛÛ™U[˜Ù\Z[Š	ÜÚÚ\	ÊJNÂ™ØÝ[Y[˜Y]™[\Ý[™\Š	ÚÙ^YÝÛ‰Ë˜\X[ÙÊNÂ™ØÝ[Y[˜Y]™[\Ý[™\Š	Ú[œ]	Ë
+]™[
+HOˆÂˆYˆ
+ZKœÙ[XÝY	‰ˆ]™[\™Ù]Ë˜ÛÜÙ\ÝËŠ	ÈÜÙ\ÜÚ[Û‹YY]Ü‰ÊH	‰ˆ]™[\™Ù]šYOOH	Ø[Ë]\ÚË]\›ÉÈ	‰ˆY]™[\™Ù]˜ÛÜÙ\ÝËŠ	ÈÝ[˜Ù\Z[‹\™XÛÝ™\žIÊJHØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂŸJNÂ™ØÝ[Y[˜Y]™[\Ý[™\Š	ØÚ[™ÙIË
+]™[
+HOˆÂˆYˆ
+ZKœÙ[XÝY	‰ˆ]™[\™Ù]Ë˜ÛÜÙ\ÝËŠ	ÈÜÙ\ÜÚ[Û‹YY]Ü‰ÊH	‰ˆY]™[\™Ù]˜ÛÜÙ\ÝËŠ	ÈÝ[˜Ù\Z[‹\™XÛÝ™\žIÊJHØÚY[Q˜Y\œÚ\Ý[˜ÙJ
+NÂŸJNÂ‚šYˆ
+ÛØ˜[\Ë˜Ú›ÛYOËœ[[YOË›Û“Y\ÜØYÙJHÚ›ÛYKœ[[YK›Û“Y\ÜØYÙK˜Y\Ý[™\Š
+Y\ÜØYÙJHOˆÂˆYˆ
+Y\ÜØYÙOË˜Ú[›™[OOH	Ø]]Ü[ÝXÛÜ™IÈY\ÜØYÙOË\HOOH	ÔÕUT×ÐÒS‘ÑQ	ÊH™]\›ŽÂˆ]Y]YTÝ]\Ô™Yœ™\Ú
+Y\ÜØYÙKœÙ\ÜÚ[Û’Y
+NÂŸJNÂ‚˜\Þ[˜È[˜Ý[Ûˆ[š]X[ØY
+
+HÂˆÞ[˜ÔØÙ[˜\š[Ò[š]X[ÝYÙÙ\›Ý[™Ê
+NÂˆÙ]ZS[ÙJÝÜ˜YÙQÙ]
+RWÓSÑWÒÑVJH	ÜÙ\ÜÚ[ÛœÉÊNÂˆÙ]Ü˜Ú\Ý˜][Û”[™[
+ÝÜ˜YÙQÙ]
+ÔÒTÕUSÓ—ÔS‘SÒÑVJH	ÛÜ˜Ú\Ý˜\ÉÊNÂˆÙ]ØÙ[˜\š[ÕÛÜšÔ[™[
+ÝÜ˜YÙQÙ]
+ÐÑST’S×ÕÓÔ’×ÔS‘SÒÑVJH	ØÞXÛIÊNÂˆ]ØZ]ØY›Ùš[TÙ][™ÜÊ
+NÂˆ]ØZ]ØYØØ[ZTÙ][™ÜÊ
+NÂˆ]ØZ]ØYZT›Ý]\”Ù][™ÜÊ
+NÂˆ]ØZ]ØYZSX[˜YÙ\”Ù][™ÜÊ
+NÂˆ]ØZ]ØYÙ\ÜÚ[ÛœÊÈ™\Ù\™Q›ØÝ\Îˆ˜[ÙHJNÂˆÛÛœÝš\œÝÚ[\YšYYHZKœÙ\ÜÚ[ÛœË™š[™
+Ù\ÜÚ[ÛˆOˆÙ\ÜÚ[Û‹œÚ[\YšYYÙ\ÜÚ[ÛŠNÂˆYˆ
+š\œÝÚ[\YšYY
+H]ØZ]Ù[XÝÚ[\YšYYÙ\ÜÚ[ÛŠš\œÝÚ[\YšYYšY
+NÂˆ[ÙHÚÝÔÚ[\YšYYÙ\ÜÚ[ÛŠ[
+NÂˆ]ØZ]ØYÛØ˜[Ý]\Ê
+NÂˆ]ØZ]ØYXÝ[ÛÙ[\Š
+NÂˆ]ØZ]ØY›Ú™XÝÛÜšÜÜXÙJ
+NÂˆ]ØZ]ØYÜ˜Ú\Ý˜][Û•Œ”Ý]\Ê
+NÂˆ]ØZ]ØYØÙ[˜\š[ÕÛÜšÊ
+NÂˆ]ØZ]ØYœ›ÝÜÙ\YÙ[›ØœÊ
+NÂˆ]ØZ]ØYœ›ÝÜÙ\YÙ[^XÝ][Û”ÛXÞJ
+NÂˆ]ØZ]ØYYÙ[Yš[š][Û”™YÚ\ÝšY\Ê
+NÂˆ]ØZ]ØYÜXÚX[\Ý™YÚ\ÝšY\Ê
+NÂˆ]ØZ]ØY™[[ÝQ\Ü]ÚÝ]\Ê
+NÂˆÛÛœÝ\ÝÙ\ÜÚ[Û’YHÝÜ˜YÙQÙ]
+TÕÔÑTÔÒSÓ—ÒÑVJNÂˆYˆ
+\ÝÙ\ÜÚ[Û’Y	‰ˆZKœÙ\ÜÚ[ÛœËœÛÛYJÙ\ÜÚ[ÛˆOˆÙ\ÜÚ[Û‹šYOOH\ÝÙ\ÜÚ[Û’Y
+JH]ØZ]Ü[”Ù\ÜÚ[ÛŠ\ÝÙ\ÜÚ[Û’Y
+NÂŸB›ÚY[š]X[ØY
+
+NÂÚ[™ÝËœÙ][\˜[
+
+
+HOˆÈ›ÚY™XÛÜ™\Ú›Ø\™XYÛ›ÜÝXÔÛ˜\ÚÝ
+
+NÈKPQÓ“ÔÕP×ÔÓTÒÕÑSVWÓTÊNÂÚ[™ÝËœÙ][\˜[
+
+
+HOˆÂˆYˆ
+ØÝ[Y[š\ÚXš[]TÝ]HOOH	Ýš\ÚX›IÈ	‰ˆÝÜ˜YÙQÙ]
+RWÓSÑWÒÑVJHOOH	ØYÙ[	ÊH›ÚY™Yœ™\Úœ›ÝÜÙ\YÙ[›ØœÊ
+NÂŸKL
+NÂ‚Ú[™ÝËœÙ][\˜[
+
+
+HOˆÂˆYˆ
+ØÝ[Y[š\ÚXš[]TÝ]HOOH	Ýš\ÚX›IÈ	‰ˆÝÜ˜YÙQÙ]
+RWÓSÑWÒÑVJHOOH	ÜÙ\ÜÚ[ÛœÉÊHÂˆ›ÚYØYÛØ˜[Ý]\Ê
+NÂˆ›ÚYØYXÝ[ÛÙ[\Š
+NÂˆBŸKL
+NÂÚ[™ÝËœÙ][\˜[
+
+
+HOˆÈYˆ
+ØÝ[Y[š\ÚXš[]TÝ]HOOH	Ýš\ÚX›IÈ	‰ˆÝÜ˜YÙQÙ]
+RWÓSÑWÒÑVJHOOH	ÜÚ[\YšYY	ÊH›ÚY™Yœ™\ÚÚ[\YšYYÙ\ÜÚ[Û”Ý]\Ê
+NÈKL
+NÂ‚™^ÜÈPVÕTÒÔË›[šÔÙ\ÜÚ[Û‹›[šÕ\ÚË˜[Y]KXYÛ›ÜÝXÑš[S˜[YHNÂ

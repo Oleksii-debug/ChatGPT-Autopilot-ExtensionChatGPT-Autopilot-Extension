@@ -309,6 +309,7 @@ async function probeAssistantConversationImpl(chromeApi, transport, job, options
       promptText: '',
       assistantBaselineCount: Number(job.assistantBaselineCount || 0),
       assistantBaselineKnown: job.assistantBaselineKnown === true,
+      freshConversationGenerationVerified: job.freshConversationGenerationVerified === true,
       submittedUserMessageKey: String(job.submittedUserMessageKey || ''),
       responseCorrelationToken: String(job.responseCorrelationToken || ''),
       submittedPromptText: String(job.submittedPromptText || ''),

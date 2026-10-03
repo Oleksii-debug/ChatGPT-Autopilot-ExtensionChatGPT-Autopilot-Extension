@@ -1,0 +1,22 @@
+QA 11.0.13 — 2026-10-03 02:21 UTC
+
+Changes tested:
+- Managed fresh-chat send proof is evaluated before the generic requirement for an appended user bubble.
+- Only the exact fresh launch transition + exclusive conversation URL + cleared composer + generation-start signal can use this proof. A hidden/no-bubble existing conversation remains uncertain.
+- Core persists a boolean proof for this verified send; scenario response reads allow a new assistant message without a user bubble only when that proof is present and the baseline was zero. Proof is cleared when a new prompt is inserted or a send becomes uncertain.
+- Scenario progress text is rendered once per pool in the global dashboard.
+
+Results:
+- Core and integration regression suites: 81/81 passed.
+- Interaction regression suite: 20/20 passed.
+- UI regression suite: 15/15 passed.
+- Focused modified send, response-correlation, Core persistence, scenario, and UI checks passed.
+- The full repository npm test command did not complete: unrelated AI/agent tests reported existing module-export and runtime failures (for example, tests importing exports absent from src/ui/agent-definition-form.js). It was interrupted while the broad suite was stalled. This does not pass the complete repository test gate.
+- The initial release-suite run occurred before 11.0.13 CHANGES/QA artifacts existed and therefore failed its release-metadata checks. It must be rerun after packaging.
+
+Limits:
+- Tests use modeled DOM and application acknowledgements; they do not prove receipt by ChatGPT servers.
+- No live account, Windows Chrome, or physical PC responsiveness test was run here. Run a small supervised scenario before unattended use.
+- Historical “46 sent” is not independently verifiable from the supplied reports as 46 server-accepted prompts. Extension counts mean locally verified Send effects; response counts mean the scenario manager accepted completed, correlated assistant turns.
+- Release qualification suite: 8/8 passed after adding the 11.0.13 release metadata.
+- Release archive: 308 files, CRC validation passed. Its SHA-256 is recorded in `releases/11.0.13/SHA256SUMS.txt`.

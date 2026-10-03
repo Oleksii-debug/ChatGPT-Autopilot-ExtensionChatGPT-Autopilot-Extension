@@ -101,7 +101,7 @@ export function isExclusiveConversationUrl(url) {
 
 export function createTask({ id, url, promptOverride = '', enabled = true, label = '' }) {
   if (!id) throw new Error('Task id required');
-  return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '', lastConversationUrl: '', lastAssistantReport: '', lastAssistantReportAt: 0, lastAssistantBaselineCount: 0, lastAssistantBaselineKnown: false };
+  return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '', lastConversationUrl: '', lastAssistantReport: '', lastAssistantReportAt: 0, lastAssistantBaselineCount: 0, lastAssistantBaselineKnown: false, lastFreshConversationGenerationVerified: false };
 }
 
 export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, configuredTaskCount = tasks.length, minimumSendIntervalMs = 120000, preSendDelayMs = 20000, tabReadyDelayMs = 0, postSendDelayMs = 0, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
@@ -133,6 +133,7 @@ function validateTask(task, taskId) {
   if (task.lastAssistantReportAt !== undefined) requireNonNegativeNumber(task.lastAssistantReportAt, `task ${taskId} lastAssistantReportAt`);
   if (task.lastAssistantBaselineCount !== undefined) requireNonNegativeNumber(task.lastAssistantBaselineCount, `task ${taskId} lastAssistantBaselineCount`);
   if (task.lastAssistantBaselineKnown !== undefined) requireBoolean(task.lastAssistantBaselineKnown, `task ${taskId} lastAssistantBaselineKnown`);
+  if (task.lastFreshConversationGenerationVerified !== undefined) requireBoolean(task.lastFreshConversationGenerationVerified, `task ${taskId} lastFreshConversationGenerationVerified`);
   const expectedNormalizedUrl = task.url ? normalizeChatUrl(task.url) : '';
   if (task.normalizedUrl !== expectedNormalizedUrl) throw new Error(`Invalid task ${taskId} normalizedUrl`);
 }
