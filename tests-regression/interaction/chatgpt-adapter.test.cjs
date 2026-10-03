@@ -343,6 +343,21 @@ test('response stays bound to the submitted user message after history virtualiz
   assert.equal(wrong.assistantComplete,false);
 });
 
+test('a fresh verified generation can track its new answer when Work never mounts the user bubble', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  chat.assistants.push(chat.reply('Відповідь на перший промпт.'));
+  const request = validRequest({ mode: 'READ_ASSISTANT_REPORT', assistantBaselineKnown: true,
+    assistantBaselineCount: 0, responseCorrelationToken: '[APSTEP:slot:1]',
+    freshConversationGenerationVerified: true });
+  const ready = await adapter.execute(request, { document: chat.document });
+  assert.equal(ready.status, adapter.STATUS.READY);
+  assert.equal(ready.assistantText, 'Відповідь на перший промпт.');
+  const unproven = await adapter.execute({ ...request, freshConversationGenerationVerified: false },
+    { document: chat.document });
+  assert.equal(unproven.assistantComplete, false, 'the fallback needs persisted proof from the physical fresh-chat Send');
+});
+
 test('already observed Send acknowledgement does not depend on a background timer', async () => {
   const { adapter } = loadAdapter({setTimeout(){throw Error('background timers are suspended');}});
   const chat = workChat();chat.composer.innerText='Continue now';

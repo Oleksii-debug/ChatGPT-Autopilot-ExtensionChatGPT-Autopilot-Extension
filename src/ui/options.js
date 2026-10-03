@@ -4154,7 +4154,7 @@ function renderGlobalStatus(data) {
   $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
   const scenarioPools = data.scenarioPools || [];
   $('global-scenario-summary').textContent = scenarioPools.length
-    ? scenarioPools.map(pool => `${pool.name}. ${scenarioProgressText(pool)}`).join(' | ')
+    ? `Запущено пулів: ${scenarioPools.length}. Прогрес кожного пулу наведено нижче.`
     : 'Сценарні пули ще не запущено.';
   renderLaunchList(document, $('global-simplified-sessions'), (data.simplifiedSessions || []).map(row => ({
     id: row.id, name: row.name, description: `${row.name}: ${globalStateLabel(row.category)}. Надіслано промптів: ${row.verifiedSends}.`,

@@ -159,6 +159,25 @@ test('fresh unique conversation transition with empty composer and generation pr
   assert.equal(f.clicks(),1);
 });
 
+test('managed scenario accepts operation-bound fresh generation when Work omits its user bubble',async()=>{
+  const f=fixture({formSubmit:true,suppressMessage:true,
+    startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/managed-hidden-bubble'});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true});
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(result.submissionEvidence,'FRESH_CONVERSATION_GENERATION_STARTED');
+  assert.equal(result.assistantBaselineCount,0);
+  assert.equal(f.submits(),1);
+  assert.equal(f.clicks(),0);
+});
+
+test('existing conversation without an appended turn remains uncertain even when generation is busy',async()=>{
+  const f=fixture({formSubmit:true,suppressMessage:true});
+  const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true});
+  assert.equal(result.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(result.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
+  assert.equal(f.submits(),1);
+});
+
 test('fresh launch with a non-matching rendered user turn remains uncertain',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
@@ -432,12 +451,12 @@ test('Scenario first Send requires its own appended turn and stable concrete URL
   assert.equal(result.status,'SENT_VERIFIED');assert.equal(result.normalizedObservedUrl,'https://chatgpt.com/c/canonical');assert.equal(f.clicks(),1);
 });
 
-test('Scenario URL-only generation fallback cannot count an absent submitted message',async()=>{
+test('Scenario accepts fresh conversation plus empty composer and generation as operation-bound proof',async()=>{
   const f=fixture({startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/client-only',suppressMessage:true});
   const result=await f.run('SUBMIT_EXISTING',{requireGenerationAcknowledgement:true});
-  assert.equal(result.status,'SUBMISSION_UNCERTAIN');
-  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{requireGenerationAcknowledgement:true,recoveryLaunchUrl:'https://chatgpt.com/'});
-  assert.notEqual(recovered.status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(result.submissionEvidence,'FRESH_CONVERSATION_GENERATION_STARTED');
+  assert.equal(f.clicks(),1);
 });
 
 

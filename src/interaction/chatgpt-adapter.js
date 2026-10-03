@@ -12,7 +12,7 @@
  * INSERT_AND_SEND remains only as a compatibility mode for non-durable/manual callers.
  */
 (function (root, factory) {
-  const buildVersion = '11.0.12';
+  const buildVersion = '11.0.13';
   const api = root?.ChatGPTInteractionAdapter?.buildVersion === buildVersion
     ? root.ChatGPTInteractionAdapter : factory();
   api.buildVersion = buildVersion;
@@ -1866,6 +1866,30 @@
         });
       }
 
+      // Work can create the /c/<id> URL and start generation before it mounts
+      // the user bubble in a background document. This is still tied to this
+      // physical operation: we began on the launch surface, performed exactly
+      // one submit, saw the exclusive conversation transition, the exact
+      // submitted composer cleared, and generation started. Evaluate this
+      // proof before the generic scenario bubble requirement below.
+      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
+        const observedUrl = globalThis.location?.href || '';
+        const composerEmpty = !postFound.element || !compactPromptText(editorText(postFound.element));
+        const generationStarted = detectBlockingState(doc)?.status === STATUS.BUSY
+          || semanticAssistantMessages(doc).length > assistantBaselineCount;
+        if (!textVerified && !unlabeledVerified && !representationVerified
+            && afterTextMessages.length === 0
+            && isExclusiveConversationLocation(observedUrl) && composerEmpty && generationStarted) {
+          return resultBase(request, start, {
+            status: STATUS.SENT_VERIFIED,
+            submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
+            safeDiagnosticCode: 'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION',
+            assistantBaselineCount,
+            submittedUserMessageKey: submittedUserKey(doc),
+          });
+        }
+      }
+
       if (request.requireGenerationAcknowledgement === true) {
         // Scenario progress must not count a client-only optimistic bubble.
         // Require this operation's appended message plus independent generation
@@ -1881,30 +1905,6 @@
         }
         if (acknowledgedUrl !== observedUrl) { acknowledgedUrl = observedUrl; acknowledgementSeenAt = nowMs(); }
         if (nowMs() - acknowledgementSeenAt < 1000) { await (deps.wait || wait)(250); continue; }
-      }
-
-      // On a fresh launch surface ChatGPT creates a unique /c/<id> at the same
-      // boundary as this operation's one physical submit. Some hidden Work
-      // tabs do not materialize user bubbles at all (messagesAfter=0), even
-      // while the Stop control proves generation. That exact transition plus
-      // an emptied composer and generation progress is operation-local proof.
-      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
-        const observedUrl = globalThis.location?.href || '';
-        const composerEmpty = !postFound.element || !compactPromptText(editorText(postFound.element));
-        const postBlocking = detectBlockingState(doc);
-        const generationStarted = postBlocking?.status === STATUS.BUSY
-          || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        if (!textVerified && !unlabeledVerified && !representationVerified
-            && afterTextMessages.length === 0
-            && isExclusiveConversationLocation(observedUrl) && composerEmpty && generationStarted) {
-          return resultBase(request, start, {
-            status: STATUS.SENT_VERIFIED,
-            submissionEvidence: 'FRESH_CONVERSATION_GENERATION_STARTED',
-            safeDiagnosticCode: 'SEND_VERIFIED_FRESH_CONVERSATION_GENERATION',
-            assistantBaselineCount,
-            submittedUserMessageKey: submittedUserKey(doc),
-          });
-        }
       }
 
       // An existing conversation still requires an operation-bound appended
@@ -2144,7 +2144,15 @@
     const baselineKnown = request.assistantBaselineKnown === true;
     const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
     const anchoredRequest = Boolean(request.submittedUserMessageKey || request.responseCorrelationToken);
-    const hasNewAssistantTurn = anchoredRequest ? anchor.paired : (anchor.paired || baselineKnown && assistants.length > baselineCount);
+    // A verified first send from a launch page can be operation-bound even
+    // when Work never mounts the user bubble. Permit the new assistant turn
+    // only for that persisted fresh-generation proof and a zero-message
+    // baseline; ordinary scenario turns still require their unique marker/key.
+    const freshGenerationReply = request.freshConversationGenerationVerified === true
+      && baselineKnown && baselineCount === 0 && assistants.length > baselineCount;
+    const hasNewAssistantTurn = anchoredRequest
+      ? anchor.paired || freshGenerationReply
+      : (anchor.paired || baselineKnown && assistants.length > baselineCount);
     const metadata = { ...anchor, paired: undefined, correlatedConversationRebind: Boolean(identityChanged && correlatedIdentity) };
     const recoverySurface = findChatRecoverySurface(doc);
     if (recoverySurface) {
