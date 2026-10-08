@@ -595,3 +595,45 @@ test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects
   const loaded = (await resumed.get('job.site-snapshot')).job;
   assert.deepEqual(loaded.config.siteRules, created.job.config.siteRules, 'restart retains the original policy snapshot');
 });
+
+
+test('Plan-1: direct Agent intake fails closed on hostile scalar coercion before persistence', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let coercions = 0;
+  const secret = 'private-owner-intake-data';
+  const hostile = {
+    toString() { coercions += 1; throw new Error(secret); },
+    valueOf() { coercions += 1; throw new Error(secret); },
+  };
+
+  for (const field of ['goal', 'name', 'projectId', 'startUrl', 'credentialDecision', 'approvalMode', 'maxCostUsd', 'maxSteps', 'aiPinnedRouteId', 'repeatMode']) {
+    let error;
+    try {
+      await manager.create({ id: 'job.hostile-' + field, goal: 'safe task', [field]: hostile });
+    } catch (caught) {
+      error = caught;
+    }
+    assert.ok(error, field + ' must fail closed');
+    assert.match(error.message, /must be a scalar data value/);
+    assert.doesNotMatch(error.message, /private-owner-intake-data/);
+  }
+  await assert.rejects(
+    () => manager.create({ id: 'job.symbol', goal: Symbol('hostile') }),
+    /must be a scalar data value/,
+  );
+  assert.equal(coercions, 0, 'validation may not invoke untrusted conversion hooks');
+  assert.deepEqual(Object.keys(data), [], 'invalid direct intake cannot persist a partial job');
+
+  const accepted = await manager.create({
+    id: 'job.scalar-ok',
+    goal: 'Read and verify the requested source.',
+    acceptanceCriteria: ['Source inspected'],
+    siteRules: [],
+    maxSteps: 5,
+  });
+  assert.equal(accepted.job.id, 'job.scalar-ok');
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.scalar-ok')).job.config.goal, 'Read and verify the requested source.');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.scalar-ok']);
+});
