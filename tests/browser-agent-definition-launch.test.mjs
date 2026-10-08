@@ -595,3 +595,91 @@ test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects
   const loaded = (await resumed.get('job.site-snapshot')).job;
   assert.deepEqual(loaded.config.siteRules, created.job.config.siteRules, 'restart retains the original policy snapshot');
 });
+
+
+test('Plan-1: direct Agent intake fails closed on hostile scalar coercion before persistence', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let coercions = 0;
+  const secret = 'private-owner-intake-data';
+  const hostile = {
+    toString() { coercions += 1; throw new Error(secret); },
+    valueOf() { coercions += 1; throw new Error(secret); },
+  };
+
+  for (const field of ['goal', 'name', 'projectId', 'startUrl', 'credentialDecision', 'approvalMode', 'maxCostUsd', 'maxSteps', 'aiPinnedRouteId', 'repeatMode']) {
+    let error;
+    try {
+      await manager.create({ id: 'job.hostile-' + field, goal: 'safe task', [field]: hostile });
+    } catch (caught) {
+      error = caught;
+    }
+    assert.ok(error, field + ' must fail closed');
+    assert.match(error.message, /must be a finite scalar data value/);
+    assert.doesNotMatch(error.message, /private-owner-intake-data/);
+  }
+  await assert.rejects(
+    () => manager.create({ id: 'job.symbol', goal: Symbol('hostile') }),
+    /must be a finite scalar data value/,
+  );
+  for (const invalidNumber of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    await assert.rejects(
+      () => manager.create({ id: 'job.nonfinite', goal: 'safe task', maxCostUsd: invalidNumber }),
+      /must be a finite scalar data value/,
+    );
+  }
+  assert.equal(coercions, 0, 'validation may not invoke untrusted conversion hooks');
+  assert.deepEqual(Object.keys(data), [], 'invalid direct intake cannot persist a partial job');
+
+  const accepted = await manager.create({
+    id: 'job.scalar-ok',
+    goal: 'Read and verify the requested source.',
+    acceptanceCriteria: ['Source inspected'],
+    siteRules: [],
+    maxSteps: 5,
+  });
+  assert.equal(accepted.job.id, 'job.scalar-ok');
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.scalar-ok')).job.config.goal, 'Read and verify the requested source.');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.scalar-ok']);
+});
+
+test('Plan-1: direct job intake rejects unknown authority-bearing fields without partial durable state', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  for (const [id, injected] of [
+    ['job.permission', { permissionGranted: true }],
+    ['job.effect', { effectAuthorized: true }],
+    ['job.outcome', { outcomeVerified: true }],
+    ['job.owner', { ownerOverride: 'ADMIN' }],
+    ['job.checkpoint', { restoreWithoutReconciliation: true }],
+  ]) {
+    await assert.rejects(
+      () => manager.create({ id, goal: 'Observe a source safely.', ...injected }),
+      /unknown field/,
+      id + ' should fail closed',
+    );
+  }
+  let reads = 0;
+  const getter = { id: 'job.getter', goal: 'Safe goal' };
+  Object.defineProperty(getter, 'permissionGranted', {
+    enumerable: true,
+    get() { reads += 1; throw new Error('owner-secret-data'); },
+  });
+  await assert.rejects(
+    () => manager.create(getter),
+    /enumerable data property/,
+  );
+  assert.equal(reads, 0);
+  assert.deepEqual(Object.keys(data), [], 'no denied request may mutate durable storage');
+  const created = await manager.create({
+    id: 'job.boundary-ok',
+    goal: 'Observe the exact source.',
+    maxSteps: 3,
+    acceptanceCriteria: ['Source observed'],
+  });
+  assert.equal(created.job.id, 'job.boundary-ok');
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.boundary-ok')).job.config.goal, 'Observe the exact source.');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.boundary-ok']);
+});
