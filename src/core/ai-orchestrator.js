@@ -393,9 +393,13 @@ export class AiOrchestrator {
               error,
             });
           } catch (settlementError) {
-            const classification = classifyAiRouteError(settlementError);
-            routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
-            throw attachFailureRuntime(settlementError);
+            // A provider may already have incurred a charge or produced an output.
+            // Do not retry another model while its settlement is uncertain.
+            const pending = new Error('Model-budget settlement is UNKNOWN; reconcile before any retry');
+            pending.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+            const classification = classifyAiRouteError(pending);
+            routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:classification.code, category:classification.category });
+            throw attachFailureRuntime(pending);
           }
         }
         const classification = classifyAiRouteError(error);
@@ -412,9 +416,13 @@ export class AiOrchestrator {
             result: value,
           });
         } catch (settlementError) {
-          const classification = classifyAiRouteError(settlementError);
-          routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
-          throw attachFailureRuntime(settlementError);
+          // A provider may already have incurred a charge or produced an output.
+          // Do not retry another model while its settlement is uncertain.
+          const pending = new Error('Model-budget settlement is UNKNOWN; reconcile before any retry');
+          pending.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+          const classification = classifyAiRouteError(pending);
+          routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:classification.code, category:classification.category });
+          throw attachFailureRuntime(pending);
         }
       }
       routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
