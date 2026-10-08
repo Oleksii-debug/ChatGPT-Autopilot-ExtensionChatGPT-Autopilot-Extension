@@ -286,3 +286,25 @@ test('S1 timeline status is a keyboard-reachable NVDA live region', async () => 
   assert.match(statusTag, /tabindex="0"/u);
   assert.match(html, /<ol\s+id="agent-run-timeline-list"\s+aria-label="[^"]+"/u);
 });
+
+
+test('S1 hostile persisted Proxy cannot spoof numeric plan or recorded-check array lengths', () => {
+  for (const field of ['plan', 'checks']) {
+    const input = job();
+    const array = field === 'plan' ? input.runtime.plan.nodes : input.runtime.verifiedOutcome.checks;
+    const spoof = new Proxy(array, {
+      getOwnPropertyDescriptor(target, key) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+        if (key === 'length') return { ...descriptor, value: '0' };
+        return descriptor;
+      },
+    });
+    if (field === 'plan') input.runtime.plan.nodes = spoof;
+    else input.runtime.verifiedOutcome.checks = spoof;
+    const expected = field === 'plan' ? /plan nodes length is invalid/ : /checks length is invalid/;
+    assert.throws(() => buildAgentRunTimelineV1(input), expected);
+    const valid = buildAgentRunTimelineV1(job());
+    assert.equal(valid.mayReplayExternalEffect, false);
+    assert.equal(valid.evidenceMap.externalEffectVerified, false);
+  }
+});
