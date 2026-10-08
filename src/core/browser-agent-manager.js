@@ -447,7 +447,7 @@ function bindBrowserAgentOutcomeContract(raw, config, definitionSelection) {
     throw new Error('Browser Agent Outcome Contract projectId does not match durable job');
   }
   const directGoal = config.goal || '';
-  const ownerGoalSuffix = '\\n\\nOwner task:\\n' + contract.desiredResult;
+  const ownerGoalSuffix = '\n\nOwner task:\n' + contract.desiredResult;
   const correctGoal = definitionSelection == null
     ? directGoal === contract.desiredResult
     : directGoal.endsWith(ownerGoalSuffix);
