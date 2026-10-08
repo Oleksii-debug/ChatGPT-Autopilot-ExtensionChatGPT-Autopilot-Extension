@@ -69,7 +69,7 @@ function fixture() {
 test('fresh resolver evidence still reaches the existing provider boundary under its canonical lease', async () => {
   const f = fixture();
   const readiness = await f.trustedResolver.resolve(f.selection);
-  await assert.rejects(f.newDispatcher().execute(f.request(readiness)), /SENTINEL_PROVIDER_REACHED/u);
+  await assert.rejects(f.newDispatcher().execute(f.request(readiness)), /Specialist provider outcome is UNKNOWN/u);
   assert.equal(f.providerCalls, 1);
 });
 
@@ -244,7 +244,7 @@ test('persisted nested provider inspection remains valid on exact same lease and
   const recovered = JSON.parse(JSON.stringify(valid));
   await assert.rejects(
     f.newDispatcher().execute(f.request(recovered)),
-    /SENTINEL_PROVIDER_REACHED/u,
+    /Specialist provider outcome is UNKNOWN/u,
   );
   assert.equal(f.providerCalls, 1);
 });
@@ -381,7 +381,7 @@ test('provider effect-edge revalidation still permits an unexpired canonical dis
       execute: async () => { effects += 1; throw new Error('EXPECTED_PROVIDER_EFFECT'); },
     }],
   });
-  await assert.rejects(dispatcher.execute(f.request(valid)), /EXPECTED_PROVIDER_EFFECT/u);
+  await assert.rejects(dispatcher.execute(f.request(valid)), /Specialist provider outcome is UNKNOWN/u);
   assert.equal(reads, 2);
   assert.equal(effects, 1);
 });
@@ -403,4 +403,32 @@ test('section 1: unknown attacker-controlled field names are redacted before pro
     }),
     error => error instanceof Error && /unknown field/u.test(error.message) && !error.message.includes(secret),
   );
+});
+
+test('Section 1 provider exception after effect is opaque UNKNOWN and must be reconciled', async () => {
+  const f = fixture();
+  const resolved = await f.trustedResolver.resolve(f.selection);
+  let executed = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => {
+        executed += 1;
+        throw new Error('PROVIDER_PRIVATE_CREDENTIAL_TOKEN_731');
+      },
+    }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(resolved)), error =>
+    error instanceof Error
+    && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+    && /reconcile the canonical effect/u.test(error.message)
+    && !error.message.includes('PROVIDER_PRIVATE_CREDENTIAL_TOKEN_731')
+    && !Object.hasOwn(error, 'cause'));
+  assert.equal(executed, 1, 'no speculative provider replay after unknown effect');
+  const saved = JSON.parse(JSON.stringify(resolved));
+  const restarted = f.newDispatcher();
+  f.nowMs = T0 + 301_000;
+  await assert.rejects(restarted.execute(f.request(saved)), /stale/u);
+  assert.equal(f.providerCalls, 0, 'stale durable readiness must not dispatch after restart');
 });
