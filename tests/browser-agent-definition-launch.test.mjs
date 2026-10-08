@@ -432,3 +432,22 @@ test('Plan-1: malformed existing store fails closed instead of silently replacin
   })), /structure is invalid/);
   assert.deepEqual(data[key], corrupted, 'invalid persisted state must remain intact for explicit recovery');
 });
+
+test('Plan-1: direct prompt-first intake rejects getter-backed policy and goal fields without invocation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let invoked = 0;
+  const hostile = { id: 'job.direct-getter' };
+  Object.defineProperty(hostile, 'goal', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('side-effect-secret'); },
+  });
+  await assert.rejects(() => manager.create(hostile), /enumerable data property/);
+  assert.equal(invoked, 0);
+  assert.equal((await manager.get('job.direct-getter')).job, null);
+
+  const poisoned = { id: 'job.direct-symbol', goal: 'Safe task' };
+  poisoned[Symbol('executionAuthorized')] = true;
+  await assert.rejects(() => manager.create(poisoned), /symbol field/);
+  assert.equal((await manager.get('job.direct-symbol')).job, null);
+});
