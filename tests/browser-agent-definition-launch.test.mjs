@@ -375,3 +375,223 @@ test('Core exposes definition launch only through the canonical BrowserAgentMana
   assert.match(source, /browserAgent\.createFromAgentDefinition\(message\.payload \|\| \{\}\)/);
   assert.doesNotMatch(source, /chrome\.storage\.local[^\n]+CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION/);
 });
+
+
+test('Plan-1: direct and reusable-definition intake share one durable Agent Job constructor across restart', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const direct = await manager.create({ id: 'job.direct', projectId: 'project-1', goal: 'Collect independently verifiable sources.' });
+  assert.equal(direct.job.id, 'job.direct');
+  await seedRegistry(manager);
+  const viaDefinition = await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.defined' }));
+  assert.equal(viaDefinition.job.definitionSelection.agentDefinitionId, 'agent.research');
+  assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1']);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.direct')).job.config.goal, 'Collect independently verifiable sources.');
+  const loadedDefined = (await restarted.get('job.defined')).job;
+  assert.equal(loadedDefined.definitionSelection.definitionRevision, 1);
+  assert.deepEqual(loadedDefined.definitionScope.toolIds, ['browser.read']);
+  await assert.rejects(() => restarted.create({ id: 'job.direct', goal: 'Must not overwrite existing identity.' }), /already exists/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(launchRequest({ jobId: 'job.defined' })), /already exists/);
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.direct', 'job.defined']);
+});
+
+test('Plan-1: unknown persisted job-store schema fails closed across restart without rewriting original effects', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const [key] = Object.keys(data);
+  const original = structuredClone(data[key]);
+
+  data[key].schemaVersion = original.schemaVersion + 1;
+  const incompatible = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  await assert.rejects(() => restarted.get('job.research-1'), /schemaVersion is unsupported/);
+  await assert.rejects(
+    () => restarted.createFromAgentDefinition(launchRequest({ jobId: 'job.after-upgrade' })),
+    /schemaVersion is unsupported/,
+  );
+  assert.deepEqual(data[key], incompatible, 'failed intake must leave the incompatible store untouched');
+  assert.equal(data[key].byId['job.research-1'].id, 'job.research-1');
+  assert.equal(data[key].byId['job.after-upgrade'], undefined);
+});
+
+test('Plan-1: malformed existing store fails closed instead of silently replacing durable identities', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const [key] = Object.keys(data);
+  data[key].order = {};
+  const corrupted = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  await assert.rejects(() => restarted.get('job.research-1'), /structure is invalid/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(launchRequest({
+    jobId: 'job.fail-closed',
+  })), /structure is invalid/);
+  assert.deepEqual(data[key], corrupted, 'invalid persisted state must remain intact for explicit recovery');
+});
+
+test('Plan-1: direct prompt-first intake rejects getter-backed policy and goal fields without invocation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let invoked = 0;
+  const hostile = { id: 'job.direct-getter' };
+  Object.defineProperty(hostile, 'goal', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('side-effect-secret'); },
+  });
+  await assert.rejects(() => manager.create(hostile), /enumerable data property/);
+  assert.equal(invoked, 0);
+  assert.equal((await manager.get('job.direct-getter')).job, null);
+
+  const poisoned = { id: 'job.direct-symbol', goal: 'Safe task' };
+  poisoned[Symbol('executionAuthorized')] = true;
+  await assert.rejects(() => manager.create(poisoned), /symbol field/);
+  assert.equal((await manager.get('job.direct-symbol')).job, null);
+});
+
+
+test('Plan-1: quarantined invalid definition job cannot be lost by unrelated writes or reused', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const key = 'autopilotBrowserAgentV1';
+  delete data[key].byId['job.research-1'].definitionRouterOverride;
+  const corrupted = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.research-1')).job, null,
+    'corrupt row remains withheld from executable job projections');
+  await assert.rejects(() => restarted.create({
+    id: 'job.safe-new', goal: 'A different task must not delete unreconciled job authority.',
+  }), /durable job identity is quarantined/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(
+    launchRequest({ jobId: 'job.research-1' }),
+  ), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], corrupted, 'rejected writes must preserve exact original durable store');
+});
+
+test('Plan-1: orphaned byId record and duplicate order identity stop all mutation', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.create({ id: 'job.1', goal: 'Prepare evidence.' });
+  const key = 'autopilotBrowserAgentV1';
+  data[key].byId['job.orphan'] = structuredClone(data[key].byId['job.1']);
+  const orphaned = structuredClone(data[key]);
+  await assert.rejects(() => manager.create({ id: 'job.2', goal: 'Not yet.' }), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], orphaned);
+  delete data[key].byId['job.orphan'];
+  data[key].order.push('job.1');
+  const duplicated = structuredClone(data[key]);
+  await assert.rejects(() => manager.create({ id: 'job.2', goal: 'Still not yet.' }), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], duplicated);
+});
+
+
+test('Plan-1: every intake path rejects non-canonical IDs without creating or replacing jobs', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  for (const invalid of ['  job.truncated', 'job.with trailing ', '  ', 'job;unsafe', 42]) {
+    await assert.rejects(() => manager.create({ id: invalid, goal: 'Evidence gathering.' }),
+      /exact bounded durable ID/);
+    await assert.rejects(() => manager.createFromAgentDefinition(launchRequest({ jobId: invalid })),
+      /exact bounded durable ID/);
+  }
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, []);
+  const brokenGenerator = managerFor(chrome, () => ' job.generated');
+  await assert.rejects(() => brokenGenerator.create({ goal: 'Must not accept coerced generated identity.' }),
+    /exact bounded durable ID/);
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, []);
+  const generated = await manager.create({ id: '', goal: 'Owner did not set a job id.' });
+  assert.equal(generated.job.id, 'job.generated', 'legacy empty-id launch must generate a canonical job');
+  const spaced = await manager.create({ id: 'manual job 2', goal: 'Preserve legitimate internal-space IDs.' });
+  assert.equal(spaced.job.id, 'manual job 2');
+  assert.equal((await managerFor(chrome).get('manual job 2')).job.id, 'manual job 2');
+  const valid = await manager.create({ id: 'job:exact/path@v1', goal: 'Preserve explicit identity.' });
+  assert.equal(valid.job.id, 'job:exact/path@v1');
+  const resumed = managerFor(chrome);
+  assert.equal((await resumed.get('job:exact/path@v1')).job.id, 'job:exact/path@v1');
+});
+
+
+test('Plan-1: outcome criteria are dense bounded text with no nested getter or coercion side effects', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.create({ id: 'job.valid', goal: 'Produce evidence.', acceptanceCriteria: ['Evidence file exists'] });
+  const baseline = structuredClone(data.autopilotBrowserAgentV1);
+  let invoked = 0;
+  const evil = { toString() { invoked += 1; throw new Error('leaked-token'); } };
+  const accessor = ['one'];
+  Object.defineProperty(accessor, '0', { enumerable: true, get() { invoked += 1; throw new Error('leaked-token'); } });
+  const sparse = []; sparse.length = 2; sparse[0] = 'one';
+  const extra = ['one']; extra.authorized = true;
+  const bad = [[evil], accessor, sparse, extra, ['x'.repeat(1001)], [17]];
+  for (const criteria of bad) {
+    await assert.rejects(() => manager.create({
+      id: 'job.reject', goal: 'Cannot claim outcome.', acceptanceCriteria: criteria,
+    }), /acceptanceCriteria|acceptance criterion/);
+  }
+  assert.equal(invoked, 0, 'criteria validation must not call hostile accessors or coercion');
+  assert.deepEqual(data.autopilotBrowserAgentV1, baseline, 'failed intake must not persist authority');
+  const restarted = managerFor(chrome);
+  assert.deepEqual((await restarted.get('job.valid')).job.config.acceptanceCriteria, ['Evidence file exists']);
+});
+
+test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects hostile getters', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let invoked = 0;
+  const accessorRule = { pattern: 'example.com' };
+  Object.defineProperty(accessorRule, 'defaultDecision', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('secret-owner-token'); },
+  });
+  await assert.rejects(() => manager.create({
+    id: 'job.site-getter', goal: 'Should not read owner policy getter.',
+    siteRules: [accessorRule],
+  }), /enumerable data property/);
+
+  const decisions = {};
+  Object.defineProperty(decisions, 'credentials', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('secret-owner-token'); },
+  });
+  await assert.rejects(() => manager.create({
+    id: 'job.decision-getter', goal: 'Should not invoke nested decision getter.',
+    siteRules: [{ pattern: 'example.com', actionDecisions: decisions }],
+  }), /enumerable data property/);
+  assert.equal(invoked, 0, 'nested policy accessors must never run');
+  assert.equal((await manager.get('job.site-getter')).job, null);
+  assert.equal((await manager.get('job.decision-getter')).job, null);
+
+  const sparse = new Array(2);
+  sparse[0] = { pattern: 'example.com' };
+  await assert.rejects(() => manager.create({
+    id: 'job.sparse-site', goal: 'Do not accept partially hidden owner rules.',
+    siteRules: sparse,
+  }), /dense bounded array|own data properties/);
+
+  const mutableRules = [{
+    pattern: 'example.com',
+    defaultDecision: 'DENY',
+    actionDecisions: { credentials: 'ASK' },
+  }];
+  const pending = manager.create({
+    id: 'job.site-snapshot', goal: 'Bound to exact owner policy.',
+    siteRules: mutableRules,
+  });
+  mutableRules[0].pattern = 'evil.example.org';
+  mutableRules[0].defaultDecision = 'ALLOW';
+  mutableRules[0].actionDecisions.credentials = 'ALLOW';
+  const created = await pending;
+  assert.equal(created.job.config.siteRules[0].pattern, 'example.com');
+  assert.equal(created.job.config.siteRules[0].defaultDecision, 'DENY');
+  assert.equal(created.job.config.siteRules[0].actionDecisions.credentials, 'ASK');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.site-snapshot']);
+  const resumed = managerFor(chrome);
+  const loaded = (await resumed.get('job.site-snapshot')).job;
+  assert.deepEqual(loaded.config.siteRules, created.job.config.siteRules, 'restart retains the original policy snapshot');
+});

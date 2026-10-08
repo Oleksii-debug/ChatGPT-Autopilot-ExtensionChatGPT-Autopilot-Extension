@@ -1,0 +1,48 @@
+name: Plan 1 Sections 1-2 exact-source qualification
+
+on:
+  push:
+    branches:
+      - plan1/11.0.13-agent-contract-intake-converge-20261008
+  pull_request:
+    paths:
+      - src/core/agent-io-contract.js
+      - src/core/browser-agent-manager.js
+      - src/core/browser-agent.js
+      - tests/agent-io-contract.test.mjs
+      - tests/browser-agent-definition-launch.test.mjs
+      - tests/browser-agent-orchestration-binding.test.mjs
+      - .github/workflows/plan1-sections-1-2-qualification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-contract-and-intake:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact-source JavaScript parse checks
+        run: |
+          node --check src/core/agent-io-contract.js
+          node --check src/core/browser-agent-manager.js
+          node --check src/core/browser-agent.js
+          node --check tests/agent-io-contract.test.mjs
+          node --check tests/browser-agent-definition-launch.test.mjs
+          node --check tests/browser-agent-orchestration-binding.test.mjs
+      - name: Agent I/O negative and schema contract tests
+        run: node --test tests/agent-io-contract.test.mjs
+      - name: Browser Agent Definition/direct durable intake and restart tests
+        run: node --test tests/browser-agent-definition-launch.test.mjs
+      - name: Adjacent persisted Agent definition regression tests
+        run: node --test tests/browser-agent-definition-persistence.test.mjs
+      - name: Existing orchestration job-ID and authority compatibility
+        run: node --test tests/browser-agent-orchestration-binding.test.mjs

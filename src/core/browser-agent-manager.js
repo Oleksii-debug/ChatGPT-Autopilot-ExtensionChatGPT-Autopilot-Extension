@@ -87,6 +87,16 @@ const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
+// Existing Browser Agent durable IDs may contain *internal* spaces (see
+// orchestration-binding compatibility tests). Reject trimming/coercion, not
+// valid legacy identities, when defending exact persistence semantics.
+const EXACT_BROWSER_JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~ -]{0,127}$/u;
+function requireExactBrowserJobId(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !EXACT_BROWSER_JOB_ID.test(value)) {
+    throw new Error(`${label} must be an exact bounded durable ID`);
+  }
+  return value;
+}
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
@@ -302,6 +312,49 @@ function snapshotAgentDefinitionLaunchNestedInputs(request) {
     );
   }
   return request;
+}
+
+// Direct prompt-first intake must snapshot owner site policy before the first
+// asynchronous write. Nested getters, sparse rule arrays and mutable caller
+// references may never become policy authority during queued persistence.
+function snapshotDirectAgentSiteRules(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error('Browser Agent direct siteRules must be a canonical array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 100
+      || Reflect.ownKeys(descriptors).length !== length + 1) {
+    throw new Error('Browser Agent direct siteRules must be a dense bounded array');
+  }
+  const rules = [];
+  const allowed = new Set(['pattern', 'defaultDecision', 'actionDecisions']);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent direct siteRules entries must be own data properties');
+    }
+    const rule = snapshotExactOwnDataRequest(
+      descriptor.value, allowed, `Browser Agent direct siteRules[${index}]`,
+    );
+    if (typeof rule.pattern !== 'string'
+        || (rule.defaultDecision != null && typeof rule.defaultDecision !== 'string')) {
+      throw new Error('Browser Agent direct siteRules pattern/decision must be text');
+    }
+    if (Object.hasOwn(rule, 'actionDecisions') && rule.actionDecisions != null) {
+      const decisions = snapshotOwnDataRequest(
+        rule.actionDecisions, `Browser Agent direct siteRules[${index}].actionDecisions`,
+      );
+      for (const decision of Object.values(decisions)) {
+        if (decision != null && typeof decision !== 'string') {
+          throw new Error('Browser Agent direct siteRules action decisions must be text');
+        }
+      }
+      rule.actionDecisions = decisions;
+    }
+    rules.push(rule);
+  }
+  return rules;
 }
 
 function normalizePersistedAgentDefinitionScope(raw, selection) {
@@ -734,7 +787,19 @@ function normalizeRuntime(raw, now) {
 }
 
 function normalizeStore(raw, now) {
-  if (!raw || raw.schemaVersion !== BROWSER_AGENT_SCHEMA_VERSION || !Array.isArray(raw.order) || !raw.byId || typeof raw.byId !== 'object') return freshStore();
+  // Absence of prior state is a fresh installation. An *existing* unknown or
+  // malformed store is not: resetting it could discard pending effects and
+  // resurrect a duplicate job after restart. Do not write a new empty store
+  // over unrecognized durable authority; require explicit migration/recovery.
+  if (raw == null) return freshStore();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+      || raw.schemaVersion !== BROWSER_AGENT_SCHEMA_VERSION) {
+    throw new Error('Browser Agent store schemaVersion is unsupported; migration/reconciliation required');
+  }
+  if (!Array.isArray(raw.order) || !raw.byId || typeof raw.byId !== 'object'
+      || Array.isArray(raw.byId)) {
+    throw new Error('Browser Agent store structure is invalid; migration/reconciliation required');
+  }
   const out = freshStore();
   for (const id of raw.order) {
     if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
@@ -795,6 +860,33 @@ function normalizeStore(raw, now) {
   return out;
 }
 
+// One durable job-record constructor for direct, prompt-first and reusable-Definition
+// intake. This is not a new Agent runtime; the existing serialized BrowserAgent
+// store remains the sole job identity and execution authority.
+function persistCanonicalAgentJob(store, {
+  id, config, now, definitionSelection = null, definitionScope = null,
+  definitionRouterOverride = null,
+}) {
+  if (typeof id !== 'string' || !id || config?.id !== id) {
+    throw new Error('Browser Agent job identity must match the normalized config');
+  }
+  if (store.byId[id]) throw new Error('Browser Agent job already exists');
+  store.byId[id] = {
+    id,
+    config: clone(config),
+    runtime: createBrowserAgentRuntime(now),
+    definitionSelection: definitionSelection == null ? null : clone(definitionSelection),
+    definitionScope: definitionScope == null ? null : clone(definitionScope),
+    definitionRouterOverride: definitionRouterOverride == null ? null : clone(definitionRouterOverride),
+    orchestrationNodeBinding: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.order.push(id);
+  store.selectedId = id;
+  return store;
+}
+
 export class BrowserAgentManager {
   constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined, specialistReadinessResolver = null, specialistProviderDispatcher = null, specialistVerificationResolver = null } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
@@ -847,7 +939,22 @@ export class BrowserAgentManager {
 
   update(mutator) {
     const operation = this.updateChain.then(async () => {
-      const store = await this.load();
+      // Reads may omit a quarantined malformed job for safe presentation. A
+      // WRITE must never silently persist that lossy projection: otherwise
+      // an unrelated policy or job update can erase unreconciled effects and
+      // make the original durable job ID available for duplicate execution.
+      const record = await this.chrome.storage.local.get(BROWSER_AGENT_STORAGE_KEY);
+      const persisted = record?.[BROWSER_AGENT_STORAGE_KEY];
+      const store = normalizeStore(persisted, this.now());
+      if (persisted != null) {
+        const persistedIds = Object.keys(persisted.byId);
+        if (persisted.order.length !== store.order.length
+            || persistedIds.length !== store.order.length
+            || persisted.order.some((id, index) => id !== store.order[index])
+            || persistedIds.some(id => !Object.hasOwn(store.byId, id))) {
+          throw new Error('Browser Agent durable job identity is quarantined; mutation requires explicit recovery');
+        }
+      }
       const next = await mutator(store) || store;
       return this.save(next);
     });
@@ -2119,9 +2226,7 @@ export class BrowserAgentManager {
 
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     const jobId = Object.hasOwn(request, 'jobId') ? request.jobId : this.createId();
-    if (typeof jobId !== 'string' || jobId.length < 1 || jobId.length > 128) {
-      throw new Error('Browser Agent definition launch jobId must be exact bounded text');
-    }
+    requireExactBrowserJobId(jobId, 'Browser Agent definition launch jobId');
 
     await this.update(store => {
       const now = this.now();
@@ -2157,82 +2262,73 @@ export class BrowserAgentManager {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
 
-      store.byId[jobId] = {
+      return persistCanonicalAgentJob(store, {
         id: jobId,
-        config: clone(materialized.config),
-        runtime: createBrowserAgentRuntime(now),
-        definitionSelection: clone(selection),
-        definitionScope: clone(materialized.scope),
-        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
-        orchestrationNodeBinding: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      store.order.push(jobId);
-      store.selectedId = jobId;
-      return store;
+        config: materialized.config,
+        now,
+        definitionSelection: selection,
+        definitionScope: materialized.scope,
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? materialized.routerOverride : null,
+      });
     });
     return this.get(jobId);
   }
 
   async create(raw = {}) {
-    const id = clean(raw.id, 128) || this.createId();
+    // Same data-only request boundary as Definition intake: no getter may
+    // supply a task/goal/policy at construction time.
+    const request = snapshotOwnDataRequest(raw, 'Browser Agent direct intake');
+    // Explicit invalid identities cannot silently turn into a newly generated
+    // task, and generated identities obey the same durable namespace.
+    const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
+    // Historical prompt-first entry permits absent/null/empty id to request a
+    // generated job. Non-empty malformed IDs must never be coerced/truncated.
+    const id = requireExactBrowserJobId(
+      suppliedId == null || suppliedId === '' ? this.createId() : suppliedId,
+      'Browser Agent direct intake jobId',
+    );
     const now = this.now();
     const config = normalizeBrowserAgentConfig({
       id,
-      projectId: raw.projectId ?? '',
-      name: raw.name || 'Нове завдання агента',
-      startUrl: raw.startUrl || '',
-      startFromActiveTab: raw.startFromActiveTab !== false,
-      goal: raw.goal || '',
-      acceptanceCriteria: raw.acceptanceCriteria || [],
-      maxSteps: raw.maxSteps ?? 500,
-      stepDelayMs: raw.stepDelayMs ?? 0,
-      allowCrossOriginNavigation: raw.allowCrossOriginNavigation !== false,
-      closeOwnedTabsOnStop: raw.closeOwnedTabsOnStop === true,
-      approvalMode: raw.approvalMode || BrowserAgentApprovalMode.CONSEQUENTIAL,
-      credentialDecision: raw.credentialDecision || BrowserAgentPolicyDecision.ASK,
-      siteRules: raw.siteRules || [],
-      visionOnDemand: raw.visionOnDemand !== false,
-      trustedScriptEnabled: raw.trustedScriptEnabled === true,
-      maxModelCalls: raw.maxModelCalls ?? 0,
-      maxInputTokens: raw.maxInputTokens ?? 0,
-      maxOutputTokens: raw.maxOutputTokens ?? 0,
-      maxTotalTokens: raw.maxTotalTokens ?? 0,
-      maxOutputTokensPerCall: raw.maxOutputTokensPerCall ?? 4096,
-      maxRuntimeMinutes: raw.maxRuntimeMinutes ?? 0,
-      maxCostUsd: raw.maxCostUsd ?? 0,
-      inputPricePerMillionUsd: raw.inputPricePerMillionUsd ?? 0,
-      outputPricePerMillionUsd: raw.outputPricePerMillionUsd ?? 0,
-      aiRoutingMode: raw.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
-      aiPinnedRouteId: raw.aiPinnedRouteId || '',
-      aiPrimaryProvider: raw.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
-      aiPrimaryModel: raw.aiPrimaryModel || '',
-      aiStrongProvider: raw.aiStrongProvider || BrowserAgentAiProvider.INHERIT,
-      aiStrongModel: raw.aiStrongModel || '',
-      repeatMode: raw.repeatMode || BrowserAgentRepeatMode.ONCE,
-      intervalSeconds: raw.intervalSeconds ?? 60,
-      scheduleStartAt: raw.scheduleStartAt ?? 0,
-      scheduleEndAt: raw.scheduleEndAt ?? 0,
-      activeWindowStart: raw.activeWindowStart || '',
-      activeWindowEnd: raw.activeWindowEnd || '',
+      projectId: request.projectId ?? '',
+      name: request.name || 'Нове завдання агента',
+      startUrl: request.startUrl || '',
+      startFromActiveTab: request.startFromActiveTab !== false,
+      goal: request.goal || '',
+      acceptanceCriteria: request.acceptanceCriteria || [],
+      maxSteps: request.maxSteps ?? 500,
+      stepDelayMs: request.stepDelayMs ?? 0,
+      allowCrossOriginNavigation: request.allowCrossOriginNavigation !== false,
+      closeOwnedTabsOnStop: request.closeOwnedTabsOnStop === true,
+      approvalMode: request.approvalMode || BrowserAgentApprovalMode.CONSEQUENTIAL,
+      credentialDecision: request.credentialDecision || BrowserAgentPolicyDecision.ASK,
+      siteRules: snapshotDirectAgentSiteRules(request.siteRules || []),
+      visionOnDemand: request.visionOnDemand !== false,
+      trustedScriptEnabled: request.trustedScriptEnabled === true,
+      maxModelCalls: request.maxModelCalls ?? 0,
+      maxInputTokens: request.maxInputTokens ?? 0,
+      maxOutputTokens: request.maxOutputTokens ?? 0,
+      maxTotalTokens: request.maxTotalTokens ?? 0,
+      maxOutputTokensPerCall: request.maxOutputTokensPerCall ?? 4096,
+      maxRuntimeMinutes: request.maxRuntimeMinutes ?? 0,
+      maxCostUsd: request.maxCostUsd ?? 0,
+      inputPricePerMillionUsd: request.inputPricePerMillionUsd ?? 0,
+      outputPricePerMillionUsd: request.outputPricePerMillionUsd ?? 0,
+      aiRoutingMode: request.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
+      aiPinnedRouteId: request.aiPinnedRouteId || '',
+      aiPrimaryProvider: request.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
+      aiPrimaryModel: request.aiPrimaryModel || '',
+      aiStrongProvider: request.aiStrongProvider || BrowserAgentAiProvider.INHERIT,
+      aiStrongModel: request.aiStrongModel || '',
+      repeatMode: request.repeatMode || BrowserAgentRepeatMode.ONCE,
+      intervalSeconds: request.intervalSeconds ?? 60,
+      scheduleStartAt: request.scheduleStartAt ?? 0,
+      scheduleEndAt: request.scheduleEndAt ?? 0,
+      activeWindowStart: request.activeWindowStart || '',
+      activeWindowEnd: request.activeWindowEnd || '',
     }, { id });
     await this.update(store => {
-      if (store.byId[id]) throw new Error('Browser Agent job already exists');
-      store.byId[id] = {
-        id,
-        config,
-        runtime: createBrowserAgentRuntime(now),
-        definitionSelection: null,
-        definitionScope: null,
-        definitionRouterOverride: null,
-        orchestrationNodeBinding: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      store.order.push(id);
-      store.selectedId = id;
-      return store;
+      return persistCanonicalAgentJob(store, { id, config, now });
     });
     return this.get(id);
   }

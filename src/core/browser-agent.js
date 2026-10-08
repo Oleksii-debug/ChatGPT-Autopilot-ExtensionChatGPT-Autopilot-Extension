@@ -276,17 +276,37 @@ function optionalEpochMs(value) {
 
 export function normalizeBrowserAgentAcceptanceCriteria(raw = []) {
   if (raw == null) return [];
-  if (!Array.isArray(raw)) throw new Error('Browser Agent acceptanceCriteria must be an array');
-  if (raw.length > 20) throw new Error('Browser Agent acceptanceCriteria exceeds 20 criteria');
+  if (!Array.isArray(raw) || Object.getPrototypeOf(raw) !== Array.prototype) {
+    throw new Error('Browser Agent acceptanceCriteria must be a plain array');
+  }
+  const entries = Object.getOwnPropertyDescriptors(raw);
+  const size = entries.length?.value;
+  if (!Number.isSafeInteger(size) || size < 0 || size > 20) {
+    throw new Error('Browser Agent acceptanceCriteria exceeds 20 criteria or has invalid length');
+  }
+  const keys = Reflect.ownKeys(entries);
+  if (keys.length !== size + 1 || keys.some(key =>
+    key !== 'length' && (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)))) {
+    throw new Error('Browser Agent acceptanceCriteria must be a dense, data-only array');
+  }
   const seen = new Set();
-  return raw.map((value, index) => {
-    const criterion = clean(value, 1000);
-    if (!criterion) throw new Error(`Browser Agent acceptance criterion ${index + 1} is required`);
+  const criteria = [];
+  for (let index = 0; index < size; index += 1) {
+    const descriptor = entries[String(index)];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')
+        || typeof descriptor.value !== 'string') {
+      throw new Error('Browser Agent acceptanceCriteria must contain only own text values');
+    }
+    const criterion = descriptor.value.trim();
+    if (!criterion || criterion.length > 1000) {
+      throw new Error(`Browser Agent acceptance criterion ${index + 1} is invalid`);
+    }
     const key = criterion.toLocaleLowerCase();
     if (seen.has(key)) throw new Error(`Duplicate Browser Agent acceptance criterion: ${criterion}`);
     seen.add(key);
-    return criterion;
-  });
+    criteria.push(criterion);
+  }
+  return criteria;
 }
 function minutesOfDay(hhmm) {
   if (!hhmm) return null;
