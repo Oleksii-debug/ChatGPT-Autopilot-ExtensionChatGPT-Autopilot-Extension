@@ -375,3 +375,23 @@ test('Core exposes definition launch only through the canonical BrowserAgentMana
   assert.match(source, /browserAgent\.createFromAgentDefinition\(message\.payload \|\| \{\}\)/);
   assert.doesNotMatch(source, /chrome\.storage\.local[^\n]+CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION/);
 });
+
+
+test('Plan-1: direct and reusable-definition intake share one durable Agent Job constructor across restart', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const direct = await manager.create({ id: 'job.direct', projectId: 'project-1', goal: 'Collect independently verifiable sources.' });
+  assert.equal(direct.job.id, 'job.direct');
+  await seedRegistry(manager);
+  const viaDefinition = await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.defined' }));
+  assert.equal(viaDefinition.job.definitionSelection.agentDefinitionId, 'agent.research');
+  assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1']);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.direct')).job.config.goal, 'Collect independently verifiable sources.');
+  const loadedDefined = (await restarted.get('job.defined')).job;
+  assert.equal(loadedDefined.definitionSelection.definitionRevision, 1);
+  assert.deepEqual(loadedDefined.definitionScope.toolIds, ['browser.read']);
+  await assert.rejects(() => restarted.create({ id: 'job.direct', goal: 'Must not overwrite existing identity.' }), /already exists/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(launchRequest({ jobId: 'job.defined' })), /already exists/);
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.direct', 'job.defined']);
+});
