@@ -68,3 +68,15 @@ test('slow earlier result cannot overwrite a later offline recovery', async () =
   assert.equal(await first, 'STALE_IGNORED');
   assert.equal(all(root).some(node => node.textContent.includes('roi-report-1')), false);
 });
+
+
+test('restart-equivalent owner surface never restores stale cached metrics', async () => {
+  const beforeRestart = panel();
+  assert.equal(await refreshRoiOwnerPanelV1(beforeRestart, async () => valid), 'EVIDENCE');
+  assert.equal(all(beforeRestart).some(node => node.textContent.includes('roi-report-1')), true);
+  const reopened = panel();
+  const result = await refreshRoiOwnerPanelV1(reopened, async () => { throw Error('Core unavailable after restart'); });
+  assert.equal(result, 'OFFLINE');
+  assert.equal(all(reopened).some(node => node.textContent.includes('roi-report-1')), false);
+  assert.equal(all(reopened).some(node => node.tagName === 'TABLE'), false);
+});
