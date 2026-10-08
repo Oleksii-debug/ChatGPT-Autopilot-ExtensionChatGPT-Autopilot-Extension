@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAiRoutePool, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
+import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
 
@@ -228,4 +228,25 @@ test('gateway retains a safe provider code but never a secret-bearing error body
     error=>error.code==='AI_GATEWAY_UNAVAILABLE' && error.retryable===true
       && !error.message.includes('sk-private-secret'),
   );
+});
+
+test('owner policy and route eligibility flags reject coerced values across restart', () => {
+  const validRoute = { ...route, enabled:false, supportsVision:false };
+  const validPolicy = { autoSwitch:false, freeOnly:true };
+  assert.equal(normalizeAiRoutePool([validRoute])[0].enabled, false);
+  assert.equal(normalizeAiRoutePolicy(validPolicy).autoSwitch, false);
+  assert.equal(normalizeAiRoutePolicy(validPolicy).freeOnly, true);
+  const persisted = JSON.parse(JSON.stringify({ routes:[validRoute], policy:validPolicy }));
+  assert.equal(normalizeAiRoutePool(persisted.routes)[0].enabled, false);
+  assert.equal(normalizeAiRoutePolicy(persisted.policy).autoSwitch, false);
+  for (const field of ['enabled','supportsVision']) {
+    for (const forged of ['false', 0, null, [], {}]) {
+      assert.throws(() => normalizeAiRoutePool([{ ...route, [field]: forged }]), /must be boolean/);
+    }
+  }
+  for (const field of ['autoSwitch','freeOnly']) {
+    for (const forged of ['false', 0, null, [], {}]) {
+      assert.throws(() => normalizeAiRoutePolicy({ [field]: forged }), /must be boolean/);
+    }
+  }
 });
