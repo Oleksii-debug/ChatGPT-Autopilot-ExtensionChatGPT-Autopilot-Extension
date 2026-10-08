@@ -229,3 +229,31 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
     assert.equal((await correct.control(originalRequest)).status, 'RECEIVED');
   });
 });
+
+test('SDK binds read-only vs mutating receipt classification to canonical operation', async () => {
+  await withServer(async port => {
+    const originalRequest = request('classification-1');
+    const raw = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+      method:'POST',
+      headers:{Authorization:'Bearer ' + TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify(originalRequest),
+    });
+    assert.equal(raw.ok,true);
+    const valid = await raw.json();
+    assert.equal(valid.result.readOnly,true);
+    assert.equal(valid.result.downstreamAuthorityRequired,false);
+    for (const patch of [
+      {readOnly:false},
+      {downstreamAuthorityRequired:true},
+      {readOnly:false,downstreamAuthorityRequired:true},
+    ]) {
+      const forged = { ...valid, result:{ ...valid.result, ...patch } };
+      let calls=0;
+      const client = createAutopilotLocalClientV1({
+        token:TOKEN,port,fetchImpl:async()=>{calls++;return {ok:true,json:async()=>forged};},
+      });
+      assert.equal((await client.control(originalRequest)).status,'UNKNOWN_NETWORK_RESULT');
+      assert.equal(calls,1);
+    }
+  });
+});
