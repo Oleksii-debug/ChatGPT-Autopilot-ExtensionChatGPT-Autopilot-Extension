@@ -203,3 +203,30 @@ test('ROI status must reflect canonical report identity and run population befor
   }));
   assert.equal(walk(root).some(n => n.tagName === 'TABLE'), false);
 });
+
+
+test('validated nested ROI interval never re-reads an attacker-controlled Proxy while rendering', () => {
+  let rawPropertyReads = 0;
+  const interval = new Proxy({ lower: 0, upper: 120 }, {
+    get() {
+      rawPropertyReads += 1;
+      throw new Error('UNTRUSTED_ROI_PROPERTY_GET');
+    },
+  });
+  const root = container();
+  renderRoiOwnerViewV1(root, base({
+    status: 'PARTIAL_EVIDENCE',
+    observedRunCount: 2,
+    verifiedOutcomeCount: 1,
+    estimatedOwnerTimeAvoidedSeconds: interval,
+    opportunities: [],
+  }));
+  const nodes = walk(root);
+  assert.equal(rawPropertyReads, 0,
+    'descriptor validation must snapshot nested metrics for later rendering');
+  assert.ok(nodes.some(node => node.tagName === 'DD' && node.textContent === '120'),
+    'upper bound comes from validated snapshot');
+  assert.ok(nodes.some(node => node.tagName === 'DD' && node.textContent === '0'),
+    'lower bound comes from validated snapshot');
+  assert.equal(nodes.find(node => node.attributes.role === 'status').attributes['aria-live'], 'polite');
+});
