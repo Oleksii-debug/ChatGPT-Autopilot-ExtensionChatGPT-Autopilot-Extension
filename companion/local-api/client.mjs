@@ -1,5 +1,5 @@
 import { normalizeArtifactRefV1 } from '../../src/core/universal-agent-contracts.js';
-import { normalizeAutopilotProgrammaticRequestV1 } from '../../src/core/autopilot-programmatic-control.js';
+import { normalizeAutopilotProgrammaticRequestV1, isAutopilotProgrammaticOperationReadOnly } from '../../src/core/autopilot-programmatic-control.js';
 
 /**
  * Opt-in SDK client for local authenticated Native Companion API.
@@ -234,6 +234,8 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || !canonicalUtcTimestamp(receipt?.observedAt)
           || !canonicalUtcTimestamp(sentRequest.requestedAt)
           || Date.parse(receipt.observedAt) < Date.parse(sentRequest.requestedAt)
+          || value?.result?.readOnly !== isAutopilotProgrammaticOperationReadOnly(sentRequest.operation)
+          || value?.result?.downstreamAuthorityRequired !== !isAutopilotProgrammaticOperationReadOnly(sentRequest.operation)
           || value?.result?.adapterGrantsAuthority !== false
           || value?.result?.executionAuthorized !== false
           || value?.result?.schedulerAuthority !== false
