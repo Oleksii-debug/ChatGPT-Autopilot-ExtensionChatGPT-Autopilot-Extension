@@ -136,6 +136,10 @@ function price(value, label) {
     throw new Error(`${label} is invalid`);
   }
   const out = Number(value);
+  // Decimal underflow is not observed free pricing: 1e-9999 must not become $0.
+  if (typeof value === 'string' && out === 0 && /[1-9]/u.test(value.replace(/[eE][+-]?[0-9]+$/u, ''))) {
+    throw new Error(`${label} is invalid`);
+  }
   if (!Number.isFinite(out) || out < 0 || out > 1_000_000 || Object.is(out, -0)) {
     throw new Error(`${label} is invalid`);
   }
