@@ -285,3 +285,29 @@ test('lost child ledger and pointer after crash retain UNKNOWN sibling lease unt
   assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
   assert.equal(reconciled.executionAuthority, false);
 });
+
+test('durable terminal child outcome suppresses duplicate activation despite lost event and ledger', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.activationRequests.length, 2);
+  const [completedChildId, eligibleSiblingId] = first.createdNodeIds;
+  const recovered = structuredClone(first.runtime);
+  const completed = recovered.nodesById[completedChildId];
+  completed.currentActivationId = '';
+  completed.activationLedger = {};
+  completed.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  completed.lastTerminalStatus = 'COMPLETED';
+  // Simulate torn restart evidence: processedEventIds was not persisted,
+  // but the canonical child outcome survived. A terminal child is never
+  // eligible for the same spawn activation a second time.
+  assert.equal(Object.keys(recovered.processedEventIds).length, 0);
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph), runtime: recovered, nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.equal(replay.activationRequests.some(item => item.nodeId === completedChildId), false);
+  assert.equal(replay.activationRequests.some(item => item.nodeId === eligibleSiblingId), true);
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
