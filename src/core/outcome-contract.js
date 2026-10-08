@@ -126,7 +126,7 @@ function exactKeys(value, allowed, label) {
   if (keys.length > allowed.size) throw new Error(`${label} contains unknown fields`);
   for (const key of keys) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
