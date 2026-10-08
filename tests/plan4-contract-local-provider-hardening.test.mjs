@@ -997,3 +997,64 @@ test('Plan 4 S2: gateway identity and provider output ceiling reject malformed e
   assert.equal(requests,2);
   assert.equal(admitted.body.maxOutputTokens,7);
 });
+
+test('Plan4 S1: explicitly undefined owner route ceilings and failover knobs never inherit defaults', () => {
+  const unsafe = [
+    ['autoSwitch', undefined], ['freeOnly', undefined],
+    ['orderedRouteIds', undefined], ['allowRouteIds', undefined],
+    ['denyRouteIds', undefined],
+    ['maxInputPricePerMillionUsd', undefined],
+    ['maxOutputPricePerMillionUsd', undefined],
+    ['retryBackoffSeconds', undefined],
+    ['circuitBreakerFailures', undefined],
+    ['circuitBreakerSeconds', undefined],
+  ];
+  for (const [field, value] of unsafe) {
+    assert.throws(
+      () => normalizeAiRoutePolicy({ [field]: value }),
+      undefined,
+      `explicitly erased owner route policy ${field} must fail closed`,
+    );
+  }
+  assert.throws(() => normalizeAiRoutePool([{ ...route, enabled:undefined }]));
+  assert.throws(() => normalizeAiRoutePool([{ ...route, supportsVision:undefined }]));
+  assert.throws(() => selectAiRouteCandidates({
+    routes:[route], policy:{ autoSwitch:undefined }, now:1,
+  }));
+  const accepted = {
+    autoSwitch:false, freeOnly:false,
+    maxInputPricePerMillionUsd:0,
+    maxOutputPricePerMillionUsd:null,
+    retryBackoffSeconds:30, circuitBreakerFailures:2, circuitBreakerSeconds:60,
+  };
+  const restored = normalizeAiRoutePolicy(JSON.parse(JSON.stringify(accepted)));
+  assert.equal(restored.autoSwitch, false);
+  assert.equal(restored.maxInputPricePerMillionUsd, 0);
+  assert.equal(restored.maxOutputPricePerMillionUsd, null);
+  assert.equal(restored.retryBackoffSeconds, 30);
+  assert.deepEqual(normalizeAiRoutePolicy({}).orderedRouteIds, []);
+});
+
+test('Plan4 S2: erased local provider/origin does not dispatch to a different service', async () => {
+  let fetchCount = 0;
+  const client = new LocalAiClient({
+    fetchFn:async () => { fetchCount += 1; throw new Error('must not connect'); },
+    setTimeoutFn:() => 1,
+    clearTimeoutFn:() => {},
+  });
+  for (const [field, value] of [
+    ['providerType', undefined], ['baseUrl', undefined],
+    ['providerType', null], ['baseUrl', null],
+  ]) {
+    const corrupted = { ...settings, [field]:value };
+    assert.throws(() => normalizeLocalAiSettings(corrupted));
+    await assert.rejects(() => client.complete(corrupted, 'no outbound effect'));
+  }
+  assert.equal(fetchCount, 0);
+  const legacy = normalizeLocalAiSettings({
+    enabled:true, model:'llama3', timeoutSeconds:5,
+  });
+  assert.equal(legacy.providerType, 'ollama');
+  assert.equal(legacy.baseUrl, 'http://127.0.0.1:11434');
+  assert.equal(normalizeLocalAiSettings(JSON.parse(JSON.stringify(settings))).model, 'llama3');
+});
