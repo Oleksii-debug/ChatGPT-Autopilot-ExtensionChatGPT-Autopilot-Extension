@@ -713,6 +713,12 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       throw new Error('Browser Agent select requires an exact bounded option value');
     }
     action.value = raw.value;
+    const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+    const observed = (frame?.elements || []).find(item => item.ref === action.ref);
+    if (typeof observed?.optionFingerprint !== 'string' || !observed.optionFingerprint) {
+      throw new Error('Browser Agent select options require observed target identity');
+    }
+    action.expectedOptionFingerprint = observed.optionFingerprint;
   }
   if (type === BrowserAgentActionType.CHECK) {
     // A missing, null, or string "false" model field must not silently
@@ -1008,6 +1014,20 @@ export function snapshotBrowserPage(snapshotId) {
     '[role="checkbox"]', '[role="radio"]', '[role="tab"]', '[role="menuitem"]',
     '[role="option"]', '[role="treeitem"]', '[role="switch"]',
   ].join(',');
+  const optionFingerprint = (element) => {
+    if (String(element.tagName || '').toLowerCase() !== 'select') return '';
+    const options = element.options;
+    if (!options || options.length > 500) return '';
+    const entries = Array.from(options).map(option => [
+      String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden),
+    ]);
+    const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
+    if (source.length > 100000) return '';
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
   const candidates = Array.from(document.querySelectorAll(selector)).filter(visible).slice(0, 350);
   const elements = [];
   let ordinal = 0;
@@ -1039,6 +1059,7 @@ export function snapshotBrowserPage(snapshotId) {
     };
     if (tag === 'a' || tag === 'area') item.href = normalize(element.href || element.getAttribute('href') || '', 1200);
     if (tag === 'select') {
+      item.optionFingerprint = optionFingerprint(element);
       item.selected = normalize(element.options?.[element.selectedIndex]?.textContent || '', 500);
       item.options = Array.from(element.options || []).filter(option => !option.disabled).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
     }
@@ -1072,6 +1093,20 @@ export function executeBrowserPageAction(snapshotId, action) {
       ...attributes.map(name => element.getAttribute(name) || ''),
       String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
       Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const optionFingerprint = (element) => {
+    if (String(element.tagName || '').toLowerCase() !== 'select') return '';
+    const options = element.options;
+    if (!options || options.length > 500) return '';
+    const entries = Array.from(options).map(option => [
+      String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden),
+    ]);
+    const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
+    if (source.length > 100000) return '';
     let hash = 2166136261;
     for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
     return (hash >>> 0).toString(16).padStart(8, '0');
@@ -1190,6 +1225,12 @@ export function executeBrowserPageAction(snapshotId, action) {
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
     ensureUnoccluded(element);
+    // After focus or restart a changed option set cannot inherit approval.
+    if (typeof action.expectedOptionFingerprint !== 'string'
+      || !action.expectedOptionFingerprint
+      || optionFingerprint(element) !== action.expectedOptionFingerprint) {
+      throw new Error('AGENT_SELECT_OPTIONS_STALE');
+    }
     // A model-facing label can be used only when it resolves to one option.
     // Prefer exact option values, including case and whitespace; never let
     // normalized label equality silently pick a different consequential value.
