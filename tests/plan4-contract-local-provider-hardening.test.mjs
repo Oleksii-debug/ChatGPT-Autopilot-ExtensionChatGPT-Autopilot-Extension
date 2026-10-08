@@ -792,3 +792,53 @@ test('malformed per-request model budget cannot become unlimited before provider
   await orchestrator.run(config,{},'owner-approved prompt',{maxModelCallsForRequest:1,maxOutputTokens:5});
   assert.equal(networkCalls,1);
 });
+
+
+test('UNKNOWN budget settlement forbids failover even after transient provider or broker errors', async () => {
+  const config = {
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:true,
+    routes:[
+      {routeId:'fast',provider:'ollama',model:'first',locality:'local',costClass:'free',priority:10},
+      {routeId:'backup',provider:'ollama',model:'second',locality:'local',costClass:'free',priority:5},
+    ],
+    routePolicy:{autoSwitch:true},
+  };
+  for (const providerFailed of [false,true]) {
+    const calls=[];
+    const settlements=[];
+    const client={async complete({model}) {
+      calls.push(model);
+      if (providerFailed) {
+        const error=new Error('provider timeout');
+        error.status=503;
+        throw error;
+      }
+      return {text:'reply',usage:{inputTokens:2,outputTokens:1,totalTokens:3}};
+    }};
+    const lifecycle={
+      async beforeProviderCall({callNumber}) {return {reservationId:'res-'+callNumber};},
+      async afterProviderCall({reservation}) {
+        settlements.push(reservation.reservationId);
+        const error=new Error('transient broker unavailable');
+        error.status=503;
+        throw error;
+      },
+    };
+    const orchestrator=new AiOrchestrator({
+      gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+    });
+    await assert.rejects(
+      orchestrator.run(config,{},'owner prompt',{
+        maxModelCallsForRequest:2,maxOutputTokens:12,
+        providerCallBudgetContext:{jobId:'fixture'},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN'
+        && error.routeFailureClassification.retryable === false
+        && error.modelCallsUsed === 1
+        && error.routeAttempts.length === 1
+        && error.routeAttempts[0].outcome === 'UNKNOWN',
+    );
+    assert.deepEqual(calls,['first'],'an unknown provider effect must never try the backup');
+    assert.deepEqual(settlements,['res-1']);
+  }
+});
