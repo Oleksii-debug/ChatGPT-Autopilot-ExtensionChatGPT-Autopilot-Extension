@@ -37,7 +37,14 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       if (!res.ok) {
-        return Object.freeze({ schemaVersion: 1, status: 'DENIED_OR_UNAVAILABLE', httpStatus: res.status });
+        // An authenticated server may have dispatched the physical operation
+        // before receipt validation or a transport failure. HTTP failure is
+        // never proof of zero effect; require reconciliation, no blind retry.
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          httpStatus: Number.isInteger(res.status) ? res.status : null,
+          instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
+        });
       }
       try {
         const value = await res.json();
