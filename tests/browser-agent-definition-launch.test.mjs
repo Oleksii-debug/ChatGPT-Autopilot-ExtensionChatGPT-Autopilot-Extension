@@ -539,3 +539,59 @@ test('Plan-1: outcome criteria are dense bounded text with no nested getter or c
   const restarted = managerFor(chrome);
   assert.deepEqual((await restarted.get('job.valid')).job.config.acceptanceCriteria, ['Evidence file exists']);
 });
+
+test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects hostile getters', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  let invoked = 0;
+  const accessorRule = { pattern: 'example.com' };
+  Object.defineProperty(accessorRule, 'defaultDecision', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('secret-owner-token'); },
+  });
+  await assert.rejects(() => manager.create({
+    id: 'job.site-getter', goal: 'Should not read owner policy getter.',
+    siteRules: [accessorRule],
+  }), /enumerable data property/);
+
+  const decisions = {};
+  Object.defineProperty(decisions, 'credentials', {
+    enumerable: true,
+    get() { invoked += 1; throw new Error('secret-owner-token'); },
+  });
+  await assert.rejects(() => manager.create({
+    id: 'job.decision-getter', goal: 'Should not invoke nested decision getter.',
+    siteRules: [{ pattern: 'example.com', actionDecisions: decisions }],
+  }), /enumerable data property/);
+  assert.equal(invoked, 0, 'nested policy accessors must never run');
+  assert.equal((await manager.get('job.site-getter')).job, null);
+  assert.equal((await manager.get('job.decision-getter')).job, null);
+
+  const sparse = new Array(2);
+  sparse[0] = { pattern: 'example.com' };
+  await assert.rejects(() => manager.create({
+    id: 'job.sparse-site', goal: 'Do not accept partially hidden owner rules.',
+    siteRules: sparse,
+  }), /own data properties/);
+
+  const mutableRules = [{
+    pattern: 'example.com',
+    defaultDecision: 'DENY',
+    actionDecisions: { credentials: 'ASK' },
+  }];
+  const pending = manager.create({
+    id: 'job.site-snapshot', goal: 'Bound to exact owner policy.',
+    siteRules: mutableRules,
+  });
+  mutableRules[0].pattern = 'evil.example.org';
+  mutableRules[0].defaultDecision = 'ALLOW';
+  mutableRules[0].actionDecisions.credentials = 'ALLOW';
+  const created = await pending;
+  assert.equal(created.job.config.siteRules[0].pattern, 'example.com');
+  assert.equal(created.job.config.siteRules[0].defaultDecision, 'DENY');
+  assert.equal(created.job.config.siteRules[0].actionDecisions.credentials, 'ASK');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.site-snapshot']);
+  const resumed = managerFor(chrome);
+  const loaded = (await resumed.get('job.site-snapshot')).job;
+  assert.deepEqual(loaded.config.siteRules, created.job.config.siteRules, 'restart retains the original policy snapshot');
+});
