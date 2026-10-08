@@ -606,6 +606,16 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.frameId = Number(raw.frameId);
     action.ref = clean(raw.ref, 120);
     if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) throw new Error('Browser Agent action references an element outside the current snapshot');
+    // The ref is only an observation-local ordinal. Bind mutations to the
+    // exact frame URL and semantic target observed before model reasoning.
+    // Page text/model output cannot manufacture this proof.
+    if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK].includes(type)) {
+      const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+      const target = (frame?.elements || []).find(item => item.ref === action.ref);
+      if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing');
+      action.expectedSemanticIdentity = target.semanticIdentity;
+      action.expectedFrameUrl = clean(frame.url, 4096);
+    }
   }
   if (type === BrowserAgentActionType.FILL_CREDENTIAL) {
     const credentialRef = clean(raw.credentialRef, 80);
@@ -907,6 +917,16 @@ export function snapshotBrowserPage(snapshotId) {
     const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
     return normalize(element.getAttribute('aria-label') || labelledBy(element) || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '', 800);
   };
+  const semanticIdentity = (element) => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
   try {
     document.querySelectorAll(`[${marker}]`).forEach(element => { element.removeAttribute(marker); element.removeAttribute(snapshotMarker); });
   } catch { /* best effort */ }
@@ -938,6 +958,7 @@ export function snapshotBrowserPage(snapshotId) {
       role: normalize(element.getAttribute('role') || '', 80),
       type: normalize(controlType, 80),
       name: accessibleName(element),
+      semanticIdentity: semanticIdentity(element),
       disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
       submitLike,
       formAssociated: Boolean(form),
@@ -973,8 +994,21 @@ export function executeBrowserPageAction(snapshotId, action) {
   const snapshotMarker = 'data-autopilot-agent-snapshot';
   const ref = String(action?.ref || '');
   const target = ref ? Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId) : null;
+  const semanticIdentity = (element) => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
   const ensureTarget = () => {
     if (!target || !target.isConnected) throw new Error('AGENT_TARGET_STALE');
+    if (!action.expectedSemanticIdentity || !action.expectedFrameUrl
+      || location.href !== action.expectedFrameUrl
+      || semanticIdentity(target) !== action.expectedSemanticIdentity) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
     if (target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
     return target;
   };
@@ -986,16 +1020,19 @@ export function executeBrowserPageAction(snapshotId, action) {
     const element = ensureTarget();
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
+    // Focus handlers may synchronously repurpose the very same DOM node.
+    ensureTarget();
     element.click();
     return { ok: true, kind: 'click', url: location.href };
   }
   if (action.type === 'fill') {
     const element = ensureTarget();
+    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    element.focus?.({ preventScroll: true });
+    ensureTarget();
     const tag = element.tagName.toLowerCase();
     const inputType = tag === 'input' ? String(element.type || 'text').toLowerCase() : '';
     if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
-    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
-    element.focus?.({ preventScroll: true });
     const value = String(action.text ?? '');
     if (tag === 'input') {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -1256,6 +1293,9 @@ function browserCoordinateTargetAt(x, y) {
       formMethod: normalize(effectiveFormMethod, 20),
       editable,
       sensitive,
+      pageUrl: location.href,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
       visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
     },
@@ -1270,6 +1310,8 @@ export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
   const proof = browserCoordinateTargetAt(x, y);
   if (!proof?.target || !fingerprint || typeof fingerprint !== 'object') return { ok: false, reason: 'missing-target' };
   const target = proof.target;
+  if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
+    || Number(fingerprint.viewportHeight) !== proof.viewportHeight) return { ok: false, reason: 'changed-page-or-viewport' };
   const fields = ['tag', 'role', 'type', 'name', 'href', 'formAction', 'formMethod'];
   for (const field of fields) {
     if (String(target[field] || '') !== String(fingerprint[field] || '')) return { ok: false, reason: `changed-${field}` };
@@ -1280,6 +1322,13 @@ export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
     || Boolean(target.sensitive) !== Boolean(fingerprint.sensitive)
     || Boolean(target.visualOnly) !== Boolean(fingerprint.visualOnly)
     || target.disabled === true) return { ok: false, reason: 'changed-state' };
+  // Same label/role is insufficient: a visually shifted target can still
+  // contain the old click point and must not authorize a consequential effect.
+  if (!fingerprint.rect || !target.rect || ['left', 'top', 'width', 'height'].some(key =>
+    !Number.isFinite(Number(fingerprint.rect[key])) || !Number.isFinite(Number(target.rect[key]))
+      || Math.abs(Number(target.rect[key]) - Number(fingerprint.rect[key])) > 1)) {
+    return { ok: false, reason: 'changed-geometry' };
+  }
   return { ok: true, proof };
 }
 
