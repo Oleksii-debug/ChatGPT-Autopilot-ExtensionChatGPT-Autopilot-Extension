@@ -886,7 +886,22 @@ export class BrowserAgentManager {
 
   update(mutator) {
     const operation = this.updateChain.then(async () => {
-      const store = await this.load();
+      // Reads may omit a quarantined malformed job for safe presentation. A
+      // WRITE must never silently persist that lossy projection: otherwise
+      // an unrelated policy or job update can erase unreconciled effects and
+      // make the original durable job ID available for duplicate execution.
+      const record = await this.chrome.storage.local.get(BROWSER_AGENT_STORAGE_KEY);
+      const persisted = record?.[BROWSER_AGENT_STORAGE_KEY];
+      const store = normalizeStore(persisted, this.now());
+      if (persisted != null) {
+        const persistedIds = Object.keys(persisted.byId);
+        if (persisted.order.length !== store.order.length
+            || persistedIds.length !== store.order.length
+            || persisted.order.some((id, index) => id !== store.order[index])
+            || persistedIds.some(id => !Object.hasOwn(store.byId, id))) {
+          throw new Error('Browser Agent durable job identity is quarantined; mutation requires explicit recovery');
+        }
+      }
       const next = await mutator(store) || store;
       return this.save(next);
     });
