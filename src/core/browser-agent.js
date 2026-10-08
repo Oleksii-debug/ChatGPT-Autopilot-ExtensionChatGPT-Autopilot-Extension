@@ -563,13 +563,15 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     if (snapshot?.visionAttached !== true) throw new Error(`Browser Agent ${type} requires a screenshot attached to this exact reasoning turn`);
     const topFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot?.frames?.[0] || null;
     const viewport = topFrame?.viewport || snapshot?.visionViewport || null;
-    const width = Number(viewport?.width || 0);
-    const height = Number(viewport?.height || 0);
-    if (!(width > 0) || !(height > 0)) throw new Error(`Browser Agent ${type} requires a current visible viewport`);
+    const width = viewport?.width;
+    const height = viewport?.height;
+    if (typeof width !== 'number' || !Number.isFinite(width)
+      || typeof height !== 'number' || !Number.isFinite(height)
+      || !(width > 0) || !(height > 0)) throw new Error(`Browser Agent ${type} requires a current visible viewport`);
     const normalizePoint = (xValue, yValue, label) => {
-      const x = Number(xValue);
-      const y = Number(yValue);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Browser Agent ${type} requires finite ${label} coordinates from the attached screenshot`);
+      const x = xValue;
+      const y = yValue;
+      if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Browser Agent ${type} requires finite ${label} coordinates from the attached screenshot`);
       if (x < 0 || y < 0 || x >= width || y >= height) throw new Error(`Browser Agent ${type} ${label} coordinates are outside the current visible viewport`);
       return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
     };
@@ -603,7 +605,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.origin = new URL(pageUrl).origin;
   }
   if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.DOWNLOAD, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
-    action.frameId = Number(raw.frameId);
+    action.frameId = raw?.frameId;
     action.ref = clean(raw.ref, 120);
     if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) throw new Error('Browser Agent action references an element outside the current snapshot');
     // The ref is only an observation-local ordinal. Bind mutations to the
@@ -629,7 +631,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     const credential = (snapshot?.credentials || []).find(item => item?.ref === credentialRef);
     if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action references a credential outside the current snapshot');
 
-    const passwordFrameId = Number(raw.passwordFrameId);
+    const passwordFrameId = raw.passwordFrameId;
     const passwordRef = clean(raw.passwordRef, 120);
     if (!Number.isInteger(passwordFrameId) || !passwordRef || !refs.has(`${passwordFrameId}:${passwordRef}`)) {
       throw new Error('Browser Agent credential action requires an exact current password field');
@@ -645,7 +647,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     let usernameFrameId = null;
     let usernameRef = '';
     if (raw.usernameRef != null || raw.usernameFrameId != null) {
-      usernameFrameId = Number(raw.usernameFrameId);
+      usernameFrameId = raw.usernameFrameId;
       usernameRef = clean(raw.usernameRef, 120);
       if (!Number.isInteger(usernameFrameId) || !usernameRef || !refs.has(`${usernameFrameId}:${usernameRef}`)) {
         throw new Error('Browser Agent credential username target is outside the current snapshot');
@@ -678,7 +680,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.key = raw.key === 'Space' ? ' ' : String(raw.key || '');
     if (!ALLOWED_KEYS.has(action.key)) throw new Error(`Browser Agent key is not allowed: ${action.key}`);
     if (action.key === 'Enter' || action.key === ' ') {
-      action.frameId = Number(raw.frameId);
+      action.frameId = raw?.frameId;
       action.ref = clean(raw.ref, 120);
       if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) {
         throw new Error('Browser Agent Enter/Space key action requires an exact current snapshot frameId/ref target');
@@ -1470,9 +1472,10 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
   }
 
   function browserCoordinateTargetAt(x, y) {
-    const px = Number(x);
-    const py = Number(y);
-    if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
+    const px = x;
+    const py = y;
+    if (typeof px !== 'number' || typeof py !== 'number'
+      || !Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
     let element = document.elementFromPoint(px, py);
     if (!(element instanceof Element)) return null;
     // Prefer a semantic actionable ancestor when the point lands on an icon/span
