@@ -288,10 +288,33 @@ export class AiOrchestrator {
     if (!settings.enabled) throw new Error('AI coordinator is disabled');
     const userPrompt = clean(prompt);
     if (!userPrompt) throw new Error('AI coordinator prompt is empty');
+    // A request with budget authority must never silently dispatch without
+    // the existing durable reserve/settle lifecycle. Missing credentials are
+    // NOT_CONFIGURED; missing accounting is not an implicit free allowance.
+    if (providerCallBudgetContext !== null && providerCallBudgetContext !== undefined) {
+      if (!providerCallBudgetContext || typeof providerCallBudgetContext !== 'object'
+          || Array.isArray(providerCallBudgetContext)) {
+        throw new Error('AI provider-call budget context must be a data object');
+      }
+      if (!this.providerCallLifecycle) {
+        const error = new Error('AI provider-call budget lifecycle is not configured');
+        error.code = 'AI_MODEL_BUDGET_LIFECYCLE_REQUIRED';
+        throw error;
+      }
+    }
+    // Never turn malformed owner-requested ceilings into zero (= unlimited).
+    for (const [label, ceiling] of [
+      ['maxOutputTokens', maxOutputTokens],
+      ['maxModelCallsForRequest', maxModelCallsForRequest],
+    ]) {
+      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || ceiling < 0) {
+        throw new Error('AI model budget ' + label + ' must be a non-negative safe integer');
+      }
+    }
     const now = this.now();
 
-    const outputCeiling = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
-    const callCeiling = Math.max(0, Math.floor(Number(maxModelCallsForRequest) || 0));
+    const outputCeiling = maxOutputTokens;
+    const callCeiling = maxModelCallsForRequest;
     let callsUsed = 0;
     let routeStates = normalizeAiRouteStates(runtime.routeStates, settings.routes);
     const routeAttempts = [];
