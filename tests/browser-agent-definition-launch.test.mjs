@@ -488,3 +488,25 @@ test('Plan-1: orphaned byId record and duplicate order identity stop all mutatio
   await assert.rejects(() => manager.create({ id: 'job.2', goal: 'Still not yet.' }), /durable job identity is quarantined/);
   assert.deepEqual(data[key], duplicated);
 });
+
+
+test('Plan-1: every intake path rejects non-canonical IDs without creating or replacing jobs', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  for (const invalid of ['  job.truncated', 'job.with trailing ', '', 'job;unsafe', 42]) {
+    await assert.rejects(() => manager.create({ id: invalid, goal: 'Evidence gathering.' }),
+      /exact bounded durable ID/);
+    await assert.rejects(() => manager.createFromAgentDefinition(launchRequest({ jobId: invalid })),
+      /exact bounded durable ID/);
+  }
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, []);
+  const brokenGenerator = managerFor(chrome, () => ' job.generated');
+  await assert.rejects(() => brokenGenerator.create({ goal: 'Must not accept coerced generated identity.' }),
+    /exact bounded durable ID/);
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, []);
+  const valid = await manager.create({ id: 'job:exact/path@v1', goal: 'Preserve explicit identity.' });
+  assert.equal(valid.job.id, 'job:exact/path@v1');
+  const resumed = managerFor(chrome);
+  assert.equal((await resumed.get('job:exact/path@v1')).job.id, 'job:exact/path@v1');
+});
