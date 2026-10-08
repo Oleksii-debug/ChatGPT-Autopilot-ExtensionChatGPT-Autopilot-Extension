@@ -611,7 +611,10 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     // The ref is only an observation-local ordinal. Bind mutations to the
     // exact frame URL and semantic target observed before model reasoning.
     // Page text/model output cannot manufacture this proof.
-    if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK].includes(type)) {
+    // A file picker is a consequential local-file effect, not a trusted
+    // ref alone. Bind its file-input meaning to the same snapshot/URL/label
+    // evidence used for clicks before Chrome DOM.setFileInputFiles.
+    if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
       const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
       const target = (frame?.elements || []).find(item => item.ref === action.ref);
       if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing');
