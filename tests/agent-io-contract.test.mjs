@@ -215,3 +215,28 @@ test('Plan-1: capability queries and handler lookup never coerce attacker-contro
   assert.equal(invoked, 0, 'untrusted coercion hooks must not run');
   assert.equal(getAgentActionRequiredCapability(AgentActionType.SUBMIT_PROMPT), CapabilityId.VERIFIED_PROMPT_SUBMIT);
 });
+
+
+test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not invoke hostile accessors', () => {
+  const secret = 'OWNER-PRIVATE-TOKEN-SHOULD-NOT-BE-DISCLOSED';
+  let reads = 0;
+  const hostileAction = action();
+  Object.defineProperty(hostileAction, secret, {
+    enumerable: true,
+    get() { reads += 1; throw new Error('must not call this getter'); },
+  });
+  assert.throws(() => normalizeAgentAction(hostileAction), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /OWNER-PRIVATE|TOKEN-SHOULD|getter/);
+    return true;
+  });
+
+  const hostileEvent = event();
+  Object.defineProperty(hostileEvent, Symbol(secret), { enumerable: true, value: 'ALLOW' });
+  assert.throws(() => normalizeAgentEvent(hostileEvent), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /OWNER-PRIVATE|TOKEN-SHOULD/);
+    return true;
+  });
+  assert.equal(reads, 0);
+});
