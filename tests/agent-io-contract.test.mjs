@@ -137,3 +137,18 @@ test('Plan-1: nested effect data stays immutable and independent of caller mutat
   assert.equal(Object.isFrozen(snapshot.data.nested.checked), true);
   assert.throws(() => normalizeAgentAction(action({ data: { value: Number.POSITIVE_INFINITY } })), /acyclic JSON/);
 });
+
+
+test('Plan-1: hostile action/event type coercion cannot execute or disclose secrets', () => {
+  const secret = 'secret-value-not-for-logs';
+  let hooks = 0;
+  const hostileType = { toString() { hooks += 1; throw new Error(secret); } };
+  assert.throws(() => normalizeAgentAction(action({ type: hostileType })), /Unsupported agent action type/);
+  assert.throws(() => normalizeAgentEvent(event({ type: hostileType })), /Unsupported agent event type/);
+  assert.equal(hooks, 0);
+  let rejection;
+  try { normalizeAgentAction(action({ data: { secret: secret.repeat(9000) } })); } catch (error) { rejection = error; }
+  assert.ok(rejection);
+  assert.match(rejection.message, /size limit/);
+  assert.doesNotMatch(rejection.message, /secret-value-not-for-logs/);
+});
