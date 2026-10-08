@@ -374,6 +374,21 @@ export class AiOrchestrator {
           maxOutputTokens: bounded,
           callNumber: callsUsed + 1,
         });
+        // A configured lifecycle is not proof that this effect was reserved.
+        // In particular, an unrecognized budget context or stopped owner must
+        // never receive a provider call with null/forged reservation evidence.
+        if (!reservation || typeof reservation !== 'object' || Array.isArray(reservation)) {
+          const unreserved = new Error('Model-budget reservation was not committed before dispatch');
+          unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
+          throw unreserved;
+        }
+        const receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId');
+        if (!receipt || !Object.hasOwn(receipt, 'value')
+            || typeof receipt.value !== 'string' || receipt.value.length < 1 || receipt.value.length > 240) {
+          const unreserved = new Error('Model-budget reservation has no exact durable identity');
+          unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
+          throw unreserved;
+        }
       }
       callsUsed += 1;
       let value;
