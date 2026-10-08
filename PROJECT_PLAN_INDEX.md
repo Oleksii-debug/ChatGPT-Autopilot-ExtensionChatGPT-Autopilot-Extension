@@ -2,9 +2,8 @@
 
 ## CRITICAL SOURCE-LINEAGE NOTE
 
-Drive Agent/Models plans inspected 2026-10-08 explicitly identify **11.0.13 High** as the migration baseline.
-The current GitHub `main` manifest still reports **0.9.19**.
-Therefore this control file is authoritative for planning/coordination, but workers MUST NOT treat the 0.9.19 main tree as the latest product source or downgrade/reimplement 11.x capabilities. Before product-source mutation, resolve/synchronize the exact 11.0.13 High-or-newer source lineage into canonical version control.
+The exact Drive source archive **ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip** has been located and inspected. It contains 308 entries, a full `src/` + `companion/` source tree, and manifest **11.0.13 High**. Audit SHA-256: `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329`.
+The current GitHub `main` manifest still reports **0.9.19** and is stale. The missing source problem is resolved; the remaining bootstrap task is to import/synchronize this exact 11.0.13 source archive (or a proven newer direct successor) into canonical Git, then qualify it. Do not reconstruct 11.x from 0.9.19. See `AUTOPILOT_11_0_13_SOURCE_BASELINE.md`.
 
 Canonical Drive folder:
 https://drive.google.com/drive/folders/11g-e0-mv_vaKlTg7uYYKh8iTak6YfP_u
