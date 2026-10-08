@@ -256,17 +256,12 @@ async function readResponseTextBounded(response) {
 
 async function readJsonResponse(response) {
   const text = await readResponseTextBounded(response);
-  let body;
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error(`Local AI server returned invalid JSON (HTTP ${response.status})`);
-  }
+  // The HTTP transport status is authoritative even if an upstream proxy returns
+  // HTML, empty text, malformed JSON or an error page containing private data.
+  // No untrusted provider body is propagated through thrown errors.
   if (!response.ok) {
     const status = response.status;
-    // Provider bodies may echo tokens, user input or arbitrary URLs. Do not surface them.
-    const message = `Local AI server error ${status}`;
-    const error = new Error(message);
+    const error = new Error(`Local AI server error ${status}`);
     error.status = status;
     error.category = status === 401 || status === 403 ? 'AUTH'
       : status === 429 ? 'RATE_LIMIT'
@@ -277,7 +272,11 @@ async function readJsonResponse(response) {
     error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
     throw error;
   }
-  return body;
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`Local AI server returned invalid JSON (HTTP ${response.status})`);
+  }
 }
 
 function modelNamesFromResponse(settings, body) {
