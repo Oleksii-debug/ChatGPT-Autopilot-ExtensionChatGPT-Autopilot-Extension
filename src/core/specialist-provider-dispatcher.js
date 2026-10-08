@@ -315,7 +315,17 @@ export class SpecialistProviderDispatcherV1 {
     if (providerEdgeMs - Date.parse(trustedReadiness.observedAt) > trustedReadiness.maxAgeMs) {
       throw new Error('Specialist readiness is stale before provider effect');
     }
-    const rawResult = await binding.execute(request);
+    // An external provider can perform an effect and then reject the promise.
+    // Its error is lower-trust and may contain secrets. Reconcile the canonical
+    // effect identity before any retry; never represent a rejection as no-effect.
+    let rawResult;
+    try {
+      rawResult = await binding.execute(request);
+    } catch {
+      const error = new Error('Specialist provider outcome is UNKNOWN after dispatch; reconcile the canonical effect before any retry');
+      error.code = 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN';
+      throw error;
+    }
     const completedAtMs = clock(this.#now);
     if (completedAtMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards');
     const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
