@@ -78,10 +78,10 @@ test('timeline refresh reports Core failure and keeps keyboard focus recoverable
   const end = script.indexOf('function exportAgentRunTimeline()', start);
   assert.ok(start >= 0 && end > start);
   const refresh = script.slice(start, end);
-  assert.match(refresh, /catch\\s*\\{/u);
+  assert.match(refresh, /catch\s*\{/u);
   assert.match(refresh, /Core недоступний/u);
-  assert.match(refresh, /button\\.disabled = false/u);
-  assert.match(refresh, /document\\.activeElement/u);
-  assert.match(refresh, /button\\.focus\\(\\)/u);
-  assert.doesNotMatch(refresh, /innerHTML|outerHTML|eval\\(/u);
+  assert.match(refresh, /button\.disabled = false/u);
+  assert.match(refresh, /document\.activeElement/u);
+  assert.match(refresh, /button\.focus\(\)/u);
+  assert.doesNotMatch(refresh, /innerHTML|outerHTML|eval\(/u);
 });
