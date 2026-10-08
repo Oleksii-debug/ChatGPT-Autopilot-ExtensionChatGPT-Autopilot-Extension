@@ -4,6 +4,7 @@ import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
+import { refreshRoiOwnerPanelV1 } from './roi-owner-entrypoint.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
@@ -5516,6 +5517,9 @@ $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { f
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('roi-owner-refresh-button').addEventListener('click', () => {
+  void refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
+});
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
 $('agent-save-execution-policy-button').addEventListener('click', () => { void saveBrowserAgentExecutionPolicy(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
@@ -5921,6 +5925,9 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  // One Core-owned read-only advisory on owner UI load; any missing Core
+  // resolver is explicitly OFFLINE. Never synthesize persisted ROI receipts.
+  await refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
   await loadBrowserAgentExecutionPolicy();
   await loadAgentDefinitionRegistries();
   await loadSpecialistRegistries();
