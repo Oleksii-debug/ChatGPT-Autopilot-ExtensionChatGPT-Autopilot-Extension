@@ -55,8 +55,26 @@ test('semantic action rechecks identical observed target before effect', () => {
   const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
   assert.equal(action.expectedFrameUrl, pageUrl);
   assert.match(action.expectedSemanticIdentity, /^[0-9a-f]{8}$/);
-  assert.equal(executeBrowserPageAction(snapshot.frames[0].snapshotId, action).ok, true);
+  const result = executeBrowserPageAction(snapshot.frames[0].snapshotId, action);
+  assert.equal(result.ok, true);
+  assert.equal(result.effectVerified, false);
   assert.equal(element.clicked, 1);
+});
+
+test('hidden ancestor after observation cannot be clicked', () => {
+  const snapshot = setup();
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  element.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+  assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_TARGET_UNAVAILABLE/);
+  assert.equal(element.clicked, 0);
+});
+
+test('overlay inserted during focus cannot be bypassed by synthetic DOM click', () => {
+  const snapshot = setup();
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  element.focus = () => { document.elementFromPoint = () => new FakeElement('Modal overlay'); };
+  assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_TARGET_OCCLUDED/);
+  assert.equal(element.clicked, 0);
 });
 
 test('semantic target text/role drift fails closed without clicking', () => {
