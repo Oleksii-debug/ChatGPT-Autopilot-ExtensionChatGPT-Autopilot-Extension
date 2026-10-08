@@ -111,14 +111,26 @@ function normalizeSlot(raw, fallback) {
   return { provider, model };
 }
 
+// Owner numeric settings may arrive as form strings, not arbitrary coercible
+// values. Hostile valueOf objects and booleans cannot alter model routing.
+function ownerRouterNumber(source, key, fallback) {
+  if (!Object.hasOwn(source, key)) return fallback;
+  const value = source[key];
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && /^[0-9]+(?:[.][0-9]+)?$/u.test(value.trim())) {
+    return Number(value.trim());
+  }
+  throw new Error(`AI router ${key} must be a numeric owner setting`);
+}
+
 export function normalizeAiRouterSettings(raw = {}) {
   const source = snapshotRouterOwnerData(raw, 'AI router settings');
-  const timeoutSeconds = Number(source.timeoutSeconds ?? DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
-  const strongEveryNRequests = Number(source.strongEveryNRequests ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
-  const strongEveryMinutes = Number(source.strongEveryMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
-  const handoffMaxChars = Number(source.handoffMaxChars ?? DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
-  const strongMinGapMinutes = Number(source.strongMinGapMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
-  const strongMaxPerHour = Number(source.strongMaxPerHour ?? DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
+  const timeoutSeconds = ownerRouterNumber(source, 'timeoutSeconds', DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
+  const strongEveryNRequests = ownerRouterNumber(source, 'strongEveryNRequests', DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
+  const strongEveryMinutes = ownerRouterNumber(source, 'strongEveryMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
+  const handoffMaxChars = ownerRouterNumber(source, 'handoffMaxChars', DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
+  const strongMinGapMinutes = ownerRouterNumber(source, 'strongMinGapMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
+  const strongMaxPerHour = ownerRouterNumber(source, 'strongMaxPerHour', DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 5 || timeoutSeconds > 900) throw new Error('AI timeout must be a whole number from 5 to 900 seconds');
   if (!Number.isInteger(strongEveryNRequests) || strongEveryNRequests < 0 || strongEveryNRequests > 10000) throw new Error('Strong-model request interval must be 0-10000 prompts');
   if (!Number.isInteger(strongEveryMinutes) || strongEveryMinutes < 0 || strongEveryMinutes > 10080) throw new Error('Strong-model time interval must be 0-10080 minutes');
