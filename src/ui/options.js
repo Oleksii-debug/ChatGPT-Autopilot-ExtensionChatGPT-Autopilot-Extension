@@ -3528,8 +3528,11 @@ function renderAgentRunTimeline(job) {
       ', викликів моделі ' + counters.modelCalls + ', токенів ' + counters.totalTokens +
       ', приблизні витрати ' + (counters.estimatedCostUsd === null ? 'невідомі' : counters.estimatedCostUsd.toFixed(6) + ' USD') +
       ', підтверджених перевірок ' + counters.verifiedChecks +
-      ', дій власника ' + counters.ownerEvents + '.' +
-      (timeline.truncated ? ' Історію обмежено останніми подіями.' : '') +
+      ', дій власника серед переглянутих ' + counters.ownerEvents + '.' +
+      ' Карта доказів: подій редакції плану ' + timeline.evidenceMap.observed.planRevisionEvents +
+      ', контрольних точок ' + timeline.evidenceMap.observed.checkpointRecordedEvents + '.' +
+      ' Підтвердження зовнішніх ефектів, знімки до/після, квитанції інструментів, походження артефактів та зв’язки Agent tree цією хронологією не встановлені.' +
+      (timeline.truncated ? ' Історію обмежено останніми подіями; підрахунки неповні.' : '') +
       ' Це перегляд, а не повторне виконання.';
   } catch {
     list.replaceChildren();
