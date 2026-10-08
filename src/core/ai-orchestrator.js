@@ -527,6 +527,9 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        // An UNKNOWN settlement is not a provider outage: neither the
+        // legacy strong fallback nor route failover may bill a second call.
+        if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN') throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -545,6 +548,9 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        // An UNKNOWN settlement is not a provider outage: neither the
+        // legacy strong fallback nor route failover may bill a second call.
+        if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN') throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -568,7 +574,7 @@ export class AiOrchestrator {
             try {
               strongResult = await tryStrong(handoff, clean(systemPrompt), requestedTrigger);
             } catch (error) {
-              if (!settings.keepPrimaryIfStrongFails) throw error;
+              if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' || !settings.keepPrimaryIfStrongFails) throw error;
               trigger = `${requestedTrigger}-strong-failed-primary-used`;
             }
           }
