@@ -104,7 +104,10 @@ function readiness(input, selection, ownership, nowMs) {
       || raw.ageMs !== resolved.ms - observed.ms) {
     throw new Error('Specialist readiness observation age is inconsistent');
   }
-  if (!Number.isSafeInteger(raw.maxAgeMs) || raw.maxAgeMs < 1 || nowMs - observed.ms > raw.maxAgeMs) {
+  // The canonical trusted resolver caps a readiness observation at five minutes.
+  // Persisted/caller-shaped evidence cannot enlarge that validity window.
+  if (!Number.isSafeInteger(raw.maxAgeMs) || raw.maxAgeMs < 1
+      || raw.maxAgeMs > 5 * 60_000 || nowMs - observed.ms > raw.maxAgeMs) {
     throw new Error('Specialist readiness is stale at provider dispatch');
   }
   if (ownership.policyEnvelopeId === '') throw new Error('Provider dispatch requires policy envelope authority');
