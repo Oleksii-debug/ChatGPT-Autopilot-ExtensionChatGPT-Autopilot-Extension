@@ -1357,24 +1357,41 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
 // Evidence must be finite numeric source data, never Number(null), defaults,
 // implicit strings, a different document epoch, or an unknown frame.
 export function browserAgentVisionOriginMatches(proof, pageUrl, viewport) {
-  if (!proof || typeof proof !== 'object' || !proof.target
-    || typeof pageUrl !== 'string' || !pageUrl
-    || !viewport || typeof viewport !== 'object' || Array.isArray(viewport)) return false;
-  const numericKeys = ['width', 'height', 'scrollX', 'scrollY', 'documentEpoch'];
-  if (numericKeys.some(key => typeof viewport[key] !== 'number' || !Number.isFinite(viewport[key]))
-    || viewport.width <= 0 || viewport.height <= 0 || viewport.documentEpoch <= 0) return false;
-  const target = proof.target;
-  const actualKeys = ['viewportWidth', 'viewportHeight'];
-  if (actualKeys.some(key => typeof proof[key] !== 'number' || !Number.isFinite(proof[key]))) return false;
-  if (['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch']
-    .some(key => typeof target[key] !== 'number' || !Number.isFinite(target[key]))) return false;
-  return proof.url === pageUrl && target.pageUrl === pageUrl
-    && proof.viewportWidth === viewport.width && proof.viewportHeight === viewport.height
-    && target.viewportWidth === viewport.width && target.viewportHeight === viewport.height
-    && target.viewportScrollX === viewport.scrollX && target.viewportScrollY === viewport.scrollY
-    && target.documentEpoch === viewport.documentEpoch;
+  // Persisted screenshot evidence must use own data properties. Accessor or
+  // inherited values cannot authorize native pointer effects after restart.
+  const ownData = (obj, key) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
+  };
+  try {
+    if (typeof pageUrl !== 'string' || !pageUrl) return false;
+    const target = ownData(proof, 'target');
+    if (!target || typeof target !== 'object' || Array.isArray(target)) return false;
+    const numeric = (obj, key) => {
+      const value = ownData(obj, key);
+      return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    };
+    if (ownData(proof, 'url') !== pageUrl || ownData(target, 'pageUrl') !== pageUrl) return false;
+    const width = numeric(viewport, 'width');
+    const height = numeric(viewport, 'height');
+    const scrollX = numeric(viewport, 'scrollX');
+    const scrollY = numeric(viewport, 'scrollY');
+    const epoch = numeric(viewport, 'documentEpoch');
+    if (width === null || height === null || scrollX === null || scrollY === null
+      || epoch === null || width <= 0 || height <= 0 || epoch <= 0) return false;
+    return numeric(proof, 'viewportWidth') === width
+      && numeric(proof, 'viewportHeight') === height
+      && numeric(target, 'viewportWidth') === width
+      && numeric(target, 'viewportHeight') === height
+      && numeric(target, 'viewportScrollX') === scrollX
+      && numeric(target, 'viewportScrollY') === scrollY
+      && numeric(target, 'documentEpoch') === epoch;
+  } catch {
+    // Hostile property-descriptor traps fail closed without leaking diagnostics.
+    return false;
+  }
 }
-
 export function browserAgentTargetFingerprint(snapshot, action) {
   const element = browserAgentSnapshotElement(snapshot, action);
   if (!element) return null;
