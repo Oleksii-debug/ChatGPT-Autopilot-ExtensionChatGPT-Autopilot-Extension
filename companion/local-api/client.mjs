@@ -30,6 +30,9 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
     async control(request) {
       // JSON request bodies only; no automatic retry of ambiguous mutations.
       const body = JSON.stringify(request);
+      // Bind response identities to the bytes sent on the wire. The caller
+      // may mutate their original object while fetch is in flight.
+      const sentRequest = JSON.parse(body);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
       let res;
       try {
@@ -68,17 +71,17 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         // requestId alone. A transport receipt is not proof of an external effect.
         if (value?.schemaVersion !== 1 || value?.status !== 'RECEIVED'
           || received?.schemaVersion !== 1
-          || received?.requestId !== request.requestId
-          || received?.principalId !== request.principalId
-          || received?.projectId !== request.projectId
-          || received?.operation !== request.operation
-          || received?.targetId !== request.targetId
-          || received?.requestedAt !== request.requestedAt
-          || !matchesArtifact(received?.payloadArtifactRef, request.payloadArtifactRef)
+          || received?.requestId !== sentRequest.requestId
+          || received?.principalId !== sentRequest.principalId
+          || received?.projectId !== sentRequest.projectId
+          || received?.operation !== sentRequest.operation
+          || received?.targetId !== sentRequest.targetId
+          || received?.requestedAt !== sentRequest.requestedAt
+          || !matchesArtifact(received?.payloadArtifactRef, sentRequest.payloadArtifactRef)
           || receipt?.schemaVersion !== 1
-          || receipt?.requestId !== request.requestId
-          || receipt?.projectId !== request.projectId
-          || receipt?.operation !== request.operation
+          || receipt?.requestId !== sentRequest.requestId
+          || receipt?.projectId !== sentRequest.projectId
+          || receipt?.operation !== sentRequest.operation
           || !['ACCEPTED', 'COMPLETED', 'REJECTED'].includes(receipt?.status)
           || value?.result?.adapterGrantsAuthority !== false
           || value?.result?.executionAuthorized !== false
