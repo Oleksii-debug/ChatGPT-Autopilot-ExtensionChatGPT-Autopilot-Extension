@@ -4,6 +4,7 @@ import {
   snapshotBrowserPage,
   parseBrowserAgentAction,
   executeBrowserPageAction,
+  proveBrowserNativeClick,
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
@@ -418,4 +419,102 @@ test('pending approved visual and drag proofs survive canonical manager storage/
   assert.equal(verifyBrowserCoordinateTarget(20, 20, persisted.dragStartFingerprint).ok, true);
   assert.equal(verifyBrowserCoordinateTarget(40, 20, persisted.dragEndFingerprint).ok, true);
   assert.equal(verifyBrowserCoordinateTarget(41, 20, persisted.dragEndFingerprint).ok, false);
+});
+
+
+test('native fallback is serialized and bound to observed semantic action', () => {
+  const snapshot = setup();
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  const injected = Function('return (' + proveBrowserNativeClick.toString() + ')')();
+  assert.deepEqual(injected('s1', 'r1', action), { x: 55, y: 25, url: pageUrl });
+  assert.equal(injected('s1', 'r1', null), null);
+  assert.equal(injected('s1', 'r1', { ...action, expectedSemanticIdentity: '' }), null);
+  element.textContent = 'Delete all records';
+  assert.equal(injected('s1', 'r1', action), null);
+  assert.equal(element.clicked, 0);
+});
+
+test('native fallback rejects a changed label, form destination and hidden ancestor', () => {
+  setup();
+  element.setAttribute('type', 'submit');
+  element.form = new HTMLFormElement();
+  element.form.action = 'https://example.test/save';
+  element.form.method = 'post';
+  const page = snapshotBrowserPage('native-form');
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}',
+    { frames: [{ frameId: 0, ...page }], url: page.url });
+  const injected = Function('return (' + proveBrowserNativeClick.toString() + ')')();
+  assert.ok(injected('native-form', 'r1', action));
+  element.form.action = 'https://example.test/delete';
+  assert.equal(injected('native-form', 'r1', action), null);
+  element.form.action = 'https://example.test/save';
+  element.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+  assert.equal(injected('native-form', 'r1', action), null);
+  element.parentElement = null;
+  element.focus = () => {};
+  document.elementFromPoint = () => new FakeElement('Overlay');
+  assert.equal(injected('native-form', 'r1', action), null);
+  assert.equal(element.clicked, 0);
+});
+
+test('vision snapshot blocks same-URL document reload after semantic observation', async () => {
+  const priorPerformance = globalThis.performance;
+  try {
+    globalThis.performance = { timeOrigin: 1000 };
+    setup();
+    let screenshotCalls = 0;
+    let attaches = 0;
+    let detaches = 0;
+    const chromeApi = {
+      tabs: { get: async () => ({ url: pageUrl }) },
+      scripting: { executeScript: async ({ func }) => [{ result: func() }] },
+      debugger: {
+        attach: async () => { attaches++; },
+        detach: async () => { detaches++; },
+        sendCommand: async () => { screenshotCalls++; return { data: 'abc' }; },
+      },
+    };
+    const manager = new BrowserAgentManager({ chromeApi });
+    const expectedViewport = { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 1000 };
+    assert.match(await manager.captureVision(7, { expectedUrl: pageUrl, expectedViewport }), /^data:image\/jpeg;base64,/);
+    assert.equal(screenshotCalls, 1);
+    globalThis.performance = { timeOrigin: 2000 };
+    await assert.rejects(manager.captureVision(7, { expectedUrl: pageUrl, expectedViewport }), /AGENT_VISION_SNAPSHOT_STALE/);
+    assert.equal(screenshotCalls, 1);
+    assert.equal(attaches, 1);
+    assert.equal(detaches, 1);
+  } finally {
+    globalThis.performance = priorPerformance;
+  }
+});
+
+test('vision screenshot refuses debugger-induced scroll drift before capture', async () => {
+  const priorPerformance = globalThis.performance;
+  try {
+    globalThis.performance = { timeOrigin: 1000 };
+    setup();
+    globalThis.scrollX = 0;
+    globalThis.scrollY = 0;
+    let screenshots = 0;
+    let detaches = 0;
+    const chromeApi = {
+      tabs: { get: async () => ({ url: pageUrl }) },
+      scripting: { executeScript: async ({ func }) => [{ result: func() }] },
+      debugger: {
+        attach: async () => { globalThis.scrollY = 30; },
+        detach: async () => { detaches++; },
+        sendCommand: async () => { screenshots++; return { data: 'abc' }; },
+      },
+    };
+    const manager = new BrowserAgentManager({ chromeApi });
+    await assert.rejects(manager.captureVision(7, {
+      expectedUrl: pageUrl,
+      expectedViewport: { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 1000 },
+    }), /AGENT_VISION_SNAPSHOT_STALE/);
+    assert.equal(screenshots, 0);
+    assert.equal(detaches, 1);
+  } finally {
+    globalThis.scrollY = 0;
+    globalThis.performance = priorPerformance;
+  }
 });
