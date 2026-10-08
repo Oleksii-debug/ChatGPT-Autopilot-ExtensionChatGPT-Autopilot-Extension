@@ -31,18 +31,26 @@ function array(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
     throw new Error(`${label} must be a bounded canonical array`);
   }
+  // Inspect descriptors before reading any element. Array#map reads accessors
+  // and silently skips holes, which is unsafe for untrusted provider data.
   const descriptors = Object.getOwnPropertyDescriptors(value);
-  const expected = new Set(['length', ...value.map((_, index) => String(index))]);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+    throw new Error(`${label} must be a bounded canonical array`);
+  }
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical array fields`);
   }
-  return value.map((_, index) => {
+  const output = new Array(length);
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label}[${index}] must be an enumerable own data property`);
     }
-    return descriptor.value;
-  });
+    output[index] = descriptor.value;
+  }
+  return output;
 }
 
 function id(value, label) {
