@@ -196,3 +196,28 @@ test('Chrome serialized semantic action verifies labels without module-scope glo
   assert.equal(injected('s1', action).ok, true);
   assert.equal(element.clicked, 1);
 });
+
+test('model-supplied semantic authority is discarded in favor of observed target evidence', () => {
+  const snapshot = setup();
+  const payload = JSON.stringify({ type: 'click', frameId: 0, ref: 'r1',
+    expectedSemanticName: 'Delete', expectedSemanticIdentity: '00000000',
+    expectedFrameUrl: 'https://attacker.test/', expectedSemanticFormAction: 'https://attacker.test/' });
+  const action = parseBrowserAgentAction(payload, snapshot);
+  assert.equal(action.expectedSemanticName, 'Save');
+  assert.equal(action.expectedFrameUrl, pageUrl);
+  assert.equal(action.expectedSemanticFormAction, '');
+  assert.match(action.expectedSemanticIdentity, /^[0-9a-f]{8}$/);
+  assert.equal(executeBrowserPageAction('s1', action).ok, true);
+  assert.equal(element.clicked, 1);
+});
+
+test('semantic snapshot binds both axes of the screenshot viewport origin', () => {
+  setup();
+  globalThis.scrollX = 35;
+  globalThis.scrollY = 70;
+  const frame = snapshotBrowserPage('scroll-origin');
+  assert.equal(frame.viewport.scrollX, 35);
+  assert.equal(frame.viewport.scrollY, 70);
+  globalThis.scrollX = 0;
+  globalThis.scrollY = 0;
+});
