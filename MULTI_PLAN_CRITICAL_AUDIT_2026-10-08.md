@@ -11,14 +11,16 @@
 - Drive folder/file naming normalized: `Проєктні плани`; `1. Перший план` … `8. Восьмий план`.
 
 ## Source-lineage warning
-Drive Agent/Models plans explicitly identify 11.0.13 High as the inspected migration baseline.
-Visible GitHub main manifest is still 0.9.19.
-Visible Drive package listing contains 11.x packages through at least 11.0.11, but the exact 11.0.13-HIGH-2026-10-03 archive was not located in the visible Drive/Library searches during this audit.
-
-Therefore SOURCE_SYNC_BLOCK remains binding:
-- do not downgrade scope to 0.9.19;
-- do not rebuild already-existing 11.x features from the stale main tree;
-- product-code closure requires resolving/publishing the exact 11.0.13 High-or-newer source lineage into canonical version control first.
+The exact Drive archive `ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip` was located and inspected.
+Observed facts:
+- Drive ID: `1HHd4rNxf7Hlt0RqRzoBUX3M0JGF3usW2`;
+- size: 5,174,898 bytes;
+- ZIP entries: 308;
+- manifest: 11.0.13 High;
+- full source includes `src/` and `companion/`;
+- SHA-256: `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329`.
+The archive QA reports important suites passing but also broad `npm test` failures from pre-existing Agent/export/runtime issues, so it is the correct baseline, not a terminal PASS.
+Current GitHub main 0.9.19 remains stale. The required bootstrap task is now **source import/synchronization + current qualification**, not source discovery. See `AUTOPILOT_11_0_13_SOURCE_BASELINE.md`.
 
 ## Dependency model
 Plans 1–4,6–7 are independent engineering plans once the correct 11.x source tree is available.
