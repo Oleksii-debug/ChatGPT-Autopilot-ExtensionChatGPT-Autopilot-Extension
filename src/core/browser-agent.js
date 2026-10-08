@@ -992,7 +992,7 @@ export function snapshotBrowserPage(snapshotId) {
     title: normalize(document.title || '', 500),
     text: bodyText,
     elements,
-    viewport: { width: innerWidth, height: innerHeight, scrollY: Math.round(scrollY), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
+    viewport: { width: innerWidth, height: innerHeight, scrollX: Math.round(Number(globalThis.scrollX || 0)), scrollY: Math.round(scrollY), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
   };
 }
 
