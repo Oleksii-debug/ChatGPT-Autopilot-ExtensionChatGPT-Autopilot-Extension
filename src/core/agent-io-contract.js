@@ -57,16 +57,37 @@ function requireProviderCapabilityForEvent(providerId, eventType) {
 }
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const ACTION_FIELDS = new Set(['schemaVersion', 'actionId', 'type', 'providerId', 'sessionId', 'taskId', 'createdAt', 'data']);
+const EVENT_FIELDS = new Set(['schemaVersion', 'eventId', 'type', 'providerId', 'actionId', 'sessionId', 'taskId', 'occurredAt', 'data']);
+const FORBIDDEN_DATA_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const MAX_DATA_BYTES = 65_536;
+const MAX_DATA_DEPTH = 16;
+const MAX_DATA_NODES = 8_192;
 
-function requirePlainObject(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  return value;
+function requirePlainObject(value, label, allowed = null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const result = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || (allowed && !allowed.has(key))) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    Object.defineProperty(result, key, { value: descriptor.value, enumerable: true, configurable: true, writable: true });
+  }
+  return result;
 }
 
 function requireId(value, label) {
-  const id = String(value || '').trim();
-  if (!ID_PATTERN.test(id)) throw new Error(`${label} is invalid`);
-  return id;
+  if (typeof value !== 'string' || value !== value.trim() || !ID_PATTERN.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
 }
 
 function optionalId(value, label) {
@@ -75,7 +96,7 @@ function optionalId(value, label) {
 }
 
 function normalizeTimestamp(value, label) {
-  if (value == null || value === '') return null;
+  if (typeof value !== 'string') throw new Error(`${label} must be an ISO-compatible timestamp`);
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) throw new Error(`${label} must be an ISO-compatible timestamp`);
   return date.toISOString();
@@ -83,12 +104,53 @@ function normalizeTimestamp(value, label) {
 
 function cloneData(value, label) {
   if (value == null) return {};
-  requirePlainObject(value, label);
-  return structuredClone(value);
+  const seen = new Set();
+  let visited = 0;
+  function copy(item, depth) {
+    if (++visited > MAX_DATA_NODES || depth > MAX_DATA_DEPTH) throw new Error(`${label} exceeds structural bounds`);
+    if (item == null || typeof item === 'string' || typeof item === 'boolean') return item;
+    if (typeof item === 'number' && Number.isFinite(item)) return item;
+    if (!item || typeof item !== 'object' || seen.has(item)) throw new Error(`${label} must be an acyclic JSON data value`);
+    seen.add(item);
+    let output;
+    if (Array.isArray(item)) {
+      if (Object.getPrototypeOf(item) !== Array.prototype || item.length > MAX_DATA_NODES) throw new Error(`${label} must be a bounded plain array`);
+      const keys = Reflect.ownKeys(item);
+      if (keys.length !== item.length + 1) throw new Error(`${label} contains non-canonical array fields`);
+      output = [];
+      for (let i = 0; i < item.length; i += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(item, String(i));
+        if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) throw new Error(`${label} contains sparse/accessor array entries`);
+        output.push(copy(descriptor.value, depth + 1));
+      }
+    } else {
+      const record = requirePlainObject(item, label);
+      output = {};
+      for (const key of Object.keys(record)) {
+        if (FORBIDDEN_DATA_KEYS.has(key)) throw new Error(`${label} contains unsafe property key`);
+        Object.defineProperty(output, key, { value: copy(record[key], depth + 1), enumerable: true, writable: true, configurable: true });
+      }
+    }
+    seen.delete(item);
+    return output;
+  }
+  const result = copy(value, 0);
+  if (!result || Array.isArray(result) || typeof result !== 'object') throw new Error(`${label} must be a plain object`);
+  if (new TextEncoder().encode(JSON.stringify(result)).length > MAX_DATA_BYTES) {
+    throw new Error(`${label} exceeds size limit`);
+  }
+  function freeze(item) {
+    if (item && typeof item === 'object' && !Object.isFrozen(item)) {
+      for (const child of Object.values(item)) freeze(child);
+      Object.freeze(item);
+    }
+    return item;
+  }
+  return freeze(result);
 }
 
 export function normalizeAgentAction(input) {
-  const action = requirePlainObject(input, 'Agent action');
+  const action = requirePlainObject(input, 'Agent action', ACTION_FIELDS);
   if (action.schemaVersion !== 1) throw new Error('Unsupported agent action schemaVersion');
   const type = String(action.type || '').trim();
   if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
@@ -108,7 +170,7 @@ export function normalizeAgentAction(input) {
 }
 
 export function normalizeAgentEvent(input) {
-  const event = requirePlainObject(input, 'Agent event');
+  const event = requirePlainObject(input, 'Agent event', EVENT_FIELDS);
   if (event.schemaVersion !== 1) throw new Error('Unsupported agent event schemaVersion');
   const type = String(event.type || '').trim();
   if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
