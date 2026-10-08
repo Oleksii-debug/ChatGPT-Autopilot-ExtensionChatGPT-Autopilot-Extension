@@ -56,6 +56,67 @@ function setup() {
   return { frames: [{ frameId: 0, ...page }], url: page.url };
 }
 
+// Section 1: the model must not cause an incomplete, partially applied form transaction.
+test('semantic batch rejects nine actions rather than silently executing eight', () => {
+  const snapshot = setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const observed = snapshotBrowserPage('batch-snapshot');
+  const current = { frames: [{ frameId: 0, ...observed }], url: observed.url };
+  const actions = Array.from({ length: 8 }, (_, i) => ({
+    type: 'fill', frameId: 0, ref: 'r1', text: 'value-' + i,
+  }));
+  assert.equal(parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions }), current).actions.length, 8);
+  assert.throws(
+    () => parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions: [...actions, actions[0]] }), current),
+    /batch requires 1–8 explicit actions/,
+  );
+  for (const invalid of [[], 'not-an-array', null]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions: invalid }), current),
+      /batch requires 1–8 explicit actions/,
+    );
+  }
+  assert.equal(element.clicked, 0);
+});
+
+test('semantic fill rejects truncated or non-string payload without changing empty-field clearing', () => {
+  const snapshot = setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const observed = snapshotBrowserPage('fill-snapshot');
+  const current = { frames: [{ frameId: 0, ...observed }], url: observed.url };
+  for (const text of [null, 12, false, {}, [], 'x'.repeat(50001)]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ type: 'fill', frameId: 0, ref: 'r1', text }), current),
+      /fill requires an exact bounded text value/,
+    );
+  }
+  assert.equal(parseBrowserAgentAction(JSON.stringify({
+    type: 'fill', frameId: 0, ref: 'r1', text: '',
+  }), current).text, '');
+  assert.equal(parseBrowserAgentAction(JSON.stringify({
+    type: 'fill', frameId: 0, ref: 'r1', text: 'a'.repeat(50000),
+  }), current).text.length, 50000);
+  assert.equal(element.clicked, 0);
+});
+
+// Section 2: no native coordinate effect may type only a truncated prefix.
+test('visual type_at requires complete bounded text before execution or restart', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  for (const text of [null, 0, false, {}, [], '', 'x'.repeat(50001)]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ type: 'type_at', x: 20, y: 20, text }), snapshot),
+      /type_at requires bounded non-empty text/,
+    );
+  }
+  assert.equal(parseBrowserAgentAction(JSON.stringify({
+    type: 'type_at', x: 20, y: 20, text: 'z'.repeat(50000),
+  }), snapshot).text.length, 50000);
+  assert.equal(element.clicked, 0);
+});
+
 // Section 1: model output cannot infer a checked value from omitted/coercible JSON.
 test('semantic check requires explicit true/false and never defaults to a mutation', () => {
   const snapshot = setup();
