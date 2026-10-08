@@ -260,3 +260,37 @@ test('semantic snapshot binds both axes of the screenshot viewport origin', () =
   globalThis.scrollX = 0;
   globalThis.scrollY = 0;
 });
+
+test('semantic check cannot toggle through a focus-time overlay', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'checkbox';
+  element.checked = false;
+  element.setAttribute('type', 'checkbox');
+  const observed = snapshotBrowserPage('check-overlay');
+  const action = parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url },
+  );
+  element.focus = () => { document.elementFromPoint = () => new FakeElement('Foreign modal'); };
+  assert.throws(() => executeBrowserPageAction('check-overlay', action), /AGENT_TARGET_OCCLUDED/);
+  assert.equal(element.clicked, 0);
+});
+
+test('semantic check still toggles a stable and visible target', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'checkbox';
+  element.checked = false;
+  element.setAttribute('type', 'checkbox');
+  element.click = () => { element.clicked++; element.checked = true; };
+  const observed = snapshotBrowserPage('check-visible');
+  const action = parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url },
+  );
+  const result = executeBrowserPageAction('check-visible', action);
+  assert.equal(result.ok, true);
+  assert.equal(result.checked, true);
+  assert.equal(element.clicked, 1);
+});
