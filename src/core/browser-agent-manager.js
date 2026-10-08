@@ -3217,6 +3217,13 @@ export class BrowserAgentManager {
   async nativeTypeAt(tabId, action, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    // Defense in depth for direct native helper callers and resumed actions:
+    // a visual fallback cannot turn a password/file target or a button into
+    // an arbitrary text sink when the normal dispatcher is skipped.
+    if (expectedFingerprint.sensitive === true) throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
+    if (expectedFingerprint.visualOnly !== true && expectedFingerprint.editable !== true) {
+      throw new Error('AGENT_TARGET_NOT_EDITABLE');
+    }
     const requireOwner = async () => {
       if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
         throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
