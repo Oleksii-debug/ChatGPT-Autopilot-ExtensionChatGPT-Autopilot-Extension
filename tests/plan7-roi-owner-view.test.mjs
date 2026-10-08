@@ -63,15 +63,17 @@ test('accessible view exposes text-only trusted metrics and semantic table heade
   assert.ok(nodes.some(x=>x.textContent.includes('Запуску немає.')));
 });
 
-test('does not emit HTML injection or create unauthorized controls',()=>{
+test('markup-like workflow identifiers fail closed before accessible DOM mutation',()=>{
   const root=container();
-  renderRoiOwnerViewV1(root,base({
+  renderRoiOwnerViewV1(root,base());
+  const previous=root.children[0];
+  assert.throws(()=>renderRoiOwnerViewV1(root,base({
     status:'EVIDENCE_BACKED',statusText:'Докази', observedRunCount:2, verifiedOutcomeCount:2,
     opportunities:[{workflowClassId:'<script>alert(1)</script>',
       verifiedManualOccurrenceCount:2,policyOrExecutionAuthorized:false}],
-  }));
+  })),/Untrusted ROI opportunity/u);
+  assert.equal(root.children[0],previous);
   const nodes=walk(root);
-  assert.ok(nodes.some(x=>x.textContent==='<script>alert(1)</script>'));
   assert.equal(nodes.some(x=>x.tagName==='SCRIPT'),false);
   assert.equal(nodes.some(x=>['BUTTON','INPUT','A'].includes(x.tagName)),false);
 });

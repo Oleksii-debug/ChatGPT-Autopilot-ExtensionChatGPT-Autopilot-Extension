@@ -90,7 +90,7 @@ function snapshotRows(value) {
     }
     const row = snapshotData(descriptor.value, OPPORTUNITY_FIELDS, 'ROI opportunity');
     if (typeof row.workflowClassId !== 'string'
-      || row.workflowClassId.length < 1 || row.workflowClassId.length > 180
+      || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(row.workflowClassId)
       || !Number.isSafeInteger(row.verifiedManualOccurrenceCount)
       || row.verifiedManualOccurrenceCount < 0
       || row.policyOrExecutionAuthorized !== false
@@ -220,6 +220,22 @@ function snapshotAdvisory(input) {
     if (number != null && (!Number.isSafeInteger(number)
       || Object.is(number, -0) || (!allowNegative && number < 0))) {
       throw new Error('ROI advisory contains invalid metric units');
+    }
+  }
+  // Each manual workflow contributes to the same observed owner-attention
+  // population. A syntactically valid advisory can otherwise overstate
+  // recurring attention (and implied savings) across individually plausible
+  // rows. Validate the conservation bound after strict integer checks and
+  // before any keyboard/NVDA DOM mutation. Missing metrics remain unknown.
+  if (advisory.observedOwnerAttentionSeconds != null) {
+    let summedAttention = 0n;
+    for (const row of rows) {
+      if (row.recurringOwnerAttentionSeconds !== undefined) {
+        summedAttention += BigInt(row.recurringOwnerAttentionSeconds);
+        if (summedAttention > BigInt(advisory.observedOwnerAttentionSeconds)) {
+          throw new Error('ROI workflow attention exceeds observed canonical owner time');
+        }
+      }
     }
   }
   const safeAdvisory = Object.freeze({

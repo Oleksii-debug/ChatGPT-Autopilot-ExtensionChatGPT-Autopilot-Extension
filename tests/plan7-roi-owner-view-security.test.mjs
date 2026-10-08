@@ -78,7 +78,7 @@ test('ROI never accepts forged model evaluation or automatic advisory promotion'
     shorterModelPath: 'NOT_EVALUATED',
   };
   const accepted = container();
-  renderRoiOwnerViewV1(accepted, evidence({ observedRunCount: 2, opportunities: [trustedRow] }));
+  renderRoiOwnerViewV1(accepted, evidence({ observedRunCount: 2, observedOwnerAttentionSeconds: 20, opportunities: [trustedRow] }));
   assert.equal(accepted.children.length, 1);
   for (const changes of [
     { advisoryPath: 'DEPLOY' },
@@ -152,4 +152,51 @@ test('ROI refuses forged or impossible canonical outcome counts before DOM mutat
   const root = container();
   renderRoiOwnerViewV1(root, evidence({ observedRunCount: 2, verifiedOutcomeCount: 1 }));
   assert.equal(root.children.length, 1, 'valid historical count relation remains renderable');
+});
+
+test('canonical ROI workflow source ID cannot contain markup, whitespace or controls', () => {
+  for (const workflowClassId of [
+    '<img src=x>', 'workflow with spaces', ' workflow.x', 'workflow.x\\n',
+    'workflow.\\u0000', 'workflow-' + 'x'.repeat(180),
+  ]) {
+    bad(root => renderRoiOwnerViewV1(root, evidence({
+      opportunities: [{
+        workflowClassId, verifiedManualOccurrenceCount: 1,
+        policyOrExecutionAuthorized: false,
+      }],
+    })));
+  }
+  const good = container();
+  renderRoiOwnerViewV1(good, evidence({
+    opportunities: [{
+      workflowClassId: 'workflow.invoice:review-1',
+      verifiedManualOccurrenceCount: 1, policyOrExecutionAuthorized: false,
+    }],
+  }));
+  assert.equal(good.children.length, 1);
+});
+
+test('disjoint workflow owner-attention must conserve canonical observed seconds', () => {
+  const row = (id, seconds) => ({
+    workflowClassId: id, verifiedManualOccurrenceCount: 1,
+    supportingRunCount: 1, recurringOwnerAttentionSeconds: seconds,
+    policyOrExecutionAuthorized: false,
+  });
+  const consistent = evidence({
+    observedRunCount: 2, verifiedOutcomeCount: 2,
+    observedOwnerAttentionSeconds: 40,
+    opportunities: [row('workflow.alpha', 10), row('workflow.beta', 30)],
+  });
+  const accepted = container();
+  renderRoiOwnerViewV1(accepted, consistent);
+  assert.equal(accepted.children.length, 1);
+  for (const opportunities of [
+    [row('workflow.alpha', 30), row('workflow.beta', 20)],
+    [row('workflow.alpha', 41)],
+    [row('workflow.alpha', '10')],
+  ]) {
+    bad(root => renderRoiOwnerViewV1(root, evidence({
+      ...consistent, opportunities,
+    })));
+  }
 });
