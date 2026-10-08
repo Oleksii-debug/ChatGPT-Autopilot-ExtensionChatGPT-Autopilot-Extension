@@ -1284,6 +1284,21 @@ export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
   const snapshotMarker = 'data-autopilot-agent-snapshot';
   const target = Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === String(ref || '') && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
   if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
+  // Approval is replayed after a durable wait. A still-connected child of a
+  // hidden/inert/disabled ancestor is no longer an actionable control.
+  for (let node = target; node; node = node.parentElement) {
+    if (node.hidden || node.inert || node.disabled
+      || node.getAttribute?.('aria-hidden') === 'true'
+      || node.getAttribute?.('aria-disabled') === 'true') {
+      return { ok: false, reason: 'target-missing-or-unavailable' };
+    }
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden'
+      || style.visibility === 'collapse' || Number(style.opacity) === 0
+      || style.pointerEvents === 'none') {
+      return { ok: false, reason: 'target-missing-or-unavailable' };
+    }
+  }
   const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   const labelledBy = (element) => normalize((element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' '));
   const accessibleName = (element) => {
