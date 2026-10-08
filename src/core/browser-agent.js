@@ -1345,6 +1345,17 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
     // inside a button/link/control. Fall back to the hit element for canvas and
     // other genuinely visual surfaces.
     element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
+    // A screenshot hit does not authorize effects through hidden, inert or
+    // inaccessible ancestor controls. Check again during each live preflight.
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true') return null;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return null;
+    }
     const tag = String(element.tagName || '').toLowerCase();
     const inputType = tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
     const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
