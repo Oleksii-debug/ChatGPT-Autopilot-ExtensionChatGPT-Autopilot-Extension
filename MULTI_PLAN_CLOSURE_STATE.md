@@ -758,3 +758,8 @@ Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source
 - Earlier S1 parser 10/10 and S2 recovered native-drag 12/12 exact-source isolated V8 checks recorded above remain separate, not a claim that whole-suite tests ran on this new head.
 - Exact-head workflows: Plan2 #37841300892/#37841290406, Chrome #37841301003, Core #37841300878, Release #37841301035 QUEUED, NOT PASS. PR #655 OPEN/DRAFT/UNMERGED. Release/main 11.x integration and postintegration browser/restart/security/dual-OS readback not proven.
 - **Both Sections 1 and 2 remain ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE**. Section 3 not activated. No second Browser Agent/provider authority, real credential challenge or CAPTCHA bypass. Evidence: https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/655#issuecomment-6068672764
+
+
+### Plan 1 S1/S2 — existing dual-OS test selection correction 20c09c5f (NONTERMINAL)
+- Existing Plan-1 workflow uses `node --test --test-name-pattern='^Plan-1:' tests/browser-agent.test.mjs`. The newly added intake security regression initially started with `Plan-1 S1/S2:` and would have been skipped. Corrected its name in existing PR #692 commit `20c09c5fabe45d43d192eb6aa78e94dc42e9354a` to `Plan-1: S1/S2 ...`; exact test blob `e34c7ac65eaed02edc36c6d0d0968fd8f11f4cf1`, workflow selector readback matched.
+- PR #692 exact head `20c09c5fabe45d43d192eb6aa78e94dc42e9354a`, still OPEN/DRAFT/UNMERGED. The prior section note at head `3bb7fd2a` is an intermediate source checkpoint, not the latest head. No exact-head complete CI success yet. S1/S2 `ACTIONABLE / IN_PROGRESS / NOT DONE`.
