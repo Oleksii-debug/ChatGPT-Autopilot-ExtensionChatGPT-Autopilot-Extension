@@ -62,7 +62,7 @@ test('accessible view exposes text-only trusted metrics and semantic table heade
 test('does not emit HTML injection or create unauthorized controls',()=>{
   const root=container();
   renderRoiOwnerViewV1(root,base({
-    status:'EVIDENCE_BACKED',statusText:'Докази',
+    status:'EVIDENCE_BACKED',statusText:'Докази', observedRunCount:2, verifiedOutcomeCount:2,
     opportunities:[{workflowClassId:'<script>alert(1)</script>',
       verifiedManualOccurrenceCount:2,policyOrExecutionAuthorized:false}],
   }));
@@ -79,4 +79,53 @@ test('rejects a second authority or missing semantic container identity',()=>{
   assert.throws(()=>renderRoiOwnerViewV1(container(),base({
     status:'EVIDENCE_BACKED',opportunities:[{workflowClassId:'w',verifiedManualOccurrenceCount:2,policyOrExecutionAuthorized:true}],
   })),/Untrusted ROI opportunity/);
+});
+
+test('owner ROI view rejects contradictory provenance populations and inverted savings without DOM mutation', () => {
+  const root = container();
+  renderRoiOwnerViewV1(root, base());
+  const existing = root.children[0];
+  const regular = {
+    status: 'PARTIAL_EVIDENCE', observedRunCount: 2, verifiedOutcomeCount: 1,
+    opportunities: [{
+      workflowClassId: 'workflow.test', verifiedManualOccurrenceCount: 2,
+      supportingRunCount: 2, policyOrExecutionAuthorized: false,
+    }],
+  };
+  const wrong = [
+    { ...regular, opportunities: [{ ...regular.opportunities[0], verifiedManualOccurrenceCount: 3 }] },
+    { ...regular, opportunities: [{ ...regular.opportunities[0], supportingRunCount: 3 }] },
+    { ...regular, netOwnerTimeLowerSeconds: 20, netOwnerTimeUpperSeconds: 10 },
+    { ...regular, estimatedOwnerTimeAvoidedSeconds: { lower: 500, upper: 300 } },
+    { ...regular, estimatedOwnerTimeAvoidedSeconds: { lower: '0', upper: 300 } },
+    { ...regular, noComparableModelEvidence: false },
+  ];
+  let getterCalls = 0;
+  const hostileInterval = { lower: 0 };
+  Object.defineProperty(hostileInterval, 'upper', {
+    enumerable: true, get() { getterCalls += 1; return 4; },
+  });
+  wrong.push({ ...regular, estimatedOwnerTimeAvoidedSeconds: hostileInterval });
+  for (const candidate of wrong) {
+    assert.throws(() => renderRoiOwnerViewV1(root, base(candidate)));
+    assert.equal(root.children[0], existing, 'invalid evidence must not change semantic owner view');
+  }
+  assert.equal(getterCalls, 0, 'hostile nested metrics must not execute accessors');
+});
+
+test('valid bounded ROI intervals and evidence populations preserve semantic status', () => {
+  const root = container();
+  renderRoiOwnerViewV1(root, base({
+    status: 'PARTIAL_EVIDENCE', observedRunCount: 3, verifiedOutcomeCount: 2,
+    observedOwnerAttentionSeconds: 60,
+    estimatedOwnerTimeAvoidedSeconds: { lower: 0, upper: 120 },
+    netOwnerTimeLowerSeconds: -60, netOwnerTimeUpperSeconds: 60,
+    noComparableModelEvidence: true,
+    opportunities: [{ workflowClassId: 'workflow.valid',
+      verifiedManualOccurrenceCount: 2, supportingRunCount: 3,
+      policyOrExecutionAuthorized: false }],
+  }));
+  const nodes = walk(root);
+  assert.equal(nodes.filter(x => x.tagName === 'TH' && x.attributes.scope === 'row').length, 1);
+  assert.equal(nodes.find(x => x.attributes.role === 'status').attributes['aria-live'], 'polite');
 });
