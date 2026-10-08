@@ -494,3 +494,7 @@ Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source
 - Scoped commits: `d81d03c9fb5ed84769243fdac54eefde257a07c8` (source), `250c5239abca1d7bc3e942389d3c445a4cb37ce9` (manager), `5ddcca8e30b8ab1690331e2f96ed7f1e0dc45a9f` (two targeted tests). Exact GitHub source blob `d73fbd033759af47f970649547df3763b3fce72c`; manager blob `524d67f63596f51ef71803ca8cb7a7962b535696`; test blob `e918d1d4ce8ce8215a8cc8f072ff286eaf2aac41`.
 - Isolated exact 11.x BrowserAgent V8 test: **5/5 PASS** (bound name/URL/hash, valid live proof, changed name denial, changed URL denial, hidden ancestor denial); additional committed Node regression definitions have not received an exact-head green CI check yet. No real file uploaded, no login/CAPTCHA bypass or remote account actions.
 - Sections 1 and 2 remain ACTIONABLE/IN_PROGRESS/NOT DONE. Source lineage release/main sync, dual-OS/Chrome tests, merge and postintegration readback remain outstanding. Do not start Section 3.
+
+
+### Plan 2 exact PR readback: head `5ddcca8e30b8ab1690331e2f96ed7f1e0dc45a9f`
+- Latest dual-OS Plan2 workflow #37828015906, Core #37828015896, Chrome #37828015819, Release #37828015895 are all **QUEUED**, not PASS. Open/draft/unmerged PR #655. PR comment #6066938064 preserves scoped source/test hashes and evidence. S1/S2 remain IN_PROGRESS / ACTIONABLE / NOT DONE, no Section 3 work.
