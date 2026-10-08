@@ -1815,7 +1815,7 @@
       submitMethod = backgroundDocument ? 'BACKGROUND_DOM_CLICK' : 'DOM_CLICK';
       send.click();
     }
-    const postSendDelay = Math.min(3600000, Math.max(0, Number(request.postSendDelayMs || 0)));
+    const postSendDelay = Math.min(60000, Math.max(0, Number(request.postSendDelayMs || 0)));
     if (postSendDelay > 0) await (deps.wait || wait)(postSendDelay);
     const verifyDeadline = nowMs() + 15000;
     let activatedForAcknowledgement = false;
