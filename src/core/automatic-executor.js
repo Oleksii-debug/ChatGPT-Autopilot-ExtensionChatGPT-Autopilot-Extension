@@ -6,7 +6,7 @@ import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LI
 import { restorePendingSendTabs } from './native-input.js';
 import { withWindowFocus, windowHasPendingSend } from './window-focus.js';
 import { assertSessionWindow } from './window-binding.js';
-import { resolveTaskTab } from './tabs.js';
+import { resolveTaskTab, sameChatConversationUrl } from './tabs.js';
 import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
@@ -151,11 +151,12 @@ export class AutomaticSessionExecutor {
         ? `__session_worker__:${sessionId}` : task.id;
       const hint = state.tabHintsByTaskId?.[hintKey];
       if (!session?.scenarioWork?.managed || !ACTIVE_STATES.has(session.runState)
-          || hint?.tabId !== tabId || hint.ownedByExtension !== true
+          || state.profile?.masterPaused === true || hint?.tabId !== tabId || hint.ownedByExtension !== true
           || windowHasPendingSend(state, tab.windowId)) return originalResult;
       let current;
       try { current = await this.chrome.tabs.get(tabId); } catch { return originalResult; }
-      if (current.active || current.windowId !== tab.windowId) return originalResult;
+      if (current.active || current.windowId !== tab.windowId
+          || !sameChatConversationUrl(current.url, task.normalizedUrl || task.url)) return originalResult;
       assertSessionWindow(session, current);
       const [previous] = await this.chrome.tabs.query({ active: true, windowId: tab.windowId });
       if (!previous?.id || previous.id === tabId) return originalResult;
