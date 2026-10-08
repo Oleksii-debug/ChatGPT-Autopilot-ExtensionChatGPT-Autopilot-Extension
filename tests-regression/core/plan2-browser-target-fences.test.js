@@ -8,6 +8,7 @@ import {
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
 } from '../../src/core/browser-agent.js';
+import { BrowserAgentManager } from '../../src/core/browser-agent-manager.js';
 
 class FakeElement {
   constructor(text = 'Save') {
@@ -324,4 +325,97 @@ test('visual fallback refuses pointer-events-disabled targets', () => {
     globalThis.getComputedStyle = originalStyle;
   }
   assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).ok, true);
+});
+
+test('semantic snapshot does not expose a control hidden by its ancestor', () => {
+  setup();
+  element.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+  assert.equal(snapshotBrowserPage('ancestor-hidden').elements.length, 0);
+  element.parentElement = null;
+  assert.equal(snapshotBrowserPage('ancestor-visible').elements.length, 1);
+});
+
+test('semantic fill denies focus-time overlay instead of writing a hidden input', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'text';
+  element.value = 'original';
+  element.setAttribute('type', 'text');
+  const observed = snapshotBrowserPage('fill-overlay');
+  const action = parseBrowserAgentAction(
+    '{"type":"fill","frameId":0,"ref":"r1","text":"unauthorized"}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url },
+  );
+  element.focus = () => { document.elementFromPoint = () => new FakeElement('Modal over input'); };
+  assert.throws(() => executeBrowserPageAction('fill-overlay', action), /AGENT_TARGET_OCCLUDED/);
+  assert.equal(element.value, 'original');
+});
+
+test('semantic select denies focus-time overlay before changing option', () => {
+  setup();
+  const oldSelectClass = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.options = [{ value: 'keep', textContent: 'Keep' }, { value: 'delete', textContent: 'Delete' }];
+    element.value = 'keep';
+    const observed = snapshotBrowserPage('select-overlay');
+    const action = parseBrowserAgentAction(
+      '{"type":"select","frameId":0,"ref":"r1","value":"Delete"}',
+      { frames: [{ frameId: 0, ...observed }], url: observed.url },
+    );
+    element.focus = () => { document.elementFromPoint = () => new FakeElement('Modal over select'); };
+    assert.throws(() => executeBrowserPageAction('select-overlay', action), /AGENT_TARGET_OCCLUDED/);
+    assert.equal(element.value, 'keep');
+  } finally {
+    globalThis.HTMLSelectElement = oldSelectClass;
+  }
+});
+
+test('visual target identity is bound to exact screenshot coordinate inside same element', () => {
+  setup();
+  const first = probeBrowserCoordinateTarget(20, 20);
+  const fingerprint = browserAgentCoordinateTargetFingerprint(first.target);
+  assert.equal(fingerprint.captureX, 20);
+  assert.equal(fingerprint.captureY, 20);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, fingerprint).ok, true);
+  assert.equal(verifyBrowserCoordinateTarget(21, 20, fingerprint).reason, 'changed-capture-point');
+  assert.equal(verifyBrowserCoordinateTarget(20, 21, fingerprint).reason, 'changed-capture-point');
+  const missing = { ...fingerprint };
+  delete missing.captureX;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, missing).reason, 'changed-capture-point');
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, { ...fingerprint, captureY: null }).reason, 'changed-capture-point');
+  const afterRestart = JSON.parse(JSON.stringify(fingerprint));
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, afterRestart).ok, true);
+});
+
+test('pending approved visual and drag proofs survive canonical manager storage/restart', async () => {
+  setup();
+  const storageState = {};
+  const chromeApi = { storage: { local: {
+    get: async () => storageState,
+    set: async record => { Object.assign(storageState, record); },
+  } } };
+  const options = { chromeApi, routePrompt: async () => ({}), now: () => 1700000000000 };
+  const manager = new BrowserAgentManager(options);
+  await manager.create({ id: 'plan2-coordinate-durable', goal: 'Safe coordinate replay' });
+  const captured = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const dragEnd = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(40, 20).target);
+  await manager.update(store => {
+    store.byId['plan2-coordinate-durable'].runtime.pendingApproval = {
+      action: { type: 'drag_at', startX: 20, startY: 20, endX: 40, endY: 20 },
+      snapshotId: 's1', snapshotSignature: 'fixture-s1', url: pageUrl, tabId: 1,
+      targetFingerprint: captured, dragStartFingerprint: captured, dragEndFingerprint: dragEnd,
+      reason: 'owner approval required', requestedAt: 1700000000000,
+    };
+    return store;
+  });
+  const restarted = new BrowserAgentManager(options);
+  const persisted = (await restarted.get('plan2-coordinate-durable')).job.runtime.pendingApproval;
+  assert.deepEqual(persisted.targetFingerprint, captured);
+  assert.deepEqual(persisted.dragStartFingerprint, captured);
+  assert.deepEqual(persisted.dragEndFingerprint, dragEnd);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, persisted.dragStartFingerprint).ok, true);
+  assert.equal(verifyBrowserCoordinateTarget(40, 20, persisted.dragEndFingerprint).ok, true);
+  assert.equal(verifyBrowserCoordinateTarget(41, 20, persisted.dragEndFingerprint).ok, false);
 });
