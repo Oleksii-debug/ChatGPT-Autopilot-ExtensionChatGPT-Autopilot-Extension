@@ -11,6 +11,7 @@ import {
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
+  browserAgentVisionOriginMatches,
   BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../../src/core/browser-agent-manager.js';
@@ -1583,3 +1584,42 @@ test('semantic SELECT binds disabled option group and permits unchanged options'
     globalThis.HTMLSelectElement = originalSelect;
   }
 });
+
+
+// Section 2: a screenshot origin is evidence, not a coercible persisted cache.
+// Use real source helper shared by click_at/type_at/drag_at, including restore.
+test('visual origin comparison rejects coercible and missing coordinates after restart', () => {
+  const { browserAgentVisionOriginMatches } = awaitImportVisionOrigin();
+  const viewport = { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 12345 };
+  const proof = { url: 'https://example.test/editor', viewportWidth: 500, viewportHeight: 300,
+    target: { pageUrl: 'https://example.test/editor', viewportWidth: 500,
+      viewportHeight: 300, viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 12345 } };
+  const pageUrl = proof.url;
+  assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, viewport), true);
+  const restored = JSON.parse(JSON.stringify({ viewport, proof }));
+  assert.equal(browserAgentVisionOriginMatches(restored.proof, pageUrl, restored.viewport), true);
+  for (const key of ['width', 'height', 'scrollX', 'scrollY', 'documentEpoch']) {
+    for (const invalid of [undefined, null, false, '', '0', {}, [], Infinity]) {
+      assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, { ...viewport, [key]: invalid }), false);
+    }
+  }
+  for (const key of ['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch']) {
+    for (const invalid of [undefined, null, false, '', '0', Infinity]) {
+      assert.equal(browserAgentVisionOriginMatches({ ...proof, target: { ...proof.target, [key]: invalid } }, pageUrl, viewport), false);
+    }
+  }
+  assert.equal(browserAgentVisionOriginMatches({ ...proof, url: 'https://other.test' }, pageUrl, viewport), false);
+  assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, null), false);
+  assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, { ...viewport, documentEpoch: 999 }), false);
+});
+
+test('all three visual dispatch branches reuse strict observed origin without Number coercion', () => {
+  const source = readFileSync(new URL('../../src/core/browser-agent-manager.js', import.meta.url), 'utf8');
+  const region = source.slice(source.indexOf('if (action.type === BrowserAgentActionType.CLICK_AT)', source.indexOf('let action;')),
+    source.indexOf('if (action.type === BrowserAgentActionType.PLAN)', source.indexOf('let action;')));
+  assert.equal((region.match(/browserAgentVisionOriginMatches\(/g) || []).length, 3);
+  assert.doesNotMatch(region, /Number\(proof\.viewportWidth|Number\(proof\.target\.viewportScroll/);
+});
+
+// Binding remains the existing browser-agent module; no second provider.
+function awaitImportVisionOrigin() { return { browserAgentVisionOriginMatches }; }
