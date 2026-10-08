@@ -385,3 +385,22 @@ test('provider effect-edge revalidation still permits an unexpired canonical dis
   assert.equal(reads, 2);
   assert.equal(effects, 1);
 });
+
+test('section 1: unknown attacker-controlled field names are redacted before provider effects', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  const secret = 'PRIVATE_CREDENTIAL_MUST_NOT_ECHO_731';
+  const hostile = { ...f.request(readiness), [secret]: 'value' };
+  await assert.rejects(f.newDispatcher().execute(hostile), error =>
+    error instanceof Error && /unknown field/u.test(error.message) && !error.message.includes(secret));
+  assert.equal(f.providerCalls, 0, 'invalid request must not invoke provider');
+  assert.throws(
+    () => new SpecialistProviderDispatcherV1({
+      bindings: [{
+        providerId: 'provider.local', execute: async () => null,
+        [secret]: 'value',
+      }],
+    }),
+    error => error instanceof Error && /unknown field/u.test(error.message) && !error.message.includes(secret),
+  );
+});
