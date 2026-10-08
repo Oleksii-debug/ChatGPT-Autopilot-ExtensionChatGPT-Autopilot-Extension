@@ -118,7 +118,7 @@ test('outbound destination not in the explicit ceiling fails closed and reports 
   assert.deepEqual(result.signals, ['CROSS_ORIGIN_OUTBOUND']);
   assert.deepEqual(result.violations, [{
     code: 'OUTBOUND_ORIGIN_ESCALATION',
-    values: ['https://attacker.invalid'],
+    values: [],
   }]);
 });
 
@@ -134,9 +134,9 @@ test('capability, tool and provider authority cannot be added by external conten
 
   assert.equal(result.status, UntrustedContentGuardStatus.BLOCKED);
   assert.deepEqual(result.violations, [
-    { code: 'CAPABILITY_AUTHORITY_ESCALATION', values: ['gmail.send'] },
-    { code: 'TOOL_AUTHORITY_ESCALATION', values: ['gmail.send'] },
-    { code: 'PROVIDER_AUTHORITY_ESCALATION', values: ['gmail'] },
+    { code: 'CAPABILITY_AUTHORITY_ESCALATION', values: [] },
+    { code: 'TOOL_AUTHORITY_ESCALATION', values: [] },
+    { code: 'PROVIDER_AUTHORITY_ESCALATION', values: [] },
   ]);
 });
 
@@ -338,6 +338,35 @@ test('arrays are dense, bounded and exact without coercion', () => {
     })),
     /bounded plain array/,
   );
+});
+
+test('all denied escalation kinds redact attacker-controlled names across persisted restart', () => {
+  const secret = 'SECRET_OWNER_POLICY_REFERENCE_313';
+  const input = request({
+    proposal: proposal({
+      requestedCapabilityIds: ['web.read', secret],
+      requestedToolIds: ['browser.inspect', secret],
+      requestedProviderIds: ['browser', secret],
+      outboundOrigins: ['https://secret-owner-policy-reference-313.invalid'],
+      requestedCredentialRefIds: [secret],
+    }),
+  });
+  const denied = assessUntrustedContentInfluenceV1(input);
+  assert.equal(denied.status, UntrustedContentGuardStatus.BLOCKED);
+  assert.deepEqual(denied.violations.map(item => item.code), [
+    'CAPABILITY_AUTHORITY_ESCALATION',
+    'TOOL_AUTHORITY_ESCALATION',
+    'PROVIDER_AUTHORITY_ESCALATION',
+    'OUTBOUND_ORIGIN_ESCALATION',
+    'UNTRUSTED_CREDENTIAL_SELECTION',
+  ]);
+  assert.ok(denied.violations.every(item => Array.isArray(item.values) && item.values.length === 0));
+  assert.doesNotMatch(JSON.stringify(denied), /SECRET_OWNER_POLICY_REFERENCE_313|secret-owner-policy-reference-313/u);
+  assert.equal(denied.executionAuthorized, false);
+  assert.equal(denied.policyDecisionGranted, false);
+  assert.equal(denied.instructionAuthority, 'NONE');
+  assert.deepEqual(assessUntrustedContentInfluenceV1(structuredClone(input)), denied);
+  assert.equal(Object.isFrozen(denied.violations), true);
 });
 
 test('credential selection denial cannot echo untrusted reference data through logs or restart', () => {
