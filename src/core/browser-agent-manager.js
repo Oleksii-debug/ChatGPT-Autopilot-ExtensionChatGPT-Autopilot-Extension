@@ -102,6 +102,16 @@ const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
+const DIRECT_AGENT_CREATE_KEYS = new Set([
+  'acceptanceCriteria', 'activeWindowEnd', 'activeWindowStart', 'aiPinnedRouteId', 'aiPrimaryModel',
+  'aiPrimaryProvider', 'aiRoutingMode', 'aiStrongModel', 'aiStrongProvider', 'allowCrossOriginNavigation',
+  'approvalMode', 'closeOwnedTabsOnStop', 'credentialDecision', 'goal', 'id',
+  'inputPricePerMillionUsd', 'intervalSeconds', 'maxCostUsd', 'maxInputTokens', 'maxModelCalls',
+  'maxOutputTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxSteps', 'maxTotalTokens',
+  'name', 'outputPricePerMillionUsd', 'projectId', 'repeatMode', 'scheduleEndAt',
+  'scheduleStartAt', 'siteRules', 'startFromActiveTab', 'startUrl', 'stepDelayMs',
+  'trustedScriptEnabled', 'visionOnDemand',
+]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
@@ -2277,7 +2287,9 @@ export class BrowserAgentManager {
   async create(raw = {}) {
     // Same data-only request boundary as Definition intake: no getter may
     // supply a task/goal/policy at construction time.
-    const request = snapshotOwnDataRequest(raw, 'Browser Agent direct intake');
+    const request = snapshotExactOwnDataRequest(
+      raw, DIRECT_AGENT_CREATE_KEYS, 'Browser Agent direct intake',
+    );
     // Site rules and acceptance criteria have their own dense/data-only
     // validators. All other direct-intake fields must be scalar so an untrusted
     // object cannot execute toString/valueOf during config coercion, silently
