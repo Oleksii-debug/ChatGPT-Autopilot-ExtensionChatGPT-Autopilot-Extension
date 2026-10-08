@@ -134,6 +134,9 @@ function priceCap(value, label) {
   return price(value, label);
 }
 function knownPriceDimension(item, priceKey, knownKey, label) {
+  if (Object.hasOwn(item, priceKey) && own(item, priceKey) == null) {
+    throw new Error(`${label} cannot treat missing price as an observed zero`);
+  }
   if (Object.hasOwn(item, knownKey)) {
     const explicitKnown = own(item, knownKey);
     if (typeof explicitKnown !== 'boolean') throw new Error(`${label} must be boolean`);
@@ -161,9 +164,13 @@ export function normalizeAiRoutePool(raw = []) {
     if (!model) throw new Error('AI route model is required');
     const roles = ids(own(item, 'roles') || [], `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
-    const locality = clean(own(item, 'locality') || (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE), 20);
+    const rawLocality = own(item, 'locality');
+    if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
+    const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
-    const costClass = clean(own(item, 'costClass') || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN), 20);
+    const rawCostClass = own(item, 'costClass');
+    if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
+    const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
@@ -197,7 +204,9 @@ export function normalizeAiRoutePool(raw = []) {
 export function normalizeAiRoutePolicy(raw = {}) {
   if (raw == null) raw = {};
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
-  const locality = clean(own(source, 'locality') || DEFAULT_AI_ROUTE_POLICY.locality, 20);
+  const rawLocality = own(source, 'locality');
+  if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
+  const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
     autoSwitch: optionalBoolean(source, 'autoSwitch', 'AI route autoSwitch', true),
