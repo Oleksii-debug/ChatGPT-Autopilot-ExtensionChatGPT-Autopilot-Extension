@@ -123,10 +123,13 @@ function storedEventTime(value, present) {
   }
   return value;
 }
-function safeHistory(history) {
+function safeHistory(history, present) {
   // Missing history is supported for old persisted snapshots, but an
   // explicitly persisted null is corruption, not evidence of zero events.
-  if (history === undefined) return { items: [], total: 0 };
+  if (history === undefined) {
+    if (present) throw new Error('Agent history must be a dense array');
+    return { items: [], total: 0 };
+  }
   if (!plainArray(history)) {
     throw new Error('Agent history must be a dense array');
   }
@@ -157,7 +160,7 @@ function planSummary(plan) {
   // An explicitly persisted malformed plan must not be presented as an
   // empty plan after restart. Only a genuinely absent optional nodes field
   // preserves the legacy zero-node projection.
-  if (nodes !== undefined && !plainArray(nodes)) {
+  if (safeHasOwn(plan, 'nodes') && !plainArray(nodes)) {
     throw new Error('Agent plan nodes must be a plain array');
   }
   if (Array.isArray(nodes)) {
@@ -225,7 +228,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const filter = filterValue === undefined ? 'ALL' : filterValue;
   if (!FILTERS.has(filter)) throw new Error('Agent timeline filter is invalid');
   const runtime = record(own(job, 'runtime'), 'Agent timeline runtime');
-  const history = safeHistory(own(runtime, 'history'));
+  const history = safeHistory(own(runtime, 'history'), safeHasOwn(runtime, 'history'));
   const all = history.items.map(({ ordinal, entry }) => {
     record(entry, 'Agent history entry');
     const rawType = own(entry, 'type');
