@@ -204,3 +204,47 @@ test('mismatched or secret-bearing nested specialist inspection cannot reach pro
   }
   assert.equal(f.providerCalls, 0);
 });
+
+test('canonical provider health rejects contradictory nested READY claims before effects', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const nested = structuredClone(valid.inspection);
+  nested.checks[0].providerReadiness.health = 'UNAVAILABLE';
+  await assert.rejects(
+    f.newDispatcher().execute(f.request({
+      ...valid, inspection: nested,
+    })),
+    /canonical provider health|inconsistent provider evidence/u,
+  );
+  assert.equal(f.providerCalls, 0);
+});
+
+test('nested inspection cannot silently narrow or expand selected Specialist tool scope', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  for (const mutation of [
+    inspection => { inspection.requiredToolIds = []; },
+    inspection => { inspection.requiredToolIds = ['fs.write']; },
+    inspection => { inspection.checks[0].toolId = 'fs.write'; },
+    inspection => { inspection.checks = []; },
+    inspection => { inspection.checks[0].readiness = 'NEEDS_AUTH'; },
+    inspection => { inspection.checks[0].source = 'MISSING'; },
+  ]) {
+    const inspection = structuredClone(valid.inspection);
+    mutation(inspection);
+    await assert.rejects(f.newDispatcher().execute(f.request({ ...valid, inspection })),
+      /readiness inspection/u);
+  }
+  assert.equal(f.providerCalls, 0);
+});
+
+test('persisted nested provider inspection remains valid on exact same lease and provider', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const recovered = JSON.parse(JSON.stringify(valid));
+  await assert.rejects(
+    f.newDispatcher().execute(f.request(recovered)),
+    /SENTINEL_PROVIDER_REACHED/u,
+  );
+  assert.equal(f.providerCalls, 1);
+});
