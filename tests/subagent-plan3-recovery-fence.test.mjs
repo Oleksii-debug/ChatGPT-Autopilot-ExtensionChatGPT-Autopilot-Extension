@@ -120,3 +120,28 @@ test('ALL_DIRECT_CHILDREN barrier allows idempotent durable restart replay witho
   assert.equal(replay.executionAuthority, false);
   assert.equal(replay.activationAuthority, false);
 });
+
+test('paused ancestor blocks a new nested durable spawn despite active child state', () => {
+  const initial = mutateOrchestrationSubagentTopologyV1(request({
+    requestedChildren: 1, spawnId: 'ancestor.top',
+  }));
+  assert.equal(initial.decision, 'ALLOW');
+  const childId = initial.createdNodeIds[0];
+  const resumed = structuredClone(initial.runtime);
+  resumed.nodesById[childId].lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const nestedRequest = {
+    graph: initial.graph, runtime: resumed, parentNodeId: childId,
+    requestedChildren: 1, spawnId: 'ancestor.nested', nowMs: 300,
+  };
+  const allowed = mutateOrchestrationSubagentTopologyV1(request(nestedRequest));
+  assert.equal(allowed.decision, 'ALLOW');
+  assert.equal(allowed.activationAuthority, false);
+  resumed.nodesById.root.scopeState = 'PAUSED';
+  const denied = mutateOrchestrationSubagentTopologyV1(request(nestedRequest));
+  assert.equal(denied.decision, 'DENY');
+  assert.equal(denied.reasonCode, 'ANCESTOR_SCOPE_NOT_RUNNING');
+  assert.deepEqual(denied.createdNodeIds, []);
+  assert.deepEqual(denied.activationRequests, []);
+  assert.equal(denied.executionAuthority, false);
+  assert.equal(denied.activationAuthority, false);
+});
