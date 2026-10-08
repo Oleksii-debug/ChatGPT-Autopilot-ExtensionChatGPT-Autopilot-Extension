@@ -6,6 +6,7 @@ import {
   executeBrowserPageAction,
   proveBrowserNativeClick,
   verifyBrowserApprovalTarget,
+  verifyBrowserFileInput,
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
@@ -876,4 +877,63 @@ test('native coordinate type helper rejects password and noneditable targets eve
     /AGENT_SENSITIVE_FIELD_BLOCKED/,
   );
   assert.deepEqual(fixture.events, []);
+});
+
+function withFileInputFixture(assertions) {
+  const originalDocument = globalThis.document;
+  const originalInputClass = globalThis.HTMLInputElement;
+  const originalEvent = globalThis.Event;
+  class FileInput extends FakeElement {
+    constructor() {
+      super('Upload');
+      this.tagName = 'INPUT';
+      this.type = 'file';
+      this.files = [];
+      this.events = [];
+      this.parentElement = null;
+      this.setAttribute('type', 'file');
+      this.setAttribute('data-autopilot-agent-ref', 'upload-r1');
+      this.setAttribute('data-autopilot-agent-snapshot', 'upload-s1');
+    }
+    dispatchEvent(event) { this.events.push(event.type); return true; }
+  }
+  const input = new FileInput();
+  globalThis.HTMLInputElement = FileInput;
+  globalThis.Event = class Event { constructor(type) { this.type = type; } };
+  globalThis.document = { querySelectorAll: () => [input] };
+  try { assertions(input); }
+  finally {
+    globalThis.document = originalDocument;
+    globalThis.HTMLInputElement = originalInputClass;
+    globalThis.Event = originalEvent;
+  }
+}
+
+test('file upload events are rejected until a chosen file exists', () => {
+  withFileInputFixture(input => {
+    assert.throws(() => verifyBrowserFileInput('upload-s1', 'upload-r1'), /AGENT_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(input.events, []);
+  });
+});
+
+test('file input no longer emits upload events after it or an ancestor becomes hidden', () => {
+  withFileInputFixture(input => {
+    input.files = [{ name: 'sample.txt', size: 3, type: 'text/plain' }];
+    input.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+    assert.throws(() => verifyBrowserFileInput('upload-s1', 'upload-r1'), /AGENT_FILE_INPUT_STALE/);
+    assert.deepEqual(input.events, []);
+    input.parentElement = null;
+    input.setAttribute('aria-hidden', 'true');
+    assert.throws(() => verifyBrowserFileInput('upload-s1', 'upload-r1'), /AGENT_FILE_INPUT_STALE/);
+    assert.deepEqual(input.events, []);
+  });
+});
+
+test('file upload preflight still emits exactly one input and change for a visible selected file', () => {
+  withFileInputFixture(input => {
+    input.files = [{ name: 'sample.txt', size: 3, type: 'text/plain' }];
+    const result = verifyBrowserFileInput('upload-s1', 'upload-r1');
+    assert.deepEqual(result, { ok: true, files: [{ name: 'sample.txt', size: 3, type: 'text/plain' }] });
+    assert.deepEqual(input.events, ['input', 'change']);
+  });
 });
