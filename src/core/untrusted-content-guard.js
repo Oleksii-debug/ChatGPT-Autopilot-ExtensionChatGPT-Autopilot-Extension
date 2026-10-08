@@ -177,7 +177,8 @@ function timestamp(value, label) {
 }
 
 function canonicalOrigin(value, label, { optional = false } = {}) {
-  if ((value == null || value === '') && optional) return '';
+  // Explicit null is corrupt source provenance, not a missing legacy value.
+  if (optional && (value === undefined || value === '')) return '';
   if (typeof value !== 'string' || value !== value.trim()) throw new Error(`${label} must be a canonical HTTP(S) origin`);
   let parsed;
   try {
