@@ -910,7 +910,7 @@ test('hybrid strong review cannot downgrade an UNKNOWN settlement to a successfu
 
 
 test('Plan 4 S1: route price and owner cap reject coercible zero values across persistence', () => {
-  const invalid = ['', ' ', ' 0 ', '0x0', '0b0', '0o0', '+0', '-0', '00', 'NaN', '0_0'];
+  const invalid = ['', ' ', ' 0 ', '0x0', '0b0', '0o0', '+0', '-0', '00', 'NaN', '0_0', '1e-9999', '0.00000000001e-9999'];
   for (const value of invalid) {
     const candidate = [{...route,inputPricePerMillionUsd:value,outputPricePerMillionUsd:0}];
     assert.throws(() => normalizeAiRoutePool(candidate), /price.*invalid/i);
