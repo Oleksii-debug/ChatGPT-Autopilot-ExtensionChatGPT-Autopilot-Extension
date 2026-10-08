@@ -17,6 +17,7 @@ function base(overrides={}){
   return {
     schemaVersion:1,status:'OFFLINE',statusText:'Офлайн: немає нових даних',
     opportunities:[],deploymentAuthorized:false,
+    reportId: overrides.status && overrides.status !== 'OFFLINE' ? 'roi-report-1' : null,
     observedRunCount:0,verifiedOutcomeCount:0,
     ...overrides,
   };
@@ -160,4 +161,38 @@ test('ROI prevents duplicated workflow identities and cross-row run overcount be
   assert.equal(rendered.filter(node => node.tagName === 'TH'
     && node.attributes.scope === 'row').length, 2);
   assert.equal(rendered.some(node => node.attributes.role === 'status'), true);
+});
+
+
+test('ROI status must reflect canonical report identity and run population before NVDA DOM mutation', () => {
+  const root = container();
+  renderRoiOwnerViewV1(root, base());
+  const previous = root.children[0];
+  const forged = [
+    base({ status:'PARTIAL_EVIDENCE', observedRunCount:0 }),
+    base({ status:'EVIDENCE_BACKED', observedRunCount:0 }),
+    base({ status:'EVIDENCE_BACKED', observedRunCount:2, reportId:null }),
+    base({ status:'EVIDENCE_BACKED', observedRunCount:2, reportId:' report-1' }),
+    base({ status:'EVIDENCE_BACKED', observedRunCount:2, reportId:'report<script>' }),
+    base({ status:'INSUFFICIENT_EVIDENCE', reportId:null }),
+    base({ status:'OFFLINE', reportId:'prior-report' }),
+    base({ status:'OFFLINE', observedRunCount:1 }),
+    base({ status:'OFFLINE', verifiedOutcomeCount:1, observedRunCount:1 }),
+    base({ status:'OFFLINE', machineSpendUsdMicros:100 }),
+    base({ status:'OFFLINE', estimatedOwnerTimeAvoidedSeconds:{ lower:0, upper:10 } }),
+  ];
+  for (const candidate of forged) {
+    assert.throws(() => renderRoiOwnerViewV1(root,candidate),
+      /status contradicts|offline evidence|outcome counters/u);
+    assert.equal(root.children[0], previous,
+      'contradictory or cached ROI status must not replace previous live region');
+  }
+  renderRoiOwnerViewV1(root, base({
+    status:'PARTIAL_EVIDENCE', observedRunCount:1, reportId:'report-1',
+  }));
+  assert.equal(walk(root).some(n => n.attributes.role === 'status'), true);
+  renderRoiOwnerViewV1(root, base({
+    status:'INSUFFICIENT_EVIDENCE', reportId:'report-no-results',
+  }));
+  assert.equal(walk(root).some(n => n.tagName === 'TABLE'), false);
 });
