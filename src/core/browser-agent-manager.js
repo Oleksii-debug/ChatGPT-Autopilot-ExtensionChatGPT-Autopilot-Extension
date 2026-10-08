@@ -314,6 +314,49 @@ function snapshotAgentDefinitionLaunchNestedInputs(request) {
   return request;
 }
 
+// Direct prompt-first intake must snapshot owner site policy before the first
+// asynchronous write. Nested getters, sparse rule arrays and mutable caller
+// references may never become policy authority during queued persistence.
+function snapshotDirectAgentSiteRules(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error('Browser Agent direct siteRules must be a canonical array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 100
+      || Reflect.ownKeys(descriptors).length !== length + 1) {
+    throw new Error('Browser Agent direct siteRules must be a dense bounded array');
+  }
+  const rules = [];
+  const allowed = new Set(['pattern', 'defaultDecision', 'actionDecisions']);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent direct siteRules entries must be own data properties');
+    }
+    const rule = snapshotExactOwnDataRequest(
+      descriptor.value, allowed, `Browser Agent direct siteRules[${index}]`,
+    );
+    if (typeof rule.pattern !== 'string'
+        || (rule.defaultDecision != null && typeof rule.defaultDecision !== 'string')) {
+      throw new Error('Browser Agent direct siteRules pattern/decision must be text');
+    }
+    if (Object.hasOwn(rule, 'actionDecisions') && rule.actionDecisions != null) {
+      const decisions = snapshotOwnDataRequest(
+        rule.actionDecisions, `Browser Agent direct siteRules[${index}].actionDecisions`,
+      );
+      for (const decision of Object.values(decisions)) {
+        if (decision != null && typeof decision !== 'string') {
+          throw new Error('Browser Agent direct siteRules action decisions must be text');
+        }
+      }
+      rule.actionDecisions = decisions;
+    }
+    rules.push(rule);
+  }
+  return rules;
+}
+
 function normalizePersistedAgentDefinitionScope(raw, selection) {
   if (selection == null) {
     if (raw == null) return null;
@@ -2259,7 +2302,7 @@ export class BrowserAgentManager {
       closeOwnedTabsOnStop: request.closeOwnedTabsOnStop === true,
       approvalMode: request.approvalMode || BrowserAgentApprovalMode.CONSEQUENTIAL,
       credentialDecision: request.credentialDecision || BrowserAgentPolicyDecision.ASK,
-      siteRules: request.siteRules || [],
+      siteRules: snapshotDirectAgentSiteRules(request.siteRules || []),
       visionOnDemand: request.visionOnDemand !== false,
       trustedScriptEnabled: request.trustedScriptEnabled === true,
       maxModelCalls: request.maxModelCalls ?? 0,
