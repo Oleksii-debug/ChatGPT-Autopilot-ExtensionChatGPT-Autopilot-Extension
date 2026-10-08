@@ -78,7 +78,7 @@ function requirePlainObject(value, label, allowed = null) {
   const result = {};
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || (allowed && !allowed.has(key))) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
