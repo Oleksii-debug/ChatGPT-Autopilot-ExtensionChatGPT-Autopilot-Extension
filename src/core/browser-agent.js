@@ -992,7 +992,7 @@ export function snapshotBrowserPage(snapshotId) {
     title: normalize(document.title || '', 500),
     text: bodyText,
     elements,
-    viewport: { width: innerWidth, height: innerHeight, scrollX: Math.round(Number(globalThis.scrollX || 0)), scrollY: Math.round(scrollY), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
+    viewport: { width: innerWidth, height: innerHeight, scrollX: Math.round(Number(globalThis.scrollX || 0)), scrollY: Math.round(scrollY), documentEpoch: Number(performance.timeOrigin), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
   };
 }
 
@@ -1229,6 +1229,7 @@ export function browserAgentCoordinateTargetFingerprint(element) {
       viewportHeight: Number(element.viewportHeight),
       viewportScrollX: Number(element.viewportScrollX),
       viewportScrollY: Number(element.viewportScrollY),
+      documentEpoch: Number(element.documentEpoch),
       rect: {
         left: Number(element.rect.left), top: Number(element.rect.top),
         width: Number(element.rect.width), height: Number(element.rect.height),
@@ -1368,6 +1369,7 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
         viewportHeight: innerHeight,
         viewportScrollX: Number(globalThis.scrollX || 0),
         viewportScrollY: Number(globalThis.scrollY || 0),
+        documentEpoch: Number(performance.timeOrigin),
         visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
         rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       },
@@ -1381,7 +1383,9 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
   if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
     || Number(fingerprint.viewportHeight) !== proof.viewportHeight
     || Number(fingerprint.viewportScrollX) !== target.viewportScrollX
-    || Number(fingerprint.viewportScrollY) !== target.viewportScrollY) return { ok: false, reason: 'changed-page-or-viewport' };
+    || Number(fingerprint.viewportScrollY) !== target.viewportScrollY
+    || !Number.isFinite(Number(fingerprint.documentEpoch))
+    || Number(fingerprint.documentEpoch) !== Number(target.documentEpoch)) return { ok: false, reason: 'changed-page-or-viewport' };
   const fields = ['tag', 'role', 'type', 'name', 'href', 'formAction', 'formMethod'];
   for (const field of fields) {
     if (String(target[field] || '') !== String(fingerprint[field] || '')) return { ok: false, reason: `changed-${field}` };
