@@ -1461,7 +1461,7 @@ export function proveBrowserNativeClick(snapshotId, ref, expected) {
 
 // The injected Chrome function must be self-contained: executeScript serializes
 // its function argument without any module-scope helpers or import bindings.
-export function probeBrowserCoordinateTarget(x, y, fingerprint) {
+export function probeBrowserCoordinateTarget(x, y, fingerprint, requireTextFocus = false) {
   function browserCoordinateAccessibleName(element) {
     if (!(element instanceof Element)) return '';
     const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1482,6 +1482,12 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
     // inside a button/link/control. Fall back to the hit element for canvas and
     // other genuinely visual surfaces.
     element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
+    // The clicked element can stay visible while a handler focuses a different field.
+    // Input.insertText must be bound to the proven focused recipient.
+    if (requireTextFocus === true) {
+      const active = document.activeElement;
+      if (!(active === element || (active instanceof Element && element.contains?.(active)))) return null;
+    }
     // A screenshot hit does not authorize effects through hidden, inert or
     // inaccessible ancestor controls. Check again during each live preflight.
     for (let node = element; node; node = node.parentElement) {
