@@ -196,6 +196,10 @@ function readiness(input, selection, ownership, nowMs) {
     'maxAgeMs', 'readiness', 'executable', 'inspection', 'trustedResolverInvoked',
     'callerReadinessAccepted', 'authority',
   ]), 'Specialist readiness result');
+  // Trust is bound to an exact wire contract, not a caller-selected future schema.
+  if (raw.schemaVersion !== SPECIALIST_PROVIDER_DISPATCHER_VERSION) {
+    throw new Error('Specialist readiness schemaVersion is not supported');
+  }
   if (raw.trustedResolverInvoked !== true || raw.callerReadinessAccepted !== false || raw.executable !== true) {
     throw new Error('Provider dispatch requires fresh executable trusted readiness');
   }
@@ -226,6 +230,9 @@ function readiness(input, selection, ownership, nowMs) {
   const evidence = cloneReadinessEvidence(raw, 'readiness');
   inertReadinessAuthority(evidence.authority, 'readiness.authority');
   const inspection = record(evidence.inspection, INSPECTION_FIELDS, 'readiness.inspection');
+  if (inspection.schemaVersion !== SPECIALIST_PROVIDER_DISPATCHER_VERSION) {
+    throw new Error('Specialist readiness inspection schemaVersion is not supported');
+  }
   inertReadinessAuthority(inspection.authority, 'readiness.inspection.authority');
   if (inspection.executable !== true || inspection.readiness !== evidence.readiness
       || inspection.requiresFreshTrustedResolution !== true) {
