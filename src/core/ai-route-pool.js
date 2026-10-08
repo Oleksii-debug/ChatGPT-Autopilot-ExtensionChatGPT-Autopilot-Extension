@@ -522,7 +522,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   }));
   const canonical = JSON.stringify({ schemaVersion: 1, registryRevision, routes, endpointProfiles: normalizedProfiles });
   if (!globalThis.crypto?.subtle) throw new Error('SHA-256 digest is unavailable; AI configuration evidence cannot be issued');
-  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`AUTOPILOT_AI_ROUTE_REGISTRY_V1\\n${canonical}`));
+  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`AUTOPILOT_AI_ROUTE_REGISTRY_V1\n${canonical}`));
   const configSha256 = Array.from(new Uint8Array(bytes), x => x.toString(16).padStart(2, '0')).join('');
   return Object.freeze({
     schemaVersion: AI_ROUTE_REGISTRY_EVIDENCE_VERSION, registryRevision,
