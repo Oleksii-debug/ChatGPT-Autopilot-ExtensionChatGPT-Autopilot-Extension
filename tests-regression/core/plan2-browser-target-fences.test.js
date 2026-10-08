@@ -474,7 +474,8 @@ test('vision snapshot blocks same-URL document reload after semantic observation
         sendCommand: async () => { screenshotCalls++; return { data: 'abc' }; },
       },
     };
-    const manager = new BrowserAgentManager({ chromeApi });
+    chromeApi.storage = { local: { get: async () => ({}), set: async () => {} } };
+    const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}) });
     const expectedViewport = { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 1000 };
     assert.match(await manager.captureVision(7, { expectedUrl: pageUrl, expectedViewport }), /^data:image\/jpeg;base64,/);
     assert.equal(screenshotCalls, 1);
@@ -506,7 +507,8 @@ test('vision screenshot refuses debugger-induced scroll drift before capture', a
         sendCommand: async () => { screenshots++; return { data: 'abc' }; },
       },
     };
-    const manager = new BrowserAgentManager({ chromeApi });
+    chromeApi.storage = { local: { get: async () => ({}), set: async () => {} } };
+    const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}) });
     await assert.rejects(manager.captureVision(7, {
       expectedUrl: pageUrl,
       expectedViewport: { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 1000 },
