@@ -150,3 +150,57 @@ test('durable readiness cannot extend the trusted five-minute resolver cap', asy
   }
   assert.equal(f.providerCalls, 0);
 });
+
+
+test('untrusted nested readiness accessor cannot execute getter or dispatch provider', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  let getterCalls = 0;
+  const forgedCheck = { ...valid.inspection.checks[0] };
+  Object.defineProperty(forgedCheck, 'providerReadiness', {
+    enumerable: true,
+    get() { getterCalls++; throw new Error('SECRET_LEAK_CANARY'); },
+  });
+  const forged = { ...valid, inspection: { ...valid.inspection, checks: [forgedCheck] } };
+  await assert.rejects(f.newDispatcher().execute(f.request(forged)), /own data property/u);
+  assert.equal(getterCalls, 0);
+  assert.equal(f.providerCalls, 0);
+});
+
+test('sparse nested specialist inspection arrays fail closed before provider effects', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const forged = { ...valid, inspection: { ...valid.inspection, checks: new Array(1) } };
+  await assert.rejects(f.newDispatcher().execute(f.request(forged)), /own data property/u);
+  assert.equal(f.providerCalls, 0);
+});
+
+test('no readiness or nested inspection can grant provider or policy authority', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const forged = [
+    { ...valid, authority: { ...valid.authority, providerExecutionAuthorized: true } },
+    { ...valid, inspection: {
+      ...valid.inspection, authority: { ...valid.inspection.authority, policyAuthorized: true },
+    } },
+  ];
+  for (const item of forged) {
+    await assert.rejects(f.newDispatcher().execute(f.request(item)), /cannot grant execution authority/u);
+  }
+  assert.equal(f.providerCalls, 0);
+});
+
+test('mismatched or secret-bearing nested specialist inspection cannot reach provider', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const forged = [
+    { ...valid, inspection: { ...valid.inspection, executable: false } },
+    { ...valid, inspection: { ...valid.inspection, specialistId: 'specialist.forged' } },
+    { ...valid, inspection: { ...valid.inspection, extraSecret: 'NEVER_LOG_ME' } },
+  ];
+  for (const item of forged) {
+    await assert.rejects(f.newDispatcher().execute(f.request(item)), error =>
+      error instanceof Error && !error.message.includes('NEVER_LOG_ME'));
+  }
+  assert.equal(f.providerCalls, 0);
+});
