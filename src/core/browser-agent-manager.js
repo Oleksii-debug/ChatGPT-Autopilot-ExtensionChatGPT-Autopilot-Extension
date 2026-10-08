@@ -3923,17 +3923,40 @@ export class BrowserAgentManager {
       const download = (matches || []).find(item => item?.id === action.downloadId);
       if (!download || download.state !== 'complete' || !clean(download.filename, 32000)) throw new Error('Browser Agent upload source is not a completed tracked download');
       if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Browser Agent native file-input capability is unavailable');
+      // CDP Runtime.evaluate operates on the main frame. Never accept an
+      // action from a different frame that coincidentally shares the same ref.
+      if (action.frameId !== 0 || action.expectedFrameUrl !== snapshot.url) throw new Error('AGENT_FILE_INPUT_STALE');
+      const requireOwner = async () => {
+        if (!(await this.verifyOwnerAuthority(job.id, epoch))) throw new Error('AGENT_FILE_INPUT_CANCELLED_BY_OWNER');
+      };
+      const proveInput = async () => {
+        const proof = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [0] },
+          func: proveBrowserNativeClick,
+          args: [snapshot.snapshotId, action.ref, action],
+        });
+        if (!proof?.[0]?.result) throw new Error('AGENT_FILE_INPUT_STALE');
+      };
+      // CDP file selection itself can trigger page-visible change handlers.
+      // Re-prove observed URL, semantic control, overlays and owner epoch
+      // before the first possible local-file effect, not only afterward.
+      await requireOwner();
+      await proveInput();
       const target = { tabId };
       let attached = false;
       try {
         await this.chrome.debugger.attach(target, '1.3');
         attached = true;
+        await requireOwner();
+        await proveInput();
         const expression = `document.querySelector('[data-autopilot-agent-ref="' + ${JSON.stringify(String(action.ref || ''))} + '"][data-autopilot-agent-snapshot="' + ${JSON.stringify(String(snapshot.snapshotId || ''))} + '"]')`;
         const evaluated = await this.chrome.debugger.sendCommand(target, 'Runtime.evaluate', { expression, returnByValue: false });
         const objectId = evaluated?.result?.objectId;
         if (!objectId) throw new Error('AGENT_FILE_INPUT_STALE');
         const node = await this.chrome.debugger.sendCommand(target, 'DOM.requestNode', { objectId });
         if (!Number.isInteger(node?.nodeId)) throw new Error('AGENT_FILE_INPUT_STALE');
+        await requireOwner();
+        await proveInput();
         await this.chrome.debugger.sendCommand(target, 'DOM.setFileInputFiles', { nodeId: node.nodeId, files: [download.filename] });
       } finally {
         if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
