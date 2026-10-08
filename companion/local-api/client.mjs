@@ -3,6 +3,14 @@
  * The client does not implement scheduling, policy, retry or effect recovery.
  * Ambiguous network results MUST be reconciled by canonical job identity.
  */
+const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+
+function canonicalUtcTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const millis = Date.parse(value);
+  return Number.isFinite(millis) && new Date(millis).toISOString() === value;
+}
+
 const ARTIFACT_FIELDS = Object.freeze([
   'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
   'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
@@ -83,6 +91,11 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || receipt?.projectId !== sentRequest.projectId
           || receipt?.operation !== sentRequest.operation
           || !['ACCEPTED', 'COMPLETED', 'REJECTED'].includes(receipt?.status)
+          || typeof receipt?.dispatchId !== 'string'
+          || !DISPATCH_ID.test(receipt.dispatchId)
+          || !canonicalUtcTimestamp(receipt?.observedAt)
+          || !canonicalUtcTimestamp(sentRequest.requestedAt)
+          || Date.parse(receipt.observedAt) < Date.parse(sentRequest.requestedAt)
           || value?.result?.adapterGrantsAuthority !== false
           || value?.result?.executionAuthorized !== false
           || value?.result?.schedulerAuthority !== false
