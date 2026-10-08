@@ -199,16 +199,21 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       try {
         const value = await res.json();
-        const received = value?.result?.request;
-        const receipt = value?.result?.receipt;
+        // Check own field descriptors before touching any nested transport
+        // object: hostile accessors must never execute, including when a
+        // test transport supplies a non-JSON JavaScript object.
+        if (!exactTransportRecord(value, RESPONSE_FIELDS)
+          || !exactTransportRecord(value.result, RESULT_FIELDS)
+          || !exactTransportRecord(value.result.request, REQUEST_FIELDS)
+          || !exactTransportRecord(value.result.scopeProof, SCOPE_FIELDS)
+          || !exactTransportRecord(value.result.receipt, RECEIPT_FIELDS)) {
+          throw new Error('Untrusted response descriptors');
+        }
+        const received = value.result.request;
+        const receipt = value.result.receipt;
         // Bind the response to the complete canonical request, not a reusable
         // requestId alone. A transport receipt is not proof of an external effect.
-        if (!exactTransportRecord(value, RESPONSE_FIELDS)
-          || !exactTransportRecord(value?.result, RESULT_FIELDS)
-          || !exactTransportRecord(value?.result?.request, REQUEST_FIELDS)
-          || !exactTransportRecord(value?.result?.scopeProof, SCOPE_FIELDS)
-          || !exactTransportRecord(value?.result?.receipt, RECEIPT_FIELDS)
-          || value?.schemaVersion !== 1 || value?.status !== 'RECEIVED'
+        if (value.schemaVersion !== 1 || value.status !== 'RECEIVED'
           || received?.schemaVersion !== 1
           || received?.requestId !== sentRequest.requestId
           || received?.principalId !== sentRequest.principalId
