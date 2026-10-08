@@ -191,7 +191,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
         Number.isFinite(own(runtime, 'estimatedCostUsd')) &&
         own(runtime, 'estimatedCostUsd') >= 0 &&
         own(runtime, 'estimatedCostUsd') <= 1000000
-          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : 0,
+          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : null,
       verifiedChecks: Array.isArray(checks) ? integer(checks.length, { max: 4096 }) : 0,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },
