@@ -166,7 +166,9 @@ function planSummary(plan) {
   if (Array.isArray(nodes)) {
     // Proxy get traps must not read array length or throw private exceptions.
     const nodeLength = own(nodes, 'length');
-    if (nodeLength > 4096) throw new Error('Agent plan is too large');
+    if (!Number.isSafeInteger(nodeLength) || nodeLength < 0 || nodeLength > 4096) {
+      throw new Error('Agent plan nodes length is invalid');
+    }
     for (let i = 0; i < nodeLength; i += 1) {
       const node = own(nodes, String(i));
       record(node, 'Agent plan node');
@@ -192,10 +194,13 @@ function recordedOutcomeSummary(value) {
   const checks = own(value, 'checks');
   let count = 0;
   if (checks != null) {
-    if (!plainArray(checks) || own(checks, 'length') > 20) {
+    if (!plainArray(checks)) {
       throw new Error('Agent recorded outcome checks must be a bounded dense array');
     }
     const checksLength = own(checks, 'length');
+    if (!Number.isSafeInteger(checksLength) || checksLength < 0 || checksLength > 20) {
+      throw new Error('Agent recorded outcome checks length is invalid');
+    }
     for (let i = 0; i < checksLength; i += 1) {
       const item = own(checks, String(i));
       if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
