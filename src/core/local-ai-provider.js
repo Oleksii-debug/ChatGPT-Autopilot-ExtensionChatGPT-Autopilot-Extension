@@ -61,6 +61,7 @@ export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_S
   if (value !== undefined && typeof value !== 'string') {
     throw new Error('Local AI server URL must be text when supplied');
   }
+  if (value !== undefined && !nonEmptyString(value)) throw new Error('Local AI server URL cannot be empty when supplied');
   const raw = nonEmptyString(value) || (providerType === LocalAiProviderType.OPENAI_COMPATIBLE
     ? 'http://127.0.0.1:1234/v1'
     : DEFAULT_LOCAL_AI_SETTINGS.baseUrl);
@@ -116,7 +117,8 @@ export function normalizeLocalAiSettings(raw = {}) {
   if (source.model !== undefined && typeof source.model !== 'string') {
     throw new Error('Local AI model must be text when supplied');
   }
-  const timeoutSeconds = source.timeoutSeconds ?? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds;
+  const timeoutSeconds = source.timeoutSeconds === undefined
+    ? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds : source.timeoutSeconds;
   if (typeof timeoutSeconds !== 'number'
       || !Number.isInteger(timeoutSeconds)
       || timeoutSeconds < MIN_TIMEOUT_SECONDS
