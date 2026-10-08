@@ -190,12 +190,12 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       inFlightRequestIds.add(sentRequest.requestId);
+      let timeoutHandle;
       try {
       // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
       // Enforce one wall-clock deadline across transport AND body parsing.
       // Timeout is always ambiguous, not evidence of zero external effects.
       const abortController = new AbortController();
-      let timeoutHandle;
       const deadline = new Promise((_, reject) => {
         timeoutHandle = setTimeout(() => {
           abortController.abort();
