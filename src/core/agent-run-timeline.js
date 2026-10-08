@@ -96,6 +96,15 @@ function boundedJobId(value) {
 function safeTime(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
 }
+function storedEventTime(value) {
+  // Missing time is supported for older records. Explicitly malformed
+  // persisted times must never be exported as fabricated epoch-zero evidence.
+  if (value === undefined) return 0;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 8_640_000_000_000_000) {
+    throw new Error('Agent history entry timestamp is invalid');
+  }
+  return value;
+}
 function safeHistory(history) {
   // Missing history is supported for old persisted snapshots, but an
   // explicitly persisted null is corruption, not evidence of zero events.
@@ -209,7 +218,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     }
     return {
       entryId: 'agent-history:' + ordinal,
-      at: safeTime(own(entry, 'at')),
+      at: storedEventTime(own(entry, 'at')),
       category: spec[0],
       event: known ? rawType : 'OTHER',
       description: spec[1],

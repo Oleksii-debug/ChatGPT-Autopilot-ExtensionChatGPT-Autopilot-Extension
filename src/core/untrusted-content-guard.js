@@ -198,14 +198,14 @@ function canonicalOrigin(value, label, { optional = false } = {}) {
 }
 
 function exactIdList(value, label) {
-  const raw = strictArray(value ?? [], label);
+  const raw = strictArray(value === undefined ? [] : value, label);
   const out = raw.map((item, index) => exactId(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
 }
 
 function originList(value, label) {
-  const raw = strictArray(value ?? [], label);
+  const raw = strictArray(value === undefined ? [] : value, label);
   const out = raw.map((item, index) => canonicalOrigin(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
