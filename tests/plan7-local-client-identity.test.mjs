@@ -28,6 +28,7 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
         schemaVersion: 1, requestId: BASE.requestId, projectId: BASE.projectId,
         operation: BASE.operation, status: 'COMPLETED',
         dispatchId: 'dispatch-1', observedAt: '2026-10-08T10:00:01.000Z',
+        resultArtifactRef: null,
         ...receiptChanges,
       },
       adapterGrantsAuthority: false, executionAuthorized: false,
@@ -206,4 +207,30 @@ test('transport receipt chronology cannot outrun or predate canonical Core stage
     else forged.result[field] = value;
     assert.equal((await attempt(forged)).status, 'UNKNOWN_NETWORK_RESULT');
   }
+});
+
+test('result artifact requires exact canonical Core provenance before RECEIVED', async () => {
+  const ref = {
+    schemaVersion: 1, artifactId: 'result-artifact-1', kind: 'result',
+    uri: 'artifact://result-artifact-1', mediaType: 'application/json',
+    sha256: 'a'.repeat(64), sizeBytes: 12,
+    createdAt: '2026-10-08T10:00:00.900Z',
+    producerInvocationId: 'invocation-1', sensitive: true,
+  };
+  const good = transportResponse({}, { resultArtifactRef: ref });
+  assert.equal((await attempt(good)).status, 'RECEIVED');
+  for (const corrupted of [
+    { ...ref, sha256: 'NOT_A_DIGEST' },
+    { ...ref, sensitive: 'true' },
+    { ...ref, createdAt: '2026-10-08T10:00:01.500Z' },
+    { ...ref, sizeBytes: -1 },
+    { ...ref, privateSecret: 'DO_NOT_DISCLOSE' },
+    Object.fromEntries(Object.entries(ref).filter(([key]) => key !== 'artifactId')),
+  ]) {
+    assert.equal((await attempt(transportResponse({}, { resultArtifactRef: corrupted }))).status,
+      'UNKNOWN_NETWORK_RESULT', 'forged result artifact must not be trusted');
+  }
+  const omitted = transportResponse();
+  delete omitted.result.receipt.resultArtifactRef;
+  assert.equal((await attempt(omitted)).status, 'UNKNOWN_NETWORK_RESULT');
 });
