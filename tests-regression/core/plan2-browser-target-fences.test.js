@@ -168,6 +168,24 @@ test('visual fallback invalidates screenshot target when page scroll changes', (
   globalThis.scrollY = 0;
 });
 
+test('same-URL browser navigation invalidates captured visual target after document restart', () => {
+  const originalPerformance = globalThis.performance;
+  try {
+    globalThis.performance = { timeOrigin: 1000 };
+    const snapshot = setup();
+    assert.equal(snapshot.frames[0].viewport.documentEpoch, 1000);
+    const probe = probeBrowserCoordinateTarget(20, 20);
+    const fingerprint = browserAgentCoordinateTargetFingerprint(probe.target);
+    assert.equal(fingerprint.documentEpoch, 1000);
+    globalThis.performance = { timeOrigin: 2000 };
+    assert.equal(verifyBrowserCoordinateTarget(20, 20, fingerprint).reason, 'changed-page-or-viewport');
+    globalThis.performance = { timeOrigin: 1000 };
+    assert.equal(verifyBrowserCoordinateTarget(20, 20, fingerprint).ok, true);
+  } finally {
+    globalThis.performance = originalPerformance;
+  }
+});
+
 test('canonical coordinate fingerprint preserves all page, viewport and geometry evidence', () => {
   setup();
   globalThis.scrollY = 0;
@@ -193,6 +211,9 @@ test('missing coordinate proof cannot be used as an approval bypass', () => {
   const canonical = browserAgentCoordinateTargetFingerprint(probe.target);
   delete canonical.pageUrl;
   assert.equal(verifyBrowserCoordinateTarget(20, 20, canonical).ok, false);
+  const withoutDocumentEpoch = browserAgentCoordinateTargetFingerprint(probe.target);
+  delete withoutDocumentEpoch.documentEpoch;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, withoutDocumentEpoch).ok, false);
   const legacy = browserAgentCoordinateTargetFingerprint({ tag: 'button', name: 'Save' });
   assert.equal(verifyBrowserCoordinateTarget(20, 20, legacy).ok, false);
 });
