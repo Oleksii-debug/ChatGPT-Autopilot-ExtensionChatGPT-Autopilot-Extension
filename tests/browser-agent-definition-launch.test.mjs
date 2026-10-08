@@ -494,7 +494,7 @@ test('Plan-1: every intake path rejects non-canonical IDs without creating or re
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
-  for (const invalid of ['  job.truncated', 'job.with trailing ', '', 'job;unsafe', 42]) {
+  for (const invalid of ['  job.truncated', 'job.with trailing ', '  ', 'job;unsafe', 42]) {
     await assert.rejects(() => manager.create({ id: invalid, goal: 'Evidence gathering.' }),
       /exact bounded durable ID/);
     await assert.rejects(() => manager.createFromAgentDefinition(launchRequest({ jobId: invalid })),
@@ -505,6 +505,11 @@ test('Plan-1: every intake path rejects non-canonical IDs without creating or re
   await assert.rejects(() => brokenGenerator.create({ goal: 'Must not accept coerced generated identity.' }),
     /exact bounded durable ID/);
   assert.deepEqual(data.autopilotBrowserAgentV1.order, []);
+  const generated = await manager.create({ id: '', goal: 'Owner did not set a job id.' });
+  assert.equal(generated.job.id, 'job.generated', 'legacy empty-id launch must generate a canonical job');
+  const spaced = await manager.create({ id: 'manual job 2', goal: 'Preserve legitimate internal-space IDs.' });
+  assert.equal(spaced.job.id, 'manual job 2');
+  assert.equal((await managerFor(chrome).get('manual job 2')).job.id, 'manual job 2');
   const valid = await manager.create({ id: 'job:exact/path@v1', goal: 'Preserve explicit identity.' });
   assert.equal(valid.job.id, 'job:exact/path@v1');
   const resumed = managerFor(chrome);
