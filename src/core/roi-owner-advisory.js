@@ -41,12 +41,45 @@ function frozenRows(report) {
 }
 
 /**
+ * Offline is a safety/privacy boundary, not a truthy UI setting. Snapshot
+ * only own data descriptors before reading the option, so getters, inherited
+ * flags and coerced strings cannot silently turn evidence reads back on.
+ */
+function strictOfflineOption(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    throw new Error('ROI offline options must be a plain object');
+  }
+  let prototype, descriptors;
+  try {
+    prototype = Object.getPrototypeOf(options);
+    descriptors = Object.getOwnPropertyDescriptors(options);
+  } catch {
+    throw new Error('ROI offline options are not trustworthy');
+  }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('ROI offline options must be a plain object');
+  }
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => key !== 'offline')) {
+    throw new Error('ROI offline options contain unknown fields');
+  }
+  if (!Object.hasOwn(descriptors, 'offline')) return false;
+  const descriptor = descriptors.offline;
+  if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')
+    || typeof descriptor.value !== 'boolean') {
+    throw new Error('ROI offline options require an own boolean data field');
+  }
+  return descriptor.value;
+}
+
+/**
  * offline=true is an explicit, observable degradation path. It never serves
  * cached gains as current evidence and never calls the resolver while offline.
  * All other malformed/tampered evidence errors propagate fail-closed.
  */
-export async function buildRoiOwnerAdvisoryV1(input, dependencies, { offline = false } = {}) {
-  if (offline === true) {
+export async function buildRoiOwnerAdvisoryV1(input, dependencies, options = {}) {
+  const offline = strictOfflineOption(options);
+  if (offline) {
     return Object.freeze({
       schemaVersion: ROI_OWNER_ADVISORY_VERSION,
       status: RoiOwnerAdvisoryStatus.OFFLINE,
