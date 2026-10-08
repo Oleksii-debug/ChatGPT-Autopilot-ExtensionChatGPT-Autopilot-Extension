@@ -1191,6 +1191,19 @@ export function browserAgentCoordinateTargetFingerprint(element) {
     editable: element.editable === true,
     sensitive: element.sensitive === true,
     visualOnly: element.visualOnly === true,
+    // Coordinate evidence must survive canonical fingerprint normalization;
+    // otherwise the native pre-effect verifier falsely rejects every target.
+    ...(element.pageUrl && element.rect ? {
+      pageUrl: clean(element.pageUrl, 4096),
+      viewportWidth: Number(element.viewportWidth),
+      viewportHeight: Number(element.viewportHeight),
+      viewportScrollX: Number(element.viewportScrollX),
+      viewportScrollY: Number(element.viewportScrollY),
+      rect: {
+        left: Number(element.rect.left), top: Number(element.rect.top),
+        width: Number(element.rect.width), height: Number(element.rect.height),
+      },
+    } : {}),
   };
 }
 
