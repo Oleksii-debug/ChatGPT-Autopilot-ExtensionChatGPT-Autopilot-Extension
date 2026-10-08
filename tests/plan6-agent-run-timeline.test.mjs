@@ -151,3 +151,36 @@ test('explicit invalid event timestamps fail closed; missing legacy time stays d
   assert.throws(() => buildAgentRunTimelineV1(accessor), /accessor-backed/);
   assert.equal(getterCalls, 0);
 });
+
+
+test('S1 time evidence distinguishes recorded epoch-zero from absent legacy timestamp after JSON restart', () => {
+  const input = job();
+  input.runtime.history = [{ at: 0, type: 'action' }, { type: 'action' }];
+  const output = buildAgentRunTimelineV1(input);
+  assert.deepEqual(output.entries.map(entry => [entry.at, entry.timeEvidence]), [
+    [0, 'RECORDED'], [0, 'MISSING_LEGACY'],
+  ]);
+  assert.deepEqual(output, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))));
+  assert.equal(output.mayReplayExternalEffect, false);
+  assert.equal(output.evidenceMap.externalEffectVerified, false);
+  assert.equal(Object.isFrozen(output.entries[0]), true);
+});
+
+test('S1 explicitly present undefined, fractional and negative-zero event times fail closed', () => {
+  for (const at of [undefined, 0.5, -0]) {
+    const input = job();
+    input.runtime.history[0].at = at;
+    assert.throws(() => buildAgentRunTimelineV1(input), /entry timestamp is invalid/);
+  }
+  const { entries } = buildAgentRunTimelineV1(job());
+  assert.equal(entries[0].timeEvidence, 'RECORDED');
+});
+
+test('S1 UI announces timestamp provenance using semantic native time text', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const script = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(script, /entry\.timeEvidence === 'RECORDED'/u);
+  assert.match(script, /'Час не записано'/u);
+  assert.doesNotMatch(script.slice(script.indexOf('function renderAgentRunTimeline(job)'),
+    script.indexOf('function renderBrowserAgentList()')), /innerHTML|outerHTML|insertAdjacentHTML/u);
+});
