@@ -261,7 +261,13 @@ export async function restorePendingSendTabs(chromeApi, repository, { sessionId 
     const previousTabId = Number(operation?.previousSendTabId || 0);
     const previousWindowId = Number(operation?.previousSendWindowId || 0);
     if (!Number.isInteger(previousTabId) || previousTabId <= 0) continue;
-    if (['RUNNING', 'RECOVERING'].includes(session.runState) && Number(operation?.postSendHoldUntil || 0) > Date.now()) continue;
+    // The dwell protects the *physical tab*, not browser focus. During an
+    // unresolved SUBMITTING effect do not restore early (native input needs an
+    // active tab); after Core commits verification/uncertainty, restore focus
+    // immediately while the tab itself remains held open.
+    if (['RUNNING', 'RECOVERING'].includes(session.runState)
+        && operation?.phase === OperationPhase.SUBMITTING
+        && Number(operation?.postSendHoldUntil || 0) > Date.now()) continue;
 
     const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       ? `__session_worker__:${session.id}` : operation.taskId;
