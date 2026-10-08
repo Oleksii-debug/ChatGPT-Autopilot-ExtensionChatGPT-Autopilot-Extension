@@ -8,8 +8,10 @@ on:
     paths:
       - src/core/agent-io-contract.js
       - src/core/browser-agent-manager.js
+      - src/core/browser-agent.js
       - tests/agent-io-contract.test.mjs
       - tests/browser-agent-definition-launch.test.mjs
+      - tests/browser-agent-orchestration-binding.test.mjs
       - .github/workflows/plan1-sections-1-2-qualification.yml
   workflow_dispatch:
 
@@ -32,8 +34,10 @@ jobs:
         run: |
           node --check src/core/agent-io-contract.js
           node --check src/core/browser-agent-manager.js
+          node --check src/core/browser-agent.js
           node --check tests/agent-io-contract.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
+          node --check tests/browser-agent-orchestration-binding.test.mjs
       - name: Agent I/O negative and schema contract tests
         run: node --test tests/agent-io-contract.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
