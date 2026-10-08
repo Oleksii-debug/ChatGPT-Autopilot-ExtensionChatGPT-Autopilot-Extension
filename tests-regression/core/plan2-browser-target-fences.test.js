@@ -56,6 +56,49 @@ function setup() {
   return { frames: [{ frameId: 0, ...page }], url: page.url };
 }
 
+// Section 1: model output cannot infer a checked value from omitted/coercible JSON.
+test('semantic check requires explicit true/false and never defaults to a mutation', () => {
+  const snapshot = setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'checkbox');
+  const current = snapshotBrowserPage('check-snapshot');
+  const observed = { frames: [{ frameId: 0, ...current }], url: current.url };
+  for (const value of [undefined, null, 'false', 'true', 0, 1, {}, []]) {
+    const raw = { type: 'check', frameId: 0, ref: 'r1' };
+    if (value !== undefined) raw.checked = value;
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify(raw), observed),
+      /explicit boolean checked value/,
+    );
+    assert.equal(element.clicked, 0);
+  }
+  for (const checked of [true, false]) {
+    const parsed = parseBrowserAgentAction(JSON.stringify({
+      type: 'check', frameId: 0, ref: 'r1', checked,
+    }), observed);
+    assert.equal(parsed.checked, checked);
+  }
+});
+
+// Section 2: explicit visual timing fields must survive JSON/restart uncoerced.
+test('visual drag rejects coercible or unbounded duration before native action', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  const base = { type: 'drag_at', startX: 20, startY: 20, endX: 40, endY: 20 };
+  for (const durationMs of [null, '250', false, 0, 119, 2001, {}, [], -1]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ ...base, durationMs }), snapshot),
+      /exact bounded durationMs/,
+    );
+  }
+  assert.equal(parseBrowserAgentAction(JSON.stringify(base), snapshot).durationMs, 450);
+  for (const durationMs of [120, 500, 2000]) {
+    assert.equal(parseBrowserAgentAction(
+      JSON.stringify({ ...base, durationMs }), snapshot,
+    ).durationMs, durationMs);
+  }
+});
+
 test('semantic action rechecks identical observed target before effect', () => {
   const snapshot = setup();
   const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
