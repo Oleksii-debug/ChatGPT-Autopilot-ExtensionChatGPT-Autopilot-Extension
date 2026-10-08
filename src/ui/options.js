@@ -3526,6 +3526,7 @@ function renderAgentRunTimeline(job) {
       ' із ' + timeline.totalRecorded + '. План, редакція ' + timeline.plan.revision +
       ', вузлів ' + timeline.plan.nodeCount + '. Кроків ' + counters.steps +
       ', викликів моделі ' + counters.modelCalls + ', токенів ' + counters.totalTokens +
+      ', приблизні витрати ' + (counters.estimatedCostUsd === null ? 'невідомі' : counters.estimatedCostUsd.toFixed(6) + ' USD') +
       ', підтверджених перевірок ' + counters.verifiedChecks +
       ', дій власника ' + counters.ownerEvents + '.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями.' : '') +
