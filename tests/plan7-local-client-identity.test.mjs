@@ -15,7 +15,9 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
       request: { ...BASE, ...requestChanges },
       receipt: {
         schemaVersion: 1, requestId: BASE.requestId, projectId: BASE.projectId,
-        operation: BASE.operation, status: 'COMPLETED', ...receiptChanges,
+        operation: BASE.operation, status: 'COMPLETED',
+        dispatchId: 'dispatch-1', observedAt: '2026-10-08T10:00:01.000Z',
+        ...receiptChanges,
       },
       adapterGrantsAuthority: false, executionAuthorized: false,
       schedulerAuthority: false, policyDecisionAuthorized: false,
@@ -131,4 +133,29 @@ test('transport receipt cannot assert store mutation authority', async () => {
   const valid = await attempt(transportResponse());
   assert.equal(valid.status, 'RECEIVED');
   assert.equal(valid.result.storeMutationAuthority, false);
+});
+
+test('receipt must retain dispatch identity and causal UTC chronology', async () => {
+  for (const corruption of [
+    { dispatchId: null },
+    { dispatchId: 1 },
+    { dispatchId: '' },
+    { dispatchId: 'bad dispatch id' },
+    { dispatchId: 'X'.repeat(181) },
+    { observedAt: null },
+    { observedAt: '2026-10-08T10:00:01' },
+    { observedAt: '2026-10-08T10:00:01+00:00' },
+    { observedAt: '2026-10-08T09:59:59.999Z' },
+    { observedAt: '2026-02-30T10:00:01.000Z' },
+  ]) {
+    assert.equal((await attempt(transportResponse({}, corruption))).status,
+      'UNKNOWN_NETWORK_RESULT', 'invalid dispatch receipt cannot prove transport success');
+  }
+  const missingId = transportResponse();
+  delete missingId.result.receipt.dispatchId;
+  assert.equal((await attempt(missingId)).status, 'UNKNOWN_NETWORK_RESULT');
+  const missingObservedAt = transportResponse();
+  delete missingObservedAt.result.receipt.observedAt;
+  assert.equal((await attempt(missingObservedAt)).status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal((await attempt(transportResponse())).status, 'RECEIVED');
 });
