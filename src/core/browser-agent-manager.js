@@ -2284,8 +2284,9 @@ export class BrowserAgentManager {
     // alter a budget, or impersonate owner-supplied policy at persistence time.
     for (const [key, value] of Object.entries(request)) {
       if (key === 'siteRules' || key === 'acceptanceCriteria' || value == null) continue;
-      if (!['string', 'number', 'boolean'].includes(typeof value)) {
-        throw new Error(`Browser Agent direct intake ${key} must be a scalar data value`);
+      if (!['string', 'number', 'boolean'].includes(typeof value)
+          || (typeof value === 'number' && !Number.isFinite(value))) {
+        throw new Error(`Browser Agent direct intake ${key} must be a finite scalar data value`);
       }
     }
     // Explicit invalid identities cannot silently turn into a newly generated
