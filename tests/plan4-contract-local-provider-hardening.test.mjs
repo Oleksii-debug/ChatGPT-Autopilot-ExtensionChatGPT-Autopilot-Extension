@@ -510,3 +510,89 @@ test('local provider standard completion still posts JSON with bounded safe head
   assert.equal(result.usage.totalTokens,3);
   assert.equal(calls,1);
 });
+
+
+// Plan 4 Sections 1–2: authoritative owner intent and exact provider effects.
+test('owner model mode and slot identity never silently fall back to another provider', () => {
+  const valid = normalizeAiRouterSettings({
+    enabled:true,
+    mode:'primary',
+    primary:{provider:'openai-compatible',model:'fixture-exact'},
+  });
+  assert.equal(valid.mode,'primary');
+  assert.equal(valid.primary.provider,'openai-compatible');
+  const restored = normalizeAiRouterSettings(JSON.parse(JSON.stringify(valid)));
+  assert.equal(restored.primary.model,'fixture-exact');
+  assert.equal(restored.primary.provider,'openai-compatible');
+  for (const invalid of [null,false,0,{},[],42,'unknown',undefined]) {
+    assert.throws(() => normalizeAiRouterSettings({mode:invalid}), /AI router mode is invalid/);
+  }
+  for (const slot of ['primary','strong']) {
+    for (const invalidProvider of [null,false,0,{},'remote-unapproved',undefined]) {
+      assert.throws(() => normalizeAiRouterSettings({
+        [slot]:{provider:invalidProvider,model:'fixture'},
+      }), /AI model slot provider is invalid/);
+    }
+    for (const invalidModel of [null,0,false,{},'  unexpected  ']) {
+      assert.throws(() => normalizeAiRouterSettings({
+        [slot]:{provider:'ollama',model:invalidModel},
+      }), /AI model slot name must be exact trimmed text/);
+    }
+  }
+  for (const key of ['mode','primary','strong']) {
+    let accessCount = 0;
+    const settingsWithGetter = {};
+    Object.defineProperty(settingsWithGetter,key,{
+      enumerable:true,
+      get() { accessCount++; throw new Error('malicious getter evaluated'); },
+    });
+    assert.throws(() => normalizeAiRouterSettings(settingsWithGetter), /own data properties/);
+    assert.equal(accessCount,0);
+  }
+  assert.equal(normalizeAiRouterSettings({}).mode,'primary');
+  assert.equal(normalizeAiRouterSettings({}).primary.provider,'ollama');
+});
+
+test('local provider discovery and chat endpoints enforce exact HTTP methods before network', async () => {
+  const clientSettings = JSON.parse(JSON.stringify(settings));
+  const chat = 'http://127.0.0.1:11434/api/chat';
+  const discovery = 'http://127.0.0.1:11434/api/tags';
+  let networkCalls = 0;
+  const deniedClient = new LocalAiClient({ fetchFn:async () => {
+    networkCalls++;
+    throw new Error('method must be checked before network');
+  } });
+  for (const [url, init] of [
+    [chat,{}],
+    [chat,{method:'GET'}],
+    [chat,{method:'POST'}],
+    [discovery,{method:'POST',body:'{}'}],
+    [discovery,{method:'POST'}],
+    [discovery,{method:'GET',body:'{}'}],
+    [discovery,{method:'PUT'}],
+  ]) {
+    await assert.rejects(deniedClient.request(clientSettings,url,init),
+      /GET-only|requires explicit POST|method is not allowed/);
+    await assert.rejects(deniedClient.request(
+      JSON.parse(JSON.stringify(clientSettings)),url,JSON.parse(JSON.stringify(init))),
+      /GET-only|requires explicit POST|method is not allowed/);
+  }
+  assert.equal(networkCalls,0);
+  const calls = [];
+  const permittedClient = new LocalAiClient({ fetchFn:async (url, init) => {
+    calls.push({url,method:init.method,redirect:init.redirect});
+    if (url===discovery) {
+      return new Response(JSON.stringify({models:[{name:'fixture'}]}),{status:200});
+    }
+    return new Response(JSON.stringify({
+      message:{content:'verified'},prompt_eval_count:3,eval_count:2,
+    }),{status:200});
+  } });
+  const models = await permittedClient.listModels(clientSettings);
+  assert.deepEqual(models.models,['fixture']);
+  const completed = await permittedClient.complete(clientSettings,'fixture');
+  assert.equal(completed.text,'verified');
+  assert.equal(completed.usage.totalTokens,5);
+  assert.deepEqual(calls.map(x=>x.method),[undefined,'POST']);
+  assert.ok(calls.every(x=>x.redirect==='error'));
+});
