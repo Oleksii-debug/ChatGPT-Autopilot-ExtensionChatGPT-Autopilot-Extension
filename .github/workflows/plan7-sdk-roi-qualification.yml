@@ -41,4 +41,4 @@ jobs:
           node --check companion/local-api/client.mjs
           node --check companion/local-api/cli.mjs
       - name: Offline SDK, API, ROI and adversarial tests
-        run: node --test tests/autopilot-programmatic-control.test.mjs tests/plan7-cli.test.mjs tests/plan7-local-api.test.mjs tests/roi-opportunity-engine.test.mjs tests/plan7-roi-owner-advisory.test.mjs tests/plan7-roi-owner-view.test.mjs
+        run: node --test tests/autopilot-programmatic-control.test.mjs tests/plan7-cli.test.mjs tests/plan7-local-api.test.mjs tests/roi-opportunity-engine.test.mjs tests/plan7-roi-owner-advisory.test.mjs tests/plan7-roi-owner-view.test.mjs tests/plan7-local-client-identity.test.mjs

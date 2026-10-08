@@ -3,6 +3,20 @@
  * The client does not implement scheduling, policy, retry or effect recovery.
  * Ambiguous network results MUST be reconciled by canonical job identity.
  */
+const ARTIFACT_FIELDS = Object.freeze([
+  'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
+  'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
+]);
+
+function matchesArtifact(received, requested) {
+  if (requested === null) return received === null;
+  if (!requested || !received || typeof received !== 'object') return false;
+  return ARTIFACT_FIELDS.every(field =>
+    Object.prototype.hasOwnProperty.call(requested, field)
+    && Object.prototype.hasOwnProperty.call(received, field)
+    && Object.is(requested[field], received[field]));
+}
+
 export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
   if (typeof token !== 'string' || token.length < 32 || token.length > 512) {
     throw new Error('A trusted local API token is required');
@@ -16,6 +30,9 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
     async control(request) {
       // JSON request bodies only; no automatic retry of ambiguous mutations.
       const body = JSON.stringify(request);
+      // Bind response identities to the bytes sent on the wire. The caller
+      // may mutate their original object while fetch is in flight.
+      const sentRequest = JSON.parse(body);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
       let res;
       try {
@@ -48,8 +65,29 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       try {
         const value = await res.json();
+        const received = value?.result?.request;
+        const receipt = value?.result?.receipt;
+        // Bind the response to the complete canonical request, not a reusable
+        // requestId alone. A transport receipt is not proof of an external effect.
         if (value?.schemaVersion !== 1 || value?.status !== 'RECEIVED'
-          || value?.result?.request?.requestId !== request.requestId) {
+          || received?.schemaVersion !== 1
+          || received?.requestId !== sentRequest.requestId
+          || received?.principalId !== sentRequest.principalId
+          || received?.projectId !== sentRequest.projectId
+          || received?.operation !== sentRequest.operation
+          || received?.targetId !== sentRequest.targetId
+          || received?.requestedAt !== sentRequest.requestedAt
+          || !matchesArtifact(received?.payloadArtifactRef, sentRequest.payloadArtifactRef)
+          || receipt?.schemaVersion !== 1
+          || receipt?.requestId !== sentRequest.requestId
+          || receipt?.projectId !== sentRequest.projectId
+          || receipt?.operation !== sentRequest.operation
+          || !['ACCEPTED', 'COMPLETED', 'REJECTED'].includes(receipt?.status)
+          || value?.result?.adapterGrantsAuthority !== false
+          || value?.result?.executionAuthorized !== false
+          || value?.result?.schedulerAuthority !== false
+          || value?.result?.policyDecisionAuthorized !== false
+          || value?.result?.exactEffectAuthority !== false) {
           throw new Error('Unbound response');
         }
         return value;
