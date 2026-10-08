@@ -51,8 +51,11 @@ test('accessible view exposes text-only trusted metrics and semantic table heade
     opportunities:[item],
   }));
   const nodes=walk(root);
-  assert.equal(nodes.filter(x=>x.tagName==='DT').length,6);
-  assert.equal(nodes.filter(x=>x.tagName==='DD').length,6);
+  assert.equal(nodes.filter(x=>x.tagName==='DT').length,10);
+  assert.equal(nodes.filter(x=>x.tagName==='DD').length,10);
+  assert.ok(nodes.some(x=>x.textContent === 'Джерело показників: звіт roi-report-1'));
+  assert.ok(nodes.some(x=>x.textContent === 'Час роботи, мілісекунд'));
+  assert.ok(nodes.some(x=>x.textContent === 'Оцінена економія, нижня межа, секунд'));
   assert.equal(nodes.find(x=>x.tagName==='CAPTION').textContent,'Дорадчі можливості за робочим процесом');
   assert.equal(nodes.filter(x=>x.tagName==='TH'&&x.attributes.scope==='col').length,3);
   assert.equal(nodes.filter(x=>x.tagName==='TH'&&x.attributes.scope==='row').length,1);
@@ -100,6 +103,8 @@ test('owner ROI view rejects contradictory provenance populations and inverted s
     { ...regular, estimatedOwnerTimeAvoidedSeconds: { lower: 500, upper: 300 } },
     { ...regular, estimatedOwnerTimeAvoidedSeconds: { lower: '0', upper: 300 } },
     { ...regular, noComparableModelEvidence: false },
+    { ...regular, runtimeMs: -1 },
+    { ...regular, runtimeMs: '500' },
   ];
   let getterCalls = 0;
   const hostileInterval = { lower: 0 };
@@ -127,6 +132,8 @@ test('valid bounded ROI intervals and evidence populations preserve semantic sta
       policyOrExecutionAuthorized: false }],
   }));
   const nodes = walk(root);
+  assert.ok(nodes.some(x => x.textContent === '120'), 'upper estimated bound is announced');
+  assert.ok(nodes.some(x => x.textContent === '0'), 'lower estimated bound is announced');
   assert.equal(nodes.filter(x => x.tagName === 'TH' && x.attributes.scope === 'row').length, 1);
   assert.equal(nodes.find(x => x.attributes.role === 'status').attributes['aria-live'], 'polite');
 });

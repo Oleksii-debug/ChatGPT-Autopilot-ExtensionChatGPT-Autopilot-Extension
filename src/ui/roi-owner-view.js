@@ -31,12 +31,14 @@ const STATUS_TEXT = Object.freeze({
 });
 
 const METRICS = [
+  ['Спостережені виконання', 'observedRunCount', false],
   ['Перевірені результати', 'verifiedOutcomeCount', false],
   ['Час уваги власника, секунд', 'observedOwnerAttentionSeconds', false],
   ['Спостережена економія часу, секунд', 'observedOwnerTimeAvoidedSeconds', false],
   ['Нижня межа чистої економії, секунд', 'netOwnerTimeLowerSeconds', true],
   ['Верхня межа чистої економії, секунд', 'netOwnerTimeUpperSeconds', true],
   ['Витрати на API, мікродоларів США', 'machineSpendUsdMicros', false],
+  ['Час роботи, мілісекунд', 'runtimeMs', false],
 ];
 
 function snapshotData(input, fields, label) {
@@ -248,12 +250,25 @@ export function renderRoiOwnerViewV1(container, rawAdvisory) {
     container.replaceChildren(section);
     return section;
   }
+  // The source report ID is a normalized canonical identifier. Expose it as
+  // readable provenance for keyboard/NVDA users rather than a hidden attribute.
+  section.appendChild(element('p', 'Джерело показників: звіт ' + advisory.reportId));
   const metrics = element('dl');
   for (const [name, key] of METRICS) {
     const value = advisory[key];
     metrics.appendChild(element('dt', name));
     metrics.appendChild(element('dd', value == null ? 'Немає підтверджених даних' : String(value)));
   }
+  // Report status may be PARTIAL because savings are only estimated. Show
+  // the full qualified interval with explicit seconds and absent-value text;
+  // a computed point estimate would be a misleading owner-facing claim.
+  const estimated = advisory.estimatedOwnerTimeAvoidedSeconds;
+  metrics.appendChild(element('dt', 'Оцінена економія, нижня межа, секунд'));
+  metrics.appendChild(element('dd', estimated == null
+    ? 'Немає підтверджених даних' : String(estimated.lower)));
+  metrics.appendChild(element('dt', 'Оцінена економія, верхня межа, секунд'));
+  metrics.appendChild(element('dd', estimated == null
+    ? 'Немає підтверджених даних' : String(estimated.upper)));
   section.appendChild(metrics);
   if (rows.length > 0) {
     const table = element('table');
