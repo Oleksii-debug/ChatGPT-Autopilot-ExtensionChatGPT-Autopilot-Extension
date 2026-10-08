@@ -13,6 +13,17 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
     schemaVersion: 1, status: 'RECEIVED',
     result: {
       request: { ...BASE, ...requestChanges },
+      scopeProof: {
+        schemaVersion: 1, scopeRevisionId: 'scope-rev-1',
+        requestId: BASE.requestId, principalId: BASE.principalId,
+        projectId: BASE.projectId, operation: BASE.operation,
+        targetId: BASE.targetId, payloadArtifactId: null, payloadSha256: null,
+        allowed: true, verifiedAt: '2026-10-08T10:00:00.000Z',
+        validThrough: '2026-10-08T10:00:03.000Z',
+      },
+      assessedAt: '2026-10-08T10:00:00.100Z',
+      dispatchAt: '2026-10-08T10:00:00.200Z',
+      completedAt: '2026-10-08T10:00:01.500Z',
       receipt: {
         schemaVersion: 1, requestId: BASE.requestId, projectId: BASE.projectId,
         operation: BASE.operation, status: 'COMPLETED',
@@ -158,4 +169,41 @@ test('receipt must retain dispatch identity and causal UTC chronology', async ()
   delete missingObservedAt.result.receipt.observedAt;
   assert.equal((await attempt(missingObservedAt)).status, 'UNKNOWN_NETWORK_RESULT');
   assert.equal((await attempt(transportResponse())).status, 'RECEIVED');
+});
+
+
+test('transport cannot promote a denied, foreign or missing Core scope proof', async () => {
+  const variants = [
+    { allowed: false }, { allowed: 'true' }, { principalId: 'other-owner' },
+    { projectId: 'other-project' }, { requestId: 'other-request' },
+    { operation: 'AGENT_STOP' }, { targetId: 'other-target' },
+    { payloadArtifactId: 'other-artifact' }, { payloadSha256: 'a'.repeat(64) },
+    { scopeRevisionId: 'invalid revision with spaces' },
+  ];
+  for (const variant of variants) {
+    const forged = transportResponse();
+    Object.assign(forged.result.scopeProof, variant);
+    assert.equal((await attempt(forged)).status, 'UNKNOWN_NETWORK_RESULT');
+  }
+  const missing = transportResponse();
+  delete missing.result.scopeProof;
+  assert.equal((await attempt(missing)).status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal((await attempt(transportResponse())).status, 'RECEIVED');
+});
+
+test('transport receipt chronology cannot outrun or predate canonical Core stages', async () => {
+  const variants = [
+    ['scopeProof', 'verifiedAt', '2026-10-08T10:00:00.500Z'],
+    ['scopeProof', 'validThrough', '2026-10-08T10:00:00.199Z'],
+    ['result', 'dispatchAt', '2026-10-08T09:59:59.000Z'],
+    ['result', 'completedAt', '2026-10-08T10:00:00.999Z'],
+    ['result', 'assessedAt', '2026-10-08T10:00:01.000Z'],
+    ['result', 'completedAt', '2026-10-08T10:00:01+00:00'],
+  ];
+  for (const [part, field, value] of variants) {
+    const forged = transportResponse();
+    if (part === 'scopeProof') forged.result.scopeProof[field] = value;
+    else forged.result[field] = value;
+    assert.equal((await attempt(forged)).status, 'UNKNOWN_NETWORK_RESULT');
+  }
 });
