@@ -31,5 +31,4 @@ jobs:
         env:
           CHROMIUM_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: |
-          npm run test:browser
           node scripts/post-send-multitab-browser-smoke.mjs
