@@ -596,3 +596,54 @@ test('local provider discovery and chat endpoints enforce exact HTTP methods bef
   assert.deepEqual(calls.map(x=>x.method),[undefined,'POST']);
   assert.ok(calls.every(x=>x.redirect==='error'));
 });
+
+
+// Plan 4 S2: the canonical gateway must not become an arbitrary loopback proxy.
+test('gateway transport cannot pivot to arbitrary loopback paths, headers or methods', async () => {
+  const gatewayUrl = 'http://127.0.0.1:17621';
+  let networkCalls = 0;
+  const client = new AiGatewayClient({fetchFn:async () => {
+    networkCalls++;
+    throw new Error('network not permitted');
+  }});
+  for (const [path, init] of [
+    ['/admin',{}],
+    ['//another-service',{}],
+    ['/health',{method:'POST',body:'{}'}],
+    ['/status',{headers:{Authorization:'Bearer secret'}}],
+    ['/models?provider=ollama',{method:'POST',body:'{}'}],
+    ['/models?provider=ollama&unexpected=1',{}],
+    ['/complete',{}],
+    ['/complete',{method:'GET'}],
+    ['/complete',{method:'POST',body:'{broken'}],
+    ['/complete',{method:'POST',body:JSON.stringify([1,2])}],
+    ['/complete',{method:'POST',body:'{}',credentials:'include'}],
+  ]) {
+    await assert.rejects(client.request(gatewayUrl,5,path,init));
+    await assert.rejects(client.request(gatewayUrl,5,path,JSON.parse(JSON.stringify(init))));
+  }
+  const poisoned = {};
+  let getterCount=0;
+  Object.defineProperty(poisoned,'headers',{enumerable:true,get() {
+    getterCount++;
+    throw new Error('secret-bearing injected getter');
+  }});
+  await assert.rejects(client.request(gatewayUrl,5,'/status',poisoned),/own data properties/);
+  assert.equal(getterCount,0);
+  assert.equal(networkCalls,0);
+
+  const requests=[];
+  const valid = new AiGatewayClient({fetchFn:async (url,init) => {
+    requests.push({url,init});
+    return new Response(JSON.stringify({ok:true,usage:{inputTokens:3,outputTokens:2}}),{status:200});
+  }});
+  await valid.health();
+  await valid.status();
+  await valid.listModels({provider:'ollama',endpointId:'local.ollama'});
+  await valid.complete({provider:'ollama',model:'fixture',prompt:'owner approved'});
+  assert.deepEqual(requests.map(({init})=>init.method),[undefined,undefined,undefined,'POST']);
+  assert.equal(requests.length,4);
+  assert.ok(requests.every(({init})=>init.redirect==='error' && init.cache==='no-store'));
+  assert.ok(requests.every(({init})=>!Object.hasOwn(init.headers,'Authorization') && !Object.hasOwn(init.headers,'Cookie')));
+  assert.ok(requests.every(({url})=>url.startsWith(gatewayUrl+'/')));
+});
