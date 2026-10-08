@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, createAiRouteRegistryEvidenceV1 } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
+import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
 
 const route = { routeId:'primary', provider:'ollama', model:'llama3', locality:'local' };
 const endpoint = { schemaVersion:1, profileId:'local.ollama', provider:'ollama', endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/', credentialRef:'', credentialless:true };
@@ -140,3 +141,35 @@ for (const [status,category,body] of [
       && !e.message.includes('sk-secret-provider-response'));
   });
 }
+
+test('gateway preserves AUTH/RATE_LIMIT/UNAVAILABLE status on non-JSON and empty errors without secret leakage', async () => {
+  for (const [status,category,body] of [
+    [401,'AUTH','<html>sk-gateway-private</html>'],
+    [429,'RATE_LIMIT','invalid-json sk-gateway-private'],
+    [503,'UNAVAILABLE',''],
+  ]) {
+    const client=new AiGatewayClient({fetchFn:async()=>new Response(body,{status})});
+    await assert.rejects(
+      client.complete({gatewayUrl:'http://127.0.0.1:17621',provider:'openai-compatible',model:'fixture',prompt:'test'}),
+      error=>error.status===status && error.category===category
+        && !error.message.includes('sk-gateway-private') && /^AI_GATEWAY_HTTP_/.test(error.code),
+    );
+  }
+});
+
+test('gateway retains a safe provider code but never a secret-bearing error body or raw network exception',async()=>{
+  const typed=new AiGatewayClient({fetchFn:async()=>new Response(
+    JSON.stringify({code:'AI_PROVIDER_QUOTA_EXHAUSTED',error:'sk-private-secret'}),{status:429},
+  )});
+  await assert.rejects(
+    typed.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
+    error=>error.status===429 && error.code==='AI_PROVIDER_QUOTA_EXHAUSTED'
+      && !error.message.includes('sk-private-secret'),
+  );
+  const network=new AiGatewayClient({fetchFn:async()=>{throw new Error('sk-private-secret endpoint');}});
+  await assert.rejects(
+    network.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
+    error=>error.code==='AI_GATEWAY_UNAVAILABLE' && error.retryable===true
+      && !error.message.includes('sk-private-secret'),
+  );
+});
