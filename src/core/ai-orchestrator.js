@@ -81,45 +81,71 @@ function ownerRoutingBoolean(raw, field, fallback) {
   return descriptor.value;
 }
 
+// Snapshot only data fields before interpreting owner-controlled model routing.
+ // Accessor/prototype coercion must never select a different provider or route.
+function snapshotRouterOwnerData(raw, label) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${label} must be a plain data object`);
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const descriptor = descriptors[key];
+    if (typeof key !== 'string' || !descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    Object.defineProperty(out, key, { value:descriptor.value, enumerable:true });
+  }
+  return out;
+}
+
 function normalizeSlot(raw, fallback) {
-  const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
-  const model = clean(raw?.model);
-  if (model.length > 300) throw new Error('AI model name is too long');
+  if (raw === undefined) return { ...fallback };
+  const slot = snapshotRouterOwnerData(raw, 'AI model slot');
+  const provider = Object.hasOwn(slot, 'provider') ? slot.provider : fallback.provider;
+  if (!PROVIDERS.has(provider)) throw new Error('AI model slot provider is invalid');
+  const model = Object.hasOwn(slot, 'model') ? slot.model : '';
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300) {
+    throw new Error('AI model slot name must be exact trimmed text of at most 300 characters');
+  }
   return { provider, model };
 }
 
 export function normalizeAiRouterSettings(raw = {}) {
-  const timeoutSeconds = Number(raw.timeoutSeconds ?? DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
-  const strongEveryNRequests = Number(raw.strongEveryNRequests ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
-  const strongEveryMinutes = Number(raw.strongEveryMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
-  const handoffMaxChars = Number(raw.handoffMaxChars ?? DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
-  const strongMinGapMinutes = Number(raw.strongMinGapMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
-  const strongMaxPerHour = Number(raw.strongMaxPerHour ?? DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
+  const source = snapshotRouterOwnerData(raw, 'AI router settings');
+  const timeoutSeconds = Number(source.timeoutSeconds ?? DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
+  const strongEveryNRequests = Number(source.strongEveryNRequests ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
+  const strongEveryMinutes = Number(source.strongEveryMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
+  const handoffMaxChars = Number(source.handoffMaxChars ?? DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
+  const strongMinGapMinutes = Number(source.strongMinGapMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
+  const strongMaxPerHour = Number(source.strongMaxPerHour ?? DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 5 || timeoutSeconds > 900) throw new Error('AI timeout must be a whole number from 5 to 900 seconds');
   if (!Number.isInteger(strongEveryNRequests) || strongEveryNRequests < 0 || strongEveryNRequests > 10000) throw new Error('Strong-model request interval must be 0-10000 prompts');
   if (!Number.isInteger(strongEveryMinutes) || strongEveryMinutes < 0 || strongEveryMinutes > 10080) throw new Error('Strong-model time interval must be 0-10080 minutes');
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
-  const routes = normalizeAiRoutePool(raw.routes === undefined ? [] : raw.routes);
+  const routes = normalizeAiRoutePool(source.routes === undefined ? [] : source.routes);
+  const mode = source.mode === undefined ? DEFAULT_AI_ROUTER_SETTINGS.mode : source.mode;
+  if (!MODES.has(mode)) throw new Error('AI router mode is invalid');
   return {
-    enabled: ownerRoutingBoolean(raw, 'enabled', false),
-    gatewayUrl: normalizeGatewayUrl(raw.gatewayUrl),
+    enabled: ownerRoutingBoolean(source, 'enabled', false),
+    gatewayUrl: normalizeGatewayUrl(source.gatewayUrl),
     timeoutSeconds,
-    mode: MODES.has(raw.mode) ? raw.mode : DEFAULT_AI_ROUTER_SETTINGS.mode,
-    primary: normalizeSlot(raw.primary, DEFAULT_AI_ROUTER_SETTINGS.primary),
-    strong: normalizeSlot(raw.strong, DEFAULT_AI_ROUTER_SETTINGS.strong),
+    mode,
+    primary: normalizeSlot(source.primary, DEFAULT_AI_ROUTER_SETTINGS.primary),
+    strong: normalizeSlot(source.strong, DEFAULT_AI_ROUTER_SETTINGS.strong),
     strongEveryNRequests,
     strongEveryMinutes,
     strongMinGapMinutes,
     strongMaxPerHour,
-    carryStrongResultToPrimary: ownerRoutingBoolean(raw, 'carryStrongResultToPrimary', true),
+    carryStrongResultToPrimary: ownerRoutingBoolean(source, 'carryStrongResultToPrimary', true),
     handoffMaxChars,
-    fallbackToStrongOnPrimaryError: ownerRoutingBoolean(raw, 'fallbackToStrongOnPrimaryError', true),
-    keepPrimaryIfStrongFails: ownerRoutingBoolean(raw, 'keepPrimaryIfStrongFails', true),
+    fallbackToStrongOnPrimaryError: ownerRoutingBoolean(source, 'fallbackToStrongOnPrimaryError', true),
+    keepPrimaryIfStrongFails: ownerRoutingBoolean(source, 'keepPrimaryIfStrongFails', true),
     routes,
-    routePolicy: normalizeAiRoutePolicy(raw.routePolicy === undefined ? DEFAULT_AI_ROUTE_POLICY : raw.routePolicy),
-    workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy === undefined ? DEFAULT_AI_WORKER_POLICY : raw.workerPolicy, routes),
+    routePolicy: normalizeAiRoutePolicy(source.routePolicy === undefined ? DEFAULT_AI_ROUTE_POLICY : source.routePolicy),
+    workerPolicy: normalizeAiWorkerPolicy(source.workerPolicy === undefined ? DEFAULT_AI_WORKER_POLICY : source.workerPolicy, routes),
   };
 }
 
