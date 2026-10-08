@@ -59,7 +59,7 @@ function strictRecord(value, allowed, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') throw new Error(label + ' contains symbol field');
-    if (!allowed.has(key)) throw new Error(label + ' contains unknown field: ' + key);
+    if (!allowed.has(key)) throw new Error(label + ' contains unknown field');
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' must be an enumerable own data property');
