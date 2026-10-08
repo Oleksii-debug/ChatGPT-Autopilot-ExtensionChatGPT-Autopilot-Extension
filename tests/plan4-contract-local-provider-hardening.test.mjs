@@ -311,3 +311,36 @@ test('remote Ollama must not inherit local-only FREE pricing across persistence 
   assert.equal(local[0].costClass,'free');
   assert.deepEqual(selectAiRouteCandidates({routes:local,policy:{freeOnly:true},now:1}).eligibleRouteIds,['local-ollama']);
 });
+
+test('local adapter rejects query and fragment before fetch even when called directly', async () => {
+  let requests = 0;
+  const client = new LocalAiClient({fetchFn:async () => { requests += 1; throw Error('should never call network'); }});
+  const resumedSettings = JSON.parse(JSON.stringify(normalizeLocalAiSettings(settings)));
+  for (const url of [
+    'http://127.0.0.1:11434/api/chat?token=private-fixture',
+    'http://localhost:11434/api/tags#secret-fixture',
+  ]) {
+    await assert.rejects(client.request(resumedSettings,url),/without credentials/);
+  }
+  assert.equal(requests,0);
+});
+
+test('partial provider usage cannot claim fewer total tokens than any reported dimension', () => {
+  for (const providerType of ['ollama','openai-compatible']) {
+    const cases = providerType === 'ollama'
+      ? [{prompt_eval_count:8,eval_count:7}]
+      : [{usage:{prompt_tokens:9,total_tokens:8}}, {usage:{completion_tokens:9,total_tokens:8}}];
+    if (providerType === 'ollama') {
+      const observed = normalizeLocalAiUsage(providerType,cases[0]);
+      assert.equal(observed.totalTokens,15);
+      continue;
+    }
+    for (const usage of cases) {
+      assert.throws(() => normalizeLocalAiUsage(providerType,usage),/token accounting mismatch/);
+    }
+  }
+  const partial = normalizeLocalAiUsage('openai-compatible',{usage:{prompt_tokens:8,total_tokens:9}});
+  assert.equal(partial.totalTokens,9);
+  assert.equal(partial.outputTokens,null);
+  assert.equal(partial.source,'PROVIDER_REPORTED');
+});
