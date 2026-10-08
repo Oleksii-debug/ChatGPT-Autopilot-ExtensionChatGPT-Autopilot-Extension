@@ -1077,3 +1077,56 @@ test('tampered screenshot viewport dimensions are not accepted by coordinate par
   snapshot.frames[0].viewport.width = 500;
   assert.equal(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 20, y: 20 }), snapshot).x, 20);
 });
+
+ 
+// Plan 2 Sections 1-2: fail closed when synthetic pointer or native keyboard
+// effects would bypass current browser hit/focus reality.
+test('semantic DOM click refuses pointer-events none even if a synthetic hit-test lies', () => {
+  const snapshot = setup();
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  const original = globalThis.getComputedStyle;
+  try {
+    globalThis.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: 1, pointerEvents: 'none' });
+    assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_TARGET_UNAVAILABLE/);
+    assert.equal(element.clicked, 0);
+  } finally {
+    globalThis.getComputedStyle = original;
+  }
+});
+
+test('coordinate screenshot proof cannot stand in for live text input focus identity', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  document.activeElement = new FakeElement('Untrusted hidden destination');
+  assert.equal(probeBrowserCoordinateTarget(20, 20, fingerprint, true).ok, false);
+  document.activeElement = element;
+  assert.equal(probeBrowserCoordinateTarget(20, 20, fingerprint, true).ok, true);
+  // Ordinary clicks continue using screenshot proof without a forced text focus.
+  document.activeElement = new FakeElement('Other control');
+  assert.equal(probeBrowserCoordinateTarget(20, 20, fingerprint).ok, true);
+});
+
+test('native coordinate typing blocks focus hijack after physical click before Input.insertText', async () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  const before = fixture.manager.chrome.debugger.sendCommand;
+  fixture.manager.chrome.debugger.sendCommand = async (...args) => {
+    await before(...args);
+    if (args[1] === 'Input.dispatchMouseEvent' && args[2]?.type === 'mouseReleased') {
+      document.activeElement = new FakeElement('Focus stolen by injected handler');
+    }
+  };
+  fixture.manager.chrome.scripting.executeScript = async ({ func, args }) =>
+    [{ result: args?.length === 4 ? func(...args) : { ok: true } }];
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'PRIVATE' }, fingerprint, 'owner-job', 3),
+    /AGENT_COORDINATE_TARGET_STALE/,
+  );
+  assert.equal(fixture.events.includes('Input.insertText'), false);
+  assert.equal(fixture.events.at(-1), 'detach');
+});
