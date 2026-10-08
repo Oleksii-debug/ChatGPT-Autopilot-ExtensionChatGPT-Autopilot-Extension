@@ -31,7 +31,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
   const interval = exactInteger(fields.interval, 1, intervalUnit === 'seconds' ? 86400 : 1440, 'Інтервал');
   const preSendDelaySeconds = exactInteger(fields.delay, 1, 30, 'Пауза перед Send');
   const tabReadyDelaySeconds = exactInteger(fields.tabReady ?? 0, 0, 60, 'Пауза після відкриття вкладки');
-  const postSendDelaySeconds = exactInteger(fields.postSend ?? 5, 0, 60, 'Очікування після надсилання');
+  const postSendDelaySeconds = exactInteger(fields.postSend ?? 5, 0, fields.postSendUnit === 'minutes' ? 60 : 3600, 'Очікування після надсилання') * (fields.postSendUnit === 'minutes' ? 60 : 1);
   const busyCheckDelaySeconds = exactInteger(fields.busy, 1, 30, 'Перевірка зайнятого чату');
   const retryUnit = fields.retryUnit === 'minutes' ? 'minutes' : 'seconds';
   const retryValue = exactInteger(
