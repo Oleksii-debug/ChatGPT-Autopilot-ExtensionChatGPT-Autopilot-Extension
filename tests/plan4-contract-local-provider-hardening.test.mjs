@@ -443,7 +443,7 @@ test('owner allow/deny/ordering lists never widen from explicit falsy input on c
       assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify(pool))), /bounded array/);
     }
     assert.throws(() => normalizeAiRouterSettings({routes:invalid}), /bounded array/);
-    assert.throws(() => normalizeAiRouterSettings({routePolicy:invalid}), /plain data object/);
+    assert.throws(() => normalizeAiRouterSettings({routePolicy:invalid}), /must be an object|plain data object/);
     assert.throws(() => normalizeAiRouterSettings({workerPolicy:invalid}), /object/);
   }
   assert.throws(() => selectAiRouteCandidates({
