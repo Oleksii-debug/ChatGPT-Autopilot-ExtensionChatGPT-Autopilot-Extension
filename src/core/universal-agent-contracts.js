@@ -96,10 +96,20 @@ function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
 
 function timestamp(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  // All durable authority/evidence clocks must be explicit, zone-bound ISO
+  // instants. Date.parse accepts shorthand and rolls impossible calendar dates.
+  const format = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/u;
+  if (typeof value !== 'string' || !format.test(value)) {
+    throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
+  }
+  const wallClock = value.slice(0, 19);
+  const calendar = new Date(wallClock + 'Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 19) !== wallClock) {
+    throw new Error(`${label} contains an invalid calendar date`);
+  }
+  const instant = new Date(value);
+  if (!Number.isFinite(instant.getTime())) throw new Error(`${label} must be a valid timestamp`);
+  return instant.toISOString();
 }
 
 function integer(value, label, min, max, { optional = false, fallback = 0 } = {}) {
