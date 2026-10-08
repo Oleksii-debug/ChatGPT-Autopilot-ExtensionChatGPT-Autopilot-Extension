@@ -178,3 +178,21 @@ test('missing coordinate proof cannot be used as an approval bypass', () => {
   const legacy = browserAgentCoordinateTargetFingerprint({ tag: 'button', name: 'Save' });
   assert.equal(verifyBrowserCoordinateTarget(20, 20, legacy).ok, false);
 });
+
+test('Chrome serialized coordinate function probes and verifies without module-scope globals', () => {
+  setup();
+  const injected = Function('return (' + probeBrowserCoordinateTarget.toString() + ')')();
+  const original = injected(20, 20);
+  const bound = browserAgentCoordinateTargetFingerprint(original.target);
+  assert.equal(injected(20, 20, bound).ok, true);
+  element.rect = { ...element.rect, top: 20 };
+  assert.equal(injected(20, 20, bound).reason, 'changed-geometry');
+});
+
+test('Chrome serialized semantic action verifies labels without module-scope globals', () => {
+  const snapshot = setup();
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  const injected = Function('return (' + executeBrowserPageAction.toString() + ')')();
+  assert.equal(injected('s1', action).ok, true);
+  assert.equal(element.clicked, 1);
+});
