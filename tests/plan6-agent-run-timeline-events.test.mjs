@@ -85,3 +85,19 @@ test('timeline refresh reports Core failure and keeps keyboard focus recoverable
   assert.match(refresh, /button\.focus\(\)/u);
   assert.doesNotMatch(refresh, /innerHTML|outerHTML|eval\(/u);
 });
+
+test('unobserved model cost is UNKNOWN, not an invented zero-dollar observation', async () => {
+  const unavailable = restoredJob();
+  assert.equal(buildAgentRunTimelineV1(unavailable).counters.estimatedCostUsd, null);
+  unavailable.runtime.estimatedCostUsd = NaN;
+  assert.equal(buildAgentRunTimelineV1(unavailable).counters.estimatedCostUsd, null);
+  unavailable.runtime.estimatedCostUsd = 0;
+  assert.equal(buildAgentRunTimelineV1(unavailable).counters.estimatedCostUsd, 0);
+  unavailable.runtime.estimatedCostUsd = 0.125;
+  assert.equal(buildAgentRunTimelineV1(unavailable).counters.estimatedCostUsd, 0.125);
+  const { readFile } = await import('node:fs/promises');
+  const options = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(options, /приблизні витрати/u);
+  assert.match(options, /estimatedCostUsd === null/u);
+  assert.match(options, /estimatedCostUsd\.toFixed\(6\)/u);
+});
