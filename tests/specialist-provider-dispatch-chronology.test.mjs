@@ -318,3 +318,25 @@ test('valid persisted Specialist receipt still yields evidence with no self-issu
   assert.equal(result.completionAuthorized, false);
   assert.equal(result.verificationRequired, true);
 });
+
+test('unknown top-level readiness schemaVersion is denied before provider effects', async () => {
+  const f = fixture();
+  const ready = await f.trustedResolver.resolve(f.selection);
+  await assert.rejects(
+    f.newDispatcher().execute(f.request({ ...ready, schemaVersion: 999 })),
+    /readiness schemaVersion is not supported/u,
+  );
+  assert.equal(f.providerCalls, 0);
+});
+
+test('unknown nested inspection schemaVersion is denied before provider effects', async () => {
+  const f = fixture();
+  const ready = await f.trustedResolver.resolve(f.selection);
+  await assert.rejects(
+    f.newDispatcher().execute(f.request({
+      ...ready, inspection: { ...ready.inspection, schemaVersion: 999 },
+    })),
+    /readiness inspection schemaVersion is not supported/u,
+  );
+  assert.equal(f.providerCalls, 0);
+});
