@@ -3067,13 +3067,25 @@ export class BrowserAgentManager {
     }
   }
 
-  async dispatchKey(tabId, key) {
+  async dispatchKey(tabId, key, activation = null) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     const target = { tabId };
     let attached = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      if (activation) {
+        // The focus step and Chrome debugger attachment are asynchronous.
+        // Re-prove both owner epoch and target meaning inside this boundary.
+        if (!(await this.verifyOwnerAuthority(activation.jobId, activation.epoch))) throw new Error('AGENT_KEY_CANCELLED_BY_OWNER');
+        const checked = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [activation.frameId] },
+          func: proveBrowserNativeClick,
+          args: [activation.snapshotId, activation.ref, activation.expectedAction],
+        });
+        if (!checked?.[0]?.result) throw new Error('AGENT_KEY_TARGET_STALE');
+        if (!(await this.verifyOwnerAuthority(activation.jobId, activation.epoch))) throw new Error('AGENT_KEY_CANCELLED_BY_OWNER');
+      }
       const normalized = key === ' ' ? ' ' : key;
       const code = key === ' ' ? 'Space' : key;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyDown', key: normalized, code });
@@ -3860,14 +3872,30 @@ export class BrowserAgentManager {
     }
     if (action.type === BrowserAgentActionType.KEY) {
       if (action.ref) {
+        // Enter/Space can submit or purchase. An ordinal ref alone is not
+        // enough: verify the observed semantic target before focus and again
+        // after debugger attach, where the key is actually dispatched.
+        const proof = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [Number(action.frameId)] },
+          func: proveBrowserNativeClick,
+          args: [snapshot.snapshotId, action.ref, action],
+        });
+        if (!proof?.[0]?.result) throw new Error('AGENT_KEY_TARGET_STALE');
         const focused = await this.requireScripting().executeScript({
-          target: { tabId, frameIds: [Number(action.frameId || 0)] },
+          target: { tabId, frameIds: [Number(action.frameId)] },
           func: focusBrowserAgentTarget,
           args: [snapshot.snapshotId, action.ref],
         });
         if (!focused?.[0]?.result?.ok) throw new Error('AGENT_KEY_TARGET_STALE');
       }
-      await this.dispatchKey(tabId, action.key);
+      await this.dispatchKey(tabId, action.key, action.ref ? {
+        frameId: Number(action.frameId),
+        snapshotId: snapshot.snapshotId,
+        ref: action.ref,
+        expectedAction: action,
+        jobId: job.id,
+        epoch,
+      } : null);
       return { kind: 'ACTION', action };
     }
     if (action.type === BrowserAgentActionType.WAIT_FOR_CHANGE) {
