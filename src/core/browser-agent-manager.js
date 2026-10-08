@@ -3244,6 +3244,13 @@ export class BrowserAgentManager {
   async nativeTypeAt(tabId, action, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    // Direct helper calls/recovered actions must obey the same bounded text
+    // envelope as parseSingleAction, not just the planner entrypoint.
+    // Check before debugger attachment, pointer or Input.insertText effects.
+    if (!action || typeof action.text !== 'string'
+      || action.text.length === 0 || action.text.length > 50000) {
+      throw new Error('AGENT_COORDINATE_TEXT_INVALID');
+    }
     // Defense in depth for direct native helper callers and resumed actions:
     // a visual fallback cannot turn a password/file target or a button into
     // an arbitrary text sink when the normal dispatcher is skipped.
@@ -3545,8 +3552,8 @@ export class BrowserAgentManager {
         job.runtime.lastSnapshotSignature = pending.snapshotSignature || '';
         job.runtime.lastAction = clone(pending.action);
         job.runtime.lastActionSnapshotId = pending.snapshotId || '';
-        job.runtime.nativeFallbackTried = pending.action?.type === BrowserAgentActionType.CLICK
-          && (pending.action?.submitLike === true || pending.action?.navigationLike === true);
+        // An unchanged page is not proof that a click had no external effect.
+        job.runtime.nativeFallbackTried = pending.action?.type === BrowserAgentActionType.CLICK;
         job.runtime.consecutiveActionErrors = 0;
         job.runtime.nextWakeAt = now + Math.max(MIN_WAKE_MS, Number(job.config.stepDelayMs || 0));
         job.runtime.updatedAt = now;
@@ -4230,27 +4237,13 @@ export class BrowserAgentManager {
     }
     const signature = browserSnapshotSignature(snapshot);
 
-    // If a normal DOM click produced no observable change, try one native click
-    // against the exact same top-frame ref before asking the model again.
-    if (current.job.runtime.lastSnapshotSignature === signature
-      && current.job.runtime.lastAction?.type === BrowserAgentActionType.CLICK
-      && current.job.runtime.nativeFallbackTried !== true
-      && current.job.runtime.lastActionSnapshotId) {
-      if (!(await this.verifyOwnerAuthority(id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
-      const prior = current.job.runtime.lastAction;
-      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref, prior, id, epoch);
-      await this.update(store => {
-        const job = store.byId[id];
-        if (!job || job.runtime.controlEpoch !== epoch) return store;
-        job.runtime.nativeFallbackTried = true;
-        job.runtime.noProgressCount = Math.max(0, Number(job.runtime.noProgressCount || 0)) + 1;
-        job.runtime.nextWakeAt = now + job.config.stepDelayMs;
-        job.runtime.updatedAt = now;
-        appendHistory(job.runtime, { at: now, type: 'native-fallback', message: used ? 'Native click fallback dispatched' : 'Native click fallback unavailable' });
-        return store;
-      });
-      if (used) { await this.reconcileAlarm(); return { kind: 'NATIVE_CLICK_FALLBACK' }; }
-    }
+    // A DOM click may already have committed a remote effect even when the
+    // observed page signature does not change (AJAX/background requests).
+    // A restarted worker can also restore a legacy nativeFallbackTried=false.
+    // Neither case proves non-execution: never blindly replay via nativeClick.
+    // Reobserve and independently verify outcome instead of dispatching a
+    // second pointer effect. Native click remains available only by an
+    // explicitly authorized path that proves a fresh target/owner epoch.
 
     // A DOM/native action can be acknowledged by Chrome while producing no
     // observable application effect. Surface that fact to the reasoning model
@@ -4690,8 +4683,7 @@ export class BrowserAgentManager {
       job.runtime.lastSnapshotSignature = signature;
       job.runtime.lastAction = clone(action);
       job.runtime.lastActionSnapshotId = snapshot.snapshotId;
-      job.runtime.nativeFallbackTried = action.type === BrowserAgentActionType.CLICK
-        && (action.submitLike === true || action.navigationLike === true);
+      job.runtime.nativeFallbackTried = action.type === BrowserAgentActionType.CLICK;
       job.runtime.lastError = '';
       job.runtime.nextWakeAt = now + Math.max(250, waitMs);
       job.runtime.updatedAt = now;
