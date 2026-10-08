@@ -367,6 +367,72 @@ function snapshotDirectAgentSiteRules(value) {
   return rules;
 }
 
+// The legacy normalizer uses convenient defaults for omitted advanced fields.
+// Explicit invalid owner ceilings/policy cannot take that same path: null or a
+// negative limit could silently remove a budget, while null booleans could
+// re-enable cross-origin navigation, active-tab intake or visual automation.
+const DIRECT_OWNER_BOOLEAN_KEYS = new Set([
+  'allowCrossOriginNavigation', 'closeOwnedTabsOnStop', 'startFromActiveTab',
+  'trustedScriptEnabled', 'visionOnDemand',
+]);
+const DIRECT_OWNER_NUMERIC_KEYS = new Set([
+  'maxSteps', 'stepDelayMs', 'maxModelCalls', 'maxInputTokens', 'maxOutputTokens',
+  'maxTotalTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
+  'inputPricePerMillionUsd', 'outputPricePerMillionUsd', 'intervalSeconds',
+  'scheduleStartAt', 'scheduleEndAt',
+]);
+function requireExplicitOwnerPolicyInputs(request, label) {
+  for (const key of DIRECT_OWNER_BOOLEAN_KEYS) {
+    if (Object.hasOwn(request, key) && typeof request[key] !== 'boolean') {
+      throw new Error(`${label} ${key} must be an explicit boolean`);
+    }
+  }
+  for (const key of DIRECT_OWNER_NUMERIC_KEYS) {
+    if (!Object.hasOwn(request, key)) continue;
+    const value = request[key];
+    if ((typeof value !== 'number' && typeof value !== 'string')
+        || (typeof value === 'string' && value.trim() === '')
+        || !Number.isFinite(Number(value)) || Number(value) < 0) {
+      throw new Error(`${label} ${key} must be a finite nonnegative explicit ceiling`);
+    }
+  }
+  for (const [key, allowed] of [
+    ['approvalMode', Object.values(BrowserAgentApprovalMode)],
+    ['credentialDecision', Object.values(BrowserAgentPolicyDecision)],
+    ['repeatMode', Object.values(BrowserAgentRepeatMode)],
+  ]) {
+    if (Object.hasOwn(request, key) && !allowed.includes(request[key])) {
+      throw new Error(`${label} ${key} must be an explicit supported decision`);
+    }
+  }
+  for (const key of ['siteRules', 'acceptanceCriteria']) {
+    if (Object.hasOwn(request, key) && !Array.isArray(request[key])) {
+      throw new Error(`${label} ${key} must be an explicit array`);
+    }
+  }
+}
+
+// Apply the same owner-input snapshot boundary to edits as to initial intake.
+// Values must not change while the durable transaction is queued.
+function snapshotDirectAgentConfigPatch(raw) {
+  const patch = snapshotExactOwnDataRequest(raw ?? {}, DIRECT_AGENT_CREATE_KEYS, 'Browser Agent config update');
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'siteRules' || key === 'acceptanceCriteria' || value == null) continue;
+    if (!['string', 'number', 'boolean'].includes(typeof value)
+        || (typeof value === 'number' && !Number.isFinite(value))) {
+      throw new Error(`Browser Agent config update ${key} must be a finite scalar data value`);
+    }
+  }
+  requireExplicitOwnerPolicyInputs(patch, 'Browser Agent config update');
+  if (Object.hasOwn(patch, 'siteRules')) {
+    patch.siteRules = snapshotDirectAgentSiteRules(patch.siteRules);
+  }
+  if (Object.hasOwn(patch, 'acceptanceCriteria')) {
+    patch.acceptanceCriteria = normalizeBrowserAgentAcceptanceCriteria(patch.acceptanceCriteria);
+  }
+  return patch;
+}
+
 function normalizePersistedAgentDefinitionScope(raw, selection) {
   if (selection == null) {
     if (raw == null) return null;
@@ -2311,6 +2377,7 @@ export class BrowserAgentManager {
         throw new Error(`Browser Agent direct intake ${key} must be a finite scalar data value`);
       }
     }
+    requireExplicitOwnerPolicyInputs(request, 'Browser Agent direct intake');
     // Explicit invalid identities cannot silently turn into a newly generated
     // task, and generated identities obey the same durable namespace.
     const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
@@ -2376,6 +2443,17 @@ export class BrowserAgentManager {
   }
 
   async updateConfig(id, rawConfig) {
+    // Preserve the previous Project-specific diagnostic for an accessor update.
+    if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
+      const descriptor = Object.getOwnPropertyDescriptor(rawConfig, 'projectId');
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+        throw new Error('Browser Agent projectId must be an enumerable own data property');
+      }
+    }
+    const patch = snapshotDirectAgentConfigPatch(rawConfig);
+    if (Object.hasOwn(patch, 'id') && patch.id !== id) {
+      throw new Error('Browser Agent config update cannot change durable job identity');
+    }
     const now = this.now();
     await this.update(store => {
       const job = store.byId[id];
@@ -2383,12 +2461,8 @@ export class BrowserAgentManager {
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
 
       let nextProjectId = job.config.projectId || '';
-      if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
-        const descriptor = Object.getOwnPropertyDescriptor(rawConfig, 'projectId');
-        if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-          throw new Error('Browser Agent projectId must be an enumerable own data property');
-        }
-        nextProjectId = normalizeBrowserAgentConfig({ ...job.config, projectId: descriptor.value, id }, { id }).projectId;
+      if (Object.hasOwn(patch, 'projectId')) {
+        nextProjectId = normalizeBrowserAgentConfig({ ...job.config, projectId: patch.projectId, id }, { id }).projectId;
         if (job.config.projectId && nextProjectId !== job.config.projectId) {
           throw new Error('Browser Agent projectId is immutable; create a new job for another Project');
         }
@@ -2412,7 +2486,7 @@ export class BrowserAgentManager {
       }
 
       const previousCriteria = JSON.stringify(job.config.acceptanceCriteria || []);
-      job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, projectId: nextProjectId, id }, { id });
+      job.config = normalizeBrowserAgentConfig({ ...job.config, ...patch, projectId: nextProjectId, id }, { id });
       if (JSON.stringify(job.config.acceptanceCriteria || []) !== previousCriteria) job.runtime.verifiedOutcome = null;
       job.updatedAt = now;
       return store;

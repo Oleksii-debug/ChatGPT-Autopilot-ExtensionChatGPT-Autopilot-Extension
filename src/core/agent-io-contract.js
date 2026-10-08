@@ -24,6 +24,12 @@ const ACTION_CAPABILITY_REQUIREMENTS = Object.freeze({
   [AgentActionType.RECOVER_INTERACTION]: CapabilityId.SAFE_RESTART_RECOVERY,
 });
 
+const ACTION_LINKED_EVENT_TYPES = new Set([
+  AgentEventType.ACTION_STARTED,
+  AgentEventType.ACTION_SUCCEEDED,
+  AgentEventType.ACTION_FAILED,
+]);
+
 const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
   [AgentEventType.COMPLETION_OBSERVED]: CapabilityId.ASSISTANT_COMPLETION_PROBE,
   [AgentEventType.RATE_LIMIT_OBSERVED]: CapabilityId.RATE_LIMIT_CLASSIFICATION,
@@ -31,13 +37,13 @@ const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
 });
 
 export function getAgentActionRequiredCapability(actionType) {
-  const type = String(actionType || '').trim();
+  const type = typeof actionType === 'string' ? actionType.trim() : '';
   if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
   return ACTION_CAPABILITY_REQUIREMENTS[type] || null;
 }
 
 export function getAgentEventRequiredCapability(eventType) {
-  const type = String(eventType || '').trim();
+  const type = typeof eventType === 'string' ? eventType.trim() : '';
   if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
   return EVENT_CAPABILITY_REQUIREMENTS[type] || null;
 }
@@ -198,6 +204,9 @@ export function normalizeAgentEvent(input) {
     occurredAt: normalizeTimestamp(event.occurredAt, 'occurredAt'),
     data: cloneData(event.data, 'event data'),
   };
+  if (ACTION_LINKED_EVENT_TYPES.has(type) && normalized.actionId === null) {
+    throw new Error('Agent action lifecycle event requires an exact actionId');
+  }
   return Object.freeze(normalized);
 }
 
@@ -207,7 +216,7 @@ export class AgentActionHandlerRegistry {
   }
 
   register(providerId, actionType, handler) {
-    const type = String(actionType || '').trim();
+    const type = typeof actionType === 'string' ? actionType.trim() : '';
     const provider = requireProviderCapabilityForAction(providerId, type);
     if (typeof handler !== 'function') throw new Error('Agent action handler must be a function');
     const key = `${provider.id}:${type}`;
@@ -217,7 +226,12 @@ export class AgentActionHandlerRegistry {
   }
 
   has(providerId, actionType) {
-    return this.handlers.has(`${String(providerId || '').trim()}:${String(actionType || '').trim()}`);
+    if (typeof providerId !== 'string' || typeof actionType !== 'string') return false;
+    // A capability probe must agree with execute(): whitespace aliases in
+    // provider identity are not valid durable provider IDs.
+    if (providerId !== providerId.trim() || actionType !== actionType.trim()
+        || !ID_PATTERN.test(providerId) || !ACTION_TYPES.has(actionType)) return false;
+    return this.handlers.has(`${providerId}:${actionType}`);
   }
 
   async execute(input, context = {}) {

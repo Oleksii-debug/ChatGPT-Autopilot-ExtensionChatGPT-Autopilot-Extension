@@ -72,6 +72,24 @@ test('action and event semantics are explicitly bound to provider capabilities',
   assert.throws(() => getAgentEventRequiredCapability('future-event'), /Unsupported agent event type/);
 });
 
+test('Plan-1: unbound action lifecycle evidence cannot be published after restart', async () => {
+  const sink = new AgentEventSink({ onEvent: () => { throw new Error('unbound event published'); } });
+  for (const type of [AgentEventType.ACTION_STARTED, AgentEventType.ACTION_SUCCEEDED, AgentEventType.ACTION_FAILED]) {
+    assert.throws(() => normalizeAgentEvent(event({ type, actionId: null })), /requires an exact actionId/);
+    await assert.rejects(() => sink.emit(event({ type, actionId: '' })), /requires an exact actionId/);
+  }
+  assert.equal(normalizeAgentEvent(event({ type: AgentEventType.COMPLETION_OBSERVED, actionId: null })).actionId, null);
+});
+
+test('Plan-1: handler existence probes never recognize invalid provider aliases', () => {
+  const registry = new AgentActionHandlerRegistry();
+  registry.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT, () => true);
+  assert.equal(registry.has(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT), true);
+  assert.equal(registry.has(` ${AgentProviderId.CHATGPT_BROWSER} `, AgentActionType.SUBMIT_PROMPT), false);
+  assert.equal(registry.has(AgentProviderId.CHATGPT_BROWSER, ` ${AgentActionType.SUBMIT_PROMPT} `), false);
+  assert.equal(registry.has(AgentProviderId.CHATGPT_BROWSER, 'future-action'), false);
+});
+
 test('handler registry is additive and does not create scheduler semantics', async () => {
   const registry = new AgentActionHandlerRegistry();
   registry.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT, async (normalized, context) => ({
@@ -180,4 +198,20 @@ test('Plan-1: Agent chronology rejects ambiguous, rolled and timezone-free times
     normalizeAgentEvent(event({ occurredAt: '2026-09-11T23:59:59.500-01:00' })).occurredAt,
     '2026-09-12T00:59:59.500Z',
   );
+});
+
+test('Plan-1: capability queries and handler lookup never coerce attacker-controlled action types', () => {
+  let invoked = 0;
+  const hostile = {
+    toString() { invoked += 1; throw new Error('secret-do-not-emit'); },
+    valueOf() { invoked += 1; throw new Error('secret-do-not-emit'); },
+  };
+  assert.throws(() => getAgentActionRequiredCapability(hostile), /Unsupported agent action type/);
+  assert.throws(() => getAgentEventRequiredCapability(hostile), /Unsupported agent event type/);
+  const registry = new AgentActionHandlerRegistry();
+  assert.throws(() => registry.register(AgentProviderId.CHATGPT_BROWSER, hostile, () => {}), /Unsupported agent action type/);
+  assert.equal(registry.has(AgentProviderId.CHATGPT_BROWSER, hostile), false);
+  assert.equal(registry.has(hostile, AgentActionType.SUBMIT_PROMPT), false);
+  assert.equal(invoked, 0, 'untrusted coercion hooks must not run');
+  assert.equal(getAgentActionRequiredCapability(AgentActionType.SUBMIT_PROMPT), CapabilityId.VERIFIED_PROMPT_SUBMIT);
 });

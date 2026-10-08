@@ -3474,3 +3474,118 @@ test('owner approval fence rejects a replacement pending action that races with 
   assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
   assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new', 'stale reject must not clear the replacement approval');
 });
+
+test('Plan-1: config edits reject hidden authority, hostile coercion and mutable acceptance evidence before persistence', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'job-config-fence', goal: 'Initial verified goal', acceptanceCriteria: ['Original evidence'] });
+  let getterReads = 0;
+  const getterUpdate = {};
+  Object.defineProperty(getterUpdate, 'goal', {
+    enumerable: true, get() { getterReads += 1; throw new Error('private-data-must-not-run'); },
+  });
+  await assert.rejects(() => manager.updateConfig('job-config-fence', getterUpdate), /data property/);
+  assert.equal(getterReads, 0);
+  await assert.rejects(() => manager.updateConfig('job-config-fence', { ownerEffectAuthorized: true }), /unknown field/);
+  await assert.rejects(() => manager.updateConfig('job-config-fence', { id: 'different-job' }), /durable job identity/);
+  let conversions = 0;
+  const hostile = { toString() { conversions += 1; throw new Error('private-data-must-not-run'); } };
+  await assert.rejects(() => manager.updateConfig('job-config-fence', { maxCostUsd: hostile }), /finite scalar/);
+  assert.equal(conversions, 0);
+  const criteria = ['Independent proof'];
+  const pending = manager.updateConfig('job-config-fence', {
+    goal: 'Updated verified goal', acceptanceCriteria: criteria,
+  });
+  criteria[0] = 'Unverified owner mutation';
+  await pending;
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const persisted = await restarted.get('job-config-fence');
+  assert.equal(persisted.config.goal, 'Updated verified goal');
+  assert.deepEqual(persisted.config.acceptanceCriteria, ['Independent proof']);
+});
+
+test('Plan-1: explicit malformed owner policy and ceilings cannot silently reset durable safety', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  await manager.create({
+    id: 'job-owner-ceilings', goal: 'Verify owner evidence',
+    allowCrossOriginNavigation: false, startFromActiveTab: false,
+    visionOnDemand: false, maxModelCalls: 4,
+    acceptanceCriteria: ['Verified by independent evidence'],
+  });
+  const invalidEdits = [
+    [{ allowCrossOriginNavigation: null }, /explicit boolean/],
+    [{ startFromActiveTab: 'false' }, /explicit boolean/],
+    [{ visionOnDemand: null }, /explicit boolean/],
+    [{ maxModelCalls: null }, /explicit ceiling/],
+    [{ maxModelCalls: -1 }, /explicit ceiling/],
+    [{ maxTotalTokens: '' }, /explicit ceiling/],
+    [{ maxCostUsd: '-2' }, /explicit ceiling/],
+    [{ siteRules: null }, /explicit array/],
+    [{ acceptanceCriteria: null }, /explicit array/],
+    [{ approvalMode: 'UNKNOWN' }, /supported decision/],
+    [{ credentialDecision: null }, /supported decision/],
+  ];
+  for (const [patch, reason] of invalidEdits) {
+    await assert.rejects(
+      () => manager.updateConfig('job-owner-ceilings', {
+        goal: 'This change must never persist', ...patch,
+      }),
+      reason,
+    );
+  }
+  await assert.rejects(
+    () => manager.create({
+      id: 'job-untrusted-ceiling', goal: 'Must not persist',
+      maxRuntimeMinutes: null,
+    }),
+    /explicit ceiling/,
+  );
+  await assert.rejects(
+    () => manager.create({
+      id: 'job-untrusted-criteria', goal: 'Must not persist',
+      acceptanceCriteria: null,
+    }),
+    /explicit array/,
+  );
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  const stored = await restarted.get('job-owner-ceilings');
+  assert.equal(stored.config.goal, 'Verify owner evidence');
+  assert.equal(stored.config.allowCrossOriginNavigation, false);
+  assert.equal(stored.config.startFromActiveTab, false);
+  assert.equal(stored.config.visionOnDemand, false);
+  assert.equal(stored.config.maxModelCalls, 4);
+  assert.deepEqual(stored.config.acceptanceCriteria, ['Verified by independent evidence']);
+  assert.equal((await restarted.load()).order.length, 1);
+  assert.equal(chrome._actionCalls.length, 0);
+});
+
+test('Plan-1: config edit rejects nested policy getter, sparse criteria and non-finite budget with no partial durable write', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'job-config-negative', goal: 'Original' });
+  let getterReads = 0;
+  const actionDecisions = {};
+  Object.defineProperty(actionDecisions, 'click', {
+    enumerable: true, get() { getterReads += 1; return 'ALLOW'; },
+  });
+  await assert.rejects(() => manager.updateConfig('job-config-negative', {
+    goal: 'Must not persist', siteRules: [{ pattern: 'https://example.org/*', actionDecisions }],
+  }), /data propert/);
+  assert.equal(getterReads, 0);
+  const sparse = []; sparse.length = 2; sparse[0] = 'Present';
+  await assert.rejects(() => manager.updateConfig('job-config-negative', {
+    goal: 'Must not persist', acceptanceCriteria: sparse,
+  }), /dense|data-only/);
+  await assert.rejects(() => manager.updateConfig('job-config-negative', {
+    goal: 'Must not persist', maxRuntimeMinutes: Infinity,
+  }), /finite scalar/);
+  const persisted = await new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  }).get('job-config-negative');
+  assert.equal(persisted.config.goal, 'Original');
+});
