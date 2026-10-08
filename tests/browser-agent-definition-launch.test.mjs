@@ -683,3 +683,21 @@ test('Plan-1: direct job intake rejects unknown authority-bearing fields without
   assert.equal((await restarted.get('job.boundary-ok')).job.config.goal, 'Observe the exact source.');
   assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.boundary-ok']);
 });
+
+
+test('Plan-1: explicit persisted null is not an absent legacy store and never permits a new job', async () => {
+  const { data, chrome } = makeChromeStorage();
+  data.autopilotBrowserAgentV1 = null;
+  const manager = managerFor(chrome);
+  await assert.rejects(
+    () => manager.create({ id: 'job.must-not-resurrect', goal: 'No duplicate consequential effects' }),
+    /schemaVersion is unsupported; migration\/reconciliation required/,
+  );
+  assert.equal(data.autopilotBrowserAgentV1, null, 'corrupt durable evidence must not be overwritten');
+
+  // Missing (undefined) legacy storage remains a valid genuinely fresh installation.
+  delete data.autopilotBrowserAgentV1;
+  const created = await manager.create({ id: 'job.new-install', goal: 'Observe the current source' });
+  assert.equal(created.job.id, 'job.new-install');
+  assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.new-install']);
+});
