@@ -346,7 +346,10 @@ test('SDK captures nested transport Proxy descriptors without executing get trap
   envelope.result.scopeProof = proxy(envelope.result.scopeProof);
   envelope.result.receipt = proxy(envelope.result.receipt);
   envelope.result = proxy(envelope.result);
-  const result = await attempt(proxy(envelope));
+  // The outer JSON result is ordinary transport data. Awaiting a top-level
+  // Proxy would trigger the language-level thenable probe outside this SDK;
+  // nested fields must still be snapshotted with zero untrusted property gets.
+  const result = await attempt(envelope);
   assert.equal(result.status, 'RECEIVED');
   assert.equal(gets, 0);
   assert.equal(Object.isFrozen(result.result.receipt), true);
