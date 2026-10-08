@@ -216,3 +216,36 @@ test('durable nonterminal child ledger reserves bounded parent capacity despite 
   assert.equal(reconciled.activationRequests.length, 1);
   assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
 });
+
+
+test('ACTIVE recovered child with an unreconciled ledger never releases a sibling lease', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const recoveredGraph = structuredClone(first.graph);
+  recoveredGraph.nodesById.root.maxActiveChildren = 1;
+  const recoveredRuntime = structuredClone(first.runtime);
+  const occupied = recoveredRuntime.nodesById[occupiedChildId];
+  occupied.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  occupied.currentActivationId = '';
+  occupied.activationLedger = {};
+  // This event was durably admitted before the crash. A lost ledger pointer
+  // must not make the active child disappear from parent's concurrency.
+  recoveredRuntime.processedEventIds[first.activationRequests[0].eventId] = 250;
+  const inFlight = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 300,
+  }));
+  assert.equal(inFlight.decision, 'ALLOW');
+  assert.equal(inFlight.reused, true);
+  assert.deepEqual(inFlight.activationRequests, [], 'ACTIVE child occupies slot');
+  assert.equal(inFlight.executionAuthority, false);
+  assert.equal(inFlight.activationAuthority, false);
+  // Only a reconciled terminal/idle child frees the parent's slot.
+  occupied.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const settled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 301,
+  }));
+  assert.equal(settled.decision, 'ALLOW');
+  assert.equal(settled.activationRequests.length, 1);
+  assert.equal(settled.activationRequests[0].nodeId, siblingId);
+});
