@@ -32,3 +32,10 @@
 
 ## Closure next action
 Qualify Section 1 on exact branch head, converge to canonical synchronized 11.x, verify identity/lease/provider/adversarial and accessible component contracts, read back final integration. Repeat for Section 2 with durable tree and processed-event recovery tests. Mark DONE only after actual evidence; preserve this checkpoint without modifying already-DONE sections or crossing into Section 3.
+
+## 2026-10-08 follow-up — new component repairs, qualification pending
+
+- **Section 1:** The existing `SpecialistProviderDispatcherV1` now recomputes the nested readiness projection through the **existing** `inspectSpecialistProviderReadinessV1` function, cross-checking exact tool IDs, check count, provider/tool identities, health/source and executable/readiness flags before dispatch. This is an internal consistency fence, **not** cryptographic authentication of caller-supplied evidence and **not** a new policy/provider authority. Three new test definitions cover contradictory READY claims, scope/check mutations, and persisted valid positive dispatch. A provider effect must remain unreachable on contradictory evidence.
+- **Section 2:** The existing topology mutation now counts any durable nonterminal child activation-ledger entry as occupying the parent's `maxActiveChildren` capacity, even when crash/restart loses `currentActivationId`. This prevents a sibling overbooking a parent lease at an uncertain-effect boundary. One new negative/recovery test definition covers PREPARED with missing current pointer and the later TERMINAL-to-sibling release.
+- **Qualification honesty:** Newly added tests are GitHub **definitions**, not proven PASS. The earlier independent 22/22 local fixture result was against the **previous** module blobs; it does not certify these new module commits. Exact-HEAD Actions results and full 11.x canonical integration/readback remain required.
+- **Status:** Section 1 and Section 2 both **IN_PROGRESS / ACTIONABLE / NOT TERMINAL DONE**. No physical NVDA acceptance, live provider effect or postmerge certification claimed. No Sections 3+ activated. Preserve all existing Agent/Scheduler/Policy authorities.
