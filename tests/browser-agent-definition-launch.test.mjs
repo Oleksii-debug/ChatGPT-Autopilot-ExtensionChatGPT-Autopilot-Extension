@@ -770,6 +770,11 @@ test('Plan-1: direct Outcome Contract is advisory, exact-goal-bound and survives
   assert.equal(created.job.outcomeContract.executionAuthorized, false);
   assert.equal(created.job.outcomeContract.ownerAccepted, false);
   assert.equal(created.job.outcomeContract.verifierPlan.verificationAuthority, 'EXTERNAL_REQUIRED');
+  const attemptedSelfPass = await manager.independentlyVerifyOutcome(
+    'job.outcome-direct', 0, created.job, created.job.config, {}, {},
+  );
+  assert.equal(attemptedSelfPass.ok, false);
+  assert.match(attemptedSelfPass.pauseReason, /trusted independent criterion-evidence verification/);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1']);
 
   const restarted = managerFor(chrome);
