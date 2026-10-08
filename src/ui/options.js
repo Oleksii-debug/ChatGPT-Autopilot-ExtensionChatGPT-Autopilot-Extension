@@ -5038,10 +5038,6 @@ async function createSession() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
-  // Read-only Plan 7 ROI ingress: this version's Core may not support the
-  // canonical resolver command yet. Missing command always means OFFLINE,
-  // never restored/cached savings or an invented recommendation.
-  await refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
   await loadBrowserAgentExecutionPolicy();
   await loadRemoteDispatchStatus();
     await openSession(data.session.id);
@@ -5929,6 +5925,9 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  // One Core-owned read-only advisory on owner UI load; any missing Core
+  // resolver is explicitly OFFLINE. Never synthesize persisted ROI receipts.
+  await refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
   await loadBrowserAgentExecutionPolicy();
   await loadAgentDefinitionRegistries();
   await loadSpecialistRegistries();
