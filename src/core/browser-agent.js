@@ -554,13 +554,22 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     const evidence = raw.evidence;
     if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new Error('Browser Agent verify_plan_node requires evidence');
     const snapshotSignature = clean(evidence.snapshotSignature, 80);
-    const checks = Array.isArray(evidence.checks) ? evidence.checks.slice(0, 32).map((check, index) => {
+    // A verifier must receive the exact declared evidence set. Truncating a
+    // 33rd criterion or coercing an object/string to a numeric criterion can
+    // falsely change what the agent claims was independently verified.
+    if (evidence.checks !== undefined && (!Array.isArray(evidence.checks) || evidence.checks.length > 32)) {
+      throw new Error('Browser Agent verify_plan_node requires at most 32 explicit evidence checks');
+    }
+    const checks = (evidence.checks || []).map((check, index) => {
       if (!check || typeof check !== 'object' || Array.isArray(check)) throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} must be an object`);
-      const criterion = Number(check.criterion);
-      const detail = clean(check.detail || check.evidence, 1000);
-      if (!Number.isInteger(criterion) || criterion < 1 || !detail) throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} is invalid`);
-      return { criterion, detail };
-    }) : [];
+      const criterion = check.criterion;
+      const detailValue = check.detail === undefined ? check.evidence : check.detail;
+      if (!Number.isSafeInteger(criterion) || criterion < 1
+        || typeof detailValue !== 'string' || !detailValue.trim() || detailValue.length > 1000) {
+        throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} is invalid`);
+      }
+      return { criterion, detail: detailValue.trim() };
+    });
     action.evidence = { snapshotSignature, checks };
   }
   if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT].includes(type)) {
