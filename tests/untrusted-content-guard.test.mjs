@@ -488,3 +488,47 @@ test('S2 hostile proxy inspection exceptions never echo untrusted content or aut
   assert.equal(assessed.policyDecisionGranted, false);
   assert.deepEqual(assessed, assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(valid))));
 });
+
+test('S2 explicit undefined authority/proposal lists are malformed rather than silently omitted', () => {
+  const fields = [
+    ['ceiling', 'allowedCapabilityIds'],
+    ['ceiling', 'allowedToolIds'],
+    ['ceiling', 'allowedProviderIds'],
+    ['ceiling', 'allowedOutboundOrigins'],
+    ['proposal', 'requestedCapabilityIds'],
+    ['proposal', 'requestedToolIds'],
+    ['proposal', 'requestedProviderIds'],
+    ['proposal', 'requestedCredentialRefIds'],
+    ['proposal', 'outboundOrigins'],
+  ];
+  for (const [objectKey, field] of fields) {
+    const malformed = request();
+    malformed[objectKey][field] = undefined;
+    assert.throws(() => assessUntrustedContentInfluenceV1(malformed), /bounded plain array/);
+    assert.throws(() => assessUntrustedContentInfluenceV1(structuredClone(malformed)), /bounded plain array/);
+    const nullRestart = request();
+    nullRestart[objectKey][field] = null;
+    assert.throws(
+      () => assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(nullRestart))),
+      /bounded plain array/,
+    );
+  }
+
+  const sourceWithoutOrigin = request();
+  sourceWithoutOrigin.source.sourceOrigin = undefined;
+  assert.throws(() => assessUntrustedContentInfluenceV1(sourceWithoutOrigin), /canonical HTTP\(S\) origin/);
+  assert.throws(() => assessUntrustedContentInfluenceV1(structuredClone(sourceWithoutOrigin)), /canonical HTTP\(S\) origin/);
+
+  const legacy = request();
+  delete legacy.source.sourceOrigin;
+  for (const field of fields.filter(([objectKey]) => objectKey === 'proposal').map(([, field]) => field)) {
+    delete legacy.proposal[field];
+  }
+  const assessed = assessUntrustedContentInfluenceV1(legacy);
+  assert.equal(assessed.status, UntrustedContentGuardStatus.SAFE_FOR_POLICY);
+  assert.equal(assessed.instructionAuthority, 'NONE');
+  assert.equal(assessed.executionAuthorized, false);
+  assert.equal(assessed.policyDecisionGranted, false);
+  assert.equal(assessed.credentialSelectionAuthorized, false);
+  assert.deepEqual(assessed, assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(legacy))));
+});
