@@ -734,7 +734,19 @@ function normalizeRuntime(raw, now) {
 }
 
 function normalizeStore(raw, now) {
-  if (!raw || raw.schemaVersion !== BROWSER_AGENT_SCHEMA_VERSION || !Array.isArray(raw.order) || !raw.byId || typeof raw.byId !== 'object') return freshStore();
+  // Absence of prior state is a fresh installation. An *existing* unknown or
+  // malformed store is not: resetting it could discard pending effects and
+  // resurrect a duplicate job after restart. Do not write a new empty store
+  // over unrecognized durable authority; require explicit migration/recovery.
+  if (raw == null) return freshStore();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+      || raw.schemaVersion !== BROWSER_AGENT_SCHEMA_VERSION) {
+    throw new Error('Browser Agent store schemaVersion is unsupported; migration/reconciliation required');
+  }
+  if (!Array.isArray(raw.order) || !raw.byId || typeof raw.byId !== 'object'
+      || Array.isArray(raw.byId)) {
+    throw new Error('Browser Agent store structure is invalid; migration/reconciliation required');
+  }
   const out = freshStore();
   for (const id of raw.order) {
     if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
