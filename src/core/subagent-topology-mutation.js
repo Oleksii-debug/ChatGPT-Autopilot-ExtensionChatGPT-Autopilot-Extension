@@ -201,11 +201,13 @@ function replayActivationAdmitted({
 }
 
 function activationInFlight(nodeRuntime) {
-  if (!nodeRuntime?.currentActivationId) return false;
-  const current = nodeRuntime.activationLedger?.[nodeRuntime.currentActivationId];
-  return Boolean(
-    current
-    && !['TERMINAL', 'SUPERSEDED'].includes(current.phase),
+  if (!nodeRuntime?.activationLedger) return false;
+  // A crash/restart can recover durable PREPARED/AMBIGUOUS ledger entries
+  // before the currentActivationId pointer is reconciled. Count every
+  // nonterminal entry as occupying a slot; otherwise a sibling may be
+  // activated beyond the parent's bounded fanout after replay.
+  return Object.values(nodeRuntime.activationLedger).some(
+    item => item && !['TERMINAL', 'SUPERSEDED'].includes(item.phase),
   );
 }
 
