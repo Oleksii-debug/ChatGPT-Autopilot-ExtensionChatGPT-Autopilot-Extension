@@ -87,7 +87,8 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || value?.result?.executionAuthorized !== false
           || value?.result?.schedulerAuthority !== false
           || value?.result?.policyDecisionAuthorized !== false
-          || value?.result?.exactEffectAuthority !== false) {
+          || value?.result?.exactEffectAuthority !== false
+          || value?.result?.storeMutationAuthority !== false) {
           throw new Error('Unbound response');
         }
         return value;

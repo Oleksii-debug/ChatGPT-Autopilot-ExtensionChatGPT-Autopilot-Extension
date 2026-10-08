@@ -19,7 +19,7 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
       },
       adapterGrantsAuthority: false, executionAuthorized: false,
       schedulerAuthority: false, policyDecisionAuthorized: false,
-      exactEffectAuthority: false,
+      exactEffectAuthority: false, storeMutationAuthority: false,
     },
   };
 }
@@ -117,4 +117,18 @@ test('response identity is bound to serialized wire bytes despite caller TOCTOU 
   assert.equal(sentProject, BASE.projectId);
   assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT');
   assert.equal(invocations, 1, 'uncertain effect must not be sent twice');
+});
+
+test('transport receipt cannot assert store mutation authority', async () => {
+  for (const forged of [true, 'false', 1, null]) {
+    const reply = transportResponse();
+    reply.result.storeMutationAuthority = forged;
+    assert.equal((await attempt(reply)).status, 'UNKNOWN_NETWORK_RESULT');
+  }
+  const missing = transportResponse();
+  delete missing.result.storeMutationAuthority;
+  assert.equal((await attempt(missing)).status, 'UNKNOWN_NETWORK_RESULT');
+  const valid = await attempt(transportResponse());
+  assert.equal(valid.status, 'RECEIVED');
+  assert.equal(valid.result.storeMutationAuthority, false);
 });
