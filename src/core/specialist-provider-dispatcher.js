@@ -77,6 +77,65 @@ function freeze(value) {
   return Object.freeze(value);
 }
 
+// Provider-facing readiness must never execute caller-supplied accessors while
+// cloning nested evidence. Bound the complete snapshot before any effect.
+function cloneReadinessEvidence(value, label, depth = 0, budget = { count: 0 }, ancestors = new Set()) {
+  budget.count += 1;
+  if (depth > 12 || budget.count > 4096) throw new Error('Specialist readiness evidence exceeds canonical bounds');
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.length > 16384) throw new Error('Specialist readiness evidence string exceeds canonical bounds');
+    return value;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (!value || typeof value !== 'object' || ancestors.has(value)) {
+    throw new Error(`${label} is not canonical data`);
+  }
+  ancestors.add(value);
+  let result;
+  if (Array.isArray(value)) {
+    result = array(value, label, 512).map((item, index) =>
+      cloneReadinessEvidence(item, `${label}[${index}]`, depth + 1, budget, ancestors));
+  } else {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain data object`);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Reflect.ownKeys(descriptors).length > 128) throw new Error(`${label} has too many fields`);
+    result = Object.create(null);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || key.length > 180
+          || ['__proto__', 'prototype', 'constructor'].includes(key)) {
+        throw new Error(`${label} contains a non-canonical field`);
+      }
+      const descriptor = descriptors[key];
+      if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(`${label}.${key} must be an enumerable own data property`);
+      }
+      result[key] = cloneReadinessEvidence(descriptor.value, `${label}.${key}`, depth + 1, budget, ancestors);
+    }
+  }
+  ancestors.delete(value);
+  return result;
+}
+
+const READINESS_AUTHORITY_FIELDS = new Set([
+  'providerExecutionAuthorized', 'toolExecutionAuthorized', 'policyAuthorized',
+  'schedulingAuthorized', 'recoveryAuthorized', 'credentialAuthorized',
+  'completionAuthorized', 'verificationAuthorized', 'capacityReserved',
+]);
+const INSPECTION_FIELDS = new Set([
+  'schemaVersion', 'registryId', 'registryRevision', 'specialistId',
+  'providerId', 'definitionRevision', 'executionPlane', 'requiredToolIds',
+  'readiness', 'executable', 'checks', 'requiresFreshTrustedResolution', 'authority',
+]);
+
+function inertReadinessAuthority(value, label) {
+  const fields = record(value, READINESS_AUTHORITY_FIELDS, label);
+  for (const key of READINESS_AUTHORITY_FIELDS) {
+    if (fields[key] !== false) throw new Error(`${label} cannot grant execution authority`);
+  }
+}
+
 function readiness(input, selection, ownership, nowMs) {
   const raw = record(input, new Set([
     'schemaVersion', 'registryId', 'registryRevision', 'specialistId', 'providerId',
@@ -111,7 +170,21 @@ function readiness(input, selection, ownership, nowMs) {
     throw new Error('Specialist readiness is stale at provider dispatch');
   }
   if (ownership.policyEnvelopeId === '') throw new Error('Provider dispatch requires policy envelope authority');
-  return freeze(structuredClone(raw));
+  const evidence = cloneReadinessEvidence(raw, 'readiness');
+  inertReadinessAuthority(evidence.authority, 'readiness.authority');
+  const inspection = record(evidence.inspection, INSPECTION_FIELDS, 'readiness.inspection');
+  inertReadinessAuthority(inspection.authority, 'readiness.inspection.authority');
+  if (inspection.executable !== true || inspection.readiness !== evidence.readiness
+      || inspection.requiresFreshTrustedResolution !== true) {
+    throw new Error('Specialist readiness inspection disagrees with provider dispatch');
+  }
+  for (const key of ['registryId', 'registryRevision', 'specialistId', 'providerId',
+    'definitionRevision', 'executionPlane']) {
+    if (inspection[key] !== selection[key]) {
+      throw new Error('Specialist readiness inspection does not match selection');
+    }
+  }
+  return freeze(evidence);
 }
 
 export class SpecialistProviderDispatcherV1 {
