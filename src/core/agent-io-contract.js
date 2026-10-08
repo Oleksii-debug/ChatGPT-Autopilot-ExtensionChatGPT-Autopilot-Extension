@@ -99,7 +99,7 @@ function normalizeTimestamp(value, label) {
   // An event's chronology is evidence. Date.parse accepts ambiguous shorthand
   // and can silently roll impossible calendar days into another month; neither
   // is a trustworthy durable event timestamp.
-  const format = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/u;
+  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (typeof value !== 'string' || !format.test(value)) {
     throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
   }
