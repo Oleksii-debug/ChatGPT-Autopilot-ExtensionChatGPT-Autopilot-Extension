@@ -701,3 +701,165 @@ test('Plan-1: explicit persisted null is not an absent legacy store and never pe
   assert.equal(created.job.id, 'job.new-install');
   assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.new-install']);
 });
+
+
+function plan1OutcomeContract(desiredResult, projectId = '', overrides = {}) {
+  return {
+    schemaVersion: 1,
+    contractId: 'outcome.bound-1',
+    projectId,
+    desiredResult,
+    completionCriteria: [{
+      criterionId: 'proof-1',
+      description: 'Observed source must support the owner goal.',
+      observable: 'Readback of a canonical source and independent verification.',
+      requiredEvidenceKinds: ['test-report'],
+    }],
+    constraints: ['No duplicate effect or owner authority.'],
+    sourceTruth: [{
+      sourceId: 'source-1',
+      location: 'https://example.org/verified-source',
+      revisionId: 'rev-1',
+      purpose: 'Exact source evidence.',
+    }],
+    allowedAuthority: [],
+    budgetBoundaries: {
+      maxModelCalls: 5,
+      maxRuntimeSeconds: 600,
+      maxCostUsdMicros: 0,
+      maxConcurrency: 1,
+    },
+    deliverables: [{
+      deliverableId: 'deliverable-1',
+      kind: 'report',
+      description: 'Verifiable evidence-bound output.',
+      criterionIds: ['proof-1'],
+    }],
+    verifierPlan: {
+      planId: 'verify-1',
+      actorId: 'actor-1',
+      verifierId: 'independent-1',
+      criterionIds: ['proof-1'],
+      requiredEvidenceArtifactCount: 1,
+      independent: true,
+    },
+    triggerRefs: [],
+    createdAt: '2026-10-08T10:00:00.000Z',
+    revision: 1,
+    advisoryOnly: true,
+    ownerAccepted: false,
+    executionAuthorized: false,
+    ...overrides,
+  };
+}
+
+test('Plan-1: direct Outcome Contract is advisory, exact-goal-bound and survives cold restart', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const goal = 'Read the canonical evidence and independently verify the source.';
+  const contract = plan1OutcomeContract(goal, 'project-1');
+  const pending = manager.create({
+    id: 'job.outcome-direct', goal, projectId: 'project-1', outcomeContract: contract,
+  });
+  contract.desiredResult = 'An attacker changed the owner goal after admission.';
+  contract.completionCriteria[0].criterionId = 'attacker-criterion';
+  const created = await pending;
+  assert.equal(created.job.outcomeContract.desiredResult, goal);
+  assert.equal(created.job.outcomeContract.completionCriteria[0].criterionId, 'proof-1');
+  assert.equal(created.job.outcomeContract.advisoryOnly, true);
+  assert.equal(created.job.outcomeContract.executionAuthorized, false);
+  assert.equal(created.job.outcomeContract.ownerAccepted, false);
+  assert.equal(created.job.outcomeContract.verifierPlan.verificationAuthority, 'EXTERNAL_REQUIRED');
+  assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1']);
+
+  const restarted = managerFor(chrome);
+  const loaded = (await restarted.get('job.outcome-direct')).job;
+  assert.deepEqual(loaded.outcomeContract, created.job.outcomeContract);
+  const safeEdit = await restarted.updateConfig('job.outcome-direct', { maxSteps: 9 });
+  assert.equal(safeEdit.job.config.maxSteps, 9);
+  assert.equal(safeEdit.job.outcomeContract.desiredResult, goal);
+  await assert.rejects(
+    () => restarted.updateConfig('job.outcome-direct', { goal: 'Different outcome' }),
+    /desiredResult does not match/,
+  );
+  await assert.rejects(
+    () => restarted.updateConfig('job.outcome-direct', { acceptanceCriteria: ['Changed proof gate'] }),
+    /bound Outcome Contract criteria cannot change/,
+  );
+  await assert.rejects(
+    () => restarted.updateConfig('job.outcome-direct', { outcomeContract: null }),
+    /outcome contract is immutable/,
+  );
+  assert.equal((await restarted.get('job.outcome-direct')).job.config.goal, goal);
+});
+
+test('Plan-1: hostile Outcome Contract admission fails closed before any durable write', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const goal = 'Inspect only the admitted goal.';
+  let getterCalls = 0;
+  const contract = plan1OutcomeContract(goal);
+  Object.defineProperty(contract.completionCriteria[0], 'description', {
+    enumerable: true,
+    get() { getterCalls += 1; throw new Error('private-intake-secret'); },
+  });
+  await assert.rejects(
+    () => manager.create({ id: 'job.contract-getter', goal, outcomeContract: contract }),
+    /enumerable data property/,
+  );
+  assert.equal(getterCalls, 0, 'untrusted getters must never be evaluated');
+
+  for (const [suffix, outcome] of [
+    ['goal', plan1OutcomeContract('Contradictory desired result')],
+    ['project', plan1OutcomeContract(goal, 'other-project')],
+    ['unknown', plan1OutcomeContract(goal, '', { schemaVersion: 2 })],
+    ['authority', plan1OutcomeContract(goal, '', { executionAuthorized: true })],
+  ]) {
+    await assert.rejects(
+      () => manager.create({ id: 'job.contract-' + suffix, goal, outcomeContract: outcome }),
+    );
+  }
+  assert.deepEqual(Object.keys(data), [], 'all denied outcomes must leave the store untouched');
+});
+
+test('Plan-1: corrupt persisted outcome is quarantined without loss or effect replay', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const goal = 'Bind evidence to exact canonical state.';
+  await manager.create({
+    id: 'job.outcome-corrupt', goal, outcomeContract: plan1OutcomeContract(goal),
+  });
+  data.autopilotBrowserAgentV1.byId['job.outcome-corrupt'].outcomeContract.desiredResult = 'Forged after restart';
+  const evidenceBefore = structuredClone(data.autopilotBrowserAgentV1);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.outcome-corrupt')).job, null);
+  await assert.rejects(
+    () => restarted.create({ id: 'job.new', goal: 'Do not erase quarantined effect history' }),
+    /quarantined; mutation requires explicit recovery/,
+  );
+  assert.deepEqual(data.autopilotBrowserAgentV1, evidenceBefore);
+});
+
+test('Plan-1: reusable Definition Outcome Contract binds the true owner task, not its instruction prefix', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const request = launchRequest({ outcomeContract: plan1OutcomeContract(
+    'Compare the current evidence and produce a verified result.', 'project-1',
+  ) });
+  const accepted = await manager.createFromAgentDefinition(request);
+  assert.equal(accepted.job.outcomeContract.desiredResult, request.goal);
+  assert.equal(accepted.job.outcomeContract.verifierPlan.verificationAuthority, 'EXTERNAL_REQUIRED');
+  assert.match(accepted.job.config.goal, /Reusable Agent definition instructions:/);
+  const resumed = managerFor(chrome);
+  assert.equal((await resumed.get('job.research-1')).job.outcomeContract.desiredResult, request.goal);
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId: 'job.definition-mismatch',
+      outcomeContract: plan1OutcomeContract('A different owner task.', 'project-1'),
+    })),
+    /desiredResult does not match/,
+  );
+  assert.equal((await resumed.get('job.definition-mismatch')).job, null);
+});
