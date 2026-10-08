@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
+import { normalizeAiRoutePool, normalizeAiRoutePolicy, normalizeAiWorkerPolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
 import { AiOrchestrator, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
@@ -1057,4 +1057,56 @@ test('Plan4 S2: erased local provider/origin does not dispatch to a different se
   assert.equal(legacy.providerType, 'ollama');
   assert.equal(legacy.baseUrl, 'http://127.0.0.1:11434');
   assert.equal(normalizeLocalAiSettings(JSON.parse(JSON.stringify(settings))).model, 'llama3');
+});
+
+
+test('Plan4 S1: numeric route caps and worker allocation cannot be silently erased or coerced', () => {
+  for (const field of ['priority', 'maxWorkers']) {
+    for (const bad of [null, undefined]) {
+      assert.throws(() => normalizeAiRoutePool([{...route, [field]:bad}]), /invalid/);
+    }
+  }
+  for (const bad of ['', '  ', '0x0', '0b1', '1e1', '00', '-0', '+0', ' 1 ']) {
+    assert.throws(() => normalizeAiRoutePool([{...route, priority:bad}]), /invalid/);
+    assert.throws(() => normalizeAiRoutePolicy({retryBackoffSeconds:bad}), /invalid/);
+  }
+  for (const [field, bad] of [
+    ['allocationMode',undefined], ['minWorkers',null], ['minWorkers',undefined],
+    ['maxParallelWorkers',null], ['maxParallelWorkers',undefined],
+    ['manualRouteWorkers',null], ['manualRouteWorkers',undefined],
+  ]) {
+    assert.throws(() => normalizeAiWorkerPolicy({[field]:bad}, [route]));
+  }
+  const valid = normalizeAiRoutePool([{...route, priority:'12', maxWorkers:2}])[0];
+  assert.equal(valid.priority,12);
+  assert.equal(valid.maxWorkers,2);
+  assert.equal(normalizeAiRoutePolicy({retryBackoffSeconds:'30'}).retryBackoffSeconds,30);
+  const worker = normalizeAiWorkerPolicy(
+    JSON.parse(JSON.stringify({allocationMode:'manual',minWorkers:1,maxParallelWorkers:2,manualRouteWorkers:{[route.routeId]:1}})),
+    [valid],
+  );
+  assert.equal(worker.manualRouteWorkers[route.routeId],1);
+  assert.equal(normalizeAiRoutePool([route])[0].maxWorkers,0);
+});
+
+test('Plan4 S2: explicit undefined local model, enablement and timeout fail before provider effect', async () => {
+  let effects=0;
+  const client = new LocalAiClient({
+    fetchFn:async()=>{effects++; throw Error('unexpected outbound effect');},
+    setTimeoutFn:()=>1,
+    clearTimeoutFn:()=>{},
+  });
+  for (const field of ['enabled','model','timeoutSeconds']) {
+    const corrupted={...settings,[field]:undefined};
+    assert.throws(()=>normalizeLocalAiSettings(corrupted), /cannot be undefined/);
+    await assert.rejects(client.complete(corrupted,'do not dispatch'), /cannot be undefined/);
+  }
+  assert.equal(effects,0);
+  const restored=normalizeLocalAiSettings(JSON.parse(JSON.stringify(settings)));
+  assert.equal(restored.model,'llama3');
+  assert.equal(restored.timeoutSeconds,5);
+  const legacy=normalizeLocalAiSettings({});
+  assert.equal(legacy.enabled,false);
+  assert.equal(legacy.model,'');
+  assert.equal(legacy.timeoutSeconds,90);
 });
