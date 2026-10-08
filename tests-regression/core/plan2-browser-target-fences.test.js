@@ -294,3 +294,34 @@ test('semantic check still toggles a stable and visible target', () => {
   assert.equal(result.checked, true);
   assert.equal(element.clicked, 1);
 });
+
+test('visual fallback refuses inert or aria-hidden ancestors', () => {
+  setup();
+  const observed = probeBrowserCoordinateTarget(20, 20);
+  const proof = browserAgentCoordinateTargetFingerprint(observed.target);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).ok, true);
+  element.parentElement = { inert: true, parentElement: null, getAttribute: () => null };
+  assert.equal(probeBrowserCoordinateTarget(20, 20), null);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).reason, 'missing-target');
+  element.parentElement = { inert: false, parentElement: null, getAttribute: (key) => key === 'aria-hidden' ? 'true' : null };
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).reason, 'missing-target');
+  element.parentElement = null;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).ok, true);
+});
+
+test('visual fallback refuses pointer-events-disabled targets', () => {
+  setup();
+  const observed = probeBrowserCoordinateTarget(20, 20);
+  const proof = browserAgentCoordinateTargetFingerprint(observed.target);
+  const originalStyle = globalThis.getComputedStyle;
+  try {
+    globalThis.getComputedStyle = () => ({
+      display: 'block', visibility: 'visible', opacity: 1, pointerEvents: 'none',
+    });
+    assert.equal(probeBrowserCoordinateTarget(20, 20), null);
+    assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).reason, 'missing-target');
+  } finally {
+    globalThis.getComputedStyle = originalStyle;
+  }
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, proof).ok, true);
+});
