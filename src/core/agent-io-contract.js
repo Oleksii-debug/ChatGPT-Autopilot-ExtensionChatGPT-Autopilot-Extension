@@ -152,7 +152,7 @@ function cloneData(value, label) {
 export function normalizeAgentAction(input) {
   const action = requirePlainObject(input, 'Agent action', ACTION_FIELDS);
   if (action.schemaVersion !== 1) throw new Error('Unsupported agent action schemaVersion');
-  const type = String(action.type || '').trim();
+  const type = typeof action.type === 'string' ? action.type.trim() : '';
   if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
   const providerId = requireId(action.providerId, 'providerId');
   requireProviderCapabilityForAction(providerId, type);
@@ -172,7 +172,7 @@ export function normalizeAgentAction(input) {
 export function normalizeAgentEvent(input) {
   const event = requirePlainObject(input, 'Agent event', EVENT_FIELDS);
   if (event.schemaVersion !== 1) throw new Error('Unsupported agent event schemaVersion');
-  const type = String(event.type || '').trim();
+  const type = typeof event.type === 'string' ? event.type.trim() : '';
   if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
   const providerId = requireId(event.providerId, 'providerId');
   requireProviderCapabilityForEvent(providerId, type);
