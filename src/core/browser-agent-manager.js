@@ -877,7 +877,10 @@ function normalizeStore(raw, now) {
   // malformed store is not: resetting it could discard pending effects and
   // resurrect a duplicate job after restart. Do not write a new empty store
   // over unrecognized durable authority; require explicit migration/recovery.
-  if (raw == null) return freshStore();
+  // Only a genuinely missing Chrome storage key is a fresh install. An
+  // explicitly persisted null is ambiguous/corrupt authority: treating it as
+  // empty could erase unreconciled effects on the next unrelated write.
+  if (raw === undefined) return freshStore();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)
       || raw.schemaVersion !== BROWSER_AGENT_SCHEMA_VERSION) {
     throw new Error('Browser Agent store schemaVersion is unsupported; migration/reconciliation required');
