@@ -306,3 +306,58 @@ test('local API concurrent distinct IDs preserve independent canonical dispatch'
   }, dependencies(counters));
   assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
 });
+
+
+test('owner-injected token rotation revokes the old credential without Core dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const freshToken = 'next-owner-credential-test-only-'.repeat(3);
+  let activeToken = TOKEN;
+  let lookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => {
+      lookups += 1;
+      return activeToken;
+    },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const oldClient = createAutopilotLocalClientV1({ token: TOKEN, port });
+    assert.equal((await oldClient.control(request('rotation-initial'))).status, 'RECEIVED');
+    activeToken = freshToken;
+    const retired = await oldClient.control(request('rotation-retired'));
+    assert.equal(retired.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(retired.httpStatus, 401);
+    const currentClient = createAutopilotLocalClientV1({ token: freshToken, port });
+    assert.equal((await currentClient.control(request('rotation-current'))).status, 'RECEIVED');
+    activeToken = null;
+    const missing = await currentClient.control(request('rotation-missing'));
+    assert.equal(missing.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(missing.httpStatus, 401);
+    assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
+    assert.equal(lookups, 4);
+  } finally {
+    await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
+
+test('token rotation provider exceptions and conflicting static fallback fail closed', async () => {
+  assert.throws(() => createAutopilotLocalApiServerV1({
+    token: TOKEN, tokenProvider: () => TOKEN, dependencies: dependencies(),
+  }), /either a static token or a trusted tokenProvider/u);
+  const counters = { scopes: 0, dispatches: 0 };
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { throw new Error('private owner credential failure'); },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port: server.address().port });
+    const result = await client.control(request('rotation-provider-error'));
+    assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(result.httpStatus, 401);
+    assert.equal(JSON.stringify(result).includes('private owner credential'), false);
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
