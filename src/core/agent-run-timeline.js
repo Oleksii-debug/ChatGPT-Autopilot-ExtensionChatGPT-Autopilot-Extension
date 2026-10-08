@@ -68,16 +68,32 @@ const ACTION_DETAIL_EVENTS = new Set(['action', 'trusted-script-executed', 'effe
 
 function record(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(name + ' must be a plain record');
-  const prototype = Object.getPrototypeOf(value);
+  let prototype;
+  try { prototype = Object.getPrototypeOf(value); }
+  catch { throw new Error(name + ' cannot be safely inspected'); }
   if (prototype !== Object.prototype && prototype !== null) throw new Error(name + ' must be a plain record');
   return value;
 }
 function own(value, key) {
   if (!value || typeof value !== 'object') return undefined;
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  let descriptor;
+  try { descriptor = Object.getOwnPropertyDescriptor(value, key); }
+  catch { throw new Error('Agent timeline field cannot be safely inspected'); }
   if (!descriptor) return undefined;
   if (!Object.hasOwn(descriptor, 'value')) throw new Error('Agent timeline refuses accessor-backed ' + String(key));
   return descriptor.value;
+}
+function safeOwnKeys(value) {
+  try { return Reflect.ownKeys(value); }
+  catch { throw new Error('Agent timeline options cannot be safely inspected'); }
+}
+function safeHasOwn(value, key) {
+  try { return Object.hasOwn(value, key); }
+  catch { throw new Error('Agent timeline field presence cannot be safely inspected'); }
+}
+function plainArray(value) {
+  try { return Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype; }
+  catch { throw new Error('Agent timeline array cannot be safely inspected'); }
 }
 function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   return Number.isSafeInteger(value) && value >= min && value <= max ? value : 0;
@@ -111,7 +127,7 @@ function safeHistory(history) {
   // Missing history is supported for old persisted snapshots, but an
   // explicitly persisted null is corruption, not evidence of zero events.
   if (history === undefined) return { items: [], total: 0 };
-  if (!Array.isArray(history) || Object.getPrototypeOf(history) !== Array.prototype) {
+  if (!plainArray(history)) {
     throw new Error('Agent history must be a dense array');
   }
   const total = own(history, 'length');
@@ -141,7 +157,7 @@ function planSummary(plan) {
   // An explicitly persisted malformed plan must not be presented as an
   // empty plan after restart. Only a genuinely absent optional nodes field
   // preserves the legacy zero-node projection.
-  if (nodes !== undefined && (!Array.isArray(nodes) || Object.getPrototypeOf(nodes) !== Array.prototype)) {
+  if (nodes !== undefined && !plainArray(nodes)) {
     throw new Error('Agent plan nodes must be a plain array');
   }
   if (Array.isArray(nodes)) {
@@ -171,7 +187,7 @@ function recordedOutcomeSummary(value) {
   const checks = own(value, 'checks');
   let count = 0;
   if (checks != null) {
-    if (!Array.isArray(checks) || Object.getPrototypeOf(checks) !== Array.prototype || checks.length > 20) {
+    if (!plainArray(checks) || own(checks, 'length') > 20) {
       throw new Error('Agent recorded outcome checks must be a bounded dense array');
     }
     for (let i = 0; i < checks.length; i += 1) {
@@ -193,7 +209,7 @@ function recordedOutcomeSummary(value) {
 export function buildAgentRunTimelineV1(job, options = {}) {
   record(job, 'Agent timeline job');
   record(options, 'Agent timeline options');
-  const keys = Reflect.ownKeys(options);
+  const keys = safeOwnKeys(options);
   if (keys.some(key => typeof key !== 'string' || !['limit', 'filter'].includes(key))) {
     throw new Error('Agent timeline options contains unknown fields');
   }
@@ -212,7 +228,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const rawType = own(entry, 'type');
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
-    const hasRecordedTime = Object.hasOwn(entry, 'at');
+    const hasRecordedTime = safeHasOwn(entry, 'at');
     const rawAction = own(entry, 'action');
     let actionType = '';
     if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
