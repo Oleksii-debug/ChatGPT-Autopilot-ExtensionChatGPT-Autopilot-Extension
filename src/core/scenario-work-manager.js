@@ -1269,6 +1269,14 @@ export class ScenarioWorkManager {
     const session = before.sessionsById?.[sessionId];
     if (!session?.scenarioWork?.managed) return { removed: true, pending: false, reason: 'ALREADY_GONE' };
 
+    // The physical tab must outlive the configured post-Send observation dwell,
+    // even when the assistant finishes quickly. Keep the existing durable
+    // cleanup obligation; the scenario alarm will retry after the hold expires.
+    // Explicit owner retirement (forceSafe) is allowed to interrupt the dwell.
+    if (!forceSafe && Number(session.operation?.postSendHoldUntil || 0) > this.now()) {
+      return { removed: false, pending: true, reason: 'POST_SEND_DWELL_PENDING' };
+    }
+
     if (forceSafe) {
       // Only a durable timeout or explicit owner retirement authorizes this.
       // Settle unknown effects without inventing Send/response success, and
@@ -1368,6 +1376,11 @@ export class ScenarioWorkManager {
     if (hint?.sessionId !== sessionId || hint?.ownedByExtension !== true
         || !Number.isInteger(hint?.tabId)) {
       return { closed: false, reason: 'TAB_NOT_EXTENSION_OWNED' };
+    }
+
+    const session = state.sessionsById?.[sessionId];
+    if (Number(session?.operation?.postSendHoldUntil || 0) > this.now()) {
+      return { closed: false, reason: 'POST_SEND_DWELL_PENDING' };
     }
 
     await this.coreRepository.update(next => {
