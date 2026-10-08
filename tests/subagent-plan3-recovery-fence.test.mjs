@@ -86,3 +86,37 @@ test('stale restart clock and resource/child authority exhaustion fail closed', 
   assert.equal(policyDenied.decision, 'DENY');
   assert.equal(policyDenied.createdNodeIds.length, 0);
 });
+
+test('ALL_DIRECT_CHILDREN barrier allows idempotent durable restart replay without a second spawn', () => {
+  const allChildrenGraph = validateOrchestrationGraphV1({
+    schemaVersion: graph.schemaVersion,
+    graphId: graph.graphId,
+    controlEpoch: graph.controlEpoch,
+    loopPolicy: structuredClone(graph.loopPolicy),
+    promptProfiles: structuredClone(graph.promptProfiles),
+    nodes: graph.nodeOrder.map(nodeId => ({
+      ...structuredClone(graph.nodesById[nodeId]),
+      barrier: { mode: 'ALL_DIRECT_CHILDREN', childIds: [] },
+    })),
+  });
+  const initialRuntime = createOrchestrationHierarchyRuntime(allChildrenGraph, 100);
+  initialRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const initial = validateOrchestrationHierarchyRuntimeV1(allChildrenGraph, initialRuntime);
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    graph: allChildrenGraph, runtime: initial,
+  }));
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.reused, false);
+  assert.equal(first.graph.nodesById.root.barrier.mode, 'ALL_DIRECT_CHILDREN');
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: JSON.parse(JSON.stringify(first.graph)),
+    runtime: JSON.parse(JSON.stringify(first.runtime)),
+    nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.createdNodeIds, first.createdNodeIds);
+  assert.equal(replay.graph.nodeOrder.length, first.graph.nodeOrder.length);
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
