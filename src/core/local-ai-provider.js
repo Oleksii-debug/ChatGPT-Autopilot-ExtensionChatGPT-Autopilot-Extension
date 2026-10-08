@@ -428,9 +428,22 @@ export class LocalAiClient {
         },
       });
       responseReceived = true;
-      return typeof consumeResponse === 'function'
+      // Some transports and body readers resolve despite AbortSignal abort.
+      // Do not publish stale provider bytes as a successful completion after expiry.
+      if (controller.signal.aborted) {
+        const late = new Error('Local AI response arrived after request cancellation');
+        late.code = 'LOCAL_AI_LATE_RESPONSE';
+        throw late;
+      }
+      const consumed = typeof consumeResponse === 'function'
         ? await consumeResponse(response)
         : response;
+      if (controller.signal.aborted) {
+        const late = new Error('Local AI response body finished after request cancellation');
+        late.code = 'LOCAL_AI_LATE_RESPONSE';
+        throw late;
+      }
+      return consumed;
     } catch (error) {
       if (controller.signal.aborted || error?.name === 'AbortError') {
         const timeout = new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
