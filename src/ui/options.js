@@ -9,6 +9,7 @@ import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from '.
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
 import { createAgentViewFenceV1, createAgentJobsReadGateV1, readAgentJobsWithDeadlineV1, describeAgentSpecialistProgressV1 } from './agent-owner-view.js';
+import { buildAgentRunTimelineV1 } from '../core/agent-run-timeline.js';
 import {
   agentDefinitionLaunchScopeTextV1,
   buildAgentDefinitionLaunchRequestV1,
@@ -3432,6 +3433,7 @@ async function prepareAutomaticSpecialistDelegation() {
 }
 
 function renderBrowserAgentJob(job) {
+  renderAgentRunTimeline(job);
   ui.selectedBrowserAgent = job || null;
   const runtime = job?.runtime || {};
   const config = job?.config || {};
@@ -3492,6 +3494,75 @@ ${pendingScript}` : '';
     : 'Історії ще немає.';
   renderBrowserAgentPlan(runtime);
   if (!ui.agentDraftActive && !ui.agentPolicyDirty) fillBrowserAgentPolicy(config);
+}
+
+// Projection only: the canonical BrowserAgentManager remains the sole state owner.
+function renderAgentRunTimeline(job) {
+  ui.agentTimelineJob = job || null;
+  const list = $('agent-run-timeline-list');
+  const status = $('agent-run-timeline-status');
+  if (!job) {
+    list.replaceChildren();
+    status.textContent = 'Немає вибраного завдання Agent.';
+    return;
+  }
+  try {
+    const filter = $('agent-run-timeline-filter').value || 'ALL';
+    const timeline = buildAgentRunTimelineV1(job, { filter });
+    list.replaceChildren();
+    for (const entry of timeline.entries) {
+      const item = document.createElement('li');
+      const timestamp = document.createElement('time');
+      if (entry.at) timestamp.dateTime = new Date(entry.at).toISOString();
+      timestamp.textContent = entry.at ? new Date(entry.at).toLocaleString('uk-UA') : 'Час невідомий';
+      const description = document.createElement('span');
+      description.textContent = ' — ' + entry.description + (entry.actionType ? ' Тип дії: ' + entry.actionType + '.' : '');
+      item.append(timestamp, description);
+      list.append(item);
+    }
+    const counters = timeline.counters;
+    status.textContent = 'Agent: показано ' + timeline.returnedEntries +
+      ' подій; переглянуто ' + timeline.inspectedEntries +
+      ' із ' + timeline.totalRecorded + '. План, редакція ' + timeline.plan.revision +
+      ', вузлів ' + timeline.plan.nodeCount + '. Кроків ' + counters.steps +
+      ', викликів моделі ' + counters.modelCalls + ', токенів ' + counters.totalTokens +
+      ', підтверджених перевірок ' + counters.verifiedChecks +
+      ', дій власника ' + counters.ownerEvents + '.' +
+      (timeline.truncated ? ' Історію обмежено останніми подіями.' : '') +
+      ' Це перегляд, а не повторне виконання.';
+  } catch {
+    list.replaceChildren();
+    status.textContent = 'Безпечна хронологія недоступна: перевірте збережений стан Agent.';
+  }
+}
+async function refreshAgentRunTimeline() {
+  const button = $('agent-run-timeline-refresh-button');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const result = await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
+    if (result.applied) {
+      announce('Хронологію Agent оновлено з Core.');
+    } else {
+      $('agent-run-timeline-status').textContent = 'Не вдалося оновити. Перевірте Core і повторіть.';
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+function exportAgentRunTimeline() {
+  const job = ui.agentTimelineJob;
+  if (!job) {
+    $('agent-run-timeline-status').textContent = 'Спочатку виберіть завдання Agent.';
+    return;
+  }
+  try {
+    const timeline = buildAgentRunTimelineV1(job, { filter: $('agent-run-timeline-filter').value || 'ALL' });
+    downloadJson(timeline, 'ChatGPT-Autopilot-Agent-run-timeline-redacted.json');
+    announce('Безпечну хронологію Agent експортовано.');
+  } catch {
+    $('agent-run-timeline-status').textContent = 'Експорт недоступний: стан Agent потребує перевірки.';
+  }
 }
 
 function renderBrowserAgentList() {
@@ -5715,6 +5786,9 @@ $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
+$('agent-run-timeline-filter').addEventListener('change', () => renderAgentRunTimeline(ui.agentTimelineJob));
+$('agent-run-timeline-refresh-button').addEventListener('click', refreshAgentRunTimeline);
+$('agent-run-timeline-export-button').addEventListener('click', exportAgentRunTimeline);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
 $('agent-resume-button').addEventListener('click', () => browserAgentLifecycle('RESUME_BROWSER_AGENT_JOB'));
 $('agent-stop-button').addEventListener('click', () => browserAgentLifecycle('STOP_BROWSER_AGENT_JOB'));
