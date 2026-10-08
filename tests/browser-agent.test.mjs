@@ -1249,7 +1249,7 @@ test('Plan-1: owner pause during independent DONE verification cannot report com
         await manager.pause('job-outcome-epoch');
         return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Page version 0 is visible.' }] }) };
       }
-      const marker = 'CURRENT SNAPSHOT:\\n';
+      const marker = 'CURRENT SNAPSHOT:\n';
       const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
       return { text: JSON.stringify({
         type: 'done', summary: 'Proof proposed',
