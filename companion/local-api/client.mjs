@@ -43,6 +43,49 @@ function exactTransportArtifactShape(received) {
   });
 }
 
+
+/**
+ * Transport RECEIVED is only a scoped acknowledgement, never permission to
+ * run effects. Do not return attacker-defined extension fields in its JSON
+ * envelope as if they came from the canonical Core contract. All nested
+ * records must have the exact own enumerable data-field shape of Core V1.
+ */
+const RESPONSE_FIELDS = Object.freeze(['schemaVersion', 'status', 'result']);
+const RESULT_FIELDS = Object.freeze([
+  'schemaVersion', 'request', 'scopeProof', 'receipt', 'assessedAt', 'dispatchAt',
+  'completedAt', 'readOnly', 'downstreamAuthorityRequired',
+  'adapterGrantsAuthority', 'executionAuthorized', 'policyDecisionAuthorized',
+  'storeMutationAuthority', 'schedulerAuthority', 'exactEffectAuthority',
+]);
+const REQUEST_FIELDS = Object.freeze([
+  'schemaVersion', 'requestId', 'principalId', 'projectId', 'operation',
+  'targetId', 'payloadArtifactRef', 'requestedAt',
+]);
+const SCOPE_FIELDS = Object.freeze([
+  'schemaVersion', 'scopeRevisionId', 'requestId', 'principalId', 'projectId',
+  'operation', 'targetId', 'payloadArtifactId', 'payloadSha256', 'allowed',
+  'verifiedAt', 'validThrough',
+]);
+const RECEIPT_FIELDS = Object.freeze([
+  'schemaVersion', 'requestId', 'projectId', 'operation', 'dispatchId',
+  'status', 'resultArtifactRef', 'observedAt',
+]);
+function exactTransportRecord(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  let prototype, descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch { return false; }
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const keys = Reflect.ownKeys(descriptors);
+  return keys.length === fields.length && keys.every(key => (
+    typeof key === 'string' && fields.includes(key)
+    && descriptors[key].enumerable === true
+    && Object.hasOwn(descriptors[key], 'value')
+  ));
+}
+
 function matchesArtifact(received, requested) {
   if (requested === null) return received === null;
   if (!requested || !exactTransportArtifactShape(received)) return false;
@@ -160,7 +203,12 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         const receipt = value?.result?.receipt;
         // Bind the response to the complete canonical request, not a reusable
         // requestId alone. A transport receipt is not proof of an external effect.
-        if (value?.schemaVersion !== 1 || value?.status !== 'RECEIVED'
+        if (!exactTransportRecord(value, RESPONSE_FIELDS)
+          || !exactTransportRecord(value?.result, RESULT_FIELDS)
+          || !exactTransportRecord(value?.result?.request, REQUEST_FIELDS)
+          || !exactTransportRecord(value?.result?.scopeProof, SCOPE_FIELDS)
+          || !exactTransportRecord(value?.result?.receipt, RECEIPT_FIELDS)
+          || value?.schemaVersion !== 1 || value?.status !== 'RECEIVED'
           || received?.schemaVersion !== 1
           || received?.requestId !== sentRequest.requestId
           || received?.principalId !== sentRequest.principalId
