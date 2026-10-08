@@ -3345,6 +3345,16 @@ export class BrowserAgentManager {
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
     }
+    // A damaged/legacy approval record must never suppress the required
+    // semantic/visual proof and fall through to an authorized effect.
+    const isCoordinatePoint = [BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT]
+      .includes(pending.action?.type);
+    const isCoordinateDrag = pending.action?.type === BrowserAgentActionType.DRAG_AT;
+    if ((pending.action?.ref && !pending.targetFingerprint)
+      || (isCoordinatePoint && !pending.targetFingerprint)
+      || (isCoordinateDrag && (!pending.dragStartFingerprint || !pending.dragEndFingerprint))) {
+      return pauseStaleApproval('Approved action is missing the persisted target evidence; nothing was executed.', pending.action);
+    }
     if (pending.action?.ref && pending.targetFingerprint) {
       let proof = null;
       try {
