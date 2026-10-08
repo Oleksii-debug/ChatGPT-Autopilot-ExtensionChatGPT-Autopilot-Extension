@@ -151,6 +151,36 @@ test('malformed persisted outcome fails closed without running foreign getters',
   assert.equal(safe.evidenceMap.recordedOutcome.criteriaRecorded, 0);
 });
 
+test('explicit null persisted history fails closed; legacy absent history remains valid', () => {
+  const input = sample();
+  const before = buildAgentRunTimelineV1(input);
+  assert.equal(before.totalRecorded, 6);
+
+  // A corrupted persisted null must not be relabelled as an empty run, even
+  // after JSON storage/reload. The source runtime must remain untouched.
+  input.runtime.history = null;
+  const restored = JSON.parse(JSON.stringify(input));
+  assert.throws(() => buildAgentRunTimelineV1(restored), /history must be a dense array/);
+  assert.equal(restored.runtime.history, null);
+
+  // True absence is the older optional-history shape, not corruption.
+  delete restored.runtime.history;
+  const legacy = buildAgentRunTimelineV1(restored);
+  assert.equal(legacy.totalRecorded, 0);
+  assert.equal(legacy.evidenceMap.externalEffectVerified, false);
+  assert.equal(legacy.evidenceOnly, true);
+  assert.equal(legacy.mayReplayExternalEffect, false);
+  assert.deepEqual(buildAgentRunTimelineV1(structuredClone(restored)), legacy);
+
+  let reads = 0;
+  Object.defineProperty(restored.runtime, 'history', {
+    enumerable: true,
+    get() { reads += 1; throw new Error('PRIVATE_HISTORY_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(restored), /accessor-backed history/);
+  assert.equal(reads, 0);
+});
+
 test('corrupt persisted plan node shapes never become plausible zero-node evidence after restart', () => {
   const original = sample();
   const valid = buildAgentRunTimelineV1(original);

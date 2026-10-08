@@ -92,7 +92,9 @@ function strictRecord(value, label, allowedKeys) {
   const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowedKeys.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      // Untrusted property names may embed confidential content and diagnostics
+      // may enter logs, support bundles or model context. Never echo the key.
+      throw new Error(`${label} contains an unknown field`);
     }
     const descriptor = descriptors[key];
     if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
