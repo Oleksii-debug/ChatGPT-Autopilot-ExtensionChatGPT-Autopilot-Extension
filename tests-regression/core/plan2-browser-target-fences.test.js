@@ -9,6 +9,7 @@ import {
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
+  BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../../src/core/browser-agent-manager.js';
 
@@ -443,6 +444,42 @@ test('pending approved visual and drag proofs survive canonical manager storage/
   assert.equal(verifyBrowserCoordinateTarget(41, 20, persisted.dragEndFingerprint).ok, false);
 });
 
+
+test('restarted pending approvals never skip missing semantic or visual target evidence', async () => {
+  setup();
+  const storageState = {};
+  let invokedChromeEffect = 0;
+  const chromeApi = {
+    storage: { local: {
+      get: async () => storageState,
+      set: async record => { Object.assign(storageState, record); },
+    } },
+    tabs: { get: async () => ({ id: 7, url: pageUrl }) },
+    scripting: { executeScript: async () => { invokedChromeEffect++; return [{ result: { ok: true } }]; } },
+  };
+  const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}), now: () => 1700000000000 });
+  const cases = [
+    { id: 'plan2-missing-semantic', action: { type: 'click', frameId: 0, ref: 'r1' } },
+    { id: 'plan2-missing-point', action: { type: 'click_at', x: 20, y: 20 } },
+    { id: 'plan2-missing-drag', action: { type: 'drag_at', startX: 20, startY: 20, endX: 40, endY: 20 } },
+  ];
+  for (const { id, action } of cases) {
+    await manager.create({ id, goal: 'Reject unsupported approval replay' });
+    await manager.update(store => {
+      const job = store.byId[id];
+      job.runtime.runState = BrowserAgentRunState.WAITING_APPROVAL;
+      job.runtime.pendingApproval = {
+        action, snapshotId: 's1', snapshotSignature: 'observed', url: pageUrl,
+        tabId: 7, requestedAt: 1700000000000, reason: 'owner requested',
+      };
+      return store;
+    });
+    const outcome = await manager.approvePendingAction(id, { runInitial: false });
+    assert.equal(outcome.job.runtime.runState, BrowserAgentRunState.PAUSED);
+    assert.match(outcome.job.runtime.lastError, /missing the persisted target evidence/);
+  }
+  assert.equal(invokedChromeEffect, 0);
+});
 
 test('native fallback is serialized and bound to observed semantic action', () => {
   const snapshot = setup();
