@@ -98,7 +98,7 @@ function timestamp(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
   // All durable authority/evidence clocks must be explicit, zone-bound ISO
   // instants. Date.parse accepts shorthand and rolls impossible calendar dates.
-  const format = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/u;
+  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (typeof value !== 'string' || !format.test(value)) {
     throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
   }
