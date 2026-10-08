@@ -52,8 +52,8 @@ test('accessible view exposes text-only trusted metrics and semantic table heade
   assert.equal(nodes.filter(x=>x.tagName==='DT').length,6);
   assert.equal(nodes.filter(x=>x.tagName==='DD').length,6);
   assert.equal(nodes.find(x=>x.tagName==='CAPTION').textContent,'Дорадчі можливості за робочим процесом');
-  assert.equal(nodes.filter(x=>x.tagName==='TH').length,3);
-  assert.ok(nodes.filter(x=>x.tagName==='TH').every(x=>x.attributes.scope==='col'));
+  assert.equal(nodes.filter(x=>x.tagName==='TH'&&x.attributes.scope==='col').length,3);
+  assert.equal(nodes.filter(x=>x.tagName==='TH'&&x.attributes.scope==='row').length,1);
   assert.ok(nodes.some(x=>x.textContent==='-600'));
   assert.ok(nodes.some(x=>x.textContent.includes('Запуску немає.')));
 });
