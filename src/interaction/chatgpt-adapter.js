@@ -1720,21 +1720,22 @@
     if (textEvidenceFor(request) || getAcceptedRepresentationEvidence(request)?.submitAttempted) {
       return verifyAfterUncertain(doc, request, start);
     }
-    const ready = prepareSend(doc, request, start);
-    if (ready.status !== STATUS.READY) return ready;
-
-    // Activation can replace the composer/button and materialize history.
-    // Select the physical target and capture evidence only AFTER activation.
-    // DOM form submission targets this exact owned tab; OS-window foreground
-    // state is not part of the Send precondition. Activate only when the user
-    // configured post-send dwell, and treat it as best-effort.
+    // Background chats can defer mounting their composer until Chrome activates
+    // that specific tab. When readiness fails in a hidden document, wake the
+    // operation-owned tab once, then inspect it again. This does not submit,
+    // and the content-script restores the previously active tab afterward.
     const backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
-    if (backgroundDocument && Number(request.postSendDelayMs || 0) > 0
-        && typeof deps.activate === 'function') {
-      try { await deps.activate(); } catch { /* observation/dwell still proceeds */ }
-      const activatedReady = prepareSend(doc, request, start);
-      if (activatedReady.status !== STATUS.READY) return activatedReady;
+    let ready = prepareSend(doc, request, start);
+    if (backgroundDocument && typeof deps.activate === 'function'
+        && (ready.status !== STATUS.READY || Number(request.postSendDelayMs || 0) > 0)) {
+      let activated = false;
+      try { activated = await deps.activate() === true; } catch { /* retain original safe state */ }
+      if (activated) {
+        await (deps.wait || wait)(250);
+        ready = prepareSend(doc, request, start);
+      }
     }
+    if (ready.status !== STATUS.READY) return ready;
     if (Number(request.executionDeadlineAt || 0) > 0 && nowMs() >= request.executionDeadlineAt) {
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
         safeDiagnosticCode: 'SEND_REQUEST_EXPIRED_BEFORE_EFFECT' });
