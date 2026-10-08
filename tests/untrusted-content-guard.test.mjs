@@ -273,14 +273,14 @@ test('authority envelopes reject accessors, hidden fields, symbols and array get
   });
   assert.throws(
     () => assessUntrustedContentInfluenceV1(request({ proposal: hiddenProposal })),
-    /unknown field: policyDecision/,
+    /contains an unknown field/,
   );
 
   const symbolCeiling = ceiling();
   symbolCeiling[Symbol('allow')] = true;
   assert.throws(
     () => assessUntrustedContentInfluenceV1(request({ ceiling: symbolCeiling })),
-    /unknown field: Symbol\(allow\)/,
+    /contains an unknown field/,
   );
 
   const capabilities = new Proxy(['web.read'], {
@@ -307,9 +307,47 @@ test('untrusted proposal cannot smuggle owner-policy or execution fields through
       () => assessUntrustedContentInfluenceV1(request({
         proposal: { ...proposal(), [field]: value },
       })),
-      new RegExp(`unknown field: ${field}`),
+      /contains an unknown field/,
     );
   }
+});
+
+test('unknown untrusted schema keys never leak names or invoke getters in diagnostics', () => {
+  const marker = 'PRIVATE_OWNER_SECRET_MARKER_812';
+  const contaminated = proposal();
+  Object.defineProperty(contaminated, marker, {
+    enumerable: false,
+    value: 'OWNER_ALLOW',
+  });
+  const input = request({ proposal: contaminated });
+  assert.throws(() => assessUntrustedContentInfluenceV1(input), error => {
+    assert.match(error.message, /contains an unknown field/);
+    assert.doesNotMatch(error.message, /PRIVATE_OWNER_SECRET_MARKER_812|OWNER_ALLOW/);
+    return true;
+  });
+  const persisted = JSON.parse(JSON.stringify(request({
+    proposal: { ...proposal(), [marker]: 'OWNER_ALLOW' },
+  })));
+  assert.throws(() => assessUntrustedContentInfluenceV1(persisted), error => {
+    assert.match(error.message, /contains an unknown field/);
+    assert.doesNotMatch(JSON.stringify({ error: error.message }), /PRIVATE_OWNER_SECRET_MARKER_812/);
+    return true;
+  });
+  const symbol = proposal();
+  symbol[Symbol('PRIVATE_ACCESS_TOKEN_LABEL')] = 'ALLOW';
+  assert.throws(() => assessUntrustedContentInfluenceV1(request({ proposal: symbol })),
+    error => /contains an unknown field/.test(error.message) && !error.message.includes('PRIVATE_ACCESS_TOKEN_LABEL'));
+
+  let reads = 0;
+  const getters = proposal();
+  Object.defineProperty(getters, marker, {
+    enumerable: true,
+    get() { reads += 1; throw new Error('PRIVATE_GETTER_EXECUTED'); },
+  });
+  assert.throws(() => assessUntrustedContentInfluenceV1(request({ proposal: getters })),
+    /contains an unknown field/);
+  assert.equal(reads, 0);
+  assert.equal(assessUntrustedContentInfluenceV1(request()).executionAuthorized, false);
 });
 
 test('arrays are dense, bounded and exact without coercion', () => {
