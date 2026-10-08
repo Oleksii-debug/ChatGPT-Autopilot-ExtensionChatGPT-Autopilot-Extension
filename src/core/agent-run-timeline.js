@@ -167,6 +167,30 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   });
   const matching = filter === 'ALL' ? all : all.filter(entry => entry.category === filter);
   const visible = matching.slice(-limit);
+  // These are presence counts within the bounded canonical history, not proof
+  // that an external operation committed or that missing evidence never existed.
+  // Do not infer receipts, artifacts or before/after snapshots from free text.
+  const evidenceMap = {
+    scope: 'INSPECTED_CANONICAL_HISTORY_ONLY',
+    completeHistoryInspected: history.total === all.length,
+    observed: {
+      planRevisionEvents: all.filter(entry => entry.event === 'plan').length,
+      ownerInterventionEvents: all.filter(entry => entry.category === 'OWNER').length,
+      actionRecordedEvents: all.filter(entry => entry.category === 'ACTION').length,
+      recoveryRecordedEvents: all.filter(entry => entry.category === 'RECOVERY' && entry.event !== 'OTHER').length,
+      checkpointRecordedEvents: all.filter(entry => entry.category === 'CHECKPOINT').length,
+      specialistProviderEvents: all.filter(entry =>
+        entry.event === 'specialist-provider-failed' || entry.event === 'specialist-provider-succeeded').length,
+    },
+    notEstablishedByThisProjection: [
+      'BEFORE_AFTER_SNAPSHOTS',
+      'EXTERNAL_EFFECT_RECEIPTS',
+      'TOOL_EXECUTION_RECEIPTS',
+      'ARTIFACT_PROVENANCE',
+      'AGENT_TREE_EDGES',
+    ],
+    externalEffectVerified: false,
+  };
   const verification = own(runtime, 'verifiedOutcome');
   const checks = verification && typeof verification === 'object' ? own(verification, 'checks') : undefined;
   const result = {
@@ -182,6 +206,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     mayReplayExternalEffect: false,
     includesPrivatePrompts: false,
     plan: planSummary(own(runtime, 'plan')),
+    evidenceMap,
     counters: {
       steps: integer(own(runtime, 'stepCount')),
       cycles: integer(own(runtime, 'completedCycles')),
