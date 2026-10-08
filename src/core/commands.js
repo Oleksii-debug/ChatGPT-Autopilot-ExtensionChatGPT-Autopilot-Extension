@@ -287,7 +287,7 @@ export function sessionFromUi(config, now = Date.now()) {
     promptMode: normalizedPromptMode, sharedPrompt: config.sharedPrompt || '', runMode: runModeFromUi(config.runMode), configuredTaskCount: logicalCount,
     minimumSendIntervalMs: minimumSendIntervalMsFromUi(config),
     tabReadyDelayMs: Math.min(60000, Math.max(0, Number(config.tabReadyDelaySeconds ?? 0) * 1000)),
-    postSendDelayMs: Math.min(60000, Math.max(0, Number(config.postSendDelaySeconds ?? 0) * 1000)),
+    postSendDelayMs: Math.min(3600000, Math.max(0, Number(config.postSendDelaySeconds ?? 0) * 1000)),
     preSendDelayMs: Math.min(30000, Math.max(1000, Number(config.preSendDelaySeconds || 20) * 1000)),
     busyCheckDelayMs: Math.max(500, Number(config.busyCheckDelaySeconds || 2) * 1000),
     retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds || 30) * 1000),
