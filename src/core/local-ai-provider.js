@@ -352,6 +352,13 @@ export class LocalAiClient {
   async request(settings, url, init = {}, consumeResponse = null) {
     const normalized = normalizeLocalAiSettings(settings);
     const requestUrl = assertLocalAiRequestUrl(url);
+    // The transport is not an arbitrary loopback HTTP client. Bind every
+    // request to the configured provider origin and one of its two explicit
+    // API endpoints before attaching prompt content or starting a network effect.
+    if (requestUrl !== endpointFor(normalized, 'models')
+        && requestUrl !== endpointFor(normalized, 'chat')) {
+      throw new Error('Local AI request URL does not match the configured provider endpoint');
+    }
     const controller = new AbortController();
     const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
     let responseReceived = false;
