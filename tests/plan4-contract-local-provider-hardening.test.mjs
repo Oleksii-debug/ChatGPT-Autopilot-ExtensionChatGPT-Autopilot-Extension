@@ -297,3 +297,17 @@ test('owner locality and route cost-class reject implicit coercion', () => {
   assert.equal(normalizeAiRoutePolicy({locality:'local'}).locality,'local');
   assert.equal(normalizeAiRoutePool([route])[0].locality,'local');
 });
+
+test('remote Ollama must not inherit local-only FREE pricing across persistence and selection', () => {
+  const remote = {routeId:'remote-ollama',provider:'ollama',model:'remote-model',locality:'remote'};
+  const normalized = normalizeAiRoutePool([remote]);
+  assert.equal(normalized[0].costClass, 'unknown');
+  assert.equal(normalized[0].inputPriceKnown, false);
+  assert.equal(normalized[0].outputPriceKnown, false);
+  const restarted = JSON.parse(JSON.stringify(normalized));
+  assert.deepEqual(selectAiRouteCandidates({routes:restarted,policy:{freeOnly:true},now:1}).eligibleRouteIds,[]);
+  assert.deepEqual(selectAiRouteCandidates({routes:restarted,policy:{maxInputPricePerMillionUsd:0},now:1}).eligibleRouteIds,[]);
+  const local = normalizeAiRoutePool([{...remote,routeId:'local-ollama',locality:'local'}]);
+  assert.equal(local[0].costClass,'free');
+  assert.deepEqual(selectAiRouteCandidates({routes:local,policy:{freeOnly:true},now:1}).eligibleRouteIds,['local-ollama']);
+});
