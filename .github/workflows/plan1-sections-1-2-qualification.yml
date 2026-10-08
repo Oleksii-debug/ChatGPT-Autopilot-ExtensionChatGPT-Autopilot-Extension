@@ -40,3 +40,5 @@ jobs:
         run: node --test tests/browser-agent-definition-launch.test.mjs
       - name: Adjacent persisted Agent definition regression tests
         run: node --test tests/browser-agent-definition-persistence.test.mjs
+      - name: Existing orchestration job-ID and authority compatibility
+        run: node --test tests/browser-agent-orchestration-binding.test.mjs
