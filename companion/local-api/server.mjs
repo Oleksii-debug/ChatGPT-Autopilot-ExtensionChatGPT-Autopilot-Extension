@@ -6,7 +6,10 @@
  */
 import { createServer } from 'node:http';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { executeAutopilotProgrammaticControlV1 } from '../../src/core/autopilot-programmatic-control.js';
+import {
+  executeAutopilotProgrammaticControlV1,
+  normalizeAutopilotProgrammaticRequestV1,
+} from '../../src/core/autopilot-programmatic-control.js';
 
 const MAX_BODY_BYTES = 65_536;
 const AUTH_FAILURE = Object.freeze({ schemaVersion: 1, status: 'DENIED' });
@@ -53,6 +56,11 @@ export function createAutopilotLocalApiServerV1({ token, dependencies } = {}) {
     || typeof dependencies.now !== 'function') {
     throw new Error('Trusted canonical control dependencies must be provided');
   }
+  // Transport-only admission fence. Core must still own durable request/effect
+  // deduplication and reconciliation across processes and restarts.
+  // Keep the transport's overlapping request population strictly bounded.
+  const inFlight = new Set();
+  const MAX_IN_FLIGHT = 256;
   const server = createServer(async (req, res) => {
     try {
       // Remote peers are rejected even if a caller improperly rebinds the server.
@@ -85,10 +93,30 @@ export function createAutopilotLocalApiServerV1({ token, dependencies } = {}) {
         chunks.push(chunk);
       }
       const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      // Input carries only request identities, not credentials or policy.
-      // Canonical control rechecks a trusted scope and downstream authority.
-      const result = await executeAutopilotProgrammaticControlV1(parsed, dependencies);
-      return send(res, 200, { schemaVersion: 1, status: 'RECEIVED', result });
+      // Reuse the exact Core request schema before touching request identities.
+      // A second authenticated SDK/CLI instance must not race the same
+      // request into canonical dispatch while its first transport is pending.
+      const normalized = normalizeAutopilotProgrammaticRequestV1(parsed);
+      const requestKey = JSON.stringify([
+        normalized.principalId, normalized.projectId, normalized.requestId,
+      ]);
+      if (inFlight.has(requestKey)) {
+        // This does NOT prove whether the first request had an external effect.
+        // The client treats 409 as UNKNOWN and must reconcile with Core.
+        return send(res, 409, { schemaVersion: 1, status: 'IN_FLIGHT' });
+      }
+      if (inFlight.size >= MAX_IN_FLIGHT) {
+        return send(res, 503, { schemaVersion: 1, status: 'UNAVAILABLE' });
+      }
+      inFlight.add(requestKey);
+      try {
+        // Input carries only request identities, not credentials or policy.
+        // Canonical control rechecks trusted scope and downstream authority.
+        const result = await executeAutopilotProgrammaticControlV1(normalized, dependencies);
+        return send(res, 200, { schemaVersion: 1, status: 'RECEIVED', result });
+      } finally {
+        inFlight.delete(requestKey);
+      }
     } catch {
       // Do not echo payloads, caller credentials, provider errors, or stack traces.
       return send(res, 422, FAILURE);
