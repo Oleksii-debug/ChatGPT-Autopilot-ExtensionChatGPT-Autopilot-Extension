@@ -250,3 +250,26 @@ test('S1 projected plan and recorded outcome array lengths never execute Proxy g
     assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_LENGTH_GETTER_EXPOSED/u);
   }
 });
+
+test('S1 present undefined history/nodes fail closed while truly absent legacy fields remain non-authorizing', () => {
+  for (const field of ['history', 'nodes']) {
+    const corrupt = job();
+    if (field === 'history') corrupt.runtime.history = undefined;
+    else corrupt.runtime.plan.nodes = undefined;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt), /dense array|plain array/);
+    assert.throws(() => buildAgentRunTimelineV1(structuredClone(corrupt)), /dense array|plain array/);
+
+    const legacy = job();
+    if (field === 'history') delete legacy.runtime.history;
+    else delete legacy.runtime.plan.nodes;
+    const projection = buildAgentRunTimelineV1(legacy);
+    assert.equal(projection.evidenceOnly, true);
+    assert.equal(projection.mayReplayExternalEffect, false);
+    assert.equal(projection.evidenceMap.externalEffectVerified, false);
+    assert.deepEqual(projection, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
+  }
+
+  const corruptRestart = job();
+  corruptRestart.runtime.history = null;
+  assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corruptRestart))), /dense array/);
+});
