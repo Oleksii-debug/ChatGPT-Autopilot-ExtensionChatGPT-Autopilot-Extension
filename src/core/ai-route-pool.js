@@ -160,7 +160,7 @@ function optionalIds(record, key, label, max = MAX_ROUTES) {
 }
 
 export function normalizeAiRoutePool(raw = []) {
-  if (raw == null) return [];
+  if (raw === null) throw new Error('AI route pool must be a bounded array');
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
   const routes = source.map((rawItem, index) => {
     const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
@@ -211,7 +211,7 @@ export function normalizeAiRoutePool(raw = []) {
 }
 
 export function normalizeAiRoutePolicy(raw = {}) {
-  if (raw == null) raw = {};
+  if (raw === null) throw new Error('AI route policy must be a plain data object');
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
   const rawLocality = own(source, 'locality');
   if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
@@ -234,15 +234,17 @@ export function normalizeAiRoutePolicy(raw = {}) {
 }
 
 export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
-  if (raw == null) raw = {};
+  if (raw === null) throw new Error('AI worker policy must be a plain data object');
   const policy = dataRecord(raw, new Set(['allocationMode','minWorkers','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
-  const allocationMode = clean(own(policy, 'allocationMode') || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
+  const requestedMode = own(policy, 'allocationMode');
+  const allocationMode = clean(requestedMode === undefined ? DEFAULT_AI_WORKER_POLICY.allocationMode : requestedMode, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
   const maxParallelWorkers = strictInteger(own(policy, 'maxParallelWorkers') ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
   const minWorkers = strictInteger(own(policy, 'minWorkers') ?? DEFAULT_AI_WORKER_POLICY.minWorkers, 'AI worker minWorkers', 1, maxParallelWorkers);
   const pool = normalizeAiRoutePool(routes);
   const routeIds = new Set(pool.map(route => route.routeId));
-  const source = own(policy, 'manualRouteWorkers') ?? {};
+  const suppliedWorkers = own(policy, 'manualRouteWorkers');
+  const source = suppliedWorkers === undefined ? {} : suppliedWorkers;
   object(source, 'AI worker manualRouteWorkers');
   const descriptors = Object.getOwnPropertyDescriptors(source);
   const keys = Reflect.ownKeys(descriptors);
