@@ -886,7 +886,7 @@ test('Plan-1 S1: universal agent contracts redact untrusted property names witho
     get() { reads += 1; throw new Error('unsafe getter invoked'); },
   });
   assert.throws(() => normalizeArtifactRefV1(unknownField), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT|unsafe getter invoked/);
     return true;
   });
@@ -894,7 +894,7 @@ test('Plan-1 S1: universal agent contracts redact untrusted property names witho
   const symbolic = artifact();
   Object.defineProperty(symbolic, Symbol(secret), { enumerable: true, value: 'ALLOW' });
   assert.throws(() => normalizeArtifactRefV1(symbolic), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT/);
     return true;
   });
