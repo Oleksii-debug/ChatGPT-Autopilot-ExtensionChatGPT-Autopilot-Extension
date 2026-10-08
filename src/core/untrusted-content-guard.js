@@ -288,8 +288,12 @@ function missing(requested, allowed) {
   return requested.filter(item => !admitted.has(item));
 }
 
-function violation(code, values = []) {
-  return freezeDeep({ code, values: [...values] });
+function violation(code) {
+  // Denials may be exported into logs, support bundles or model context.
+  // The proposed capability/tool/provider/origin names are untrusted input;
+  // even a syntactically valid identifier can encode private content. Keep
+  // only fixed violation codes, never reflect attacker-controlled names.
+  return freezeDeep({ code, values: [] });
 }
 
 /**
@@ -333,10 +337,10 @@ export function assessUntrustedContentInfluenceV1(value) {
   const providerEscalation = missing(proposal.requestedProviderIds, ceiling.allowedProviderIds);
   const outboundEscalation = missing(proposal.outboundOrigins, ceiling.allowedOutboundOrigins);
 
-  if (capabilityEscalation.length) violations.push(violation('CAPABILITY_AUTHORITY_ESCALATION', capabilityEscalation));
-  if (toolEscalation.length) violations.push(violation('TOOL_AUTHORITY_ESCALATION', toolEscalation));
-  if (providerEscalation.length) violations.push(violation('PROVIDER_AUTHORITY_ESCALATION', providerEscalation));
-  if (outboundEscalation.length) violations.push(violation('OUTBOUND_ORIGIN_ESCALATION', outboundEscalation));
+  if (capabilityEscalation.length) violations.push(violation('CAPABILITY_AUTHORITY_ESCALATION'));
+  if (toolEscalation.length) violations.push(violation('TOOL_AUTHORITY_ESCALATION'));
+  if (providerEscalation.length) violations.push(violation('PROVIDER_AUTHORITY_ESCALATION'));
+  if (outboundEscalation.length) violations.push(violation('OUTBOUND_ORIGIN_ESCALATION'));
   if (proposal.requestedCredentialRefIds.length) {
     // Never reflect attacker-provided credential references into support logs,
     // model context, UI notifications, or serialized denial evidence.

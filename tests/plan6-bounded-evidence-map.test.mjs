@@ -151,6 +151,32 @@ test('malformed persisted outcome fails closed without running foreign getters',
   assert.equal(safe.evidenceMap.recordedOutcome.criteriaRecorded, 0);
 });
 
+test('corrupt persisted plan node shapes never become plausible zero-node evidence after restart', () => {
+  const original = sample();
+  const valid = buildAgentRunTimelineV1(original);
+  assert.equal(valid.plan.nodeCount, 1);
+  assert.deepEqual(buildAgentRunTimelineV1(structuredClone(original)), valid);
+  for (const invalid of [null, 'NOT_A_PLAN_ARRAY', { length: 0 }, 0, new Uint8Array(0)]) {
+    const restored = sample();
+    restored.runtime.plan.nodes = invalid;
+    assert.throws(() => buildAgentRunTimelineV1(restored), /plan nodes must be a plain array/);
+  }
+  const subclass = sample();
+  subclass.runtime.plan.nodes = new (class ForeignNodes extends Array {})();
+  assert.throws(() => buildAgentRunTimelineV1(subclass), /plan nodes must be a plain array/);
+  let getterCalls = 0;
+  const accessor = sample();
+  Object.defineProperty(accessor.runtime.plan, 'nodes', {
+    enumerable: true,
+    get() { getterCalls += 1; throw new Error('PRIVATE_PLAN_NODE_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), /accessor-backed nodes/);
+  assert.equal(getterCalls, 0);
+  const absent = sample();
+  delete absent.runtime.plan.nodes;
+  assert.equal(buildAgentRunTimelineV1(absent).plan.nodeCount, 0);
+});
+
 test('bounded identity and snapshot-scoped event ordinals survive restart without leaking malformed IDs', async () => {
   const base = sample();
   base.id = 'завдання_один';
