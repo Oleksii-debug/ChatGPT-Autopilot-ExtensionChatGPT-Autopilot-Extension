@@ -510,3 +510,27 @@ test('Plan-1: every intake path rejects non-canonical IDs without creating or re
   const resumed = managerFor(chrome);
   assert.equal((await resumed.get('job:exact/path@v1')).job.id, 'job:exact/path@v1');
 });
+
+
+test('Plan-1: outcome criteria are dense bounded text with no nested getter or coercion side effects', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.create({ id: 'job.valid', goal: 'Produce evidence.', acceptanceCriteria: ['Evidence file exists'] });
+  const baseline = structuredClone(data.autopilotBrowserAgentV1);
+  let invoked = 0;
+  const evil = { toString() { invoked += 1; throw new Error('leaked-token'); } };
+  const accessor = ['one'];
+  Object.defineProperty(accessor, '0', { enumerable: true, get() { invoked += 1; throw new Error('leaked-token'); } });
+  const sparse = []; sparse.length = 2; sparse[0] = 'one';
+  const extra = ['one']; extra.authorized = true;
+  const bad = [[evil], accessor, sparse, extra, ['x'.repeat(1001)], [17]];
+  for (const criteria of bad) {
+    await assert.rejects(() => manager.create({
+      id: 'job.reject', goal: 'Cannot claim outcome.', acceptanceCriteria: criteria,
+    }), /acceptanceCriteria|acceptance criterion/);
+  }
+  assert.equal(invoked, 0, 'criteria validation must not call hostile accessors or coercion');
+  assert.deepEqual(data.autopilotBrowserAgentV1, baseline, 'failed intake must not persist authority');
+  const restarted = managerFor(chrome);
+  assert.deepEqual((await restarted.get('job.valid')).job.config.acceptanceCriteria, ['Evidence file exists']);
+});
