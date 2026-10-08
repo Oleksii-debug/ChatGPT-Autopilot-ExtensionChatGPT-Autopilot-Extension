@@ -56,7 +56,7 @@ function record(value, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor
@@ -72,7 +72,7 @@ function record(value, label) {
 function exactKeys(value, allowed, label) {
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
   }
 }
