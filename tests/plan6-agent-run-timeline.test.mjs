@@ -126,3 +126,28 @@ test('Agent UI has native labelled controls and only renders redacted projection
   assert.doesNotMatch(projection, /innerHTML|outerHTML|insertAdjacentHTML|eval\(/u);
   assert.match(script, /renderAgentRunTimeline\(job\);/u);
 });
+
+test('explicit invalid event timestamps fail closed; missing legacy time stays distinguishable on restart', () => {
+  for (const at of [null, '0', '2030-01-01', -1, NaN, Infinity, 8_640_000_000_000_001]) {
+    const input = job();
+    input.runtime.history[0].at = at;
+    assert.throws(() => buildAgentRunTimelineV1(input), /entry timestamp is invalid/);
+    if (Number.isFinite(at)) {
+      assert.throws(() => buildAgentRunTimelineV1(structuredClone(input)), /entry timestamp is invalid/);
+    }
+  }
+  const legacy = job();
+  delete legacy.runtime.history[0].at;
+  const output = buildAgentRunTimelineV1(legacy);
+  assert.equal(output.entries[0].at, 0);
+  assert.equal(output.evidenceOnly, true);
+  assert.equal(output.mayReplayExternalEffect, false);
+  assert.deepEqual(output, buildAgentRunTimelineV1(structuredClone(legacy)));
+  let getterCalls = 0;
+  const accessor = job();
+  Object.defineProperty(accessor.runtime.history[0], 'at', {
+    enumerable: true, get() { getterCalls += 1; throw Error('PRIVATE_TIME_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), /accessor-backed/);
+  assert.equal(getterCalls, 0);
+});
