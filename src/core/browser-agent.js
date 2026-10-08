@@ -615,6 +615,13 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing');
       action.expectedSemanticIdentity = target.semanticIdentity;
       action.expectedFrameUrl = clean(frame.url, 4096);
+      // Bind live accessible labels, link destinations, and form endpoints, too.
+      // An external aria-labelledby label or parent form can change without
+      // changing the element's own attributes/textContent.
+      action.expectedSemanticName = String(target.name ?? '');
+      action.expectedSemanticHref = String(target.href ?? '');
+      action.expectedSemanticFormAction = String(target.formAction ?? '');
+      action.expectedSemanticFormMethod = String(target.formMethod ?? '');
     }
   }
   if (type === BrowserAgentActionType.FILL_CREDENTIAL) {
@@ -1006,9 +1013,26 @@ export function executeBrowserPageAction(snapshotId, action) {
   };
   const ensureTarget = () => {
     if (!target || !target.isConnected) throw new Error('AGENT_TARGET_STALE');
+    const tag = String(target.tagName || '').toLowerCase();
+    const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
+      : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
+    const form = target.form instanceof HTMLFormElement ? target.form : null;
+    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
+    const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
+    const normalizeObserved = (value, max) => String(value || '').replace(/\\s+/g, ' ').trim().slice(0, max);
+    const href = (tag === 'a' || tag === 'area') ? normalizeObserved(target.href || target.getAttribute('href'), 1200) : '';
     if (!action.expectedSemanticIdentity || !action.expectedFrameUrl
+      || typeof action.expectedSemanticName !== 'string'
+      || typeof action.expectedSemanticHref !== 'string'
+      || typeof action.expectedSemanticFormAction !== 'string'
+      || typeof action.expectedSemanticFormMethod !== 'string'
       || location.href !== action.expectedFrameUrl
-      || semanticIdentity(target) !== action.expectedSemanticIdentity) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
+      || semanticIdentity(target) !== action.expectedSemanticIdentity
+      || browserCoordinateAccessibleName(target) !== action.expectedSemanticName
+      || href !== action.expectedSemanticHref
+      || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
+      || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
     if (target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
     return target;
   };
@@ -1296,6 +1320,8 @@ function browserCoordinateTargetAt(x, y) {
       pageUrl: location.href,
       viewportWidth: innerWidth,
       viewportHeight: innerHeight,
+      viewportScrollX: Number(globalThis.scrollX || 0),
+      viewportScrollY: Number(globalThis.scrollY || 0),
       visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
     },
@@ -1311,7 +1337,9 @@ export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
   if (!proof?.target || !fingerprint || typeof fingerprint !== 'object') return { ok: false, reason: 'missing-target' };
   const target = proof.target;
   if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
-    || Number(fingerprint.viewportHeight) !== proof.viewportHeight) return { ok: false, reason: 'changed-page-or-viewport' };
+    || Number(fingerprint.viewportHeight) !== proof.viewportHeight
+    || Number(fingerprint.viewportScrollX) !== target.viewportScrollX
+    || Number(fingerprint.viewportScrollY) !== target.viewportScrollY) return { ok: false, reason: 'changed-page-or-viewport' };
   const fields = ['tag', 'role', 'type', 'name', 'href', 'formAction', 'formMethod'];
   for (const field of fields) {
     if (String(target[field] || '') !== String(fingerprint[field] || '')) return { ok: false, reason: `changed-${field}` };
