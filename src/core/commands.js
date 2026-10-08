@@ -293,6 +293,7 @@ export function sessionFromUi(config, now = Date.now()) {
     retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds || 30) * 1000),
     tabStrategy: tabStrategyFromUi(config.tabStrategy), now
   });
+  session.postSendDelayUnit = config.postSendDelayUnit === 'minutes' ? 'minutes' : 'seconds';
   session.version = Math.max(1, Number(config.version) || 1);
   session.promptCadence = normalizeSessionPromptCadence(config.promptCadence);
   session.drivePromptSources = normalizeSessionDrivePromptSources(config.drivePromptSources);
