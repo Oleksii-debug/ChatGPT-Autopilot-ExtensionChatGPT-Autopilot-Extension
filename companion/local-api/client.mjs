@@ -70,20 +70,32 @@ const RECEIPT_FIELDS = Object.freeze([
   'schemaVersion', 'requestId', 'projectId', 'operation', 'dispatchId',
   'status', 'resultArtifactRef', 'observedAt',
 ]);
-function exactTransportRecord(value, fields) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+function snapshotTransportRecord(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Malformed transport record');
+  }
   let prototype, descriptors;
   try {
     prototype = Object.getPrototypeOf(value);
     descriptors = Object.getOwnPropertyDescriptors(value);
-  } catch { return false; }
-  if (prototype !== Object.prototype && prototype !== null) return false;
+  } catch { throw new Error('Untrusted transport descriptors'); }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Untrusted transport prototype');
+  }
   const keys = Reflect.ownKeys(descriptors);
-  return keys.length === fields.length && keys.every(key => (
-    typeof key === 'string' && fields.includes(key)
-    && descriptors[key].enumerable === true
-    && Object.hasOwn(descriptors[key], 'value')
-  ));
+  if (keys.length !== fields.length || keys.some(key => (
+    typeof key !== 'string' || !fields.includes(key)
+    || descriptors[key].enumerable !== true
+    || !Object.hasOwn(descriptors[key], 'value')
+  ))) throw new Error('Untrusted transport fields');
+  // Capture descriptor data once. A Proxy can advertise safe descriptors
+  // but execute a hostile get trap when an original field is read later.
+  const snapshot = Object.create(null);
+  for (const field of fields) snapshot[field] = descriptors[field].value;
+  return Object.freeze(snapshot);
+}
+function snapshotTransportArtifact(value) {
+  return value === null ? null : snapshotTransportRecord(value, ARTIFACT_FIELDS);
 }
 
 function matchesArtifact(received, requested) {
@@ -209,17 +221,26 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       try {
-        const value = await res.json();
-        // Check own field descriptors before touching any nested transport
-        // object: hostile accessors must never execute, including when a
-        // test transport supplies a non-JSON JavaScript object.
-        if (!exactTransportRecord(value, RESPONSE_FIELDS)
-          || !exactTransportRecord(value.result, RESULT_FIELDS)
-          || !exactTransportRecord(value.result.request, REQUEST_FIELDS)
-          || !exactTransportRecord(value.result.scopeProof, SCOPE_FIELDS)
-          || !exactTransportRecord(value.result.receipt, RECEIPT_FIELDS)) {
-          throw new Error('Untrusted response descriptors');
-        }
+        // Validate and return only immutable snapshots, never original Proxies.
+        const envelope = snapshotTransportRecord(await res.json(), RESPONSE_FIELDS);
+        const outer = snapshotTransportRecord(envelope.result, RESULT_FIELDS);
+        const requestSnapshot = snapshotTransportRecord(outer.request, REQUEST_FIELDS);
+        const receiptSnapshot = snapshotTransportRecord(outer.receipt, RECEIPT_FIELDS);
+        const value = Object.freeze({
+          ...envelope,
+          result: Object.freeze({
+            ...outer,
+            request: Object.freeze({
+              ...requestSnapshot,
+              payloadArtifactRef: snapshotTransportArtifact(requestSnapshot.payloadArtifactRef),
+            }),
+            scopeProof: snapshotTransportRecord(outer.scopeProof, SCOPE_FIELDS),
+            receipt: Object.freeze({
+              ...receiptSnapshot,
+              resultArtifactRef: snapshotTransportArtifact(receiptSnapshot.resultArtifactRef),
+            }),
+          }),
+        });
         const received = value.result.request;
         const receipt = value.result.receipt;
         // Bind the response to the complete canonical request, not a reusable

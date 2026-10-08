@@ -12,6 +12,7 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
   return {
     schemaVersion: 1, status: 'RECEIVED',
     result: {
+      schemaVersion: 1, readOnly: true, downstreamAuthorityRequired: false,
       request: { ...BASE, ...requestChanges },
       scopeProof: {
         schemaVersion: 1, scopeRevisionId: 'scope-rev-1',
@@ -334,4 +335,53 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
   }
   assert.equal(networkCalls, 1);
   assert.equal(getterCalls, 0);
+});
+
+
+test('SDK captures nested transport Proxy descriptors without executing get traps', async () => {
+  let gets = 0;
+  const proxy = value => new Proxy(value, { get() { gets++; throw Error('SECRET_GET_TRAP'); } });
+  const envelope = transportResponse();
+  envelope.result.request = proxy(envelope.result.request);
+  envelope.result.scopeProof = proxy(envelope.result.scopeProof);
+  envelope.result.receipt = proxy(envelope.result.receipt);
+  envelope.result = proxy(envelope.result);
+  // The outer JSON result is ordinary transport data. Awaiting a top-level
+  // Proxy would trigger the language-level thenable probe outside this SDK;
+  // nested fields must still be snapshotted with zero untrusted property gets.
+  const result = await attempt(envelope);
+  assert.equal(result.status, 'RECEIVED');
+  assert.equal(gets, 0);
+  assert.equal(Object.isFrozen(result.result.receipt), true);
+  assert.equal(Object.isFrozen(result.result.request), true);
+});
+
+test('SDK snapshots nested result ArtifactRef Proxy without property gets', async () => {
+  let gets = 0;
+  const envelope = transportResponse();
+  envelope.result.receipt.resultArtifactRef = new Proxy({
+    schemaVersion: 1, artifactId: 'result-artifact-1', kind: 'result',
+    uri: 'artifact://result-artifact-1', mediaType: 'application/json',
+    sha256: 'a'.repeat(64), sizeBytes: 10,
+    createdAt: '2026-10-08T10:00:00.900Z',
+    producerInvocationId: 'producer-1', sensitive: true,
+  }, { get() { gets++; throw Error('SECRET_GET_TRAP'); } });
+  const result = await attempt(envelope);
+  assert.equal(result.status, 'RECEIVED');
+  assert.equal(gets, 0);
+  assert.equal(Object.isFrozen(result.result.receipt.resultArtifactRef), true);
+});
+
+
+test('SDK returns detached immutable transport receipts after successful validation', async () => {
+  const wire = transportResponse();
+  const accepted = await attempt(wire);
+  assert.equal(accepted.status, 'RECEIVED');
+  assert.equal(Object.isFrozen(accepted.result), true);
+  assert.equal(Object.isFrozen(accepted.result.receipt), true);
+  assert.equal(Object.isFrozen(accepted.result.scopeProof), true);
+  wire.result.receipt.status = 'REJECTED';
+  wire.result.scopeProof.allowed = false;
+  assert.equal(accepted.result.receipt.status, 'COMPLETED');
+  assert.equal(accepted.result.scopeProof.allowed, true);
 });
