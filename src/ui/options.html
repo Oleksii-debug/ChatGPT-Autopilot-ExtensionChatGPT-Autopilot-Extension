@@ -143,8 +143,10 @@
 
           <label for="simplified-tab-ready">Пауза після відкриття вкладки, секунд</label>
           <input id="simplified-tab-ready" type="number" min="0" max="60" step="1" value="0" inputmode="numeric">
-          <label for="simplified-post-send">Очікування після натискання «Надіслати», секунд</label>
-          <input id="simplified-post-send" type="number" min="0" max="60" step="1" value="5" inputmode="numeric">
+          <label for="simplified-post-send">Очікування після надсилання</label>
+          <input id="simplified-post-send" type="number" min="0" max="3600" step="1" value="5" inputmode="numeric">
+          <label for="simplified-post-send-unit">Одиниця очікування після надсилання</label>
+          <select id="simplified-post-send-unit"><option value="seconds">Секунди</option><option value="minutes">Хвилини</option></select>
           <label for="simplified-delay">Пауза перед відправленням, с</label>
           <input id="simplified-delay" type="number" min="1" max="30" step="1" value="20" inputmode="numeric">
 
@@ -777,8 +779,10 @@
         <input id="scenario-work-launch-gap" type="number" min="0" max="3600" step="1" inputmode="numeric" value="0">
         <label for="scenario-work-tab-ready">Пауза після відкриття вкладки, секунд</label>
         <input id="scenario-work-tab-ready" type="number" min="0" max="60" step="1" value="0" inputmode="numeric">
-        <label for="scenario-work-post-send">Очікування після натискання «Надіслати», секунд</label>
-        <input id="scenario-work-post-send" type="number" min="0" max="60" step="1" value="5" inputmode="numeric">
+        <label for="scenario-work-post-send">Очікування після надсилання</label>
+        <input id="scenario-work-post-send" type="number" min="0" max="3600" step="1" value="5" inputmode="numeric">
+        <label for="scenario-work-post-send-unit">Одиниця очікування після надсилання</label>
+        <select id="scenario-work-post-send-unit"><option value="seconds">Секунди</option><option value="minutes">Хвилини</option></select>
         <label for="scenario-work-pre-send">Пауза перед надсиланням, с</label>
         <input id="scenario-work-pre-send" type="number" min="1" max="30" step="1" inputmode="numeric" value="10">
         <label for="scenario-work-busy-check">Повторна перевірка зайнятого чату, с</label>
