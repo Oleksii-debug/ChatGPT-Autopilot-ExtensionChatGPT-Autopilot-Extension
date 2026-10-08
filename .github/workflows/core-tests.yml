@@ -42,3 +42,4 @@ jobs:
           node-version: "22"
       - run: npm run test:core
       - run: npm run test:web-det
+      - run: node --test tests/plan4-contract-local-provider-hardening.test.mjs
