@@ -88,7 +88,9 @@ function strictRecord(value, label, allowedKeys) {
     throw new Error(`${label} must be a plain object`);
   }
 
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  let descriptors;
+  try { descriptors = Object.getOwnPropertyDescriptors(value); }
+  catch { throw new Error(`${label} property descriptors cannot be safely inspected`); }
   const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowedKeys.has(key)) {
@@ -106,10 +108,17 @@ function strictRecord(value, label, allowedKeys) {
 }
 
 function strictArray(value, label, { max = MAX_LIST } = {}) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let descriptors;
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new Error('Invalid untrusted array');
+    }
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Proxy traps can throw attacker-controlled text into support/log/model
+    // surfaces; reject the structure without echoing the upstream exception.
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
