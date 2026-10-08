@@ -768,7 +768,7 @@ test('universal-agent contract boundary rejects accessor-backed and hidden field
   });
   assert.throws(
     () => normalizeCapabilityV1(hiddenAuthority),
-    /enumerable own data properties|unknown field: hiddenAuthority/,
+    /enumerable own data properties|unknown field/,
   );
 });
 
@@ -874,4 +874,29 @@ test('Plan-1: universal authority, artifact and credential chronology rejects sh
     normalizeArtifactRefV1(artifact({ createdAt: '2026-09-18T22:00:00-05:00' })).createdAt,
     '2026-09-19T03:00:00.000Z',
   );
+});
+
+
+test('Plan-1 S1: universal agent contracts redact untrusted property names without invoking accessors', () => {
+  const secret = 'OWNER-CREDENTIAL-SECRET-MUST-NOT-BE-LOGGED';
+  let reads = 0;
+  const unknownField = artifact();
+  Object.defineProperty(unknownField, secret, {
+    enumerable: true,
+    get() { reads += 1; throw new Error('unsafe getter invoked'); },
+  });
+  assert.throws(() => normalizeArtifactRefV1(unknownField), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT|unsafe getter invoked/);
+    return true;
+  });
+
+  const symbolic = artifact();
+  Object.defineProperty(symbolic, Symbol(secret), { enumerable: true, value: 'ALLOW' });
+  assert.throws(() => normalizeArtifactRefV1(symbolic), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT/);
+    return true;
+  });
+  assert.equal(reads, 0);
 });
