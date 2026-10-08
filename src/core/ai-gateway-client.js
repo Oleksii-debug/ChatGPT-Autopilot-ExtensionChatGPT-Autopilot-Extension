@@ -159,17 +159,27 @@ async function readResponseTextBounded(response, controller) {
 
 async function parseJson(response, controller) {
   const text = await readResponseTextBounded(response, controller);
-  let body;
-  try { body = text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
   if (!response.ok) {
-    const detail = clean(body?.error?.message) || clean(body?.error) || clean(body?.message);
-    const error = new Error(detail ? `AI Gateway error ${response.status}: ${detail}` : `AI Gateway error ${response.status}`);
-    error.status = response.status;
-    if (clean(body?.code)) error.code = clean(body.code);
-    throw error;
+    // Trust the transport status even when the proxy/server returned HTML or
+    // invalid JSON. Never put upstream content, prompts or secrets in errors.
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch { /* HTTP status remains authoritative */ }
+    const status = response.status;
+    const error = new Error(`AI Gateway error ${status}`);
+    error.status = status;
+    const sourceCode = body && typeof body === 'object' && !Array.isArray(body)
+      ? body.code : null;
+    error.code = typeof sourceCode === 'string' && /^AI_[A-Z0-9_]{1,79}$/u.test(sourceCode)
+      ? sourceCode : `AI_GATEWAY_HTTP_${status}`;
+    error.category = status === 401 || status === 403 ? 'AUTH'
+      : status === 429 ? 'RATE_LIMIT'
+      : status === 408 || status === 504 ? 'TIMEOUT'
+      : status >= 500 ? 'UNAVAILABLE'
+      : 'INVALID_REQUEST';
+    return Promise.reject(error);
   }
-  return body;
+  try { return text ? JSON.parse(text) : {}; }
+  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
 }
 
 export class AiGatewayClient {
@@ -211,7 +221,11 @@ export class AiGatewayClient {
       if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
       if (error?.name === 'AbortError') throw new Error(`AI Gateway request timed out after ${timeout} seconds`);
       if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
-      throw new Error(`Could not reach AI Gateway: ${error?.message || 'network error'}`);
+      const unavailable = new Error('Could not reach AI Gateway');
+      unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
+      unavailable.category = 'UNAVAILABLE';
+      unavailable.retryable = true;
+      throw unavailable;
     } finally {
       clearTimeout(timer);
     }
