@@ -286,7 +286,7 @@ export function normalizeBrowserAgentAcceptanceCriteria(raw = []) {
   }
   const keys = Reflect.ownKeys(entries);
   if (keys.length !== size + 1 || keys.some(key =>
-    key !== 'length' && (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)))) {
+    key !== 'length' && (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)))) {
     throw new Error('Browser Agent acceptanceCriteria must be a dense, data-only array');
   }
   const seen = new Set();
