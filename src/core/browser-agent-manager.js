@@ -3270,7 +3270,7 @@ export class BrowserAgentManager {
       const postClick = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
         func: probeBrowserCoordinateTarget,
-        args: [action.x, action.y, expectedFingerprint],
+        args: [action.x, action.y, expectedFingerprint, true],
       });
       if (!postClick?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
       await requireOwner();
