@@ -234,3 +234,49 @@ test('result artifact requires exact canonical Core provenance before RECEIVED',
   delete omitted.result.receipt.resultArtifactRef;
   assert.equal((await attempt(omitted)).status, 'UNKNOWN_NETWORK_RESULT');
 });
+
+test('SDK validates canonical Core request before opening transport, without executing getters', async () => {
+  let getterCalls = 0, networkCalls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => { networkCalls++; throw new Error('unreachable transport'); },
+  });
+  const malformed = [
+    { ...BASE, operation: 'FORGED_EFFECT' },
+    { ...BASE, requestedAt: '2026-10-08T10:00:00+00:00' },
+    { ...BASE, targetId: 'agent 1' },
+    { ...BASE, credential: 'SHOULD_NOT_LEAVE_PROCESS' },
+    { ...BASE, payloadArtifactRef: { secret: 'SHOULD_NOT_LEAVE_PROCESS' } },
+    { ...BASE, projectId: null },
+  ];
+  const getterRequest = { ...BASE };
+  Object.defineProperty(getterRequest, 'principalId', {
+    enumerable: true, get() { getterCalls++; return BASE.principalId; },
+  });
+  malformed.push(getterRequest);
+  const symbolRequest = { ...BASE };
+  symbolRequest[Symbol('hiddenCredential')] = 'SHOULD_NOT_LEAVE_PROCESS';
+  malformed.push(symbolRequest);
+  for (const input of malformed) {
+    await assert.rejects(() => client.control(input));
+  }
+  assert.equal(getterCalls, 0, 'SDK must not execute hostile request accessors');
+  assert.equal(networkCalls, 0, 'invalid request must never enter transport');
+});
+
+test('SDK serializes only canonical request fields and preserves wire-bound identity', async () => {
+  const seen = [];
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async (_url, options) => {
+      seen.push(JSON.parse(options.body));
+      return { ok: true, json: async () => transportResponse() };
+    },
+  });
+  const request = { ...BASE };
+  const reply = await client.control(request);
+  assert.equal(reply.status, 'RECEIVED');
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0], BASE);
+  assert.equal(Object.hasOwn(seen[0], 'authorization'), false);
+});

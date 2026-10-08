@@ -1,4 +1,5 @@
 import { normalizeArtifactRefV1 } from '../../src/core/universal-agent-contracts.js';
+import { normalizeAutopilotProgrammaticRequestV1 } from '../../src/core/autopilot-programmatic-control.js';
 
 /**
  * Opt-in SDK client for local authenticated Native Companion API.
@@ -93,11 +94,13 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
   if (typeof fetchImpl !== 'function') throw new Error('A fetch transport is required');
   return Object.freeze({
     async control(request) {
+      // Canonical Core preflight snapshots own data descriptors before any
+      // JSON serialization. No getter, noncanonical date, extra credential
+      // field or malformed ArtifactRef may execute or cross the loopback.
+      // Validation must complete before a potentially effectful transport.
+      const sentRequest = normalizeAutopilotProgrammaticRequestV1(request);
       // JSON request bodies only; no automatic retry of ambiguous mutations.
-      const body = JSON.stringify(request);
-      // Bind response identities to the bytes sent on the wire. The caller
-      // may mutate their original object while fetch is in flight.
-      const sentRequest = JSON.parse(body);
+      const body = JSON.stringify(sentRequest);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
       let res;
       try {
