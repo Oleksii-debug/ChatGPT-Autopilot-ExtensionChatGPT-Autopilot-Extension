@@ -1,0 +1,35 @@
+name: Plan 6 Agent timeline qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/core/agent-run-timeline.js'
+      - 'src/ui/options.js'
+      - 'src/ui/options.html'
+      - 'tests/plan6-agent-run-timeline.test.mjs'
+      - '.github/workflows/plan6-agent-timeline-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-qualification:
+    name: Source and accessibility (OS matrix)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse changed JavaScript
+        run: |
+          node --check src/core/agent-run-timeline.js
+          node --check src/ui/options.js
+          node --check tests/plan6-agent-run-timeline.test.mjs
+      - name: Read-only timeline, security, chaos and keyboard contract regressions
+        run: node --test tests/plan6-agent-run-timeline.test.mjs tests/run-timeline.test.mjs tests/run-timeline-command.test.mjs tests/run-timeline-ui.test.mjs tests/untrusted-content-guard.test.mjs
