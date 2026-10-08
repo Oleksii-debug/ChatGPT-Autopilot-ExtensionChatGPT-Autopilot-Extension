@@ -937,3 +937,72 @@ test('file upload preflight still emits exactly one input and change for a visib
     assert.deepEqual(input.events, ['input', 'change']);
   });
 });
+
+test('native coordinate click release failure retries release without a duplicate press', async () => {
+  setup();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  const send = fixture.manager.chrome.debugger.sendCommand;
+  let releases = 0;
+  fixture.manager.chrome.debugger.sendCommand = async (...args) => {
+    const [, method, data] = args;
+    await send(...args);
+    if (method === 'Input.dispatchMouseEvent' && data?.type === 'mouseReleased' && ++releases === 1) {
+      throw new Error('injected release failure');
+    }
+  };
+  await assert.rejects(
+    () => fixture.manager.nativeClickAt(7, 20, 20, fingerprint, 'owner-job', 3),
+    /injected release failure/,
+  );
+  assert.deepEqual(fixture.events, [
+    'attach', 'Input.dispatchMouseEvent:mousePressed',
+    'Input.dispatchMouseEvent:mouseReleased',
+    'Input.dispatchMouseEvent:mouseReleased', 'detach',
+  ]);
+});
+
+test('native coordinate typing releases uncertain press and never inserts text', async () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  const send = fixture.manager.chrome.debugger.sendCommand;
+  fixture.manager.chrome.debugger.sendCommand = async (...args) => {
+    const [, method, data] = args;
+    await send(...args);
+    if (method === 'Input.dispatchMouseEvent' && data?.type === 'mousePressed') throw new Error('injected press failure');
+  };
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'must not insert' }, fingerprint, 'owner-job', 3),
+    /injected press failure/,
+  );
+  assert.deepEqual(fixture.events, [
+    'attach', 'Input.dispatchMouseEvent:mousePressed',
+    'Input.dispatchMouseEvent:mouseReleased', 'detach',
+  ]);
+  assert.equal(fixture.events.includes('Input.insertText'), false);
+});
+
+test('native visual drag releases uncertain press on debugger failure', async () => {
+  setup();
+  const start = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const end = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(40, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  const send = fixture.manager.chrome.debugger.sendCommand;
+  fixture.manager.chrome.debugger.sendCommand = async (...args) => {
+    const [, method, data] = args;
+    await send(...args);
+    if (method === 'Input.dispatchMouseEvent' && data?.type === 'mousePressed') throw new Error('injected drag press failure');
+  };
+  await assert.rejects(
+    () => fixture.manager.nativeDragAt(7, { startX: 20, startY: 20, endX: 40, endY: 20 }, start, end, 'owner-job', 3),
+    /injected drag press failure/,
+  );
+  assert.deepEqual(fixture.events, [
+    'attach', 'Input.dispatchMouseEvent:mouseMoved',
+    'Input.dispatchMouseEvent:mousePressed',
+    'Input.dispatchMouseEvent:mouseReleased', 'detach',
+  ]);
+});
