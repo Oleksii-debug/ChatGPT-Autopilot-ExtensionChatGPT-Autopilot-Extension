@@ -1161,3 +1161,48 @@ test('Plan4 S2: timed-out local body must not publish late success, normal respo
   assert.deepEqual(allowed,{models:['allowed']});
   assert.equal(networkRequests,2);
 });
+
+test('Plan4 S2: AI Gateway rejects late fetch completion after its deadline without retrying', async () => {
+  let expire;
+  let requests=0;
+  const client = new AiGatewayClient({
+    fetchFn:async () => { requests++; expire(); return {ok:true,status:200,text:async()=>JSON.stringify({text:'stale'})}; },
+    setTimeoutFn:callback=>{expire=callback;return 1;},
+    clearTimeoutFn:()=>{},
+  });
+  await assert.rejects(
+    client.complete({provider:'openai-compatible',model:'fixture',prompt:'do not publish stale output',timeoutSeconds:5}),
+    error => error.code === 'AI_GATEWAY_TIMEOUT' && error.category === 'TIMEOUT' && error.retryable === true,
+  );
+  assert.equal(requests,1);
+});
+
+test('Plan4 S2: AI Gateway body expiry fails closed, bounded rejection keeps its typed code, restart succeeds', async () => {
+  let expire;
+  let mode='late-body';
+  let requests=0;
+  const client = new AiGatewayClient({
+    fetchFn:async () => {
+      requests++;
+      if (mode === 'oversized') return {
+        ok:true,status:200,headers:{get:()=>String(4_000_001)},body:{cancel:async()=>{}},
+      };
+      return {
+        ok:true,status:200,
+        text:async()=>{if(mode==='late-body')expire();return JSON.stringify({text:'safe reply'});},
+      };
+    },
+    setTimeoutFn:callback=>{expire=callback;return 2;},
+    clearTimeoutFn:()=>{},
+  });
+  const input={provider:'openai-compatible',model:'fixture',prompt:'bounded',timeoutSeconds:5};
+  await assert.rejects(client.complete(input),
+    error=>error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT');
+  mode='oversized';
+  await assert.rejects(client.complete(input),
+    error=>error.code==='AI_GATEWAY_RESPONSE_TOO_LARGE');
+  mode='allowed';
+  const valid=await client.complete(JSON.parse(JSON.stringify(input)));
+  assert.deepEqual(valid,{text:'safe reply'});
+  assert.equal(requests,3);
+});
