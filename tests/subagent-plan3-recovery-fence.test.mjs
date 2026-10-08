@@ -1,0 +1,324 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  createOrchestrationHierarchyRuntime,
+  OrchestrationNodeLifecycle,
+  validateOrchestrationGraphV1,
+  validateOrchestrationHierarchyRuntimeV1,
+} from '../src/core/orchestration-hierarchy.js';
+import { SubagentSpawnInitiator } from '../src/core/subagent-structure-policy.js';
+import { mutateOrchestrationSubagentTopologyV1 } from '../src/core/subagent-topology-mutation.js';
+
+const policy = { schemaVersion: 1, allowAgentCreatedChildren: true, maxDepth: 2, maxChildrenPerAgent: 4 };
+const graph = validateOrchestrationGraphV1({
+  schemaVersion: 1, graphId: 'plan3.fence', controlEpoch: 7,
+  loopPolicy: { mode: 'ONE_SHOT', maxRounds: 0 },
+  promptProfiles: [
+    { id: 'worker', role: 'worker', version: 1, prompt: 'work' },
+    { id: 'recovery', role: 'recovery', version: 1, prompt: 'recover' },
+  ],
+  nodes: [{
+    id: 'root', parentId: null, childIds: [], promptProfileId: 'worker',
+    recoveryPromptProfileId: 'recovery', chatMode: 'NEW_CHAT_PER_ACTIVATION',
+    maxActiveChildren: 0, barrier: { mode: 'NONE', childIds: [] },
+    providerBinding: null,
+  }],
+});
+const runtime = createOrchestrationHierarchyRuntime(graph, 100);
+runtime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+const canonicalRuntime = validateOrchestrationHierarchyRuntimeV1(graph, runtime);
+const request = (overrides = {}) => ({
+  graph, runtime: canonicalRuntime, policy, initiator: SubagentSpawnInitiator.AGENT,
+  parentNodeId: 'root', requestedChildren: 2, resourceBudget: { maxChildAgents: 8 },
+  spawnId: 'plan3.spawn', nowMs: 250, ...overrides,
+});
+
+test('exact durable restart replay cannot create an orphan or duplicate children', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.reused, false);
+  assert.equal(first.createdNodeIds.length, 2);
+  const restartedGraph = JSON.parse(JSON.stringify(first.graph));
+  const restartedRuntime = JSON.parse(JSON.stringify(first.runtime));
+  const second = mutateOrchestrationSubagentTopologyV1(request({
+    graph: restartedGraph, runtime: restartedRuntime, nowMs: 300,
+  }));
+  assert.equal(second.decision, 'ALLOW');
+  assert.equal(second.reused, true);
+  assert.equal(second.graph.nodeOrder.length, first.graph.nodeOrder.length);
+  assert.deepEqual(second.createdNodeIds, first.createdNodeIds);
+  const collision = mutateOrchestrationSubagentTopologyV1(request({
+    graph: restartedGraph, runtime: restartedRuntime, requestedChildren: 1, nowMs: 300,
+  }));
+  assert.equal(collision.decision, 'DENY');
+  assert.equal(collision.reasonCode, 'SPAWN_IDENTITY_CONFLICT');
+  assert.equal(collision.executionAuthority, false);
+  assert.equal(collision.activationAuthority, false);
+});
+
+test('parent pause on recovered tree prevents child auto-activation and keeps stored topology', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  const paused = JSON.parse(JSON.stringify(first.runtime));
+  paused.nodesById.root.scopeState = 'PAUSED';
+  const checked = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph, runtime: paused, nowMs: 350,
+  }));
+  assert.equal(checked.reused, true);
+  assert.deepEqual(checked.activationRequests, []);
+  assert.deepEqual(checked.createdNodeIds, first.createdNodeIds);
+  assert.equal(checked.executionAuthority, false);
+});
+
+test('stale restart clock and resource/child authority exhaustion fail closed', () => {
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({ nowMs: 99 })),
+    /nowMs cannot precede/u,
+  );
+  const budgetDenied = mutateOrchestrationSubagentTopologyV1(request({
+    resourceBudget: { maxChildAgents: 0 },
+  }));
+  assert.equal(budgetDenied.decision, 'DENY');
+  assert.equal(budgetDenied.createdNodeIds.length, 0);
+  assert.equal(budgetDenied.activationAuthority, false);
+  const policyDenied = mutateOrchestrationSubagentTopologyV1(request({
+    policy: { ...policy, allowAgentCreatedChildren: false },
+  }));
+  assert.equal(policyDenied.decision, 'DENY');
+  assert.equal(policyDenied.createdNodeIds.length, 0);
+});
+
+test('ALL_DIRECT_CHILDREN barrier allows idempotent durable restart replay without a second spawn', () => {
+  const allChildrenGraph = validateOrchestrationGraphV1({
+    schemaVersion: graph.schemaVersion,
+    graphId: graph.graphId,
+    controlEpoch: graph.controlEpoch,
+    loopPolicy: structuredClone(graph.loopPolicy),
+    promptProfiles: structuredClone(graph.promptProfiles),
+    nodes: graph.nodeOrder.map(nodeId => ({
+      ...structuredClone(graph.nodesById[nodeId]),
+      barrier: { mode: 'ALL_DIRECT_CHILDREN', childIds: [] },
+    })),
+  });
+  const initialRuntime = createOrchestrationHierarchyRuntime(allChildrenGraph, 100);
+  initialRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const initial = validateOrchestrationHierarchyRuntimeV1(allChildrenGraph, initialRuntime);
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    graph: allChildrenGraph, runtime: initial,
+  }));
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.reused, false);
+  assert.equal(first.graph.nodesById.root.barrier.mode, 'ALL_DIRECT_CHILDREN');
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: JSON.parse(JSON.stringify(first.graph)),
+    runtime: JSON.parse(JSON.stringify(first.runtime)),
+    nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.createdNodeIds, first.createdNodeIds);
+  assert.equal(replay.graph.nodeOrder.length, first.graph.nodeOrder.length);
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
+
+test('paused ancestor blocks a new nested durable spawn despite active child state', () => {
+  const initial = mutateOrchestrationSubagentTopologyV1(request({
+    requestedChildren: 1, spawnId: 'ancestor.top',
+  }));
+  assert.equal(initial.decision, 'ALLOW');
+  const childId = initial.createdNodeIds[0];
+  const resumed = structuredClone(initial.runtime);
+  resumed.nodesById[childId].lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const nestedRequest = {
+    graph: initial.graph, runtime: resumed, parentNodeId: childId,
+    requestedChildren: 1, spawnId: 'ancestor.nested', nowMs: 300,
+  };
+  const allowed = mutateOrchestrationSubagentTopologyV1(request(nestedRequest));
+  assert.equal(allowed.decision, 'ALLOW');
+  assert.equal(allowed.activationAuthority, false);
+  resumed.nodesById.root.scopeState = 'PAUSED';
+  const denied = mutateOrchestrationSubagentTopologyV1(request(nestedRequest));
+  assert.equal(denied.decision, 'DENY');
+  assert.equal(denied.reasonCode, 'ANCESTOR_SCOPE_NOT_RUNNING');
+  assert.deepEqual(denied.createdNodeIds, []);
+  assert.deepEqual(denied.activationRequests, []);
+  assert.equal(denied.executionAuthority, false);
+  assert.equal(denied.activationAuthority, false);
+});
+
+
+test('durably processed child event is not proposed a second time after restart', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.activationRequests.length, 2);
+  const alreadyProcessed = first.activationRequests[0];
+  const savedRuntime = structuredClone(first.runtime);
+  savedRuntime.processedEventIds[alreadyProcessed.eventId] = 250;
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph),
+    runtime: savedRuntime,
+    nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.createdNodeIds, first.createdNodeIds);
+  assert.equal(replay.activationRequests.filter(item => item.eventId === alreadyProcessed.eventId).length, 0);
+  assert.equal(replay.activationRequests.length, 1, 'unprocessed sibling still admitted');
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
+
+test('without durable processed event exact restart can still offer deterministic proposals', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph), runtime: structuredClone(first.runtime), nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(
+    replay.activationRequests.map(item => item.eventId),
+    first.activationRequests.map(item => item.eventId),
+  );
+});
+
+test('durable nonterminal child ledger reserves bounded parent capacity despite orphaned current-activation pointer', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const resumedGraph = structuredClone(first.graph);
+  resumedGraph.nodesById.root.maxActiveChildren = 1;
+  const resumedRuntime = structuredClone(first.runtime);
+  const occupiedChild = resumedRuntime.nodesById[occupiedChildId];
+  occupiedChild.currentActivationId = '';
+  occupiedChild.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  occupiedChild.activationLedger['activation.persisted'] = {
+    phase: 'PREPARED',
+    activationId: 'activation.persisted',
+    nodeId: occupiedChildId,
+  };
+  // Even when the current pointer is lost at the crash boundary, the
+  // recovered PREPARED ledger is evidence of a still-uncertain effect.
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: resumedGraph, runtime: resumedRuntime, nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.activationRequests, []);
+  assert.equal(replay.activationAuthority, false);
+  assert.equal(replay.executionAuthority, false);
+
+  const settledRuntime = structuredClone(resumedRuntime);
+  settledRuntime.nodesById[occupiedChildId].activationLedger['activation.persisted'].phase = 'TERMINAL';
+  const reconciled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: resumedGraph, runtime: settledRuntime, nowMs: 301,
+  }));
+  assert.equal(reconciled.decision, 'ALLOW');
+  assert.equal(reconciled.activationRequests.length, 1);
+  assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
+});
+
+
+test('ACTIVE recovered child with an unreconciled ledger never releases a sibling lease', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const recoveredGraph = structuredClone(first.graph);
+  recoveredGraph.nodesById.root.maxActiveChildren = 1;
+  const recoveredRuntime = structuredClone(first.runtime);
+  const occupied = recoveredRuntime.nodesById[occupiedChildId];
+  occupied.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  occupied.currentActivationId = '';
+  occupied.activationLedger = {};
+  // This event was durably admitted before the crash. A lost ledger pointer
+  // must not make the active child disappear from parent's concurrency.
+  recoveredRuntime.processedEventIds[first.activationRequests[0].eventId] = 250;
+  const inFlight = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 300,
+  }));
+  assert.equal(inFlight.decision, 'ALLOW');
+  assert.equal(inFlight.reused, true);
+  assert.deepEqual(inFlight.activationRequests, [], 'ACTIVE child occupies slot');
+  assert.equal(inFlight.executionAuthority, false);
+  assert.equal(inFlight.activationAuthority, false);
+  // IDLE alone cannot reconcile an unknown previously processed effect.
+  occupied.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const unknown = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 301,
+  }));
+  assert.equal(unknown.decision, 'ALLOW');
+  assert.deepEqual(unknown.activationRequests, []);
+  assert.equal(unknown.executionAuthority, false);
+  // Only explicit durable terminal proof permits capacity reuse.
+  occupied.lastTerminalStatus = 'COMPLETED';
+  const settled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 302,
+  }));
+  assert.equal(settled.decision, 'ALLOW');
+  assert.equal(settled.activationRequests.length, 1);
+  assert.equal(settled.activationRequests[0].nodeId, siblingId);
+});
+
+test('lost child ledger and pointer after crash retain UNKNOWN sibling lease until terminal proof', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const recoveredGraph = structuredClone(first.graph);
+  recoveredGraph.nodesById.root.maxActiveChildren = 1;
+  const recoveredRuntime = structuredClone(first.runtime);
+  const occupied = recoveredRuntime.nodesById[occupiedChildId];
+  occupied.currentActivationId = '';
+  occupied.activationLedger = {};
+  occupied.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  recoveredRuntime.processedEventIds[first.activationRequests[0].eventId] = 250;
+  const unknown = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 300,
+  }));
+  assert.equal(unknown.decision, 'ALLOW');
+  assert.deepEqual(unknown.activationRequests, []);
+  assert.equal(unknown.activationAuthority, false);
+  assert.equal(unknown.executionAuthority, false);
+  occupied.lastTerminalStatus = 'COMPLETED';
+  const reconciled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 301,
+  }));
+  assert.equal(reconciled.decision, 'ALLOW');
+  assert.equal(reconciled.activationRequests.length, 1);
+  assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
+  assert.equal(reconciled.executionAuthority, false);
+});
+
+test('durable terminal child outcome suppresses duplicate activation despite lost event and ledger', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.activationRequests.length, 2);
+  const [completedChildId, eligibleSiblingId] = first.createdNodeIds;
+  const recovered = structuredClone(first.runtime);
+  const completed = recovered.nodesById[completedChildId];
+  completed.currentActivationId = '';
+  completed.activationLedger = {};
+  completed.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  completed.lastTerminalStatus = 'COMPLETED';
+  // Simulate torn restart evidence: processedEventIds was not persisted,
+  // but the canonical child outcome survived. A terminal child is never
+  // eligible for the same spawn activation a second time.
+  assert.equal(Object.keys(recovered.processedEventIds).length, 0);
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph), runtime: recovered, nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.equal(replay.activationRequests.some(item => item.nodeId === completedChildId), false);
+  assert.equal(replay.activationRequests.some(item => item.nodeId === eligibleSiblingId), true);
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
+
+test('section 2: invalid spawn field names cannot disclose attacker-controlled secret strings', () => {
+  const secret = 'PRIVATE_DELEGATION_SECRET_MUST_NOT_ECHO_731';
+  const hostile = { ...request(), [secret]: 'value' };
+  assert.throws(() => mutateOrchestrationSubagentTopologyV1(hostile), error =>
+    error instanceof Error && /unknown field/u.test(error.message) && !error.message.includes(secret));
+  const canonical = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(canonical.decision, 'ALLOW', 'legitimate spawn still has bounded admission');
+  assert.equal(canonical.executionAuthority, false);
+  assert.equal(canonical.activationAuthority, false);
+});

@@ -59,7 +59,7 @@ function strictRecord(value, allowed, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') throw new Error(label + ' contains symbol field');
-    if (!allowed.has(key)) throw new Error(label + ' contains unknown field: ' + key);
+    if (!allowed.has(key)) throw new Error(label + ' contains unknown field');
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' must be an enumerable own data property');
@@ -200,13 +200,41 @@ function replayActivationAdmitted({
   return true;
 }
 
-function activationInFlight(nodeRuntime) {
-  if (!nodeRuntime?.currentActivationId) return false;
-  const current = nodeRuntime.activationLedger?.[nodeRuntime.currentActivationId];
-  return Boolean(
-    current
-    && !['TERMINAL', 'SUPERSEDED'].includes(current.phase),
-  );
+function activationInFlight(nodeRuntime, runtime, graph, nodeId) {
+  if (!nodeRuntime) return false;
+  // A recovered ACTIVE child already occupies parent concurrency even if
+  // its activation pointer or ledger has not been reconciled after a crash.
+  // Treat missing ledger evidence as UNKNOWN, never a free sibling lease.
+  if (nodeRuntime.lifecycle === OrchestrationNodeLifecycle.ACTIVE) return true;
+  const ledger = nodeRuntime.activationLedger;
+  if (nodeRuntime.currentActivationId
+      && (!ledger || !Object.hasOwn(ledger, nodeRuntime.currentActivationId))) {
+    return true;
+  }
+  if (!ledger) return false;
+  // Durable PREPARED/AMBIGUOUS effects reserve capacity independently of
+  // currentActivationId. Only fully terminal/superseded entries release it.
+  if (Object.values(ledger).some(
+    item => item && !['TERMINAL', 'SUPERSEDED'].includes(item.phase),
+  )) return true;
+  // A crash may persist the activation event while losing its pointer and
+  // ledger. Until reconciliation produces terminal proof, the event is an
+  // UNKNOWN outstanding effect and cannot free a sibling lease.
+  if (nodeRuntime.lifecycle === OrchestrationNodeLifecycle.IDLE
+      && !nodeRuntime.currentActivationId
+      && !nodeRuntime.lastTerminalStatus
+      && Object.keys(ledger).length === 0
+      && nodeId.startsWith('subagent:')) {
+    const lastSeparator = nodeId.lastIndexOf(':');
+    const spawnId = nodeId.slice('subagent:'.length, lastSeparator);
+    if (lastSeparator > 'subagent:'.length && /^[1-9][0-9]*$/u.test(nodeId.slice(lastSeparator + 1))) {
+      const eventId = compactOrchestrationEventId(
+        'subagent-spawn', graph.graphId, spawnId, nodeId, 1,
+      );
+      if (Object.hasOwn(runtime.processedEventIds, eventId)) return true;
+    }
+  }
+  return false;
 }
 
 function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, childNodeIds) {
@@ -218,7 +246,7 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
   // child-activation limit and must include already in-flight siblings.
   const effectiveLimit = parent.maxActiveChildren || parent.childIds.length;
   const occupiedSlots = parent.childIds.reduce(
-    (count, childId) => count + (activationInFlight(runtime.nodesById[childId]) ? 1 : 0),
+    (count, childId) => count + (activationInFlight(runtime.nodesById[childId], runtime, graph, childId) ? 1 : 0),
     0,
   );
   let remainingSlots = Math.max(0, effectiveLimit - occupiedSlots);
@@ -231,22 +259,26 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
         || nodeRuntime.generation !== 1
         || nodeRuntime.lifecycle !== OrchestrationNodeLifecycle.IDLE
         || nodeRuntime.currentActivationId
+        || nodeRuntime.lastTerminalStatus
         || !scopeChainIsRunning(graph, runtime, nodeId)) {
       return;
     }
+    const eventId = compactOrchestrationEventId(
+      'subagent-spawn', graph.graphId, spawnId, nodeId, 1,
+    );
+    const activationId = 'spawn:' + spawnId + ':child:' + (index + 1);
+    // Restart must never propose an already processed event or an activation
+    // that survived in the canonical ledger, even if the child is now IDLE.
+    // The reducer also deduplicates, but don't generate duplicate work intent.
+    if (Object.hasOwn(runtime.processedEventIds, eventId)
+        || Object.hasOwn(nodeRuntime.activationLedger, activationId)) return;
     requests.push({
       type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
-      eventId: compactOrchestrationEventId(
-        'subagent-spawn',
-        graph.graphId,
-        spawnId,
-        nodeId,
-        1,
-      ),
+      eventId,
       controlEpoch: graph.controlEpoch,
       nodeId,
       generation: 1,
-      activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
+      activationId,
       purpose: OrchestrationActivationPurpose.WORK,
     });
     remainingSlots -= 1;
@@ -286,9 +318,16 @@ function replayResult(
   const exactFamily = family.length === expectedChildIds.length
     && expectedChildIds.every(nodeId => family.includes(nodeId));
   const parent = graph.nodesById[parentNodeId];
+  // ALL_DIRECT_CHILDREN is encoded by an empty explicit childIds list.
+  // A valid replay must check the canonical parent's direct children instead
+  // of treating that representation as a missing delegation barrier.
   const barrierCoversSpawn = parent
-    && parent.barrier.mode !== OrchestrationBarrierMode.NONE
-    && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId));
+    && (
+      (parent.barrier.mode === OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN
+        && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId)))
+      || (parent.barrier.mode === OrchestrationBarrierMode.ALL_DIRECT_CHILDREN
+        && expectedChildIds.every(nodeId => parent.childIds.includes(nodeId)))
+    );
   const exactAuthority = exactFamily
     && parent
     && !parent.providerBinding
@@ -428,6 +467,16 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
   const lifecycleDenial = lifecycleAdmission(initiator, parentNode, parentRuntime);
   if (lifecycleDenial) {
     return denial(lifecycleDenial.reasonCode, {
+      parentNodeId,
+      spawnId,
+      structure,
+      resource,
+    });
+  }
+  // An active child under a paused/stopped ancestor cannot create new durable
+  // descendants, even when the child's own scope still reads RUNNING.
+  if (!scopeChainIsRunning(canonicalGraph, canonicalRuntime, parentNodeId)) {
+    return denial('ANCESTOR_SCOPE_NOT_RUNNING', {
       parentNodeId,
       spawnId,
       structure,

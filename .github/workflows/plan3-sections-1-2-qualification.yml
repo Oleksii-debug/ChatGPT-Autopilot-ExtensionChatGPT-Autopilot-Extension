@@ -1,0 +1,88 @@
+name: Plan 3 Sections 1-2 focused qualification
+
+on:
+  push:
+    branches:
+      - audit/plan3-specialists-subagents-20261008
+  pull_request:
+    paths:
+      - "src/core/specialist-*.js"
+      - "src/core/agent-specialist-*.js"
+      - "src/core/subagent-*.js"
+      - "src/core/orchestration-hierarchy*.js"
+      - "tests/*specialist*.test.mjs"
+      - "tests/subagent-*.test.mjs"
+      - "tests/orchestration-hierarchy*.test.mjs"
+      - ".github/workflows/plan3-sections-1-2-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  specialist-readiness:
+    name: Section 1 specialist registry and readiness (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate canonical version and specialist source syntax
+        shell: bash
+        run: |
+          node -e "const m=require('./manifest.json'); if (m.version !== '11.0.13') process.exit(1)"
+          for src in src/core/specialist-*.js src/core/agent-specialist-*.js src/core/browser-agent-manager.js; do node --check "$src"; done
+      - name: Specialist registry/readiness/dispatch/admission tests
+        shell: bash
+        run: |
+          node --test \
+            tests/specialist-registry.test.mjs \
+            tests/specialist-provider-readiness.test.mjs \
+            tests/specialist-provider-readiness-resolver.test.mjs \
+            tests/specialist-provider-dispatch-chronology.test.mjs \
+            tests/specialist-provider-config.test.mjs \
+            tests/specialist-provider-execution.test.mjs \
+            tests/specialist-assignment.test.mjs \
+            tests/specialist-provider-ui.test.mjs \
+            tests/specialist-registry-ui.test.mjs \
+            tests/agent-specialist-bridge.test.mjs \
+            tests/agent-specialist-delegation.test.mjs \
+            tests/agent-specialist-delegation-profile.test.mjs \
+            tests/browser-agent-specialist-registry-persistence.test.mjs \
+            tests/browser-agent-specialist-provider-config-persistence.test.mjs \
+            tests/browser-agent-specialist-provider-runtime-wiring.test.mjs \
+            tests/browser-agent-auto-delegation-runtime.test.mjs \
+            tests/agent-route-readiness.test.mjs
+
+  subagent-authority:
+    name: Section 2 subagent topology, leases and recovery (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate canonical version and authority source syntax
+        shell: bash
+        run: |
+          node -e "const m=require('./manifest.json'); if (m.version !== '11.0.13') process.exit(1)"
+          for src in src/core/subagent-*.js src/core/orchestration-hierarchy*.js; do node --check "$src"; done
+      - name: Subagent policy/topology/lease/reconciliation tests
+        shell: bash
+        run: |
+          node --test \
+            tests/subagent-*.test.mjs \
+            tests/orchestration-hierarchy*.test.mjs \
+            tests/orchestration-subagent-policy-profile.test.mjs \
+            tests/agent-tree-observability.test.mjs
