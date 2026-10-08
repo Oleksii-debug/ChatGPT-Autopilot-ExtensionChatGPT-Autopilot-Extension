@@ -563,3 +563,30 @@ test('valid Proxy-backed contract records and arrays execute zero ordinary gette
   assert.equal(projectOutcomeEvidenceV1(projectionRequest).status, OutcomeEvidenceStatus.EVIDENCE_READY);
   assert.equal(reads, 0);
 });
+
+
+test('Plan-1 S2: Outcome Contract intake rejects hostile property keys without leaking names or executing getters', () => {
+  const secretKey = 'secret-OUTCOME-CONTRACT-OWNER-TOKEN';
+  const candidate = input();
+  let reads = 0;
+  Object.defineProperty(candidate, secretKey, {
+    enumerable: true,
+    get() { reads++; throw new Error('untrusted getter executed'); },
+  });
+  assert.throws(() => createOutcomeContractV1(candidate), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /secret-OUTCOME|OWNER-TOKEN|untrusted getter executed/);
+    return true;
+  });
+  assert.equal(reads, 0);
+
+  const symbolCandidate = input();
+  Object.defineProperty(symbolCandidate, Symbol(secretKey), { enumerable: true, value: 'ALLOW' });
+  assert.throws(() => normalizeOutcomeContractV1({schemaVersion:1, ...symbolCandidate}), error => {
+    // Spreading a symbol does not confer authority; normalizer must still reject
+    // any unsupported own field without echoing attacker-defined descriptions.
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /secret-OUTCOME|OWNER-TOKEN/);
+    return true;
+  });
+});
