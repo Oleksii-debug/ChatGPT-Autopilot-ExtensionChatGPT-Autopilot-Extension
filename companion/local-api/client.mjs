@@ -19,12 +19,35 @@ const ARTIFACT_FIELDS = Object.freeze([
   'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
 ]);
 
+/**
+ * A successful transport must not carry undeclared fields, secrets, getters,
+ * symbol keys or non-data properties inside payload provenance. Validating
+ * only the ten known fields would otherwise accept a forged extra field and
+ * pass the unfiltered response to SDK callers as authoritative.
+ */
+function exactTransportArtifactShape(received) {
+  if (!received || typeof received !== 'object' || Array.isArray(received)) return false;
+  let prototype, descriptors;
+  try {
+    prototype = Object.getPrototypeOf(received);
+    descriptors = Object.getOwnPropertyDescriptors(received);
+  } catch {
+    return false;
+  }
+  if (prototype !== Object.prototype && prototype !== null
+    || Reflect.ownKeys(descriptors).length !== ARTIFACT_FIELDS.length) return false;
+  return ARTIFACT_FIELDS.every(field => {
+    const descriptor = descriptors[field];
+    return descriptor?.enumerable === true
+      && Object.hasOwn(descriptor, 'value');
+  });
+}
+
 function matchesArtifact(received, requested) {
   if (requested === null) return received === null;
-  if (!requested || !received || typeof received !== 'object') return false;
+  if (!requested || !exactTransportArtifactShape(received)) return false;
   return ARTIFACT_FIELDS.every(field =>
     Object.prototype.hasOwnProperty.call(requested, field)
-    && Object.prototype.hasOwnProperty.call(received, field)
     && Object.is(requested[field], received[field]));
 }
 
