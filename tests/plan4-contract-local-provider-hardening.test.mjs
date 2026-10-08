@@ -647,3 +647,33 @@ test('gateway transport cannot pivot to arbitrary loopback paths, headers or met
   assert.ok(requests.every(({init})=>!Object.hasOwn(init.headers,'Authorization') && !Object.hasOwn(init.headers,'Cookie')));
   assert.ok(requests.every(({url})=>url.startsWith(gatewayUrl+'/')));
 });
+
+
+test('owner numeric model-routing controls reject forged coercion and survive reload', () => {
+  const fields = ['timeoutSeconds','strongEveryNRequests','strongEveryMinutes',
+    'handoffMaxChars','strongMinGapMinutes','strongMaxPerHour'];
+  for (const field of fields) {
+    for (const malformed of [null,false,true,[],[1],{},'', '  ']) {
+      assert.throws(() => normalizeAiRouterSettings({[field]:malformed}),/numeric owner setting/);
+      assert.throws(() => normalizeAiRouterSettings(
+        JSON.parse(JSON.stringify({[field]:malformed}))),/numeric owner setting/);
+    }
+    let coerced=0;
+    assert.throws(() => normalizeAiRouterSettings({
+      [field]:{valueOf() { coerced++; throw new Error('must not coerce'); }},
+    }),/numeric owner setting/);
+    assert.equal(coerced,0);
+  }
+  const allowed = {
+    enabled:true,mode:'primary',primary:{provider:'ollama',model:'fixture'},
+    timeoutSeconds:' 180 ',strongEveryNRequests:'10',strongEveryMinutes:'120',
+    handoffMaxChars:'12000',strongMinGapMinutes:'0',strongMaxPerHour:'0',
+  };
+  const active=normalizeAiRouterSettings(allowed);
+  const persisted=normalizeAiRouterSettings(JSON.parse(JSON.stringify(allowed)));
+  assert.equal(active.timeoutSeconds,180);
+  assert.equal(active.strongEveryNRequests,10);
+  assert.equal(persisted.strongMinGapMinutes,0);
+  assert.equal(persisted.strongMaxPerHour,0);
+  assert.equal(normalizeAiRouterSettings({}).timeoutSeconds,180);
+});
