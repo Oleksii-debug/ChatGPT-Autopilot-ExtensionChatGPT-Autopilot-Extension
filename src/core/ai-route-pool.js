@@ -148,7 +148,7 @@ export function normalizeAiRoutePool(raw = []) {
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
   const routes = source.map((rawItem, index) => {
     const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
-    if (integer(own(item, 'schemaVersion') ?? AI_ROUTE_POOL_VERSION, 'AI route schemaVersion', AI_ROUTE_POOL_VERSION, AI_ROUTE_POOL_VERSION) !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
+    if (Object.hasOwn(item, 'schemaVersion') && own(item, 'schemaVersion') !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
     const provider = clean(own(item, 'provider'), 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
     const model = clean(own(item, 'model'), 300);
@@ -474,4 +474,60 @@ export function createAiRoutePoolExhaustedError({ attempts = [], retryAt = 0, me
   error.retryAt = Math.max(0, Number(retryAt) || 0);
   error.routeAttempts = structuredClone(attempts).slice(-32);
   return error;
+}
+
+
+// Evidence only: this hashes the canonical router's normalized configuration;
+// it does not select a route, fetch credentials, or grant execution authority.
+export const AI_ROUTE_REGISTRY_EVIDENCE_VERSION = 1;
+
+export async function createAiRouteRegistryEvidenceV1(raw) {
+  const input = dataRecord(raw, new Set(['schemaVersion', 'registryRevision', 'routes', 'endpointProfiles']), 'AI route evidence request');
+  if (own(input, 'schemaVersion') !== AI_ROUTE_REGISTRY_EVIDENCE_VERSION) throw new Error('Unsupported AI route evidence schemaVersion');
+  const registryRevision = strictInteger(own(input, 'registryRevision'), 'AI registry revision', 1, Number.MAX_SAFE_INTEGER);
+  const routes = normalizeAiRoutePool(own(input, 'routes'));
+  const profiles = denseDataArray(own(input, 'endpointProfiles') ?? [], 'AI endpoint profiles', 32);
+  const seen = new Set();
+  const normalizedProfiles = profiles.map((entry, index) => {
+    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless']), `AI endpoint profile ${index + 1}`);
+    if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
+    const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
+    if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
+    seen.add(profileId);
+    const provider = clean(own(item, 'provider'), 40);
+    if (!PROVIDERS.has(provider)) throw new Error('AI endpoint provider is invalid');
+    const endpointId = id(own(item, 'endpointId'), 'AI endpoint endpointId', true);
+    const locality = own(item, 'locality');
+    if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
+    const origin = own(item, 'origin');
+    if (typeof origin !== 'string' || origin !== origin.trim()) throw new Error('AI endpoint origin is invalid');
+    let parsed;
+    try { parsed = new URL(origin); } catch { throw new Error('AI endpoint origin is invalid'); }
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/' || origin !== parsed.origin + '/') {
+      throw new Error('AI endpoint origin must be an exact credential-free origin');
+    }
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname.toLowerCase());
+    if (locality === 'local' && !loopback) throw new Error('Local AI endpoint must use loopback');
+    if (locality === 'remote' && parsed.protocol !== 'https:') throw new Error('Remote AI endpoint must use HTTPS');
+    const credentialRef = own(item, 'credentialRef') === undefined ? '' : id(own(item, 'credentialRef'), 'AI endpoint credentialRef', true);
+    const credentialless = own(item, 'credentialless');
+    if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
+    if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
+    if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
+    return Object.freeze({ schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin, locality, credentialRef, credentialless });
+  });
+  const identities = routes.map(route => Object.freeze({
+    routeId: route.routeId, provider: route.provider, model: route.model,
+    endpointId: route.endpointId, locality: route.locality,
+  }));
+  const canonical = JSON.stringify({ schemaVersion: 1, registryRevision, routes, endpointProfiles: normalizedProfiles });
+  if (!globalThis.crypto?.subtle) throw new Error('SHA-256 digest is unavailable; AI configuration evidence cannot be issued');
+  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`AUTOPILOT_AI_ROUTE_REGISTRY_V1\\n${canonical}`));
+  const configSha256 = Array.from(new Uint8Array(bytes), x => x.toString(16).padStart(2, '0')).join('');
+  return Object.freeze({
+    schemaVersion: AI_ROUTE_REGISTRY_EVIDENCE_VERSION, registryRevision,
+    configSha256, routeIdentities: Object.freeze(identities),
+    endpointProfiles: Object.freeze(normalizedProfiles),
+    authority: Object.freeze({ advisoryOnly: true, canSelectRoute: false, canGrantPermission: false, canReadCredentials: false }),
+  });
 }
