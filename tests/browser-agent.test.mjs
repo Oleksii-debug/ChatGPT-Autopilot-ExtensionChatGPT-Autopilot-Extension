@@ -3589,3 +3589,60 @@ test('Plan-1: config edit rejects nested policy getter, sparse criteria and non-
   }).get('job-config-negative');
   assert.equal(persisted.config.goal, 'Original');
 });
+
+test('Plan-1 S1: corrupt in-flight model reservation quarantines on cold restart without write or retry', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }), now: () => 80_000 });
+  await manager.create({ id:'job-corrupt-reservation', goal:'Never lose an outstanding model effect', maxModelCalls:2, maxOutputTokensPerCall:128 });
+  await manager.update(store => { store.byId['job-corrupt-reservation'].runtime.runState = 'RUNNING'; return store; });
+  await manager.reserveProviderModelBudget({
+    jobId:'job-corrupt-reservation', controlEpoch:0, prompt:'Reserved effect', maxOutputTokens:128,
+  });
+  const originalGet = chrome.storage.local.get.bind(chrome.storage.local);
+  const originalSet = chrome.storage.local.set.bind(chrome.storage.local);
+  let writes = 0;
+  chrome.storage.local.set = async values => { writes += 1; return originalSet(values); };
+  for (const corrupted of [
+    { reservationId:'' },
+    { modelCalls:'1' },
+    { totalTokens:0 },
+    { estimatedCostUsd:Infinity },
+    { callNumber:null },
+    { outputTokens:-1 },
+  ]) {
+    chrome.storage.local.get = async key => {
+      const record = await originalGet(key);
+      const value = structuredClone(record[key]);
+      Object.assign(value.byId['job-corrupt-reservation'].runtime.modelBudgetReservation, corrupted);
+      return { [key]: value };
+    };
+    const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+    const before = writes;
+    assert.equal((await restarted.get('job-corrupt-reservation')).job, null);
+    await assert.rejects(() => restarted.updateConfig('job-corrupt-reservation', { goal:'Unsafe' }), /quarantined/);
+    await assert.rejects(() => restarted.reserveProviderModelBudget({
+      jobId:'job-corrupt-reservation', controlEpoch:0, prompt:'Blind retry', maxOutputTokens:128,
+    }), /quarantined/);
+    assert.equal(writes, before, 'corrupt outstanding model reservation must never be overwritten');
+  }
+});
+
+test('Plan-1 S2: explicit persisted null Outcome Contract is quarantined, not downgraded to legacy DONE', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-null-contract', goal:'Do not lose completion evidence requirements' });
+  const originalGet = chrome.storage.local.get.bind(chrome.storage.local);
+  const originalSet = chrome.storage.local.set.bind(chrome.storage.local);
+  chrome.storage.local.get = async key => {
+    const record = await originalGet(key);
+    const value = structuredClone(record[key]);
+    value.byId['job-null-contract'].outcomeContract = null;
+    return { [key]:value };
+  };
+  let writes = 0;
+  chrome.storage.local.set = async values => { writes += 1; return originalSet(values); };
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  assert.equal((await restarted.get('job-null-contract')).job, null);
+  await assert.rejects(() => restarted.updateConfig('job-null-contract', { goal:'Unsafe downgrade' }), /quarantined/);
+  assert.equal(writes, 0);
+});
