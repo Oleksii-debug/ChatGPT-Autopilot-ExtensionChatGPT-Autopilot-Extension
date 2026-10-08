@@ -97,7 +97,9 @@ function safeTime(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
 }
 function safeHistory(history) {
-  if (history == null) return { items: [], total: 0 };
+  // Missing history is supported for old persisted snapshots, but an
+  // explicitly persisted null is corruption, not evidence of zero events.
+  if (history === undefined) return { items: [], total: 0 };
   if (!Array.isArray(history) || Object.getPrototypeOf(history) !== Array.prototype) {
     throw new Error('Agent history must be a dense array');
   }
