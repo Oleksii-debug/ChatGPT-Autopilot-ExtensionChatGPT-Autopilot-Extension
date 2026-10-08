@@ -53,7 +53,7 @@ class PageConnection {
 }
 
 const adapterSource = readFileSync(path.join(root, 'src/interaction/chatgpt-adapter.js'), 'utf8')
-  .replace(/globalThis\\.location\\?\\.href \\|\\| ''/g,
+  .replace(/globalThis\.location\?\.href \|\| ''/g,
     "(globalThis.__apFakeUrl || 'https://chatgpt.com/')");
 const listener = "document.querySelector('#frm').addEventListener('submit',e=>{e.preventDefault();"
   + "const txt=document.querySelector('#prompt').innerText;"
