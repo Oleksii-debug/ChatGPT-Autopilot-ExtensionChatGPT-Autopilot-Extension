@@ -2047,7 +2047,8 @@ function scenarioWorkConfigFromForm() {
     pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Інтервал перевірки'),
     minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
     tabReadyDelaySeconds: scenarioWorkInt('scenario-work-tab-ready', 0, 60, 'Пауза після відкриття вкладки'),
-    postSendDelaySeconds: scenarioWorkInt('scenario-work-post-send', 0, 60, 'Очікування після надсилання'),
+    postSendDelaySeconds: validatedPostSendSeconds('scenario-work-post-send', 'scenario-work-post-send-unit'),
+    postSendDelayUnit: $('scenario-work-post-send-unit').value === 'minutes' ? 'minutes' : 'seconds',
     preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'Пауза перед надсиланням'),
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
@@ -2114,7 +2115,11 @@ function fillScenarioWorkForm(item) {
   $('scenario-work-poll').value = String(config.pollSeconds ?? 180);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
   $('scenario-work-tab-ready').value = String(config.tabReadyDelaySeconds ?? 0);
-  $('scenario-work-post-send').value = String(config.postSendDelaySeconds ?? 5);
+  $('scenario-work-post-send-unit').value = config.postSendDelayUnit === 'minutes' ? 'minutes' : config.postSendDelayUnit === 'seconds' ? 'seconds' : (config.postSendDelaySeconds >= 60 && config.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
+  $('scenario-work-post-send').value = String($('scenario-work-post-send-unit').value === 'minutes' ? (config.postSendDelaySeconds / 60) : (config.postSendDelaySeconds ?? 5));
+  $('scenario-work-post-send').dataset.postSendUnit = $('scenario-work-post-send-unit').value;
+  $('scenario-work-post-send').max = $('scenario-work-post-send-unit').value === 'minutes' ? '60' : '3600';
+  $('scenario-work-post-send').step = $('scenario-work-post-send-unit').value === 'minutes' ? 'any' : '1';
   $('scenario-work-pre-send').value = String(config.preSendDelaySeconds ?? 10);
   $('scenario-work-busy-check').value = String(config.busyCheckDelaySeconds ?? 3);
   $('scenario-work-retry').value = String(config.retryBackoffSeconds ?? 30);
@@ -3909,7 +3914,7 @@ function simplifiedFields() {
     prompt: field('simplified-prompt'), prompts: field('simplified-prompts'),
     runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
     interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
-    tabReady: field('simplified-tab-ready'), postSend: field('simplified-post-send'),
+    tabReady: field('simplified-tab-ready'), postSend: field('simplified-post-send'), postSendUnit: field('simplified-post-send-unit'),
     delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
     retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
     busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
@@ -3975,7 +3980,11 @@ function showSimplifiedSession(session) {
   $('simplified-interval-unit').value = session?.minimumSendIntervalUnit || 'minutes';
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
   $('simplified-tab-ready').value = String(session?.tabReadyDelaySeconds ?? 0);
-  $('simplified-post-send').value = String(session?.postSendDelaySeconds ?? 5);
+  $('simplified-post-send-unit').value = session?.postSendDelayUnit === 'minutes' ? 'minutes' : session?.postSendDelayUnit === 'seconds' ? 'seconds' : (session?.postSendDelaySeconds >= 60 && session.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
+  $('simplified-post-send').value = String($('simplified-post-send-unit').value === 'minutes' ? (session.postSendDelaySeconds / 60) : (session?.postSendDelaySeconds ?? 5));
+  $('simplified-post-send').dataset.postSendUnit = $('simplified-post-send-unit').value;
+  $('simplified-post-send').max = $('simplified-post-send-unit').value === 'minutes' ? '60' : '3600';
+  $('simplified-post-send').step = $('simplified-post-send-unit').value === 'minutes' ? 'any' : '1';
   $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
   $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
   const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
@@ -5522,6 +5531,37 @@ $('mode-tabs').addEventListener('keydown', (event) => {
   setUiMode(ordered[index], { focus: true });
 });
 
+function validatedPostSendSeconds(valueId, unitId) {
+  const unit = $(unitId).value === 'minutes' ? 'minutes' : 'seconds';
+  const raw = $(valueId).value.trim();
+  const value = Number(raw);
+  const seconds = Math.round(value * (unit === 'minutes' ? 60 : 1));
+  if (!raw || !Number.isFinite(value) || value < 0
+      || value > (unit === 'minutes' ? 60 : 3600)
+      || Math.abs(value * (unit === 'minutes' ? 60 : 1) - seconds) > 1e-7) {
+    throw new Error('Очікування після надсилання: від 0 до 60 хвилин, із точністю до секунди.');
+  }
+  return seconds;
+}
+function bindPostSendUnit(valueId, unitId) {
+  const value = $(valueId);
+  const unit = $(unitId);
+  unit.addEventListener('change', () => {
+    const previousUnit = value.dataset.postSendUnit || 'seconds';
+    const raw = Number(value.value);
+    if (Number.isInteger(raw) && raw >= 0) {
+      const seconds = raw * (previousUnit === 'minutes' ? 60 : 1);
+      const converted = seconds / (unit.value === 'minutes' ? 60 : 1);
+      value.value = String(converted);
+    }
+    value.max = unit.value === 'minutes' ? '60' : '3600';
+    value.dataset.postSendUnit = unit.value;
+    value.step = unit.value === 'minutes' ? 'any' : '1';
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+bindPostSendUnit('simplified-post-send', 'simplified-post-send-unit');
+bindPostSendUnit('scenario-work-post-send', 'scenario-work-post-send-unit');
 $('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
 $('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
 $('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });

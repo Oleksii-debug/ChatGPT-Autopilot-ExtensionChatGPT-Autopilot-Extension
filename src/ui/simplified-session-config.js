@@ -31,7 +31,16 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
   const interval = exactInteger(fields.interval, 1, intervalUnit === 'seconds' ? 86400 : 1440, 'Інтервал');
   const preSendDelaySeconds = exactInteger(fields.delay, 1, 30, 'Пауза перед Send');
   const tabReadyDelaySeconds = exactInteger(fields.tabReady ?? 0, 0, 60, 'Пауза після відкриття вкладки');
-  const postSendDelaySeconds = exactInteger(fields.postSend ?? 5, 0, 60, 'Очікування після надсилання');
+  const postSendUnit = fields.postSendUnit === 'minutes' ? 'minutes' : 'seconds';
+  const postSendValue = Number(fields.postSend ?? 5);
+  const postSendFactor = postSendUnit === 'minutes' ? 60 : 1;
+  const postSendDelaySeconds = Math.round(postSendValue * postSendFactor);
+  if (!String(fields.postSend ?? 5).trim()
+      || !Number.isFinite(postSendValue) || postSendValue < 0
+      || postSendValue > (postSendUnit === 'minutes' ? 60 : 3600)
+      || Math.abs(postSendValue * postSendFactor - postSendDelaySeconds) > 1e-7) {
+    throw new Error('Очікування після надсилання: вкажіть час до 60 хвилин із точністю до секунди.');
+  }
   const busyCheckDelaySeconds = exactInteger(fields.busy, 1, 30, 'Перевірка зайнятого чату');
   const retryUnit = fields.retryUnit === 'minutes' ? 'minutes' : 'seconds';
   const retryValue = exactInteger(
@@ -57,7 +66,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     tasks, configuredTaskCount,
     runMode: fields.runMode === 'one-pass' ? 'one-pass' : 'continuous',
     minimumSendIntervalValue: interval, minimumSendIntervalUnit: intervalUnit,
-    tabReadyDelaySeconds, postSendDelaySeconds, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
+    tabReadyDelaySeconds, postSendDelaySeconds, postSendDelayUnit: postSendUnit, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
     retryPolicy: fields.retryPolicy === 'manual' ? 'manual' : 'safe',
     busyChatBehavior: fields.busyBehavior === 'skip-next' ? 'skip-next' : 'skip-next',
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',

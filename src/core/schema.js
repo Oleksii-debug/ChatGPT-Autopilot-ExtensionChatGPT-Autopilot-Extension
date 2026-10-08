@@ -209,7 +209,7 @@ function validateSession(session, id) {
     throw new Error('Invalid currentTaskIndex');
   }
   for (const field of ['tabReadyDelayMs', 'postSendDelayMs']) {
-    if (session[field] !== undefined && (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > 60000)) throw new Error(`Invalid session ${id} ${field}`);
+    if (session[field] !== undefined && (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > (field === 'postSendDelayMs' ? 3600000 : 60000))) throw new Error(`Invalid session ${id} ${field}`);
   }
   for (const field of ['minimumSendIntervalMs', 'preSendDelayMs', 'busyCheckDelayMs', 'retryBackoffMs', 'nextAllowedSendAt', 'lastActionAt', 'lastSuccessfulSendAt', 'createdAt', 'updatedAt']) {
     requireNonNegativeNumber(session[field], `session ${id} ${field}`);

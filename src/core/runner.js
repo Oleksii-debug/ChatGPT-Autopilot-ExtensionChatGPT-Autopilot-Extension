@@ -135,7 +135,7 @@ export class DurableSubmissionCoordinator {
       // Per-Session durable operation state is the exact-once guard. Distinct
       // Sessions may submit concurrently because each owns an isolated tab.
       markSubmitting(session, submitStartedAt);
-      operation.postSendHoldUntil = submitStartedAt + Math.min(60000, Math.max(0, Number(session.postSendDelayMs || 0)));
+      operation.postSendHoldUntil = submitStartedAt + Math.min(3600000, Math.max(0, Number(session.postSendDelayMs || 0)));
       return draft;
     });
 

@@ -4,8 +4,9 @@ import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
 import { restorePendingSendTabs } from './native-input.js';
+import { withWindowFocus, windowHasPendingSend } from './window-focus.js';
 import { assertSessionWindow } from './window-binding.js';
-import { resolveTaskTab } from './tabs.js';
+import { resolveTaskTab, sameChatConversationUrl } from './tabs.js';
 import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
@@ -137,6 +138,49 @@ export class AutomaticSessionExecutor {
     this.tabBindQueues = new Map();
     this.sessionRuns = new Map();
     this.forceHighEffort = forceHighEffort === true;
+  }
+
+  async retryHiddenScenarioCheck(sessionId, task, tabId, requestId, originalResult) {
+    let tab;
+    try { tab = await this.chrome.tabs.get(tabId); } catch { return originalResult; }
+    if (tab.active || !Number.isInteger(tab.windowId)) return originalResult;
+    return withWindowFocus(this.repo, tab.windowId, async () => {
+      const state = await this.repo.load();
+      const session = state.sessionsById?.[sessionId];
+      const hintKey = session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+        ? `__session_worker__:${sessionId}` : task.id;
+      const hint = state.tabHintsByTaskId?.[hintKey];
+      if (!session?.scenarioWork?.managed || !ACTIVE_STATES.has(session.runState)
+          || state.profile?.masterPaused === true || hint?.tabId !== tabId || hint.ownedByExtension !== true
+          || windowHasPendingSend(state, tab.windowId)) return originalResult;
+      let current;
+      try { current = await this.chrome.tabs.get(tabId); } catch { return originalResult; }
+      if (current.active || current.windowId !== tab.windowId
+          || !sameChatConversationUrl(current.url, task.normalizedUrl || task.url)) return originalResult;
+      assertSessionWindow(session, current);
+      const [previous] = await this.chrome.tabs.query({ active: true, windowId: tab.windowId });
+      if (!previous?.id || previous.id === tabId) return originalResult;
+      let activated = false;
+      try {
+        await this.chrome.tabs.update(tabId, { active: true });
+        activated = true;
+        await new Promise(resolve => setTimeout(resolve, 350));
+        const stillOwned = await this.repo.load();
+        if (stillOwned.tabHintsByTaskId?.[hintKey]?.tabId !== tabId
+            || !ACTIVE_STATES.has(stillOwned.sessionsById?.[sessionId]?.runState)) return originalResult;
+        return await this.executeInteraction(sessionId, stillOwned.sessionsById[sessionId],
+          task, tabId, 'CHECK_ONLY', requestId, '');
+      } catch {
+        return originalResult;
+      } finally {
+        if (activated) {
+          try {
+            const selected = await this.chrome.tabs.get(tabId);
+            if (selected.active) await this.chrome.tabs.update(previous.id, { active: true });
+          } catch { /* owner may have closed the tab or changed the window */ }
+        }
+      }
+    });
   }
 
   async bindTaskTab(sessionId, taskId) {
@@ -903,6 +947,11 @@ export class AutomaticSessionExecutor {
         operation.promptText,
       ),
     });
+    // The adapter's finally runs while Core is still SUBMITTING. After the
+    // durable result has changed that phase, release the foreground focus
+    // independently of the longer physical post-Send tab dwell.
+    try { await restorePendingSendTabs(this.chrome, this.repo, { sessionId }); }
+    catch (_) { /* Cold-start reconciliation retains the durable focus lease. */ }
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
       await this.markNormalWorkResumed(sessionId, task.id);
@@ -970,7 +1019,7 @@ export class AutomaticSessionExecutor {
     const readyAfterAt = (await this.repo.load()).tabHintsByTaskId[hintKey]?.readyAfterAt || 0;
     if (readyAfterAt > this.now()) return { kind: 'TAB_SETTLING', wakeAt: readyAfterAt };
     const checkId = `${sessionId}:${task.id}:check:${this.now()}`;
-    const check = await this.executeInteraction(
+    let check = await this.executeInteraction(
       sessionId,
       session,
       task,
@@ -979,6 +1028,13 @@ export class AutomaticSessionExecutor {
       checkId,
       '',
     );
+    // Some background ChatGPT documents postpone mounting their composer until
+    // briefly activated. Retry only a read-only CHECK_ONLY on this positively
+    // owned Scenario tab, never a second Send or an arbitrary user tab.
+    if (session.scenarioWork?.managed === true && check.status === InteractionResult.TEMPORARY_ERROR
+        && check.safeDiagnosticCode === 'COMPOSER_NOT_READY') {
+      check = await this.retryHiddenScenarioCheck(sessionId, task, tab.id, checkId, check);
+    }
 
     const postCheck = await this.repo.load();
     const postCheckSession = requireSession(postCheck, sessionId);
