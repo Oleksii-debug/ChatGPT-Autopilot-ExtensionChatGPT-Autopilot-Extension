@@ -42,7 +42,7 @@ export async function checkpointDomSubmit(chromeApi, repository, message, sender
   await repository.update(state => {
     const live = authorizedOperation(state, request, sender, chromeApi);
     live.operation.domSubmitDispatched = true;
-    live.operation.postSendHoldUntil = Date.now() + Math.min(60000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+    live.operation.postSendHoldUntil = Date.now() + Math.min(3600000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
     return state;
   });
 }
@@ -117,7 +117,7 @@ export async function performNativeInput(chromeApi, repository, message, sender)
       text = live.operation.promptText;
       if (message.kind === 'submit') {
         live.operation.nativeSubmitDispatched = true;
-        live.operation.postSendHoldUntil = Date.now() + Math.min(60000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+        live.operation.postSendHoldUntil = Date.now() + Math.min(3600000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
       }
       return state;
     });
