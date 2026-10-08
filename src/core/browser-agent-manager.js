@@ -87,7 +87,10 @@ const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
-const EXACT_BROWSER_JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,127}$/u;
+// Existing Browser Agent durable IDs may contain *internal* spaces (see
+// orchestration-binding compatibility tests). Reject trimming/coercion, not
+// valid legacy identities, when defending exact persistence semantics.
+const EXACT_BROWSER_JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~ -]{0,127}$/u;
 function requireExactBrowserJobId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !EXACT_BROWSER_JOB_ID.test(value)) {
     throw new Error(`${label} must be an exact bounded durable ID`);
@@ -2234,8 +2237,11 @@ export class BrowserAgentManager {
     const request = snapshotOwnDataRequest(raw, 'Browser Agent direct intake');
     // Explicit invalid identities cannot silently turn into a newly generated
     // task, and generated identities obey the same durable namespace.
+    const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
+    // Historical prompt-first entry permits absent/null/empty id to request a
+    // generated job. Non-empty malformed IDs must never be coerced/truncated.
     const id = requireExactBrowserJobId(
-      Object.hasOwn(request, 'id') ? request.id : this.createId(),
+      suppliedId == null || suppliedId === '' ? this.createId() : suppliedId,
       'Browser Agent direct intake jobId',
     );
     const now = this.now();
