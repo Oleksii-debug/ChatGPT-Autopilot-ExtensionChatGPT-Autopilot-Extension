@@ -175,6 +175,7 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
     });
     assert.equal(raw.ok, true);
     const valid = await raw.json();
+    let getterCalls = 0;
     const mutations = [
       value => ({ ...value, unexpectedCredential: 'DO_NOT_EXPOSE' }),
       value => ({ ...value, result: { ...value.result, grantAuthority: true } }),
@@ -201,7 +202,7 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
         const copy = { ...value, result: { ...value.result } };
         Object.defineProperty(copy.result, 'receipt', {
           enumerable: true,
-          get() { throw new Error('SECRET_GETTER_EXECUTED'); },
+          get() { getterCalls += 1; return value.result.receipt; },
         });
         return copy;
       },
@@ -221,6 +222,7 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
       assert.equal(JSON.stringify(answer).includes('SECRET_GETTER_EXECUTED'), false);
     }
     assert.equal(calls, mutations.length, 'no automatic resends after forged receipts');
+    assert.equal(getterCalls, 0, 'accessors must never run during transport response validation');
     const correct = createAutopilotLocalClientV1({
       token: TOKEN, port, fetchImpl: async () => ({ ok: true, json: async () => valid }),
     });
