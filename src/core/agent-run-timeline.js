@@ -127,6 +127,39 @@ function planSummary(plan) {
   }
   return freeze({ revision: integer(own(plan, 'revision')), nodeCount, stateCounts });
 }
+function recordedOutcomeSummary(value) {
+  // The persisted outcome record is observable Core state, not an external
+  // receipt or a grant of execution/owner authority. Never export check text.
+  if (value == null) return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
+    recordPresent: false,
+    criteriaRecorded: 0,
+    recordedAt: null,
+    externalEffectVerified: false,
+  });
+  record(value, 'Agent recorded outcome');
+  const checks = own(value, 'checks');
+  let count = 0;
+  if (checks != null) {
+    if (!Array.isArray(checks) || Object.getPrototypeOf(checks) !== Array.prototype || checks.length > 20) {
+      throw new Error('Agent recorded outcome checks must be a bounded dense array');
+    }
+    for (let i = 0; i < checks.length; i += 1) {
+      const item = own(checks, String(i));
+      if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
+      record(item, 'Agent recorded outcome check');
+    }
+    count = checks.length;
+  }
+  const at = safeTime(own(value, 'verifiedAt'));
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
+    recordPresent: true,
+    criteriaRecorded: count,
+    recordedAt: at || null,
+    externalEffectVerified: false,
+  });
+}
 export function buildAgentRunTimelineV1(job, options = {}) {
   record(job, 'Agent timeline job');
   record(options, 'Agent timeline options');
@@ -170,6 +203,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // These are presence counts within the bounded canonical history, not proof
   // that an external operation committed or that missing evidence never existed.
   // Do not infer receipts, artifacts or before/after snapshots from free text.
+  const recordedOutcome = recordedOutcomeSummary(own(runtime, 'verifiedOutcome'));
   const evidenceMap = {
     scope: 'INSPECTED_CANONICAL_HISTORY_ONLY',
     // BrowserAgentManager also caps its persisted history. Even reading all
@@ -193,9 +227,8 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       'AGENT_TREE_EDGES',
     ],
     externalEffectVerified: false,
+    recordedOutcome,
   };
-  const verification = own(runtime, 'verifiedOutcome');
-  const checks = verification && typeof verification === 'object' ? own(verification, 'checks') : undefined;
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
     jobId: typeof own(job, 'id') === 'string' ? own(job, 'id') : '',
@@ -220,7 +253,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
         own(runtime, 'estimatedCostUsd') >= 0 &&
         own(runtime, 'estimatedCostUsd') <= 1000000
           ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : null,
-      verifiedChecks: Array.isArray(checks) ? integer(checks.length, { max: 4096 }) : 0,
+      verifiedChecks: recordedOutcome.criteriaRecorded,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },
     entries: visible,
