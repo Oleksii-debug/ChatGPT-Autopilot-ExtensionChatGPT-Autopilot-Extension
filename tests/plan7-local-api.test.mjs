@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
+import { request as httpRequest } from 'node:http';
 import { startAutopilotLocalApiLoopbackV1, createAutopilotLocalApiServerV1 } from '../companion/local-api/server.mjs';
 import { createAutopilotLocalClientV1 } from '../companion/local-api/client.mjs';
 
@@ -85,10 +85,16 @@ test('unauthenticated, wrong-host, origin and preflight requests do not reach Co
     const preflight=await fetch(url,{method:'OPTIONS',headers:{
       Authorization:'Bearer '+TOKEN,'Access-Control-Request-Method':'POST'}});
     assert.equal(preflight.status,403);
-    const rebinding=await fetch(url,{method:'POST',headers:{
-      Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',
-      Host:'attacker.invalid'},body:JSON.stringify(request())});
-    assert.equal(rebinding.status,403);
+    const rebindingStatus=await new Promise((resolve,reject)=>{
+      const raw=httpRequest({hostname:'127.0.0.1',port,path:'/v1/control',method:'POST',
+        headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',
+          Host:'attacker.invalid'}},res=>{
+        res.resume();res.on('end',()=>resolve(res.statusCode));
+      });
+      raw.once('error',reject);
+      raw.end(JSON.stringify(request()));
+    });
+    assert.equal(rebindingStatus,403);
   },dependencies(counters));
   assert.deepEqual(counters,{scopes:0,dispatches:0});
 });
@@ -129,4 +135,31 @@ test('client rejects forged success response and never treats it as acknowledged
   })});
   const result=await client.control(request());
   assert.equal(result.status,'UNKNOWN_NETWORK_RESULT');
+});
+
+
+test('server-after-dispatch receipt failure remains ambiguous and never auto-resends', async () => {
+  let effects=0;
+  const broken = dependencies();
+  broken.dispatchCanonicalControl = () => { effects += 1; throw new Error('private provider failure'); };
+  await withServer(async port => {
+    const client=createAutopilotLocalClientV1({token:TOKEN,port});
+    const first=await client.control(request('uncertain-http-request'));
+    assert.equal(first.status,'UNKNOWN_NETWORK_RESULT');
+    assert.equal(first.httpStatus,422);
+    assert.equal(effects,1);
+    assert.equal(JSON.stringify(first).includes('private'),false);
+  },broken);
+});
+
+test('transport cannot treat any non-2xx response as proof an effect did not occur', async () => {
+  let invocations=0;
+  const client=createAutopilotLocalClientV1({token:TOKEN,port:12345,fetchImpl:async()=>{
+    invocations++;
+    return {ok:false,status:500};
+  }});
+  const value=await client.control(request('mutating-request-1'));
+  assert.equal(value.status,'UNKNOWN_NETWORK_RESULT');
+  assert.equal(value.httpStatus,500);
+  assert.equal(invocations,1);
 });
