@@ -516,10 +516,28 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
     return Object.freeze({ schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin, locality, credentialRef, credentialless });
   });
-  const identities = routes.map(route => Object.freeze({
-    routeId: route.routeId, provider: route.provider, model: route.model,
-    endpointId: route.endpointId, locality: route.locality,
-  }));
+  // Endpoint identity is advisory evidence, never a second source of dispatch authority.
+  // Versionless legacy routes may have no endpointId; explicitly record that gap
+  // rather than silently claiming their provider/profile linkage was proven.
+  const byEndpointId = new Map();
+  for (const profile of normalizedProfiles) {
+    if (!profile.endpointId) continue;
+    if (byEndpointId.has(profile.endpointId)) throw new Error('Ambiguous AI endpoint identity');
+    byEndpointId.set(profile.endpointId, profile);
+  }
+  const identities = routes.map(route => {
+    const profile = route.endpointId ? byEndpointId.get(route.endpointId) : null;
+    if (route.endpointId && !profile) throw new Error('AI route endpoint has no registry profile');
+    if (profile && (route.provider !== profile.provider || route.locality !== profile.locality)) {
+      throw new Error('AI route provider/locality does not match its endpoint profile');
+    }
+    return Object.freeze({
+      routeId: route.routeId, provider: route.provider, model: route.model,
+      endpointId: route.endpointId, locality: route.locality,
+      endpointProfileId: profile?.profileId ?? '',
+      endpointBinding: profile ? 'MATCHED' : 'UNRESOLVED_LEGACY',
+    });
+  });
   const canonical = JSON.stringify({ schemaVersion: 1, registryRevision, routes, endpointProfiles: normalizedProfiles });
   if (!globalThis.crypto?.subtle) throw new Error('SHA-256 digest is unavailable; AI configuration evidence cannot be issued');
   const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`AUTOPILOT_AI_ROUTE_REGISTRY_V1\n${canonical}`));
