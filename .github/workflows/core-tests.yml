@@ -33,6 +33,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan4-model-contracts:
+    name: Plan 4 model contracts / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check src/core/ai-route-pool.js
+      - run: node --check src/core/local-ai-provider.js
+      - run: node --check src/core/ai-gateway-client.js
+      - run: node --test tests/plan4-contract-local-provider-hardening.test.mjs
   core-tests:
     runs-on: ubuntu-latest
     steps:
