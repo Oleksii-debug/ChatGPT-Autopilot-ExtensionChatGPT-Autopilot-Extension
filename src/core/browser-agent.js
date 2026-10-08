@@ -1021,6 +1021,15 @@ export function executeBrowserPageAction(snapshotId, action) {
     const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
     const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
     const normalizeObserved = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    // Chrome scripting serializes this function without imported module helpers.
+    // Resolve accessible names entirely within this injected action function.
+    const labelIds = String(target.getAttribute('aria-labelledby') || '').split(/\s+/);
+    const labelledBy = labelIds.map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = target.labels ? Array.from(target.labels).map(label => label.textContent || '').join(' ') : '';
+    const imageAlt = target.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    const currentName = normalizeObserved(target.getAttribute('aria-label') || labelledBy || labels
+      || target.getAttribute('alt') || imageAlt || target.getAttribute('title') || target.textContent
+      || target.getAttribute('placeholder') || target.getAttribute('name') || target.id || '', 800);
     const href = (tag === 'a' || tag === 'area') ? normalizeObserved(target.href || target.getAttribute('href'), 1200) : '';
     if (!action.expectedSemanticIdentity || !action.expectedFrameUrl
       || typeof action.expectedSemanticName !== 'string'
@@ -1029,7 +1038,7 @@ export function executeBrowserPageAction(snapshotId, action) {
       || typeof action.expectedSemanticFormMethod !== 'string'
       || location.href !== action.expectedFrameUrl
       || semanticIdentity(target) !== action.expectedSemanticIdentity
-      || browserCoordinateAccessibleName(target) !== action.expectedSemanticName
+      || currentName !== action.expectedSemanticName
       || href !== action.expectedSemanticHref
       || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
       || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
