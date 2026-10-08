@@ -11,10 +11,19 @@ class FakeNode {
 const doc={createElement(tag){return new FakeNode(tag);}};
 function container() { const root=new FakeNode('div');root.id='roi-panel';root.ownerDocument=doc;return root; }
 function evidence(overrides={}) {
-  return {schemaVersion:1,status:'EVIDENCE_BACKED',statusText:'Локальна оцінка',
+  // Positive fixtures must satisfy the same canonical report identity and
+  // OFFLINE no-cached-metrics invariants as production Core evidence.
+  const status = overrides.status ?? 'EVIDENCE_BACKED';
+  const offline = status === 'OFFLINE';
+  return {schemaVersion:1,status,statusText:'Локальна оцінка',
     deploymentAuthorized:false, recommendationAuthorized:false, telemetryEmitted:false,
-    observedRunCount:1,verifiedOutcomeCount:1,observedOwnerAttentionSeconds:10,observedOwnerTimeAvoidedSeconds:0,
-    netOwnerTimeLowerSeconds:-10,netOwnerTimeUpperSeconds:0,machineSpendUsdMicros:0,
+    reportId:offline ? null : 'roi-security-report-1',
+    observedRunCount:offline ? 0 : 1,verifiedOutcomeCount:offline ? 0 : 1,
+    observedOwnerAttentionSeconds:offline ? null : 10,
+    observedOwnerTimeAvoidedSeconds:offline ? null : 0,
+    netOwnerTimeLowerSeconds:offline ? null : -10,
+    netOwnerTimeUpperSeconds:offline ? null : 0,
+    machineSpendUsdMicros:offline ? null : 0,
     opportunities:[],...overrides};
 }
 function bad(fn) { const root=container(); const old=root.children; assert.throws(()=>fn(root));assert.equal(root.children,old); }
@@ -69,7 +78,7 @@ test('ROI never accepts forged model evaluation or automatic advisory promotion'
     shorterModelPath: 'NOT_EVALUATED',
   };
   const accepted = container();
-  renderRoiOwnerViewV1(accepted, evidence({ opportunities: [trustedRow] }));
+  renderRoiOwnerViewV1(accepted, evidence({ observedRunCount: 2, opportunities: [trustedRow] }));
   assert.equal(accepted.children.length, 1);
   for (const changes of [
     { advisoryPath: 'DEPLOY' },
@@ -79,7 +88,7 @@ test('ROI never accepts forged model evaluation or automatic advisory promotion'
     { supportingRunCount: Number.MAX_SAFE_INTEGER + 1 },
   ]) {
     bad(root => renderRoiOwnerViewV1(root,
-      evidence({ opportunities: [{ ...trustedRow, ...changes }] })));
+      evidence({ observedRunCount: 2, opportunities: [{ ...trustedRow, ...changes }] })));
   }
 });
 
