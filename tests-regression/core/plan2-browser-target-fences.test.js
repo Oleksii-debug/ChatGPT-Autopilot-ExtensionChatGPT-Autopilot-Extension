@@ -1200,9 +1200,9 @@ test('vision capture rejects coercible or absent origin evidence before debugger
 test('unverified semantic click cannot be replayed through the native fallback', () => {
   const managerSource = readFileSync(new URL('../../src/core/browser-agent-manager.js', import.meta.url), 'utf8');
   assert.match(managerSource, /A DOM click may already have committed a remote effect/);
-  assert.doesNotMatch(managerSource, /await\\s+this\\.nativeClick\\s*\\(/);
-  assert.match(managerSource, /nativeFallbackTried = pending\\.action\\?\\.type === BrowserAgentActionType\\.CLICK/);
-  assert.match(managerSource, /nativeFallbackTried = action\\.type === BrowserAgentActionType\\.CLICK/);
+  assert.doesNotMatch(managerSource, /await\s+this\.nativeClick\s*\(/);
+  assert.match(managerSource, /nativeFallbackTried = pending\.action\?\.type === BrowserAgentActionType\.CLICK/);
+  assert.match(managerSource, /nativeFallbackTried = action\.type === BrowserAgentActionType\.CLICK/);
 });
 
 // Plan 2 S2: the direct native helper may be reached from a restored action,
