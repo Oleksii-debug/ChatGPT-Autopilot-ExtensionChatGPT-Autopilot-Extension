@@ -26,6 +26,7 @@ import {
   BrowserAgentPolicyDecision,
   browserAgentTargetFingerprint,
   browserAgentCoordinateTargetFingerprint,
+  browserAgentVisionOriginMatches,
   verifyBrowserApprovalTarget,
   probeBrowserCoordinateTarget,
   focusBrowserAgentTarget,
@@ -4455,13 +4456,9 @@ export class BrowserAgentManager {
       let proof = null;
       try { proof = await this.probeCoordinateTarget(current.job.runtime.tabId, action.x, action.y); }
       catch (error) { return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 }); }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      if (!proof?.target || proof.target.disabled === true || clean(proof.url, 4096) !== clean(snapshot.url, 4096)
-        || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
-        || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)
-        || Number(proof.target.viewportScrollX) !== Number(topFrame?.viewport?.scrollX ?? 0)
-        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)
-        || Number(proof.target.documentEpoch) !== Number(topFrame?.viewport?.documentEpoch)) {
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      if (proof?.target?.disabled === true
+        || !browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       action.coordinateTarget = clone(proof.target);
@@ -4471,13 +4468,9 @@ export class BrowserAgentManager {
       let proof = null;
       try { proof = await this.probeCoordinateTarget(current.job.runtime.tabId, action.x, action.y); }
       catch (error) { return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 }); }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      if (!proof?.target || proof.target.disabled === true || proof.target.sensitive === true || clean(proof.url, 4096) !== clean(snapshot.url, 4096)
-        || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
-        || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)
-        || Number(proof.target.viewportScrollX) !== Number(topFrame?.viewport?.scrollX ?? 0)
-        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)
-        || Number(proof.target.documentEpoch) !== Number(topFrame?.viewport?.documentEpoch)) {
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      if (proof?.target?.disabled === true || proof?.target?.sensitive === true
+        || !browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error(proof?.target?.sensitive === true ? 'AGENT_SENSITIVE_FIELD_BLOCKED' : 'AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       if (proof.target.visualOnly !== true && proof.target.editable !== true) {
@@ -4495,16 +4488,9 @@ export class BrowserAgentManager {
       } catch (error) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      const expectedWidth = Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0);
-      const expectedHeight = Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0);
-      const proofValid = proof => proof?.target && proof.target.disabled !== true
-        && clean(proof.url, 4096) === clean(snapshot.url, 4096)
-        && Number(proof.viewportWidth || 0) === expectedWidth
-        && Number(proof.viewportHeight || 0) === expectedHeight
-        && Number(proof.target.viewportScrollX) === Number(topFrame?.viewport?.scrollX ?? 0)
-        && Number(proof.target.viewportScrollY) === Number(topFrame?.viewport?.scrollY ?? 0)
-        && Number(proof.target.documentEpoch) === Number(topFrame?.viewport?.documentEpoch);
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      const proofValid = proof => proof?.target?.disabled !== true
+        && browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport);
       if (!proofValid(startProof) || !proofValid(endProof)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_DRAG_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
