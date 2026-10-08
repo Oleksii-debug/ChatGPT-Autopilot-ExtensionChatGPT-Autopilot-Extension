@@ -125,7 +125,15 @@ function optionalIdentity(record, key, label) {
   }
   return id(value, label, true);
 }
-function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
+function integer(value, label, min, max) {
+  if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`);
+  // Owner route/timeout numbers may come from a form as decimal strings,
+  // never from coercible empty, hexadecimal, exponential or aliased values.
+  if (typeof value === 'string' && !/^(?:0|[1-9][0-9]*)$/u.test(value)) throw new Error(`${label} is invalid`);
+  const out = Number(value);
+  if (!Number.isSafeInteger(out) || Object.is(out, -0) || out < min || out > max) throw new Error(`${label} is invalid`);
+  return out;
+}
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
 function optionalBoolean(record, key, label, fallback) {
   // Only absent legacy fields can inherit defaults; an explicit undefined
@@ -229,7 +237,7 @@ export function normalizeAiRoutePool(raw = []) {
       endpointId: optionalIdentity(item, 'endpointId', 'AI route endpointId'),
       roles: Object.freeze(roles),
       capabilityIds: Object.freeze(optionalIds(item, 'capabilityIds', `AI route ${index + 1} capabilityIds`, 64)),
-      priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
+      priority: integer(Object.hasOwn(item, 'priority') ? own(item, 'priority') : 0, 'AI route priority', 0, 1_000_000),
       enabled: optionalBoolean(item, 'enabled', `AI route ${index + 1} enabled`, true),
       locality,
       costClass,
@@ -238,7 +246,7 @@ export function normalizeAiRoutePool(raw = []) {
       inputPriceKnown,
       outputPriceKnown,
       supportsVision: optionalBoolean(item, 'supportsVision', `AI route ${index + 1} supportsVision`, false),
-      maxWorkers: strictInteger(own(item, 'maxWorkers') ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
+      maxWorkers: strictInteger(Object.hasOwn(item, 'maxWorkers') ? own(item, 'maxWorkers') : 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
     });
   });
   if (new Set(routes.map(route => route.routeId)).size !== routes.length) throw new Error('AI route pool contains duplicate routeId');
@@ -272,14 +280,15 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   if (raw === null) throw new Error('AI worker policy must be a plain data object');
   const policy = dataRecord(raw, new Set(['allocationMode','minWorkers','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
   const requestedMode = own(policy, 'allocationMode');
+  if (Object.hasOwn(policy, 'allocationMode') && typeof requestedMode !== 'string') throw new Error('AI worker allocationMode is invalid');
   const allocationMode = clean(requestedMode === undefined ? DEFAULT_AI_WORKER_POLICY.allocationMode : requestedMode, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
-  const maxParallelWorkers = strictInteger(own(policy, 'maxParallelWorkers') ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
-  const minWorkers = strictInteger(own(policy, 'minWorkers') ?? DEFAULT_AI_WORKER_POLICY.minWorkers, 'AI worker minWorkers', 1, maxParallelWorkers);
+  const maxParallelWorkers = strictInteger(Object.hasOwn(policy, 'maxParallelWorkers') ? own(policy, 'maxParallelWorkers') : DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
+  const minWorkers = strictInteger(Object.hasOwn(policy, 'minWorkers') ? own(policy, 'minWorkers') : DEFAULT_AI_WORKER_POLICY.minWorkers, 'AI worker minWorkers', 1, maxParallelWorkers);
   const pool = normalizeAiRoutePool(routes);
   const routeIds = new Set(pool.map(route => route.routeId));
   const suppliedWorkers = own(policy, 'manualRouteWorkers');
-  const source = suppliedWorkers === undefined ? {} : suppliedWorkers;
+  const source = Object.hasOwn(policy, 'manualRouteWorkers') ? suppliedWorkers : {};
   object(source, 'AI worker manualRouteWorkers');
   const descriptors = Object.getOwnPropertyDescriptors(source);
   const keys = Reflect.ownKeys(descriptors);
