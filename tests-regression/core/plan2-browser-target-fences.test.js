@@ -1460,3 +1460,61 @@ test('recovered direct native drag denies coerced or out-of-range duration befor
   assert.equal(fixture.ownerChecks, 0);
   assert.equal(fixture.proofChecks, 0);
 });
+
+
+// Plan 2 S1 exact SELECT DOM effect identity, including malicious duplicate labels.
+test('semantic SELECT resolves a unique explicit option value before normalized labels', () => {
+  setup();
+  const originalSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.options = [
+      { value: 'keep', textContent: 'Keep' },
+      { value: ' VALUE ', textContent: 'Precise choice' },
+      { value: 'other', textContent: ' value ' },
+    ];
+    element.value = 'keep';
+    element.dispatchEvent = () => true;
+    const frame = snapshotBrowserPage('select-exact-effect');
+    const snapshot = { frames: [{ frameId: 0, ...frame }], url: frame.url };
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: ' VALUE ',
+    }), snapshot);
+    const result = executeBrowserPageAction('select-exact-effect', action);
+    assert.equal(result.ok, true);
+    assert.equal(element.value, ' VALUE ');
+  } finally {
+    globalThis.HTMLSelectElement = originalSelect;
+  }
+});
+
+test('semantic SELECT ambiguous label does not cause a DOM form effect', () => {
+  setup();
+  const originalSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.options = [
+      { value: 'keep', textContent: 'Keep' },
+      { value: 'transfer-external', textContent: 'Continue' },
+      { value: 'save-local', textContent: ' continue ' },
+    ];
+    element.value = 'keep';
+    let dispatched = 0;
+    element.dispatchEvent = () => { dispatched++; return true; };
+    const frame = snapshotBrowserPage('select-ambiguous');
+    const snapshot = { frames: [{ frameId: 0, ...frame }], url: frame.url };
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'Continue',
+    }), snapshot);
+    assert.throws(
+      () => executeBrowserPageAction('select-ambiguous', action),
+      /AGENT_SELECT_OPTION_AMBIGUOUS/,
+    );
+    assert.equal(element.value, 'keep');
+    assert.equal(dispatched, 0);
+  } finally {
+    globalThis.HTMLSelectElement = originalSelect;
+  }
+});
