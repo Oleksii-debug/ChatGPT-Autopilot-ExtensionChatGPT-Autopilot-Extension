@@ -383,3 +383,25 @@ test('local provider request cannot pivot to another loopback service or API pat
   } });
   assert.equal((await ok.complete(settings,'fixture')).usage.totalTokens,3);
 });
+
+test('gateway keeps transport AUTH/RATE_LIMIT/UNAVAILABLE on oversized hostile error body', async () => {
+  for (const [status,category,retryable] of [
+    [401,'AUTH',false], [429,'RATE_LIMIT',true], [503,'UNAVAILABLE',true],
+  ]) {
+    let reads=0, cancels=0;
+    const client = new AiGatewayClient({ fetchFn:async () => ({
+      ok:false, status,
+      headers:{ get:name => name === 'content-length' ? '999999999' : null },
+      body:{cancel:async()=>{cancels++;}},
+      text:async()=>{reads++;throw new Error('SECRET_ERROR_BODY_MUST_NOT_BE_READ');},
+    }) });
+    await assert.rejects(
+      client.complete({provider:'openai-compatible',model:'fixture',prompt:'fixture'}),
+      error=>error.status===status && error.category===category
+        && error.retryable===retryable && error.code==='AI_GATEWAY_HTTP_'+status
+        && !error.message.includes('SECRET_ERROR_BODY_MUST_NOT_BE_READ'),
+    );
+    assert.equal(cancels,1);
+    assert.equal(reads,0);
+  }
+});
