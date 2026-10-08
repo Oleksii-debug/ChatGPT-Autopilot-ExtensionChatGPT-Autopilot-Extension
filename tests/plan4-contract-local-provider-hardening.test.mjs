@@ -344,3 +344,42 @@ test('partial provider usage cannot claim fewer total tokens than any reported d
   assert.equal(partial.outputTokens,null);
   assert.equal(partial.source,'PROVIDER_REPORTED');
 });
+
+// Plan 4 S1/S2: immutable identity evidence and no cross-service loopback request.
+test('normalized route and policy ID arrays stay immutable after evidence selection and JSON restart', () => {
+  const rawRoute = { ...route, roles:['planner'], capabilityIds:['read.page'] };
+  const rawPolicy = { orderedRouteIds:['primary'], allowRouteIds:['primary'], denyRouteIds:[] };
+  for (const persisted of [false, true]) {
+    const source = persisted ? JSON.parse(JSON.stringify({ routes:[rawRoute], policy:rawPolicy })) : { routes:[rawRoute], policy:rawPolicy };
+    const normalizedRoute = normalizeAiRoutePool(source.routes)[0];
+    const normalizedPolicy = normalizeAiRoutePolicy(source.policy);
+    for (const entries of [normalizedRoute.roles, normalizedRoute.capabilityIds,
+      normalizedPolicy.orderedRouteIds, normalizedPolicy.allowRouteIds, normalizedPolicy.denyRouteIds]) {
+      assert.equal(Object.isFrozen(entries), true);
+      assert.throws(() => entries.push('attacker'), TypeError);
+    }
+    assert.deepEqual(normalizedRoute.roles, ['planner']);
+    assert.deepEqual(normalizedPolicy.allowRouteIds, ['primary']);
+    assert.deepEqual(selectAiRouteCandidates({ routes:[normalizedRoute], policy:normalizedPolicy, now:1 }).eligibleRouteIds,['primary']);
+  }
+});
+
+test('local provider request cannot pivot to another loopback service or API path', async () => {
+  let network = 0;
+  const client = new LocalAiClient({ fetchFn:async () => { network++; throw new Error('not permitted in negative test'); } });
+  for (const wrongTarget of [
+    'http://127.0.0.1:17621/api/chat',
+    'http://localhost:11434/api/chat',
+    'http://127.0.0.1:11434/admin',
+    'http://127.0.0.1:11434/api/chat/extra',
+    'http://127.0.0.1:11434/api/tags?token=secret',
+  ]) {
+    await assert.rejects(client.request(settings,wrongTarget), /configured provider endpoint|without credentials/);
+  }
+  assert.equal(network,0);
+  const ok = new LocalAiClient({ fetchFn:async url => {
+    assert.equal(url,'http://127.0.0.1:11434/api/chat');
+    return new Response(JSON.stringify({ message:{content:'ok'},prompt_eval_count:2,eval_count:1 }),{status:200});
+  } });
+  assert.equal((await ok.complete(settings,'fixture')).usage.totalTokens,3);
+});
