@@ -462,3 +462,29 @@ test('S2 explicit null source origin is not silently downgraded to missing prove
   assert.equal(safe.executionAuthorized, false);
   assert.equal(safe.policyDecisionGranted, false);
 });
+
+test('S2 hostile proxy inspection exceptions never echo untrusted content or authorize policy', () => {
+  const marker = 'PRIVATE_SOURCE_TRAP_MESSAGE';
+  const cases = [
+    new Proxy(request(), { ownKeys() { throw Error(marker); } }),
+    request({ source: new Proxy(source(), {
+      getOwnPropertyDescriptor() { throw Error(marker); },
+    }) }),
+    request({ proposal: proposal({
+      requestedToolIds: new Proxy([], { getPrototypeOf() { throw Error(marker); } }),
+    }) }),
+    request({ ceiling: ceiling({
+      allowedCapabilityIds: new Proxy([], { ownKeys() { throw Error(marker); } }),
+    }) }),
+  ];
+  for (const input of cases) {
+    assert.throws(() => assessUntrustedContentInfluenceV1(input),
+      error => error instanceof Error && !error.message.includes(marker));
+  }
+  const valid = request();
+  const assessed = assessUntrustedContentInfluenceV1(valid);
+  assert.equal(assessed.instructionAuthority, 'NONE');
+  assert.equal(assessed.executionAuthorized, false);
+  assert.equal(assessed.policyDecisionGranted, false);
+  assert.deepEqual(assessed, assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(valid))));
+});
