@@ -5,6 +5,7 @@ on:
       - "src/core/autopilot-programmatic-control.js"
       - "src/core/roi-opportunity-engine.js"
       - "src/core/roi-owner-advisory.js"
+      - "src/ui/roi-owner-view.js"
       - "companion/local-api/**"
       - "tests/autopilot-programmatic-control.test.mjs"
       - "tests/roi-opportunity-engine.test.mjs"
@@ -35,8 +36,9 @@ jobs:
           node --check src/core/autopilot-programmatic-control.js
           node --check src/core/roi-opportunity-engine.js
           node --check src/core/roi-owner-advisory.js
+          node --check src/ui/roi-owner-view.js
           node --check companion/local-api/server.mjs
           node --check companion/local-api/client.mjs
           node --check companion/local-api/cli.mjs
       - name: Offline SDK, API, ROI and adversarial tests
-        run: node --test tests/autopilot-programmatic-control.test.mjs tests/plan7-local-api.test.mjs tests/roi-opportunity-engine.test.mjs tests/plan7-roi-owner-advisory.test.mjs
+        run: node --test tests/autopilot-programmatic-control.test.mjs tests/plan7-local-api.test.mjs tests/roi-opportunity-engine.test.mjs tests/plan7-roi-owner-advisory.test.mjs tests/plan7-roi-owner-view.test.mjs
