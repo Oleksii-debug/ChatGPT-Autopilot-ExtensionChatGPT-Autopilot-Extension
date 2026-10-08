@@ -13,6 +13,7 @@ on:
       - tests/agent-io-contract.test.mjs
       - tests/universal-agent-contracts.test.mjs
       - tests/browser-agent-definition-launch.test.mjs
+      - tests/browser-agent.test.mjs
       - tests/browser-agent-orchestration-binding.test.mjs
       - .github/workflows/plan1-sections-1-2-qualification.yml
   workflow_dispatch:
@@ -41,6 +42,7 @@ jobs:
           node --check tests/agent-io-contract.test.mjs
           node --check tests/universal-agent-contracts.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
+          node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
       - name: Agent I/O negative and schema contract tests
         run: node --test tests/agent-io-contract.test.mjs
@@ -50,5 +52,7 @@ jobs:
         run: node --test tests/browser-agent-definition-launch.test.mjs
       - name: Adjacent persisted Agent definition regression tests
         run: node --test tests/browser-agent-definition-persistence.test.mjs
+      - name: Plan-1 specialist chronology and Outcome epoch race regressions
+        run: node --test --test-name-pattern='^Plan-1:' tests/browser-agent.test.mjs
       - name: Existing orchestration job-ID and authority compatibility
         run: node --test tests/browser-agent-orchestration-binding.test.mjs
