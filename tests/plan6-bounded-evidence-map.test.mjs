@@ -26,7 +26,7 @@ test('recorded events are a bounded presence map, never external effect proof', 
   const timeline = buildAgentRunTimelineV1(input);
   const map = timeline.evidenceMap;
   assert.equal(map.scope, 'INSPECTED_CANONICAL_HISTORY_ONLY');
-  assert.equal(map.completeHistoryInspected, true);
+  assert.equal(map.allRetainedHistoryInspected, true);
   assert.deepEqual(map.observed, {
     planRevisionEvents: 1,
     ownerInterventionEvents: 1,
@@ -35,6 +35,7 @@ test('recorded events are a bounded presence map, never external effect proof', 
     checkpointRecordedEvents: 1,
     specialistProviderEvents: 1,
   });
+  assert.equal(map.completeLifetimeHistoryKnown, false);
   assert.equal(map.externalEffectVerified, false);
   assert.deepEqual(map.notEstablishedByThisProjection, [
     'BEFORE_AFTER_SNAPSHOTS', 'EXTERNAL_EFFECT_RECEIPTS',
@@ -71,7 +72,7 @@ test('history truncation never advertises complete provenance or global event co
     message: 'PRIVATE_HISTORY_CONTENT',
   }));
   const result = buildAgentRunTimelineV1(input, { limit: 1, filter: 'ACTION' });
-  assert.equal(result.evidenceMap.completeHistoryInspected, false);
+  assert.equal(result.evidenceMap.allRetainedHistoryInspected, false);
   assert.equal(result.totalRecorded, 2200);
   assert.equal(result.inspectedEntries, 2048);
   assert.equal(result.evidenceMap.observed.ownerInterventionEvents, 0);
