@@ -286,9 +286,16 @@ function replayResult(
   const exactFamily = family.length === expectedChildIds.length
     && expectedChildIds.every(nodeId => family.includes(nodeId));
   const parent = graph.nodesById[parentNodeId];
+  // ALL_DIRECT_CHILDREN is encoded by an empty explicit childIds list.
+  // A valid replay must check the canonical parent's direct children instead
+  // of treating that representation as a missing delegation barrier.
   const barrierCoversSpawn = parent
-    && parent.barrier.mode !== OrchestrationBarrierMode.NONE
-    && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId));
+    && (
+      (parent.barrier.mode === OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN
+        && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId)))
+      || (parent.barrier.mode === OrchestrationBarrierMode.ALL_DIRECT_CHILDREN
+        && expectedChildIds.every(nodeId => parent.childIds.includes(nodeId)))
+    );
   const exactAuthority = exactFamily
     && parent
     && !parent.providerBinding
