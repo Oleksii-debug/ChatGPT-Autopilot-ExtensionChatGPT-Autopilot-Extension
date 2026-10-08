@@ -124,6 +124,35 @@ function snapshotAdvisory(input) {
     || advisory.verifiedOutcomeCount > advisory.observedRunCount) {
     throw new Error('ROI outcome counters contradict canonical run evidence');
   }
+
+  // Status is an evidence claim, not a cosmetic string. Core never produces
+  // EVIDENCE_BACKED/PARTIAL for an empty run set and always attaches a stable
+  // report ID when it did evaluate evidence. OFFLINE is a fresh absence of
+  // evaluation, not permission to replay a previous success as current.
+  const offline = advisory.status === 'OFFLINE';
+  const reportIsCanonical = typeof advisory.reportId === 'string'
+    && /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(advisory.reportId);
+  if ((!offline && !reportIsCanonical)
+    || (offline && (advisory.reportId !== null
+      || advisory.observedRunCount !== 0
+      || advisory.verifiedOutcomeCount !== 0))
+    || ((advisory.status === 'PARTIAL_EVIDENCE'
+      || advisory.status === 'EVIDENCE_BACKED')
+      && advisory.observedRunCount === 0)) {
+    throw new Error('ROI status contradicts canonical report identity or run evidence');
+  }
+  if (offline && [
+    advisory.observedOwnerTimeAvoidedSeconds,
+    advisory.estimatedOwnerTimeAvoidedSeconds,
+    advisory.observedOwnerAttentionSeconds,
+    advisory.netOwnerTimeLowerSeconds,
+    advisory.netOwnerTimeUpperSeconds,
+    advisory.machineSpendUsdMicros,
+    advisory.runtimeMs,
+  ].some(value => value != null)) {
+    throw new Error('ROI offline evidence cannot retain current savings or spend');
+  }
+
   const rows = snapshotRows(advisory.opportunities);
   // Per-workflow numbers are subsets of the bounded observed run population.
   // A single forged advisory must never display more supporting/verified
