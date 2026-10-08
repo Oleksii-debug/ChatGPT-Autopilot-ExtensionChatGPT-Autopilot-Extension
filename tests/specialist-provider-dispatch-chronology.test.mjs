@@ -116,3 +116,26 @@ test('the existing canonical lease and scope gates remain in force', async () =>
   }), /revision does not match selection/u);
   assert.equal(f.providerCalls, 0);
 });
+
+test('hostile binding array accessors and holes are rejected before any callback fires', () => {
+  let getterCalls = 0;
+  const forged = [];
+  Object.defineProperty(forged, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return { providerId: 'provider.forged', execute: async () => ({}) };
+    },
+  });
+  forged.length = 1;
+  assert.throws(
+    () => new SpecialistProviderDispatcherV1({ bindings: forged }),
+    /enumerable own data property/u,
+  );
+  assert.equal(getterCalls, 0);
+  assert.throws(
+    () => new SpecialistProviderDispatcherV1({ bindings: new Array(1) }),
+    /enumerable own data property/u,
+  );
+});
