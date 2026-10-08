@@ -572,10 +572,10 @@ test('local provider discovery and chat endpoints enforce exact HTTP methods bef
     [discovery,{method:'PUT'}],
   ]) {
     await assert.rejects(deniedClient.request(clientSettings,url,init),
-      /GET-only|requires explicit POST|method is not allowed/);
+      /GET-only|requires (?:an )?explicit POST|method is not allowed/);
     await assert.rejects(deniedClient.request(
       JSON.parse(JSON.stringify(clientSettings)),url,JSON.parse(JSON.stringify(init))),
-      /GET-only|requires explicit POST|method is not allowed/);
+      /GET-only|requires (?:an )?explicit POST|method is not allowed/);
   }
   assert.equal(networkCalls,0);
   const calls = [];
