@@ -125,6 +125,40 @@ function snapshotAdvisory(input) {
     throw new Error('ROI outcome counters contradict canonical run evidence');
   }
   const rows = snapshotRows(advisory.opportunities);
+  // Per-workflow numbers are subsets of the bounded observed run population.
+  // A single forged advisory must never display more supporting/verified
+  // occurrences than there are canonical runs in the same report.
+  for (const row of rows) {
+    if (row.verifiedManualOccurrenceCount > advisory.observedRunCount
+      || (row.supportingRunCount !== undefined
+        && row.supportingRunCount > advisory.observedRunCount)) {
+      throw new Error('ROI opportunity counts exceed observed evidence');
+    }
+  }
+  // Estimated bounds are an evidence interval, never a coerced string,
+  // getter-backed object or reversed savings claim.
+  if (advisory.estimatedOwnerTimeAvoidedSeconds != null) {
+    const interval = snapshotData(
+      advisory.estimatedOwnerTimeAvoidedSeconds,
+      new Set(['lower', 'upper']),
+      'ROI estimated owner time interval',
+    );
+    if (!Number.isSafeInteger(interval.lower)
+      || !Number.isSafeInteger(interval.upper)
+      || Object.is(interval.lower, -0) || Object.is(interval.upper, -0)
+      || interval.lower < 0 || interval.upper < interval.lower) {
+      throw new Error('ROI estimated owner time bounds are invalid');
+    }
+  }
+  if (advisory.netOwnerTimeLowerSeconds != null
+    && advisory.netOwnerTimeUpperSeconds != null
+    && advisory.netOwnerTimeLowerSeconds > advisory.netOwnerTimeUpperSeconds) {
+    throw new Error('ROI net owner time interval is inverted');
+  }
+  if (advisory.noComparableModelEvidence !== undefined
+    && advisory.noComparableModelEvidence !== true) {
+    throw new Error('ROI cannot invent comparable model evidence');
+  }
   if (advisory.status === 'OFFLINE' || advisory.status === 'INSUFFICIENT_EVIDENCE') {
     if (rows.length !== 0) throw new Error('Unavailable evidence cannot list opportunities');
   }
