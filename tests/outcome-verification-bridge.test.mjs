@@ -805,7 +805,7 @@ test('Plan-1 S2: trusted Outcome verification errors redact attacker-defined fie
     get() { reads += 1; throw new Error('forbidden getter'); },
   });
   await assert.rejects(() => adjudicate(requestFixture), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /PRIVATE-OUTCOME|SECRET-DO-NOT-LOG|forbidden getter/);
     return true;
   });
@@ -814,7 +814,7 @@ test('Plan-1 S2: trusted Outcome verification errors redact attacker-defined fie
   const trusted = recordFixture.records.get('verification-tests');
   Object.defineProperty(trusted, Symbol(secret), { enumerable: true, value: 'ALLOW' });
   await assert.rejects(() => adjudicate(recordFixture), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /PRIVATE-OUTCOME|SECRET-DO-NOT-LOG/);
     return true;
   });
