@@ -230,3 +230,23 @@ test('S1 hostile inspection traps cannot leak diagnostic text or trigger recorde
   assert.equal(result.evidenceMap.externalEffectVerified, false);
   assert.deepEqual(result, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(persisted))));
 });
+
+test('S1 projected plan and recorded outcome array lengths never execute Proxy get traps', () => {
+  const marker = 'PRIVATE_LENGTH_GETTER_EXPOSED';
+  for (const field of ['plan', 'outcome']) {
+    const input = job();
+    const array = field === 'plan' ? input.runtime.plan.nodes : input.runtime.verifiedOutcome.checks;
+    const proxy = new Proxy(array, {
+      get(target, key) {
+        if (key === 'length') throw Error(marker);
+        return Reflect.get(target, key);
+      },
+    });
+    if (field === 'plan') input.runtime.plan.nodes = proxy;
+    else input.runtime.verifiedOutcome.checks = proxy;
+    const projected = buildAgentRunTimelineV1(input);
+    assert.equal(projected.mayReplayExternalEffect, false);
+    assert.equal(projected.evidenceMap.externalEffectVerified, false);
+    assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_LENGTH_GETTER_EXPOSED/u);
+  }
+});
