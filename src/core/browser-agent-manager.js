@@ -40,6 +40,7 @@ import {
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeOutcomeContractV1 } from './outcome-contract.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -110,12 +111,12 @@ const DIRECT_AGENT_CREATE_KEYS = new Set([
   'maxOutputTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxSteps', 'maxTotalTokens',
   'name', 'outputPricePerMillionUsd', 'projectId', 'repeatMode', 'scheduleEndAt',
   'scheduleStartAt', 'siteRules', 'startFromActiveTab', 'startUrl', 'stepDelayMs',
-  'trustedScriptEnabled', 'visionOnDemand',
+  'trustedScriptEnabled', 'visionOnDemand', 'outcomeContract',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
-  'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
+  'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds', 'outcomeContract',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -416,6 +417,9 @@ function requireExplicitOwnerPolicyInputs(request, label) {
 // Values must not change while the durable transaction is queued.
 function snapshotDirectAgentConfigPatch(raw) {
   const patch = snapshotExactOwnDataRequest(raw ?? {}, DIRECT_AGENT_CREATE_KEYS, 'Browser Agent config update');
+  if (Object.hasOwn(patch, 'outcomeContract')) {
+    throw new Error('Browser Agent outcome contract is immutable after job creation');
+  }
   for (const [key, value] of Object.entries(patch)) {
     if (key === 'siteRules' || key === 'acceptanceCriteria' || value == null) continue;
     if (!['string', 'number', 'boolean'].includes(typeof value)
@@ -431,6 +435,26 @@ function snapshotDirectAgentConfigPatch(raw) {
     patch.acceptanceCriteria = normalizeBrowserAgentAcceptanceCriteria(patch.acceptanceCriteria);
   }
   return patch;
+}
+
+// Outcome evidence is advisory only. Binding it to an existing durable job
+// must neither mint new permission nor treat verifier claims as owner approval.
+// This same check is applied on admission, config changes and cold restart.
+function bindBrowserAgentOutcomeContract(raw, config, definitionSelection) {
+  if (raw == null) return null;
+  const contract = normalizeOutcomeContractV1(raw);
+  if (contract.projectId !== (config.projectId || '')) {
+    throw new Error('Browser Agent Outcome Contract projectId does not match durable job');
+  }
+  const directGoal = config.goal || '';
+  const ownerGoalSuffix = '\\n\\nOwner task:\\n' + contract.desiredResult;
+  const correctGoal = definitionSelection == null
+    ? directGoal === contract.desiredResult
+    : directGoal.endsWith(ownerGoalSuffix);
+  if (!correctGoal) {
+    throw new Error('Browser Agent Outcome Contract desiredResult does not match the admitted owner goal');
+  }
+  return contract;
 }
 
 function normalizePersistedAgentDefinitionScope(raw, selection) {
@@ -919,6 +943,7 @@ function normalizeStore(raw, now) {
         definitionSelection,
         definitionScope,
         definitionRouterOverride,
+        outcomeContract: bindBrowserAgentOutcomeContract(raw.byId[id].outcomeContract, config, definitionSelection),
         orchestrationNodeBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
@@ -954,7 +979,7 @@ function normalizeStore(raw, now) {
 // store remains the sole job identity and execution authority.
 function persistCanonicalAgentJob(store, {
   id, config, now, definitionSelection = null, definitionScope = null,
-  definitionRouterOverride = null,
+  definitionRouterOverride = null, outcomeContract = null,
 }) {
   if (typeof id !== 'string' || !id || config?.id !== id) {
     throw new Error('Browser Agent job identity must match the normalized config');
@@ -967,6 +992,7 @@ function persistCanonicalAgentJob(store, {
     definitionSelection: definitionSelection == null ? null : clone(definitionSelection),
     definitionScope: definitionScope == null ? null : clone(definitionScope),
     definitionRouterOverride: definitionRouterOverride == null ? null : clone(definitionRouterOverride),
+    outcomeContract: outcomeContract == null ? null : clone(outcomeContract),
     orchestrationNodeBinding: null,
     createdAt: now,
     updatedAt: now,
@@ -2306,6 +2332,10 @@ export class BrowserAgentManager {
       }
     }
     snapshotAgentDefinitionLaunchNestedInputs(request);
+    // Snapshot before entering the serialized async store transaction: no
+    // caller mutation or accessor can change completion evidence/authority.
+    const admittedOutcome = Object.hasOwn(request, 'outcomeContract')
+      ? normalizeOutcomeContractV1(request.outcomeContract) : null;
     for (const key of ['expectedRegistryRevision', 'expectedDefinitionRevision']) {
       const value = request[key];
       if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
@@ -2358,6 +2388,7 @@ export class BrowserAgentManager {
         definitionSelection: selection,
         definitionScope: materialized.scope,
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? materialized.routerOverride : null,
+        outcomeContract: bindBrowserAgentOutcomeContract(admittedOutcome, materialized.config, selection),
       });
     });
     return this.get(jobId);
@@ -2374,13 +2405,15 @@ export class BrowserAgentManager {
     // object cannot execute toString/valueOf during config coercion, silently
     // alter a budget, or impersonate owner-supplied policy at persistence time.
     for (const [key, value] of Object.entries(request)) {
-      if (key === 'siteRules' || key === 'acceptanceCriteria' || value == null) continue;
+      if (key === 'siteRules' || key === 'acceptanceCriteria' || key === 'outcomeContract' || value == null) continue;
       if (!['string', 'number', 'boolean'].includes(typeof value)
           || (typeof value === 'number' && !Number.isFinite(value))) {
         throw new Error(`Browser Agent direct intake ${key} must be a finite scalar data value`);
       }
     }
     requireExplicitOwnerPolicyInputs(request, 'Browser Agent direct intake');
+    const admittedOutcome = Object.hasOwn(request, 'outcomeContract')
+      ? normalizeOutcomeContractV1(request.outcomeContract) : null;
     // Explicit invalid identities cannot silently turn into a newly generated
     // task, and generated identities obey the same durable namespace.
     const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
@@ -2431,7 +2464,10 @@ export class BrowserAgentManager {
       activeWindowEnd: request.activeWindowEnd || '',
     }, { id });
     await this.update(store => {
-      return persistCanonicalAgentJob(store, { id, config, now });
+      return persistCanonicalAgentJob(store, {
+        id, config, now,
+        outcomeContract: bindBrowserAgentOutcomeContract(admittedOutcome, config, null),
+      });
     });
     return this.get(id);
   }
@@ -2489,7 +2525,14 @@ export class BrowserAgentManager {
       }
 
       const previousCriteria = JSON.stringify(job.config.acceptanceCriteria || []);
-      job.config = normalizeBrowserAgentConfig({ ...job.config, ...patch, projectId: nextProjectId, id }, { id });
+      const nextConfig = normalizeBrowserAgentConfig({ ...job.config, ...patch, projectId: nextProjectId, id }, { id });
+      if (job.outcomeContract) {
+        bindBrowserAgentOutcomeContract(job.outcomeContract, nextConfig, job.definitionSelection);
+        if (JSON.stringify(nextConfig.acceptanceCriteria || []) !== previousCriteria) {
+          throw new Error('Browser Agent bound Outcome Contract criteria cannot change; create a new job');
+        }
+      }
+      job.config = nextConfig;
       if (JSON.stringify(job.config.acceptanceCriteria || []) !== previousCriteria) job.runtime.verifiedOutcome = null;
       job.updatedAt = now;
       return store;
