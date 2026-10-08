@@ -3170,6 +3170,13 @@ export class BrowserAgentManager {
   async nativeDragAt(tabId, action, startFingerprint, endFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     if (!startFingerprint || !endFingerprint) throw new Error('AGENT_DRAG_TARGET_UNPROVEN');
+    // Persisted/recovered direct native calls must satisfy the same explicit
+    // duration envelope as the planner; do not coerce or clamp after attach.
+    if (!action || (action.durationMs !== undefined
+      && (typeof action.durationMs !== 'number' || !Number.isSafeInteger(action.durationMs)
+        || action.durationMs < 120 || action.durationMs > 2000))) {
+      throw new Error('AGENT_DRAG_DURATION_INVALID');
+    }
     const requireOwner = async () => {
       if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
         throw new Error('AGENT_DRAG_CANCELLED_BY_OWNER');
@@ -3199,7 +3206,7 @@ export class BrowserAgentManager {
       await verifyPoint(action.startX, action.startY, startFingerprint);
       await verifyPoint(action.endX, action.endY, endFingerprint);
       await requireOwner();
-      const durationMs = Math.max(120, Math.min(2000, Number(action.durationMs || 450)));
+      const durationMs = action.durationMs === undefined ? 450 : action.durationMs;
       const steps = Math.max(3, Math.min(12, Math.round(durationMs / 75)));
       const stepDelayMs = Math.max(16, Math.round(durationMs / steps));
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
