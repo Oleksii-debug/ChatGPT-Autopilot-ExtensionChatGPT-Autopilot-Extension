@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, normalizeAiRoutePolicy, normalizeAiWorkerPolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
@@ -1336,4 +1337,41 @@ test('Plan4 S1/S2: budgeted dispatch refuses missing or forged durable reservati
   });
   assert.equal(result.usage.modelCalls,1);
   assert.equal(effects,1);
+});
+
+test('Plan4 S2: canonical service-worker lifecycle requires settled durable owner receipt', async () => {
+  const serviceWorkerSource = await readFile(new URL('../src/background/service-worker.js', import.meta.url),'utf8');
+  const marker='providerCallLifecycle: {';
+  const start=serviceWorkerSource.indexOf(marker);
+  const end=serviceWorkerSource.indexOf('\n  },\n});',start);
+  assert.ok(start >= 0 && end > start,'existing canonical lifecycle must be wired');
+  const body=serviceWorkerSource.slice(start+marker.length,end);
+  const createLifecycle=new Function('browserAgentLifecycle', 'return ({' + body + '\n  });');
+  const context={kind:'browser-agent',jobId:'test-job',controlEpoch:2};
+  const reservation={reservationId:'test-job:model-budget:1'};
+  const withoutOwner=createLifecycle({current:null});
+  await assert.rejects(withoutOwner.beforeProviderCall({context}),error =>
+    error.code==='AI_MODEL_BUDGET_LIFECYCLE_REQUIRED');
+  await assert.rejects(withoutOwner.afterProviderCall({context,reservation,ok:true}),error =>
+    error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN');
+
+  let reserveCalls=0;
+  let settleCalls=0;
+  const current={
+    async reserveProviderModelBudget(){reserveCalls++;return reservation;},
+    async settleProviderModelBudget(){settleCalls++;return {settled:false};},
+  };
+  const lifecycle=createLifecycle({current});
+  assert.deepEqual(await lifecycle.beforeProviderCall({
+    context,route:{routeId:'r'},prompt:'prompt',maxOutputTokens:128,callNumber:1,
+  }),reservation);
+  await assert.rejects(lifecycle.afterProviderCall({context,reservation,ok:true}),
+    error=>error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN');
+  current.settleProviderModelBudget=async()=>{settleCalls++;return {settled:true};};
+  assert.deepEqual(await lifecycle.afterProviderCall({context,reservation,ok:true}),{settled:true});
+  await assert.rejects(lifecycle.beforeProviderCall({
+    context:{...context,kind:'untrusted'},
+  }),error=>error.code==='AI_MODEL_BUDGET_LIFECYCLE_REQUIRED');
+  assert.equal(reserveCalls,1);
+  assert.equal(settleCalls,2);
 });
