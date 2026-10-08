@@ -1284,78 +1284,77 @@ export function proveBrowserNativeClick(snapshotId, ref) {
   return { x, y, url: location.href };
 }
 
-function browserCoordinateAccessibleName(element) {
-  if (!(element instanceof Element)) return '';
-  const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
-  const labelledBy = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
-  const labels = element.labels ? Array.from(element.labels).map(label => label.textContent || '').join(' ') : '';
-  const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
-  return normalize(element.getAttribute('aria-label') || labelledBy || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '');
-}
+// The injected Chrome function must be self-contained: executeScript serializes
+// its function argument without any module-scope helpers or import bindings.
+export function probeBrowserCoordinateTarget(x, y, fingerprint) {
+  function browserCoordinateAccessibleName(element) {
+    if (!(element instanceof Element)) return '';
+    const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    const labelledBy = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = element.labels ? Array.from(element.labels).map(label => label.textContent || '').join(' ') : '';
+    const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    return normalize(element.getAttribute('aria-label') || labelledBy || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '');
+  }
 
-function browserCoordinateTargetAt(x, y) {
-  const px = Number(x);
-  const py = Number(y);
-  if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
-  let element = document.elementFromPoint(px, py);
-  if (!(element instanceof Element)) return null;
-  // Prefer a semantic actionable ancestor when the point lands on an icon/span
-  // inside a button/link/control. Fall back to the hit element for canvas and
-  // other genuinely visual surfaces.
-  element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
-  const tag = String(element.tagName || '').toLowerCase();
-  const inputType = tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
-  const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
-  const sensitive = inputType === 'password' || inputType === 'file';
-  const nonTextInputTypes = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit']);
-  const editable = !sensitive && (
-    tag === 'textarea'
-    || element.isContentEditable === true
-    || String(element.getAttribute('role') || '').toLowerCase() === 'textbox'
-    || (tag === 'input' && !nonTextInputTypes.has(inputType || 'text'))
-  );
-  const form = element.form instanceof HTMLFormElement ? element.form : null;
-  const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
-  const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
-  const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
-  const rect = element.getBoundingClientRect();
-  const normalize = (value, max = 1200) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
-  return {
-    x: px,
-    y: py,
-    url: location.href,
-    viewportWidth: innerWidth,
-    viewportHeight: innerHeight,
-    target: {
-      tag,
-      role: normalize(element.getAttribute('role') || '', 80),
-      type: normalize(controlType, 80),
-      name: browserCoordinateAccessibleName(element),
-      href: normalize(element.href || element.getAttribute?.('href') || '', 1200),
-      disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
-      submitLike,
-      formAssociated: Boolean(form),
-      formAction: normalize(effectiveFormAction, 1200),
-      formMethod: normalize(effectiveFormMethod, 20),
-      editable,
-      sensitive,
-      pageUrl: location.href,
+  function browserCoordinateTargetAt(x, y) {
+    const px = Number(x);
+    const py = Number(y);
+    if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
+    let element = document.elementFromPoint(px, py);
+    if (!(element instanceof Element)) return null;
+    // Prefer a semantic actionable ancestor when the point lands on an icon/span
+    // inside a button/link/control. Fall back to the hit element for canvas and
+    // other genuinely visual surfaces.
+    element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
+    const tag = String(element.tagName || '').toLowerCase();
+    const inputType = tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
+    const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
+    const sensitive = inputType === 'password' || inputType === 'file';
+    const nonTextInputTypes = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit']);
+    const editable = !sensitive && (
+      tag === 'textarea'
+      || element.isContentEditable === true
+      || String(element.getAttribute('role') || '').toLowerCase() === 'textbox'
+      || (tag === 'input' && !nonTextInputTypes.has(inputType || 'text'))
+    );
+    const form = element.form instanceof HTMLFormElement ? element.form : null;
+    const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
+    const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
+    const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
+    const rect = element.getBoundingClientRect();
+    const normalize = (value, max = 1200) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    return {
+      x: px,
+      y: py,
+      url: location.href,
       viewportWidth: innerWidth,
       viewportHeight: innerHeight,
-      viewportScrollX: Number(globalThis.scrollX || 0),
-      viewportScrollY: Number(globalThis.scrollY || 0),
-      visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
-      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-    },
-  };
-}
+      target: {
+        tag,
+        role: normalize(element.getAttribute('role') || '', 80),
+        type: normalize(controlType, 80),
+        name: browserCoordinateAccessibleName(element),
+        href: normalize(element.href || element.getAttribute?.('href') || '', 1200),
+        disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
+        submitLike,
+        formAssociated: Boolean(form),
+        formAction: normalize(effectiveFormAction, 1200),
+        formMethod: normalize(effectiveFormMethod, 20),
+        editable,
+        sensitive,
+        pageUrl: location.href,
+        viewportWidth: innerWidth,
+        viewportHeight: innerHeight,
+        viewportScrollX: Number(globalThis.scrollX || 0),
+        viewportScrollY: Number(globalThis.scrollY || 0),
+        visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      },
+    };
+  }
 
-export function probeBrowserCoordinateTarget(x, y) {
-  return browserCoordinateTargetAt(x, y);
-}
-
-export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
   const proof = browserCoordinateTargetAt(x, y);
+  if (arguments.length < 3) return proof;
   if (!proof?.target || !fingerprint || typeof fingerprint !== 'object') return { ok: false, reason: 'missing-target' };
   const target = proof.target;
   if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
@@ -1380,6 +1379,10 @@ export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
     return { ok: false, reason: 'changed-geometry' };
   }
   return { ok: true, proof };
+}
+
+export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
+  return probeBrowserCoordinateTarget(x, y, fingerprint);
 }
 
 const CONSEQUENTIAL_ACTION_TERMS = Object.freeze([
