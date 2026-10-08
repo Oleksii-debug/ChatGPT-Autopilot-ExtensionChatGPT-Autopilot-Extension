@@ -831,3 +831,27 @@ test('stable owner and screenshot permit exactly one coordinate text insertion',
   assert.equal(fixture.events.filter(event => event === 'Input.insertText').length, 1);
   assert.equal(fixture.events.at(-1), 'detach');
 });
+
+
+test('restart normalization never turns malformed visual origin or geometry into valid zero', () => {
+  setup();
+  const valid = probeBrowserCoordinateTarget(20, 20).target;
+  for (const field of ['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch', 'captureX', 'captureY']) {
+    for (const invalid of [null, '', '0', undefined, Infinity]) {
+      const normalized = browserAgentCoordinateTargetFingerprint({ ...valid, [field]: invalid });
+      assert.equal(normalized[field], null);
+      assert.equal(verifyBrowserCoordinateTarget(20, 20, normalized).ok, false);
+    }
+  }
+  for (const field of ['left', 'top', 'width', 'height']) {
+    for (const invalid of [null, '', '0', undefined, Infinity]) {
+      const normalized = browserAgentCoordinateTargetFingerprint({
+        ...valid, rect: { ...valid.rect, [field]: invalid },
+      });
+      assert.equal(normalized.rect[field], null);
+      assert.equal(verifyBrowserCoordinateTarget(20, 20, normalized).ok, false);
+    }
+  }
+  const sound = browserAgentCoordinateTargetFingerprint(valid);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, sound).ok, true);
+});
