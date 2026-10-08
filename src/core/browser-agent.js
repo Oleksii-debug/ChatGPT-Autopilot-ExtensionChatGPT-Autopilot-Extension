@@ -1122,7 +1122,24 @@ export function executeBrowserPageAction(snapshotId, action) {
     const role = element.getAttribute('role');
     const current = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
     if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
-    if (current !== desired) element.click();
+    if (current !== desired) {
+      // Checkbox/radio/switch toggles are click effects too: never bypass an
+      // overlay, an inert ancestor, or a focus-time semantic retarget.
+      element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      element.focus?.({ preventScroll: true });
+      ensureTarget();
+      const bounds = element.getBoundingClientRect();
+      const x = bounds.left + bounds.width / 2;
+      const y = bounds.top + bounds.height / 2;
+      if (!(bounds.width > 0 && bounds.height > 0)
+        || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
+        throw new Error('AGENT_TARGET_NOT_VISIBLE');
+      }
+      const hit = document.elementFromPoint(x, y);
+      if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
+      ensureTarget();
+      element.click();
+    }
     const observed = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
     if (observed !== desired) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     return { ok: true, kind: 'check', effectVerified: true, checked: observed, url: location.href };
