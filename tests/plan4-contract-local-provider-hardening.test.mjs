@@ -740,3 +740,55 @@ test('route failover preserves model-budget reservation settlement and JSON rest
   assert.deepEqual(calls,['second']);
   assert.deepEqual(settlements.map(x=>x.ok),[true]);
 });
+
+
+test('budgeted model dispatch fails closed without canonical lifecycle, including JSON restart', async () => {
+  let networkCalls = 0;
+  const client = { async complete() { networkCalls++; throw new Error('must not dispatch'); } };
+  const orchestrator = new AiOrchestrator({ gatewayClient:client });
+  const config = {
+    enabled:true, mode:'primary', primary:{provider:'ollama',model:'fixture'},
+    fallbackToStrongOnPrimaryError:false,
+  };
+  for (const context of [{jobId:'fixture'}, JSON.parse('{"jobId":"fixture"}')]) {
+    await assert.rejects(
+      orchestrator.run(config, {}, 'owner-approved prompt', {providerCallBudgetContext:context}),
+      error => error.code === 'AI_MODEL_BUDGET_LIFECYCLE_REQUIRED',
+    );
+  }
+  for (const context of [false, 0, '', 'untrusted', []]) {
+    await assert.rejects(
+      orchestrator.run(config, {}, 'owner-approved prompt', {providerCallBudgetContext:context}),
+      /budget context must be a data object/,
+    );
+  }
+  assert.equal(networkCalls,0);
+});
+
+test('malformed per-request model budget cannot become unlimited before provider dispatch', async () => {
+  let networkCalls=0;
+  const client = {async complete() {
+    networkCalls++;
+    return {text:'fixture',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const orchestrator=new AiOrchestrator({gatewayClient:client,now:()=>1000});
+  const config={enabled:true,mode:'primary',primary:{provider:'ollama',model:'fixture'}};
+  for (const field of ['maxOutputTokens','maxModelCallsForRequest']) {
+    for (const malformed of [-1,1.2,'0','5',false,true,null,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,{},[]]) {
+      await assert.rejects(
+        orchestrator.run(config,{},'owner-approved prompt',{[field]:malformed}),
+        /must be a non-negative safe integer/,
+      );
+    }
+    for (const malformed of [-1,'0',false,null,1.2]) {
+      await assert.rejects(
+        orchestrator.run(config,{},'owner-approved prompt',
+          JSON.parse(JSON.stringify({[field]:malformed}))),
+        /must be a non-negative safe integer/,
+      );
+    }
+  }
+  assert.equal(networkCalls,0);
+  await orchestrator.run(config,{},'owner-approved prompt',{maxModelCallsForRequest:1,maxOutputTokens:5});
+  assert.equal(networkCalls,1);
+});
