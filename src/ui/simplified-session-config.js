@@ -66,7 +66,7 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     tasks, configuredTaskCount,
     runMode: fields.runMode === 'one-pass' ? 'one-pass' : 'continuous',
     minimumSendIntervalValue: interval, minimumSendIntervalUnit: intervalUnit,
-    tabReadyDelaySeconds, postSendDelaySeconds, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
+    tabReadyDelaySeconds, postSendDelaySeconds, postSendDelayUnit: postSendUnit, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
     retryPolicy: fields.retryPolicy === 'manual' ? 'manual' : 'safe',
     busyChatBehavior: fields.busyBehavior === 'skip-next' ? 'skip-next' : 'skip-next',
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',
