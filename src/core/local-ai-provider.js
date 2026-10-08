@@ -102,10 +102,9 @@ export function normalizeLocalAiSettings(raw = {}) {
   for (const key of Object.keys(source)) {
     if (!['enabled', 'providerType', 'baseUrl', 'model', 'timeoutSeconds'].includes(key)) throw new Error(`Local AI settings contain unknown field: ${key}`);
   }
-  // A genuinely omitted connection setting may use the legacy local default.
-  // A present-but-undefined endpoint/provider is corrupted owner configuration;
-  // never retarget an AI request to a different localhost model service.
-  for (const field of ['providerType', 'baseUrl']) {
+  // Only genuinely absent legacy fields inherit defaults. Explicit undefined
+  // for provider/origin/model/timeout/enablement can alter an approved effect.
+  for (const field of ['enabled', 'providerType', 'baseUrl', 'model', 'timeoutSeconds']) {
     if (Object.hasOwn(source, field) && source[field] === undefined) {
       throw new Error(`Local AI ${field} cannot be undefined when explicitly supplied`);
     }
