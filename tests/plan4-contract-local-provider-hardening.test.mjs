@@ -1110,3 +1110,54 @@ test('Plan4 S2: explicit undefined local model, enablement and timeout fail befo
   assert.equal(legacy.model,'');
   assert.equal(legacy.timeoutSeconds,90);
 });
+
+test('Plan4 S1: explicitly erased router ownership fields must not trigger default provider dispatch', async () => {
+  const owner = {
+    enabled: true, mode:'primary', gatewayUrl:'http://127.0.0.1:17621',
+    primary:{provider:'ollama', model:'llama3'}, strong:{provider:'openai',model:'strong-fixture'},
+    routes:[route], routePolicy:{locality:'local',autoSwitch:false}, workerPolicy:{allocationMode:'auto'},
+  };
+  let effects=0;
+  const orchestrator=new AiOrchestrator({gatewayClient:{complete:async()=>{effects++;return {text:'unexpected model response'};}}});
+  for (const field of ['gatewayUrl','primary','strong','routes','routePolicy','workerPolicy']) {
+    const corrupt={...owner,[field]:undefined};
+    assert.throws(()=>normalizeAiRouterSettings(corrupt), /cannot be undefined when explicitly supplied/);
+    await assert.rejects(orchestrator.run(corrupt,{},'Do not dispatch'), /cannot be undefined when explicitly supplied/);
+  }
+  assert.equal(effects,0);
+  const valid=normalizeAiRouterSettings(JSON.parse(JSON.stringify(owner)));
+  assert.equal(valid.routes[0].routeId,route.routeId);
+  assert.equal(valid.routePolicy.locality,'local');
+  assert.equal(normalizeAiRouterSettings({}).routes.length,0);
+});
+
+test('Plan4 S2: timed-out local fetch must reject late resolved response', async () => {
+  let expiry;
+  const client=new LocalAiClient({
+    fetchFn:async()=>{expiry();return {ok:true,status:200};},
+    setTimeoutFn:callback=>{expiry=callback;return 1;},
+    clearTimeoutFn:()=>{},
+  });
+  await assert.rejects(
+    client.request(settings,'http://127.0.0.1:11434/api/tags',{},async()=>({models:['stale']})),
+    error=>{assert.equal(error.code,'LOCAL_AI_TIMEOUT');assert.equal(error.category,'TIMEOUT');return true;},
+  );
+});
+
+test('Plan4 S2: timed-out local body must not publish late success, normal response still works', async () => {
+  let expiry;
+  let networkRequests=0;
+  const client=new LocalAiClient({
+    fetchFn:async()=>{networkRequests++;return {ok:true,status:200};},
+    setTimeoutFn:callback=>{expiry=callback;return 2;},
+    clearTimeoutFn:()=>{},
+  });
+  await assert.rejects(
+    client.request(settings,'http://127.0.0.1:11434/api/tags',{},async()=>{expiry();return {models:['stale']};}),
+    error=>{assert.equal(error.code,'LOCAL_AI_TIMEOUT');assert.equal(error.category,'TIMEOUT');return true;},
+  );
+  const restored=JSON.parse(JSON.stringify(settings));
+  const allowed=await client.request(restored,'http://127.0.0.1:11434/api/tags',{},async()=>({models:['allowed']}));
+  assert.deepEqual(allowed,{models:['allowed']});
+  assert.equal(networkRequests,2);
+});
