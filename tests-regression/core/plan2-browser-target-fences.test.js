@@ -12,6 +12,7 @@ import {
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
   browserAgentVisionOriginMatches,
+  browserAgentSnapshotElement,
   BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../../src/core/browser-agent-manager.js';
@@ -1623,3 +1624,49 @@ test('all three visual dispatch branches reuse strict observed origin without Nu
 
 // Binding remains the existing browser-agent module; no second provider.
 function awaitImportVisionOrigin() { return { browserAgentVisionOriginMatches }; }
+
+
+test('Plan-2 S1: semantic policy lookup accepts exact Chrome frame ID only', () => {
+  const observed = { ref: 'r1', name: 'Submit' };
+  const snapshot = { frames: [{ frameId: 0, elements: [observed] }] };
+  assert.equal(browserAgentSnapshotElement(snapshot, { frameId: 0, ref: 'r1' }), observed);
+  for (const frameId of [null, false, '', '0', [], {}, -1, 1]) {
+    assert.equal(browserAgentSnapshotElement(snapshot, { frameId, ref: 'r1' }), null);
+  }
+  assert.equal(browserAgentSnapshotElement(snapshot, { frameId: 0, ref: [] }), null);
+  assert.equal(browserAgentSnapshotElement(snapshot, { frameId: 0, ref: 'missing' }), null);
+});
+
+test('Plan-2 S2: restarted visual origin never trusts accessor/inherited evidence', () => {
+  const pageUrl = 'https://example.test/editor';
+  const viewport = { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 12345 };
+  const proof = { url: pageUrl, viewportWidth: 500, viewportHeight: 300,
+    target: { pageUrl, viewportWidth: 500, viewportHeight: 300,
+      viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 12345 } };
+  assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, viewport), true);
+  const jsonRestart = JSON.parse(JSON.stringify({ proof, viewport }));
+  assert.equal(browserAgentVisionOriginMatches(jsonRestart.proof, pageUrl, jsonRestart.viewport), true);
+
+  const withGetter = JSON.parse(JSON.stringify(proof));
+  let getterCalls = 0;
+  Object.defineProperty(withGetter.target, 'viewportScrollX', {
+    get() { getterCalls++; return 0; }, configurable: true,
+  });
+  assert.equal(browserAgentVisionOriginMatches(withGetter, pageUrl, viewport), false);
+  assert.equal(getterCalls, 0, 'never evaluate untrusted origin getter');
+
+  assert.equal(browserAgentVisionOriginMatches({
+    ...proof, target: Object.create(proof.target),
+  }, pageUrl, viewport), false);
+  assert.equal(browserAgentVisionOriginMatches({
+    ...proof, target: new Proxy({ ...proof.target }, {
+      getOwnPropertyDescriptor() { throw new Error('sensitive provider data'); },
+    }),
+  }, pageUrl, viewport), false);
+  assert.equal(browserAgentVisionOriginMatches({
+    ...proof, target: { ...proof.target, viewportScrollX: null },
+  }, pageUrl, viewport), false);
+  assert.equal(browserAgentVisionOriginMatches(proof, pageUrl, {
+    ...viewport, documentEpoch: viewport.documentEpoch + 1,
+  }), false);
+});
