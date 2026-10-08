@@ -800,6 +800,8 @@ test('native coordinate drag releases pressed pointer when Stop interrupts movem
 
 test('native coordinate typing denies post-click changed target before insertText', async () => {
   setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
   const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
   const fixture = plan2NativeCoordinateFixture({ allowProof: index => index < 3 });
   await assert.rejects(
@@ -813,6 +815,8 @@ test('native coordinate typing denies post-click changed target before insertTex
 
 test('native coordinate typing denies Stop after debugger attach with zero input effects', async () => {
   setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
   const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
   const fixture = plan2NativeCoordinateFixture({ allowOwner: index => index === 1 });
   await assert.rejects(
@@ -824,6 +828,8 @@ test('native coordinate typing denies Stop after debugger attach with zero input
 
 test('stable owner and screenshot permit exactly one coordinate text insertion', async () => {
   setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
   const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
   const fixture = plan2NativeCoordinateFixture();
   await fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'safe' }, fingerprint, 'owner-job', 3);
@@ -854,4 +860,20 @@ test('restart normalization never turns malformed visual origin or geometry into
   }
   const sound = browserAgentCoordinateTargetFingerprint(valid);
   assert.equal(verifyBrowserCoordinateTarget(20, 20, sound).ok, true);
+});
+
+
+test('native coordinate type helper rejects password and noneditable targets even when directly called', async () => {
+  setup();
+  const uneditable = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'not allowed' }, uneditable, 'owner-job', 3),
+    /AGENT_TARGET_NOT_EDITABLE/,
+  );
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'not allowed' }, { ...uneditable, sensitive: true }, 'owner-job', 3),
+    /AGENT_SENSITIVE_FIELD_BLOCKED/,
+  );
+  assert.deepEqual(fixture.events, []);
 });
