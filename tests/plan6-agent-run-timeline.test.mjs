@@ -184,3 +184,49 @@ test('S1 UI announces timestamp provenance using semantic native time text', asy
   assert.doesNotMatch(script.slice(script.indexOf('function renderAgentRunTimeline(job)'),
     script.indexOf('function renderBrowserAgentList()')), /innerHTML|outerHTML|insertAdjacentHTML/u);
 });
+
+test('S1 hostile inspection traps cannot leak diagnostic text or trigger recorded effects', () => {
+  const marker = 'PRIVATE_TRAP_PAYLOAD_DO_NOT_EXPORT';
+  const failures = [
+    () => {
+      const input = job();
+      input.runtime = new Proxy(input.runtime, { getPrototypeOf() { throw Error(marker); } });
+      return buildAgentRunTimelineV1(input);
+    },
+    () => {
+      const input = job();
+      return buildAgentRunTimelineV1(new Proxy(input, {
+        getOwnPropertyDescriptor(target, key) {
+          if (key === 'runtime') throw Error(marker);
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+      }));
+    },
+    () => buildAgentRunTimelineV1(job(), new Proxy({}, { ownKeys() { throw Error(marker); } })),
+    () => {
+      const input = job();
+      input.runtime.history[0] = new Proxy(input.runtime.history[0], {
+        getOwnPropertyDescriptor(target, key) {
+          if (key === 'at') throw Error(marker);
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+      });
+      return buildAgentRunTimelineV1(input);
+    },
+    () => {
+      const input = job();
+      input.runtime.history = new Proxy(input.runtime.history, {
+        getPrototypeOf() { throw Error(marker); },
+      });
+      return buildAgentRunTimelineV1(input);
+    },
+  ];
+  for (const fail of failures) {
+    assert.throws(fail, error => error instanceof Error && !error.message.includes(marker));
+  }
+  const persisted = JSON.parse(JSON.stringify(job()));
+  const result = buildAgentRunTimelineV1(persisted);
+  assert.equal(result.mayReplayExternalEffect, false);
+  assert.equal(result.evidenceMap.externalEffectVerified, false);
+  assert.deepEqual(result, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(persisted))));
+});
