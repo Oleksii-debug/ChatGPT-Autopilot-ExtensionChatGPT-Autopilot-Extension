@@ -2278,6 +2278,16 @@ export class BrowserAgentManager {
     // Same data-only request boundary as Definition intake: no getter may
     // supply a task/goal/policy at construction time.
     const request = snapshotOwnDataRequest(raw, 'Browser Agent direct intake');
+    // Site rules and acceptance criteria have their own dense/data-only
+    // validators. All other direct-intake fields must be scalar so an untrusted
+    // object cannot execute toString/valueOf during config coercion, silently
+    // alter a budget, or impersonate owner-supplied policy at persistence time.
+    for (const [key, value] of Object.entries(request)) {
+      if (key === 'siteRules' || key === 'acceptanceCriteria' || value == null) continue;
+      if (!['string', 'number', 'boolean'].includes(typeof value)) {
+        throw new Error(`Browser Agent direct intake ${key} must be a scalar data value`);
+      }
+    }
     // Explicit invalid identities cannot silently turn into a newly generated
     // task, and generated identities obey the same durable namespace.
     const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
