@@ -523,8 +523,16 @@ function buildOpportunityCandidates(workflows) {
 
 export async function buildRoiOpportunityReportV1(
   input = {},
-  { resolveTrustedRunEvidence } = {},
+  dependencies = {},
 ) {
+  // The resolver is trusted only after its descriptor is inspected. Never
+  // execute an accessor supplied by a lower-trust API/SDK boundary.
+  const dependencyData = dataRecord(
+    dependencies,
+    new Set(['resolveTrustedRunEvidence']),
+    'RoiOpportunityDependenciesV1',
+  );
+  const resolveTrustedRunEvidence = dependencyData.resolveTrustedRunEvidence;
   if (typeof resolveTrustedRunEvidence !== 'function') {
     throw new Error('Canonical trusted run-evidence resolver is required');
   }

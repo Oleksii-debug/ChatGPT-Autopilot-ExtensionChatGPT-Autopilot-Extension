@@ -1,0 +1,44 @@
+name: Plan 7 SDK and ROI qualification (11.x)
+on:
+  pull_request:
+    paths:
+      - "src/core/autopilot-programmatic-control.js"
+      - "src/core/roi-opportunity-engine.js"
+      - "src/core/roi-owner-advisory.js"
+      - "src/ui/roi-owner-view.js"
+      - "companion/local-api/**"
+      - "tests/autopilot-programmatic-control.test.mjs"
+      - "tests/roi-opportunity-engine.test.mjs"
+      - "tests/plan7-*.test.mjs"
+      - ".github/workflows/plan7-sdk-roi-qualification.yml"
+  push:
+    branches: ["plan7/11.0.13-sdk-roi-reuse-20261008"]
+permissions:
+  contents: read
+concurrency:
+  group: plan7-sdk-roi-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  offline-sdk-roi:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Exact source and syntax
+        run: |
+          git rev-parse HEAD
+          node --check src/core/autopilot-programmatic-control.js
+          node --check src/core/roi-opportunity-engine.js
+          node --check src/core/roi-owner-advisory.js
+          node --check src/ui/roi-owner-view.js
+          node --check companion/local-api/server.mjs
+          node --check companion/local-api/client.mjs
+          node --check companion/local-api/cli.mjs
+      - name: Offline SDK, API, ROI and adversarial tests
+        run: node --test tests/autopilot-programmatic-control.test.mjs tests/plan7-cli.test.mjs tests/plan7-local-api.test.mjs tests/roi-opportunity-engine.test.mjs tests/plan7-roi-owner-advisory.test.mjs tests/plan7-roi-owner-view.test.mjs
