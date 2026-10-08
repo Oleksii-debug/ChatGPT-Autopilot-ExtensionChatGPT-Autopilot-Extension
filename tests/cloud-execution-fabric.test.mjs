@@ -44,6 +44,10 @@ function provider(providerId = 'provider-a', overrides = {}) {
     schemaVersion: 1,
     providerId,
     toolId: '',
+    sourceId: 'test.cloud-health',
+    sourceRevision: 1,
+    observedAt: '2026-09-25T10:00:00.000Z',
+    validThrough: '2026-09-25T23:59:59.999Z',
     health: 'READY',
     installationRequired: false,
     installed: true,
@@ -383,4 +387,20 @@ test('accessor-backed outer authority is rejected without executing the getter',
     /enumerable own data properties/u,
   );
   assert.equal(reads, 0);
+});
+
+test('stale or future provider readiness cannot authorize an otherwise eligible cloud slot', () => {
+  for (const [overrides, expectedReason] of [
+    [{ observedAt: '2026-09-25T09:00:00.000Z', validThrough: '2026-09-25T10:04:59.999Z' }, 'PROVIDER_STATE_STALE'],
+    [{ observedAt: '2026-09-25T10:05:00.001Z', validThrough: '2026-09-25T10:30:00.000Z' }, 'PROVIDER_STATE_FUTURE'],
+  ]) {
+    const result = assessCloudExecutionFabricV1(request({
+      affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+      providerStates: [provider('provider-a', overrides)],
+    }));
+    assert.equal(result.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(result.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(result.candidateAssessments[0].eligible, false);
+    assert.equal(result.candidateAssessments[0].reasonCode, expectedReason);
+  }
 });

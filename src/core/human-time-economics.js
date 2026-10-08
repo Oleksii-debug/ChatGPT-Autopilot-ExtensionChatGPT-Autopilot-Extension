@@ -1,5 +1,6 @@
 import {
   ProviderHealthStatus,
+  assessProviderReadinessFreshnessV1,
   normalizeProviderReadinessV1,
 } from './capability-discovery.js';
 import {
@@ -219,8 +220,12 @@ function ownerTimeCostUsdMicros(seconds, ownerMinuteValueUsdMicros) {
   );
 }
 
-function readinessBlockers(readiness) {
+function readinessBlockers(readiness, asOf) {
   const blockers = [];
+  const freshness = assessProviderReadinessFreshnessV1(readiness, asOf);
+  if (!freshness.fresh) {
+    blockers.push(freshness.reasonCode);
+  }
   if (readiness.health === ProviderHealthStatus.UNAVAILABLE) {
     blockers.push('PROVIDER_UNAVAILABLE');
   } else if (readiness.health === ProviderHealthStatus.UNKNOWN) {
@@ -374,7 +379,7 @@ function normalizeAlternative(
     runtimeMs,
   );
 
-  const blockers = readinessBlockers(readiness);
+  const blockers = readinessBlockers(readiness, asOf);
   if (budget.decision !== ResourceBudgetDecisionKind.ALLOW) {
     blockers.push('RESOURCE_BUDGET_DENIED');
   }

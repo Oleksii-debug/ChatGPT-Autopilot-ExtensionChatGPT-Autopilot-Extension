@@ -4,9 +4,15 @@ import {
   CapabilityPathKind,
   CapabilityPathReadiness,
   ProviderHealthStatus,
+  ProviderReadinessFreshness,
+  assessProviderReadinessFreshnessV1,
   discoverCapabilityPathsV1,
   normalizeProviderReadinessV1,
 } from '../src/core/capability-discovery.js';
+
+const AS_OF = '2026-09-29T04:30:00.000Z';
+const OBSERVED_AT = '2026-09-29T04:00:00.000Z';
+const VALID_THROUGH = '2026-09-29T05:00:00.000Z';
 
 function capability(capabilityId) {
   return { schemaVersion:1, capabilityId, description:'', riskClass:'R0', attributes:{} };
@@ -30,6 +36,10 @@ function state(providerId, overrides = {}) {
   return {
     schemaVersion:1,
     providerId,
+    sourceId:'health.authority',
+    sourceRevision:1,
+    observedAt:OBSERVED_AT,
+    validThrough:VALID_THROUGH,
     health:ProviderHealthStatus.READY,
     installationRequired:false,
     installed:true,
@@ -53,8 +63,21 @@ const tools = [
   tool('github.mutate', 'remote/github', ['github.code', 'artifact.write'], false),
 ];
 
+function discover(input) {
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const request = Object.create(Object.getPrototypeOf(input));
+  Object.defineProperties(request, descriptors);
+  Object.defineProperty(request, 'asOf', {
+    value: AS_OF,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return discoverCapabilityPathsV1(request);
+}
+
 test('discovery produces a deterministic executable coverage plan without granting permission', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities,
     tools,
     providerStates:[
@@ -72,6 +95,10 @@ test('discovery produces a deterministic executable coverage plan without granti
       capabilityIds:['artifact.write', 'filesystem.read'],
       readiness:'READY',
       pathKind:'API',
+      readinessSourceId:'health.authority',
+      readinessSourceRevision:1,
+      readinessObservedAt:OBSERVED_AT,
+      readinessValidThrough:VALID_THROUGH,
       requiresPolicyDecision:true,
       permissionGranted:false,
     },
@@ -82,6 +109,10 @@ test('discovery produces a deterministic executable coverage plan without granti
       capabilityIds:['github.code'],
       readiness:'DEGRADED',
       pathKind:'API',
+      readinessSourceId:'health.authority',
+      readinessSourceRevision:1,
+      readinessObservedAt:OBSERVED_AT,
+      readinessValidThrough:VALID_THROUGH,
       requiresPolicyDecision:true,
       permissionGranted:false,
     },
@@ -91,13 +122,13 @@ test('discovery produces a deterministic executable coverage plan without granti
 });
 
 test('input ordering does not change recommendation or plan ordering', () => {
-  const first = discoverCapabilityPathsV1({
+  const first = discover({
     capabilities,
     tools,
     providerStates:[state('local/fs'), state('remote/github')],
     requestedCapabilityIds:['artifact.write', 'filesystem.read', 'github.code'],
   });
-  const second = discoverCapabilityPathsV1({
+  const second = discover({
     capabilities:[...capabilities].reverse(),
     tools:[...tools].reverse(),
     providerStates:[state('remote/github'), state('local/fs')],
@@ -107,7 +138,7 @@ test('input ordering does not change recommendation or plan ordering', () => {
 });
 
 test('needs-auth, needs-install and unavailable candidates are visible but never executable plan steps', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities,
     tools:[
       tool('auth.tool', 'auth/provider', ['github.code']),
@@ -130,8 +161,118 @@ test('needs-auth, needs-install and unavailable candidates are visible but never
   assert.deepEqual(result.unresolvedCapabilityIds, ['artifact.write', 'filesystem.read', 'github.code']);
 });
 
+test('stale and future provider readiness never enter executable plan', () => {
+  const stale = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:'2026-09-29T03:00:00.000Z',
+      validThrough:'2026-09-29T04:00:00.000Z',
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(stale.candidates[0].readiness, CapabilityPathReadiness.NEEDS_HEALTH_CHECK);
+  assert.equal(stale.candidates[0].reasonCode, 'PROVIDER_STATE_STALE');
+  assert.deepEqual(stale.plan, []);
+  assert.deepEqual(stale.unresolvedCapabilityIds, ['filesystem.read']);
+
+  const future = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:'2026-09-29T04:45:00.000Z',
+      validThrough:'2026-09-29T05:30:00.000Z',
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(future.candidates[0].readiness, CapabilityPathReadiness.NEEDS_HEALTH_CHECK);
+  assert.equal(future.candidates[0].reasonCode, 'PROVIDER_STATE_FUTURE');
+  assert.deepEqual(future.plan, []);
+});
+
+test('freshness boundary is inclusive at observedAt and validThrough', () => {
+  const observedNow = discoverCapabilityPathsV1({
+    asOf:AS_OF,
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:AS_OF,
+      validThrough:'2026-09-29T05:00:00.000Z',
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(observedNow.candidates[0].readiness, CapabilityPathReadiness.READY);
+  assert.equal(observedNow.plan.length, 1);
+
+  const expiresNow = discoverCapabilityPathsV1({
+    asOf:AS_OF,
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      observedAt:'2026-09-29T04:00:00.000Z',
+      validThrough:AS_OF,
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(expiresNow.candidates[0].readiness, CapabilityPathReadiness.READY);
+  assert.equal(expiresNow.plan.length, 1);
+});
+
+test('fresh executable plan carries exact readiness source provenance', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs', {
+      sourceId:'health.windows',
+      sourceRevision:7,
+      observedAt:'2026-09-29T04:20:00.000Z',
+      validThrough:'2026-09-29T04:40:00.000Z',
+    })],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(result.asOf, AS_OF);
+  assert.equal(result.candidates[0].readiness, CapabilityPathReadiness.READY);
+  assert.equal(result.candidates[0].readinessSourceId, 'health.windows');
+  assert.equal(result.candidates[0].readinessSourceRevision, 7);
+  assert.equal(result.candidates[0].readinessObservedAt, '2026-09-29T04:20:00.000Z');
+  assert.equal(result.candidates[0].readinessValidThrough, '2026-09-29T04:40:00.000Z');
+  assert.equal(result.plan[0].readinessSourceId, 'health.windows');
+  assert.equal(result.plan[0].readinessSourceRevision, 7);
+});
+
+test('impossible readiness chronology and malformed source provenance fail closed', () => {
+  assert.throws(
+    () => normalizeProviderReadinessV1(state('local/fs', {
+      observedAt:'2026-09-29T04:20:00.000Z',
+      validThrough:'2026-09-29T04:10:00.000Z',
+    })),
+    /validThrough cannot predate observedAt/,
+  );
+  assert.throws(
+    () => normalizeProviderReadinessV1(state('local/fs', { sourceRevision:-0 })),
+    /positive safe integer/,
+  );
+  assert.throws(
+    () => normalizeProviderReadinessV1(state('local/fs', { observedAt:'2026-09-29 04:00:00Z' })),
+    /canonical UTC/,
+  );
+});
+
+test('discovery asOf must use exact canonical UTC representation', () => {
+  assert.throws(
+    () => discoverCapabilityPathsV1({
+      asOf:'2026-09-29 04:30:00Z',
+      capabilities:[capability('filesystem.read')],
+      tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+      providerStates:[state('local/fs')],
+      requestedCapabilityIds:['filesystem.read'],
+    }),
+    /canonical UTC/,
+  );
+});
+
 test('missing provider state requires health evidence and never silently becomes ready', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[],
@@ -144,7 +285,7 @@ test('missing provider state requires health evidence and never silently becomes
 });
 
 test('unknown requested capabilities are reported unresolved rather than synthesized', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[state('local/fs')],
@@ -156,14 +297,14 @@ test('unknown requested capabilities are reported unresolved rather than synthes
 });
 
 test('inventory identity conflicts and dangling tool capability references fail closed', () => {
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read'), capability('filesystem.read')],
     tools:[],
     providerStates:[],
     requestedCapabilityIds:[],
   }), /duplicate capabilityId/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[
       tool('same', 'a/provider', ['filesystem.read']),
@@ -173,21 +314,21 @@ test('inventory identity conflicts and dangling tool capability references fail 
     requestedCapabilityIds:['filesystem.read'],
   }), /duplicate toolId/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('bad.tool', 'a/provider', ['missing.capability'])],
     providerStates:[],
     requestedCapabilityIds:['filesystem.read'],
   }), /unknown capability/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'])],
     providerStates:[state('local/fs'), state('local/fs')],
     requestedCapabilityIds:['filesystem.read'],
   }), /duplicate provider\/tool readiness identity/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'])],
     providerStates:[state('other/provider', { toolId:'fs.inspect' })],
@@ -227,7 +368,7 @@ test('provider readiness boundary rejects coercion, inherited authority and exot
 });
 
 test('degraded providers remain executable but sort behind ready providers for equal coverage', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('filesystem.read')],
     tools:[
       tool('z.degraded', 'z/provider', ['filesystem.read']),
@@ -245,7 +386,7 @@ test('degraded providers remain executable but sort behind ready providers for e
 
 
 test('best-path planning prefers deterministic API/CLI/semantic/UIA paths before visual or OCR fallback', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('filesystem.read')],
     tools:[
       tool('visual.fast', 'visual/provider', ['filesystem.read']),
@@ -268,7 +409,7 @@ test('best-path planning prefers deterministic API/CLI/semantic/UIA paths before
 
 
 test('tool-specific path readiness overrides provider-wide fallback for mixed-mode providers', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('filesystem.read')],
     tools:[
       tool('windows.visual', 'windows/provider', ['filesystem.read']),
@@ -289,8 +430,36 @@ test('tool-specific path readiness overrides provider-wide fallback for mixed-mo
 });
 
 
+test('stale tool-specific readiness does not fall back to fresh provider-wide readiness', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('windows.uia', 'windows/provider', ['filesystem.read'])],
+    providerStates:[
+      state('windows/provider', {
+        sourceId:'health.provider',
+        sourceRevision:3,
+        pathKind:'API',
+      }),
+      state('windows/provider', {
+        toolId:'windows.uia',
+        sourceId:'health.tool',
+        sourceRevision:4,
+        pathKind:'UIA',
+        observedAt:'2026-09-29T03:00:00.000Z',
+        validThrough:'2026-09-29T04:00:00.000Z',
+      }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.equal(result.candidates[0].readiness, CapabilityPathReadiness.NEEDS_HEALTH_CHECK);
+  assert.equal(result.candidates[0].reasonCode, 'PROVIDER_STATE_STALE');
+  assert.equal(result.candidates[0].readinessSourceId, 'health.tool');
+  assert.deepEqual(result.plan, []);
+});
+
 test('deterministic path class outranks broader visual coverage in the executable plan', () => {
-  const result = discoverCapabilityPathsV1({
+  const result = discover({
     capabilities:[capability('a.read'), capability('b.read')],
     tools:[
       tool('api.a', 'api/provider', ['a.read']),
@@ -346,13 +515,13 @@ test('candidate tie-breaking uses locale-independent code-unit order regardless 
     state('Provider/A', { toolId:'tool.same', latencyMs:10 }),
     state('provider/a', { toolId:'tool.same2', latencyMs:10 }),
   ];
-  const forward = discoverCapabilityPathsV1({
+  const forward = discover({
     capabilities:caps,
     tools:[lower, upper],
     providerStates:[states[1], states[0]],
     requestedCapabilityIds:['filesystem.read'],
   });
-  const reverse = discoverCapabilityPathsV1({
+  const reverse = discover({
     capabilities:caps,
     tools:[upper, lower],
     providerStates:[states[0], states[1]],
@@ -386,7 +555,7 @@ test('readiness records, array lengths and request envelopes are snapshot withou
       return Reflect.get(target, key, receiver);
     },
   });
-  const fromArrayProxy = discoverCapabilityPathsV1({
+  const fromArrayProxy = discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates,
@@ -397,6 +566,7 @@ test('readiness records, array lengths and request envelopes are snapshot withou
 
   let requestReads = 0;
   const requestProxy = new Proxy({
+    asOf:AS_OF,
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[state('local/fs')],
@@ -414,6 +584,7 @@ test('readiness records, array lengths and request envelopes are snapshot withou
 
   let accessorReads = 0;
   const accessorRequest = {
+    asOf:AS_OF,
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     requestedCapabilityIds:['filesystem.read'],
@@ -433,7 +604,7 @@ test('readiness records, array lengths and request envelopes are snapshot withou
   assert.equal(accessorReads, 0, 'top-level request accessor must never execute');
 
   assert.throws(
-    () => discoverCapabilityPathsV1({
+    () => discover({
       capabilities:[],
       tools:[],
       providerStates:[],
@@ -442,6 +613,26 @@ test('readiness records, array lengths and request envelopes are snapshot withou
     }),
     /unknown field/,
   );
+});
+
+test('discovery asOf authority rejects accessors without executing getters', () => {
+  let reads = 0;
+  const request = {
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs')],
+    requestedCapabilityIds:['filesystem.read'],
+  };
+  Object.defineProperty(request, 'asOf', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return AS_OF;
+    },
+  });
+  assert.throws(() => discoverCapabilityPathsV1(request), /own data properties/);
+  assert.equal(reads, 0, 'asOf getter must never execute');
 });
 
 test('collection boundaries reject accessor-backed inventory and request items without executing getters', () => {
@@ -456,7 +647,7 @@ test('collection boundaries reject accessor-backed inventory and request items w
     },
   });
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates,
@@ -475,7 +666,7 @@ test('collection boundaries reject accessor-backed inventory and request items w
     },
   });
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[],
@@ -486,7 +677,7 @@ test('collection boundaries reject accessor-backed inventory and request items w
 
 test('collection boundaries reject sparse, hidden, custom, symbol and exotic arrays', () => {
   const sparse = new Array(1);
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:sparse,
     tools:[],
     providerStates:[],
@@ -500,7 +691,7 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
     writable:true,
     value:hidden[0],
   });
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:hidden,
@@ -509,7 +700,7 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
 
   const custom = [capability('filesystem.read')];
   custom.metadata = 'authority';
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:custom,
     tools:[],
     providerStates:[],
@@ -518,7 +709,7 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
 
   const symbolic = [capability('filesystem.read')];
   symbolic[Symbol('authority')] = true;
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:symbolic,
     tools:[],
     providerStates:[],
@@ -527,7 +718,7 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
 
   const exotic = [capability('filesystem.read')];
   Object.setPrototypeOf(exotic, null);
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:exotic,
     tools:[],
     providerStates:[],
@@ -537,7 +728,7 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
 
 
 test('capability discovery rejects canonical-looking identity and enum aliases instead of normalizing them', () => {
-  const canonical = discoverCapabilityPathsV1({
+  const canonical = discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[state('local/fs')],
@@ -555,38 +746,189 @@ test('capability discovery rejects canonical-looking identity and enum aliases i
     assert.throws(() => normalizeProviderReadinessV1(badState), /exact canonical/);
   }
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[state('local/fs')],
     requestedCapabilityIds:[' filesystem.read'],
   }), /exact canonical identity/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability(' filesystem.read')],
     tools:[],
     providerStates:[],
     requestedCapabilityIds:[],
   }), /exact canonical identity/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool(' fs.inspect', 'local/fs', ['filesystem.read'], true)],
     providerStates:[],
     requestedCapabilityIds:['filesystem.read'],
   }), /exact canonical identity/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', ' local/fs', ['filesystem.read'], true)],
     providerStates:[],
     requestedCapabilityIds:['filesystem.read'],
   }), /exact canonical identity/);
 
-  assert.throws(() => discoverCapabilityPathsV1({
+  assert.throws(() => discover({
     capabilities:[capability('filesystem.read')],
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read '], true)],
     providerStates:[],
     requestedCapabilityIds:['filesystem.read'],
   }), /exact canonical identity/);
+});
+
+
+test('executable deterministic path outranks ready visual or OCR fallback even when degraded', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+      tool('visual.ready', 'visual/provider', ['filesystem.read']),
+      tool('api.degraded', 'api/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('ocr/provider', { pathKind:'OCR', health:'READY', latencyMs:1 }),
+      state('visual/provider', { pathKind:'VISUAL', health:'READY', latencyMs:2 }),
+      state('api/provider', { pathKind:'API', health:'DEGRADED', latencyMs:500 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => [item.toolId, item.readiness, item.pathKind]), [
+    ['api.degraded', 'DEGRADED', 'API'],
+    ['visual.ready', 'READY', 'VISUAL'],
+    ['ocr.ready', 'READY', 'OCR'],
+  ]);
+  assert.equal(result.plan[0].toolId, 'api.degraded');
+  assert.equal(result.plan[0].pathKind, 'API');
+  assert.equal(result.plan[0].permissionGranted, false);
+});
+
+test('degraded UIA remains preferred to ready OCR while non-executable API cannot displace executable fallback', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.auth', 'api/provider', ['filesystem.read']),
+      tool('uia.degraded', 'uia/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', {
+        pathKind:'API',
+        authenticationRequired:true,
+        authenticated:false,
+        latencyMs:1,
+      }),
+      state('uia/provider', { pathKind:'UIA', health:'DEGRADED', latencyMs:200 }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY', latencyMs:1 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => [item.toolId, item.readiness, item.pathKind]), [
+    ['uia.degraded', 'DEGRADED', 'UIA'],
+    ['ocr.ready', 'READY', 'OCR'],
+    ['api.auth', 'NEEDS_AUTH', 'API'],
+  ]);
+  assert.equal(result.plan.length, 1);
+  assert.equal(result.plan[0].toolId, 'uia.degraded');
+});
+
+test('readiness remains the tie-breaker for equal executable path classes', () => {
+  const result = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.degraded', 'z/provider', ['filesystem.read']),
+      tool('api.ready', 'a/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('z/provider', { pathKind:'API', health:'DEGRADED', latencyMs:1 }),
+      state('a/provider', { pathKind:'API', health:'READY', latencyMs:500 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => item.toolId), ['api.ready', 'api.degraded']);
+  assert.equal(result.plan[0].toolId, 'api.ready');
+});
+
+
+test('stale deterministic path cannot outrank fresh executable fallback, but fresh degraded deterministic path can', () => {
+  const staleApi = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.stale', 'api/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', {
+        pathKind:'API',
+        health:'READY',
+        observedAt:'2026-09-29T03:00:00.000Z',
+        validThrough:'2026-09-29T04:00:00.000Z',
+      }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY' }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(staleApi.candidates.map(item => [item.toolId, item.readiness]), [
+    ['ocr.ready', 'READY'],
+    ['api.stale', 'NEEDS_HEALTH_CHECK'],
+  ]);
+  assert.equal(staleApi.plan[0].toolId, 'ocr.ready');
+
+  const freshDegradedApi = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.degraded', 'api/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', { pathKind:'API', health:'DEGRADED' }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY' }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(freshDegradedApi.candidates.map(item => [item.toolId, item.readiness]), [
+    ['api.degraded', 'DEGRADED'],
+    ['ocr.ready', 'READY'],
+  ]);
+  assert.equal(freshDegradedApi.plan[0].toolId, 'api.degraded');
+});
+
+test('direct readiness freshness assessment is canonical and preserves exact source evidence', () => {
+  const fresh = assessProviderReadinessFreshnessV1(state('local/fs', {
+    sourceId:'health.windows',
+    sourceRevision:7,
+  }), AS_OF);
+  assert.equal(fresh.status, ProviderReadinessFreshness.FRESH);
+  assert.equal(fresh.fresh, true);
+  assert.equal(fresh.reasonCode, '');
+  assert.equal(fresh.sourceId, 'health.windows');
+  assert.equal(fresh.sourceRevision, 7);
+  assert.equal(fresh.observedAt, OBSERVED_AT);
+  assert.equal(fresh.validThrough, VALID_THROUGH);
+  assert.equal(fresh.asOf, AS_OF);
+
+  const stale = assessProviderReadinessFreshnessV1(state('local/fs', {
+    validThrough:'2026-09-29T04:29:59.999Z',
+  }), AS_OF);
+  assert.equal(stale.status, ProviderReadinessFreshness.STALE);
+  assert.equal(stale.fresh, false);
+  assert.equal(stale.reasonCode, 'PROVIDER_STATE_STALE');
+
+  const future = assessProviderReadinessFreshnessV1(state('local/fs', {
+    observedAt:'2026-09-29T04:30:00.001Z',
+    validThrough:'2026-09-29T05:00:00.000Z',
+  }), AS_OF);
+  assert.equal(future.status, ProviderReadinessFreshness.FUTURE);
+  assert.equal(future.reasonCode, 'PROVIDER_STATE_FUTURE');
+  assert.ok(Object.isFrozen(fresh));
 });
