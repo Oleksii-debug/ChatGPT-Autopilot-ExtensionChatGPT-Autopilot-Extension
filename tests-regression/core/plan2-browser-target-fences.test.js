@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   snapshotBrowserPage,
   parseBrowserAgentAction,
@@ -1191,4 +1192,37 @@ test('vision capture rejects coercible or absent origin evidence before debugger
   } finally {
     globalThis.performance = originalPerformance;
   }
+});
+
+
+// Plan 2 S1: a lack of synchronous DOM change after a click says nothing
+// about the remote/AJAX effect. A restarted legacy job must never replay it.
+test('unverified semantic click cannot be replayed through the native fallback', () => {
+  const managerSource = readFileSync(new URL('../../src/core/browser-agent-manager.js', import.meta.url), 'utf8');
+  assert.match(managerSource, /A DOM click may already have committed a remote effect/);
+  assert.doesNotMatch(managerSource, /await\\s+this\\.nativeClick\\s*\\(/);
+  assert.match(managerSource, /nativeFallbackTried = pending\\.action\\?\\.type === BrowserAgentActionType\\.CLICK/);
+  assert.match(managerSource, /nativeFallbackTried = action\\.type === BrowserAgentActionType\\.CLICK/);
+});
+
+// Plan 2 S2: the direct native helper may be reached from a restored action,
+// bypassing parseSingleAction; reject malformed text without debugger effects.
+test('visual text envelope rejects invalid or oversized direct typing before pointer effects', async () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'text');
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  assert.equal(fingerprint.editable, true);
+  const fixture = plan2NativeCoordinateFixture();
+  for (const textValue of [undefined, null, 42, {}, '', 'x'.repeat(50001)]) {
+    await assert.rejects(
+      () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: textValue }, fingerprint, 'owner-job', 3),
+      /AGENT_COORDINATE_TEXT_INVALID/,
+    );
+  }
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, null, fingerprint, 'owner-job', 3),
+    /AGENT_COORDINATE_TEXT_INVALID/,
+  );
+  assert.deepEqual(fixture.events, []);
 });
