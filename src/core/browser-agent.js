@@ -683,6 +683,19 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) {
         throw new Error('Browser Agent Enter/Space key action requires an exact current snapshot frameId/ref target');
       }
+      // Keys can submit forms and activate controls. They need the same
+      // observed semantic identity as a pointer click, never a bare ordinal ref.
+      const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+      const observed = (frame?.elements || []).find(item => item.ref === action.ref);
+      if (!observed?.semanticIdentity || !clean(frame?.url, 4096)) {
+        throw new Error('Browser Agent key target identity is missing');
+      }
+      action.expectedSemanticIdentity = observed.semanticIdentity;
+      action.expectedFrameUrl = clean(frame.url, 4096);
+      action.expectedSemanticName = String(observed.name ?? '');
+      action.expectedSemanticHref = String(observed.href ?? '');
+      action.expectedSemanticFormAction = String(observed.formAction ?? '');
+      action.expectedSemanticFormMethod = String(observed.formMethod ?? '');
     }
   }
   if (type === BrowserAgentActionType.SCROLL) {
@@ -1516,12 +1529,16 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
     || fingerprint.captureX !== proof.x || fingerprint.captureY !== proof.y) {
     return { ok: false, reason: 'changed-capture-point' };
   }
-  if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
-    || Number(fingerprint.viewportHeight) !== proof.viewportHeight
-    || Number(fingerprint.viewportScrollX) !== target.viewportScrollX
-    || Number(fingerprint.viewportScrollY) !== target.viewportScrollY
-    || !Number.isFinite(Number(fingerprint.documentEpoch))
-    || Number(fingerprint.documentEpoch) !== Number(target.documentEpoch)) return { ok: false, reason: 'changed-page-or-viewport' };
+  // Persisted evidence must carry actual finite numbers. Coercion would let
+  // null/empty scroll origins masquerade as zero after restart.
+  const viewportFields = ['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch'];
+  if (fingerprint.pageUrl !== proof.url
+    || viewportFields.some(key => typeof fingerprint[key] !== 'number' || !Number.isFinite(fingerprint[key]))
+    || fingerprint.viewportWidth !== proof.viewportWidth
+    || fingerprint.viewportHeight !== proof.viewportHeight
+    || fingerprint.viewportScrollX !== target.viewportScrollX
+    || fingerprint.viewportScrollY !== target.viewportScrollY
+    || fingerprint.documentEpoch !== target.documentEpoch) return { ok: false, reason: 'changed-page-or-viewport' };
   const fields = ['tag', 'role', 'type', 'name', 'href', 'formAction', 'formMethod'];
   for (const field of fields) {
     if (String(target[field] || '') !== String(fingerprint[field] || '')) return { ok: false, reason: `changed-${field}` };
@@ -1535,8 +1552,9 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
   // Same label/role is insufficient: a visually shifted target can still
   // contain the old click point and must not authorize a consequential effect.
   if (!fingerprint.rect || !target.rect || ['left', 'top', 'width', 'height'].some(key =>
-    !Number.isFinite(Number(fingerprint.rect[key])) || !Number.isFinite(Number(target.rect[key]))
-      || Math.abs(Number(target.rect[key]) - Number(fingerprint.rect[key])) > 1)) {
+    typeof fingerprint.rect[key] !== 'number' || !Number.isFinite(fingerprint.rect[key])
+      || typeof target.rect[key] !== 'number' || !Number.isFinite(target.rect[key])
+      || Math.abs(target.rect[key] - fingerprint.rect[key]) > 1)) {
     return { ok: false, reason: 'changed-geometry' };
   }
   return { ok: true, proof };
