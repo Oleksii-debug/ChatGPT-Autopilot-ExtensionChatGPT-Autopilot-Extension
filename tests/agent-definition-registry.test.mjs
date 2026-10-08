@@ -615,7 +615,7 @@ test('config defaults reject every legacy-normalizer alias instead of silently c
 });
 
 test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {
-  assert.throws(() => normalizeAgentDefinitionV1({ ...definition(), apiKey: 'never-store-this' }), /unknown field: apiKey/);
+  assert.throws(() => normalizeAgentDefinitionV1({ ...definition(), apiKey: 'never-store-this' }), /unknown field/);
   assert.throws(() => normalizeAgentDefinitionV1(definition({ definitionRevision: -0 })), /definitionRevision is invalid/);
   assert.throws(() => normalizeAgentDefinitionV1(definition({ label: ' Research Agent' })), /exact bounded text/);
   assert.throws(() => normalizeAgentDefinitionV1(definition({ tags: ['research', 'research'] })), /duplicate identity/);
@@ -1043,7 +1043,7 @@ test('reusable Agent model route policy admits canonical failover state but reje
   assert.equal(failover.circuitBreakerSeconds, 1);
   assert.throws(() => normalizeAgentDefinitionV1(definition({
     modelRoutePolicy: { providerApiKey: 'secret' },
-  })), /unknown field: providerApiKey/);
+  })), /unknown field/);
 
   let reads = 0;
   const policy = {};
@@ -1074,4 +1074,29 @@ test('reusable Agent model route policy rejects coercive aliases so durable byte
       /must already be canonical|invalid/,
     );
   }
+});
+
+
+test('Plan-1 S1: forbidden Agent Definition property keys are rejected without name disclosure or getter invocation', () => {
+  const privateKey = 'private-token-DO-NOT-DISCLOSE';
+  const hostile = definition();
+  let invoked = 0;
+  Object.defineProperty(hostile, privateKey, {
+    enumerable: true,
+    get() { invoked++; throw Error('getter should never run'); },
+  });
+  assert.throws(() => normalizeAgentDefinitionV1(hostile), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /private-token|DO-NOT-DISCLOSE|getter should never run/);
+    return true;
+  });
+  assert.equal(invoked, 0);
+
+  const symbolic = definition();
+  Object.defineProperty(symbolic, Symbol(privateKey), { value: true, enumerable: true });
+  assert.throws(() => normalizeAgentDefinitionV1(symbolic), error => {
+    assert.match(error.message, /unknown field/);
+    assert.doesNotMatch(error.message, /private-token|DO-NOT-DISCLOSE/);
+    return true;
+  });
 });

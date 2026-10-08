@@ -6,10 +6,14 @@ on:
       - plan1/11.0.13-agent-contract-intake-converge-20261008
   pull_request:
     paths:
+      - src/core/outcome-contract.js
+      - src/core/agent-definition-registry.js
       - src/core/agent-io-contract.js
       - src/core/universal-agent-contracts.js
       - src/core/browser-agent-manager.js
       - src/core/browser-agent.js
+      - tests/outcome-contract.test.mjs
+      - tests/agent-definition-registry.test.mjs
       - tests/agent-io-contract.test.mjs
       - tests/universal-agent-contracts.test.mjs
       - tests/browser-agent-definition-launch.test.mjs
@@ -35,15 +39,23 @@ jobs:
           node-version: '22'
       - name: Exact-source JavaScript parse checks
         run: |
+          node --check src/core/outcome-contract.js
+          node --check src/core/agent-definition-registry.js
           node --check src/core/agent-io-contract.js
           node --check src/core/universal-agent-contracts.js
           node --check src/core/browser-agent-manager.js
           node --check src/core/browser-agent.js
+          node --check tests/outcome-contract.test.mjs
+          node --check tests/agent-definition-registry.test.mjs
           node --check tests/agent-io-contract.test.mjs
           node --check tests/universal-agent-contracts.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
           node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
+      - name: Outcome Contract canonical goal/evidence and intake non-disclosure
+        run: node --test tests/outcome-contract.test.mjs
+      - name: Agent Definition canonical route policy and diagnostic non-disclosure
+        run: node --test tests/agent-definition-registry.test.mjs
       - name: Agent I/O negative and schema contract tests
         run: node --test tests/agent-io-contract.test.mjs
       - name: Universal agent authority and evidence contracts

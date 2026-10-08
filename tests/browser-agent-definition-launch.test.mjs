@@ -868,3 +868,48 @@ test('Plan-1: reusable Definition Outcome Contract binds the true owner task, no
   );
   assert.equal((await resumed.get('job.definition-mismatch')).job, null);
 });
+
+
+test('Plan-1 S1: existing model route retry and circuit settings are canonical and fail closed', async () => {
+  const validPolicy = definition().modelRoutePolicy;
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const created = await manager.createFromAgentDefinition(launchRequest());
+  assert.equal(created.job.definitionRouterOverride.routePolicy.retryBackoffSeconds, 120);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.circuitBreakerFailures, 1);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.circuitBreakerSeconds, 600);
+  const restarted = managerFor(chrome);
+  const restored = await restarted.get('job.research-1');
+  assert.equal(restored.job.definitionRouterOverride.routePolicy.retryBackoffSeconds, 120);
+  assert.equal(restored.job.definitionRouterOverride.routePolicy.circuitBreakerFailures, 1);
+  assert.equal(restored.job.definitionRouterOverride.routePolicy.circuitBreakerSeconds, 600);
+
+  const malformed = [
+    ['retryBackoffSeconds', 0],
+    ['retryBackoffSeconds', '120'],
+    ['retryBackoffSeconds', -0],
+    ['circuitBreakerFailures', 0],
+    ['circuitBreakerFailures', 101],
+    ['circuitBreakerSeconds', 0],
+    ['circuitBreakerSeconds', 86401],
+    ['unrecognizedPolicyAuthority', true],
+  ];
+  for (const [field, value] of malformed) {
+    const { chrome: rejectedChrome, data } = makeChromeStorage();
+    const rejectedManager = managerFor(rejectedChrome);
+    await rejectedManager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+    const before = structuredClone(data);
+    await assert.rejects(
+      rejectedManager.mutateAgentDefinitionRegistry({
+        registryId: 'agents:project-1',
+        expectedRegistryRevision: 1,
+        kind: AgentDefinitionRegistryMutationKind.CREATE,
+        definition: definition({ modelRoutePolicy: { ...validPolicy, [field]: value } }),
+      }),
+      /modelRoutePolicy|AI route/,
+      'invalid model retry/circuit evidence must never be written into the canonical registry',
+    );
+    assert.deepEqual(structuredClone(data), before, 'denied policy must not mutate the durable store');
+  }
+});
