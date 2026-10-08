@@ -371,3 +371,17 @@ test('SDK snapshots nested result ArtifactRef Proxy without property gets', asyn
   assert.equal(gets, 0);
   assert.equal(Object.isFrozen(result.result.receipt.resultArtifactRef), true);
 });
+
+
+test('SDK returns detached immutable transport receipts after successful validation', async () => {
+  const wire = transportResponse();
+  const accepted = await attempt(wire);
+  assert.equal(accepted.status, 'RECEIVED');
+  assert.equal(Object.isFrozen(accepted.result), true);
+  assert.equal(Object.isFrozen(accepted.result.receipt), true);
+  assert.equal(Object.isFrozen(accepted.result.scopeProof), true);
+  wire.result.receipt.status = 'REJECTED';
+  wire.result.scopeProof.allowed = false;
+  assert.equal(accepted.result.receipt.status, 'COMPLETED');
+  assert.equal(accepted.result.scopeProof.allowed, true);
+});
