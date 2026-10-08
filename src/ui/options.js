@@ -4,6 +4,7 @@ import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
+import { refreshRoiOwnerPanelV1 } from './roi-owner-entrypoint.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
@@ -5037,6 +5038,10 @@ async function createSession() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  // Read-only Plan 7 ROI ingress: this version's Core may not support the
+  // canonical resolver command yet. Missing command always means OFFLINE,
+  // never restored/cached savings or an invented recommendation.
+  await refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
   await loadBrowserAgentExecutionPolicy();
   await loadRemoteDispatchStatus();
     await openSession(data.session.id);
@@ -5516,6 +5521,9 @@ $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { f
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('roi-owner-refresh-button').addEventListener('click', () => {
+  void refreshRoiOwnerPanelV1($('roi-owner-panel'), () => core('GET_ROI_OWNER_ADVISORY'));
+});
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
 $('agent-save-execution-policy-button').addEventListener('click', () => { void saveBrowserAgentExecutionPolicy(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
