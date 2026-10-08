@@ -338,7 +338,9 @@ export function assessUntrustedContentInfluenceV1(value) {
   if (providerEscalation.length) violations.push(violation('PROVIDER_AUTHORITY_ESCALATION', providerEscalation));
   if (outboundEscalation.length) violations.push(violation('OUTBOUND_ORIGIN_ESCALATION', outboundEscalation));
   if (proposal.requestedCredentialRefIds.length) {
-    violations.push(violation('UNTRUSTED_CREDENTIAL_SELECTION', proposal.requestedCredentialRefIds));
+    // Never reflect attacker-provided credential references into support logs,
+    // model context, UI notifications, or serialized denial evidence.
+    violations.push(violation('UNTRUSTED_CREDENTIAL_SELECTION'));
   }
 
   const signals = [];

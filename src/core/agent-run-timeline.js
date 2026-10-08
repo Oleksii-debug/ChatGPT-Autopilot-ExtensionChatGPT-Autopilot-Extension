@@ -82,6 +82,16 @@ function own(value, key) {
 function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   return Number.isSafeInteger(value) && value >= min && value <= max ? value : 0;
 }
+function boundedJobId(value) {
+  // Durable BrowserAgentManager identities are bounded text, not trusted
+  // display/HTML content. Never export corrupt oversized/control-char IDs.
+  if (value == null) return '';
+  if (typeof value !== 'string' || value.length < 1 || value.length > 128 ||
+      /[\u0000-\u001f\u007f]/u.test(value)) {
+    throw new Error('Agent timeline job identity is invalid');
+  }
+  return value;
+}
 function safeTime(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
 }
@@ -231,7 +241,8 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   };
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
-    jobId: typeof own(job, 'id') === 'string' ? own(job, 'id') : '',
+    jobId: boundedJobId(own(job, 'id')),
+    entryIdentityScope: 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE',
     filter,
     totalRecorded: history.total,
     inspectedEntries: all.length,
