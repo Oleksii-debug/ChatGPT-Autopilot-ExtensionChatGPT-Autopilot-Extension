@@ -158,6 +158,9 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
     throw new Error('Invalid bounded timeout');
   }
   if (typeof fetchImpl !== 'function') throw new Error('A fetch transport is required');
+  // This instance-local concurrency fence does not replace Core's durable
+  // request/effect deduplication or authorize retry after ambiguity.
+  const inFlightRequestIds = new Set();
   return Object.freeze({
     async control(request) {
       // Canonical Core preflight snapshots own data descriptors before any
@@ -168,6 +171,14 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       // JSON request bodies only; no automatic retry of ambiguous mutations.
       const body = JSON.stringify(sentRequest);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
+      if (inFlightRequestIds.has(sentRequest.requestId)) {
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'An identical requestId is already in flight; reconcile canonical job state before retrying.',
+        });
+      }
+      inFlightRequestIds.add(sentRequest.requestId);
+      try {
       let res;
       try {
         res = await fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
@@ -250,6 +261,9 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
           instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
         });
+      }
+      } finally {
+        inFlightRequestIds.delete(sentRequest.requestId);
       }
     },
   });
