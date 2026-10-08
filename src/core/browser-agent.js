@@ -528,8 +528,12 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   }
   if (type === BrowserAgentActionType.BATCH) {
     if (!allowBatch) throw new Error('Nested Browser Agent batches are not allowed');
-    const items = Array.isArray(raw.actions) ? raw.actions.slice(0, 8) : [];
-    if (!items.length) throw new Error('Browser Agent batch requires at least one action');
+    if (!Array.isArray(raw.actions) || raw.actions.length === 0 || raw.actions.length > 8) {
+      // Never silently drop actions from a model-proposed batch. A truncated
+      // form transaction can leave a partially mutated, misleading state.
+      throw new Error('Browser Agent batch requires 1–8 explicit actions');
+    }
+    const items = raw.actions;
     const actions = items.map(item => parseSingleAction(item, snapshot, refs, { allowBatch: false }));
     if (actions.some(action => !BATCH_ACTION_TYPES.has(action.type))) {
       throw new Error('Browser Agent batch may contain only fill/select/check actions');
@@ -580,8 +584,11 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       action.x = point.x;
       action.y = point.y;
       if (type === BrowserAgentActionType.TYPE_AT) {
-        action.text = typeof raw?.text === 'string' ? raw.text.slice(0, 50000) : '';
-        if (!action.text) throw new Error('Browser Agent type_at requires non-empty text');
+        if (typeof raw?.text !== 'string' || !raw.text.length || raw.text.length > 50000) {
+          // Partial native input is not the effect the owner/model requested.
+          throw new Error('Browser Agent type_at requires bounded non-empty text');
+        }
+        action.text = raw.text;
       }
     } else {
       const start = normalizePoint(raw?.startX, raw?.startY, 'start');
@@ -680,7 +687,14 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.usernameFrameId = usernameFrameId;
     action.usernameRef = usernameRef;
   }
-  if (type === BrowserAgentActionType.FILL) action.text = typeof raw.text === 'string' ? raw.text.slice(0, 50000) : '';
+  if (type === BrowserAgentActionType.FILL) {
+    // Empty strings intentionally clear a form field; non-string or oversized
+    // inputs are invalid rather than silently coercing/truncating an effect.
+    if (typeof raw?.text !== 'string' || raw.text.length > 50000) {
+      throw new Error('Browser Agent fill requires an exact bounded text value');
+    }
+    action.text = raw.text;
+  }
   if (type === BrowserAgentActionType.SELECT) {
     action.value = clean(raw.value, 5000);
     if (!action.value) throw new Error('Browser Agent select action requires value');
