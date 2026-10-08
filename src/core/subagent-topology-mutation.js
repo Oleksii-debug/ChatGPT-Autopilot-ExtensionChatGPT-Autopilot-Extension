@@ -201,12 +201,20 @@ function replayActivationAdmitted({
 }
 
 function activationInFlight(nodeRuntime) {
-  if (!nodeRuntime?.activationLedger) return false;
-  // A crash/restart can recover durable PREPARED/AMBIGUOUS ledger entries
-  // before the currentActivationId pointer is reconciled. Count every
-  // nonterminal entry as occupying a slot; otherwise a sibling may be
-  // activated beyond the parent's bounded fanout after replay.
-  return Object.values(nodeRuntime.activationLedger).some(
+  if (!nodeRuntime) return false;
+  // A recovered ACTIVE child already occupies parent concurrency even if
+  // its activation pointer or ledger has not been reconciled after a crash.
+  // Treat missing ledger evidence as UNKNOWN, never a free sibling lease.
+  if (nodeRuntime.lifecycle === OrchestrationNodeLifecycle.ACTIVE) return true;
+  const ledger = nodeRuntime.activationLedger;
+  if (nodeRuntime.currentActivationId
+      && (!ledger || !Object.hasOwn(ledger, nodeRuntime.currentActivationId))) {
+    return true;
+  }
+  if (!ledger) return false;
+  // Durable PREPARED/AMBIGUOUS effects reserve capacity independently of
+  // currentActivationId. Only fully terminal/superseded entries release it.
+  return Object.values(ledger).some(
     item => item && !['TERMINAL', 'SUPERSEDED'].includes(item.phase),
   );
 }
