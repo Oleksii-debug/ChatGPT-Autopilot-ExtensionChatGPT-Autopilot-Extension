@@ -406,6 +406,26 @@
         <div id="agent-history" tabindex="0" aria-label="Історія роботи агента">Історії ще немає.</div>
       </details>
 
+      <details id="agent-run-timeline-details">
+        <summary>Хронологія Agent та безпечні докази</summary>
+        <p>Лише перегляд збережених подій. Відтворення не запускає дій повторно; промпти, URL, ключі та текст сторінок не експортуються.</p>
+        <label for="agent-run-timeline-filter">Фільтр хронології Agent</label>
+        <select id="agent-run-timeline-filter">
+          <option value="ALL">Усі події</option>
+          <option value="ACTION">Дії</option>
+          <option value="OWNER">Рішення власника</option>
+          <option value="PLAN">План і субагенти</option>
+          <option value="RECOVERY">Помилки і відновлення</option>
+          <option value="CHECKPOINT">Контрольні точки</option>
+        </select>
+        <div class="agent-actions" aria-label="Команди хронології Agent">
+          <button id="agent-run-timeline-refresh-button" type="button">Оновити з Core</button>
+          <button id="agent-run-timeline-export-button" type="button">Експортувати безпечні докази JSON</button>
+        </div>
+        <p id="agent-run-timeline-status" tabindex="0">Виберіть завдання Agent для перегляду.</p>
+        <ol id="agent-run-timeline-list" aria-label="Безпечна хронологія подій Agent"></ol>
+      </details>
+
       <details id="agent-plan-details" open>
         <summary>План і субагенти поточного завдання</summary>
         <p id="agent-plan-summary" tabindex="0">Durable plan ще не створено.</p>
