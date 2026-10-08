@@ -3104,8 +3104,14 @@ export class BrowserAgentManager {
     return proof?.[0]?.result || null;
   }
 
-  async nativeClickAt(tabId, x, y, expectedFingerprint = null) {
+  async nativeClickAt(tabId, x, y, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    // The canonical owner epoch is mandatory even when a direct caller reaches
+    // this helper without passing through the normal action dispatcher.
+    if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+      throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+    }
     if (expectedFingerprint) {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
@@ -3119,14 +3125,14 @@ export class BrowserAgentManager {
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
-      if (expectedFingerprint) {
-        const postAttach = await this.requireScripting().executeScript({
-          target: { tabId, frameIds: [0] },
-          func: probeBrowserCoordinateTarget,
-          args: [x, y, expectedFingerprint],
-        });
-        if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
-      }
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      const postAttach = await this.requireScripting().executeScript({
+        target: { tabId, frameIds: [0] },
+        func: probeBrowserCoordinateTarget,
+        args: [x, y, expectedFingerprint],
+      });
+      if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
       return true;
@@ -3135,8 +3141,15 @@ export class BrowserAgentManager {
     }
   }
 
-  async nativeDragAt(tabId, action, startFingerprint, endFingerprint) {
+  async nativeDragAt(tabId, action, startFingerprint, endFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    if (!startFingerprint || !endFingerprint) throw new Error('AGENT_DRAG_TARGET_UNPROVEN');
+    const requireOwner = async () => {
+      if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+        throw new Error('AGENT_DRAG_CANCELLED_BY_OWNER');
+      }
+    };
+    await requireOwner();
     const verifyPoint = async (x, y, fingerprint) => {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
@@ -3150,11 +3163,16 @@ export class BrowserAgentManager {
 
     const target = { tabId };
     let attached = false;
+    let pointerDown = false;
+    let lastX = action.startX;
+    let lastY = action.startY;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      await requireOwner();
       await verifyPoint(action.startX, action.startY, startFingerprint);
       await verifyPoint(action.endX, action.endY, endFingerprint);
+      await requireOwner();
       const durationMs = Math.max(120, Math.min(2000, Number(action.durationMs || 450)));
       const steps = Math.max(3, Math.min(12, Math.round(durationMs / 75)));
       const stepDelayMs = Math.max(16, Math.round(durationMs / steps));
@@ -3164,27 +3182,47 @@ export class BrowserAgentManager {
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.startX, y: action.startY, button: 'left', buttons: 1, clickCount: 1,
       });
+      pointerDown = true;
       await sleep(Math.min(50, stepDelayMs));
       for (let index = 1; index <= steps; index += 1) {
+        await requireOwner();
         const ratio = index / steps;
         const x = action.startX + ((action.endX - action.startX) * ratio);
         const y = action.startY + ((action.endY - action.startY) * ratio);
         await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
           type: 'mouseMoved', x, y, button: 'none', buttons: 1,
         });
+        lastX = x;
+        lastY = y;
         if (index < steps) await sleep(stepDelayMs);
       }
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased', x: action.endX, y: action.endY, button: 'left', buttons: 0, clickCount: 1,
       });
+      pointerDown = false;
       return true;
     } finally {
+      // Release an already-pressed pointer on Stop; never continue the drag.
+      if (attached && pointerDown) {
+        try {
+          await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased', x: lastX, y: lastY, button: 'left', buttons: 0, clickCount: 1,
+          });
+        } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
 
-  async nativeTypeAt(tabId, action, expectedFingerprint) {
+  async nativeTypeAt(tabId, action, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    const requireOwner = async () => {
+      if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+        throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      }
+    };
+    await requireOwner();
     const verification = await this.requireScripting().executeScript({
       target: { tabId, frameIds: [0] },
       func: probeBrowserCoordinateTarget,
@@ -3196,18 +3234,28 @@ export class BrowserAgentManager {
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      await requireOwner();
       const postAttach = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
         func: probeBrowserCoordinateTarget,
         args: [action.x, action.y, expectedFingerprint],
       });
       if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      await requireOwner();
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.x, y: action.y, button: 'left', buttons: 1, clickCount: 1,
       });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased', x: action.x, y: action.y, button: 'left', buttons: 0, clickCount: 1,
       });
+      // A click may fire a handler that replaces the focused target.
+      const postClick = await this.requireScripting().executeScript({
+        target: { tabId, frameIds: [0] },
+        func: probeBrowserCoordinateTarget,
+        args: [action.x, action.y, expectedFingerprint],
+      });
+      if (!postClick?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      await requireOwner();
       await this.chrome.debugger.sendCommand(target, 'Input.insertText', { text: action.text });
       return true;
     } finally {
@@ -3634,7 +3682,7 @@ export class BrowserAgentManager {
       if (job.config.visionOnDemand !== true) throw new Error('Browser Agent coordinate computer-use is disabled by owner policy');
       const fingerprint = browserAgentTargetFingerprint(snapshot, action);
       if (!fingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
-      await this.nativeClickAt(tabId, action.x, action.y, fingerprint);
+      await this.nativeClickAt(tabId, action.x, action.y, fingerprint, job.id, epoch);
       const child = await this.adoptNewChildTab(job.id, priorTabs, tabId);
       return { kind: 'ACTION', action, currentUrl: child?.pendingUrl || child?.url || snapshot.url || '' };
     }
@@ -3644,7 +3692,7 @@ export class BrowserAgentManager {
       const startFingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateStartTarget);
       const endFingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateEndTarget);
       if (!startFingerprint || !endFingerprint) throw new Error('AGENT_DRAG_TARGET_UNPROVEN');
-      await this.nativeDragAt(tabId, action, startFingerprint, endFingerprint);
+      await this.nativeDragAt(tabId, action, startFingerprint, endFingerprint, job.id, epoch);
       return { kind: 'ACTION', action, currentUrl: snapshot.url || '' };
     }
 
@@ -3653,7 +3701,7 @@ export class BrowserAgentManager {
       const fingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateTarget);
       if (!fingerprint || fingerprint.sensitive === true) throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
       if (fingerprint.visualOnly !== true && fingerprint.editable !== true) throw new Error('AGENT_TARGET_NOT_EDITABLE');
-      await this.nativeTypeAt(tabId, action, fingerprint);
+      await this.nativeTypeAt(tabId, action, fingerprint, job.id, epoch);
       return { kind: 'ACTION', action, currentUrl: snapshot.url || '' };
     }
 
