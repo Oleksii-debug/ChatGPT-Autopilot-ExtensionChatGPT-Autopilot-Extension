@@ -128,8 +128,10 @@ function optionalIdentity(record, key, label) {
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
 function optionalBoolean(record, key, label, fallback) {
+  // Only absent legacy fields can inherit defaults; an explicit undefined
+  // must never silently alter owner-approved routing/failover policy.
+  if (!Object.hasOwn(record, key)) return fallback;
   const value = own(record, key);
-  if (value === undefined) return fallback;
   if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
   return value;
 }
@@ -158,6 +160,14 @@ function priceCap(value, label) {
   if (value == null) return null;
   return price(value, label);
 }
+function policyPriceCap(record, key, label) {
+  // Explicit null is the canonical owner choice "no ceiling"; explicit
+  // undefined is malformed and must not erase a persisted price ceiling.
+  if (Object.hasOwn(record, key) && own(record, key) === undefined) {
+    throw new Error(`${label} cannot be undefined when supplied`);
+  }
+  return priceCap(own(record, key), label);
+}
 function knownPriceDimension(item, priceKey, knownKey, label) {
   if (Object.hasOwn(item, priceKey) && own(item, priceKey) == null) {
     throw new Error(`${label} cannot treat missing price as an observed zero`);
@@ -180,8 +190,8 @@ function ids(value, label, max = MAX_ROUTES) {
 // Only an absent optional list means the legacy empty default. Explicit
 // null/false/zero/empty text is invalid owner policy, not "allow every route".
 function optionalIds(record, key, label, max = MAX_ROUTES) {
-  const value = own(record, key);
-  return ids(value === undefined ? [] : value, label, max);
+  if (!Object.hasOwn(record, key)) return ids([], label, max);
+  return ids(own(record, key), label, max);
 }
 
 export function normalizeAiRoutePool(raw = []) {
@@ -250,11 +260,11 @@ export function normalizeAiRoutePolicy(raw = {}) {
     denyRouteIds: Object.freeze(optionalIds(source, 'denyRouteIds', 'AI route denyRouteIds')),
     freeOnly: optionalBoolean(source, 'freeOnly', 'AI route freeOnly', false),
     locality,
-    maxInputPricePerMillionUsd: priceCap(own(source, 'maxInputPricePerMillionUsd'), 'AI route maximum input price'),
-    maxOutputPricePerMillionUsd: priceCap(own(source, 'maxOutputPricePerMillionUsd'), 'AI route maximum output price'),
-    retryBackoffSeconds: integer(own(source, 'retryBackoffSeconds') ?? DEFAULT_AI_ROUTE_POLICY.retryBackoffSeconds, 'AI route retryBackoffSeconds', 1, 86_400),
-    circuitBreakerFailures: integer(own(source, 'circuitBreakerFailures') ?? DEFAULT_AI_ROUTE_POLICY.circuitBreakerFailures, 'AI route circuitBreakerFailures', 1, 100),
-    circuitBreakerSeconds: integer(own(source, 'circuitBreakerSeconds') ?? DEFAULT_AI_ROUTE_POLICY.circuitBreakerSeconds, 'AI route circuitBreakerSeconds', 1, 86_400),
+    maxInputPricePerMillionUsd: policyPriceCap(source, 'maxInputPricePerMillionUsd', 'AI route maximum input price'),
+    maxOutputPricePerMillionUsd: policyPriceCap(source, 'maxOutputPricePerMillionUsd', 'AI route maximum output price'),
+    retryBackoffSeconds: integer(Object.hasOwn(source, 'retryBackoffSeconds') ? own(source, 'retryBackoffSeconds') : DEFAULT_AI_ROUTE_POLICY.retryBackoffSeconds, 'AI route retryBackoffSeconds', 1, 86_400),
+    circuitBreakerFailures: integer(Object.hasOwn(source, 'circuitBreakerFailures') ? own(source, 'circuitBreakerFailures') : DEFAULT_AI_ROUTE_POLICY.circuitBreakerFailures, 'AI route circuitBreakerFailures', 1, 100),
+    circuitBreakerSeconds: integer(Object.hasOwn(source, 'circuitBreakerSeconds') ? own(source, 'circuitBreakerSeconds') : DEFAULT_AI_ROUTE_POLICY.circuitBreakerSeconds, 'AI route circuitBreakerSeconds', 1, 86_400),
   });
 }
 
