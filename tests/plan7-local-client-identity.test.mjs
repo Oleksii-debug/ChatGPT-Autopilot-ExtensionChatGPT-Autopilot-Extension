@@ -280,3 +280,58 @@ test('SDK serializes only canonical request fields and preserves wire-bound iden
   assert.deepEqual(seen[0], BASE);
   assert.equal(Object.hasOwn(seen[0], 'authorization'), false);
 });
+
+test('payload receipt rejects extra, symbol and accessor fields without reading untrusted values', async () => {
+  const artifact = {
+    schemaVersion: 1, artifactId: 'payload-a', kind: 'programmatic-control-payload',
+    uri: 'artifact://payload-a', mediaType: 'application/json',
+    sha256: 'a'.repeat(64), sizeBytes: 12,
+    createdAt: '2026-10-08T09:00:00.000Z',
+    producerInvocationId: 'producer-a', sensitive: false,
+  };
+  const original = { ...BASE, operation: 'OUTCOME_SUBMIT', targetId: 'outcome-a', payloadArtifactRef: artifact };
+  let getterCalls = 0, networkCalls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => {
+      networkCalls += 1;
+      return { ok: true, json: async () => {
+        const reply = transportResponse({ operation: original.operation, targetId: original.targetId,
+          payloadArtifactRef: { ...artifact } }, { operation: original.operation });
+        Object.assign(reply.result.scopeProof, {
+          operation: original.operation, targetId: original.targetId,
+          payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
+        });
+        return reply;
+      }};
+    },
+  });
+  const good = await client.control(original);
+  assert.equal(good.status, 'RECEIVED', 'ordinary canonical payload remains compatible');
+  for (const shape of ['extra', 'symbol', 'getter', 'nonenumerable']) {
+    const reply = transportResponse({ operation: original.operation, targetId: original.targetId,
+      payloadArtifactRef: { ...artifact } }, { operation: original.operation });
+    Object.assign(reply.result.scopeProof, {
+      operation: original.operation, targetId: original.targetId,
+      payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
+    });
+    const ref = reply.result.request.payloadArtifactRef;
+    if (shape === 'extra') ref.privateToken = 'MUST_NOT_LEAK';
+    if (shape === 'symbol') ref[Symbol('secret')] = 'MUST_NOT_LEAK';
+    if (shape === 'getter') Object.defineProperty(ref, 'sensitive', {
+      enumerable: true, get() { getterCalls++; return false; },
+    });
+    if (shape === 'nonenumerable') Object.defineProperty(ref, 'unexpected', {
+      enumerable: false, value: 'MUST_NOT_LEAK',
+    });
+    const attempt = createAutopilotLocalClientV1({
+      token: 'test-only-'.repeat(5), port: 12345,
+      fetchImpl: async () => ({ ok: true, json: async () => reply }),
+    });
+    const result = await attempt.control(original);
+    assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT', shape);
+    assert.equal(JSON.stringify(result).includes('MUST_NOT_LEAK'), false);
+  }
+  assert.equal(networkCalls, 1);
+  assert.equal(getterCalls, 0);
+});
