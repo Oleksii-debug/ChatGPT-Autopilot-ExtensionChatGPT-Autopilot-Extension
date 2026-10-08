@@ -173,7 +173,7 @@ function snapshotOwnDataRequest(value, label) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label}.${key} must be an enumerable data property`);
+      throw new Error(`${label} fields must be enumerable own data properties`);
     }
     snapshot[key] = descriptor.value;
   }
@@ -182,7 +182,7 @@ function snapshotOwnDataRequest(value, label) {
 function snapshotExactOwnDataRequest(value, allowed, label) {
   const snapshot = snapshotOwnDataRequest(value, label);
   for (const key of Object.keys(snapshot)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains an unknown field: ${key}`);
+    if (!allowed.has(key)) throw new Error(`${label} contains an unknown field`);
   }
   return snapshot;
 }
@@ -275,7 +275,7 @@ function snapshotAgentDefinitionLaunchRecord(value, label, maxFields = 32) {
   if (Object.keys(snapshot).length > maxFields) throw new Error(`${label} contains too many fields`);
   for (const [key, item] of Object.entries(snapshot)) {
     if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
-      throw new Error(`${label}.${key} must be scalar data`);
+      throw new Error(`${label} fields must be scalar data`);
     }
   }
   return snapshot;
