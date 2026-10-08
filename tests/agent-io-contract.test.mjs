@@ -181,3 +181,19 @@ test('Plan-1: Agent chronology rejects ambiguous, rolled and timezone-free times
     '2026-09-12T00:59:59.500Z',
   );
 });
+
+test('Plan-1: capability queries and handler lookup never coerce attacker-controlled action types', () => {
+  let invoked = 0;
+  const hostile = {
+    toString() { invoked += 1; throw new Error('secret-do-not-emit'); },
+    valueOf() { invoked += 1; throw new Error('secret-do-not-emit'); },
+  };
+  assert.throws(() => getAgentActionRequiredCapability(hostile), /Unsupported agent action type/);
+  assert.throws(() => getAgentEventRequiredCapability(hostile), /Unsupported agent event type/);
+  const registry = new AgentActionHandlerRegistry();
+  assert.throws(() => registry.register(AgentProviderId.CHATGPT_BROWSER, hostile, () => {}), /Unsupported agent action type/);
+  assert.equal(registry.has(AgentProviderId.CHATGPT_BROWSER, hostile), false);
+  assert.equal(registry.has(hostile, AgentActionType.SUBMIT_PROMPT), false);
+  assert.equal(invoked, 0, 'untrusted coercion hooks must not run');
+  assert.equal(getAgentActionRequiredCapability(AgentActionType.SUBMIT_PROMPT), CapabilityId.VERIFIED_PROMPT_SUBMIT);
+});
