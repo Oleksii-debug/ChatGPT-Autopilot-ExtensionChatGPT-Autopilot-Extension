@@ -23,5 +23,12 @@
 |7|PARTIAL_EXISTING_11_0_13 / FUTURE_COMPONENTS|Section 1, audit existing then first actual gap|
 |8|ACTIONABLE_SOURCE_IMPORT_THEN_UPSTREAM|Section 1 imports/synchronizes the exact 11.0.13 Drive source baseline; final gate ultimately waits on terminal Plans 1–7, including resumed Plan 5|
 
+## Plan 1 — 2026-10-08 isolated 11.x engineering progress (NOT terminal)
+- Plan 1 Section 1 and Section 2 remain **PARTIAL_EXISTING_11_0_13 / ACTIONABLE**; **neither is DONE**.
+- Existing 11.0.13 High archive SHA-256 `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329` verified and target source blobs matched to branch `fix/11.0.13-post-send-dwell-background` (PR #654).
+- Reuse/repair evidence PR #657 (head `75513ade737316e8ab1930a9a0d11af59d4e9b83`): Agent I/O defensive schema/deep-freeze and unified Browser Agent Job store constructor for direct and Definition intake, with negative and restart tests. Local focused 5/5 PASS. GitHub CI pending at registration time.
+- Remaining terminal requirements: full cross-contract durable schema compatibility and migration/recovery verification, complete Outcome Contract intake binding and user-entry paths, exact 11.x canonical source synchronization/qualification and integrated readback. PR/green local smoke tests do not constitute terminal closure.
+- Preserve original 11.x source and avoid rebuilding from stale `main` 0.9.19. Do not create duplicate policy, scheduler, Agent Core, effect or recovery authorities.
+
 ## Historical source note
 Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source archive. The source itself is available; the remaining bootstrap step is canonical Git import/synchronization plus current qualification.
