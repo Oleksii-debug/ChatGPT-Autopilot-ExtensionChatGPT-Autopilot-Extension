@@ -451,3 +451,40 @@ test('Plan-1: direct prompt-first intake rejects getter-backed policy and goal f
   await assert.rejects(() => manager.create(poisoned), /symbol field/);
   assert.equal((await manager.get('job.direct-symbol')).job, null);
 });
+
+
+test('Plan-1: quarantined invalid definition job cannot be lost by unrelated writes or reused', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const key = 'autopilotBrowserAgentV1';
+  delete data[key].byId['job.research-1'].definitionRouterOverride;
+  const corrupted = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.research-1')).job, null,
+    'corrupt row remains withheld from executable job projections');
+  await assert.rejects(() => restarted.create({
+    id: 'job.safe-new', goal: 'A different task must not delete unreconciled job authority.',
+  }), /durable job identity is quarantined/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(
+    launchRequest({ jobId: 'job.research-1' }),
+  ), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], corrupted, 'rejected writes must preserve exact original durable store');
+});
+
+test('Plan-1: orphaned byId record and duplicate order identity stop all mutation', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.create({ id: 'job.1', goal: 'Prepare evidence.' });
+  const key = 'autopilotBrowserAgentV1';
+  data[key].byId['job.orphan'] = structuredClone(data[key].byId['job.1']);
+  const orphaned = structuredClone(data[key]);
+  await assert.rejects(() => manager.create({ id: 'job.2', goal: 'Not yet.' }), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], orphaned);
+  delete data[key].byId['job.orphan'];
+  data[key].order.push('job.1');
+  const duplicated = structuredClone(data[key]);
+  await assert.rejects(() => manager.create({ id: 'job.2', goal: 'Still not yet.' }), /durable job identity is quarantined/);
+  assert.deepEqual(data[key], duplicated);
+});
