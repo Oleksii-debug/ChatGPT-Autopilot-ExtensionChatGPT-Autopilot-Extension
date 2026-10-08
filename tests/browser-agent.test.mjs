@@ -3504,7 +3504,7 @@ test('Plan-1: config edits reject hidden authority, hostile coercion and mutable
   assert.deepEqual(persisted.config.acceptanceCriteria, ['Independent proof']);
 });
 
-test('Plan-1 S1/S2: untrusted intake field names never leak secrets or mutate durable jobs', async () => {
+test('Plan-1: S1/S2 untrusted intake field names never leak secrets or mutate durable jobs', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({
     chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
