@@ -159,7 +159,9 @@ test('bounded identity and snapshot-scoped event ordinals survive restart withou
   assert.equal(before.entryIdentityScope, 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE');
   assert.deepEqual(buildAgentRunTimelineV1(structuredClone(base)), before);
   assert.equal(before.mayReplayExternalEffect, false);
-  for (const invalid of ['x'.repeat(129), 'owner\\nsecret', 'owner\\u0000secret', 42, '']) {
+  // Bidi spoofing and actual control characters must not enter NVDA status
+  // or downloadable evidence; a missing ID must never become an empty ID.
+  for (const invalid of ['x'.repeat(129), 'owner\nsecret', 'owner\u0000secret', 'owner\u2028secret', 'owner\u202Esecret', null, undefined, 42, '']) {
     assert.throws(() => buildAgentRunTimelineV1({ ...base, id: invalid }), /job identity is invalid/);
   }
   const html = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');

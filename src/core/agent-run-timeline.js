@@ -85,9 +85,10 @@ function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
 function boundedJobId(value) {
   // Durable BrowserAgentManager identities are bounded text, not trusted
   // display/HTML content. Never export corrupt oversized/control-char IDs.
-  if (value == null) return '';
+  // A persisted Agent must have a real identity; never export an orphan
+  // timeline under an empty identifier after corrupted storage or restart.
   if (typeof value !== 'string' || value.length < 1 || value.length > 128 ||
-      /[\u0000-\u001f\u007f]/u.test(value)) {
+      /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)) {
     throw new Error('Agent timeline job identity is invalid');
   }
   return value;
