@@ -57,6 +57,37 @@ function setup() {
 }
 
 // Section 1: the model must not cause an incomplete, partially applied form transaction.
+// Section 1: evidence for an observed semantic task cannot be silently
+// truncated or expanded by implicit JSON number/string coercion.
+test('semantic verifier requires complete and typed criterion evidence', () => {
+  setup();
+  const base = { type: 'verify_plan_node', nodeId: 'node-1',
+    evidence: { snapshotSignature: 'observed', checks: [{ criterion: 1, detail: 'verified' }] } };
+  const valid = parseBrowserAgentAction(JSON.stringify(base), { frames: [] });
+  assert.deepEqual(valid.evidence.checks, [{ criterion: 1, detail: 'verified' }]);
+  const oversized = Array.from({ length: 33 }, (_, i) => ({ criterion: i + 1, detail: 'proof' }));
+  for (const checks of [oversized, null, 'not-array', {}]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ ...base, evidence: { ...base.evidence, checks } }), { frames: [] }),
+      /at most 32 explicit evidence checks/,
+    );
+  }
+  for (const check of [
+    { criterion: '1', detail: 'proof' },
+    { criterion: 1.5, detail: 'proof' },
+    { criterion: null, detail: 'proof' },
+    { criterion: 1, detail: 42 },
+    { criterion: 1, detail: 'x'.repeat(1001) },
+    { criterion: 1, detail: ' ' },
+  ]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ ...base, evidence: { ...base.evidence, checks: [check] } }), { frames: [] }),
+      /evidence check 1 is invalid/,
+    );
+  }
+  assert.equal(element.clicked, 0);
+});
+
 test('semantic batch rejects nine actions rather than silently executing eight', () => {
   const snapshot = setup();
   element.tagName = 'INPUT';
