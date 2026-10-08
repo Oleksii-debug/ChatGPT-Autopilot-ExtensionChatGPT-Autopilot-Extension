@@ -367,6 +367,51 @@ function snapshotDirectAgentSiteRules(value) {
   return rules;
 }
 
+// The legacy normalizer uses convenient defaults for omitted advanced fields.
+// Explicit invalid owner ceilings/policy cannot take that same path: null or a
+// negative limit could silently remove a budget, while null booleans could
+// re-enable cross-origin navigation, active-tab intake or visual automation.
+const DIRECT_OWNER_BOOLEAN_KEYS = new Set([
+  'allowCrossOriginNavigation', 'closeOwnedTabsOnStop', 'startFromActiveTab',
+  'trustedScriptEnabled', 'visionOnDemand',
+]);
+const DIRECT_OWNER_NUMERIC_KEYS = new Set([
+  'maxSteps', 'stepDelayMs', 'maxModelCalls', 'maxInputTokens', 'maxOutputTokens',
+  'maxTotalTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
+  'inputPricePerMillionUsd', 'outputPricePerMillionUsd', 'intervalSeconds',
+  'scheduleStartAt', 'scheduleEndAt',
+]);
+function requireExplicitOwnerPolicyInputs(request, label) {
+  for (const key of DIRECT_OWNER_BOOLEAN_KEYS) {
+    if (Object.hasOwn(request, key) && typeof request[key] !== 'boolean') {
+      throw new Error(`${label} ${key} must be an explicit boolean`);
+    }
+  }
+  for (const key of DIRECT_OWNER_NUMERIC_KEYS) {
+    if (!Object.hasOwn(request, key)) continue;
+    const value = request[key];
+    if ((typeof value !== 'number' && typeof value !== 'string')
+        || (typeof value === 'string' && value.trim() === '')
+        || !Number.isFinite(Number(value)) || Number(value) < 0) {
+      throw new Error(`${label} ${key} must be a finite nonnegative explicit ceiling`);
+    }
+  }
+  for (const [key, allowed] of [
+    ['approvalMode', Object.values(BrowserAgentApprovalMode)],
+    ['credentialDecision', Object.values(BrowserAgentPolicyDecision)],
+    ['repeatMode', Object.values(BrowserAgentRepeatMode)],
+  ]) {
+    if (Object.hasOwn(request, key) && !allowed.includes(request[key])) {
+      throw new Error(`${label} ${key} must be an explicit supported decision`);
+    }
+  }
+  for (const key of ['siteRules', 'acceptanceCriteria']) {
+    if (Object.hasOwn(request, key) && !Array.isArray(request[key])) {
+      throw new Error(`${label} ${key} must be an explicit array`);
+    }
+  }
+}
+
 // Apply the same owner-input snapshot boundary to edits as to initial intake.
 // Values must not change while the durable transaction is queued.
 function snapshotDirectAgentConfigPatch(raw) {
@@ -378,8 +423,9 @@ function snapshotDirectAgentConfigPatch(raw) {
       throw new Error(`Browser Agent config update ${key} must be a finite scalar data value`);
     }
   }
+  requireExplicitOwnerPolicyInputs(patch, 'Browser Agent config update');
   if (Object.hasOwn(patch, 'siteRules')) {
-    patch.siteRules = snapshotDirectAgentSiteRules(patch.siteRules ?? []);
+    patch.siteRules = snapshotDirectAgentSiteRules(patch.siteRules);
   }
   if (Object.hasOwn(patch, 'acceptanceCriteria')) {
     patch.acceptanceCriteria = normalizeBrowserAgentAcceptanceCriteria(patch.acceptanceCriteria);
@@ -2331,6 +2377,7 @@ export class BrowserAgentManager {
         throw new Error(`Browser Agent direct intake ${key} must be a finite scalar data value`);
       }
     }
+    requireExplicitOwnerPolicyInputs(request, 'Browser Agent direct intake');
     // Explicit invalid identities cannot silently turn into a newly generated
     // task, and generated identities obey the same durable namespace.
     const suppliedId = Object.hasOwn(request, 'id') ? request.id : undefined;
