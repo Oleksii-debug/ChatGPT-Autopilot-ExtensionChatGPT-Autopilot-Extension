@@ -134,7 +134,8 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const all = history.items.map(({ ordinal, entry }) => {
     record(entry, 'Agent history entry');
     const rawType = own(entry, 'type');
-    const spec = Object.hasOwn(EVENT_LABELS, rawType) ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
+    const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
+    const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
     const rawAction = own(entry, 'action');
     let actionType = '';
     if (rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
@@ -145,7 +146,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       entryId: 'agent-history:' + ordinal,
       at: safeTime(own(entry, 'at')),
       category: spec[0],
-      event: Object.hasOwn(EVENT_LABELS, rawType) ? rawType : 'OTHER',
+      event: known ? rawType : 'OTHER',
       description: spec[1],
       actionType,
       source: 'CANONICAL_AGENT_HISTORY',
@@ -173,6 +174,11 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       cycles: integer(own(runtime, 'completedCycles')),
       modelCalls: integer(own(runtime, 'modelCalls')),
       totalTokens: integer(own(runtime, 'totalTokens')),
+      estimatedCostUsd: typeof own(runtime, 'estimatedCostUsd') === 'number' &&
+        Number.isFinite(own(runtime, 'estimatedCostUsd')) &&
+        own(runtime, 'estimatedCostUsd') >= 0 &&
+        own(runtime, 'estimatedCostUsd') <= 1000000
+          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : 0,
       verifiedChecks: Array.isArray(checks) ? integer(checks.length, { max: 4096 }) : 0,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },
