@@ -5,6 +5,7 @@ import {
   parseBrowserAgentAction,
   executeBrowserPageAction,
   proveBrowserNativeClick,
+  verifyBrowserApprovalTarget,
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
   browserAgentCoordinateTargetFingerprint,
@@ -69,6 +70,27 @@ test('hidden ancestor after observation cannot be clicked', () => {
   element.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
   assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_TARGET_UNAVAILABLE/);
   assert.equal(element.clicked, 0);
+});
+
+test('approved semantic replay refuses an unavailable ancestor before any effect', () => {
+  const snapshot = setup();
+  const observed = snapshot.frames[0].elements[0];
+  const proof = browserAgentCoordinateTargetFingerprint(observed);
+  assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, true);
+  element.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+  assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).reason, 'target-missing-or-unavailable');
+  element.parentElement = { inert: true, parentElement: null, getAttribute: () => null };
+  assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, false);
+  element.parentElement = null;
+  const originalStyle = globalThis.getComputedStyle;
+  try {
+    globalThis.getComputedStyle = () => ({ display: 'block', visibility: 'visible', opacity: 1, pointerEvents: 'none' });
+    assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, false);
+  } finally {
+    globalThis.getComputedStyle = originalStyle;
+  }
+  assert.equal(element.clicked, 0);
+  assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, true);
 });
 
 test('overlay inserted during focus cannot be bypassed by synthetic DOM click', () => {
