@@ -3002,7 +3002,7 @@ export class BrowserAgentManager {
     return false;
   }
 
-  async captureVision(tabId, { expectedUrl = '' } = {}) {
+  async captureVision(tabId, { expectedUrl = '', expectedViewport = null } = {}) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Browser Agent vision capture requires Chrome debugger capability');
     if (!this.chrome.tabs?.get) throw new Error('Browser Agent vision capture requires live tab identity');
     const expected = clean(expectedUrl, 4096);
@@ -3015,10 +3015,38 @@ export class BrowserAgentManager {
         throw error;
       }
       const liveUrl = clean(tab?.pendingUrl || tab?.url, 4096);
-      if (expected && liveUrl !== expected) {
+      const stale = () => {
         const error = new Error('AGENT_VISION_SNAPSHOT_STALE');
         error.code = 'AGENT_VISION_SNAPSHOT_STALE';
         throw error;
+      };
+      if (expected && liveUrl !== expected) stale();
+      // A same-URL reload, scroll or viewport change between DOM observation
+      // and screenshot invalidates visual coordinates. Chrome debugger attach
+      // can itself change the viewport; check before and after that effect.
+      if (expectedViewport) {
+        let proof;
+        try {
+          const frames = await this.requireScripting().executeScript({
+            target: { tabId, frameIds: [0] },
+            func: () => ({
+              url: location.href,
+              documentEpoch: Number(performance.timeOrigin),
+              width: innerWidth,
+              height: innerHeight,
+              scrollX: Math.round(Number(globalThis.scrollX || 0)),
+              scrollY: Math.round(Number(globalThis.scrollY || 0)),
+            }),
+          });
+          proof = frames?.[0]?.result;
+        } catch { stale(); }
+        if (!proof || proof.url !== liveUrl
+          || !Number.isFinite(proof.documentEpoch) || proof.documentEpoch <= 0
+          || proof.documentEpoch !== Number(expectedViewport.documentEpoch)
+          || proof.width !== Number(expectedViewport.width)
+          || proof.height !== Number(expectedViewport.height)
+          || proof.scrollX !== Number(expectedViewport.scrollX)
+          || proof.scrollY !== Number(expectedViewport.scrollY)) stale();
       }
       return liveUrl;
     };
@@ -3175,11 +3203,11 @@ export class BrowserAgentManager {
     }
   }
 
-  async nativeClick(tabId, frameId, snapshotId, ref) {
+  async nativeClick(tabId, frameId, snapshotId, ref, expectedAction) {
     if (frameId !== 0) return false;
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) return false;
     const prove = async () => (await this.requireScripting().executeScript({
-      target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref],
+      target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref, expectedAction],
     }))?.[0]?.result;
     const beforeAttach = await prove();
     if (!beforeAttach || !Number.isFinite(beforeAttach.x) || !Number.isFinite(beforeAttach.y)) return false;
@@ -4071,7 +4099,7 @@ export class BrowserAgentManager {
       && current.job.runtime.lastActionSnapshotId) {
       if (!(await this.verifyOwnerAuthority(id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
       const prior = current.job.runtime.lastAction;
-      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref);
+      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref, prior);
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.controlEpoch !== epoch) return store;
@@ -4121,8 +4149,12 @@ export class BrowserAgentManager {
     let visionSnapshotStale = false;
     if (current.job.runtime.visionPending === true) {
       try {
-        imageDataUrl = await this.captureVision(current.job.runtime.tabId, { expectedUrl: snapshot.url });
         const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
+        if (!topFrame?.viewport) throw new Error('AGENT_VISION_SNAPSHOT_STALE');
+        imageDataUrl = await this.captureVision(current.job.runtime.tabId, {
+          expectedUrl: snapshot.url,
+          expectedViewport: topFrame.viewport,
+        });
         snapshot.visionAttached = true;
         snapshot.visionViewport = topFrame?.viewport ? clone(topFrame.viewport) : null;
       } catch (error) {
