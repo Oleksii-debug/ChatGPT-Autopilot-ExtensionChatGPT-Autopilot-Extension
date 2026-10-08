@@ -5797,7 +5797,11 @@ $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
-$('agent-run-timeline-filter').addEventListener('change', () => renderAgentRunTimeline(ui.agentTimelineJob));
+$('agent-run-timeline-filter').addEventListener('change', () => {
+  renderAgentRunTimeline(ui.agentTimelineJob);
+  // A user-triggered filter change is announced once; background refreshes remain silent.
+  announce($('agent-run-timeline-status').textContent);
+});
 $('agent-run-timeline-refresh-button').addEventListener('click', refreshAgentRunTimeline);
 $('agent-run-timeline-export-button').addEventListener('click', exportAgentRunTimeline);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
