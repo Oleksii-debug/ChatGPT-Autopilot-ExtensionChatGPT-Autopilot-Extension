@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { renderRoiOwnerViewV1 } from '../src/ui/roi-owner-view.js';
+
+class FakeNode {
+  constructor(tag) { this.tagName=tag.toUpperCase();this.id='';this.textContent='';this.attributes={};this.children=[];this.ownerDocument=null; }
+  setAttribute(name,value){this.attributes[name]=value;}
+  appendChild(node){this.children.push(node);}
+  replaceChildren(...nodes){this.children=nodes;}
+}
+const doc={createElement(tag){return new FakeNode(tag);}};
+function container() { const root=new FakeNode('div');root.id='roi-panel';root.ownerDocument=doc;return root; }
+function evidence(overrides={}) {
+  return {schemaVersion:1,status:'EVIDENCE_BACKED',statusText:'Локальна оцінка',
+    deploymentAuthorized:false, recommendationAuthorized:false, telemetryEmitted:false,
+    verifiedOutcomeCount:1,observedOwnerAttentionSeconds:10,observedOwnerTimeAvoidedSeconds:0,
+    netOwnerTimeLowerSeconds:-10,netOwnerTimeUpperSeconds:0,machineSpendUsdMicros:0,
+    opportunities:[],...overrides};
+}
+function bad(fn) { const root=container(); const old=root.children; assert.throws(()=>fn(root));assert.equal(root.children,old); }
+
+test('adversarial: advisory getters never run and DOM remains unchanged',()=>{
+  let sideEffects=0;
+  const a=evidence();
+  Object.defineProperty(a,'statusText',{enumerable:true,get(){ sideEffects++;return 'FORGED'; }});
+  bad(root=>renderRoiOwnerViewV1(root,a));
+  assert.equal(sideEffects,0);
+});
+
+test('adversarial: nested opportunity getters never run',()=>{
+  let sideEffects=0;
+  const row={verifiedManualOccurrenceCount:1,policyOrExecutionAuthorized:false};
+  Object.defineProperty(row,'workflowClassId',{enumerable:true,get(){sideEffects++;return 'FORGED';}});
+  bad(root=>renderRoiOwnerViewV1(root,evidence({opportunities:[row]})));
+  assert.equal(sideEffects,0);
+});
+
+test('adversarial: sparse/accessor arrays and forged controls fail closed',()=>{
+  const rows=new Array(1);
+  bad(root=>renderRoiOwnerViewV1(root,evidence({opportunities:rows})));
+  const accessorRows=[];
+  Object.defineProperty(accessorRows,'0',{get(){throw new Error('SHOULD NOT EXECUTE');},enumerable:true});
+  accessorRows.length=1;
+  bad(root=>renderRoiOwnerViewV1(root,evidence({opportunities:accessorRows})));
+  bad(root=>renderRoiOwnerViewV1(root,evidence({recommendationAuthorized:true})));
+  bad(root=>renderRoiOwnerViewV1(root,evidence({telemetryEmitted:true})));
+  bad(root=>renderRoiOwnerViewV1(root,evidence({opportunities:[{
+    workflowClassId:'w',verifiedManualOccurrenceCount:1,policyOrExecutionAuthorized:false,decisionAuthorized:true,
+  }]})));
+});
+
+test('adversarial: metrics reject overflow/NaN/coercion and report absent values explicitly',()=>{
+  for (const amount of [Number.MAX_SAFE_INTEGER + 1,NaN,Infinity,'0',-1]) {
+    bad(root=>renderRoiOwnerViewV1(root,evidence({machineSpendUsdMicros:amount})));
+  }
+  const root=container();
+  renderRoiOwnerViewV1(root,evidence({machineSpendUsdMicros:null}));
+  const all=[]; const walk=node=>{all.push(node);node.children.forEach(walk);};walk(root);
+  assert.ok(all.some(node=>node.tagName==='DD'&&node.textContent==='Немає підтверджених даних'));
+  assert.ok(all.some(node=>node.attributes['aria-live']==='polite'));
+});
