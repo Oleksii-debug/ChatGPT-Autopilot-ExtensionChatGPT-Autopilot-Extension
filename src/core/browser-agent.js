@@ -912,9 +912,13 @@ export function snapshotBrowserPage(snapshotId) {
   const normalize = (value, max = 500) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   const visible = (element) => {
     if (!(element instanceof Element) || !element.isConnected) return false;
-    if (element.hidden || element.inert || element.getAttribute('aria-hidden') === 'true') return false;
-    const style = getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true') return false;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') return false;
+    }
     const rect = element.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   };
@@ -1057,6 +1061,21 @@ export function executeBrowserPageAction(snapshotId, action) {
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   };
+  // Programmatic fill/select are browser effects too. Do not use synthetic
+  // events to bypass a focus-time modal or an occluded/unavailable control.
+  const ensureUnoccluded = (element) => {
+    ensureTarget();
+    const bounds = element.getBoundingClientRect();
+    const x = bounds.left + bounds.width / 2;
+    const y = bounds.top + bounds.height / 2;
+    if (!(bounds.width > 0 && bounds.height > 0)
+      || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
+      throw new Error('AGENT_TARGET_NOT_VISIBLE');
+    }
+    const hit = document.elementFromPoint(x, y);
+    if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
+    ensureTarget();
+  };
   if (action.type === 'click') {
     const element = ensureTarget();
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
@@ -1083,7 +1102,7 @@ export function executeBrowserPageAction(snapshotId, action) {
     const element = ensureTarget();
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
-    ensureTarget();
+    ensureUnoccluded(element);
     const tag = element.tagName.toLowerCase();
     const inputType = tag === 'input' ? String(element.type || 'text').toLowerCase() : '';
     if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
@@ -1107,6 +1126,9 @@ export function executeBrowserPageAction(snapshotId, action) {
   if (action.type === 'select') {
     const element = ensureTarget();
     if (!(element instanceof HTMLSelectElement)) throw new Error('AGENT_TARGET_NOT_SELECT');
+    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    element.focus?.({ preventScroll: true });
+    ensureUnoccluded(element);
     const wanted = String(action.value || '').trim().toLowerCase();
     const option = Array.from(element.options).find(item => String(item.textContent || item.label || '').trim().toLowerCase() === wanted)
       || Array.from(element.options).find(item => String(item.value || '').trim().toLowerCase() === wanted);
@@ -1247,6 +1269,8 @@ export function browserAgentCoordinateTargetFingerprint(element) {
       viewportScrollX: Number(element.viewportScrollX),
       viewportScrollY: Number(element.viewportScrollY),
       documentEpoch: Number(element.documentEpoch),
+      captureX: Number(element.captureX),
+      captureY: Number(element.captureY),
       rect: {
         left: Number(element.rect.left), top: Number(element.rect.top),
         width: Number(element.rect.width), height: Number(element.rect.height),
@@ -1398,6 +1422,8 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
         viewportScrollX: Number(globalThis.scrollX || 0),
         viewportScrollY: Number(globalThis.scrollY || 0),
         documentEpoch: Number(performance.timeOrigin),
+        captureX: px,
+        captureY: py,
         visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
         rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       },
@@ -1408,6 +1434,13 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint) {
   if (arguments.length < 3) return proof;
   if (!proof?.target || !fingerprint || typeof fingerprint !== 'object') return { ok: false, reason: 'missing-target' };
   const target = proof.target;
+  // The screenshot must authorize this exact coordinate, not another point
+  // inside the same canvas/slider/control with an identical semantic label.
+  if (typeof fingerprint.captureX !== 'number' || !Number.isFinite(fingerprint.captureX)
+    || typeof fingerprint.captureY !== 'number' || !Number.isFinite(fingerprint.captureY)
+    || fingerprint.captureX !== proof.x || fingerprint.captureY !== proof.y) {
+    return { ok: false, reason: 'changed-capture-point' };
+  }
   if (fingerprint.pageUrl !== proof.url || Number(fingerprint.viewportWidth) !== proof.viewportWidth
     || Number(fingerprint.viewportHeight) !== proof.viewportHeight
     || Number(fingerprint.viewportScrollX) !== target.viewportScrollX
