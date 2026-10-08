@@ -6,6 +6,14 @@ const MAX_REQUEST_BYTES = 4_000_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_RESPONSE_CHUNKS = 8_192;
 
+// Only errors created by this module may cross the provider boundary as-is.
+// Untrusted fetch/body readers can forge diagnostic prefixes or error codes.
+const trustedGatewayFailures = new WeakSet();
+function trustedGatewayFailure(error) {
+  trustedGatewayFailures.add(error);
+  return error;
+}
+
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -104,13 +112,13 @@ function requestTooLargeError() {
 function responseTooLargeError() {
   const error = new Error('AI Gateway response is too large');
   error.code = 'AI_GATEWAY_RESPONSE_TOO_LARGE';
-  return error;
+  return trustedGatewayFailure(error);
 }
 
 function invalidResponseStreamError() {
   const error = new Error('AI Gateway returned an invalid response body stream');
   error.code = 'AI_GATEWAY_INVALID_RESPONSE';
-  return error;
+  return trustedGatewayFailure(error);
 }
 
 async function cancelResponse(response, reader, controller) {
@@ -199,10 +207,10 @@ async function parseJson(response, controller) {
       : status >= 500 ? 'UNAVAILABLE'
       : 'INVALID_REQUEST';
     error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
-    return Promise.reject(error);
+    return Promise.reject(trustedGatewayFailure(error));
   }
   try { return text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
+  catch { throw trustedGatewayFailure(new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`)); }
 }
 
 export class AiGatewayClient {
@@ -299,8 +307,9 @@ export class AiGatewayClient {
         timeoutError.retryable = true;
         throw timeoutError;
       }
-      if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
-      if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
+      // Do not trust a transport error's message, code, or prototype. Only
+      // locally constructed failures have an authenticated diagnostic origin.
+      if (error && typeof error === 'object' && trustedGatewayFailures.has(error)) throw error;
       const unavailable = new Error('Could not reach AI Gateway');
       unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
       unavailable.category = 'UNAVAILABLE';
