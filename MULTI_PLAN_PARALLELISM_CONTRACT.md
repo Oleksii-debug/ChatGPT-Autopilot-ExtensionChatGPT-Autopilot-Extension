@@ -1,7 +1,7 @@
 # ChatGPT Autopilot — Multi-Plan Parallelism Contract
 
 ## Source authority
-Never use stale GitHub main 0.9.19 to erase or reimplement 11.x functionality. Source mutation requires a resolved 11.0.13 High-or-newer canonical tree.
+Never use stale GitHub main 0.9.19 to erase or reimplement 11.x functionality. Exact Drive source baseline `ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip` is available; source mutation/closure requires importing/synchronizing that exact 11.0.13 tree (or a proven newer successor) into canonical Git first.
 
 ## Ownership
 
