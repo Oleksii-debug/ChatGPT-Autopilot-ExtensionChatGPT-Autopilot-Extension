@@ -1670,3 +1670,69 @@ test('Plan-2 S2: restarted visual origin never trusts accessor/inherited evidenc
     ...viewport, documentEpoch: viewport.documentEpoch + 1,
   }), false);
 });
+
+
+// Plan 2 S1: evidence claiming terminal completion must remain exact.
+test('Plan-2 S1: DONE evidence rejects truncated, coercible or incomplete check sets', () => {
+  const snapshot = { frames: [] };
+  const normal = { type: 'done', summary: 'Proof', evidence: {
+    snapshotSignature: 'observed',
+    checks: [{ criterion: 1, detail: 'Verified' }],
+  } };
+  const good = parseBrowserAgentAction(JSON.stringify(normal), snapshot);
+  assert.deepEqual(good.evidence.checks, [{ criterion: 1, detail: 'Verified' }]);
+  const overflow = Array.from({ length: 21 }, (_, i) => ({ criterion: i + 1, detail: 'Verified' }));
+  for (const checks of [overflow, null, 'not-array', {}]) {
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+      ...normal, evidence: { ...normal.evidence, checks },
+    }), snapshot), /at most 20 explicit checks/);
+  }
+  for (const badCheck of [
+    { criterion: '1', detail: 'Verified' },
+    { criterion: null, detail: 'Verified' },
+    { criterion: false, detail: 'Verified' },
+    { criterion: 1.1, detail: 'Verified' },
+    { criterion: 1, detail: 44 },
+    { criterion: 1, detail: ' ' },
+  ]) {
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+      ...normal, evidence: { ...normal.evidence, checks: [badCheck] },
+    }), snapshot), /done evidence check 1 is invalid/);
+  }
+});
+
+// Plan 2 S1: a frame labelled "0" must not be mistaken for Chrome frame 0.
+test('Plan-2 S1: semantic action rejects string-alias observed frame identity', () => {
+  const snapshot = { frames: [{
+    frameId: '0',
+    url: 'https://example.test/editor',
+    elements: [{ ref: 'r1', semanticIdentity: 'observed-button', name: 'Submit' }],
+  }] };
+  assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+    type: 'click', frameId: 0, ref: 'r1',
+  }), snapshot), /semantic target identity is missing/);
+  snapshot.frames[0].frameId = 0;
+  const valid = parseBrowserAgentAction(JSON.stringify({
+    type: 'click', frameId: 0, ref: 'r1',
+  }), snapshot);
+  assert.equal(valid.expectedSemanticIdentity, 'observed-button');
+});
+
+// Plan 2 S2: visual pixels cannot be authorized by an aliased root frame
+// or the viewport of a different (sub)frame.
+test('Plan-2 S2: screenshot point requires exact numeric main-frame viewport', () => {
+  const action = JSON.stringify({ type: 'click_at', x: 20, y: 20 });
+  const viewport = { width: 500, height: 300 };
+  const snapshot = { visionAttached: true, frames: [
+    { frameId: '0', viewport },
+  ] };
+  assert.throws(() => parseBrowserAgentAction(action, snapshot), /current visible viewport/);
+  snapshot.frames = [{ frameId: 12, viewport }];
+  assert.throws(() => parseBrowserAgentAction(action, snapshot), /current visible viewport/);
+  snapshot.frames = [{ frameId: 0, viewport }];
+  assert.equal(parseBrowserAgentAction(action, snapshot).x, 20);
+  snapshot.frames = [{ frameId: 12, viewport }];
+  snapshot.visionViewport = viewport;
+  assert.equal(parseBrowserAgentAction(action, snapshot).y, 20,
+    'exact attached screenshot viewport remains valid without a main-frame DOM snapshot');
+});
