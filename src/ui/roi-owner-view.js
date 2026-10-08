@@ -21,6 +21,15 @@ const OPPORTUNITY_FIELDS = new Set([
 const STATUSES = new Set([
   'OFFLINE', 'INSUFFICIENT_EVIDENCE', 'PARTIAL_EVIDENCE', 'EVIDENCE_BACKED',
 ]);
+// Owner-facing text is derived from the vetted enum, not from a transport
+// supplied statusText that may falsely claim deployment or verified effects.
+const STATUS_TEXT = Object.freeze({
+  OFFLINE: 'Немає зв’язку з локальними доказами. Оцінку економії не оновлено.',
+  INSUFFICIENT_EVIDENCE: 'Доказів недостатньо для рекомендації автоматизації.',
+  PARTIAL_EVIDENCE: 'Часткові докази. Оцінена економія показана як інтервал.',
+  EVIDENCE_BACKED: 'Доступні підтверджені локальні показники. Рекомендації лише дорадчі.',
+});
+
 const METRICS = [
   ['Перевірені результати', 'verifiedOutcomeCount', false],
   ['Час уваги власника, секунд', 'observedOwnerAttentionSeconds', false],
@@ -138,7 +147,7 @@ export function renderRoiOwnerViewV1(container, rawAdvisory) {
   heading.id = container.id + '-heading';
   section.setAttribute('aria-labelledby', heading.id);
   section.appendChild(heading);
-  const status = element('p', advisory.statusText);
+  const status = element('p', STATUS_TEXT[advisory.status]);
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
@@ -172,7 +181,9 @@ export function renderRoiOwnerViewV1(container, rawAdvisory) {
     const tbody = element('tbody');
     for (const row of rows) {
       const tr = element('tr');
-      tr.appendChild(element('td', row.workflowClassId));
+      const rowHeading = element('th', row.workflowClassId);
+      rowHeading.setAttribute('scope', 'row');
+      tr.appendChild(rowHeading);
       tr.appendChild(element('td', String(row.verifiedManualOccurrenceCount)));
       tr.appendChild(element('td', 'Лише оцінка Recipe або інструмента. Запуску немає.'));
       tbody.appendChild(tr);
