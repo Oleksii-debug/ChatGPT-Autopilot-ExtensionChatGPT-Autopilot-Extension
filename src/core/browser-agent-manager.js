@@ -515,8 +515,18 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   if (typeof candidate !== 'string' || candidate !== candidate.trim() || !candidate) {
     throw new Error(`${label} must be a timestamp`);
   }
+  // Specialist effect/recovery chronology is a durable contract: do not
+  // normalize Date.parse shorthand, timezone-free input, calendar rollover,
+  // or sub-millisecond timestamps into apparently trustworthy evidence.
+  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  if (!format.test(candidate)) throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
+  const wallClock = candidate.slice(0, 19);
+  const calendar = new Date(wallClock + 'Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 19) !== wallClock) {
+    throw new Error(`${label} contains an invalid calendar date`);
+  }
   const millis = Date.parse(candidate);
-  if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
+  if (!Number.isFinite(millis)) throw new Error(`${label} must be a valid timestamp`);
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
@@ -4520,6 +4530,7 @@ export class BrowserAgentManager {
       } catch (error) {
         return this.recordRecoverableFailure(id, epoch, { type: 'planning', error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
       }
+      let verificationCommitted = false;
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.controlEpoch !== epoch || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -4527,8 +4538,13 @@ export class BrowserAgentManager {
         job.runtime.lastError = '';
         job.runtime.updatedAt = now;
         appendHistory(job.runtime, { at: now, type: 'plan-node-verified', message: `Plan node ${node.nodeId} independently verified.`, nodeId: node.nodeId });
+        verificationCommitted = true;
         return store;
       });
+      // An owner Stop/Pause or restart can invalidate authority while the
+      // independent verifier is in flight. Never report terminal success
+      // when the exact epoch's durable transition was not committed.
+      if (!verificationCommitted) return { kind: 'CANCELLED_BY_OWNER' };
       return { kind: 'PLAN_NODE_VERIFIED', nodeId: node.nodeId, plan: nextPlan };
     }
 
@@ -4568,6 +4584,7 @@ export class BrowserAgentManager {
       });
       const verification = outcome.verification;
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
+      let completionCommitted = false;
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.controlEpoch !== epoch || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -4595,8 +4612,10 @@ export class BrowserAgentManager {
           appendHistory(job.runtime, { at: now, type: 'done', message: action.summary });
         }
         job.runtime.updatedAt = now;
+        completionCommitted = true;
         return store;
       });
+      if (!completionCommitted) return { kind: 'CANCELLED_BY_OWNER' };
       await this.reconcileAlarm();
       return { kind: repeating ? 'CYCLE_COMPLETED' : 'COMPLETED', summary: action.summary };
     }

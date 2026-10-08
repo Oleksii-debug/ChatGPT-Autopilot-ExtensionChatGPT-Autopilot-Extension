@@ -272,6 +272,34 @@ test('job-to-Project resolver composes exact persisted AgentPlan identity and fa
   );
 });
 
+test('Plan-1: specialist handoff chronology rejects ambiguous timestamps before durable mutation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse('2026-09-23T12:00:00.000Z'),
+  });
+  await manager.create({ id: 'job-specialist-clock', goal: 'Preserve exact handoff evidence.' });
+  const original = structuredClone((await manager.get('job-specialist-clock')).job);
+  for (const invalid of [
+    '0', '2026-09-23', '2026-09-23T12:00:00',
+    '2026-02-30T12:00:00Z', '2026-09-23T24:00:00Z',
+    '2026-09-23T12:00:00.1234Z', '2026-09-23T12:00:00+25:00',
+  ]) {
+    await assert.rejects(
+      () => manager.prepareSpecialistHandoff('job-specialist-clock', { at: invalid }),
+      /ISO timestamp|calendar date|valid timestamp/i,
+    );
+    assert.deepEqual((await manager.get('job-specialist-clock')).job, original,
+      'invalid chronology must not change durable specialist/effect state');
+  }
+  await assert.rejects(
+    () => manager.prepareSpecialistHandoff('job-specialist-clock', { at: '2026-09-23T14:00:00+02:00' }),
+    /no durable plan/i,
+    'valid offset-aware chronology must proceed to normal plan validation',
+  );
+});
+
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00.000Z') });
@@ -1209,6 +1237,37 @@ test('Browser Agent requires a separate read-only verifier before completing an 
   assert.equal(live.job.runtime.modelCalls, 2);
 });
 
+test('Plan-1: owner pause during independent DONE verification cannot report committed completion', async () => {
+  const chrome = makeChrome();
+  let manager;
+  let verifierCalls = 0;
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        verifierCalls += 1;
+        await manager.pause('job-outcome-epoch');
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Page version 0 is visible.' }] }) };
+      }
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({
+        type: 'done', summary: 'Proof proposed',
+        evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'page version 0' }] },
+      }) };
+    },
+  });
+  await manager.create({ id: 'job-outcome-epoch', goal: 'Read page', acceptanceCriteria: ['Page is visible'] });
+  await manager.start('job-outcome-epoch', { runInitial: false });
+  const result = await manager.cycleOne('job-outcome-epoch');
+  const live = await manager.get('job-outcome-epoch');
+  assert.equal(verifierCalls, 1);
+  assert.equal(result.kind, 'CANCELLED_BY_OWNER');
+  assert.equal(live.job.runtime.runState, 'PAUSED');
+  assert.equal(live.job.runtime.completedCycles, 0);
+  assert.equal(live.job.runtime.verifiedOutcome, null);
+});
+
 test('Browser Agent persists independent verifier route failure runtime before retry', async () => {
   const chrome = makeChrome();
   let verifierCalls = 0;
@@ -1411,6 +1470,47 @@ test('Browser Agent independently verifies a READY Browser plan node and unblock
   assert.equal(result.kind, 'PLAN_NODE_VERIFIED');
   assert.equal(live.job.runtime.plan.nodes[0].state, 'VERIFIED');
   assert.match(live.job.runtime.plan.nodes[0].evidence, /page version 0/);
+});
+
+test('Plan-1: owner pause during plan-node verification cannot report a verified node', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  let manager;
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        await manager.pause('job-plan-epoch');
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Page 0 observed' }] }) };
+      }
+      if (phase++ === 0) return { text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-epoch', jobId: 'job-plan-epoch',
+        objective: 'Inspect page', successCriteria: ['Page inspected'],
+        createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{
+          nodeId: 'inspect', title: 'Inspect', objective: 'Read page', dependsOn: [],
+          conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER',
+          acceptanceCriteria: ['page version 0 is visible'], budget: {},
+          state: 'PENDING', evidence: '', updatedAt: at,
+        }],
+      } }) };
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({
+        type: 'verify_plan_node', nodeId: 'inspect',
+        evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'Page 0 observed' }] },
+      }) };
+    },
+  });
+  await manager.create({ id: 'job-plan-epoch', goal: 'Inspect page' });
+  await manager.start('job-plan-epoch', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-plan-epoch')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-plan-epoch');
+  const current = await manager.get('job-plan-epoch');
+  assert.equal(result.kind, 'CANCELLED_BY_OWNER');
+  assert.equal(current.job.runtime.runState, 'PAUSED');
+  assert.notEqual(current.job.runtime.plan.nodes[0].state, 'VERIFIED');
 });
 
 test('Browser Agent atomically claims the referenced READY plan node before a physical action', async () => {
