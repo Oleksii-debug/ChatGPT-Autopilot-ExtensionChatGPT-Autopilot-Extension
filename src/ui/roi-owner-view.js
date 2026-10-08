@@ -185,6 +185,7 @@ function snapshotAdvisory(input) {
   }
   // Estimated bounds are an evidence interval, never a coerced string,
   // getter-backed object or reversed savings claim.
+  let validatedInterval = null;
   if (advisory.estimatedOwnerTimeAvoidedSeconds != null) {
     const interval = snapshotData(
       advisory.estimatedOwnerTimeAvoidedSeconds,
@@ -197,6 +198,10 @@ function snapshotAdvisory(input) {
       || interval.lower < 0 || interval.upper < interval.lower) {
       throw new Error('ROI estimated owner time bounds are invalid');
     }
+    // Render only the verified copy, never the original nested object.
+    // A hostile Proxy can expose safe own descriptors during validation yet
+    // run an unrelated get trap when the semantic view later reads .lower.
+    validatedInterval = Object.freeze({ lower: interval.lower, upper: interval.upper });
   }
   if (advisory.netOwnerTimeLowerSeconds != null
     && advisory.netOwnerTimeUpperSeconds != null
@@ -217,7 +222,11 @@ function snapshotAdvisory(input) {
       throw new Error('ROI advisory contains invalid metric units');
     }
   }
-  return Object.freeze({ advisory, rows });
+  const safeAdvisory = Object.freeze({
+    ...advisory,
+    estimatedOwnerTimeAvoidedSeconds: validatedInterval,
+  });
+  return Object.freeze({ advisory: safeAdvisory, rows });
 }
 
 export function renderRoiOwnerViewV1(container, rawAdvisory) {
