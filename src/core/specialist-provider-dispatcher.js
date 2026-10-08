@@ -18,7 +18,7 @@ function record(value, allowed, label) {
   const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field: ${String(key)}`);
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field`);
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label}.${key} must be an enumerable own data property`);
