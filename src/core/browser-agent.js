@@ -586,7 +586,9 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       const y = yValue;
       if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Browser Agent ${type} requires finite ${label} coordinates from the attached screenshot`);
       if (x < 0 || y < 0 || x >= width || y >= height) throw new Error(`Browser Agent ${type} ${label} coordinates are outside the current visible viewport`);
-      return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      // Exact screenshot points must not be silently moved before native
+      // pointer input. Rounding can cross a subpixel hit-target boundary.
+      return { x, y };
     };
     if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(type)) {
       const point = normalizePoint(raw?.x, raw?.y, 'target');
@@ -612,7 +614,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       // malformed effect envelope into a plausible native pointer duration.
       const durationMs = raw?.durationMs;
       if (durationMs !== undefined && (typeof durationMs !== 'number'
-        || !Number.isFinite(durationMs) || durationMs < 120 || durationMs > 2000)) {
+        || !Number.isSafeInteger(durationMs) || durationMs < 120 || durationMs > 2000)) {
         throw new Error('Browser Agent drag_at requires an exact bounded durationMs');
       }
       action.durationMs = durationMs === undefined ? 450 : durationMs;
