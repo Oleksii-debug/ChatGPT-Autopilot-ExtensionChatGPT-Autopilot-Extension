@@ -24,6 +24,12 @@ const ACTION_CAPABILITY_REQUIREMENTS = Object.freeze({
   [AgentActionType.RECOVER_INTERACTION]: CapabilityId.SAFE_RESTART_RECOVERY,
 });
 
+const ACTION_LINKED_EVENT_TYPES = new Set([
+  AgentEventType.ACTION_STARTED,
+  AgentEventType.ACTION_SUCCEEDED,
+  AgentEventType.ACTION_FAILED,
+]);
+
 const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
   [AgentEventType.COMPLETION_OBSERVED]: CapabilityId.ASSISTANT_COMPLETION_PROBE,
   [AgentEventType.RATE_LIMIT_OBSERVED]: CapabilityId.RATE_LIMIT_CLASSIFICATION,
@@ -198,6 +204,9 @@ export function normalizeAgentEvent(input) {
     occurredAt: normalizeTimestamp(event.occurredAt, 'occurredAt'),
     data: cloneData(event.data, 'event data'),
   };
+  if (ACTION_LINKED_EVENT_TYPES.has(type) && normalized.actionId === null) {
+    throw new Error('Agent action lifecycle event requires an exact actionId');
+  }
   return Object.freeze(normalized);
 }
 
@@ -218,7 +227,11 @@ export class AgentActionHandlerRegistry {
 
   has(providerId, actionType) {
     if (typeof providerId !== 'string' || typeof actionType !== 'string') return false;
-    return this.handlers.has(`${providerId.trim()}:${actionType.trim()}`);
+    // A capability probe must agree with execute(): whitespace aliases in
+    // provider identity are not valid durable provider IDs.
+    if (providerId !== providerId.trim() || actionType !== actionType.trim()
+        || !ID_PATTERN.test(providerId) || !ACTION_TYPES.has(actionType)) return false;
+    return this.handlers.has(`${providerId}:${actionType}`);
   }
 
   async execute(input, context = {}) {
