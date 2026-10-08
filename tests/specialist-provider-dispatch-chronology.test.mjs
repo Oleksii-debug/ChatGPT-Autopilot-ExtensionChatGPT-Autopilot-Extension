@@ -248,3 +248,73 @@ test('persisted nested provider inspection remains valid on exact same lease and
   );
   assert.equal(f.providerCalls, 1);
 });
+
+
+test('untrusted Specialist result artifact metadata never invokes a provider-supplied getter', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  let getterCalls = 0;
+  let dispatches = 0;
+  const maliciousArtifact = { schemaVersion: 1 };
+  Object.defineProperty(maliciousArtifact, 'artifactId', {
+    enumerable: true,
+    get() { getterCalls += 1; throw Error('SECRET_RESULT_GETTER_CANARY'); },
+  });
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0 + 1,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => {
+        dispatches += 1;
+        return {
+          providerReceiptId: 'receipt.local',
+          observedAt: ts(T0 + 1),
+          resultArtifactRefs: [maliciousArtifact],
+        };
+      },
+    }],
+  });
+  await assert.rejects(
+    dispatcher.execute(f.request(readiness)),
+    error => error instanceof Error
+      && /enumerable own data property/u.test(error.message)
+      && !error.message.includes('SECRET_RESULT_GETTER_CANARY'),
+  );
+  assert.equal(dispatches, 1, 'this is a post-provider receipt validation fence');
+  assert.equal(getterCalls, 0, 'receipt accessors must never execute');
+});
+
+test('valid persisted Specialist receipt still yields evidence with no self-issued completion authority', async () => {
+  const f = fixture();
+  const readiness = JSON.parse(JSON.stringify(
+    await f.trustedResolver.resolve(f.selection),
+  ));
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0 + 1,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => ({
+        providerReceiptId: 'receipt.local',
+        observedAt: ts(T0 + 1),
+        resultArtifactRefs: [{
+          schemaVersion: 1,
+          artifactId: 'artifact.local',
+          kind: 'report',
+          uri: 'artifact://local/report',
+          mediaType: 'application/json',
+          sha256: 'a'.repeat(64),
+          sizeBytes: 123,
+          createdAt: ts(T0 + 1),
+          producerInvocationId: 'lease.read',
+          sensitive: false,
+        }],
+      }),
+    }],
+  });
+  const result = await dispatcher.execute(f.request(readiness));
+  assert.equal(result.executionId, 'lease.read');
+  assert.equal(result.resultArtifactRefs.length, 1);
+  assert.equal(result.resultArtifactRefs[0].sha256, 'a'.repeat(64));
+  assert.equal(result.completionAuthorized, false);
+  assert.equal(result.verificationRequired, true);
+});
