@@ -256,6 +256,11 @@ export function normalizeAiRoutePool(raw = []) {
 export function normalizeAiRoutePolicy(raw = {}) {
   if (raw === null) throw new Error('AI route policy must be a plain data object');
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
+  // A persisted explicit null/undefined must not silently lift the owner's
+  // pinned route and authorize a different account/model on recovery.
+  if (Object.hasOwn(source, 'pinnedRouteId') && typeof own(source, 'pinnedRouteId') !== 'string') {
+    throw new Error('AI route pinnedRouteId must be exact text when explicitly supplied');
+  }
   const rawLocality = own(source, 'locality');
   if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
   const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
