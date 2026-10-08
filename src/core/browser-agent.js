@@ -1042,7 +1042,15 @@ export function executeBrowserPageAction(snapshotId, action) {
       || href !== action.expectedSemanticHref
       || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
       || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
-    if (target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
+    // Do not activate a target whose ancestor has become hidden/inert or whose
+    // computed visibility changed after the planner's semantic observation.
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true' || node.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0) throw new Error('AGENT_TARGET_UNAVAILABLE');
+    }
     return target;
   };
   const events = (element) => {
@@ -1055,8 +1063,21 @@ export function executeBrowserPageAction(snapshotId, action) {
     element.focus?.({ preventScroll: true });
     // Focus handlers may synchronously repurpose the very same DOM node.
     ensureTarget();
+    // Native pointer users cannot activate obscured controls; synthetic DOM
+    // clicks must not bypass a modal/overlay that appeared during planning.
+    const bounds = element.getBoundingClientRect();
+    const pointX = bounds.left + bounds.width / 2;
+    const pointY = bounds.top + bounds.height / 2;
+    if (!(bounds.width > 0 && bounds.height > 0)
+      || pointX < 0 || pointY < 0 || pointX >= innerWidth || pointY >= innerHeight) {
+      throw new Error('AGENT_TARGET_NOT_VISIBLE');
+    }
+    const hit = document.elementFromPoint(pointX, pointY);
+    if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
+    ensureTarget();
     element.click();
-    return { ok: true, kind: 'click', url: location.href };
+    // A click is an attempted effect, not proof of navigation/server commit.
+    return { ok: true, kind: 'click', effectVerified: false, url: location.href };
   }
   if (action.type === 'fill') {
     const element = ensureTarget();
