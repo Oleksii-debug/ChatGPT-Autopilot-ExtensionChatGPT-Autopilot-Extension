@@ -422,3 +422,28 @@ test('credential selection denial cannot echo untrusted reference data through l
   assert.doesNotMatch(JSON.stringify(denied), /SECRET_CREDENTIAL_REFERENCE_OWNER/u);
   assert.deepEqual(assessUntrustedContentInfluenceV1(structuredClone(input)), denied);
 });
+
+test('explicit null authority and credential lists fail closed instead of becoming empty permissions', () => {
+  const cases = [
+    { ceiling: ceiling({ allowedCapabilityIds: null }) },
+    { ceiling: ceiling({ allowedToolIds: null }) },
+    { ceiling: ceiling({ allowedProviderIds: null }) },
+    { ceiling: ceiling({ allowedOutboundOrigins: null }) },
+    { proposal: proposal({ requestedCapabilityIds: null }) },
+    { proposal: proposal({ requestedToolIds: null }) },
+    { proposal: proposal({ requestedProviderIds: null }) },
+    { proposal: proposal({ requestedCredentialRefIds: null }) },
+    { proposal: proposal({ outboundOrigins: null }) },
+  ];
+  for (const override of cases) {
+    const input = request(override);
+    assert.throws(() => assessUntrustedContentInfluenceV1(input), /bounded plain array/);
+    assert.throws(() => assessUntrustedContentInfluenceV1(structuredClone(input)), /bounded plain array/);
+  }
+  const allowed = assessUntrustedContentInfluenceV1(request({
+    proposal: proposal({ requestedCredentialRefIds: [], outboundOrigins: [] }),
+  }));
+  assert.equal(allowed.status, UntrustedContentGuardStatus.SAFE_FOR_POLICY);
+  assert.equal(allowed.executionAuthorized, false);
+  assert.equal(allowed.instructionAuthority, 'NONE');
+});
