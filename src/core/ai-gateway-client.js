@@ -157,7 +157,16 @@ async function readResponseTextBounded(response, controller) {
 }
 
 async function parseJson(response, controller) {
-  const text = await readResponseTextBounded(response, controller);
+  let text;
+  try {
+    text = await readResponseTextBounded(response, controller);
+  } catch (error) {
+    // On non-2xx, HTTP status remains the authoritative failure even when
+    // an untrusted upstream error stream is oversized or malformed. Never
+    // downgrade AUTH/RATE_LIMIT to an untyped response-size error.
+    if (response.ok || !['AI_GATEWAY_RESPONSE_TOO_LARGE', 'AI_GATEWAY_INVALID_RESPONSE'].includes(error?.code)) throw error;
+    text = '';
+  }
   if (!response.ok) {
     // Trust the transport status even when the proxy/server returned HTML or
     // invalid JSON. Never put upstream content, prompts or secrets in errors.
