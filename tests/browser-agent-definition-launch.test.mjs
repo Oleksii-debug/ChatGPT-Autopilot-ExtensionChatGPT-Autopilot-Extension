@@ -910,6 +910,6 @@ test('Plan-1 S1: existing model route retry and circuit settings are canonical a
       /modelRoutePolicy|AI route/,
       'invalid model retry/circuit evidence must never be written into the canonical registry',
     );
-    assert.deepEqual(data, before, 'denied policy must not mutate the durable store');
+    assert.deepEqual(structuredClone(data), before, 'denied policy must not mutate the durable store');
   }
 });
