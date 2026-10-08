@@ -615,13 +615,19 @@ test('Plan-1: direct Agent intake fails closed on hostile scalar coercion before
       error = caught;
     }
     assert.ok(error, field + ' must fail closed');
-    assert.match(error.message, /must be a scalar data value/);
+    assert.match(error.message, /must be a finite scalar data value/);
     assert.doesNotMatch(error.message, /private-owner-intake-data/);
   }
   await assert.rejects(
     () => manager.create({ id: 'job.symbol', goal: Symbol('hostile') }),
-    /must be a scalar data value/,
+    /must be a finite scalar data value/,
   );
+  for (const invalidNumber of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    await assert.rejects(
+      () => manager.create({ id: 'job.nonfinite', goal: 'safe task', maxCostUsd: invalidNumber }),
+      /must be a finite scalar data value/,
+    );
+  }
   assert.equal(coercions, 0, 'validation may not invoke untrusted conversion hooks');
   assert.deepEqual(Object.keys(data), [], 'invalid direct intake cannot persist a partial job');
 
