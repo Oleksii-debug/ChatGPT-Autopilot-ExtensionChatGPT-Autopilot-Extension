@@ -627,3 +627,97 @@ test('native fallback refuses stale owner epoch at final pre-dispatch proof', as
   assert.equal(detachCount, 1);
   assert.deepEqual(dispatched, []);
 });
+
+test('Enter and Space activate only a snapshot-bound semantic target', () => {
+  const snapshot = setup();
+  for (const key of ['Enter', 'Space']) {
+    const action = parseBrowserAgentAction(JSON.stringify({ type: 'key', key, frameId: 0, ref: 'r1' }), snapshot);
+    assert.equal(action.expectedFrameUrl, pageUrl);
+    assert.equal(action.expectedSemanticName, 'Save');
+    assert.equal(action.expectedSemanticIdentity, snapshot.frames[0].elements[0].semanticIdentity);
+    assert.equal(proveBrowserNativeClick('s1', 'r1', action)?.url, pageUrl);
+    element.setAttribute('aria-label', 'Delete');
+    assert.equal(proveBrowserNativeClick('s1', 'r1', action), null);
+    element.removeAttribute('aria-label');
+    pageUrl = 'https://example.test/changed';
+    assert.equal(proveBrowserNativeClick('s1', 'r1', action), null);
+    pageUrl = snapshot.url;
+  }
+});
+
+test('post-attach key proof failure dispatches zero native key events', async () => {
+  setup();
+  const methods = [];
+  let detached = 0;
+  const manager = new BrowserAgentManager({ chromeApi: {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: null }] },
+    debugger: {
+      attach: async () => {},
+      sendCommand: async (_target, method) => { methods.push(method); },
+      detach: async () => { detached++; },
+    },
+  }, routePrompt: async () => ({}) });
+  manager.verifyOwnerAuthority = async () => true;
+  await assert.rejects(() => manager.dispatchKey(7, 'Enter', {
+    frameId: 0, snapshotId: 's1', ref: 'r1', expectedAction: {}, jobId: 'job-1', epoch: 3,
+  }), /AGENT_KEY_TARGET_STALE/);
+  assert.deepEqual(methods, []);
+  assert.equal(detached, 1);
+});
+
+test('owner Stop after debugger attach cancels key before any effect', async () => {
+  setup();
+  const methods = [];
+  const manager = new BrowserAgentManager({ chromeApi: {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: { x: 55, y: 25, url: pageUrl } }] },
+    debugger: {
+      attach: async () => {},
+      sendCommand: async (_target, method) => { methods.push(method); },
+      detach: async () => {},
+    },
+  }, routePrompt: async () => ({}) });
+  let checks = 0;
+  manager.verifyOwnerAuthority = async () => ++checks === 1;
+  await assert.rejects(() => manager.dispatchKey(7, ' ', {
+    frameId: 0, snapshotId: 's1', ref: 'r1', expectedAction: {}, jobId: 'job-1', epoch: 3,
+  }), /AGENT_KEY_CANCELLED_BY_OWNER/);
+  assert.equal(checks, 2);
+  assert.deepEqual(methods, []);
+});
+
+test('verified targeted key emits one down/up pair', async () => {
+  setup();
+  const methods = [];
+  const manager = new BrowserAgentManager({ chromeApi: {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: { x: 55, y: 25, url: pageUrl } }] },
+    debugger: {
+      attach: async () => {},
+      sendCommand: async (_target, method) => { methods.push(method); },
+      detach: async () => {},
+    },
+  }, routePrompt: async () => ({}) });
+  manager.verifyOwnerAuthority = async () => true;
+  await manager.dispatchKey(7, 'Enter', {
+    frameId: 0, snapshotId: 's1', ref: 'r1', expectedAction: {}, jobId: 'job-1', epoch: 3,
+  });
+  assert.deepEqual(methods, ['Input.dispatchKeyEvent', 'Input.dispatchKeyEvent']);
+});
+
+test('visual evidence refuses null, string and missing origin after restart', () => {
+  setup();
+  const original = probeBrowserCoordinateTarget(20, 20);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, original.target).ok, true);
+  for (const field of ['viewportScrollX', 'viewportScrollY', 'documentEpoch', 'viewportWidth', 'viewportHeight']) {
+    for (const invalid of [null, '', '0', undefined, Infinity]) {
+      const broken = { ...original.target, [field]: invalid };
+      assert.equal(verifyBrowserCoordinateTarget(20, 20, broken).reason, 'changed-page-or-viewport');
+    }
+  }
+  for (const field of ['left', 'top', 'width', 'height']) {
+    const broken = { ...original.target, rect: { ...original.target.rect, [field]: null } };
+    assert.equal(verifyBrowserCoordinateTarget(20, 20, broken).reason, 'changed-geometry');
+  }
+});
