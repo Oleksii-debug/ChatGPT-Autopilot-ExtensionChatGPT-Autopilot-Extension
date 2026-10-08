@@ -125,6 +125,12 @@ function planSummary(plan) {
   const nodes = own(plan, 'nodes');
   const stateCounts = {};
   let nodeCount = 0;
+  // An explicitly persisted malformed plan must not be presented as an
+  // empty plan after restart. Only a genuinely absent optional nodes field
+  // preserves the legacy zero-node projection.
+  if (nodes !== undefined && (!Array.isArray(nodes) || Object.getPrototypeOf(nodes) !== Array.prototype)) {
+    throw new Error('Agent plan nodes must be a plain array');
+  }
   if (Array.isArray(nodes)) {
     if (nodes.length > 4096) throw new Error('Agent plan is too large');
     for (let i = 0; i < nodes.length; i += 1) {
