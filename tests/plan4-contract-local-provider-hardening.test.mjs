@@ -941,3 +941,59 @@ test('Plan 4 S2: explicit corrupt local URL and timeout cannot silently select d
   assert.equal(normalizeLocalAiSettings(legacy).baseUrl,'http://127.0.0.1:11434');
   assert.equal(normalizeLocalAiSettings(settings).timeoutSeconds,5);
 });
+
+
+test('Plan 4 S1: explicit null endpoint identities and profile list never downgrade to unbound legacy evidence', async () => {
+  const boundRoute = {...route, endpointId:'loopback.1'};
+  const boundProfile = {...endpoint, endpointId:'loopback.1'};
+  const bound = {...snapshot, routes:[boundRoute], endpointProfiles:[boundProfile]};
+  const valid = await createAiRouteRegistryEvidenceV1(bound);
+  assert.equal(valid.routeIdentities[0].endpointBinding,'MATCHED');
+  for (const corrupt of [
+    {...bound, routes:[{...boundRoute,endpointId:null}]},
+    {...bound, routes:[{...boundRoute,endpointId:undefined}]},
+    {...bound, endpointProfiles:null},
+    {...bound, endpointProfiles:undefined},
+    {...bound, endpointProfiles:[{...boundProfile,endpointId:null}]},
+    {...bound, endpointProfiles:[{...boundProfile,credentialRef:null}]},
+  ]) {
+    await assert.rejects(createAiRouteRegistryEvidenceV1(corrupt), /endpoint|credential/i);
+    // JSON round trips preserve null but erase undefined keys, which is
+    // genuine legacy absence; do not fabricate a bound identity after restore.
+    const restarted = JSON.parse(JSON.stringify(corrupt));
+    if (restarted.routes[0].endpointId === null || restarted.endpointProfiles === null || restarted.endpointProfiles?.[0]?.endpointId === null || restarted.endpointProfiles?.[0]?.credentialRef === null) {
+      await assert.rejects(createAiRouteRegistryEvidenceV1(restarted), /endpoint|credential/i);
+    }
+  }
+  const legacy = await createAiRouteRegistryEvidenceV1(snapshot);
+  assert.equal(legacy.routeIdentities[0].endpointBinding,'UNRESOLVED_LEGACY');
+  assert.equal((await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(bound)))).configSha256,valid.configSha256);
+});
+
+test('Plan 4 S2: gateway identity and provider output ceiling reject malformed explicit owner values before network', async () => {
+  let requests = 0;
+  let admitted = null;
+  const client = new AiGatewayClient({fetchFn:async (url,init) => {
+    requests += 1;
+    admitted = {url,body:JSON.parse(init.body)};
+    return {ok:true,status:200,headers:{get:()=>null},text:async()=>JSON.stringify({ok:true,text:'ok'})};
+  }});
+  const base = {provider:'ollama',model:'llama3',prompt:'approved task'};
+  for (const invalidUrl of [null,'','  ',false]) {
+    assert.throws(() => normalizeGatewayUrl(invalidUrl), /URL/);
+    await assert.rejects(client.complete({...base,gatewayUrl:invalidUrl}), /Gateway URL/);
+  }
+  for (const bad of [1.5,0.5,-0,-1,null,false,'8',NaN,Infinity,Number.MAX_SAFE_INTEGER+1]) {
+    await assert.rejects(client.complete({...base,maxOutputTokens:bad}), /non-negative safe integer/);
+  }
+  assert.equal(requests,0,'invalid endpoints and budget may not dispatch');
+  assert.equal(normalizeGatewayUrl(undefined),'http://127.0.0.1:17621');
+  await client.complete({...base,maxOutputTokens:7});
+  assert.equal(requests,1);
+  assert.equal(admitted.body.maxOutputTokens,7);
+  assert.equal(admitted.body.model,'llama3');
+  const replay = JSON.parse(JSON.stringify({...base,maxOutputTokens:7}));
+  await client.complete(replay);
+  assert.equal(requests,2);
+  assert.equal(admitted.body.maxOutputTokens,7);
+});
