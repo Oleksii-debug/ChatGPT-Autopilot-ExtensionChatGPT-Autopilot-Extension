@@ -152,6 +152,13 @@ function ids(value, label, max = MAX_ROUTES) {
   return out;
 }
 
+// Only an absent optional list means the legacy empty default. Explicit
+// null/false/zero/empty text is invalid owner policy, not "allow every route".
+function optionalIds(record, key, label, max = MAX_ROUTES) {
+  const value = own(record, key);
+  return ids(value === undefined ? [] : value, label, max);
+}
+
 export function normalizeAiRoutePool(raw = []) {
   if (raw == null) return [];
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
@@ -162,7 +169,7 @@ export function normalizeAiRoutePool(raw = []) {
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
     const model = clean(own(item, 'model'), 300);
     if (!model) throw new Error('AI route model is required');
-    const roles = ids(own(item, 'roles') || [], `AI route ${index + 1} roles`, 12);
+    const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const rawLocality = own(item, 'locality');
     if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
@@ -186,7 +193,7 @@ export function normalizeAiRoutePool(raw = []) {
       workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
       endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
       roles: Object.freeze(roles),
-      capabilityIds: Object.freeze(ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64)),
+      capabilityIds: Object.freeze(optionalIds(item, 'capabilityIds', `AI route ${index + 1} capabilityIds`, 64)),
       priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
       enabled: optionalBoolean(item, 'enabled', `AI route ${index + 1} enabled`, true),
       locality,
@@ -213,9 +220,9 @@ export function normalizeAiRoutePolicy(raw = {}) {
   return Object.freeze({
     autoSwitch: optionalBoolean(source, 'autoSwitch', 'AI route autoSwitch', true),
     pinnedRouteId: id(own(source, 'pinnedRouteId'), 'AI route pinnedRouteId', true),
-    orderedRouteIds: Object.freeze(ids(own(source, 'orderedRouteIds') || [], 'AI route orderedRouteIds')),
-    allowRouteIds: Object.freeze(ids(own(source, 'allowRouteIds') || [], 'AI route allowRouteIds')),
-    denyRouteIds: Object.freeze(ids(own(source, 'denyRouteIds') || [], 'AI route denyRouteIds')),
+    orderedRouteIds: Object.freeze(optionalIds(source, 'orderedRouteIds', 'AI route orderedRouteIds')),
+    allowRouteIds: Object.freeze(optionalIds(source, 'allowRouteIds', 'AI route allowRouteIds')),
+    denyRouteIds: Object.freeze(optionalIds(source, 'denyRouteIds', 'AI route denyRouteIds')),
     freeOnly: optionalBoolean(source, 'freeOnly', 'AI route freeOnly', false),
     locality,
     maxInputPricePerMillionUsd: priceCap(own(source, 'maxInputPricePerMillionUsd'), 'AI route maximum input price'),
@@ -354,7 +361,7 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const normalizedRole = clean(role, 40);
   if (!ROLES.has(normalizedRole)) throw new Error('AI route requested role is invalid');
-  const capabilities = ids(capabilityIds || [], 'AI route requested capabilityIds', 64);
+  const capabilities = ids(capabilityIds, 'AI route requested capabilityIds', 64);
   const states = normalizeAiRouteStates(routeStates, pool);
   const selectionNow = stateInteger(now, 'AI route selection now');
   const allow = new Set(normalizedPolicy.allowRouteIds);
