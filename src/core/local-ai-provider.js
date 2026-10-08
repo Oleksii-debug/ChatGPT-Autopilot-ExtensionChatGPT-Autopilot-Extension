@@ -334,6 +334,38 @@ export function normalizeLocalAiUsage(providerType, body) {
   return Object.freeze({ inputTokens, outputTokens, totalTokens, source: inputTokens === null && outputTokens === null && totalTokens === null ? 'UNREPORTED' : 'PROVIDER_REPORTED' });
 }
 
+// Local-provider transport is not a general-purpose HTTP proxy. Credential
+// injection, arbitrary fetch flags, unsafe verbs and non-JSON outbound payloads
+// must not bypass the canonical gateway/credential/budget boundaries.
+function snapshotLocalAiRequestInit(raw = {}) {
+  const init = snapshotSettingsRecord(raw);
+  for (const key of Object.keys(init)) {
+    // redirect is accepted for backward compatibility, but ALWAYS overridden
+    // to error before fetch: no provider-controlled off-host redirection.
+    if (!['method', 'body', 'redirect'].includes(key)) {
+      throw new Error('Local AI transport option is not allowed');
+    }
+  }
+  if (init.method !== undefined && init.method !== 'GET' && init.method !== 'POST') {
+    throw new Error('Local AI transport method is not allowed');
+  }
+  if (init.body !== undefined && (typeof init.body !== 'string' || init.method !== 'POST')) {
+    throw new Error('Local AI transport body requires an explicit POST with JSON text');
+  }
+  if (typeof init.body === 'string') {
+    if (new TextEncoder().encode(init.body).byteLength > 128_000) {
+      throw new Error('Local AI transport body exceeds safe request limit');
+    }
+    try {
+      const parsed = JSON.parse(init.body);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+    } catch {
+      throw new Error('Local AI transport body must be a JSON object');
+    }
+  }
+  return init;
+}
+
 export class LocalAiClient {
   constructor({
     fetchFn = globalThis.fetch,
@@ -352,6 +384,7 @@ export class LocalAiClient {
   async request(settings, url, init = {}, consumeResponse = null) {
     const normalized = normalizeLocalAiSettings(settings);
     const requestUrl = assertLocalAiRequestUrl(url);
+    const safeInit = snapshotLocalAiRequestInit(init);
     // The transport is not an arbitrary loopback HTTP client. Bind every
     // request to the configured provider origin and one of its two explicit
     // API endpoints before attaching prompt content or starting a network effect.
@@ -359,19 +392,21 @@ export class LocalAiClient {
         && requestUrl !== endpointFor(normalized, 'chat')) {
       throw new Error('Local AI request URL does not match the configured provider endpoint');
     }
+    if (requestUrl === endpointFor(normalized, 'models') && (safeInit.body !== undefined || safeInit.method === 'POST')) {
+      throw new Error('Local AI model discovery cannot send prompt content');
+    }
     const controller = new AbortController();
     const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
     let responseReceived = false;
     try {
       const response = await this.fetchFn(requestUrl, {
-        ...init,
+        ...safeInit,
         cache: 'no-store',
         redirect: 'error',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-          ...(init.headers || {}),
+          ...(safeInit.body ? { 'Content-Type': 'application/json' } : {}),
         },
       });
       responseReceived = true;
