@@ -32,3 +32,10 @@
 
 ## Historical source note
 Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source archive. The source itself is available; the remaining bootstrap step is canonical Git import/synchronization plus current qualification.
+
+## Plan 3 — 2026-10-08 Sections 1–2: evidence, NOT terminal DONE
+- Source: canonical 11.0.13 High `fix/11.0.13-post-send-dwell-background`, SHA `ca7062e1f8e47b26d7e024c46bb432d341621dd4`; `main` remains stale 0.9.19 until source convergence.
+- S1 `IN_PROGRESS`: reused Specialist registry/readiness/dispatcher and repaired dispatch-time chronology against future observations, future resolutions and inconsistent age. New test `tests/specialist-provider-dispatch-chronology.test.mjs` local 5/5 pass; provider/lease/restart adversarial evidence.
+- S2 `IN_PROGRESS`: reused Subagent authority/topology/activation/reconciliation with `tests/subagent-plan3-recovery-fence.test.mjs` local 3/3 pass; restart/no-orphan, pause, clock and resource denials.
+- GitHub evidence: draft [PR #656](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/656), two-section `plan3-sections-1-2-qualification.yml`. Exact-head CI QUEUED at last read; integration not terminal; neither section has evidence for DONE yet.
+- Drive mirror: `3. Третій план`, doc `1FgqO_2mbIt3ljvn8GN0hX7G_KZCVkoMqcuTCU6YxViY`.
