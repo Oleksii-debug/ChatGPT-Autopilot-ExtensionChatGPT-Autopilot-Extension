@@ -98,3 +98,23 @@ test('payload reference needs exact size, sensitivity, provenance, and digest', 
   });
   assert.equal((await client.control(request)).status, 'UNKNOWN_NETWORK_RESULT');
 });
+
+
+test('response identity is bound to serialized wire bytes despite caller TOCTOU mutation', async () => {
+  const request = { ...BASE };
+  let sentProject = null, invocations = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async (_, options) => {
+      invocations += 1;
+      sentProject = JSON.parse(options.body).projectId;
+      request.projectId = 'foreign-project';
+      return { ok: true, json: async () => transportResponse({ projectId: 'foreign-project' },
+        { projectId: 'foreign-project' }) };
+    },
+  });
+  const result = await client.control(request);
+  assert.equal(sentProject, BASE.projectId);
+  assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(invocations, 1, 'uncertain effect must not be sent twice');
+});
