@@ -145,3 +145,38 @@ test('paused ancestor blocks a new nested durable spawn despite active child sta
   assert.equal(denied.executionAuthority, false);
   assert.equal(denied.activationAuthority, false);
 });
+
+
+test('durably processed child event is not proposed a second time after restart', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.activationRequests.length, 2);
+  const alreadyProcessed = first.activationRequests[0];
+  const savedRuntime = structuredClone(first.runtime);
+  savedRuntime.processedEventIds[alreadyProcessed.eventId] = 250;
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph),
+    runtime: savedRuntime,
+    nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.createdNodeIds, first.createdNodeIds);
+  assert.equal(replay.activationRequests.filter(item => item.eventId === alreadyProcessed.eventId).length, 0);
+  assert.equal(replay.activationRequests.length, 1, 'unprocessed sibling still admitted');
+  assert.equal(replay.executionAuthority, false);
+  assert.equal(replay.activationAuthority, false);
+});
+
+test('without durable processed event exact restart can still offer deterministic proposals', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: structuredClone(first.graph), runtime: structuredClone(first.runtime), nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(
+    replay.activationRequests.map(item => item.eventId),
+    first.activationRequests.map(item => item.eventId),
+  );
+});
