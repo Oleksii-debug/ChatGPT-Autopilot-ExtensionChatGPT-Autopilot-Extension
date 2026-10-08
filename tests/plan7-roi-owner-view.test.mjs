@@ -230,3 +230,23 @@ test('validated nested ROI interval never re-reads an attacker-controlled Proxy 
     'lower bound comes from validated snapshot');
   assert.equal(nodes.find(node => node.attributes.role === 'status').attributes['aria-live'], 'polite');
 });
+
+
+test('Plan 7 ROI degraded NVDA copy never claims computed verified savings', () => {
+  for (const [state, expected] of [
+    ['OFFLINE', 'Локальна оцінка недоступна'],
+    ['INSUFFICIENT_EVIDENCE', 'Доказів недостатньо для обчислення економії часу'],
+  ]) {
+    const root = container();
+    renderRoiOwnerViewV1(root, base({ status: state }));
+    const nodes = walk(root);
+    const explanatory = nodes.filter(node => node.tagName === 'P').map(node => node.textContent);
+    assert.ok(explanatory.some(value => value.includes(expected)));
+    assert.equal(explanatory.some(value => value.includes('Показники обчислено з перевірених записів')), false);
+    assert.ok(nodes.some(node => node.attributes.role === 'status'), 'keyboard/NVDA state must remain semantic');
+    assert.equal(nodes.some(node => node.tagName === 'TABLE'), false, 'degraded state must not show saved economics');
+  }
+  const verified = container();
+  renderRoiOwnerViewV1(verified, base({ status: 'EVIDENCE_BACKED', observedRunCount: 1 }));
+  assert.ok(walk(verified).some(node => node.textContent.includes('Показники обчислено з перевірених записів')));
+});

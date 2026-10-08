@@ -252,8 +252,15 @@ export function renderRoiOwnerViewV1(container, rawAdvisory) {
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
   section.appendChild(status);
+  // A missing/offline report is not measured savings. In particular, NVDA
+  // must not announce "calculated from verified records" when none exist.
+  const provenanceText = advisory.status === 'OFFLINE'
+    ? 'Локальна оцінка недоступна; попередні показники не використовуються.'
+    : advisory.status === 'INSUFFICIENT_EVIDENCE'
+      ? 'Доказів недостатньо для обчислення економії часу.'
+      : 'Показники обчислено з перевірених записів.';
   section.appendChild(element('p',
-    'Показники обчислено з перевірених записів. Оцінки не гарантують економії; ' +
+    provenanceText + ' Оцінки не гарантують економії; ' +
     'жодна рекомендація не запускає автоматизацію, не змінює політики або бюджет.'));
   if (advisory.status === 'OFFLINE' || advisory.status === 'INSUFFICIENT_EVIDENCE') {
     container.replaceChildren(section);
