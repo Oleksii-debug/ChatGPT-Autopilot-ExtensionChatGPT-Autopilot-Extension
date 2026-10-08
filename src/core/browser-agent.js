@@ -1356,12 +1356,31 @@ export function focusBrowserAgentTarget(snapshotId, ref) {
 }
 
 export function verifyBrowserFileInput(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === String(ref || '') && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
-  if (!(target instanceof HTMLInputElement) || String(target.type || '').toLowerCase() !== 'file') throw new Error('AGENT_FILE_INPUT_STALE');
+  // Chrome serializes this function into the page. Site-visible input/change
+  // events are effects: prove target availability and chosen files first.
+  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element =>
+    element.getAttribute('data-autopilot-agent-ref') === String(ref || '')
+    && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
+  if (!(target instanceof HTMLInputElement) || String(target.type || '').toLowerCase() !== 'file'
+    || !target.isConnected) throw new Error('AGENT_FILE_INPUT_STALE');
+  for (let node = target; node; node = node.parentElement) {
+    if (node.hidden || node.inert || node.disabled
+      || node.getAttribute?.('aria-hidden') === 'true'
+      || node.getAttribute?.('aria-disabled') === 'true') throw new Error('AGENT_FILE_INPUT_STALE');
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden'
+      || style.visibility === 'collapse' || Number(style.opacity) === 0
+      || style.pointerEvents === 'none') throw new Error('AGENT_FILE_INPUT_STALE');
+  }
+  const files = Array.from(target.files || []).map(file => ({
+    name: String(file.name || '').slice(0, 500),
+    size: Number(file.size || 0),
+    type: String(file.type || '').slice(0, 200),
+  }));
+  if (!files.length) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+  // This proves local selection, not a completed remote upload.
   target.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   target.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-  const files = Array.from(target.files || []).map(file => ({ name: String(file.name || '').slice(0, 500), size: Number(file.size || 0), type: String(file.type || '').slice(0, 200) }));
-  if (!files.length) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
   return { ok: true, files };
 }
 
