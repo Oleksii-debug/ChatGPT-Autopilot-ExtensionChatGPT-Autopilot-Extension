@@ -39,3 +39,12 @@ Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source
 - S2 `IN_PROGRESS`: reused Subagent authority/topology/activation/reconciliation with `tests/subagent-plan3-recovery-fence.test.mjs` local 3/3 pass; restart/no-orphan, pause, clock and resource denials.
 - GitHub evidence: draft [PR #656](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/656), two-section `plan3-sections-1-2-qualification.yml`. Exact-head CI QUEUED at last read; integration not terminal; neither section has evidence for DONE yet.
 - Drive mirror: `3. Третій план`, doc `1FgqO_2mbIt3ljvn8GN0hX7G_KZCVkoMqcuTCU6YxViY`.
+
+## Plan 2 — live in-progress evidence (2026-10-08)
+- Assigned Drive authority: `2. Другий план`, document `1LWRjRhYYv1jQE3CXeDZg20Dn8WD3EJJbKtXNcsohsCo`. This note changes **only** Plan 2 status.
+- Section 1 (Semantic Browser Agent): **IN_PROGRESS / NOT TERMINAL DONE**. Existing 11.0.13 High Browser Agent retained; additional live semantic target/name/form/link checks and Chrome-serialized action guard implemented in draft PR #655.
+- Section 2 (Vision/coordinate fallback): **IN_PROGRESS / NOT TERMINAL DONE**. Existing 11.0.13 High visual fallback retained; page/viewport/scroll/geometry target proof and standalone injected verifier repaired in the same PR.
+- Branch: `plan2/semantic-coordinate-fences-11-0-13-high-20261008`, observed head `7a475d283d91a45edfb178899928452d7b3c3b35`, base on the 11.x source successor PR #654 (NOT main 0.9.19).
+- Evidence: 16/16 isolated in-process synthetic tests passed against exact GitHub browser-agent/test blobs; code/manager parsed; GitHub file readbacks matched. GitHub Actions CI pending at this checkpoint. This is not terminal integration, authenticated account, native Windows/NVDA or whole-product evidence.
+- Existing source lineage and coordination ownership remain unchanged. Do **not** mark either section DONE before missing test, CI and integration evidence are read back. Continue with the first actionable unfinished section (Section 1), then Section 2.
+- Working PR: https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/655
