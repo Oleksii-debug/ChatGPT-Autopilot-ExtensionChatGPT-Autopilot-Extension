@@ -13,7 +13,7 @@ function container() { const root=new FakeNode('div');root.id='roi-panel';root.o
 function evidence(overrides={}) {
   return {schemaVersion:1,status:'EVIDENCE_BACKED',statusText:'Локальна оцінка',
     deploymentAuthorized:false, recommendationAuthorized:false, telemetryEmitted:false,
-    verifiedOutcomeCount:1,observedOwnerAttentionSeconds:10,observedOwnerTimeAvoidedSeconds:0,
+    observedRunCount:1,verifiedOutcomeCount:1,observedOwnerAttentionSeconds:10,observedOwnerTimeAvoidedSeconds:0,
     netOwnerTimeLowerSeconds:-10,netOwnerTimeUpperSeconds:0,machineSpendUsdMicros:0,
     opportunities:[],...overrides};
 }
@@ -128,4 +128,19 @@ test('ROI workflow name is a semantic row header for keyboard/NVDA navigation', 
   assert.equal(row?.textContent, 'workflow.nvda');
   assert.equal(all.filter(node => node.tagName === 'TH'
     && node.attributes.scope === 'col').length, 3);
+});
+
+test('ROI refuses forged or impossible canonical outcome counts before DOM mutation', () => {
+  for (const changes of [
+    { observedRunCount: -1 }, { observedRunCount: 257 },
+    { observedRunCount: '1' }, { observedRunCount: Number.NaN },
+    { verifiedOutcomeCount: 2 }, { verifiedOutcomeCount: -1 },
+    { verifiedOutcomeCount: 1.5 }, { verifiedOutcomeCount: '1' },
+    { observedRunCount: 0, verifiedOutcomeCount: 1 },
+  ]) {
+    bad(root => renderRoiOwnerViewV1(root, evidence(changes)));
+  }
+  const root = container();
+  renderRoiOwnerViewV1(root, evidence({ observedRunCount: 2, verifiedOutcomeCount: 1 }));
+  assert.equal(root.children.length, 1, 'valid historical count relation remains renderable');
 });

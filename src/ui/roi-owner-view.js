@@ -115,6 +115,15 @@ function snapshotAdvisory(input) {
     || (advisory.telemetryEmitted !== undefined && advisory.telemetryEmitted !== false)) {
     throw new Error('ROI advisory is invalid or attempts to grant authority');
   }
+  // A forged advisory must not report more independently verified outcomes
+  // than the bounded canonical run population, even if the status label is valid.
+  if (!Number.isSafeInteger(advisory.observedRunCount)
+    || advisory.observedRunCount < 0 || advisory.observedRunCount > 256
+    || !Number.isSafeInteger(advisory.verifiedOutcomeCount)
+    || advisory.verifiedOutcomeCount < 0
+    || advisory.verifiedOutcomeCount > advisory.observedRunCount) {
+    throw new Error('ROI outcome counters contradict canonical run evidence');
+  }
   const rows = snapshotRows(advisory.opportunities);
   if (advisory.status === 'OFFLINE' || advisory.status === 'INSUFFICIENT_EVIDENCE') {
     if (rows.length !== 0) throw new Error('Unavailable evidence cannot list opportunities');
