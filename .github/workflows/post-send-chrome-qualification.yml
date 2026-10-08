@@ -1,0 +1,32 @@
+name: Post-Send Chrome qualification
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "scripts/browser-smoke-lib.cjs"
+      - "scripts/native-browser-smoke.cjs"
+      - "scripts/chrome-ui-accessibility-smoke.mjs"
+      - "tests-regression/**"
+      - ".github/workflows/post-send-chrome-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium:
+    name: Native Chrome browser smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+      - name: Run actual Chromium UI and interaction smoke
+        env:
+          CHROMIUM_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run test:browser
