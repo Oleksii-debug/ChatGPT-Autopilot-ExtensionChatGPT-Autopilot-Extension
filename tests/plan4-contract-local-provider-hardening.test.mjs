@@ -907,3 +907,37 @@ test('hybrid strong review cannot downgrade an UNKNOWN settlement to a successfu
   assert.deepEqual(calls,['first','review']);
   assert.equal(settles,2);
 });
+
+
+test('Plan 4 S1: route price and owner cap reject coercible zero values across persistence', () => {
+  const invalid = ['', ' ', ' 0 ', '0x0', '0b0', '0o0', '+0', '-0', '00', 'NaN', '0_0'];
+  for (const value of invalid) {
+    const candidate = [{...route,inputPricePerMillionUsd:value,outputPricePerMillionUsd:0}];
+    assert.throws(() => normalizeAiRoutePool(candidate), /price.*invalid/i);
+    assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify(candidate))), /price.*invalid/i);
+    assert.throws(() => normalizeAiRoutePolicy({maxInputPricePerMillionUsd:value}), /price.*invalid/i);
+  }
+  const exact = normalizeAiRoutePool([{...route,inputPricePerMillionUsd:'0',outputPricePerMillionUsd:'0.0005'}])[0];
+  assert.equal(exact.inputPriceKnown,true);
+  assert.equal(exact.inputPricePerMillionUsd,0);
+  assert.equal(exact.outputPricePerMillionUsd,0.0005);
+  assert.equal(normalizeAiRoutePolicy({maxInputPricePerMillionUsd:'0'}).maxInputPricePerMillionUsd,0);
+});
+
+test('Plan 4 S2: explicit corrupt local URL and timeout cannot silently select defaults after restart', () => {
+  for (const badBaseUrl of ['', '   ']) {
+    const config = {...settings,baseUrl:badBaseUrl};
+    assert.throws(() => normalizeLocalAiSettings(config), /URL cannot be empty/);
+    assert.throws(() => normalizeLocalAiSettings(JSON.parse(JSON.stringify(config))), /URL cannot be empty/);
+    assert.throws(() => normalizeLocalAiBaseUrl(badBaseUrl), /URL cannot be empty/);
+  }
+  const corrupt = {...settings,timeoutSeconds:null};
+  assert.throws(() => normalizeLocalAiSettings(corrupt), /timeout/);
+  assert.throws(() => normalizeLocalAiSettings(JSON.parse(JSON.stringify(corrupt))), /timeout/);
+  const legacy = {...settings};
+  delete legacy.baseUrl;
+  delete legacy.timeoutSeconds;
+  assert.equal(normalizeLocalAiSettings(legacy).timeoutSeconds,90);
+  assert.equal(normalizeLocalAiSettings(legacy).baseUrl,'http://127.0.0.1:11434');
+  assert.equal(normalizeLocalAiSettings(settings).timeoutSeconds,5);
+});
