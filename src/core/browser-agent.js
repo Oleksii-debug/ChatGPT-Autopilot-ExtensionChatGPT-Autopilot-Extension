@@ -1068,7 +1068,7 @@ export function executeBrowserPageAction(snapshotId, action) {
         || node.getAttribute?.('aria-disabled') === 'true' || node.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
-        || Number(style.opacity) === 0) throw new Error('AGENT_TARGET_UNAVAILABLE');
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') throw new Error('AGENT_TARGET_UNAVAILABLE');
     }
     return target;
   };
