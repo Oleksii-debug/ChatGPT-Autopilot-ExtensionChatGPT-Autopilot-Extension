@@ -259,6 +259,7 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
         || nodeRuntime.generation !== 1
         || nodeRuntime.lifecycle !== OrchestrationNodeLifecycle.IDLE
         || nodeRuntime.currentActivationId
+        || nodeRuntime.lastTerminalStatus
         || !scopeChainIsRunning(graph, runtime, nodeId)) {
       return;
     }
