@@ -38,7 +38,7 @@ test('Agent timeline projects existing job without effects and redacts private d
   assert.deepEqual(result.plan.stateCounts, { READY: 1, VERIFIED: 1 });
   assert.equal(result.plan.revision, 4);
   assert.deepEqual(result.counters, {
-    steps: 9, cycles: 2, modelCalls: 3, totalTokens: 450, verifiedChecks: 1, ownerEvents: 2,
+    steps: 9, cycles: 2, modelCalls: 3, totalTokens: 450, estimatedCostUsd: 0.016, verifiedChecks: 1, ownerEvents: 2,
   });
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.entries), true);
