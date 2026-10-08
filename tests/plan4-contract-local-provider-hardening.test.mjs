@@ -1296,3 +1296,44 @@ test('Plan4 S2: forged Gateway diagnostic prefixes cannot leak transport secrets
     error.status === 429 && error.category === 'RATE_LIMIT'
     && error.retryable === true && !String(error.message).includes('sk-sentinel'));
 });
+
+test('Plan4 S1/S2: budgeted dispatch refuses missing or forged durable reservation before provider I/O', async () => {
+  const seen=[];
+  let effects=0;
+  const owner={enabled:true,mode:'primary',
+    primary:{provider:'ollama',model:'fixture'},fallbackToStrongOnPrimaryError:false};
+  const budget={kind:'browser-agent',jobId:'job',controlEpoch:1};
+  const forged=[
+    null, undefined, false, {},
+    {reservationId:''},{reservationId:42},
+    Object.defineProperty({},'reservationId',{get(){throw Error('sk-private-accessor');},enumerable:true}),
+  ];
+  for(const fake of forged) {
+    const router=new AiOrchestrator({
+      gatewayClient:{async complete(){effects++;return {text:'unsafe'};}},
+      providerCallLifecycle:{
+        async beforeProviderCall(){seen.push('before');return fake;},
+        async afterProviderCall(){seen.push('after');},
+      },
+    });
+    await assert.rejects(router.run(owner,{},'owner approved',{
+      providerCallBudgetContext:budget,maxOutputTokens:128,maxModelCallsForRequest:1,
+    }),error=>error.code==='AI_MODEL_BUDGET_RESERVATION_REQUIRED'
+      && !String(error.message).includes('sk-private'));
+  }
+  assert.equal(effects,0);
+  assert.deepEqual(seen,Array(forged.length).fill('before'));
+  const admitted=new AiOrchestrator({
+    gatewayClient:{async complete(){effects++;return {text:'safe',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};}},
+    providerCallLifecycle:{
+      async beforeProviderCall(){return {reservationId:'job:model-budget:1'};},
+      async afterProviderCall(){return {settled:true};},
+    },
+  });
+  const result=await admitted.run(owner,{},'owner approved',{
+    providerCallBudgetContext:JSON.parse(JSON.stringify(budget)),
+    maxOutputTokens:128,maxModelCallsForRequest:1,
+  });
+  assert.equal(result.usage.modelCalls,1);
+  assert.equal(effects,1);
+});
