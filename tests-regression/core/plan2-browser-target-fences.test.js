@@ -102,3 +102,49 @@ test('focus-induced repurpose cannot convert an approved Save into Delete', () =
   assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_SEMANTIC_TARGET_STALE/);
   assert.equal(element.clicked, 0);
 });
+
+test('external aria-labelledby label retarget cannot silently change Save into Delete', () => {
+  setup();
+  element.textContent = '';
+  element.setAttribute('aria-labelledby', 'external-name');
+  const label = { textContent: 'Save' };
+  document.getElementById = id => id === 'external-name' ? label : null;
+  const page = snapshotBrowserPage('s-label');
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', { frames: [{ frameId: 0, ...page }], url: page.url });
+  assert.equal(action.expectedSemanticName, 'Save');
+  label.textContent = 'Delete account';
+  assert.throws(() => executeBrowserPageAction('s-label', action), /AGENT_SEMANTIC_TARGET_STALE/);
+  assert.equal(element.clicked, 0);
+});
+
+test('parent form action drift invalidates approved submit even with unchanged button', () => {
+  setup();
+  element.setAttribute('type', 'submit');
+  element.form = new HTMLFormElement();
+  element.form.action = 'https://example.test/save';
+  element.form.method = 'post';
+  const page = snapshotBrowserPage('s-form');
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', { frames: [{ frameId: 0, ...page }], url: page.url });
+  assert.equal(action.expectedSemanticFormAction, 'https://example.test/save');
+  element.form.action = 'https://example.test/remove';
+  assert.throws(() => executeBrowserPageAction('s-form', action), /AGENT_SEMANTIC_TARGET_STALE/);
+  assert.equal(element.clicked, 0);
+});
+
+test('serialized stale semantic actions cannot regain effects after reinitialization', () => {
+  const snapshot = setup();
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot)));
+  delete action.expectedSemanticName;
+  assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_SEMANTIC_TARGET_STALE/);
+  assert.equal(element.clicked, 0);
+});
+
+test('visual fallback invalidates screenshot target when page scroll changes', () => {
+  setup();
+  globalThis.scrollY = 0;
+  const original = probeBrowserCoordinateTarget(20, 20);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, original.target).ok, true);
+  globalThis.scrollY = 45;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, original.target).reason, 'changed-page-or-viewport');
+  globalThis.scrollY = 0;
+});
