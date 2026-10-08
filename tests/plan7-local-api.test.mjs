@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
+import { request as httpRequest } from 'node:http';
 import { startAutopilotLocalApiLoopbackV1, createAutopilotLocalApiServerV1 } from '../companion/local-api/server.mjs';
 import { createAutopilotLocalClientV1 } from '../companion/local-api/client.mjs';
 
@@ -85,10 +85,16 @@ test('unauthenticated, wrong-host, origin and preflight requests do not reach Co
     const preflight=await fetch(url,{method:'OPTIONS',headers:{
       Authorization:'Bearer '+TOKEN,'Access-Control-Request-Method':'POST'}});
     assert.equal(preflight.status,403);
-    const rebinding=await fetch(url,{method:'POST',headers:{
-      Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',
-      Host:'attacker.invalid'},body:JSON.stringify(request())});
-    assert.equal(rebinding.status,403);
+    const rebindingStatus=await new Promise((resolve,reject)=>{
+      const raw=httpRequest({hostname:'127.0.0.1',port,path:'/v1/control',method:'POST',
+        headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',
+          Host:'attacker.invalid'}},res=>{
+        res.resume();res.on('end',()=>resolve(res.statusCode));
+      });
+      raw.once('error',reject);
+      raw.end(JSON.stringify(request()));
+    });
+    assert.equal(rebindingStatus,403);
   },dependencies(counters));
   assert.deepEqual(counters,{scopes:0,dispatches:0});
 });
