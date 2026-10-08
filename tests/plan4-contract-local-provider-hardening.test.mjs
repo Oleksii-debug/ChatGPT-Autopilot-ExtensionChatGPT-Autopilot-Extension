@@ -1230,3 +1230,69 @@ test('Plan4 S1: exact endpoint identity cannot be erased or aliased at gateway d
   assert.match(seen[1].url,/endpointId=local.profile-1/);
   assert.equal(effects,2);
 });
+
+test('Plan4 S1: persisted null/undefined owner pin never broadens model routing', () => {
+  const ownerRoutes = [
+    {...route,routeId:'owner.primary',priority:1},
+    {...route,routeId:'other.account',priority:100},
+  ];
+  for (const invalid of [null,undefined,false,0,{},[]]) {
+    assert.throws(
+      () => normalizeAiRoutePolicy({pinnedRouteId:invalid}),
+      /pinnedRouteId must be exact text/,
+    );
+  }
+  const resumed = JSON.parse(JSON.stringify({pinnedRouteId:null}));
+  assert.throws(() => normalizeAiRoutePolicy(resumed), /pinnedRouteId must be exact text/);
+  assert.deepEqual(
+    selectAiRouteCandidates({
+      routes:ownerRoutes, policy:{pinnedRouteId:'owner.primary'}, now:1,
+    }).candidates.map(candidate => candidate.routeId),
+    ['owner.primary'],
+  );
+  // Only an explicitly empty string can deliberately clear the pin.
+  assert.equal(normalizeAiRoutePolicy({pinnedRouteId:''}).pinnedRouteId,'');
+  assert.equal(normalizeAiRoutePolicy({}).pinnedRouteId,'');
+});
+
+test('Plan4 S2: forged Gateway diagnostic prefixes cannot leak transport secrets', async () => {
+  const request = {provider:'openai-compatible',model:'fixture',prompt:'safe',timeoutSeconds:5};
+  for (const forgedMessage of [
+    'AI Gateway returned sk-sentinel-transport-exception',
+    'AI Gateway error sk-sentinel-transport-exception',
+  ]) {
+    const gateway = new AiGatewayClient({
+      fetchFn: async () => { throw new Error(forgedMessage); },
+    });
+    await assert.rejects(gateway.complete(request), error =>
+      error.code === 'AI_GATEWAY_UNAVAILABLE'
+      && error.category === 'UNAVAILABLE'
+      && !String(error.message).includes('sk-sentinel'));
+  }
+  const forgedBody = new AiGatewayClient({
+    fetchFn:async () => ({
+      ok:true,status:200,
+      text:async () => { throw new Error('AI Gateway returned sk-sentinel-body-reader'); },
+    }),
+  });
+  await assert.rejects(forgedBody.complete(request), error =>
+    error.code === 'AI_GATEWAY_UNAVAILABLE'
+    && !String(error.message).includes('sk-sentinel'));
+  const forgedCode = new AiGatewayClient({
+    fetchFn:async () => {
+      const failure = new Error('sk-sentinel-fake-code');
+      failure.code = 'AI_GATEWAY_RESPONSE_TOO_LARGE';
+      throw failure;
+    },
+  });
+  await assert.rejects(forgedCode.complete(request), error =>
+    error.code === 'AI_GATEWAY_UNAVAILABLE'
+    && !String(error.message).includes('sk-sentinel'));
+  // Internally generated HTTP classification is still preserved.
+  const genuine = new AiGatewayClient({
+    fetchFn:async () => new Response('sk-sentinel-http-body',{status:429}),
+  });
+  await assert.rejects(genuine.complete(request), error =>
+    error.status === 429 && error.category === 'RATE_LIMIT'
+    && error.retryable === true && !String(error.message).includes('sk-sentinel'));
+});
