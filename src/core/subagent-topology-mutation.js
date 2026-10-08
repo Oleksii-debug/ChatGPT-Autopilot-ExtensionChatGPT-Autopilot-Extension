@@ -441,6 +441,16 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
       resource,
     });
   }
+  // An active child under a paused/stopped ancestor cannot create new durable
+  // descendants, even when the child's own scope still reads RUNNING.
+  if (!scopeChainIsRunning(canonicalGraph, canonicalRuntime, parentNodeId)) {
+    return denial('ANCESTOR_SCOPE_NOT_RUNNING', {
+      parentNodeId,
+      spawnId,
+      structure,
+      resource,
+    });
+  }
 
   const rawGraph = graphDocument(canonicalGraph);
   const rawParent = rawGraph.nodes.find(node => node.id === parentNodeId);
