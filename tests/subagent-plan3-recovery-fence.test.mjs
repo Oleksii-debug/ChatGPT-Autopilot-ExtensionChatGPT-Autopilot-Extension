@@ -311,3 +311,14 @@ test('durable terminal child outcome suppresses duplicate activation despite los
   assert.equal(replay.executionAuthority, false);
   assert.equal(replay.activationAuthority, false);
 });
+
+test('section 2: invalid spawn field names cannot disclose attacker-controlled secret strings', () => {
+  const secret = 'PRIVATE_DELEGATION_SECRET_MUST_NOT_ECHO_731';
+  const hostile = { ...request(), [secret]: 'value' };
+  assert.throws(() => mutateOrchestrationSubagentTopologyV1(hostile), error =>
+    error instanceof Error && /unknown field/u.test(error.message) && !error.message.includes(secret));
+  const canonical = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(canonical.decision, 'ALLOW', 'legitimate spawn still has bounded admission');
+  assert.equal(canonical.executionAuthority, false);
+  assert.equal(canonical.activationAuthority, false);
+});
