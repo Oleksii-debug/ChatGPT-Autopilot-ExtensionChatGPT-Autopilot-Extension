@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
+import { normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
 
 const route = { routeId:'primary', provider:'ollama', model:'llama3', locality:'local' };
 const endpoint = { schemaVersion:1, profileId:'local.ollama', provider:'ollama', endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/', credentialRef:'', credentialless:true };
@@ -404,4 +405,24 @@ test('gateway keeps transport AUTH/RATE_LIMIT/UNAVAILABLE on oversized hostile e
     assert.equal(cancels,1);
     assert.equal(reads,0);
   }
+});
+
+test('owner model-routing failover booleans reject coercion and accessor traps after restart', () => {
+  for (const flag of ['enabled','carryStrongResultToPrimary','fallbackToStrongOnPrimaryError','keepPrimaryIfStrongFails']) {
+    for (const forged of ['false','true',0,1,null,[],{}]) {
+      assert.throws(() => normalizeAiRouterSettings({ [flag]:forged }), /must be boolean/);
+    }
+    const malicious = {};
+    Object.defineProperty(malicious,flag,{enumerable:true,get(){throw new Error('forged getter evaluated');}});
+    assert.throws(() => normalizeAiRouterSettings(malicious), /must be boolean/);
+  }
+  const denied = JSON.parse(JSON.stringify({
+    enabled:true, carryStrongResultToPrimary:false,
+    fallbackToStrongOnPrimaryError:false, keepPrimaryIfStrongFails:false,
+  }));
+  const restored = normalizeAiRouterSettings(denied);
+  assert.equal(restored.enabled,true);
+  assert.equal(restored.carryStrongResultToPrimary,false);
+  assert.equal(restored.fallbackToStrongOnPrimaryError,false);
+  assert.equal(restored.keepPrimaryIfStrongFails,false);
 });
