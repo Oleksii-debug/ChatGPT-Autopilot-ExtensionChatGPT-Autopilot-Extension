@@ -2048,6 +2048,7 @@ function scenarioWorkConfigFromForm() {
     minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
     tabReadyDelaySeconds: scenarioWorkInt('scenario-work-tab-ready', 0, 60, 'Пауза після відкриття вкладки'),
     postSendDelaySeconds: validatedPostSendSeconds('scenario-work-post-send', 'scenario-work-post-send-unit'),
+    postSendDelayUnit: $('scenario-work-post-send-unit').value === 'minutes' ? 'minutes' : 'seconds',
     preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'Пауза перед надсиланням'),
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
@@ -2114,7 +2115,7 @@ function fillScenarioWorkForm(item) {
   $('scenario-work-poll').value = String(config.pollSeconds ?? 180);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
   $('scenario-work-tab-ready').value = String(config.tabReadyDelaySeconds ?? 0);
-  $('scenario-work-post-send-unit').value = (config.postSendDelaySeconds >= 60 && config.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
+  $('scenario-work-post-send-unit').value = config.postSendDelayUnit === 'minutes' ? 'minutes' : config.postSendDelayUnit === 'seconds' ? 'seconds' : (config.postSendDelaySeconds >= 60 && config.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
   $('scenario-work-post-send').value = String($('scenario-work-post-send-unit').value === 'minutes' ? (config.postSendDelaySeconds / 60) : (config.postSendDelaySeconds ?? 5));
   $('scenario-work-post-send').dataset.postSendUnit = $('scenario-work-post-send-unit').value;
   $('scenario-work-post-send').max = $('scenario-work-post-send-unit').value === 'minutes' ? '60' : '3600';
@@ -3979,7 +3980,7 @@ function showSimplifiedSession(session) {
   $('simplified-interval-unit').value = session?.minimumSendIntervalUnit || 'minutes';
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
   $('simplified-tab-ready').value = String(session?.tabReadyDelaySeconds ?? 0);
-  $('simplified-post-send-unit').value = (session?.postSendDelaySeconds >= 60 && session.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
+  $('simplified-post-send-unit').value = session?.postSendDelayUnit === 'minutes' ? 'minutes' : session?.postSendDelayUnit === 'seconds' ? 'seconds' : (session?.postSendDelaySeconds >= 60 && session.postSendDelaySeconds % 60 === 0) ? 'minutes' : 'seconds';
   $('simplified-post-send').value = String($('simplified-post-send-unit').value === 'minutes' ? (session.postSendDelaySeconds / 60) : (session?.postSendDelaySeconds ?? 5));
   $('simplified-post-send').dataset.postSendUnit = $('simplified-post-send-unit').value;
   $('simplified-post-send').max = $('simplified-post-send-unit').value === 'minutes' ? '60' : '3600';
