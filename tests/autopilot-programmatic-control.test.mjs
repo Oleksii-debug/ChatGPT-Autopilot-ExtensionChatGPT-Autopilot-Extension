@@ -653,3 +653,37 @@ test('Plan 7 model catalog query remains read-only and carries no model-routing 
     payloadArtifactRef:artifact(),
   })),/does not accept payloadArtifactRef/);
 });
+
+
+test('Plan 7 SDK rejects secret-bearing unknown request keys without echo or getter execution', () => {
+  const sensitiveCanary = 'test-only-private-field-name-should-never-appear-in-diagnostics';
+  for (const extraKey of [sensitiveCanary, Symbol(sensitiveCanary)]) {
+    let getterCalls = 0;
+    const malformed = request();
+    Object.defineProperty(malformed, extraKey, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        getterCalls += 1;
+        throw new Error('test-only-private-getter-should-not-execute');
+      },
+    });
+    assert.throws(
+      () => normalizeAutopilotProgrammaticRequestV1(malformed),
+      error => {
+        assert.match(error.message, /unknown field/u);
+        assert.equal(error.message.includes(sensitiveCanary), false);
+        assert.equal(error.message.includes('test-only-private-getter'), false);
+        return true;
+      },
+    );
+    assert.equal(getterCalls, 0);
+  }
+});
+
+test('Plan 7 SDK retains strict normal request identity after error redaction', () => {
+  const value = normalizeAutopilotProgrammaticRequestV1(request());
+  assert.equal(value.requestId, 'request-1');
+  assert.equal(value.operation, AutopilotProgrammaticOperation.STATUS_GET);
+  assert.equal(value.schemaVersion, AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION);
+});
