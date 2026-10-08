@@ -1472,6 +1472,47 @@ test('Browser Agent independently verifies a READY Browser plan node and unblock
   assert.match(live.job.runtime.plan.nodes[0].evidence, /page version 0/);
 });
 
+test('Plan-1: owner pause during plan-node verification cannot report a verified node', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  let manager;
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        await manager.pause('job-plan-epoch');
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Page 0 observed' }] }) };
+      }
+      if (phase++ === 0) return { text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-epoch', jobId: 'job-plan-epoch',
+        objective: 'Inspect page', successCriteria: ['Page inspected'],
+        createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{
+          nodeId: 'inspect', title: 'Inspect', objective: 'Read page', dependsOn: [],
+          conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER',
+          acceptanceCriteria: ['page version 0 is visible'], budget: {},
+          state: 'PENDING', evidence: '', updatedAt: at,
+        }],
+      } }) };
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({
+        type: 'verify_plan_node', nodeId: 'inspect',
+        evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'Page 0 observed' }] },
+      }) };
+    },
+  });
+  await manager.create({ id: 'job-plan-epoch', goal: 'Inspect page' });
+  await manager.start('job-plan-epoch', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-plan-epoch')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-plan-epoch');
+  const current = await manager.get('job-plan-epoch');
+  assert.equal(result.kind, 'CANCELLED_BY_OWNER');
+  assert.equal(current.job.runtime.runState, 'PAUSED');
+  assert.notEqual(current.job.runtime.plan.nodes[0].state, 'VERIFIED');
+});
+
 test('Browser Agent atomically claims the referenced READY plan node before a physical action', async () => {
   const chrome = makeChrome();
   const at = new Date().toISOString();
