@@ -172,7 +172,10 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // Do not infer receipts, artifacts or before/after snapshots from free text.
   const evidenceMap = {
     scope: 'INSPECTED_CANONICAL_HISTORY_ONLY',
-    completeHistoryInspected: history.total === all.length,
+    // BrowserAgentManager also caps its persisted history. Even reading all
+    // provided entries cannot prove the *lifetime* run history is complete.
+    allRetainedHistoryInspected: history.total === all.length,
+    completeLifetimeHistoryKnown: false,
     observed: {
       planRevisionEvents: all.filter(entry => entry.event === 'plan').length,
       ownerInterventionEvents: all.filter(entry => entry.category === 'OWNER').length,
