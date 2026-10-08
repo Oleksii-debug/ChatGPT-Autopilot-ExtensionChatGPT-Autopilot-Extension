@@ -61,7 +61,7 @@ const ASSISTANT_TAB_RECOVERY_CODES = new Set([
 ]);
 const POOL_RUNTIME_EDITABLE_CONFIG_KEYS = Object.freeze([
   'responseTimeoutMinutes', 'pollSeconds', 'minimumLaunchGapSeconds',
-  'tabReadyDelaySeconds', 'postSendDelaySeconds', 'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
+  'tabReadyDelaySeconds', 'postSendDelaySeconds', 'postSendDelayUnit', 'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
   'timeoutPolicy', 'restartCurrentRoundOnTimeout', 'closeTabsBetweenChecks',
   'reopenOnceAfterProbeError',
 ]);
@@ -225,6 +225,7 @@ function compatiblePersistedConfig(persisted, canonical) {
   for (const [key, defaultValue] of [
     ['tabReadyDelaySeconds', 0],
     ['postSendDelaySeconds', 0],
+    ['postSendDelayUnit', 'seconds'],
     ['schemaVersion', 1],
     ['timeoutPolicy', 'REPLACE_MEMBER'],
     ['closeTabsBetweenChecks', false],
