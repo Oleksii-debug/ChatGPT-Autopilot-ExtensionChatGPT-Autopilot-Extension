@@ -100,6 +100,20 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
   assert.equal(request.jobId, 'job.research-1');
 });
 
+test('reusable Agent launch requires Project identity before Core mutation', () => {
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form({ projectId: '' }), {
+    registry: registry(),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  }), /Project ID/u);
+
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form({ projectId: '   ' }), {
+    registry: registry(),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  }), /Project ID/u);
+});
+
 test('Project and Job identity aliases fail locally before Core mutation', () => {
   assert.throws(() => buildAgentDefinitionLaunchRequestV1(form({ projectId: 'project 1' }), {
     registry: registry(),

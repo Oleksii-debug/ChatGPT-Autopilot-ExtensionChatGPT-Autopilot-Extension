@@ -30,6 +30,25 @@ function managerFor(chrome, createId = () => 'job.generated') {
   return new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => ({
+      routePoolRevision: 7,
+      gatewayUrl: 'http://127.0.0.1:3210',
+      routePool: [{
+        schemaVersion: 1,
+        routeId: 'route.research',
+        provider: 'ollama',
+        model: 'research-local',
+        roles: ['planner', 'verifier', 'vision'],
+        capabilityIds: ['research'],
+        priority: 10,
+        enabled: true,
+        locality: 'local',
+        costClass: 'free',
+        supportsVision: true,
+        maxWorkers: 1,
+      }],
+      ownerAllowedRouteIds: ['route.research'],
+    }),
     createId,
   });
 }
@@ -149,7 +168,238 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
   assert.equal(created.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
+  assert.equal(created.job.definitionModelPolicyBinding.modelPolicyBinding.routePoolRevision, 7);
+  assert.deepEqual(created.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds, ['route.research']);
+  assert.equal(created.job.definitionModelPolicyBinding.providerAuthority, false);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
+});
+
+test('definition-bound provider reservation revalidates current Router authority immediately before admission', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContext = {
+    routePoolRevision: 7,
+    gatewayUrl: 'http://127.0.0.1:3210',
+    routePool: [{
+      schemaVersion: 1,
+      routeId: 'route.research',
+      provider: 'ollama',
+      model: 'research-local',
+      roles: ['planner', 'verifier', 'vision'],
+      capabilityIds: ['research'],
+      priority: 10,
+      enabled: true,
+      locality: 'local',
+      costClass: 'free',
+      supportsVision: true,
+      maxWorkers: 1,
+    }],
+    ownerAllowedRouteIds: ['route.research'],
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => structuredClone(routeContext),
+  });
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.provider-revalidation' }));
+  await manager.update(store => {
+    store.byId['job.provider-revalidation'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const request = () => manager.reserveProviderModelBudget({
+    jobId:'job.provider-revalidation',
+    controlEpoch:0,
+    prompt:'provider-bound task',
+    systemPrompt:'system',
+    maxOutputTokens:128,
+    route:{
+      routeId:'route.research',
+      provider:'ollama',
+      model:'research-local',
+      endpointId:'',
+    },
+    gatewayUrl:'http://127.0.0.1:3210',
+    taskRole:'planner',
+    capabilityIds:['research'],
+    requiresVision:false,
+    callNumber:1,
+  });
+
+  routeContext = { ...routeContext, ownerAllowedRouteIds: [] };
+  await assert.rejects(request, /no longer allowed by current owner Router policy/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePoolRevision:8,
+    ownerAllowedRouteIds:['route.research'],
+  };
+  await assert.rejects(request, /route-pool revision drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePoolRevision:7,
+    routePool:[{ ...routeContext.routePool[0], model:'research-replaced' }],
+  };
+  await assert.rejects(request, /provider route identity drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routePool:[{ ...routeContext.routePool[0], model:'research-local' }],
+    gatewayUrl:'http://127.0.0.1:9999',
+  };
+  await assert.rejects(request, /Gateway identity drifted before provider admission/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    gatewayUrl:'http://127.0.0.1:3210',
+    routePolicy:{ pinnedRouteId:'route.research', autoSwitch:false },
+    routeStates:{
+      'route.research':{
+        backoffUntil:Number.MAX_SAFE_INTEGER,
+      },
+    },
+  };
+  await assert.rejects(request, /no longer dispatchable by current Router policy\/state/);
+  assert.equal((await manager.get('job.provider-revalidation')).job.runtime.modelBudgetReservation, null);
+
+  routeContext = {
+    ...routeContext,
+    routeStates:{},
+  };
+  const reservation = await request();
+  assert.match(reservation.reservationId, /^job\.provider-revalidation:model-budget:/);
+  assert.equal(reservation.routeId, 'route.research');
+  assert.equal(reservation.model, 'research-local');
+});
+
+test('definition-bound provider reservation rejects a definition revision changed after dispatch preparation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.definition-revalidation' }));
+  await manager.update(store => {
+    store.byId['job.definition-revalidation'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const before = await manager.getAgentDefinitionRegistry('agents:project-1');
+  await manager.mutateAgentDefinitionRegistry({
+    registryId:'agents:project-1',
+    expectedRegistryRevision:2,
+    expectedRegistryBindingKey:before.registry.bindingKey,
+    kind:AgentDefinitionRegistryMutationKind.UPDATE,
+    agentDefinitionId:'agent.research',
+    expectedDefinitionRevision:1,
+    definition:definition({ definitionRevision:2, label:'Research Agent v2' }),
+  });
+
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job.definition-revalidation',
+      controlEpoch:0,
+      prompt:'stale definition task',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+      route:{
+        routeId:'route.research',
+        provider:'ollama',
+        model:'research-local',
+        endpointId:'',
+      },
+      gatewayUrl:'http://127.0.0.1:3210',
+      taskRole:'planner',
+      capabilityIds:['research'],
+      requiresVision:false,
+      callNumber:1,
+    }),
+    /definition authority drifted before provider admission/,
+  );
+  const current = await manager.get('job.definition-revalidation');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 0);
+});
+
+test('definition launch fails before route-context reads when Project identity is absent', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContextReads = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => {
+      routeContextReads += 1;
+      throw new Error('must not read route context for invalid projectless launch');
+    },
+  });
+  await seedRegistry(manager);
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId:'job.projectless',
+      projectId:'',
+    })),
+    /requires Project ID for durable model authority/u,
+  );
+  assert.equal(routeContextReads, 0);
+  assert.equal((await manager.get('job.projectless')).job, null);
+});
+
+test('definition launch route-context failure is atomic and persists no partial job', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    readModelRouteContext: async () => {
+      throw new Error('route context unavailable');
+    },
+    createId: () => 'job.generated',
+  });
+  await seedRegistry(manager);
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({ jobId:'job.route-context-failure' })),
+    /route context unavailable/,
+  );
+  assert.equal(
+    (await manager.get('job.route-context-failure')).job,
+    null,
+    'route-context failure must not persist a partially materialized reusable Agent',
+  );
+});
+
+test('reusable Agent may keep an unbounded whole-job model-call budget while retaining bounded route authority', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const unboundedDefinition = definition({
+    configDefaults: {
+      ...definition().configDefaults,
+      maxModelCalls: 0,
+    },
+  });
+  const createdRegistry = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const mutated = await manager.mutateAgentDefinitionRegistry({
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: createdRegistry.registry.bindingKey,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: unboundedDefinition,
+  });
+
+  const created = await manager.createFromAgentDefinition(launchRequest({
+    expectedRegistryBindingKey: mutated.registry.bindingKey,
+    ownerBudget: ownerBudget({ maxModelCalls: 0 }),
+    jobId: 'job.unbounded-model-calls',
+  }));
+
+  assert.equal(created.job.config.maxModelCalls, 0);
+  assert.deepEqual(
+    created.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds,
+    ['route.research'],
+  );
 });
 
 test('definition launch provenance and narrowed scope survive service-worker restart', async () => {
@@ -168,6 +418,8 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.pinnedRouteId, 'route.research');
   assert.equal(loaded.job.config.aiPinnedRouteId, '');
+  assert.equal(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.routePoolRevision, 7);
+  assert.deepEqual(loaded.job.definitionModelPolicyBinding.modelPolicyBinding.effectiveRouteIds, ['route.research']);
 });
 
 test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
@@ -196,6 +448,21 @@ test('restart rejects a definition-bound job when its exact launch config bindin
   const restarted = managerFor(chrome);
   const loaded = await restarted.get('job.binding-missing');
   assert.equal(loaded.job, null, 'definition launch config binding must survive restart');
+});
+
+
+test('restart rejects a reusable Agent when its durable definition model policy binding disappears', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId:'job.model-binding-missing' }));
+
+  const [storageKey] = Object.keys(data);
+  delete data[storageKey].byId['job.model-binding-missing'].definitionModelPolicyBinding;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.model-binding-missing');
+  assert.equal(loaded.job, null, 'a reusable Agent must not reload without its durable model-policy binding');
 });
 
 test('restart rejects a selected definition when its persisted model route policy binding is missing', async () => {
@@ -442,6 +709,7 @@ test('standard Browser Agent creation carries no reusable-definition provenance'
   });
   assert.equal(created.job.definitionSelection, null);
   assert.equal(created.job.definitionScope, null);
+  assert.equal(created.job.definitionModelPolicyBinding, null);
 
   const restarted = managerFor(chrome);
   const loaded = await restarted.get('job.manual');
@@ -449,9 +717,84 @@ test('standard Browser Agent creation carries no reusable-definition provenance'
   assert.equal(loaded.job.definitionScope, null);
 });
 
+test('ordinary Browser Agent provider reservation bypasses reusable-definition Router revalidation', async () => {
+  const { chrome } = makeChromeStorage();
+  let routeContextReads = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text:'{}' }),
+    readModelRouteContext: async () => {
+      routeContextReads += 1;
+      throw new Error('ordinary jobs must not read reusable-Agent route context');
+    },
+  });
+  await manager.create({
+    id:'job.manual-provider',
+    goal:'Owner-created Browser Agent provider call',
+  });
+  await manager.update(store => {
+    store.byId['job.manual-provider'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job.manual-provider',
+    controlEpoch:0,
+    prompt:'ordinary task',
+    systemPrompt:'system',
+    maxOutputTokens:128,
+    route:{ routeId:'ordinary', provider:'ollama', model:'local', endpointId:'' },
+    gatewayUrl:'http://127.0.0.1:3210',
+    taskRole:'planner',
+    capabilityIds:[],
+    requiresVision:false,
+    callNumber:1,
+  });
+  assert.match(reservation.reservationId, /^job\.manual-provider:model-budget:/);
+  assert.equal(routeContextReads, 0);
+});
+
 test('Core exposes definition launch only through the canonical BrowserAgentManager', async () => {
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
   assert.match(source, /'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION'/);
   assert.match(source, /browserAgent\.createFromAgentDefinition\(message\.payload \|\| \{\}\)/);
   assert.doesNotMatch(source, /chrome\.storage\.local[^\n]+CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION/);
+});
+
+
+test('Core prepares definition-bound Browser Agent model calls through the canonical bounded envelope chain', async () => {
+  const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
+  assert.match(source, /createBoundAgentModelRouteDispatchIntentV1/);
+  assert.match(source, /createBoundAgentModelOrchestratorEnvelopeV1/);
+  assert.match(source, /prepareDefinitionBoundAgentInvocation/);
+  assert.match(source, /snapshotDefinitionBoundAgentRoutePayload/);
+  assert.match(source, /Object\.getOwnPropertyDescriptors\(rawPayload\)/);
+  assert.match(source, /snapshotBrowserAgentProviderBudgetContext/);
+  assert.match(source, /gatewayUrl:\s*settings\.gatewayUrl/);
+  assert.match(source, /routePolicy:\s*structuredClone\(settings\.routePolicy\)/);
+  assert.match(source, /routeStates:\s*structuredClone\(runtime\.routeStates\)/);
+  assert.match(source, /taskRole,/);
+  assert.match(source, /explicitRole = Object\.hasOwn\(safePayload, 'taskRole'\)/);
+  assert.match(source, /Reusable Agent model dispatch taskRole must be canonical text/);
+  assert.match(source, /const role = explicitRole \? safePayload\.taskRole : 'planner'/);
+  assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
+  assert.match(source, /capabilityIds,/);
+  assert.match(source, /requiresVision,/);
+  assert.match(source, /gatewayUrl,/);
+  assert.match(source, /Object\.getOwnPropertyDescriptors\(rawContext\)/);
+  assert.match(source, /controlEpoch drifted before model dispatch/);
+  assert.match(source, /runState\?\. !== BrowserAgentRunState\.RUNNING|runState\s*!==\s*BrowserAgentRunState\.RUNNING/);
+  assert.match(source, /Reusable Agent is not running before model dispatch/);
+  assert.match(source, /fields must be enumerable own data properties/);
+  assert.doesNotMatch(source, /const sanitizedPayload = \{ \.\.\.\(payload \|\| \{\}\) \}/);
+  assert.match(source, /definitionModelPolicyBinding/);
+  assert.match(source, /ownerAllowedRouteIds:\s*ownerAllowedRouteIdsForSettings\(settings\)/);
+  assert.doesNotMatch(source, /ownerAllowedRouteIds:\s*settings\.routes\.map/);
+  assert.match(source, /agentModelOrchestratorEnvelope:bound\.envelope/);
+  assert.match(source, /delete sanitizedPayload\[key\]/);
+  assert.match(source, /boundRouteCallCeiling = binding\.modelPolicyBinding\?\.effectiveRouteIds\?\.length/);
+  assert.match(source, /requestedCallCeilingPresent = Object\.hasOwn\(sanitizedPayload, 'maxModelCallsForRequest'\)/);
+  assert.match(source, /Reusable Agent model dispatch requires canonical bounded maxModelCallsForRequest/);
+  assert.match(source, /sanitizedPayload\.maxModelCallsForRequest = requestedCallCeilingPresent/);
+  assert.match(source, /Math\.min\(requestedCallCeiling, boundRouteCallCeiling\)/);
+  assert.doesNotMatch(source, /agentModelOrchestratorEnvelope\s*:\s*message\.payload/u);
 });

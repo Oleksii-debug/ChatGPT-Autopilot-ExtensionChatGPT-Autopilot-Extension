@@ -209,7 +209,7 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     agentDefinitionId,
     expectedDefinitionRevision,
     goal: boundedText(raw.goal, 'Owner task', 50000),
-    projectId: boundedText(raw.projectId || '', 'Project ID', 180, { optional: true }),
+    projectId: boundedText(raw.projectId, 'Project ID', 180),
     ownerBudget: agentDefinitionOwnerBudgetFromPolicyV1(ownerPolicy),
     ownerCapabilityIds,
     ownerToolIds,
