@@ -25,6 +25,41 @@ function matchesArtifact(received, requested) {
     && Object.is(requested[field], received[field]));
 }
 
+
+/**
+ * The transport may be a stale or forged responder. A RECEIVED wrapper must
+ * carry the same Core scope proof and causal timestamps as the serialized wire
+ * request. This validates evidence; it never grants policy/effect authority.
+ */
+function validBoundScopeAndChronology(result, sentRequest) {
+  const proof = result?.scopeProof;
+  const receipt = result?.receipt;
+  if (proof?.schemaVersion !== 1
+    || typeof proof.scopeRevisionId !== 'string'
+    || !DISPATCH_ID.test(proof.scopeRevisionId)
+    || proof.allowed !== true
+    || proof.requestId !== sentRequest.requestId
+    || proof.principalId !== sentRequest.principalId
+    || proof.projectId !== sentRequest.projectId
+    || proof.operation !== sentRequest.operation
+    || proof.targetId !== sentRequest.targetId
+    || proof.payloadArtifactId !== (sentRequest.payloadArtifactRef?.artifactId ?? null)
+    || proof.payloadSha256 !== (sentRequest.payloadArtifactRef?.sha256 ?? null)) {
+    return false;
+  }
+  const chronology = [
+    sentRequest.requestedAt, proof.verifiedAt, result.assessedAt,
+    result.dispatchAt, receipt?.observedAt, result.completedAt,
+    proof.validThrough,
+  ];
+  if (!chronology.every(canonicalUtcTimestamp)) return false;
+  const [requested, verified, assessed, dispatched, observed, completed, validThrough] =
+    chronology.map(value => Date.parse(value));
+  return requested <= verified && verified <= assessed
+    && assessed <= dispatched && dispatched <= observed
+    && observed <= completed && dispatched <= validThrough;
+}
+
 export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
   if (typeof token !== 'string' || token.length < 32 || token.length > 512) {
     throw new Error('A trusted local API token is required');
@@ -86,6 +121,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || received?.targetId !== sentRequest.targetId
           || received?.requestedAt !== sentRequest.requestedAt
           || !matchesArtifact(received?.payloadArtifactRef, sentRequest.payloadArtifactRef)
+          || !validBoundScopeAndChronology(value?.result, sentRequest)
           || receipt?.schemaVersion !== 1
           || receipt?.requestId !== sentRequest.requestId
           || receipt?.projectId !== sentRequest.projectId
