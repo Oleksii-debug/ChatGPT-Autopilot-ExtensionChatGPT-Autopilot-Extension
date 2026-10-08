@@ -303,7 +303,13 @@ export class SpecialistProviderDispatcherV1 {
     const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
     const observed = timestamp(result.observedAt, 'provider result observedAt');
     if (observed.ms < startedAtMs || observed.ms > completedAtMs) throw new Error('Specialist provider result chronology is invalid');
-    const refs = array(result.resultArtifactRefs, 'resultArtifactRefs', 64).map(normalizeArtifactRefV1);
+    // A provider receipt is lower-trust input, even after the provider call.
+    // Snapshot descriptor-safe artifact metadata before contract normalization:
+    // getters and proxies must not run while verifying completion evidence.
+    const refs = array(result.resultArtifactRefs, 'resultArtifactRefs', 64)
+      .map((item, index) => normalizeArtifactRefV1(
+        cloneReadinessEvidence(item, `resultArtifactRefs[${index}]`),
+      ));
     if (!refs.length) throw new Error('Specialist provider result requires artifact evidence');
     if (new Set(refs.map(item => item.artifactId)).size !== refs.length) throw new Error('Specialist provider result contains duplicate artifactId');
     for (const ref of refs) {
