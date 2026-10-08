@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
-import { normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
+import { AiOrchestrator, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
 
 const route = { routeId:'primary', provider:'ollama', model:'llama3', locality:'local' };
 const endpoint = { schemaVersion:1, profileId:'local.ollama', provider:'ollama', endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/', credentialRef:'', credentialless:true };
@@ -676,4 +676,67 @@ test('owner numeric model-routing controls reject forged coercion and survive re
   assert.equal(persisted.strongMinGapMinutes,0);
   assert.equal(persisted.strongMaxPerHour,0);
   assert.equal(normalizeAiRouterSettings({}).timeoutSeconds,180);
+});
+
+
+test('route failover preserves model-budget reservation settlement and JSON restart backoff', async () => {
+  const reservations = [];
+  const settlements = [];
+  const calls = [];
+  const routes = [
+    { routeId:'fast',provider:'ollama',model:'first',locality:'local',costClass:'free',priority:10 },
+    { routeId:'backup',provider:'ollama',model:'second',locality:'local',costClass:'free',priority:5 },
+  ];
+  let now=1_000;
+  let failFirst=true;
+  const client = {
+    async complete(request) {
+      calls.push(request.model);
+      if (request.model==='first' && failFirst) {
+        const unavailable=new Error('fixture provider offline');
+        unavailable.status=503;
+        throw unavailable;
+      }
+      return { text:'answer',usage:{inputTokens:3,outputTokens:2,totalTokens:5} };
+    },
+  };
+  const lifecycle = {
+    async beforeProviderCall({route,maxOutputTokens,callNumber}) {
+      assert.equal(maxOutputTokens,12);
+      const reservationId='fixture-reservation-'+callNumber;
+      reservations.push({reservationId,routeId:route.routeId});
+      return {reservationId};
+    },
+    async afterProviderCall({route,reservation,ok}) {
+      settlements.push({routeId:route.routeId,reservationId:reservation.reservationId,ok});
+    },
+  };
+  const orchestrator=new AiOrchestrator({gatewayClient:client,now:()=>now,providerCallLifecycle:lifecycle});
+  const config={
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:false,
+    routes,routePolicy:{autoSwitch:true},
+  };
+  const options={
+    providerCallBudgetContext:{jobId:'fixture'},
+    maxModelCallsForRequest:2,maxOutputTokens:12,
+  };
+  const first=await orchestrator.run(config,{},'owner prompt',options);
+  assert.equal(first.routing.selectedRouteId,'backup');
+  assert.equal(first.usage.modelCalls,2);
+  assert.deepEqual(reservations.map(x=>x.routeId),['fast','backup']);
+  assert.deepEqual(settlements.map(x=>x.ok),[false,true]);
+  assert.deepEqual(settlements.map(x=>x.reservationId),
+    ['fixture-reservation-1','fixture-reservation-2']);
+  assert.equal(first.routing.failoverChain.length,2);
+  const resumed=JSON.parse(JSON.stringify(first.runtime));
+  reservations.length=0;
+  settlements.length=0;
+  calls.length=0;
+  failFirst=false;
+  now=1100;
+  const second=await orchestrator.run(config,resumed,'owner prompt',options);
+  assert.equal(second.routing.selectedRouteId,'backup');
+  assert.equal(second.usage.modelCalls,1);
+  assert.deepEqual(calls,['second']);
+  assert.deepEqual(settlements.map(x=>x.ok),[true]);
 });
