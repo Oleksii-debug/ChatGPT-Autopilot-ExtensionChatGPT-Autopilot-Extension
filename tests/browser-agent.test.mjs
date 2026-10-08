@@ -3504,6 +3504,66 @@ test('Plan-1: config edits reject hidden authority, hostile coercion and mutable
   assert.deepEqual(persisted.config.acceptanceCriteria, ['Independent proof']);
 });
 
+test('Plan-1: explicit malformed owner policy and ceilings cannot silently reset durable safety', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  await manager.create({
+    id: 'job-owner-ceilings', goal: 'Verify owner evidence',
+    allowCrossOriginNavigation: false, startFromActiveTab: false,
+    visionOnDemand: false, maxModelCalls: 4,
+    acceptanceCriteria: ['Verified by independent evidence'],
+  });
+  const invalidEdits = [
+    [{ allowCrossOriginNavigation: null }, /explicit boolean/],
+    [{ startFromActiveTab: 'false' }, /explicit boolean/],
+    [{ visionOnDemand: null }, /explicit boolean/],
+    [{ maxModelCalls: null }, /explicit ceiling/],
+    [{ maxModelCalls: -1 }, /explicit ceiling/],
+    [{ maxTotalTokens: '' }, /explicit ceiling/],
+    [{ maxCostUsd: '-2' }, /explicit ceiling/],
+    [{ siteRules: null }, /explicit array/],
+    [{ acceptanceCriteria: null }, /explicit array/],
+    [{ approvalMode: 'UNKNOWN' }, /supported decision/],
+    [{ credentialDecision: null }, /supported decision/],
+  ];
+  for (const [patch, reason] of invalidEdits) {
+    await assert.rejects(
+      () => manager.updateConfig('job-owner-ceilings', {
+        goal: 'This change must never persist', ...patch,
+      }),
+      reason,
+    );
+  }
+  await assert.rejects(
+    () => manager.create({
+      id: 'job-untrusted-ceiling', goal: 'Must not persist',
+      maxRuntimeMinutes: null,
+    }),
+    /explicit ceiling/,
+  );
+  await assert.rejects(
+    () => manager.create({
+      id: 'job-untrusted-criteria', goal: 'Must not persist',
+      acceptanceCriteria: null,
+    }),
+    /explicit array/,
+  );
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  const stored = await restarted.get('job-owner-ceilings');
+  assert.equal(stored.config.goal, 'Verify owner evidence');
+  assert.equal(stored.config.allowCrossOriginNavigation, false);
+  assert.equal(stored.config.startFromActiveTab, false);
+  assert.equal(stored.config.visionOnDemand, false);
+  assert.equal(stored.config.maxModelCalls, 4);
+  assert.deepEqual(stored.config.acceptanceCriteria, ['Verified by independent evidence']);
+  assert.equal((await restarted.load()).order.length, 1);
+  assert.equal(chrome._actionCalls.length, 0);
+});
+
 test('Plan-1: config edit rejects nested policy getter, sparse criteria and non-finite budget with no partial durable write', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
