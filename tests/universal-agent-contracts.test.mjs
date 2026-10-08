@@ -900,3 +900,31 @@ test('Plan-1 S1: universal agent contracts redact untrusted property names witho
   });
   assert.equal(reads, 0);
 });
+
+
+test('Plan-1 S1: exact effect and artifact numeric identity rejects JSON-lossy negative zero', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-numeric-canonical',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { offset: 0 },
+    createdAt: AT,
+  };
+  assert.deepEqual(normalizeToolInvocationV1(invocation).arguments, { offset: 0 });
+  for (const argumentsValue of [{ offset: -0 }, { nested: [{ offset: -0 }] }]) {
+    assert.throws(
+      () => normalizeToolInvocationV1({ ...invocation, arguments: argumentsValue }),
+      /non-canonical negative zero/,
+      'effect arguments must not change identity after JSON persistence',
+    );
+  }
+  assert.equal(normalizeArtifactRefV1(artifact({ sizeBytes: 0 })).sizeBytes, 0);
+  assert.throws(
+    () => normalizeArtifactRefV1(artifact({ sizeBytes: -0 })),
+    /sizeBytes.*invalid/,
+    'sizeBytes -0 must not be normalized into zero across restart',
+  );
+});
