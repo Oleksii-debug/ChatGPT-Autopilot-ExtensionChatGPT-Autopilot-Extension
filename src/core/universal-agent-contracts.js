@@ -117,6 +117,7 @@ function integer(value, label, min, max, { optional = false, fallback = 0 } = {}
   if (typeof value !== 'number'
       || !Number.isInteger(value)
       || !Number.isFinite(value)
+      || Object.is(value, -0)
       || value < min
       || value > max) {
     throw new Error(`${label} is invalid`);
@@ -192,6 +193,8 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    // JSON.stringify(-0) is 0; reject rather than mutate exact effect identity on restart.
+    if (Object.is(value, -0)) throw new Error(`${label} contains non-canonical negative zero`);
     return value;
   }
   if (!value || typeof value !== 'object') {
