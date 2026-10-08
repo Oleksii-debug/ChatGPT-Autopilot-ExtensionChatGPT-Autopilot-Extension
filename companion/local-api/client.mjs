@@ -1,3 +1,5 @@
+import { normalizeArtifactRefV1 } from '../../src/core/universal-agent-contracts.js';
+
 /**
  * Opt-in SDK client for local authenticated Native Companion API.
  * The client does not implement scheduling, policy, retry or effect recovery.
@@ -23,6 +25,26 @@ function matchesArtifact(received, requested) {
     Object.prototype.hasOwnProperty.call(requested, field)
     && Object.prototype.hasOwnProperty.call(received, field)
     && Object.is(requested[field], received[field]));
+}
+
+
+/**
+ * A transport response can supply a forged result artifact independently of
+ * the request artifact. Reuse Core's exact ArtifactRef normalizer; a transport
+ * acknowledgement must not be accepted with unknown/malformed provenance.
+ */
+function matchesResultArtifact(received, observedAt) {
+  if (received === null) return true;
+  if (!received || !canonicalUtcTimestamp(observedAt)) return false;
+  try {
+    const canonical = normalizeArtifactRefV1(received);
+    return ARTIFACT_FIELDS.every(field =>
+      Object.prototype.hasOwnProperty.call(received, field)
+      && Object.is(received[field], canonical[field]))
+      && Date.parse(canonical.createdAt) <= Date.parse(observedAt);
+  } catch {
+    return false;
+  }
 }
 
 
@@ -121,6 +143,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || received?.targetId !== sentRequest.targetId
           || received?.requestedAt !== sentRequest.requestedAt
           || !matchesArtifact(received?.payloadArtifactRef, sentRequest.payloadArtifactRef)
+          || !matchesResultArtifact(receipt?.resultArtifactRef, receipt?.observedAt)
           || !validBoundScopeAndChronology(value?.result, sentRequest)
           || receipt?.schemaVersion !== 1
           || receipt?.requestId !== sentRequest.requestId
