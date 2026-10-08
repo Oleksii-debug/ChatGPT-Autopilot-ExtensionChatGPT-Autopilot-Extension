@@ -3203,9 +3203,12 @@ export class BrowserAgentManager {
     }
   }
 
-  async nativeClick(tabId, frameId, snapshotId, ref, expectedAction) {
+  async nativeClick(tabId, frameId, snapshotId, ref, expectedAction, jobId, epoch) {
     if (frameId !== 0) return false;
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) return false;
+    // A delayed fallback is a new possible browser effect. An owner Pause/Stop
+    // invalidates the durable epoch even when the old DOM marker still exists.
+    if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) return false;
     const prove = async () => (await this.requireScripting().executeScript({
       target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref, expectedAction],
     }))?.[0]?.result;
@@ -3216,12 +3219,14 @@ export class BrowserAgentManager {
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) return false;
       // Debugger attach may resize the viewport. The original coordinates may
       // now hit a different control, so bind the click to the same snapshot ref
       // again after attach and use its newly measured position.
       const point = await prove();
       if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
         || point.x < 0 || point.y < 0 || (beforeAttach.url && point.url !== beforeAttach.url)) return false;
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) return false;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 });
       return true;
@@ -4099,7 +4104,7 @@ export class BrowserAgentManager {
       && current.job.runtime.lastActionSnapshotId) {
       if (!(await this.verifyOwnerAuthority(id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
       const prior = current.job.runtime.lastAction;
-      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref, prior);
+      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref, prior, id, epoch);
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.controlEpoch !== epoch) return store;
