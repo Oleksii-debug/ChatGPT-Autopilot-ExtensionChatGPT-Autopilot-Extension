@@ -12,6 +12,7 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
   return {
     schemaVersion: 1, status: 'RECEIVED',
     result: {
+      schemaVersion: 1, readOnly: true, downstreamAuthorityRequired: false,
       request: { ...BASE, ...requestChanges },
       scopeProof: {
         schemaVersion: 1, scopeRevisionId: 'scope-rev-1',
