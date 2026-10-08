@@ -88,7 +88,9 @@ function assertLocalAiRequestUrl(value) {
   if (!['http:', 'https:'].includes(parsed.protocol)
       || !LOCAL_HOSTS.has(parsed.hostname.toLowerCase())
       || parsed.username
-      || parsed.password) {
+      || parsed.password
+      || parsed.search
+      || parsed.hash) {
     throw new Error('Local AI request URL must stay on localhost or 127.0.0.1 without credentials');
   }
   return parsed.toString();
@@ -324,7 +326,11 @@ export function normalizeLocalAiUsage(providerType, body) {
   const declaredTotal = exactTokenCount(providerType === LocalAiProviderType.OLLAMA ? undefined : usage.total_tokens, 'Local AI total tokens');
   const totalTokens = inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : declaredTotal;
   if (totalTokens !== null && !Number.isSafeInteger(totalTokens)) throw new Error('Local AI total tokens overflow');
-  if (declaredTotal !== null && inputTokens !== null && outputTokens !== null && declaredTotal !== totalTokens) throw new Error('Local AI token accounting mismatch');
+  if (declaredTotal !== null && (
+    (inputTokens !== null && declaredTotal < inputTokens)
+    || (outputTokens !== null && declaredTotal < outputTokens)
+    || (inputTokens !== null && outputTokens !== null && declaredTotal !== totalTokens)
+  )) throw new Error('Local AI token accounting mismatch');
   return Object.freeze({ inputTokens, outputTokens, totalTokens, source: inputTokens === null && outputTokens === null && totalTokens === null ? 'UNREPORTED' : 'PROVIDER_REPORTED' });
 }
 
