@@ -842,3 +842,68 @@ test('UNKNOWN budget settlement forbids failover even after transient provider o
     assert.deepEqual(settlements,['res-1']);
   }
 });
+
+
+test('legacy primary/strong routing never retries an UNKNOWN model settlement', async () => {
+  const calls=[];
+  const client={async complete({model}) {
+    calls.push(model);
+    return {text:'model answer',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const lifecycle={
+    async beforeProviderCall() {return {reservationId:'unsettled'};},
+    async afterProviderCall() {
+      const error=new Error('broker 503; status cannot prove reservation settled');
+      error.status=503;
+      throw error;
+    },
+  };
+  const orchestrator=new AiOrchestrator({
+    gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+  });
+  const config={
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:true,
+    primary:{provider:'ollama',model:'first'},
+    strong:{provider:'openai',model:'backup'},
+  };
+  await assert.rejects(orchestrator.run(config,{},'prompt',{
+    maxOutputTokens:12,maxModelCallsForRequest:2,
+    providerCallBudgetContext:{jobId:'legacy'},
+  }),error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' && error.modelCallsUsed===1);
+  assert.deepEqual(calls,['first']);
+});
+
+test('hybrid strong review cannot downgrade an UNKNOWN settlement to a successful primary result', async () => {
+  const calls=[];
+  let settles=0;
+  const client={async complete({model}) {
+    calls.push(model);
+    return {text:model==='first'?'[[ESCALATE]] review':'strong answer',
+      usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const lifecycle={
+    async beforeProviderCall({callNumber}) {return {reservationId:'res-'+callNumber};},
+    async afterProviderCall() {
+      settles++;
+      if (settles===2) {
+        const error=new Error('broker timeout');
+        error.status=503;
+        throw error;
+      }
+    },
+  };
+  const orchestrator=new AiOrchestrator({
+    gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+  });
+  const config={
+    enabled:true,mode:'hybrid-auto',keepPrimaryIfStrongFails:true,
+    primary:{provider:'ollama',model:'first'},
+    strong:{provider:'openai',model:'review'},
+  };
+  await assert.rejects(orchestrator.run(config,{},'owner prompt',{
+    maxOutputTokens:12,maxModelCallsForRequest:2,
+    providerCallBudgetContext:{jobId:'hybrid'},
+  }),error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' && error.modelCallsUsed===2);
+  assert.deepEqual(calls,['first','review']);
+  assert.equal(settles,2);
+});
