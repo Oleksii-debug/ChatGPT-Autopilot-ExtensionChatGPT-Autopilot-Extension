@@ -192,6 +192,27 @@ test('gateway preserves AUTH/RATE_LIMIT/UNAVAILABLE status on non-JSON and empty
   }
 });
 
+test('gateway typed HTTP and timeout failures retain retryability without leaking private body',async()=>{
+  for(const [status,category,retryable] of [
+    [401,'AUTH',false],[403,'AUTH',false],[429,'RATE_LIMIT',true],
+    [408,'TIMEOUT',true],[503,'UNAVAILABLE',true],
+  ]){
+    const gateway=new AiGatewayClient({fetchFn:async()=>new Response(
+      'sk-private-gateway-provider-payload',{status},
+    )});
+    await assert.rejects(gateway.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
+      error=>error.status===status && error.category===category
+        && error.retryable===retryable
+        && !error.message.includes('sk-private-gateway-provider-payload'));
+  }
+  const aborted=new AiGatewayClient({fetchFn:async()=>{
+    throw Object.assign(new Error('sk-transport-secret'),{name:'AbortError'});
+  }});
+  await assert.rejects(aborted.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
+    error=>error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT'
+      && error.retryable===true && !error.message.includes('sk-transport-secret'));
+});
+
 test('gateway retains a safe provider code but never a secret-bearing error body or raw network exception',async()=>{
   const typed=new AiGatewayClient({fetchFn:async()=>new Response(
     JSON.stringify({code:'AI_PROVIDER_QUOTA_EXHAUSTED',error:'sk-private-secret'}),{status:429},
