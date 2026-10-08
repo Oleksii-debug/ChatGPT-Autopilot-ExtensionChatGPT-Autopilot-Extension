@@ -128,7 +128,19 @@ function own(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
   return descriptor && 'value' in descriptor ? descriptor.value : undefined;
 }
-function price(value, label) { if (value == null) return 0; if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
+function price(value, label) {
+  if (value == null) return 0;
+  if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`);
+  // Number('') and Number('0x0') are not observed zero-cost evidence.
+  if (typeof value === 'string' && !/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/u.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  const out = Number(value);
+  if (!Number.isFinite(out) || out < 0 || out > 1_000_000 || Object.is(out, -0)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return out;
+}
 function priceCap(value, label) {
   if (value == null) return null;
   return price(value, label);
