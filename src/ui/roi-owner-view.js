@@ -83,7 +83,13 @@ function snapshotRows(value) {
       || !Number.isSafeInteger(row.verifiedManualOccurrenceCount)
       || row.verifiedManualOccurrenceCount < 0
       || row.policyOrExecutionAuthorized !== false
-      || row.decisionAuthorized === true) {
+      || (row.decisionAuthorized !== undefined && row.decisionAuthorized !== false)
+      || (row.advisoryPath !== undefined && row.advisoryPath !== 'EVALUATE_DETERMINISTIC_RECIPE_OR_TOOL')
+      || (row.shorterModelPath !== undefined && row.shorterModelPath !== 'NOT_EVALUATED')
+      || (row.recurringOwnerAttentionSeconds !== undefined
+        && (!Number.isSafeInteger(row.recurringOwnerAttentionSeconds) || row.recurringOwnerAttentionSeconds < 0))
+      || (row.supportingRunCount !== undefined
+        && (!Number.isSafeInteger(row.supportingRunCount) || row.supportingRunCount < 0))) {
       throw new Error('Untrusted ROI opportunity rejected');
     }
     rows.push(row);
@@ -96,7 +102,8 @@ function snapshotAdvisory(input) {
   if (advisory.schemaVersion !== 1 || !STATUSES.has(advisory.status)
     || typeof advisory.statusText !== 'string' || advisory.statusText.length > 300
     || advisory.deploymentAuthorized !== false
-    || advisory.recommendationAuthorized === true || advisory.telemetryEmitted === true) {
+    || (advisory.recommendationAuthorized !== undefined && advisory.recommendationAuthorized !== false)
+    || (advisory.telemetryEmitted !== undefined && advisory.telemetryEmitted !== false)) {
     throw new Error('ROI advisory is invalid or attempts to grant authority');
   }
   const rows = snapshotRows(advisory.opportunities);

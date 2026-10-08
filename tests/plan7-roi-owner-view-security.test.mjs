@@ -59,3 +59,35 @@ test('adversarial: metrics reject overflow/NaN/coercion and report absent values
   assert.ok(all.some(node=>node.tagName==='DD'&&node.textContent==='Немає підтверджених даних'));
   assert.ok(all.some(node=>node.attributes['aria-live']==='polite'));
 });
+
+test('ROI never accepts forged model evaluation or automatic advisory promotion', () => {
+  const trustedRow = {
+    workflowClassId: 'workflow.safe', verifiedManualOccurrenceCount: 2,
+    recurringOwnerAttentionSeconds: 15, supportingRunCount: 2,
+    policyOrExecutionAuthorized: false, decisionAuthorized: false,
+    advisoryPath: 'EVALUATE_DETERMINISTIC_RECIPE_OR_TOOL',
+    shorterModelPath: 'NOT_EVALUATED',
+  };
+  const accepted = container();
+  renderRoiOwnerViewV1(accepted, evidence({ opportunities: [trustedRow] }));
+  assert.equal(accepted.children.length, 1);
+  for (const changes of [
+    { advisoryPath: 'DEPLOY' },
+    { shorterModelPath: 'VERIFIED_CHEAPER_MODEL' },
+    { decisionAuthorized: 'false' },
+    { recurringOwnerAttentionSeconds: -1 },
+    { supportingRunCount: Number.MAX_SAFE_INTEGER + 1 },
+  ]) {
+    bad(root => renderRoiOwnerViewV1(root,
+      evidence({ opportunities: [{ ...trustedRow, ...changes }] })));
+  }
+});
+
+test('ROI rejects stringified or nullable approval and telemetry flags', () => {
+  for (const changes of [
+    { recommendationAuthorized: 'false' },
+    { recommendationAuthorized: null },
+    { telemetryEmitted: 'false' },
+    { telemetryEmitted: null },
+  ]) bad(root => renderRoiOwnerViewV1(root, evidence(changes)));
+});
