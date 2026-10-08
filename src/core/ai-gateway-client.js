@@ -47,8 +47,7 @@ export function normalizeGatewayUrl(value) {
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI Gateway must use http:// or https://');
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) throw new Error('AI Gateway must use localhost or 127.0.0.1');
   if (parsed.username || parsed.password) throw new Error('Credentials are not allowed in the AI Gateway URL');
-  parsed.hash = '';
-  parsed.search = '';
+  if (parsed.search || parsed.hash) throw new Error('AI Gateway URL cannot contain query or fragment');
   parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
   return parsed.toString().replace(/\/$/, '');
 }
