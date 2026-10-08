@@ -12,11 +12,14 @@ const fields = (overrides = {}) => ({
 });
 test('simplified post-Send unit converts minutes to canonical seconds', () => {
   assert.equal(buildSimplifiedSessionConfig(fields()).postSendDelaySeconds,120);
+  assert.equal(buildSimplifiedSessionConfig(fields()).postSendDelayUnit,'minutes');
   assert.equal(buildSimplifiedSessionConfig(fields({postSend:'45',postSendUnit:'seconds'})).postSendDelaySeconds,45);
+  assert.equal(buildSimplifiedSessionConfig(fields({postSend:'45',postSendUnit:'seconds'})).postSendDelayUnit,'seconds');
   assert.throws(() => buildSimplifiedSessionConfig(fields({postSend:'61',postSendUnit:'minutes'})));
 });
 test('scenario post-Send dwell accepts minutes converted to seconds without clipping at 60', () => {
-  assert.equal(normalizeScenarioWorkConfig({postSendDelaySeconds:180}).postSendDelaySeconds,180);
+  assert.equal(normalizeScenarioWorkConfig({postSendDelaySeconds:180,postSendDelayUnit:'minutes'}).postSendDelaySeconds,180);
+  assert.equal(normalizeScenarioWorkConfig({postSendDelaySeconds:180,postSendDelayUnit:'minutes'}).postSendDelayUnit,'minutes');
   assert.equal(normalizeScenarioWorkConfig({postSendDelaySeconds:3600}).postSendDelaySeconds,3600);
 });
 test('both accessible configuration surfaces expose units after Send', () => {
