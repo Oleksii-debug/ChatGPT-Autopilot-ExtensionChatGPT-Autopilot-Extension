@@ -21,8 +21,12 @@ permissions:
 
 jobs:
   specialist-readiness:
-    name: Section 1 specialist registry and readiness
-    runs-on: ubuntu-latest
+    name: Section 1 specialist registry and readiness (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -57,8 +61,12 @@ jobs:
             tests/agent-route-readiness.test.mjs
 
   subagent-authority:
-    name: Section 2 subagent topology, leases and recovery
-    runs-on: ubuntu-latest
+    name: Section 2 subagent topology, leases and recovery (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
