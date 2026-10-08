@@ -637,3 +637,19 @@ test('unknown, symbol, hidden and exotic dependency/request authority fields fai
     /plain or null-prototype object/u,
   );
 });
+
+
+test('Plan 7 model catalog query remains read-only and carries no model-routing authority', () => {
+  const model = normalizeAutopilotProgrammaticRequestV1(request({
+    operation: AutopilotProgrammaticOperation.MODEL_CATALOG_GET,
+    targetId: null,
+  }));
+  assert.equal(model.operation,'MODEL_CATALOG_GET');
+  assert.equal(model.targetId,null);
+  assert.equal(isAutopilotProgrammaticOperationReadOnly(model.operation),true);
+  assert.throws(()=>normalizeAutopilotProgrammaticRequestV1(request({
+    operation:AutopilotProgrammaticOperation.MODEL_CATALOG_GET,
+    targetId:null,
+    payloadArtifactRef:artifact(),
+  })),/does not accept payloadArtifactRef/);
+});
