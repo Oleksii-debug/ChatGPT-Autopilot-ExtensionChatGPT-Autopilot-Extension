@@ -542,3 +542,51 @@ test('vision screenshot refuses debugger-induced scroll drift before capture', a
     globalThis.performance = priorPerformance;
   }
 });
+
+
+test('native fallback refuses owner Stop after debugger attach, without mouse effect', async () => {
+  setup();
+  let attachCount = 0;
+  let detachCount = 0;
+  const dispatched = [];
+  const chromeApi = {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: { x: 55, y: 25, url: pageUrl } }] },
+    debugger: {
+      attach: async () => { attachCount++; },
+      sendCommand: async (_target, method) => { dispatched.push(method); },
+      detach: async () => { detachCount++; },
+    },
+  };
+  const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}) });
+  let authorityChecks = 0;
+  manager.verifyOwnerAuthority = async () => ++authorityChecks === 1;
+  const approved = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', setup());
+  assert.equal(await manager.nativeClick(7, 0, 's1', 'r1', approved, 'job-1', 3), false);
+  assert.equal(attachCount, 1);
+  assert.equal(detachCount, 1);
+  assert.deepEqual(dispatched, []);
+});
+
+test('native fallback refuses stale owner epoch at final pre-dispatch proof', async () => {
+  const snapshot = setup();
+  let detachCount = 0;
+  const dispatched = [];
+  const chromeApi = {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: { x: 55, y: 25, url: pageUrl } }] },
+    debugger: {
+      attach: async () => {},
+      sendCommand: async (_target, method) => { dispatched.push(method); },
+      detach: async () => { detachCount++; },
+    },
+  };
+  const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}) });
+  let checks = 0;
+  manager.verifyOwnerAuthority = async () => ++checks < 3;
+  const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
+  assert.equal(await manager.nativeClick(7, 0, 's1', 'r1', action, 'job-1', 3), false);
+  assert.equal(checks, 3);
+  assert.equal(detachCount, 1);
+  assert.deepEqual(dispatched, []);
+});
