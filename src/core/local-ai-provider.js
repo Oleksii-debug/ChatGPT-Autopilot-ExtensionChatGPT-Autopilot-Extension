@@ -388,12 +388,21 @@ export class LocalAiClient {
     // The transport is not an arbitrary loopback HTTP client. Bind every
     // request to the configured provider origin and one of its two explicit
     // API endpoints before attaching prompt content or starting a network effect.
-    if (requestUrl !== endpointFor(normalized, 'models')
-        && requestUrl !== endpointFor(normalized, 'chat')) {
+    const modelsEndpoint = endpointFor(normalized, 'models');
+    const chatEndpoint = endpointFor(normalized, 'chat');
+    if (requestUrl !== modelsEndpoint && requestUrl !== chatEndpoint) {
       throw new Error('Local AI request URL does not match the configured provider endpoint');
     }
-    if (requestUrl === endpointFor(normalized, 'models') && (safeInit.body !== undefined || safeInit.method === 'POST')) {
-      throw new Error('Local AI model discovery cannot send prompt content');
+    // Discovery and completion have distinct allowed effects; do not accept
+    // a GET completion or an unbounded write against the discovery endpoint.
+    if (requestUrl === modelsEndpoint && (
+      (safeInit.method !== undefined && safeInit.method !== 'GET')
+      || safeInit.body !== undefined
+    )) {
+      throw new Error('Local AI model discovery is GET-only and cannot send prompt content');
+    }
+    if (requestUrl === chatEndpoint && (safeInit.method !== 'POST' || safeInit.body === undefined)) {
+      throw new Error('Local AI completion requires explicit POST with bounded JSON');
     }
     const controller = new AbortController();
     const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
