@@ -240,3 +240,17 @@ test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not i
   });
   assert.equal(reads, 0);
 });
+
+
+test('Plan-1 S1: direct actions and events reject JSON-lossy negative zero across restart', () => {
+  const validAction = normalizeAgentAction(action({ data: { offset: 0 } }));
+  const validEvent = normalizeAgentEvent(event({ data: { metrics: [{ offset: 0 }] } }));
+  assert.equal(validAction.data.offset, 0);
+  assert.equal(validEvent.data.metrics[0].offset, 0);
+  for (const payload of [{ offset: -0 }, { metrics: [{ offset: -0 }] }]) {
+    assert.throws(() => normalizeAgentAction(action({ data: payload })), /non-canonical negative zero/);
+    assert.throws(() => normalizeAgentEvent(event({ data: payload })), /non-canonical negative zero/);
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(validAction.data)), { offset: 0 });
+  assert.deepEqual(JSON.parse(JSON.stringify(validEvent.data)), { metrics: [{ offset: 0 }] });
+});
