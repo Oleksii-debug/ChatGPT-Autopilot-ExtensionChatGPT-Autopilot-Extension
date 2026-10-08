@@ -128,11 +128,28 @@ function snapshotAdvisory(input) {
   // Per-workflow numbers are subsets of the bounded observed run population.
   // A single forged advisory must never display more supporting/verified
   // occurrences than there are canonical runs in the same report.
+  // Each canonical run belongs to exactly one workflow class. Individual
+  // per-row bounds are insufficient: duplicate rows or several individually
+  // plausible rows could sum to more runs than the entire report contains.
+  // Reject the entire forged snapshot before mutating the NVDA-facing DOM.
+  const workflowClasses = new Set();
+  let manualOccurrenceTotal = 0, supportingRunTotal = 0;
   for (const row of rows) {
+    if (workflowClasses.has(row.workflowClassId)) {
+      throw new Error('ROI report duplicates workflow evidence');
+    }
+    workflowClasses.add(row.workflowClassId);
     if (row.verifiedManualOccurrenceCount > advisory.observedRunCount
       || (row.supportingRunCount !== undefined
-        && row.supportingRunCount > advisory.observedRunCount)) {
+        && (row.supportingRunCount > advisory.observedRunCount
+          || row.verifiedManualOccurrenceCount > row.supportingRunCount))) {
       throw new Error('ROI opportunity counts exceed observed evidence');
+    }
+    manualOccurrenceTotal += row.verifiedManualOccurrenceCount;
+    supportingRunTotal += row.supportingRunCount ?? 0;
+    if (manualOccurrenceTotal > advisory.observedRunCount
+      || supportingRunTotal > advisory.observedRunCount) {
+      throw new Error('ROI report double-counts canonical runs');
     }
   }
   // Estimated bounds are an evidence interval, never a coerced string,
