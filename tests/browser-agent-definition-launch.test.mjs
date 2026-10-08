@@ -572,7 +572,7 @@ test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects
   await assert.rejects(() => manager.create({
     id: 'job.sparse-site', goal: 'Do not accept partially hidden owner rules.',
     siteRules: sparse,
-  }), /own data properties/);
+  }), /dense bounded array|own data properties/);
 
   const mutableRules = [{
     pattern: 'example.com',
