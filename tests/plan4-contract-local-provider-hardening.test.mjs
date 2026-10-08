@@ -426,3 +426,87 @@ test('owner model-routing failover booleans reject coercion and accessor traps a
   assert.equal(restored.fallbackToStrongOnPrimaryError,false);
   assert.equal(restored.keepPrimaryIfStrongFails,false);
 });
+
+
+test('owner allow/deny/ordering lists never widen from explicit falsy input on cold or JSON restart', () => {
+  const policyKeys = ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds'];
+  const routeKeys = ['roles', 'capabilityIds'];
+  for (const invalid of [false, 0, '', null]) {
+    for (const key of policyKeys) {
+      const policy = { [key]:invalid };
+      assert.throws(() => normalizeAiRoutePolicy(policy), /bounded array/);
+      assert.throws(() => normalizeAiRoutePolicy(JSON.parse(JSON.stringify(policy))), /bounded array/);
+    }
+    for (const key of routeKeys) {
+      const pool = [{...route, [key]:invalid}];
+      assert.throws(() => normalizeAiRoutePool(pool), /bounded array/);
+      assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify(pool))), /bounded array/);
+    }
+    assert.throws(() => normalizeAiRouterSettings({routes:invalid}), /bounded array/);
+    assert.throws(() => normalizeAiRouterSettings({routePolicy:invalid}), /plain data object/);
+    assert.throws(() => normalizeAiRouterSettings({workerPolicy:invalid}), /object/);
+  }
+  assert.throws(() => selectAiRouteCandidates({
+    routes:[route], policy:{}, capabilityIds:false, now:1,
+  }), /bounded array/);
+  assert.deepEqual(normalizeAiRoutePolicy({}).allowRouteIds, []);
+  assert.deepEqual(normalizeAiRoutePool([route])[0].capabilityIds, []);
+  const explicitlyDenied = normalizeAiRoutePolicy({denyRouteIds:['primary']});
+  assert.deepEqual(selectAiRouteCandidates({
+    routes:[route], policy:JSON.parse(JSON.stringify(explicitlyDenied)), now:1,
+  }).eligibleRouteIds, []);
+});
+
+test('local AI transport rejects caller headers, unsafe HTTP methods, malformed and oversized requests before network', async () => {
+  let networkCalls = 0;
+  const client = new LocalAiClient({fetchFn:async () => {
+    networkCalls += 1;
+    throw new Error('network forbidden in negative tests');
+  }});
+  const chat = 'http://127.0.0.1:11434/api/chat';
+  const models = 'http://127.0.0.1:11434/api/tags';
+  const forbidden = [
+    [chat,{headers:{Authorization:'Bearer secret'}}],
+    [chat,{headers:{Cookie:'session=private'}}],
+    [chat,{method:'DELETE'}],
+    [chat,{method:'POST',body:'{broken'}],
+    [chat,{method:'POST',body:JSON.stringify([1,2])}],
+    [chat,{method:'POST',body:JSON.stringify({prompt:'x'.repeat(130000)})}],
+    [models,{method:'POST',body:'{"prompt":"secret"}'}],
+    [models,{method:'POST'}],
+    [chat,{mode:'no-cors'}],
+  ];
+  for (const [url, init] of forbidden) {
+    await assert.rejects(client.request(settings,url,init));
+    await assert.rejects(client.request(JSON.parse(JSON.stringify(settings)),url,JSON.parse(JSON.stringify(init))));
+  }
+  let getterCalled = false;
+  const hostile = {};
+  Object.defineProperty(hostile, 'headers', {enumerable:true, get() {
+    getterCalled = true;
+    throw new Error('getter must not execute');
+  }});
+  await assert.rejects(client.request(settings,chat,hostile), /own data properties/);
+  assert.equal(getterCalled,false);
+  assert.equal(networkCalls,0);
+});
+
+test('local provider standard completion still posts JSON with bounded safe headers', async () => {
+  let calls = 0;
+  const client = new LocalAiClient({fetchFn:async (url, init) => {
+    calls++;
+    assert.equal(url,'http://127.0.0.1:11434/api/chat');
+    assert.equal(init.method,'POST');
+    assert.equal(init.redirect,'error');
+    assert.equal(init.cache,'no-store');
+    assert.equal(init.headers.Accept,'application/json');
+    assert.equal(init.headers['Content-Type'],'application/json');
+    assert.equal('Authorization' in init.headers,false);
+    assert.equal(JSON.parse(init.body).messages[0].content,'fixture');
+    return new Response(JSON.stringify({message:{content:'ok'},prompt_eval_count:2,eval_count:1}),{status:200});
+  }});
+  const result = await client.complete(settings,'fixture');
+  assert.equal(result.text,'ok');
+  assert.equal(result.usage.totalTokens,3);
+  assert.equal(calls,1);
+});
