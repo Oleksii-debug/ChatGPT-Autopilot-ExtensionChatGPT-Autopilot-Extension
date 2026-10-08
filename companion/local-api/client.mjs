@@ -191,19 +191,30 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       inFlightRequestIds.add(sentRequest.requestId);
       try {
+      // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
+      // Enforce one wall-clock deadline across transport AND body parsing.
+      // Timeout is always ambiguous, not evidence of zero external effects.
+      const abortController = new AbortController();
+      let timeoutHandle;
+      const deadline = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          abortController.abort();
+          reject(new Error('Local API deadline expired'));
+        }, timeoutMs);
+      });
       let res;
       try {
-        res = await fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
+        res = await Promise.race([fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
           method: 'POST',
           headers: {
             Authorization: 'Bearer ' + token,
             'Content-Type': 'application/json',
           },
           body,
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: abortController.signal,
           cache: 'no-store',
           redirect: 'error',
-        });
+        }), deadline]);
       } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
@@ -222,7 +233,9 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       try {
         // Validate and return only immutable snapshots, never original Proxies.
-        const envelope = snapshotTransportRecord(await res.json(), RESPONSE_FIELDS);
+        const body = await Promise.race([res.json(), deadline]);
+        if (abortController.signal.aborted) throw new Error('Late Local API response');
+        const envelope = snapshotTransportRecord(body, RESPONSE_FIELDS);
         const outer = snapshotTransportRecord(envelope.result, RESULT_FIELDS);
         const requestSnapshot = snapshotTransportRecord(outer.request, REQUEST_FIELDS);
         const receiptSnapshot = snapshotTransportRecord(outer.receipt, RECEIPT_FIELDS);
@@ -276,6 +289,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || value?.result?.storeMutationAuthority !== false) {
           throw new Error('Unbound response');
         }
+        if (abortController.signal.aborted) throw new Error('Late Local API receipt');
         return value;
       } catch {
         return Object.freeze({
@@ -284,6 +298,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       } finally {
+        clearTimeout(timeoutHandle);
         inFlightRequestIds.delete(sentRequest.requestId);
       }
     },
