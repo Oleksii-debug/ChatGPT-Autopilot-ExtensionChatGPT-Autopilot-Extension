@@ -3527,7 +3527,7 @@ function renderAgentRunTimeline(job) {
       ', вузлів ' + timeline.plan.nodeCount + '. Кроків ' + counters.steps +
       ', викликів моделі ' + counters.modelCalls + ', токенів ' + counters.totalTokens +
       ', приблизні витрати ' + (counters.estimatedCostUsd === null ? 'невідомі' : counters.estimatedCostUsd.toFixed(6) + ' USD') +
-      ', підтверджених перевірок ' + counters.verifiedChecks +
+      ', записаних критеріїв перевірки (без підтвердження зовнішнього ефекту) ' + counters.verifiedChecks +
       ', дій власника серед переглянутих ' + counters.ownerEvents + '.' +
       ' Карта доказів: подій редакції плану ' + timeline.evidenceMap.observed.planRevisionEvents +
       ', контрольних точок ' + timeline.evidenceMap.observed.checkpointRecordedEvents + '.' +
