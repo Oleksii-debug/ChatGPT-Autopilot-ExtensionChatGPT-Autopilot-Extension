@@ -707,8 +707,12 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.text = raw.text;
   }
   if (type === BrowserAgentActionType.SELECT) {
-    action.value = clean(raw.value, 5000);
-    if (!action.value) throw new Error('Browser Agent select action requires value');
+    // Option values are exact remote form effect identities. Never silently
+    // trim or truncate a model-proposed value into another option.
+    if (typeof raw?.value !== 'string' || raw.value.length === 0 || raw.value.length > 5000) {
+      throw new Error('Browser Agent select requires an exact bounded option value');
+    }
+    action.value = raw.value;
   }
   if (type === BrowserAgentActionType.CHECK) {
     // A missing, null, or string "false" model field must not silently
