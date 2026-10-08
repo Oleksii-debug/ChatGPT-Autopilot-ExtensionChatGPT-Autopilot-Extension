@@ -70,6 +70,17 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
 
 const clean = value => typeof value === 'string' ? value.trim() : '';
 
+// Model routing options are owner-controlled policy, not truthy/falsey hints.
+// Coercion must never silently enable fallback to another account or locality.
+function ownerRoutingBoolean(raw, field, fallback) {
+  const descriptor = Object.getOwnPropertyDescriptor(raw, field);
+  if (!descriptor) return fallback;
+  if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'boolean') {
+    throw new Error(`AI router ${field} must be boolean`);
+  }
+  return descriptor.value;
+}
+
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
   const model = clean(raw?.model);
@@ -92,7 +103,7 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
   const routes = normalizeAiRoutePool(raw.routes || []);
   return {
-    enabled: raw.enabled === true,
+    enabled: ownerRoutingBoolean(raw, 'enabled', false),
     gatewayUrl: normalizeGatewayUrl(raw.gatewayUrl),
     timeoutSeconds,
     mode: MODES.has(raw.mode) ? raw.mode : DEFAULT_AI_ROUTER_SETTINGS.mode,
@@ -102,10 +113,10 @@ export function normalizeAiRouterSettings(raw = {}) {
     strongEveryMinutes,
     strongMinGapMinutes,
     strongMaxPerHour,
-    carryStrongResultToPrimary: raw.carryStrongResultToPrimary !== false,
+    carryStrongResultToPrimary: ownerRoutingBoolean(raw, 'carryStrongResultToPrimary', true),
     handoffMaxChars,
-    fallbackToStrongOnPrimaryError: raw.fallbackToStrongOnPrimaryError !== false,
-    keepPrimaryIfStrongFails: raw.keepPrimaryIfStrongFails !== false,
+    fallbackToStrongOnPrimaryError: ownerRoutingBoolean(raw, 'fallbackToStrongOnPrimaryError', true),
+    keepPrimaryIfStrongFails: ownerRoutingBoolean(raw, 'keepPrimaryIfStrongFails', true),
     routes,
     routePolicy: normalizeAiRoutePolicy(raw.routePolicy || DEFAULT_AI_ROUTE_POLICY),
     workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy || DEFAULT_AI_WORKER_POLICY, routes),
