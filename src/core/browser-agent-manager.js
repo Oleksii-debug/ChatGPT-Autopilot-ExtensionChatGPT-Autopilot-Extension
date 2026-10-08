@@ -3122,6 +3122,7 @@ export class BrowserAgentManager {
     }
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
@@ -3133,10 +3134,16 @@ export class BrowserAgentManager {
       });
       if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
       if (!(await this.verifyOwnerAuthority(jobId, epoch))) throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      // A rejected Chrome dispatch can still have pressed the button.
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+      pointerMayBeDown = false;
       return true;
     } finally {
+      if (attached && pointerMayBeDown) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
@@ -3179,10 +3186,11 @@ export class BrowserAgentManager {
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseMoved', x: action.startX, y: action.startY, button: 'none', buttons: 0,
       });
+      // A rejected press promise may still have effected a physical press.
+      pointerDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.startX, y: action.startY, button: 'left', buttons: 1, clickCount: 1,
       });
-      pointerDown = true;
       await sleep(Math.min(50, stepDelayMs));
       for (let index = 1; index <= steps; index += 1) {
         await requireOwner();
@@ -3238,6 +3246,7 @@ export class BrowserAgentManager {
     if (!verification?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
@@ -3249,12 +3258,14 @@ export class BrowserAgentManager {
       });
       if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
       await requireOwner();
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.x, y: action.y, button: 'left', buttons: 1, clickCount: 1,
       });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased', x: action.x, y: action.y, button: 'left', buttons: 0, clickCount: 1,
       });
+      pointerMayBeDown = false;
       // A click may fire a handler that replaces the focused target.
       const postClick = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
@@ -3266,6 +3277,9 @@ export class BrowserAgentManager {
       await this.chrome.debugger.sendCommand(target, 'Input.insertText', { text: action.text });
       return true;
     } finally {
+      if (attached && pointerMayBeDown) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: action.x, y: action.y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
@@ -3283,6 +3297,8 @@ export class BrowserAgentManager {
     if (!beforeAttach || !Number.isFinite(beforeAttach.x) || !Number.isFinite(beforeAttach.y)) return false;
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
+    let clickPoint = null;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
@@ -3294,12 +3310,18 @@ export class BrowserAgentManager {
       if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
         || point.x < 0 || point.y < 0 || (beforeAttach.url && point.url !== beforeAttach.url)) return false;
       if (!(await this.verifyOwnerAuthority(jobId, epoch))) return false;
+      clickPoint = point;
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 });
+      pointerMayBeDown = false;
       return true;
     } catch {
       return false;
     } finally {
+      if (attached && pointerMayBeDown && clickPoint) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: clickPoint.x, y: clickPoint.y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
