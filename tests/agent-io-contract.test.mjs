@@ -152,3 +152,32 @@ test('Plan-1: hostile action/event type coercion cannot execute or disclose secr
   assert.match(rejection.message, /size limit/);
   assert.doesNotMatch(rejection.message, /secret-value-not-for-logs/);
 });
+
+
+test('Plan-1: Agent chronology rejects ambiguous, rolled and timezone-free timestamps', () => {
+  for (const timestamp of [
+    '0', '2026-09-12', '2026-09-12T00:00:00',
+    '2026-02-30T00:00:00Z', '2026-13-01T00:00:00Z',
+    '2026-09-12T24:00:00Z', '2026-09-12T00:00:00.1234Z',
+    '2026-09-12T00:00:00+25:00',
+  ]) {
+    assert.throws(
+      () => normalizeAgentAction(action({ createdAt: timestamp })),
+      /timestamp|calendar date/i,
+      'action must reject ' + timestamp,
+    );
+    assert.throws(
+      () => normalizeAgentEvent(event({ occurredAt: timestamp })),
+      /timestamp|calendar date/i,
+      'event must reject ' + timestamp,
+    );
+  }
+  assert.equal(
+    normalizeAgentAction(action({ createdAt: '2026-09-12T02:00:00+02:00' })).createdAt,
+    '2026-09-12T00:00:00.000Z',
+  );
+  assert.equal(
+    normalizeAgentEvent(event({ occurredAt: '2026-09-11T23:59:59.500-01:00' })).occurredAt,
+    '2026-09-12T00:59:59.500Z',
+  );
+});
