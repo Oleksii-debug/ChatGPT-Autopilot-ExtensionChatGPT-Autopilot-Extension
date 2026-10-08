@@ -5524,6 +5524,24 @@ $('mode-tabs').addEventListener('keydown', (event) => {
   setUiMode(ordered[index], { focus: true });
 });
 
+function bindPostSendUnit(valueId, unitId) {
+  const value = $(valueId);
+  const unit = $(unitId);
+  let previousUnit = unit.value;
+  unit.addEventListener('change', () => {
+    const raw = Number(value.value);
+    if (Number.isInteger(raw) && raw >= 0) {
+      const seconds = raw * (previousUnit === 'minutes' ? 60 : 1);
+      const converted = seconds / (unit.value === 'minutes' ? 60 : 1);
+      value.value = String(Number.isInteger(converted) ? converted : Math.ceil(converted));
+    }
+    value.max = unit.value === 'minutes' ? '60' : '3600';
+    previousUnit = unit.value;
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+bindPostSendUnit('simplified-post-send', 'simplified-post-send-unit');
+bindPostSendUnit('scenario-work-post-send', 'scenario-work-post-send-unit');
 $('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
 $('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
 $('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
