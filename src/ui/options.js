@@ -3513,8 +3513,9 @@ function renderAgentRunTimeline(job) {
     for (const entry of timeline.entries) {
       const item = document.createElement('li');
       const timestamp = document.createElement('time');
-      if (entry.at) timestamp.dateTime = new Date(entry.at).toISOString();
-      timestamp.textContent = entry.at ? new Date(entry.at).toLocaleString('uk-UA') : 'Час невідомий';
+      const hasRecordedTime = entry.timeEvidence === 'RECORDED';
+      if (hasRecordedTime) timestamp.dateTime = new Date(entry.at).toISOString();
+      timestamp.textContent = hasRecordedTime ? new Date(entry.at).toLocaleString('uk-UA') : 'Час не записано';
       const description = document.createElement('span');
       description.textContent = ' — ' + entry.description + (entry.actionType ? ' Тип дії: ' + entry.actionType + '.' : '');
       item.append(timestamp, description);

@@ -447,3 +447,18 @@ test('explicit null authority and credential lists fail closed instead of becomi
   assert.equal(allowed.executionAuthorized, false);
   assert.equal(allowed.instructionAuthority, 'NONE');
 });
+
+
+test('S2 explicit null source origin is not silently downgraded to missing provenance', () => {
+  const input = request({ source: source({ sourceOrigin: null }) });
+  assert.throws(() => assessUntrustedContentInfluenceV1(input), /canonical HTTP\(S\) origin/);
+  assert.throws(() => assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(input))),
+    /canonical HTTP\(S\) origin/);
+  const omitted = source();
+  delete omitted.sourceOrigin;
+  const safe = assessUntrustedContentInfluenceV1(request({ source: omitted }));
+  assert.equal(safe.contentTrust, 'UNTRUSTED_DATA');
+  assert.equal(safe.instructionAuthority, 'NONE');
+  assert.equal(safe.executionAuthorized, false);
+  assert.equal(safe.policyDecisionGranted, false);
+});

@@ -96,11 +96,13 @@ function boundedJobId(value) {
 function safeTime(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
 }
-function storedEventTime(value) {
-  // Missing time is supported for older records. Explicitly malformed
-  // persisted times must never be exported as fabricated epoch-zero evidence.
-  if (value === undefined) return 0;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 8_640_000_000_000_000) {
+function storedEventTime(value, present) {
+  // Absent legacy timestamps remain compatible but are explicitly identified
+  // as missing evidence. A recorded epoch-zero is not "unknown" time.
+  // A present undefined/fractional/noncanonical timestamp is corrupt.
+  if (!present) return 0;
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) ||
+      value < 0 || value > 8_640_000_000_000_000) {
     throw new Error('Agent history entry timestamp is invalid');
   }
   return value;
@@ -210,6 +212,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const rawType = own(entry, 'type');
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
+    const hasRecordedTime = Object.hasOwn(entry, 'at');
     const rawAction = own(entry, 'action');
     let actionType = '';
     if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
@@ -218,7 +221,8 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     }
     return {
       entryId: 'agent-history:' + ordinal,
-      at: storedEventTime(own(entry, 'at')),
+      at: storedEventTime(own(entry, 'at'), hasRecordedTime),
+      timeEvidence: hasRecordedTime ? 'RECORDED' : 'MISSING_LEGACY',
       category: spec[0],
       event: known ? rawType : 'OTHER',
       description: spec[1],
