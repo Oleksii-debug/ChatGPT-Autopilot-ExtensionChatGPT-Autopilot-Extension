@@ -1130,3 +1130,65 @@ test('native coordinate typing blocks focus hijack after physical click before I
   assert.equal(fixture.events.includes('Input.insertText'), false);
   assert.equal(fixture.events.at(-1), 'detach');
 });
+
+
+test('semantic native activation recovers uncertain keyDown/keyUp without a duplicate keyDown', async () => {
+  setup();
+  for (const failure of ['keyDown', 'keyUp']) {
+    const events = [];
+    let detaches = 0;
+    const manager = new BrowserAgentManager({ chromeApi: {
+      storage: { local: { get: async () => ({}), set: async () => {} } },
+      scripting: { executeScript: async () => [{ result: { x: 55, y: 25, url: pageUrl } }] },
+      debugger: {
+        attach: async () => {},
+        sendCommand: async (_target, method, args) => {
+          if (method !== 'Input.dispatchKeyEvent') return;
+          events.push(args.type);
+          if (args.type === failure && events.filter(value => value === failure).length === 1) {
+            throw new Error('ACK_LOST');
+          }
+        },
+        detach: async () => { detaches++; },
+      },
+    }, routePrompt: async () => ({}) });
+    manager.verifyOwnerAuthority = async () => true;
+    await assert.rejects(() => manager.dispatchKey(7, 'Enter', {
+      frameId: 0, snapshotId: 's1', ref: 'r1', expectedAction: {}, jobId: 'owner', epoch: 3,
+    }), /ACK_LOST/);
+    assert.equal(events.filter(type => type === 'keyDown').length, 1);
+    assert.deepEqual(events, failure === 'keyDown'
+      ? ['keyDown', 'keyUp'] : ['keyDown', 'keyUp', 'keyUp']);
+    assert.equal(detaches, 1);
+  }
+});
+
+test('vision capture rejects coercible or absent origin evidence before debugger attach', async () => {
+  const originalPerformance = globalThis.performance;
+  try {
+    globalThis.performance = { timeOrigin: 1000 };
+    setup();
+    let attaches = 0;
+    const manager = new BrowserAgentManager({ chromeApi: {
+      storage: { local: { get: async () => ({}), set: async () => {} } },
+      tabs: { get: async () => ({ url: pageUrl }) },
+      scripting: { executeScript: async ({ func }) => [{ result: func() }] },
+      debugger: {
+        attach: async () => { attaches++; },
+        sendCommand: async () => ({ data: 'abc' }),
+        detach: async () => {},
+      },
+    }, routePrompt: async () => ({}) });
+    const valid = { width: 500, height: 300, scrollX: 0, scrollY: 0, documentEpoch: 1000 };
+    for (const field of Object.keys(valid)) {
+      for (const value of [null, '', '0', undefined, Infinity]) {
+        await assert.rejects(manager.captureVision(7, {
+          expectedUrl: pageUrl, expectedViewport: { ...valid, [field]: value },
+        }), /AGENT_VISION_SNAPSHOT_STALE/);
+      }
+    }
+    assert.equal(attaches, 0);
+  } finally {
+    globalThis.performance = originalPerformance;
+  }
+});

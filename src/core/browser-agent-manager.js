@@ -3025,6 +3025,13 @@ export class BrowserAgentManager {
       // and screenshot invalidates visual coordinates. Chrome debugger attach
       // can itself change the viewport; check before and after that effect.
       if (expectedViewport) {
+        // Persisted visual origin values are evidence, never coercible
+        // defaults. A missing scroll=0 after restart cannot prove a frame.
+        const numericFields = ['width', 'height', 'scrollX', 'scrollY', 'documentEpoch'];
+        if (numericFields.some(field => typeof expectedViewport[field] !== 'number'
+          || !Number.isFinite(expectedViewport[field]))
+          || expectedViewport.width <= 0 || expectedViewport.height <= 0
+          || expectedViewport.documentEpoch <= 0) stale();
         let proof;
         try {
           const frames = await this.requireScripting().executeScript({
@@ -3042,11 +3049,11 @@ export class BrowserAgentManager {
         } catch { stale(); }
         if (!proof || proof.url !== liveUrl
           || !Number.isFinite(proof.documentEpoch) || proof.documentEpoch <= 0
-          || proof.documentEpoch !== Number(expectedViewport.documentEpoch)
-          || proof.width !== Number(expectedViewport.width)
-          || proof.height !== Number(expectedViewport.height)
-          || proof.scrollX !== Number(expectedViewport.scrollX)
-          || proof.scrollY !== Number(expectedViewport.scrollY)) stale();
+          || proof.documentEpoch !== expectedViewport.documentEpoch
+          || proof.width !== expectedViewport.width
+          || proof.height !== expectedViewport.height
+          || proof.scrollX !== expectedViewport.scrollX
+          || proof.scrollY !== expectedViewport.scrollY) stale();
       }
       return liveUrl;
     };
@@ -3071,6 +3078,8 @@ export class BrowserAgentManager {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     const target = { tabId };
     let attached = false;
+    let keyMayBeDown = false;
+    let releaseKey = null;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
@@ -3088,9 +3097,19 @@ export class BrowserAgentManager {
       }
       const normalized = key === ' ' ? ' ' : key;
       const code = key === ' ' ? 'Space' : key;
+      releaseKey = { key: normalized, code };
+      // A rejected keyDown promise may still have caused a press in Chrome.
+      // Recovery may release it but must never repeat the activation.
+      keyMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyDown', key: normalized, code });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyUp', key: normalized, code });
+      keyMayBeDown = false;
     } finally {
+      if (attached && keyMayBeDown && releaseKey) {
+        try {
+          await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyUp', ...releaseKey });
+        } catch { /* release is best effort; never blindly repeat keyDown */ }
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
