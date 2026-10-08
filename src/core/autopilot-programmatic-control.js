@@ -129,7 +129,7 @@ function snapshotRecord(input, allowed, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains an unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor
