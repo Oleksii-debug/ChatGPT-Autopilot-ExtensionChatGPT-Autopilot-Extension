@@ -42,6 +42,7 @@ test('canonical owner, model-budget and recovery events have accurate safe categ
   const result = buildAgentRunTimelineV1(original);
   assert.deepEqual(result.entries.map(entry => [entry.event, entry.category]), Object.entries(EVENT_CATEGORIES));
   assert.equal(result.counters.ownerEvents, 1);
+  assert.deepEqual(result.entries.map(entry => entry.actionType), ['click', ...Array(result.entries.length - 1).fill('')]);
   assert.equal(result.plan.revision, 7);
   assert.equal(result.evidenceOnly, true);
   assert.equal(result.mayReplayExternalEffect, false);
@@ -60,6 +61,7 @@ test('restart, filters and unknown event type do not promote event evidence to e
     action: { type: 'click', value: 'SECRET_EXTERNAL_EFFECT_987' },
   });
   const full = buildAgentRunTimelineV1(restored);
+  assert.equal(full.entries.at(-1).actionType, '');
   assert.equal(full.entries.at(-1).event, 'OTHER');
   assert.equal(full.entries.at(-1).category, 'RECOVERY');
   assert.equal(buildAgentRunTimelineV1(restored, { filter: 'OWNER' }).entries.length, 1);
