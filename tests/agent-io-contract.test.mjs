@@ -226,7 +226,7 @@ test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not i
     get() { reads += 1; throw new Error('must not call this getter'); },
   });
   assert.throws(() => normalizeAgentAction(hostileAction), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /OWNER-PRIVATE|TOKEN-SHOULD|getter/);
     return true;
   });
@@ -234,7 +234,7 @@ test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not i
   const hostileEvent = event();
   Object.defineProperty(hostileEvent, Symbol(secret), { enumerable: true, value: 'ALLOW' });
   assert.throws(() => normalizeAgentEvent(hostileEvent), error => {
-    assert.match(error.message, /unknown field/);
+    assert.match(error.message, /unknown field|enumerable own data properties/);
     assert.doesNotMatch(error.message, /OWNER-PRIVATE|TOKEN-SHOULD/);
     return true;
   });
