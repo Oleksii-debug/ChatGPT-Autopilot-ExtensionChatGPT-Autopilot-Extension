@@ -101,7 +101,7 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
-  const routes = normalizeAiRoutePool(raw.routes || []);
+  const routes = normalizeAiRoutePool(raw.routes === undefined ? [] : raw.routes);
   return {
     enabled: ownerRoutingBoolean(raw, 'enabled', false),
     gatewayUrl: normalizeGatewayUrl(raw.gatewayUrl),
@@ -118,8 +118,8 @@ export function normalizeAiRouterSettings(raw = {}) {
     fallbackToStrongOnPrimaryError: ownerRoutingBoolean(raw, 'fallbackToStrongOnPrimaryError', true),
     keepPrimaryIfStrongFails: ownerRoutingBoolean(raw, 'keepPrimaryIfStrongFails', true),
     routes,
-    routePolicy: normalizeAiRoutePolicy(raw.routePolicy || DEFAULT_AI_ROUTE_POLICY),
-    workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy || DEFAULT_AI_WORKER_POLICY, routes),
+    routePolicy: normalizeAiRoutePolicy(raw.routePolicy === undefined ? DEFAULT_AI_ROUTE_POLICY : raw.routePolicy),
+    workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy === undefined ? DEFAULT_AI_WORKER_POLICY : raw.workerPolicy, routes),
   };
 }
 
