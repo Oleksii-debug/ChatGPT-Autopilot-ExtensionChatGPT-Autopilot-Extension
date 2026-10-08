@@ -1,6 +1,7 @@
 import { normalizeSpecialistSelectionV1 } from './specialist-registry.js';
 import { normalizeSpecialistHandoffV1, normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 import { normalizeExecutionOwnershipV1, ExecutionOwnershipState } from './execution-plane-ownership.js';
+import { inspectSpecialistProviderReadinessV1 } from './specialist-provider-readiness.js';
 
 export const SPECIALIST_PROVIDER_DISPATCHER_VERSION = 1;
 
@@ -136,6 +137,58 @@ function inertReadinessAuthority(value, label) {
   }
 }
 
+// Recompute the observational projection using the existing canonical inspector.
+// Readiness flags and nested checks may be persisted or caller-shaped, so their
+// internal consistency must be proven before any provider callback runs.
+function assertInspectionConsistency(inspection, evidence, selection) {
+  const tools = array(inspection.requiredToolIds, 'readiness.inspection.requiredToolIds', 128);
+  if (tools.length !== selection.grantedToolIds.length
+      || tools.some((toolId, index) => toolId !== selection.grantedToolIds[index])) {
+    throw new Error('Specialist readiness inspection tool scope differs from selection');
+  }
+  const expectedTools = tools.length ? tools : [''];
+  const checks = array(inspection.checks, 'readiness.inspection.checks', 128);
+  if (checks.length !== expectedTools.length) {
+    throw new Error('Specialist readiness inspection check count differs from selected tools');
+  }
+  const states = new Map();
+  checks.forEach((value, index) => {
+    const check = record(value, new Set([
+      'providerId', 'toolId', 'source', 'readiness', 'providerReadiness',
+    ]), 'readiness.inspection.checks[' + index + ']');
+    if (check.providerId !== selection.providerId || check.toolId !== expectedTools[index]) {
+      throw new Error('Specialist readiness inspection check identity differs from selection');
+    }
+    if (check.providerReadiness !== null) {
+      const state = check.providerReadiness;
+      const stateKey = String(state.providerId) + '\u0000' + String(state.toolId);
+      const snapshot = JSON.stringify(state);
+      if (states.has(stateKey) && states.get(stateKey).snapshot !== snapshot) {
+        throw new Error('Specialist readiness inspection has contradictory provider states');
+      }
+      if (!states.has(stateKey)) states.set(stateKey, { snapshot, state });
+    }
+  });
+  const recomputed = inspectSpecialistProviderReadinessV1({
+    selection,
+    providerStates: [...states.values()].map(item => item.state),
+  });
+  if (recomputed.readiness !== evidence.readiness
+      || recomputed.executable !== evidence.executable
+      || !recomputed.executable) {
+    throw new Error('Specialist readiness inspection disagrees with canonical provider health');
+  }
+  checks.forEach((check, index) => {
+    const expected = recomputed.checks[index];
+    if (check.providerId !== expected.providerId
+        || check.toolId !== expected.toolId
+        || check.source !== expected.source
+        || check.readiness !== expected.readiness) {
+      throw new Error('Specialist readiness inspection contains inconsistent provider evidence');
+    }
+  });
+}
+
 function readiness(input, selection, ownership, nowMs) {
   const raw = record(input, new Set([
     'schemaVersion', 'registryId', 'registryRevision', 'specialistId', 'providerId',
@@ -184,6 +237,7 @@ function readiness(input, selection, ownership, nowMs) {
       throw new Error('Specialist readiness inspection does not match selection');
     }
   }
+  assertInspectionConsistency(inspection, evidence, selection);
   return freeze(evidence);
 }
 
