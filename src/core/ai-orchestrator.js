@@ -81,45 +81,83 @@ function ownerRoutingBoolean(raw, field, fallback) {
   return descriptor.value;
 }
 
+// Snapshot only data fields before interpreting owner-controlled model routing.
+ // Accessor/prototype coercion must never select a different provider or route.
+function snapshotRouterOwnerData(raw, label) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${label} must be a plain data object`);
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const descriptor = descriptors[key];
+    if (typeof key !== 'string' || !descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    Object.defineProperty(out, key, { value:descriptor.value, enumerable:true });
+  }
+  return out;
+}
+
 function normalizeSlot(raw, fallback) {
-  const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
-  const model = clean(raw?.model);
-  if (model.length > 300) throw new Error('AI model name is too long');
+  if (raw === undefined) return { ...fallback };
+  const slot = snapshotRouterOwnerData(raw, 'AI model slot');
+  const provider = Object.hasOwn(slot, 'provider') ? slot.provider : fallback.provider;
+  if (!PROVIDERS.has(provider)) throw new Error('AI model slot provider is invalid');
+  const model = Object.hasOwn(slot, 'model') ? slot.model : '';
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300) {
+    throw new Error('AI model slot name must be exact trimmed text of at most 300 characters');
+  }
   return { provider, model };
 }
 
+// Owner numeric settings may arrive as form strings, not arbitrary coercible
+// values. Hostile valueOf objects and booleans cannot alter model routing.
+function ownerRouterNumber(source, key, fallback) {
+  if (!Object.hasOwn(source, key)) return fallback;
+  const value = source[key];
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && /^[0-9]+(?:[.][0-9]+)?$/u.test(value.trim())) {
+    return Number(value.trim());
+  }
+  throw new Error(`AI router ${key} must be a numeric owner setting`);
+}
+
 export function normalizeAiRouterSettings(raw = {}) {
-  const timeoutSeconds = Number(raw.timeoutSeconds ?? DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
-  const strongEveryNRequests = Number(raw.strongEveryNRequests ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
-  const strongEveryMinutes = Number(raw.strongEveryMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
-  const handoffMaxChars = Number(raw.handoffMaxChars ?? DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
-  const strongMinGapMinutes = Number(raw.strongMinGapMinutes ?? DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
-  const strongMaxPerHour = Number(raw.strongMaxPerHour ?? DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
+  const source = snapshotRouterOwnerData(raw, 'AI router settings');
+  const timeoutSeconds = ownerRouterNumber(source, 'timeoutSeconds', DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
+  const strongEveryNRequests = ownerRouterNumber(source, 'strongEveryNRequests', DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
+  const strongEveryMinutes = ownerRouterNumber(source, 'strongEveryMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
+  const handoffMaxChars = ownerRouterNumber(source, 'handoffMaxChars', DEFAULT_AI_ROUTER_SETTINGS.handoffMaxChars);
+  const strongMinGapMinutes = ownerRouterNumber(source, 'strongMinGapMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongMinGapMinutes);
+  const strongMaxPerHour = ownerRouterNumber(source, 'strongMaxPerHour', DEFAULT_AI_ROUTER_SETTINGS.strongMaxPerHour);
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 5 || timeoutSeconds > 900) throw new Error('AI timeout must be a whole number from 5 to 900 seconds');
   if (!Number.isInteger(strongEveryNRequests) || strongEveryNRequests < 0 || strongEveryNRequests > 10000) throw new Error('Strong-model request interval must be 0-10000 prompts');
   if (!Number.isInteger(strongEveryMinutes) || strongEveryMinutes < 0 || strongEveryMinutes > 10080) throw new Error('Strong-model time interval must be 0-10080 minutes');
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
-  const routes = normalizeAiRoutePool(raw.routes || []);
+  const routes = normalizeAiRoutePool(source.routes === undefined ? [] : source.routes);
+  const mode = Object.hasOwn(source, 'mode') ? source.mode : DEFAULT_AI_ROUTER_SETTINGS.mode;
+  if (!MODES.has(mode)) throw new Error('AI router mode is invalid');
   return {
-    enabled: ownerRoutingBoolean(raw, 'enabled', false),
-    gatewayUrl: normalizeGatewayUrl(raw.gatewayUrl),
+    enabled: ownerRoutingBoolean(source, 'enabled', false),
+    gatewayUrl: normalizeGatewayUrl(source.gatewayUrl),
     timeoutSeconds,
-    mode: MODES.has(raw.mode) ? raw.mode : DEFAULT_AI_ROUTER_SETTINGS.mode,
-    primary: normalizeSlot(raw.primary, DEFAULT_AI_ROUTER_SETTINGS.primary),
-    strong: normalizeSlot(raw.strong, DEFAULT_AI_ROUTER_SETTINGS.strong),
+    mode,
+    primary: normalizeSlot(source.primary, DEFAULT_AI_ROUTER_SETTINGS.primary),
+    strong: normalizeSlot(source.strong, DEFAULT_AI_ROUTER_SETTINGS.strong),
     strongEveryNRequests,
     strongEveryMinutes,
     strongMinGapMinutes,
     strongMaxPerHour,
-    carryStrongResultToPrimary: ownerRoutingBoolean(raw, 'carryStrongResultToPrimary', true),
+    carryStrongResultToPrimary: ownerRoutingBoolean(source, 'carryStrongResultToPrimary', true),
     handoffMaxChars,
-    fallbackToStrongOnPrimaryError: ownerRoutingBoolean(raw, 'fallbackToStrongOnPrimaryError', true),
-    keepPrimaryIfStrongFails: ownerRoutingBoolean(raw, 'keepPrimaryIfStrongFails', true),
+    fallbackToStrongOnPrimaryError: ownerRoutingBoolean(source, 'fallbackToStrongOnPrimaryError', true),
+    keepPrimaryIfStrongFails: ownerRoutingBoolean(source, 'keepPrimaryIfStrongFails', true),
     routes,
-    routePolicy: normalizeAiRoutePolicy(raw.routePolicy || DEFAULT_AI_ROUTE_POLICY),
-    workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy || DEFAULT_AI_WORKER_POLICY, routes),
+    routePolicy: normalizeAiRoutePolicy(source.routePolicy === undefined ? DEFAULT_AI_ROUTE_POLICY : source.routePolicy),
+    workerPolicy: normalizeAiWorkerPolicy(source.workerPolicy === undefined ? DEFAULT_AI_WORKER_POLICY : source.workerPolicy, routes),
   };
 }
 
@@ -250,10 +288,33 @@ export class AiOrchestrator {
     if (!settings.enabled) throw new Error('AI coordinator is disabled');
     const userPrompt = clean(prompt);
     if (!userPrompt) throw new Error('AI coordinator prompt is empty');
+    // A request with budget authority must never silently dispatch without
+    // the existing durable reserve/settle lifecycle. Missing credentials are
+    // NOT_CONFIGURED; missing accounting is not an implicit free allowance.
+    if (providerCallBudgetContext !== null && providerCallBudgetContext !== undefined) {
+      if (!providerCallBudgetContext || typeof providerCallBudgetContext !== 'object'
+          || Array.isArray(providerCallBudgetContext)) {
+        throw new Error('AI provider-call budget context must be a data object');
+      }
+      if (!this.providerCallLifecycle) {
+        const error = new Error('AI provider-call budget lifecycle is not configured');
+        error.code = 'AI_MODEL_BUDGET_LIFECYCLE_REQUIRED';
+        throw error;
+      }
+    }
+    // Never turn malformed owner-requested ceilings into zero (= unlimited).
+    for (const [label, ceiling] of [
+      ['maxOutputTokens', maxOutputTokens],
+      ['maxModelCallsForRequest', maxModelCallsForRequest],
+    ]) {
+      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || ceiling < 0) {
+        throw new Error('AI model budget ' + label + ' must be a non-negative safe integer');
+      }
+    }
     const now = this.now();
 
-    const outputCeiling = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
-    const callCeiling = Math.max(0, Math.floor(Number(maxModelCallsForRequest) || 0));
+    const outputCeiling = maxOutputTokens;
+    const callCeiling = maxModelCallsForRequest;
     let callsUsed = 0;
     let routeStates = normalizeAiRouteStates(runtime.routeStates, settings.routes);
     const routeAttempts = [];
@@ -332,9 +393,13 @@ export class AiOrchestrator {
               error,
             });
           } catch (settlementError) {
-            const classification = classifyAiRouteError(settlementError);
-            routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
-            throw attachFailureRuntime(settlementError);
+            // A provider may already have incurred a charge or produced an output.
+            // Do not retry another model while its settlement is uncertain.
+            const pending = new Error('Model-budget settlement is UNKNOWN; reconcile before any retry');
+            pending.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+            const classification = classifyAiRouteError(pending);
+            routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:classification.code, category:classification.category });
+            throw attachFailureRuntime(pending);
           }
         }
         const classification = classifyAiRouteError(error);
@@ -351,9 +416,13 @@ export class AiOrchestrator {
             result: value,
           });
         } catch (settlementError) {
-          const classification = classifyAiRouteError(settlementError);
-          routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
-          throw attachFailureRuntime(settlementError);
+          // A provider may already have incurred a charge or produced an output.
+          // Do not retry another model while its settlement is uncertain.
+          const pending = new Error('Model-budget settlement is UNKNOWN; reconcile before any retry');
+          pending.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+          const classification = classifyAiRouteError(pending);
+          routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:classification.code, category:classification.category });
+          throw attachFailureRuntime(pending);
         }
       }
       routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
@@ -458,6 +527,9 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        // An UNKNOWN settlement is not a provider outage: neither the
+        // legacy strong fallback nor route failover may bill a second call.
+        if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN') throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -476,6 +548,9 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        // An UNKNOWN settlement is not a provider outage: neither the
+        // legacy strong fallback nor route failover may bill a second call.
+        if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN') throw error;
         if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
@@ -499,7 +574,7 @@ export class AiOrchestrator {
             try {
               strongResult = await tryStrong(handoff, clean(systemPrompt), requestedTrigger);
             } catch (error) {
-              if (!settings.keepPrimaryIfStrongFails) throw error;
+              if (error?.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' || !settings.keepPrimaryIfStrongFails) throw error;
               trigger = `${requestedTrigger}-strong-failed-primary-used`;
             }
           }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
-import { normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
+import { AiOrchestrator, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
 
 const route = { routeId:'primary', provider:'ollama', model:'llama3', locality:'local' };
 const endpoint = { schemaVersion:1, profileId:'local.ollama', provider:'ollama', endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/', credentialRef:'', credentialless:true };
@@ -425,4 +425,519 @@ test('owner model-routing failover booleans reject coercion and accessor traps a
   assert.equal(restored.carryStrongResultToPrimary,false);
   assert.equal(restored.fallbackToStrongOnPrimaryError,false);
   assert.equal(restored.keepPrimaryIfStrongFails,false);
+});
+
+
+test('owner allow/deny/ordering lists never widen from explicit falsy input on cold or JSON restart', () => {
+  const policyKeys = ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds'];
+  const routeKeys = ['roles', 'capabilityIds'];
+  for (const invalid of [false, 0, '', null]) {
+    for (const key of policyKeys) {
+      const policy = { [key]:invalid };
+      assert.throws(() => normalizeAiRoutePolicy(policy), /bounded array/);
+      assert.throws(() => normalizeAiRoutePolicy(JSON.parse(JSON.stringify(policy))), /bounded array/);
+    }
+    for (const key of routeKeys) {
+      const pool = [{...route, [key]:invalid}];
+      assert.throws(() => normalizeAiRoutePool(pool), /bounded array/);
+      assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify(pool))), /bounded array/);
+    }
+    assert.throws(() => normalizeAiRouterSettings({routes:invalid}), /bounded array/);
+    assert.throws(() => normalizeAiRouterSettings({routePolicy:invalid}), /must be an object|plain data object/);
+    assert.throws(() => normalizeAiRouterSettings({workerPolicy:invalid}), /object/);
+  }
+  assert.throws(() => selectAiRouteCandidates({
+    routes:[route], policy:{}, capabilityIds:false, now:1,
+  }), /bounded array/);
+  assert.deepEqual(normalizeAiRoutePolicy({}).allowRouteIds, []);
+  assert.deepEqual(normalizeAiRoutePool([route])[0].capabilityIds, []);
+  const explicitlyDenied = normalizeAiRoutePolicy({denyRouteIds:['primary']});
+  assert.deepEqual(selectAiRouteCandidates({
+    routes:[route], policy:JSON.parse(JSON.stringify(explicitlyDenied)), now:1,
+  }).eligibleRouteIds, []);
+});
+
+test('local AI transport rejects caller headers, unsafe HTTP methods, malformed and oversized requests before network', async () => {
+  let networkCalls = 0;
+  const client = new LocalAiClient({fetchFn:async () => {
+    networkCalls += 1;
+    throw new Error('network forbidden in negative tests');
+  }});
+  const chat = 'http://127.0.0.1:11434/api/chat';
+  const models = 'http://127.0.0.1:11434/api/tags';
+  const forbidden = [
+    [chat,{headers:{Authorization:'Bearer secret'}}],
+    [chat,{headers:{Cookie:'session=private'}}],
+    [chat,{method:'DELETE'}],
+    [chat,{method:'POST',body:'{broken'}],
+    [chat,{method:'POST',body:JSON.stringify([1,2])}],
+    [chat,{method:'POST',body:JSON.stringify({prompt:'x'.repeat(130000)})}],
+    [models,{method:'POST',body:'{"prompt":"secret"}'}],
+    [models,{method:'POST'}],
+    [chat,{mode:'no-cors'}],
+  ];
+  for (const [url, init] of forbidden) {
+    await assert.rejects(client.request(settings,url,init));
+    await assert.rejects(client.request(JSON.parse(JSON.stringify(settings)),url,JSON.parse(JSON.stringify(init))));
+  }
+  let getterCalled = false;
+  const hostile = {};
+  Object.defineProperty(hostile, 'headers', {enumerable:true, get() {
+    getterCalled = true;
+    throw new Error('getter must not execute');
+  }});
+  await assert.rejects(client.request(settings,chat,hostile), /own data properties/);
+  assert.equal(getterCalled,false);
+  assert.equal(networkCalls,0);
+});
+
+test('local provider standard completion still posts JSON with bounded safe headers', async () => {
+  let calls = 0;
+  const client = new LocalAiClient({fetchFn:async (url, init) => {
+    calls++;
+    assert.equal(url,'http://127.0.0.1:11434/api/chat');
+    assert.equal(init.method,'POST');
+    assert.equal(init.redirect,'error');
+    assert.equal(init.cache,'no-store');
+    assert.equal(init.headers.Accept,'application/json');
+    assert.equal(init.headers['Content-Type'],'application/json');
+    assert.equal('Authorization' in init.headers,false);
+    assert.equal(JSON.parse(init.body).messages[0].content,'fixture');
+    return new Response(JSON.stringify({message:{content:'ok'},prompt_eval_count:2,eval_count:1}),{status:200});
+  }});
+  const result = await client.complete(settings,'fixture');
+  assert.equal(result.text,'ok');
+  assert.equal(result.usage.totalTokens,3);
+  assert.equal(calls,1);
+});
+
+
+// Plan 4 Sections 1–2: authoritative owner intent and exact provider effects.
+test('owner model mode and slot identity never silently fall back to another provider', () => {
+  const valid = normalizeAiRouterSettings({
+    enabled:true,
+    mode:'primary',
+    primary:{provider:'openai-compatible',model:'fixture-exact'},
+  });
+  assert.equal(valid.mode,'primary');
+  assert.equal(valid.primary.provider,'openai-compatible');
+  const restored = normalizeAiRouterSettings(JSON.parse(JSON.stringify(valid)));
+  assert.equal(restored.primary.model,'fixture-exact');
+  assert.equal(restored.primary.provider,'openai-compatible');
+  for (const invalid of [null,false,0,{},[],42,'unknown',undefined]) {
+    assert.throws(() => normalizeAiRouterSettings({mode:invalid}), /AI router mode is invalid/);
+  }
+  for (const slot of ['primary','strong']) {
+    for (const invalidProvider of [null,false,0,{},'remote-unapproved',undefined]) {
+      assert.throws(() => normalizeAiRouterSettings({
+        [slot]:{provider:invalidProvider,model:'fixture'},
+      }), /AI model slot provider is invalid/);
+    }
+    for (const invalidModel of [null,0,false,{},'  unexpected  ']) {
+      assert.throws(() => normalizeAiRouterSettings({
+        [slot]:{provider:'ollama',model:invalidModel},
+      }), /AI model slot name must be exact trimmed text/);
+    }
+  }
+  for (const key of ['mode','primary','strong']) {
+    let accessCount = 0;
+    const settingsWithGetter = {};
+    Object.defineProperty(settingsWithGetter,key,{
+      enumerable:true,
+      get() { accessCount++; throw new Error('malicious getter evaluated'); },
+    });
+    assert.throws(() => normalizeAiRouterSettings(settingsWithGetter), /own data properties/);
+    assert.equal(accessCount,0);
+  }
+  assert.equal(normalizeAiRouterSettings({}).mode,'primary');
+  assert.equal(normalizeAiRouterSettings({}).primary.provider,'ollama');
+});
+
+test('local provider discovery and chat endpoints enforce exact HTTP methods before network', async () => {
+  const clientSettings = JSON.parse(JSON.stringify(settings));
+  const chat = 'http://127.0.0.1:11434/api/chat';
+  const discovery = 'http://127.0.0.1:11434/api/tags';
+  let networkCalls = 0;
+  const deniedClient = new LocalAiClient({ fetchFn:async () => {
+    networkCalls++;
+    throw new Error('method must be checked before network');
+  } });
+  for (const [url, init] of [
+    [chat,{}],
+    [chat,{method:'GET'}],
+    [chat,{method:'POST'}],
+    [discovery,{method:'POST',body:'{}'}],
+    [discovery,{method:'POST'}],
+    [discovery,{method:'GET',body:'{}'}],
+    [discovery,{method:'PUT'}],
+  ]) {
+    await assert.rejects(deniedClient.request(clientSettings,url,init),
+      /GET-only|requires (?:an )?explicit POST|method is not allowed/);
+    await assert.rejects(deniedClient.request(
+      JSON.parse(JSON.stringify(clientSettings)),url,JSON.parse(JSON.stringify(init))),
+      /GET-only|requires (?:an )?explicit POST|method is not allowed/);
+  }
+  assert.equal(networkCalls,0);
+  const calls = [];
+  const permittedClient = new LocalAiClient({ fetchFn:async (url, init) => {
+    calls.push({url,method:init.method,redirect:init.redirect});
+    if (url===discovery) {
+      return new Response(JSON.stringify({models:[{name:'fixture'}]}),{status:200});
+    }
+    return new Response(JSON.stringify({
+      message:{content:'verified'},prompt_eval_count:3,eval_count:2,
+    }),{status:200});
+  } });
+  const models = await permittedClient.listModels(clientSettings);
+  assert.deepEqual(models.models,['fixture']);
+  const completed = await permittedClient.complete(clientSettings,'fixture');
+  assert.equal(completed.text,'verified');
+  assert.equal(completed.usage.totalTokens,5);
+  assert.deepEqual(calls.map(x=>x.method),[undefined,'POST']);
+  assert.ok(calls.every(x=>x.redirect==='error'));
+});
+
+
+// Plan 4 S2: the canonical gateway must not become an arbitrary loopback proxy.
+test('gateway transport cannot pivot to arbitrary loopback paths, headers or methods', async () => {
+  const gatewayUrl = 'http://127.0.0.1:17621';
+  let networkCalls = 0;
+  const client = new AiGatewayClient({fetchFn:async () => {
+    networkCalls++;
+    throw new Error('network not permitted');
+  }});
+  for (const [path, init] of [
+    ['/admin',{}],
+    ['//another-service',{}],
+    ['/health',{method:'POST',body:'{}'}],
+    ['/status',{headers:{Authorization:'Bearer secret'}}],
+    ['/models?provider=ollama',{method:'POST',body:'{}'}],
+    ['/models?provider=ollama&unexpected=1',{}],
+    ['/complete',{}],
+    ['/complete',{method:'GET'}],
+    ['/complete',{method:'POST',body:'{broken'}],
+    ['/complete',{method:'POST',body:JSON.stringify([1,2])}],
+    ['/complete',{method:'POST',body:'{}',credentials:'include'}],
+  ]) {
+    await assert.rejects(client.request(gatewayUrl,5,path,init));
+    await assert.rejects(client.request(gatewayUrl,5,path,JSON.parse(JSON.stringify(init))));
+  }
+  const poisoned = {};
+  let getterCount=0;
+  Object.defineProperty(poisoned,'headers',{enumerable:true,get() {
+    getterCount++;
+    throw new Error('secret-bearing injected getter');
+  }});
+  await assert.rejects(client.request(gatewayUrl,5,'/status',poisoned),/own data properties/);
+  assert.equal(getterCount,0);
+  assert.equal(networkCalls,0);
+
+  const requests=[];
+  const valid = new AiGatewayClient({fetchFn:async (url,init) => {
+    requests.push({url,init});
+    return new Response(JSON.stringify({ok:true,usage:{inputTokens:3,outputTokens:2}}),{status:200});
+  }});
+  await valid.health();
+  await valid.status();
+  await valid.listModels({provider:'ollama',endpointId:'local.ollama'});
+  await valid.complete({provider:'ollama',model:'fixture',prompt:'owner approved'});
+  assert.deepEqual(requests.map(({init})=>init.method),[undefined,undefined,undefined,'POST']);
+  assert.equal(requests.length,4);
+  assert.ok(requests.every(({init})=>init.redirect==='error' && init.cache==='no-store'));
+  assert.ok(requests.every(({init})=>!Object.hasOwn(init.headers,'Authorization') && !Object.hasOwn(init.headers,'Cookie')));
+  assert.ok(requests.every(({url})=>url.startsWith(gatewayUrl+'/')));
+});
+
+
+test('owner numeric model-routing controls reject forged coercion and survive reload', () => {
+  const fields = ['timeoutSeconds','strongEveryNRequests','strongEveryMinutes',
+    'handoffMaxChars','strongMinGapMinutes','strongMaxPerHour'];
+  for (const field of fields) {
+    for (const malformed of [null,false,true,[],[1],{},'', '  ']) {
+      assert.throws(() => normalizeAiRouterSettings({[field]:malformed}),/numeric owner setting/);
+      assert.throws(() => normalizeAiRouterSettings(
+        JSON.parse(JSON.stringify({[field]:malformed}))),/numeric owner setting/);
+    }
+    let coerced=0;
+    assert.throws(() => normalizeAiRouterSettings({
+      [field]:{valueOf() { coerced++; throw new Error('must not coerce'); }},
+    }),/numeric owner setting/);
+    assert.equal(coerced,0);
+  }
+  const allowed = {
+    enabled:true,mode:'primary',primary:{provider:'ollama',model:'fixture'},
+    timeoutSeconds:' 180 ',strongEveryNRequests:'10',strongEveryMinutes:'120',
+    handoffMaxChars:'12000',strongMinGapMinutes:'0',strongMaxPerHour:'0',
+  };
+  const active=normalizeAiRouterSettings(allowed);
+  const persisted=normalizeAiRouterSettings(JSON.parse(JSON.stringify(allowed)));
+  assert.equal(active.timeoutSeconds,180);
+  assert.equal(active.strongEveryNRequests,10);
+  assert.equal(persisted.strongMinGapMinutes,0);
+  assert.equal(persisted.strongMaxPerHour,0);
+  assert.equal(normalizeAiRouterSettings({}).timeoutSeconds,180);
+});
+
+
+test('route failover preserves model-budget reservation settlement and JSON restart backoff', async () => {
+  const reservations = [];
+  const settlements = [];
+  const calls = [];
+  const routes = [
+    { routeId:'fast',provider:'ollama',model:'first',locality:'local',costClass:'free',priority:10 },
+    { routeId:'backup',provider:'ollama',model:'second',locality:'local',costClass:'free',priority:5 },
+  ];
+  let now=1_000;
+  let failFirst=true;
+  const client = {
+    async complete(request) {
+      calls.push(request.model);
+      if (request.model==='first' && failFirst) {
+        const unavailable=new Error('fixture provider offline');
+        unavailable.status=503;
+        throw unavailable;
+      }
+      return { text:'answer',usage:{inputTokens:3,outputTokens:2,totalTokens:5} };
+    },
+  };
+  const lifecycle = {
+    async beforeProviderCall({route,maxOutputTokens,callNumber}) {
+      assert.equal(maxOutputTokens,12);
+      const reservationId='fixture-reservation-'+callNumber;
+      reservations.push({reservationId,routeId:route.routeId});
+      return {reservationId};
+    },
+    async afterProviderCall({route,reservation,ok}) {
+      settlements.push({routeId:route.routeId,reservationId:reservation.reservationId,ok});
+    },
+  };
+  const orchestrator=new AiOrchestrator({gatewayClient:client,now:()=>now,providerCallLifecycle:lifecycle});
+  const config={
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:false,
+    routes,routePolicy:{autoSwitch:true},
+  };
+  const options={
+    providerCallBudgetContext:{jobId:'fixture'},
+    maxModelCallsForRequest:2,maxOutputTokens:12,
+  };
+  const first=await orchestrator.run(config,{},'owner prompt',options);
+  assert.equal(first.routing.selectedRouteId,'backup');
+  assert.equal(first.usage.modelCalls,2);
+  assert.deepEqual(reservations.map(x=>x.routeId),['fast','backup']);
+  assert.deepEqual(settlements.map(x=>x.ok),[false,true]);
+  assert.deepEqual(settlements.map(x=>x.reservationId),
+    ['fixture-reservation-1','fixture-reservation-2']);
+  assert.equal(first.routing.failoverChain.length,2);
+  const resumed=JSON.parse(JSON.stringify(first.runtime));
+  reservations.length=0;
+  settlements.length=0;
+  calls.length=0;
+  failFirst=false;
+  now=1100;
+  const second=await orchestrator.run(config,resumed,'owner prompt',options);
+  assert.equal(second.routing.selectedRouteId,'backup');
+  assert.equal(second.usage.modelCalls,1);
+  assert.deepEqual(calls,['second']);
+  assert.deepEqual(settlements.map(x=>x.ok),[true]);
+});
+
+
+test('budgeted model dispatch fails closed without canonical lifecycle, including JSON restart', async () => {
+  let networkCalls = 0;
+  const client = { async complete() { networkCalls++; throw new Error('must not dispatch'); } };
+  const orchestrator = new AiOrchestrator({ gatewayClient:client });
+  const config = {
+    enabled:true, mode:'primary', primary:{provider:'ollama',model:'fixture'},
+    fallbackToStrongOnPrimaryError:false,
+  };
+  for (const context of [{jobId:'fixture'}, JSON.parse('{"jobId":"fixture"}')]) {
+    await assert.rejects(
+      orchestrator.run(config, {}, 'owner-approved prompt', {providerCallBudgetContext:context}),
+      error => error.code === 'AI_MODEL_BUDGET_LIFECYCLE_REQUIRED',
+    );
+  }
+  for (const context of [false, 0, '', 'untrusted', []]) {
+    await assert.rejects(
+      orchestrator.run(config, {}, 'owner-approved prompt', {providerCallBudgetContext:context}),
+      /budget context must be a data object/,
+    );
+  }
+  assert.equal(networkCalls,0);
+});
+
+test('malformed per-request model budget cannot become unlimited before provider dispatch', async () => {
+  let networkCalls=0;
+  const client = {async complete() {
+    networkCalls++;
+    return {text:'fixture',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const orchestrator=new AiOrchestrator({gatewayClient:client,now:()=>1000});
+  const config={enabled:true,mode:'primary',primary:{provider:'ollama',model:'fixture'}};
+  for (const field of ['maxOutputTokens','maxModelCallsForRequest']) {
+    for (const malformed of [-1,1.2,'0','5',false,true,null,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,{},[]]) {
+      await assert.rejects(
+        orchestrator.run(config,{},'owner-approved prompt',{[field]:malformed}),
+        /must be a non-negative safe integer/,
+      );
+    }
+    for (const malformed of [-1,'0',false,null,1.2]) {
+      await assert.rejects(
+        orchestrator.run(config,{},'owner-approved prompt',
+          JSON.parse(JSON.stringify({[field]:malformed}))),
+        /must be a non-negative safe integer/,
+      );
+    }
+  }
+  assert.equal(networkCalls,0);
+  await orchestrator.run(config,{},'owner-approved prompt',{maxModelCallsForRequest:1,maxOutputTokens:5});
+  assert.equal(networkCalls,1);
+});
+
+
+test('UNKNOWN budget settlement forbids failover even after transient provider or broker errors', async () => {
+  const config = {
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:true,
+    routes:[
+      {routeId:'fast',provider:'ollama',model:'first',locality:'local',costClass:'free',priority:10},
+      {routeId:'backup',provider:'ollama',model:'second',locality:'local',costClass:'free',priority:5},
+    ],
+    routePolicy:{autoSwitch:true},
+  };
+  for (const providerFailed of [false,true]) {
+    const calls=[];
+    const settlements=[];
+    const client={async complete({model}) {
+      calls.push(model);
+      if (providerFailed) {
+        const error=new Error('provider timeout');
+        error.status=503;
+        throw error;
+      }
+      return {text:'reply',usage:{inputTokens:2,outputTokens:1,totalTokens:3}};
+    }};
+    const lifecycle={
+      async beforeProviderCall({callNumber}) {return {reservationId:'res-'+callNumber};},
+      async afterProviderCall({reservation}) {
+        settlements.push(reservation.reservationId);
+        const error=new Error('transient broker unavailable');
+        error.status=503;
+        throw error;
+      },
+    };
+    const orchestrator=new AiOrchestrator({
+      gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+    });
+    await assert.rejects(
+      orchestrator.run(config,{},'owner prompt',{
+        maxModelCallsForRequest:2,maxOutputTokens:12,
+        providerCallBudgetContext:{jobId:'fixture'},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN'
+        && error.routeFailureClassification.retryable === false
+        && error.modelCallsUsed === 1
+        && error.routeAttempts.length === 1
+        && error.routeAttempts[0].outcome === 'UNKNOWN',
+    );
+    assert.deepEqual(calls,['first'],'an unknown provider effect must never try the backup');
+    assert.deepEqual(settlements,['res-1']);
+  }
+});
+
+
+test('legacy primary/strong routing never retries an UNKNOWN model settlement', async () => {
+  const calls=[];
+  const client={async complete({model}) {
+    calls.push(model);
+    return {text:'model answer',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const lifecycle={
+    async beforeProviderCall() {return {reservationId:'unsettled'};},
+    async afterProviderCall() {
+      const error=new Error('broker 503; status cannot prove reservation settled');
+      error.status=503;
+      throw error;
+    },
+  };
+  const orchestrator=new AiOrchestrator({
+    gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+  });
+  const config={
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:true,
+    primary:{provider:'ollama',model:'first'},
+    strong:{provider:'openai',model:'backup'},
+  };
+  await assert.rejects(orchestrator.run(config,{},'prompt',{
+    maxOutputTokens:12,maxModelCallsForRequest:2,
+    providerCallBudgetContext:{jobId:'legacy'},
+  }),error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' && error.modelCallsUsed===1);
+  assert.deepEqual(calls,['first']);
+});
+
+test('hybrid strong review cannot downgrade an UNKNOWN settlement to a successful primary result', async () => {
+  const calls=[];
+  let settles=0;
+  const client={async complete({model}) {
+    calls.push(model);
+    return {text:model==='first'?'[[ESCALATE]] review':'strong answer',
+      usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const lifecycle={
+    async beforeProviderCall({callNumber}) {return {reservationId:'res-'+callNumber};},
+    async afterProviderCall() {
+      settles++;
+      if (settles===2) {
+        const error=new Error('broker timeout');
+        error.status=503;
+        throw error;
+      }
+    },
+  };
+  const orchestrator=new AiOrchestrator({
+    gatewayClient:client,providerCallLifecycle:lifecycle,now:()=>1000,
+  });
+  const config={
+    enabled:true,mode:'hybrid-auto',keepPrimaryIfStrongFails:true,
+    primary:{provider:'ollama',model:'first'},
+    strong:{provider:'openai',model:'review'},
+  };
+  await assert.rejects(orchestrator.run(config,{},'owner prompt',{
+    maxOutputTokens:12,maxModelCallsForRequest:2,
+    providerCallBudgetContext:{jobId:'hybrid'},
+  }),error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN' && error.modelCallsUsed===2);
+  assert.deepEqual(calls,['first','review']);
+  assert.equal(settles,2);
+});
+
+
+test('Plan 4 S1: route price and owner cap reject coercible zero values across persistence', () => {
+  const invalid = ['', ' ', ' 0 ', '0x0', '0b0', '0o0', '+0', '-0', '00', 'NaN', '0_0', '1e-9999', '0.00000000001e-9999'];
+  for (const value of invalid) {
+    const candidate = [{...route,inputPricePerMillionUsd:value,outputPricePerMillionUsd:0}];
+    assert.throws(() => normalizeAiRoutePool(candidate), /price.*invalid/i);
+    assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify(candidate))), /price.*invalid/i);
+    assert.throws(() => normalizeAiRoutePolicy({maxInputPricePerMillionUsd:value}), /price.*invalid/i);
+  }
+  const exact = normalizeAiRoutePool([{...route,inputPricePerMillionUsd:'0',outputPricePerMillionUsd:'0.0005'}])[0];
+  assert.equal(exact.inputPriceKnown,true);
+  assert.equal(exact.inputPricePerMillionUsd,0);
+  assert.equal(exact.outputPricePerMillionUsd,0.0005);
+  assert.equal(normalizeAiRoutePolicy({maxInputPricePerMillionUsd:'0'}).maxInputPricePerMillionUsd,0);
+});
+
+test('Plan 4 S2: explicit corrupt local URL and timeout cannot silently select defaults after restart', () => {
+  for (const badBaseUrl of ['', '   ']) {
+    const config = {...settings,baseUrl:badBaseUrl};
+    assert.throws(() => normalizeLocalAiSettings(config), /URL cannot be empty/);
+    assert.throws(() => normalizeLocalAiSettings(JSON.parse(JSON.stringify(config))), /URL cannot be empty/);
+    assert.throws(() => normalizeLocalAiBaseUrl(badBaseUrl), /URL cannot be empty/);
+  }
+  const corrupt = {...settings,timeoutSeconds:null};
+  assert.throws(() => normalizeLocalAiSettings(corrupt), /timeout/);
+  assert.throws(() => normalizeLocalAiSettings(JSON.parse(JSON.stringify(corrupt))), /timeout/);
+  const legacy = {...settings};
+  delete legacy.baseUrl;
+  delete legacy.timeoutSeconds;
+  assert.equal(normalizeLocalAiSettings(legacy).timeoutSeconds,90);
+  assert.equal(normalizeLocalAiSettings(legacy).baseUrl,'http://127.0.0.1:11434');
+  assert.equal(normalizeLocalAiSettings(settings).timeoutSeconds,5);
 });
