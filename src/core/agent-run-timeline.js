@@ -12,6 +12,7 @@ const EVENT_LABELS = Object.freeze({
   'trusted-script-executed': ['ACTION', 'Виконання Trusted Script зареєстровано.'],
   'effect-not-observed': ['RECOVERY', 'Наслідок дії не підтверджено.'],
   'native-fallback': ['RECOVERY', 'Застосовано резервний спосіб взаємодії.'],
+  'approval-requested': ['OWNER', 'Підтвердження власника запитано.'],
   'approval-approved': ['OWNER', 'Власник підтвердив дію.'],
   'approval-rejected': ['OWNER', 'Власник відхилив дію.'],
   'approval-stale': ['OWNER', 'Підтвердження втратило актуальність.'],
@@ -21,16 +22,23 @@ const EVENT_LABELS = Object.freeze({
   plan: ['PLAN', 'Зміну плану зареєстровано.'],
   'plan-node-running': ['PLAN', 'Вузол плану розпочав виконання.'],
   'plan-node-verified': ['PLAN', 'Перевірку вузла плану зареєстровано.'],
+  'specialist-handoff-auto-prepared': ['PLAN', 'Автоматичну передачу Specialist підготовлено.'],
+  'specialist-handoff-admitted': ['PLAN', 'Передачу Specialist допущено до виконання.'],
   'specialist-handoff-prepared': ['PLAN', 'Підготовлено передачу Specialist.'],
   'specialist-handoff-claimed': ['PLAN', 'Передачу Specialist прийнято.'],
   'specialist-handoff-completed': ['PLAN', 'Передача Specialist завершила виконання.'],
   'specialist-handoff-verified': ['PLAN', 'Результат Specialist перевірено.'],
   'specialist-handoff-reconcile': ['RECOVERY', 'Передачу Specialist звірено після переривання.'],
+  'specialist-handoff-safe-retry-authorized': ['RECOVERY', 'Незалежна перевірка дозволила повторний допуск Specialist без автоматичного повтору дії.'],
+  'specialist-automation-blocked': ['RECOVERY', 'Автоматичне продовження Specialist заблоковано.'],
+  'specialist-automation-retry-wait': ['RECOVERY', 'Specialist очікує дозволеного моменту повторної спроби.'],
   'specialist-provider-failed': ['RECOVERY', 'Помилку Specialist provider зареєстровано.'],
   'specialist-provider-succeeded': ['PLAN', 'Результат Specialist provider зареєстровано.'],
   'specialist-required': ['PLAN', 'Потрібен Specialist.'],
   'page-watch-started': ['RECOVERY', 'Почато спостереження сторінки.'],
   'page-watch-ended': ['RECOVERY', 'Спостереження сторінки завершено.'],
+  'page-watch-timeout': ['RECOVERY', 'Час спостереження сторінки вичерпано.'],
+  'page-change-detected': ['RECOVERY', 'Спостереження виявило зміну сторінки.'],
   'page-watch-interrupted': ['RECOVERY', 'Спостереження сторінки перервано.'],
   'vision-requested': ['ACTION', 'Запитано візуальне спостереження.'],
   'vision-stale': ['RECOVERY', 'Застаріле візуальне спостереження відхилено.'],
@@ -43,6 +51,10 @@ const EVENT_LABELS = Object.freeze({
   tab: ['ACTION', 'Подію вкладки зареєстровано.'],
   permission: ['OWNER', 'Запит дозволу зареєстровано.'],
   capability: ['OWNER', 'Запит можливості зареєстровано.'],
+  'model-budget-reserved': ['RECOVERY', 'Ресурс моделі зарезервовано до виклику провайдера.'],
+  'model-budget-settled': ['RECOVERY', 'Резерв моделі звірено після виклику провайдера.'],
+  'model-budget-conservative-settlement': ['RECOVERY', 'Невизначений виклик моделі консервативно враховано.'],
+  'model-budget-recovered-after-restart': ['RECOVERY', 'Незакритий резерв моделі збережено після перезапуску.'],
   budget: ['RECOVERY', 'Ліміт ресурсів досягнуто.'],
   error: ['RECOVERY', 'Помилку виконання зареєстровано.'],
   schedule: ['RECOVERY', 'Подію розкладу зареєстровано.'],
@@ -52,6 +64,7 @@ const EVENT_LABELS = Object.freeze({
 const FILTERS = new Set(['ALL', 'ACTION', 'OWNER', 'PLAN', 'RECOVERY', 'CHECKPOINT']);
 const PLAN_STATES = new Set(['PENDING', 'READY', 'RUNNING', 'VERIFIED', 'FAILED', 'BLOCKED', 'SKIPPED', 'CANCELLED', 'COMPLETED']);
 const ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'wait', 'new_tab', 'close_tab', 'download', 'trusted_script', 'click_at', 'type_at', 'drag_at', 'batch']);
+const ACTION_DETAIL_EVENTS = new Set(['action', 'trusted-script-executed', 'effect-not-observed', 'approval-requested', 'approval-approved', 'approval-stale']);
 
 function record(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(name + ' must be a plain record');
@@ -138,7 +151,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
     const rawAction = own(entry, 'action');
     let actionType = '';
-    if (rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
+    if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
       const candidate = own(rawAction, 'type');
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
     }
@@ -178,7 +191,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
         Number.isFinite(own(runtime, 'estimatedCostUsd')) &&
         own(runtime, 'estimatedCostUsd') >= 0 &&
         own(runtime, 'estimatedCostUsd') <= 1000000
-          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : 0,
+          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : null,
       verifiedChecks: Array.isArray(checks) ? integer(checks.length, { max: 4096 }) : 0,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },

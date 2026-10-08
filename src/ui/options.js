@@ -3526,6 +3526,7 @@ function renderAgentRunTimeline(job) {
       ' із ' + timeline.totalRecorded + '. План, редакція ' + timeline.plan.revision +
       ', вузлів ' + timeline.plan.nodeCount + '. Кроків ' + counters.steps +
       ', викликів моделі ' + counters.modelCalls + ', токенів ' + counters.totalTokens +
+      ', приблизні витрати ' + (counters.estimatedCostUsd === null ? 'невідомі' : counters.estimatedCostUsd.toFixed(6) + ' USD') +
       ', підтверджених перевірок ' + counters.verifiedChecks +
       ', дій власника ' + counters.ownerEvents + '.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями.' : '') +
@@ -3538,6 +3539,7 @@ function renderAgentRunTimeline(job) {
 async function refreshAgentRunTimeline() {
   const button = $('agent-run-timeline-refresh-button');
   if (button.disabled) return;
+  const restoreFocusOnUnownedBlur = document.activeElement === button;
   button.disabled = true;
   try {
     const result = await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
@@ -3545,9 +3547,18 @@ async function refreshAgentRunTimeline() {
       announce('Хронологію Agent оновлено з Core.');
     } else {
       $('agent-run-timeline-status').textContent = 'Не вдалося оновити. Перевірте Core і повторіть.';
+      announce('Хронологію Agent не оновлено. Перевірте Core.');
     }
+  } catch {
+    // A failed Core read must not leave a disabled keyboard control or an unhandled UI rejection.
+    $('agent-run-timeline-status').textContent = 'Core недоступний. Оновлення хронології не виконано; попередні докази не підтверджені як актуальні.';
+    announce('Core недоступний. Повторіть оновлення хронології.');
   } finally {
     button.disabled = false;
+    // Do not steal focus if the user navigated to another control during the async read.
+    if (restoreFocusOnUnownedBlur && (!document.activeElement || document.activeElement === document.body)) {
+      button.focus();
+    }
   }
 }
 function exportAgentRunTimeline() {
@@ -5786,7 +5797,11 @@ $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
-$('agent-run-timeline-filter').addEventListener('change', () => renderAgentRunTimeline(ui.agentTimelineJob));
+$('agent-run-timeline-filter').addEventListener('change', () => {
+  renderAgentRunTimeline(ui.agentTimelineJob);
+  // A user-triggered filter change is announced once; background refreshes remain silent.
+  announce($('agent-run-timeline-status').textContent);
+});
 $('agent-run-timeline-refresh-button').addEventListener('click', refreshAgentRunTimeline);
 $('agent-run-timeline-export-button').addEventListener('click', exportAgentRunTimeline);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
