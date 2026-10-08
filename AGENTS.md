@@ -11,7 +11,7 @@ Before product-code mutation/closure, resolve and synchronize the exact 11.0.13 
 Read PROJECT_PLAN_INDEX.md, MULTI_PLAN_PARALLELISM_CONTRACT.md, MULTI_PLAN_CLOSURE_STATE.md, the assigned Drive plan and live source lineage.
 
 - Plans 1–4,6–7 are independent engineering plans; no global earliest Section.
-- Plan 5 cloud/remote/team remains the owner-deferred later wave from the binding roadmap.
+- Plan 5 cloud/remote/team remains the owner-deferred later wave from the binding roadmap. Do not spend active capacity there before explicit owner resume, but Plan 5 remains mandatory final North-Star scope before Plan 8 terminal go-live.
 - Plan 8 is final whole-product convergence.
 - Inside an assigned actionable plan, audit/reuse 11.x baseline first, skip terminal DONE, and close the first actual gap; do not assume migration Section 1 is greenfield.
 - Old Agent 0–99 and Models 0–54 plans are audit-only after this migration.
