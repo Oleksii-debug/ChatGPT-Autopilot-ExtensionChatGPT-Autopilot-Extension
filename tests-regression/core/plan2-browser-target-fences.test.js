@@ -6,6 +6,7 @@ import {
   executeBrowserPageAction,
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
+  browserAgentCoordinateTargetFingerprint,
 } from '../../src/core/browser-agent.js';
 
 class FakeElement {
@@ -147,4 +148,33 @@ test('visual fallback invalidates screenshot target when page scroll changes', (
   globalThis.scrollY = 45;
   assert.equal(verifyBrowserCoordinateTarget(20, 20, original.target).reason, 'changed-page-or-viewport');
   globalThis.scrollY = 0;
+});
+
+test('canonical coordinate fingerprint preserves all page, viewport and geometry evidence', () => {
+  setup();
+  globalThis.scrollY = 0;
+  const probe = probeBrowserCoordinateTarget(20, 20);
+  const canonical = browserAgentCoordinateTargetFingerprint(probe.target);
+  assert.equal(canonical.pageUrl, probe.url);
+  assert.equal(canonical.viewportWidth, probe.viewportWidth);
+  assert.equal(canonical.viewportHeight, probe.viewportHeight);
+  assert.equal(canonical.viewportScrollY, 0);
+  assert.deepEqual(canonical.rect, probe.target.rect);
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, canonical).ok, true);
+  element.rect = { ...element.rect, left: 14 };
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, canonical).reason, 'changed-geometry');
+  element.rect = { ...element.rect, left: 10 };
+  globalThis.scrollY = 100;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, canonical).reason, 'changed-page-or-viewport');
+  globalThis.scrollY = 0;
+});
+
+test('missing coordinate proof cannot be used as an approval bypass', () => {
+  setup();
+  const probe = probeBrowserCoordinateTarget(20, 20);
+  const canonical = browserAgentCoordinateTargetFingerprint(probe.target);
+  delete canonical.pageUrl;
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, canonical).ok, false);
+  const legacy = browserAgentCoordinateTargetFingerprint({ tag: 'button', name: 'Save' });
+  assert.equal(verifyBrowserCoordinateTarget(20, 20, legacy).ok, false);
 });
