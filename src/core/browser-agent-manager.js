@@ -795,6 +795,33 @@ function normalizeStore(raw, now) {
   return out;
 }
 
+// One durable job-record constructor for direct, prompt-first and reusable-Definition
+// intake. This is not a new Agent runtime; the existing serialized BrowserAgent
+// store remains the sole job identity and execution authority.
+function persistCanonicalAgentJob(store, {
+  id, config, now, definitionSelection = null, definitionScope = null,
+  definitionRouterOverride = null,
+}) {
+  if (typeof id !== 'string' || !id || config?.id !== id) {
+    throw new Error('Browser Agent job identity must match the normalized config');
+  }
+  if (store.byId[id]) throw new Error('Browser Agent job already exists');
+  store.byId[id] = {
+    id,
+    config: clone(config),
+    runtime: createBrowserAgentRuntime(now),
+    definitionSelection: definitionSelection == null ? null : clone(definitionSelection),
+    definitionScope: definitionScope == null ? null : clone(definitionScope),
+    definitionRouterOverride: definitionRouterOverride == null ? null : clone(definitionRouterOverride),
+    orchestrationNodeBinding: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.order.push(id);
+  store.selectedId = id;
+  return store;
+}
+
 export class BrowserAgentManager {
   constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined, specialistReadinessResolver = null, specialistProviderDispatcher = null, specialistVerificationResolver = null } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
@@ -2157,20 +2184,14 @@ export class BrowserAgentManager {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
 
-      store.byId[jobId] = {
+      return persistCanonicalAgentJob(store, {
         id: jobId,
-        config: clone(materialized.config),
-        runtime: createBrowserAgentRuntime(now),
-        definitionSelection: clone(selection),
-        definitionScope: clone(materialized.scope),
-        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
-        orchestrationNodeBinding: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      store.order.push(jobId);
-      store.selectedId = jobId;
-      return store;
+        config: materialized.config,
+        now,
+        definitionSelection: selection,
+        definitionScope: materialized.scope,
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? materialized.routerOverride : null,
+      });
     });
     return this.get(jobId);
   }
@@ -2218,21 +2239,7 @@ export class BrowserAgentManager {
       activeWindowEnd: raw.activeWindowEnd || '',
     }, { id });
     await this.update(store => {
-      if (store.byId[id]) throw new Error('Browser Agent job already exists');
-      store.byId[id] = {
-        id,
-        config,
-        runtime: createBrowserAgentRuntime(now),
-        definitionSelection: null,
-        definitionScope: null,
-        definitionRouterOverride: null,
-        orchestrationNodeBinding: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      store.order.push(id);
-      store.selectedId = id;
-      return store;
+      return persistCanonicalAgentJob(store, { id, config, now });
     });
     return this.get(id);
   }
