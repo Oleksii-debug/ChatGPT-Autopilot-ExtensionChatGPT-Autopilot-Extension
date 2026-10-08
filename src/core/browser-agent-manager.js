@@ -518,7 +518,7 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   // Specialist effect/recovery chronology is a durable contract: do not
   // normalize Date.parse shorthand, timezone-free input, calendar rollover,
   // or sub-millisecond timestamps into apparently trustworthy evidence.
-  const format = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$/u;
+  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (!format.test(candidate)) throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
   const wallClock = candidate.slice(0, 19);
   const calendar = new Date(wallClock + 'Z');
