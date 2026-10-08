@@ -176,6 +176,7 @@ async function parseJson(response, controller) {
       : status === 408 || status === 504 ? 'TIMEOUT'
       : status >= 500 ? 'UNAVAILABLE'
       : 'INVALID_REQUEST';
+    error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
     return Promise.reject(error);
   }
   try { return text ? JSON.parse(text) : {}; }
@@ -219,7 +220,13 @@ export class AiGatewayClient {
       return await parseJson(response, controller);
     } catch (error) {
       if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
-      if (error?.name === 'AbortError') throw new Error(`AI Gateway request timed out after ${timeout} seconds`);
+      if (error?.name === 'AbortError') {
+        const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
+        timeoutError.code = 'AI_GATEWAY_TIMEOUT';
+        timeoutError.category = 'TIMEOUT';
+        timeoutError.retryable = true;
+        throw timeoutError;
+      }
       if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
       const unavailable = new Error('Could not reach AI Gateway');
       unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
