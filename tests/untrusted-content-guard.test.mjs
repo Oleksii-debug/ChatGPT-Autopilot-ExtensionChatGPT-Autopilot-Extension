@@ -569,3 +569,15 @@ test('S2 assessment object getter and hostile descriptor traps fail without leak
   assert.deepEqual(denied.violations.map(item => item.code), ['UNTRUSTED_CREDENTIAL_SELECTION']);
   assert.doesNotMatch(JSON.stringify(denied), /credential.owner-secret/u);
 });
+
+
+test('S2 exact source digest must reject noncanonical upper/whitespace aliases before policy', () => {
+  const exact = request();
+  assert.equal(assessUntrustedContentInfluenceV1(exact).status, UntrustedContentGuardStatus.SAFE_FOR_POLICY);
+  for (const sha256 of [SHA.toUpperCase(), ' ' + SHA, SHA + '\\n']) {
+    const hostile = request({ source: source({ artifactRef: { ...source().artifactRef, sha256 } }) });
+    assert.throws(() => assessUntrustedContentInfluenceV1(hostile), /canonical lowercase sha256/);
+    assert.equal(hostile.proposal?.executionAuthorized, undefined);
+  }
+  assert.equal(assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(exact))).executionAuthorized, false);
+});
