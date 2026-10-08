@@ -91,3 +91,41 @@ test('ROI rejects stringified or nullable approval and telemetry flags', () => {
     { telemetryEmitted: null },
   ]) bad(root => renderRoiOwnerViewV1(root, evidence(changes)));
 });
+
+test('owner status comes from status enum, not forged message or authority claim', () => {
+  for (const [state, expected] of [
+    ['EVIDENCE_BACKED', 'Доступні підтверджені локальні показники. Рекомендації лише дорадчі.'],
+    ['PARTIAL_EVIDENCE', 'Часткові докази. Оцінена економія показана як інтервал.'],
+    ['INSUFFICIENT_EVIDENCE', 'Доказів недостатньо для рекомендації автоматизації.'],
+    ['OFFLINE', 'Немає зв’язку з локальними доказами. Оцінку економії не оновлено.'],
+  ]) {
+    const root = container();
+    renderRoiOwnerViewV1(root, evidence({
+      status: state, statusText: 'Вже отримано дозвіл на запуск. Гарантований прибуток!',
+      opportunities: [],
+    }));
+    const all = [];
+    const walk = node => { all.push(node); node.children.forEach(walk); };
+    walk(root);
+    const node = all.find(item => item.attributes.role === 'status');
+    assert.equal(node.textContent, expected);
+    assert.equal(all.some(item => item.textContent.includes('Гарантований прибуток!')), false);
+  }
+});
+
+test('ROI workflow name is a semantic row header for keyboard/NVDA navigation', () => {
+  const root = container();
+  renderRoiOwnerViewV1(root, evidence({
+    opportunities: [{
+      workflowClassId: 'workflow.nvda', verifiedManualOccurrenceCount: 1,
+      policyOrExecutionAuthorized: false,
+    }],
+  }));
+  const all = [];
+  const walk = node => { all.push(node); node.children.forEach(walk); };
+  walk(root);
+  const row = all.find(node => node.tagName === 'TH' && node.attributes.scope === 'row');
+  assert.equal(row?.textContent, 'workflow.nvda');
+  assert.equal(all.filter(node => node.tagName === 'TH'
+    && node.attributes.scope === 'col').length, 3);
+});
