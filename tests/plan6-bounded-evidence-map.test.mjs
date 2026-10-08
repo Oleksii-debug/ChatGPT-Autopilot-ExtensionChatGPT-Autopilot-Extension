@@ -150,3 +150,20 @@ test('malformed persisted outcome fails closed without running foreign getters',
   assert.equal(safe.evidenceMap.recordedOutcome.recordedAt, null);
   assert.equal(safe.evidenceMap.recordedOutcome.criteriaRecorded, 0);
 });
+
+test('bounded identity and snapshot-scoped event ordinals survive restart without leaking malformed IDs', async () => {
+  const base = sample();
+  base.id = 'завдання_один';
+  const before = buildAgentRunTimelineV1(base);
+  assert.equal(before.jobId, 'завдання_один');
+  assert.equal(before.entryIdentityScope, 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE');
+  assert.deepEqual(buildAgentRunTimelineV1(structuredClone(base)), before);
+  assert.equal(before.mayReplayExternalEffect, false);
+  for (const invalid of ['x'.repeat(129), 'owner\\nsecret', 'owner\\u0000secret', 42, '']) {
+    assert.throws(() => buildAgentRunTimelineV1({ ...base, id: invalid }), /job identity is invalid/);
+  }
+  const html = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const projection = html.slice(html.indexOf('function renderAgentRunTimeline(job)'), html.indexOf('async function refreshAgentRunTimeline()'));
+  assert.match(projection, /після обрізання історії/u);
+  assert.doesNotMatch(projection, /\.innerHTML\s*=|\.outerHTML\s*=/u);
+});
