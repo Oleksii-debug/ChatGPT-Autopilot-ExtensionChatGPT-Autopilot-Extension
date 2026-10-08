@@ -1226,3 +1226,39 @@ test('visual text envelope rejects invalid or oversized direct typing before poi
   );
   assert.deepEqual(fixture.events, []);
 });
+
+
+test('file upload is bound to exact observed main-frame semantic input before local file effects', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'file');
+  element.setAttribute('aria-label', 'Attach document');
+  const frame = snapshotBrowserPage('upload-snapshot');
+  const snapshot = {
+    frames: [{ frameId: 0, ...frame }],
+    url: frame.url,
+    downloads: [{ ref: 'dl1', downloadId: 99, state: 'complete' }],
+  };
+  const action = parseBrowserAgentAction(JSON.stringify({
+    type: 'upload_download', frameId: 0, ref: 'r1', downloadRef: 'dl1',
+  }), snapshot);
+  assert.equal(action.expectedFrameUrl, pageUrl);
+  assert.equal(action.expectedSemanticName, 'Attach document');
+  assert.match(action.expectedSemanticIdentity, /^[0-9a-f]{8}$/);
+  assert.ok(proveBrowserNativeClick(frame.snapshotId, 'r1', action));
+  element.setAttribute('aria-label', 'Share confidential file externally');
+  assert.equal(proveBrowserNativeClick(frame.snapshotId, 'r1', action), null);
+  assert.equal(element.clicked, 0);
+});
+
+test('file upload native CDP target checks precede any setFileInputFiles effect', () => {
+  const managerSource = readFileSync(new URL('../../src/core/browser-agent-manager.js', import.meta.url), 'utf8');
+  const start = managerSource.indexOf('if (action.type === BrowserAgentActionType.UPLOAD_DOWNLOAD)');
+  const end = managerSource.indexOf('if (action.type === BrowserAgentActionType.NAVIGATE)', start);
+  assert.ok(start > -1 && end > start, 'upload branch is present');
+  const upload = managerSource.slice(start, end);
+  assert.match(upload, /action.frameId !== 0/);
+  assert.match(upload, /AGENT_FILE_INPUT_CANCELLED_BY_OWNER/);
+  assert.equal((upload.match(/await proveInput\(\)/g) || []).length, 3);
+  assert.ok(upload.indexOf('await proveInput()') < upload.indexOf('DOM.setFileInputFiles'));
+});
