@@ -273,3 +273,16 @@ test('S1 present undefined history/nodes fail closed while truly absent legacy f
   corruptRestart.runtime.history = null;
   assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corruptRestart))), /dense array/);
 });
+
+
+test('S1 timeline status is a keyboard-reachable NVDA live region', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8');
+  const statusTag = html.match(/<p\s+id="agent-run-timeline-status"[^>]*>/u)?.[0];
+  assert.ok(statusTag, 'timeline status element must exist');
+  assert.match(statusTag, /role="status"/u);
+  assert.match(statusTag, /aria-live="polite"/u);
+  assert.match(statusTag, /aria-atomic="true"/u);
+  assert.match(statusTag, /tabindex="0"/u);
+  assert.match(html, /<ol\s+id="agent-run-timeline-list"\s+aria-label="[^"]+"/u);
+});

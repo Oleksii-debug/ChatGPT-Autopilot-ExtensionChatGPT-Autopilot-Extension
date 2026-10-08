@@ -532,3 +532,40 @@ test('S2 explicit undefined authority/proposal lists are malformed rather than s
   assert.equal(assessed.credentialSelectionAuthorized, false);
   assert.deepEqual(assessed, assessUntrustedContentInfluenceV1(JSON.parse(JSON.stringify(legacy))));
 });
+
+
+test('S2 assessment object getter and hostile descriptor traps fail without leaking diagnostics', () => {
+  const marker = 'PRIVATE_INJECTION_TRAP_MUST_NOT_LEAK_410';
+  let getterReads = 0;
+  const inputWithGetter = request();
+  Object.defineProperty(inputWithGetter, 'proposal', {
+    enumerable: true,
+    get() { getterReads += 1; throw new Error(marker); },
+  });
+  assert.throws(() => assessUntrustedContentInfluenceV1(inputWithGetter), error => {
+    assert.match(error.message, /enumerable own data property/u);
+    assert.doesNotMatch(error.message, /PRIVATE_INJECTION_TRAP_MUST_NOT_LEAK_410/u);
+    return true;
+  });
+  assert.equal(getterReads, 0);
+
+  const hostile = new Proxy(proposal(), {
+    ownKeys() { throw new Error(marker); },
+  });
+  assert.throws(() => assessUntrustedContentInfluenceV1(request({ proposal: hostile })), error => {
+    assert.match(error.message, /property descriptors cannot be safely inspected/u);
+    assert.doesNotMatch(error.message, /PRIVATE_INJECTION_TRAP_MUST_NOT_LEAK_410/u);
+    return true;
+  });
+
+  const persisted = JSON.parse(JSON.stringify(request({
+    proposal: proposal({ requestedCredentialRefIds: ['credential.owner-secret'] }),
+  })));
+  const denied = assessUntrustedContentInfluenceV1(persisted);
+  assert.equal(denied.status, UntrustedContentGuardStatus.BLOCKED);
+  assert.equal(denied.executionAuthorized, false);
+  assert.equal(denied.credentialSelectionAuthorized, false);
+  assert.equal(denied.instructionAuthority, 'NONE');
+  assert.deepEqual(denied.violations.map(item => item.code), ['UNTRUSTED_CREDENTIAL_SELECTION']);
+  assert.doesNotMatch(JSON.stringify(denied), /credential.owner-secret/u);
+});
