@@ -200,7 +200,7 @@ function replayActivationAdmitted({
   return true;
 }
 
-function activationInFlight(nodeRuntime) {
+function activationInFlight(nodeRuntime, runtime, graph, nodeId) {
   if (!nodeRuntime) return false;
   // A recovered ACTIVE child already occupies parent concurrency even if
   // its activation pointer or ledger has not been reconciled after a crash.
@@ -214,9 +214,27 @@ function activationInFlight(nodeRuntime) {
   if (!ledger) return false;
   // Durable PREPARED/AMBIGUOUS effects reserve capacity independently of
   // currentActivationId. Only fully terminal/superseded entries release it.
-  return Object.values(ledger).some(
+  if (Object.values(ledger).some(
     item => item && !['TERMINAL', 'SUPERSEDED'].includes(item.phase),
-  );
+  )) return true;
+  // A crash may persist the activation event while losing its pointer and
+  // ledger. Until reconciliation produces terminal proof, the event is an
+  // UNKNOWN outstanding effect and cannot free a sibling lease.
+  if (nodeRuntime.lifecycle === OrchestrationNodeLifecycle.IDLE
+      && !nodeRuntime.currentActivationId
+      && !nodeRuntime.lastTerminalStatus
+      && Object.keys(ledger).length === 0
+      && nodeId.startsWith('subagent:')) {
+    const lastSeparator = nodeId.lastIndexOf(':');
+    const spawnId = nodeId.slice('subagent:'.length, lastSeparator);
+    if (lastSeparator > 'subagent:'.length && /^[1-9][0-9]*$/u.test(nodeId.slice(lastSeparator + 1))) {
+      const eventId = compactOrchestrationEventId(
+        'subagent-spawn', graph.graphId, spawnId, nodeId, 1,
+      );
+      if (Object.hasOwn(runtime.processedEventIds, eventId)) return true;
+    }
+  }
+  return false;
 }
 
 function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, childNodeIds) {
@@ -228,7 +246,7 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
   // child-activation limit and must include already in-flight siblings.
   const effectiveLimit = parent.maxActiveChildren || parent.childIds.length;
   const occupiedSlots = parent.childIds.reduce(
-    (count, childId) => count + (activationInFlight(runtime.nodesById[childId]) ? 1 : 0),
+    (count, childId) => count + (activationInFlight(runtime.nodesById[childId], runtime, graph, childId) ? 1 : 0),
     0,
   );
   let remainingSlots = Math.max(0, effectiveLimit - occupiedSlots);
