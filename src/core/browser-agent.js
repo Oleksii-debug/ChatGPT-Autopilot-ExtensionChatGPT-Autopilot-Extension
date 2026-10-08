@@ -1020,7 +1020,7 @@ export function executeBrowserPageAction(snapshotId, action) {
     const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
     const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
     const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
-    const normalizeObserved = (value, max) => String(value || '').replace(/\\s+/g, ' ').trim().slice(0, max);
+    const normalizeObserved = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
     const href = (tag === 'a' || tag === 'area') ? normalizeObserved(target.href || target.getAttribute('href'), 1200) : '';
     if (!action.expectedSemanticIdentity || !action.expectedFrameUrl
       || typeof action.expectedSemanticName !== 'string'
