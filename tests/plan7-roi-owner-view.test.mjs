@@ -129,3 +129,35 @@ test('valid bounded ROI intervals and evidence populations preserve semantic sta
   assert.equal(nodes.filter(x => x.tagName === 'TH' && x.attributes.scope === 'row').length, 1);
   assert.equal(nodes.find(x => x.attributes.role === 'status').attributes['aria-live'], 'polite');
 });
+
+test('ROI prevents duplicated workflow identities and cross-row run overcount before DOM mutation', () => {
+  const root = container();
+  renderRoiOwnerViewV1(root, base());
+  const previous = root.children[0];
+  const row = (workflowClassId, manual = 2, supporting = 2) => ({
+    workflowClassId, verifiedManualOccurrenceCount: manual,
+    supportingRunCount: supporting, policyOrExecutionAuthorized: false,
+  });
+  const variants = [
+    [row('workflow.alpha'), row('workflow.alpha', 1, 1)],
+    [row('workflow.alpha'), row('workflow.beta')],
+    [row('workflow.alpha', 1, 2), row('workflow.beta', 1, 2)],
+    [row('workflow.alpha', 2, 1)],
+  ];
+  for (const opportunities of variants) {
+    assert.throws(() => renderRoiOwnerViewV1(root, base({
+      status: 'EVIDENCE_BACKED', observedRunCount: 3, verifiedOutcomeCount: 2,
+      opportunities,
+    })), /duplicates workflow|double-counts canonical runs|exceed observed evidence/u);
+    assert.equal(root.children[0], previous,
+      'forged aggregates must not replace the previous accessible owner view');
+  }
+  renderRoiOwnerViewV1(root, base({
+    status: 'EVIDENCE_BACKED', observedRunCount: 3, verifiedOutcomeCount: 2,
+    opportunities: [row('workflow.alpha', 1, 1), row('workflow.beta', 2, 2)],
+  }));
+  const rendered = walk(root);
+  assert.equal(rendered.filter(node => node.tagName === 'TH'
+    && node.attributes.scope === 'row').length, 2);
+  assert.equal(rendered.some(node => node.attributes.role === 'status'), true);
+});
