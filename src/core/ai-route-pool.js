@@ -170,7 +170,9 @@ export function normalizeAiRoutePool(raw = []) {
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
     const rawCostClass = own(item, 'costClass');
     if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
-    const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
+    // A remote Ollama-compatible endpoint is not provably free merely because its provider name is Ollama.
+    // Only explicitly local Ollama keeps the legacy zero-cost default; all other unpriced routes stay UNKNOWN.
+    const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' && locality === AiRouteLocality.LOCAL ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
