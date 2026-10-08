@@ -116,6 +116,15 @@ function exactPromptText(value, label, max = 8_000) {
   return value;
 }
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
+// Optional identity may be absent in legacy snapshots, but an explicitly
+// persisted null/undefined cannot erase a previously bound endpoint or credential.
+function optionalIdentity(record, key, label) {
+  const value = own(record, key);
+  if (Object.hasOwn(record, key) && (value === null || value === undefined)) {
+    throw new Error(`${label} cannot be null or undefined when explicitly supplied`);
+  }
+  return id(value, label, true);
+}
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
 function optionalBoolean(record, key, label, fallback) {
@@ -207,7 +216,7 @@ export function normalizeAiRoutePool(raw = []) {
       displayName: clean(own(item, 'displayName'), 160),
       systemPrompt: exactPromptText(own(item, 'systemPrompt'), 'AI route systemPrompt'),
       workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
-      endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
+      endpointId: optionalIdentity(item, 'endpointId', 'AI route endpointId'),
       roles: Object.freeze(roles),
       capabilityIds: Object.freeze(optionalIds(item, 'capabilityIds', `AI route ${index + 1} capabilityIds`, 64)),
       priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
@@ -530,7 +539,11 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   if (own(input, 'schemaVersion') !== AI_ROUTE_REGISTRY_EVIDENCE_VERSION) throw new Error('Unsupported AI route evidence schemaVersion');
   const registryRevision = strictInteger(own(input, 'registryRevision'), 'AI registry revision', 1, Number.MAX_SAFE_INTEGER);
   const routes = normalizeAiRoutePool(own(input, 'routes'));
-  const profiles = denseDataArray(own(input, 'endpointProfiles') ?? [], 'AI endpoint profiles', 32);
+  const suppliedProfiles = own(input, 'endpointProfiles');
+  if (Object.hasOwn(input, 'endpointProfiles') && (suppliedProfiles === null || suppliedProfiles === undefined)) {
+    throw new Error('AI endpoint profiles cannot be null or undefined when explicitly supplied');
+  }
+  const profiles = denseDataArray(suppliedProfiles === undefined ? [] : suppliedProfiles, 'AI endpoint profiles', 32);
   const seen = new Set();
   const normalizedProfiles = profiles.map((entry, index) => {
     const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless']), `AI endpoint profile ${index + 1}`);
@@ -540,7 +553,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     seen.add(profileId);
     const provider = clean(own(item, 'provider'), 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI endpoint provider is invalid');
-    const endpointId = id(own(item, 'endpointId'), 'AI endpoint endpointId', true);
+    const endpointId = optionalIdentity(item, 'endpointId', 'AI endpoint endpointId');
     const locality = own(item, 'locality');
     if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
     const origin = own(item, 'origin');
@@ -553,7 +566,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname.toLowerCase());
     if (locality === 'local' && !loopback) throw new Error('Local AI endpoint must use loopback');
     if (locality === 'remote' && parsed.protocol !== 'https:') throw new Error('Remote AI endpoint must use HTTPS');
-    const credentialRef = own(item, 'credentialRef') === undefined ? '' : id(own(item, 'credentialRef'), 'AI endpoint credentialRef', true);
+    const credentialRef = optionalIdentity(item, 'credentialRef', 'AI endpoint credentialRef');
     const credentialless = own(item, 'credentialless');
     if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
     if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
