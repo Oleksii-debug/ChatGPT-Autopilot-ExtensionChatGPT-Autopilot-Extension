@@ -340,3 +340,48 @@ test('unknown nested inspection schemaVersion is denied before provider effects'
   );
   assert.equal(f.providerCalls, 0);
 });
+
+test('provider effect-edge check rejects lease and readiness expiry during preparation', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const scenarios = [
+    { name: 'expired execution lease', edge: T0 + 601_000, pattern: /lease expired before provider effect/u },
+    { name: 'readiness TTL crossed', edge: T0 + 300_001, pattern: /readiness is stale before provider effect/u },
+    { name: 'clock rollback', edge: T0 - 1, pattern: /clock moved backwards before effect/u },
+  ];
+  for (const scenario of scenarios) {
+    let clockReads = 0;
+    let effects = 0;
+    const dispatcher = new SpecialistProviderDispatcherV1({
+      now: () => (++clockReads === 1 ? T0 : scenario.edge),
+      bindings: [{
+        providerId: 'provider.local',
+        execute: async () => { effects += 1; throw new Error('FORBIDDEN_PROVIDER_EFFECT'); },
+      }],
+    });
+    await assert.rejects(
+      dispatcher.execute(f.request(valid)),
+      scenario.pattern,
+      scenario.name,
+    );
+    assert.equal(clockReads, 2, scenario.name);
+    assert.equal(effects, 0, scenario.name);
+  }
+});
+
+test('provider effect-edge revalidation still permits an unexpired canonical dispatch', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  let reads = 0;
+  let effects = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => { reads += 1; return T0; },
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => { effects += 1; throw new Error('EXPECTED_PROVIDER_EFFECT'); },
+    }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(valid)), /EXPECTED_PROVIDER_EFFECT/u);
+  assert.equal(reads, 2);
+  assert.equal(effects, 1);
+});
