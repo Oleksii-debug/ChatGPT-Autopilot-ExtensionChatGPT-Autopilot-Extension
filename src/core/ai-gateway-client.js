@@ -198,6 +198,30 @@ export class AiGatewayClient {
   }
 
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
+    // Only existing gateway operations are admissible. This client is not
+    // an arbitrary loopback HTTP proxy, credential injector or model authority.
+    const allowedDiscoveryPath = /^\/models\?provider=[^&?#]+(?:&endpointId=[^&?#]+)?$/u.test(path);
+    const readOnly = path === '/health' || path === '/status' || allowedDiscoveryPath;
+    const completion = path === '/complete';
+    if (!readOnly && !completion) throw new Error('AI Gateway request path is not an approved model endpoint');
+    const safeInit = snapshotDataRecord(init, 'AI Gateway transport options');
+    for (const key of Object.keys(safeInit)) {
+      if (!['method','body','redirect'].includes(key)) {
+        throw new Error('AI Gateway transport option is not permitted');
+      }
+    }
+    if (readOnly && (
+      (safeInit.method !== undefined && safeInit.method !== 'GET')
+      || safeInit.body !== undefined
+    )) throw new Error('AI Gateway read-only endpoint requires GET without a request body');
+    if (completion && (safeInit.method !== 'POST' || typeof safeInit.body !== 'string')) {
+      throw new Error('AI Gateway completion requires explicit POST JSON');
+    }
+    if (completion) {
+      let payload;
+      try { payload = JSON.parse(safeInit.body); } catch { throw invalidRequestBodyError(); }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw invalidRequestBodyError();
+    }
     const base = normalizeGatewayUrl(gatewayUrl);
     const requestUrl = gatewayRequestUrl(base, path);
     const timeout = timeoutSeconds;
@@ -207,22 +231,21 @@ export class AiGatewayClient {
         || timeout > MAX_TIMEOUT_SECONDS) {
       throw new Error(`AI Gateway timeout must be ${MIN_TIMEOUT_SECONDS}-${MAX_TIMEOUT_SECONDS} seconds`);
     }
-    if (init.body != null && typeof init.body !== 'string') throw invalidRequestBodyError();
-    if (typeof init.body === 'string' && new TextEncoder().encode(init.body).byteLength > MAX_REQUEST_BYTES) {
+    if (safeInit.body != null && typeof safeInit.body !== 'string') throw invalidRequestBodyError();
+    if (typeof safeInit.body === 'string' && new TextEncoder().encode(safeInit.body).byteLength > MAX_REQUEST_BYTES) {
       throw requestTooLargeError();
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
     try {
       const response = await this.fetchFn(requestUrl, {
-        ...init,
+        ...safeInit,
         cache: 'no-store',
         redirect: 'error',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-          ...(init.headers || {}),
+          ...(safeInit.body ? { 'Content-Type': 'application/json' } : {}),
         },
       });
       return await parseJson(response, controller);
