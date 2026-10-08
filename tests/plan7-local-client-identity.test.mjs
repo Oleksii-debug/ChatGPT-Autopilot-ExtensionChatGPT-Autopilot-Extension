@@ -385,3 +385,40 @@ test('SDK returns detached immutable transport receipts after successful validat
   assert.equal(accepted.result.receipt.status, 'COMPLETED');
   assert.equal(accepted.result.scopeProof.allowed, true);
 });
+
+
+test('SDK deadline refuses late transport completion even when fetch ignores AbortSignal', async () => {
+  let calls = 0;
+  let signal;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async (_url, options) => {
+      calls += 1;
+      signal = options.signal;
+      return new Promise(resolve => setTimeout(
+        () => resolve({ ok: true, json: async () => transportResponse() }), 250,
+      ));
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(signal.aborted, true, 'late uncooperative transport must be aborted');
+  assert.equal(calls, 1, 'deadline must never resend an ambiguous request');
+});
+
+test('SDK deadline covers slow JSON body after early HTTP headers', async () => {
+  let calls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async () => {
+      calls += 1;
+      return {
+        ok: true,
+        json: () => new Promise(resolve => setTimeout(() => resolve(transportResponse()), 250)),
+      };
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(calls, 1, 'response parsing must not trigger a second effect');
+});
