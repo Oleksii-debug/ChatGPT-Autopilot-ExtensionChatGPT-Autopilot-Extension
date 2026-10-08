@@ -23,7 +23,7 @@ Conflict keys: model-router, provider-models, model-evals.
 
 ### Plan 5 — Cloud/remote/team
 Cloud workspace/pool, remote steering, team/RBAC, mobile, multi-account, remote dispatch and cross-device identity.
-DEFERRED_LATER_WAVE.
+DEFERRED_LATER_WAVE for current priority only; mandatory before terminal whole-product release.
 Conflict keys: cloud-exec, remote-control, team-identity.
 
 ### Plan 6 — Reliability/UI/security/release mechanics
