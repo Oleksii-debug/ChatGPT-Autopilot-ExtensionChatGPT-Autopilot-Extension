@@ -1419,3 +1419,44 @@ test('file upload native CDP target checks precede any setFileInputFiles effect'
   assert.equal((upload.match(/await proveInput\(\)/g) || []).length, 3);
   assert.ok(upload.indexOf('await proveInput()') < upload.indexOf('DOM.setFileInputFiles'));
 });
+
+
+// Plan 2 S1/S2 exact-effect envelope regressions (11.0.13 High).
+test('semantic select keeps exact option bytes and rejects untrusted truncation', () => {
+  setup();
+  element.tagName = 'SELECT';
+  element.options = [{ value: ' chosen ', textContent: 'Chosen' }];
+  const observed = snapshotBrowserPage('select-exact');
+  const snapshot = { frames: [{ frameId: 0, ...observed }], url: observed.url };
+  const envelope = value => JSON.stringify({ type: 'select', frameId: 0, ref: 'r1', value });
+  for (const value of [undefined, null, false, 10, {}, [], '', 'x'.repeat(5001)]) {
+    assert.throws(
+      () => parseBrowserAgentAction(envelope(value), snapshot),
+      /select requires an exact bounded option value/,
+    );
+  }
+  assert.equal(parseBrowserAgentAction(envelope(' chosen '), snapshot).value, ' chosen ');
+  assert.equal(parseBrowserAgentAction(envelope('x'.repeat(5000)), snapshot).value.length, 5000);
+  assert.equal(element.clicked, 0);
+});
+
+test('recovered direct native drag denies coerced or out-of-range duration before debugger attach', async () => {
+  setup();
+  const start = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const end = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(40, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  const base = { startX: 20, startY: 20, endX: 40, endY: 20 };
+  for (const durationMs of [null, false, '450', 0, 119, 120.5, 2000.5, 2001, Infinity, {}, []]) {
+    await assert.rejects(
+      () => fixture.manager.nativeDragAt(7, { ...base, durationMs }, start, end, 'owner-job', 3),
+      /AGENT_DRAG_DURATION_INVALID/,
+    );
+  }
+  await assert.rejects(
+    () => fixture.manager.nativeDragAt(7, null, start, end, 'owner-job', 3),
+    /AGENT_DRAG_DURATION_INVALID/,
+  );
+  assert.deepEqual(fixture.events, []);
+  assert.equal(fixture.ownerChecks, 0);
+  assert.equal(fixture.proofChecks, 0);
+});
