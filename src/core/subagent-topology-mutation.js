@@ -234,19 +234,22 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
         || !scopeChainIsRunning(graph, runtime, nodeId)) {
       return;
     }
+    const eventId = compactOrchestrationEventId(
+      'subagent-spawn', graph.graphId, spawnId, nodeId, 1,
+    );
+    const activationId = 'spawn:' + spawnId + ':child:' + (index + 1);
+    // Restart must never propose an already processed event or an activation
+    // that survived in the canonical ledger, even if the child is now IDLE.
+    // The reducer also deduplicates, but don't generate duplicate work intent.
+    if (Object.hasOwn(runtime.processedEventIds, eventId)
+        || Object.hasOwn(nodeRuntime.activationLedger, activationId)) return;
     requests.push({
       type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
-      eventId: compactOrchestrationEventId(
-        'subagent-spawn',
-        graph.graphId,
-        spawnId,
-        nodeId,
-        1,
-      ),
+      eventId,
       controlEpoch: graph.controlEpoch,
       nodeId,
       generation: 1,
-      activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
+      activationId,
       purpose: OrchestrationActivationPurpose.WORK,
     });
     remainingSlots -= 1;
