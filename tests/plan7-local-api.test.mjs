@@ -257,3 +257,52 @@ test('SDK binds read-only vs mutating receipt classification to canonical operat
     }
   });
 });
+
+
+test('local API ingress suppresses overlapping same-ID SDK clients before second Core dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let enteredDispatch, releaseDispatch;
+  const entered = new Promise(resolve => { enteredDispatch = resolve; });
+  const heldDispatch = new Promise(resolve => { releaseDispatch = resolve; });
+  const deps = dependencies(counters);
+  const delegate = deps.dispatchCanonicalControl;
+  deps.dispatchCanonicalControl = async args => {
+    const receipt = delegate(args);
+    enteredDispatch();
+    await heldDispatch;
+    return receipt;
+  };
+  await withServer(async port => {
+    const first = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const second = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const firstPromise = first.control(request('multi-client-race-1'));
+    try {
+      await entered;
+      const duplicate = await second.control(request('multi-client-race-1'));
+      assert.equal(duplicate.status, 'UNKNOWN_NETWORK_RESULT');
+      assert.equal(duplicate.httpStatus, 409);
+      assert.equal(counters.scopes, 1);
+      assert.equal(counters.dispatches, 1);
+    } finally {
+      releaseDispatch();
+    }
+    const response = await firstPromise;
+    assert.equal(response.status, 'RECEIVED');
+  }, deps);
+  assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+});
+
+test('local API concurrent distinct IDs preserve independent canonical dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  await withServer(async port => {
+    const first = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const second = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const [one, two] = await Promise.all([
+      first.control(request('multi-client-a')),
+      second.control(request('multi-client-b')),
+    ]);
+    assert.equal(one.status, 'RECEIVED');
+    assert.equal(two.status, 'RECEIVED');
+  }, dependencies(counters));
+  assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
+});
