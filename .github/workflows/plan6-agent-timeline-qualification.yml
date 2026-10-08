@@ -8,6 +8,7 @@ on:
       - 'src/ui/options.html'
       - 'tests/plan6-agent-run-timeline.test.mjs'
       - 'tests/plan6-agent-run-timeline-events.test.mjs'
+      - 'tests/plan6-bounded-evidence-map.test.mjs'
       - '.github/workflows/plan6-agent-timeline-qualification.yml'
   workflow_dispatch:
 
@@ -33,5 +34,6 @@ jobs:
           node --check src/ui/options.js
           node --check tests/plan6-agent-run-timeline.test.mjs
           node --check tests/plan6-agent-run-timeline-events.test.mjs
+          node --check tests/plan6-bounded-evidence-map.test.mjs
       - name: Read-only timeline, security, chaos and keyboard contract regressions
-        run: node --test tests/plan6-agent-run-timeline.test.mjs tests/plan6-agent-run-timeline-events.test.mjs tests/run-timeline.test.mjs tests/run-timeline-command.test.mjs tests/run-timeline-ui.test.mjs tests/untrusted-content-guard.test.mjs
+        run: node --test tests/plan6-agent-run-timeline.test.mjs tests/plan6-agent-run-timeline-events.test.mjs tests/plan6-bounded-evidence-map.test.mjs tests/run-timeline.test.mjs tests/run-timeline-command.test.mjs tests/run-timeline-ui.test.mjs tests/untrusted-content-guard.test.mjs
