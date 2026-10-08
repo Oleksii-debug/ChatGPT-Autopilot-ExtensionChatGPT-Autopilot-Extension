@@ -97,3 +97,56 @@ test('keyboard reader sees limitations in semantic status, not a visual-only bad
   assert.match(projection, /підрахунки неповні/u);
   assert.doesNotMatch(projection, /\.innerHTML\s*=|\.outerHTML\s*=|eval\(/u);
 });
+
+test('recorded outcome counters never claim independent external-effect verification', () => {
+  const input = sample();
+  const absent = buildAgentRunTimelineV1(input);
+  assert.deepEqual(absent.evidenceMap.recordedOutcome, {
+    source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
+    recordPresent: false,
+    criteriaRecorded: 0,
+    recordedAt: null,
+    externalEffectVerified: false,
+  });
+  input.runtime.verifiedOutcome = {
+    verifiedAt: 1_750_000_000_000,
+    snapshotSignature: 'PRIVATE_PAGE_SIGNATURE',
+    checks: [{ criterion: 1, text: 'PRIVATE_OWNER_GOAL', detail: 'PRIVATE_TOOL_RECEIPT' }],
+  };
+  const seen = buildAgentRunTimelineV1(input);
+  assert.equal(seen.counters.verifiedChecks, 1);
+  assert.deepEqual(seen.evidenceMap.recordedOutcome, {
+    source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
+    recordPresent: true,
+    criteriaRecorded: 1,
+    recordedAt: 1_750_000_000_000,
+    externalEffectVerified: false,
+  });
+  assert.equal(seen.evidenceMap.externalEffectVerified, false);
+  assert.deepEqual(seen, buildAgentRunTimelineV1(structuredClone(input)));
+  assert.equal(Object.isFrozen(seen.evidenceMap.recordedOutcome), true);
+  assert.doesNotMatch(JSON.stringify(seen), /PRIVATE_|PAGE_SIGNATURE|TOOL_RECEIPT/);
+});
+
+test('malformed persisted outcome fails closed without running foreign getters', () => {
+  const input = sample();
+  let getterCalls = 0;
+  input.runtime.verifiedOutcome = { verifiedAt: 100 };
+  Object.defineProperty(input.runtime.verifiedOutcome, 'checks', {
+    enumerable: true,
+    get() { getterCalls += 1; throw new Error('PRIVATE_GETTER_EXECUTED'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(input), /accessor-backed checks/);
+  assert.equal(getterCalls, 0);
+  input.runtime.verifiedOutcome = { checks: new Array(2) };
+  input.runtime.verifiedOutcome.checks[1] = { criterion: 1 };
+  assert.throws(() => buildAgentRunTimelineV1(input), /dense/);
+  input.runtime.verifiedOutcome = { checks: Array.from({ length: 21 }, () => ({})) };
+  assert.throws(() => buildAgentRunTimelineV1(input), /bounded/);
+  input.runtime.verifiedOutcome = { checks: 'PRIVATE_NOT_AN_ARRAY' };
+  assert.throws(() => buildAgentRunTimelineV1(input), /bounded/);
+  input.runtime.verifiedOutcome = { verifiedAt: -1, checks: [] };
+  const safe = buildAgentRunTimelineV1(input);
+  assert.equal(safe.evidenceMap.recordedOutcome.recordedAt, null);
+  assert.equal(safe.evidenceMap.recordedOutcome.criteriaRecorded, 0);
+});
