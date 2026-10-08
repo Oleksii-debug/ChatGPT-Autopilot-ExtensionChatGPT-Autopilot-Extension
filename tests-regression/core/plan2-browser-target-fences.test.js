@@ -721,3 +721,113 @@ test('visual evidence refuses null, string and missing origin after restart', ()
     assert.equal(verifyBrowserCoordinateTarget(20, 20, broken).reason, 'changed-geometry');
   }
 });
+
+
+function plan2NativeCoordinateFixture({ allowOwner = () => true, allowProof = () => true } = {}) {
+  const events = [];
+  let ownerChecks = 0;
+  let proofChecks = 0;
+  const chromeApi = {
+    storage: { local: { get: async () => ({}), set: async () => {} } },
+    scripting: { executeScript: async () => [{ result: { ok: allowProof(++proofChecks) } }] },
+    debugger: {
+      attach: async () => { events.push('attach'); },
+      sendCommand: async (_target, method, data) => { events.push(method + (data?.type ? ':' + data.type : '')); },
+      detach: async () => { events.push('detach'); },
+    },
+  };
+  const manager = new BrowserAgentManager({ chromeApi, routePrompt: async () => ({}) });
+  manager.verifyOwnerAuthority = async () => allowOwner(++ownerChecks);
+  return { manager, events, get ownerChecks() { return ownerChecks; }, get proofChecks() { return proofChecks; } };
+}
+
+test('native coordinate click refuses Stop after debugger attach without pointer effect', async () => {
+  setup();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture({ allowOwner: index => index === 1 });
+  await assert.rejects(
+    () => fixture.manager.nativeClickAt(7, 20, 20, fingerprint, 'owner-job', 3),
+    /AGENT_COORDINATE_CANCELLED_BY_OWNER/,
+  );
+  assert.equal(fixture.ownerChecks, 2);
+  assert.deepEqual(fixture.events, ['attach', 'detach']);
+});
+
+test('native coordinate click refuses absent target proof and absent owner epoch', async () => {
+  setup();
+  const fixture = plan2NativeCoordinateFixture();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  await assert.rejects(
+    () => fixture.manager.nativeClickAt(7, 20, 20, null, 'owner-job', 3),
+    /AGENT_COORDINATE_TARGET_UNPROVEN/,
+  );
+  await assert.rejects(
+    () => fixture.manager.nativeClickAt(7, 20, 20, fingerprint),
+    /AGENT_COORDINATE_CANCELLED_BY_OWNER/,
+  );
+  assert.deepEqual(fixture.events, []);
+});
+
+test('native coordinate drag rejects Stop before pointerDown', async () => {
+  setup();
+  const start = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const end = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(40, 20).target);
+  const fixture = plan2NativeCoordinateFixture({ allowOwner: index => index === 1 });
+  await assert.rejects(
+    () => fixture.manager.nativeDragAt(7, { startX: 20, startY: 20, endX: 40, endY: 20 }, start, end, 'owner-job', 3),
+    /AGENT_DRAG_CANCELLED_BY_OWNER/,
+  );
+  assert.deepEqual(fixture.events, ['attach', 'detach']);
+});
+
+test('native coordinate drag releases pressed pointer when Stop interrupts movement', async () => {
+  setup();
+  const start = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const end = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(40, 20).target);
+  const fixture = plan2NativeCoordinateFixture({ allowOwner: index => index <= 3 });
+  await assert.rejects(
+    () => fixture.manager.nativeDragAt(7, { startX: 20, startY: 20, endX: 40, endY: 20, durationMs: 120 }, start, end, 'owner-job', 3),
+    /AGENT_DRAG_CANCELLED_BY_OWNER/,
+  );
+  assert.deepEqual(fixture.events, [
+    'attach',
+    'Input.dispatchMouseEvent:mouseMoved',
+    'Input.dispatchMouseEvent:mousePressed',
+    'Input.dispatchMouseEvent:mouseReleased',
+    'detach',
+  ]);
+});
+
+test('native coordinate typing denies post-click changed target before insertText', async () => {
+  setup();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture({ allowProof: index => index < 3 });
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'safe' }, fingerprint, 'owner-job', 3),
+    /AGENT_COORDINATE_TARGET_STALE/,
+  );
+  assert.equal(fixture.proofChecks, 3);
+  assert.equal(fixture.events.includes('Input.insertText'), false);
+  assert.equal(fixture.events.at(-1), 'detach');
+});
+
+test('native coordinate typing denies Stop after debugger attach with zero input effects', async () => {
+  setup();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture({ allowOwner: index => index === 1 });
+  await assert.rejects(
+    () => fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'safe' }, fingerprint, 'owner-job', 3),
+    /AGENT_COORDINATE_CANCELLED_BY_OWNER/,
+  );
+  assert.deepEqual(fixture.events, ['attach', 'detach']);
+});
+
+test('stable owner and screenshot permit exactly one coordinate text insertion', async () => {
+  setup();
+  const fingerprint = browserAgentCoordinateTargetFingerprint(probeBrowserCoordinateTarget(20, 20).target);
+  const fixture = plan2NativeCoordinateFixture();
+  await fixture.manager.nativeTypeAt(7, { x: 20, y: 20, text: 'safe' }, fingerprint, 'owner-job', 3);
+  assert.equal(fixture.proofChecks, 3);
+  assert.equal(fixture.events.filter(event => event === 'Input.insertText').length, 1);
+  assert.equal(fixture.events.at(-1), 'detach');
+});
