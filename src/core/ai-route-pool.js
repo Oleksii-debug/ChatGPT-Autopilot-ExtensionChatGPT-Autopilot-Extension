@@ -350,10 +350,12 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
     && (route.costClass === AiRouteCostClass.FREE
       || (route.costClass === AiRouteCostClass.PAID && route.inputPriceKnown && route.outputPriceKnown))
     && (normalizedPolicy.locality === 'any' || route.locality === normalizedPolicy.locality)
+    // A price cap is a safety policy, not permission to treat an unknown
+    // provider price as zero. Explicitly observed zero remains eligible.
     && (normalizedPolicy.maxInputPricePerMillionUsd === null
-      || route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd)
+      || (route.inputPriceKnown && route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd))
     && (normalizedPolicy.maxOutputPricePerMillionUsd === null
-      || route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd)
+      || (route.outputPriceKnown && route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd))
     && (!route.roles.length || route.roles.includes(normalizedRole))
     && capabilities.every(capabilityId => route.capabilityIds.includes(capabilityId))
     && (!requiresVision || route.supportsVision));
