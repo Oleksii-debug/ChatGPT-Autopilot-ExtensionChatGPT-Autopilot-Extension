@@ -50,6 +50,14 @@ Current main manifest 0.9.19 is older than the located 11.0.13 High Drive source
 - Working PR: https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/655
 
 
+### Plan 2 — semantic key and coordinate fail-closed follow-up (NOT DONE)
+- Same Plan 2 owner, existing 11.0.13 High PR #655; no second Browser Agent, scheduler, policy, recovery or provider authority. Existing 11.x only; stale main product source not used.
+- Section 1 IN_PROGRESS / ACTIONABLE / NOT DONE: snapshot-bound Enter/Space key identity (frame URL, semantic target/name/link/form); post-debugger-attach target reproof and owner epoch checks prevent activation after semantic drift or Stop. Source commit `25cb7c08880b4b6a4393217f2a50a4ed27afd462`, manager commit `43e276b864717a2aa2da03bb7ea1b403e3111b1f`.
+- Section 2 IN_PROGRESS / ACTIONABLE / NOT DONE: reject coercible/null/missing/nonfinite persisted viewport scroll, document epoch and geometry evidence before coordinate effects. Source commit `25cb7c08880b4b6a4393217f2a50a4ed27afd462`.
+- Five additional Node negative/positive regression definitions committed at `6bdd731dd1d677053ecc152a3a0c3ea035a5db16`; exact readback blobs: source `32be47ccd44e6dada9b70185fb6675e928233818`, manager `413571ec3356a2174d467e50df0be2f7ab75c1ff`, tests `8e47a7280f63e2d7a0c8e01b5bb1b43ca81f8f44`. CI exact-head Plan2/Core/Chrome/Release QUEUED; these newly added tests have NOT been confirmed PASS.
+- Terminal blockers persist: 11.x canonical main/release sync and integration, exact-head dual-OS/Chrome CI completion, restart/security/post-integration readback. PR #655 open draft/unmerged. Neither S1 nor S2 DONE; do not skip to S3.
+- Drive Plan 2 mirror updated in its exact canonical document `1LWRjRhYYv1jQE3CXeDZg20Dn8WD3EJJbKtXNcsohsCo`; no other plan edited.
+
 ## Plan 4 — 2026-10-08 offline contracts and local-provider hardening (NOT terminal DONE)
 - Drive authority: `4. Четвертий план`, document `1fx4sR_jCfIoKlFHPed7chAr5zy2eJKwWRQq_mjuALh4`. This checkpoint concerns **only** Plan 4.
 - Section 1 `IN_PROGRESS / ACTIONABLE / NOT DONE`: reused canonical 11.0.13 High `src/core/ai-route-pool.js` and added fail-closed unknown schema versions plus deterministic SHA-256 evidence for route identities/endpoint profiles with explicit advisory-only/no-permission authority. Endpoint locality/origin/opaque credential references are validated. Remaining gaps: full model/provider/profile/route/evidence lineage integration, schema migration and live dispatch provenance readback.
