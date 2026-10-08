@@ -78,6 +78,17 @@ function optionalText(value, label) {
   return value;
 }
 
+// Bound endpoint identity cannot be silently erased at the dispatch boundary.
+// Omitted identity retains legacy behavior without pretending a profile match.
+function endpointIdFromRequest(record) {
+  if (!Object.hasOwn(record, 'endpointId')) return '';
+  const value = record.endpointId;
+  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(value)) {
+    throw new Error('AI Gateway endpointId must be an exact bounded identity when supplied');
+  }
+  return value;
+}
+
 function invalidRequestBodyError() {
   const error = new Error('AI Gateway request body must be JSON text');
   error.code = 'AI_GATEWAY_INVALID_REQUEST_BODY';
@@ -319,7 +330,7 @@ export class AiGatewayClient {
     const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
     const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     const provider = request.provider;
-    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
+    const endpointId = endpointIdFromRequest(request);
     const p = encodeURIComponent(clean(provider));
     if (!p) throw new Error('AI provider is required');
     const endpoint = clean(endpointId);
@@ -332,7 +343,7 @@ export class AiGatewayClient {
     const timeoutSeconds = request.timeoutSeconds === undefined ? 180 : request.timeoutSeconds;
     const provider = request.provider;
     const model = request.model;
-    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
+    const endpointId = endpointIdFromRequest(request);
     const prompt = request.prompt;
     const systemPrompt = optionalText(request.systemPrompt, 'AI Gateway systemPrompt');
     const maxOutputTokens = request.maxOutputTokens === undefined ? 0 : request.maxOutputTokens;
