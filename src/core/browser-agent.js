@@ -574,7 +574,11 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   }
   if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT].includes(type)) {
     if (snapshot?.visionAttached !== true) throw new Error(`Browser Agent ${type} requires a screenshot attached to this exact reasoning turn`);
-    const topFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot?.frames?.[0] || null;
+    // Screenshot CSS coordinates may only be borrowed from exact numeric
+    // Chrome main-frame identity, never a coercible ID or arbitrary iframe.
+    const topFrame = Array.isArray(snapshot?.frames)
+      ? snapshot.frames.find(frame => frame?.frameId === 0) || null
+      : null;
     const viewport = topFrame?.viewport || snapshot?.visionViewport || null;
     const width = viewport?.width;
     const height = viewport?.height;
@@ -640,7 +644,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     // ref alone. Bind its file-input meaning to the same snapshot/URL/label
     // evidence used for clicks before Chrome DOM.setFileInputFiles.
     if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
-      const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+      const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
       const target = (frame?.elements || []).find(item => item.ref === action.ref);
       if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing');
       action.expectedSemanticIdentity = target.semanticIdentity;
@@ -664,7 +668,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     if (!Number.isInteger(passwordFrameId) || !passwordRef || !refs.has(`${passwordFrameId}:${passwordRef}`)) {
       throw new Error('Browser Agent credential action requires an exact current password field');
     }
-    const passwordFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === passwordFrameId);
+    const passwordFrame = (snapshot?.frames || []).find(frame => frame.frameId === passwordFrameId);
     const passwordElement = (passwordFrame?.elements || []).find(item => item.ref === passwordRef);
     if (String(passwordElement?.tag || '').toLowerCase() !== 'input'
       || String(passwordElement?.type || '').toLowerCase() !== 'password'
@@ -681,7 +685,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
         throw new Error('Browser Agent credential username target is outside the current snapshot');
       }
       if (usernameFrameId !== passwordFrameId) throw new Error('Browser Agent credential username/password fields must be in the same frame in V1');
-      const usernameFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === usernameFrameId);
+      const usernameFrame = (snapshot?.frames || []).find(frame => frame.frameId === usernameFrameId);
       const usernameElement = (usernameFrame?.elements || []).find(item => item.ref === usernameRef);
       const usernameType = String(usernameElement?.type || '').toLowerCase();
       if (!usernameElement || usernameElement.sensitive === true || usernameType === 'password' || usernameType === 'file') {
@@ -713,7 +717,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       throw new Error('Browser Agent select requires an exact bounded option value');
     }
     action.value = raw.value;
-    const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+    const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
     const observed = (frame?.elements || []).find(item => item.ref === action.ref);
     if (typeof observed?.optionFingerprint !== 'string' || !observed.optionFingerprint) {
       throw new Error('Browser Agent select options require observed target identity');
@@ -739,7 +743,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       }
       // Keys can submit forms and activate controls. They need the same
       // observed semantic identity as a pointer click, never a bare ordinal ref.
-      const frame = (snapshot?.frames || []).find(item => Number(item.frameId) === action.frameId);
+      const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
       const observed = (frame?.elements || []).find(item => item.ref === action.ref);
       if (!observed?.semanticIdentity || !clean(frame?.url, 4096)) {
         throw new Error('Browser Agent key target identity is missing');
@@ -775,13 +779,21 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     if (evidence != null) {
       if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new Error('Browser Agent done evidence must be an object');
       const snapshotSignature = clean(evidence.snapshotSignature, 80);
-      const checks = Array.isArray(evidence.checks) ? evidence.checks.slice(0, 20).map((check, index) => {
+      // Completion evidence is an exact owner-contract claim. Never silently
+      // truncate an additional check or coerce a model-supplied criterion.
+      if (evidence.checks !== undefined && (!Array.isArray(evidence.checks) || evidence.checks.length > 20)) {
+        throw new Error('Browser Agent done evidence requires at most 20 explicit checks without truncation');
+      }
+      const checks = (evidence.checks || []).map((check, index) => {
         if (!check || typeof check !== 'object' || Array.isArray(check)) throw new Error(`Browser Agent done evidence check ${index + 1} must be an object`);
-        const criterion = Number(check.criterion);
-        const detail = clean(check.detail || check.evidence, 1000);
-        if (!Number.isInteger(criterion) || criterion < 1 || !detail) throw new Error(`Browser Agent done evidence check ${index + 1} is invalid`);
-        return { criterion, detail };
-      }) : [];
+        const criterion = check.criterion;
+        const detailValue = check.detail === undefined ? check.evidence : check.detail;
+        if (!Number.isSafeInteger(criterion) || criterion < 1
+          || typeof detailValue !== 'string' || !detailValue.trim() || detailValue.length > 1000) {
+          throw new Error(`Browser Agent done evidence check ${index + 1} is invalid`);
+        }
+        return { criterion, detail: detailValue.trim() };
+      });
       action.evidence = { snapshotSignature, checks };
     }
   }
