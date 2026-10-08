@@ -195,9 +195,18 @@ async function parseJson(response, controller) {
 }
 
 export class AiGatewayClient {
-  constructor({ fetchFn = globalThis.fetch } = {}) {
+  constructor({
+    fetchFn = globalThis.fetch,
+    setTimeoutFn = globalThis.setTimeout,
+    clearTimeoutFn = globalThis.clearTimeout,
+  } = {}) {
     if (typeof fetchFn !== 'function') throw new Error('AI Gateway fetch is unavailable');
+    if (typeof setTimeoutFn !== 'function' || typeof clearTimeoutFn !== 'function') {
+      throw new Error('AI Gateway deadline clock is unavailable');
+    }
     this.fetchFn = fetchFn;
+    this.setTimeoutFn = setTimeoutFn;
+    this.clearTimeoutFn = clearTimeoutFn;
   }
 
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
@@ -239,7 +248,13 @@ export class AiGatewayClient {
       throw requestTooLargeError();
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout * 1000);
+    // Only the deadline callback marks timeout. A bounded-body rejection can
+    // abort the response separately and must keep its own typed failure.
+    let timedOut = false;
+    const timer = this.setTimeoutFn(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeout * 1000);
     try {
       const response = await this.fetchFn(requestUrl, {
         ...safeInit,
@@ -251,16 +266,29 @@ export class AiGatewayClient {
           ...(safeInit.body ? { 'Content-Type': 'application/json' } : {}),
         },
       });
-      return await parseJson(response, controller);
+      // Fetch and body readers may ignore AbortSignal, but their late bytes
+      // must never be published as a successful model completion.
+      if (timedOut) {
+        const late = new Error('AI Gateway response arrived after the deadline');
+        late.name = 'AbortError';
+        throw late;
+      }
+      const parsed = await parseJson(response, controller);
+      if (timedOut) {
+        const late = new Error('AI Gateway response body finished after the deadline');
+        late.name = 'AbortError';
+        throw late;
+      }
+      return parsed;
     } catch (error) {
-      if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
-      if (error?.name === 'AbortError') {
+      if (timedOut || error?.name === 'AbortError') {
         const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
         timeoutError.code = 'AI_GATEWAY_TIMEOUT';
         timeoutError.category = 'TIMEOUT';
         timeoutError.retryable = true;
         throw timeoutError;
       }
+      if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
       if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
       const unavailable = new Error('Could not reach AI Gateway');
       unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
@@ -268,7 +296,7 @@ export class AiGatewayClient {
       unavailable.retryable = true;
       throw unavailable;
     } finally {
-      clearTimeout(timer);
+      this.clearTimeoutFn(timer);
     }
   }
 
