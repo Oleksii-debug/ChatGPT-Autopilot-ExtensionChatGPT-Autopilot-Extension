@@ -151,7 +151,7 @@ test('untrusted content cannot select even an opaque credential reference', () =
   assert.equal(result.status, UntrustedContentGuardStatus.BLOCKED);
   assert.deepEqual(result.violations, [{
     code: 'UNTRUSTED_CREDENTIAL_SELECTION',
-    values: ['credential-owner-mail'],
+    values: [],
   }]);
   assert.equal(result.credentialSelectionAuthorized, false);
 });
@@ -338,4 +338,20 @@ test('arrays are dense, bounded and exact without coercion', () => {
     })),
     /bounded plain array/,
   );
+});
+
+test('credential selection denial cannot echo untrusted reference data through logs or restart', () => {
+  const hostileRef = 'SECRET_CREDENTIAL_REFERENCE_OWNER';
+  const input = request({
+    proposal: proposal({ requestedCredentialRefIds: [hostileRef], outboundOrigins: [] }),
+  });
+  const denied = assessUntrustedContentInfluenceV1(input);
+  assert.equal(denied.status, UntrustedContentGuardStatus.BLOCKED);
+  assert.deepEqual(denied.violations, [{ code: 'UNTRUSTED_CREDENTIAL_SELECTION', values: [] }]);
+  assert.equal(denied.credentialSelectionAuthorized, false);
+  assert.equal(denied.executionAuthorized, false);
+  assert.equal(denied.policyDecisionGranted, false);
+  assert.equal(denied.instructionAuthority, 'NONE');
+  assert.doesNotMatch(JSON.stringify(denied), /SECRET_CREDENTIAL_REFERENCE_OWNER/u);
+  assert.deepEqual(assessUntrustedContentInfluenceV1(structuredClone(input)), denied);
 });
