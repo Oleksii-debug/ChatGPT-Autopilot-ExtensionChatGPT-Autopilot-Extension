@@ -158,6 +158,25 @@ for (const [status,category,body] of [
   });
 }
 
+test('local 401/429/503 errors preserve HTTP identity without reading untrusted oversized bodies', async () => {
+  for (const [status,category,retryable] of [
+    [401,'AUTH',false], [429,'RATE_LIMIT',true], [503,'UNAVAILABLE',true],
+  ]) {
+    let reads=0, cancels=0;
+    const client=new LocalAiClient({fetchFn:async()=>({
+      ok:false,status,
+      body:{cancel:async()=>{cancels++;}},
+      text:async()=>{reads++;throw new Error('sk-private-upstream-error-body');},
+    })});
+    await assert.rejects(client.complete(settings,'test'),error=>
+      error.status===status && error.category===category
+      && error.retryable===retryable
+      && !String(error.message).includes('sk-private-upstream-error-body'));
+    assert.equal(reads,0,'error payload must never be read');
+    assert.equal(cancels,1,'error response stream must be cancelled');
+  }
+});
+
 test('gateway preserves AUTH/RATE_LIMIT/UNAVAILABLE status on non-JSON and empty errors without secret leakage', async () => {
   for (const [status,category,body] of [
     [401,'AUTH','<html>sk-gateway-private</html>'],
