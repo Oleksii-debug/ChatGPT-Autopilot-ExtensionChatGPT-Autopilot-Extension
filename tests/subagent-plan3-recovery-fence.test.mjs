@@ -180,3 +180,39 @@ test('without durable processed event exact restart can still offer deterministi
     first.activationRequests.map(item => item.eventId),
   );
 });
+
+test('durable nonterminal child ledger reserves bounded parent capacity despite orphaned current-activation pointer', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const resumedGraph = structuredClone(first.graph);
+  resumedGraph.nodesById.root.maxActiveChildren = 1;
+  const resumedRuntime = structuredClone(first.runtime);
+  const occupiedChild = resumedRuntime.nodesById[occupiedChildId];
+  occupiedChild.currentActivationId = '';
+  occupiedChild.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  occupiedChild.activationLedger['activation.persisted'] = {
+    phase: 'PREPARED',
+    activationId: 'activation.persisted',
+    nodeId: occupiedChildId,
+  };
+  // Even when the current pointer is lost at the crash boundary, the
+  // recovered PREPARED ledger is evidence of a still-uncertain effect.
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: resumedGraph, runtime: resumedRuntime, nowMs: 300,
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(replay.activationRequests, []);
+  assert.equal(replay.activationAuthority, false);
+  assert.equal(replay.executionAuthority, false);
+
+  const settledRuntime = structuredClone(resumedRuntime);
+  settledRuntime.nodesById[occupiedChildId].activationLedger['activation.persisted'].phase = 'TERMINAL';
+  const reconciled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: resumedGraph, runtime: settledRuntime, nowMs: 301,
+  }));
+  assert.equal(reconciled.decision, 'ALLOW');
+  assert.equal(reconciled.activationRequests.length, 1);
+  assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
+});
