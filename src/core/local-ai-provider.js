@@ -255,11 +255,11 @@ async function readResponseTextBounded(response) {
 }
 
 async function readJsonResponse(response) {
-  const text = await readResponseTextBounded(response);
-  // The HTTP transport status is authoritative even if an upstream proxy returns
-  // HTML, empty text, malformed JSON or an error page containing private data.
-  // No untrusted provider body is propagated through thrown errors.
+  // Non-2xx transport status already supplies the complete error category.
+  // Never read untrusted error bodies: they may be huge, contain secrets, or
+  // stall indefinitely. An oversized 401/429/503 must retain its real status.
   if (!response.ok) {
+    await cancelResponseBody(response);
     const status = response.status;
     const error = new Error(`Local AI server error ${status}`);
     error.status = status;
@@ -272,6 +272,7 @@ async function readJsonResponse(response) {
     error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
     throw error;
   }
+  const text = await readResponseTextBounded(response);
   try {
     return text ? JSON.parse(text) : {};
   } catch {
