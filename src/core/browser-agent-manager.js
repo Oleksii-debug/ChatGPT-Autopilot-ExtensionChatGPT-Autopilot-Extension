@@ -87,6 +87,13 @@ const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
+const EXACT_BROWSER_JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,127}$/u;
+function requireExactBrowserJobId(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !EXACT_BROWSER_JOB_ID.test(value)) {
+    throw new Error(`${label} must be an exact bounded durable ID`);
+  }
+  return value;
+}
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
@@ -2173,9 +2180,7 @@ export class BrowserAgentManager {
 
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     const jobId = Object.hasOwn(request, 'jobId') ? request.jobId : this.createId();
-    if (typeof jobId !== 'string' || jobId.length < 1 || jobId.length > 128) {
-      throw new Error('Browser Agent definition launch jobId must be exact bounded text');
-    }
+    requireExactBrowserJobId(jobId, 'Browser Agent definition launch jobId');
 
     await this.update(store => {
       const now = this.now();
@@ -2227,7 +2232,12 @@ export class BrowserAgentManager {
     // Same data-only request boundary as Definition intake: no getter may
     // supply a task/goal/policy at construction time.
     const request = snapshotOwnDataRequest(raw, 'Browser Agent direct intake');
-    const id = clean(request.id, 128) || this.createId();
+    // Explicit invalid identities cannot silently turn into a newly generated
+    // task, and generated identities obey the same durable namespace.
+    const id = requireExactBrowserJobId(
+      Object.hasOwn(request, 'id') ? request.id : this.createId(),
+      'Browser Agent direct intake jobId',
+    );
     const now = this.now();
     const config = normalizeBrowserAgentConfig({
       id,
