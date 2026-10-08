@@ -1078,6 +1078,13 @@ export class BrowserAgentManager {
   }
 
   async independentlyVerifyOutcome(id, epoch, job, config, snapshot, action) {
+    // OutcomeContractV1 explicitly requires external independent criterion evidence.
+    // The legacy Browser Agent model verifier cannot authenticate an external
+    // verifier or issue a terminal Outcome PASS. Never silently downgrade a
+    // bound Outcome Contract into the weaker legacy "activity completed" gate.
+    if (job?.outcomeContract) {
+      return { ok: false, pauseReason: 'Bound Outcome Contract requires trusted independent criterion-evidence verification' };
+    }
     let verification = verifyBrowserAgentOutcomeEvidence(config, action, snapshot);
     if (!verification.ok) return { ok: false, error: new Error(verification.reason) };
     const criteria = normalizeBrowserAgentAcceptanceCriteria(config.acceptanceCriteria);
