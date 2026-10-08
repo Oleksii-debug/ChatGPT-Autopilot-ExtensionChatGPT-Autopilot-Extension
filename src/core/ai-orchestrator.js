@@ -126,7 +126,7 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
   const routes = normalizeAiRoutePool(source.routes === undefined ? [] : source.routes);
-  const mode = source.mode === undefined ? DEFAULT_AI_ROUTER_SETTINGS.mode : source.mode;
+  const mode = Object.hasOwn(source, 'mode') ? source.mode : DEFAULT_AI_ROUTER_SETTINGS.mode;
   if (!MODES.has(mode)) throw new Error('AI router mode is invalid');
   return {
     enabled: ownerRoutingBoolean(source, 'enabled', false),
