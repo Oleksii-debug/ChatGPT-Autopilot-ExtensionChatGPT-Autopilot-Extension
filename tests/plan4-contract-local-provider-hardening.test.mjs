@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeAiRoutePool, normalizeAiRoutePolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
-import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
+import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
 
 const route = { routeId:'primary', provider:'ollama', model:'llama3', locality:'local' };
 const endpoint = { schemaVersion:1, profileId:'local.ollama', provider:'ollama', endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/', credentialRef:'', credentialless:true };
@@ -249,4 +249,21 @@ test('owner policy and route eligibility flags reject coerced values across rest
       assert.throws(() => normalizeAiRoutePolicy({ [field]: forged }), /must be boolean/);
     }
   }
+});
+
+test('Gateway profile refuses query and fragment secrets before any provider request', async () => {
+  let requests = 0;
+  const client = new AiGatewayClient({ fetchFn: () => { requests++; throw new Error('network forbidden'); } });
+  assert.equal(normalizeGatewayUrl('http://127.0.0.1:17621'), 'http://127.0.0.1:17621');
+  assert.equal(normalizeGatewayUrl('http://localhost:17621/'), 'http://localhost:17621');
+  for (const forgedUrl of [
+    'http://127.0.0.1:17621/?api_key=secret-fixture',
+    'http://127.0.0.1:17621/#prompt-fixture',
+    'http://localhost:17621/?token=fixture#fragment',
+    'http://127.0.0.1:17621/health?token=fixture'
+  ]) {
+    assert.throws(() => normalizeGatewayUrl(forgedUrl), /cannot contain query or fragment/);
+    await assert.rejects(client.health({ gatewayUrl:forgedUrl, timeoutSeconds:5 }), /cannot contain query or fragment/);
+  }
+  assert.equal(requests, 0);
 });
