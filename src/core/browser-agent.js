@@ -1334,16 +1334,76 @@ export function verifyBrowserFileInput(snapshotId, ref) {
   return { ok: true, files };
 }
 
-export function proveBrowserNativeClick(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === ref && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId);
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return null;
+export function proveBrowserNativeClick(snapshotId, ref, expected) {
+  // This function is serialized into the page by Chrome scripting. A marker
+  // alone cannot prove a control still means the same action after a rerender.
+  if (!expected || typeof expected !== 'object'
+    || typeof expected.expectedSemanticIdentity !== 'string'
+    || !expected.expectedSemanticIdentity
+    || typeof expected.expectedFrameUrl !== 'string'
+    || location.href !== expected.expectedFrameUrl
+    || typeof expected.expectedSemanticName !== 'string'
+    || typeof expected.expectedSemanticHref !== 'string'
+    || typeof expected.expectedSemanticFormAction !== 'string'
+    || typeof expected.expectedSemanticFormMethod !== 'string') return null;
+  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element =>
+    element.getAttribute('data-autopilot-agent-ref') === ref
+    && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId);
+  if (!target || !target.isConnected) return null;
+  const normalized = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const identity = element => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const valid = () => {
+    if (!target.isConnected || location.href !== expected.expectedFrameUrl
+      || identity(target) !== expected.expectedSemanticIdentity) return false;
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true') return false;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return false;
+    }
+    const tag = String(target.tagName || '').toLowerCase();
+    const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
+      : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
+    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const form = target.form instanceof HTMLFormElement ? target.form : null;
+    const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
+    const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
+    const labelledBy = String(target.getAttribute('aria-labelledby') || '').split(/\s+/)
+      .map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = target.labels ? Array.from(target.labels).map(label => label.textContent || '').join(' ') : '';
+    const alt = target.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    const name = normalized(target.getAttribute('aria-label') || labelledBy || labels
+      || target.getAttribute('alt') || alt || target.getAttribute('title') || target.textContent
+      || target.getAttribute('placeholder') || target.getAttribute('name') || target.id || '', 800);
+    const href = (tag === 'a' || tag === 'area') ? normalized(target.href || target.getAttribute('href') || '', 1200) : '';
+    return name === expected.expectedSemanticName
+      && href === expected.expectedSemanticHref
+      && normalized(formAction, 1200) === expected.expectedSemanticFormAction
+      && normalized(formMethod, 20) === expected.expectedSemanticFormMethod;
+  };
+  if (!valid()) return null;
   target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+  if (!valid()) return null;
   const rect = target.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
+  if (!(rect.width > 0 && rect.height > 0)) return null;
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
+  if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return null;
   const hit = document.elementFromPoint(x, y);
-  if (hit !== target && !target.contains(hit)) return null;
+  if (hit !== target && !target.contains?.(hit)) return null;
+  if (!valid()) return null;
   return { x, y, url: location.href };
 }
 
