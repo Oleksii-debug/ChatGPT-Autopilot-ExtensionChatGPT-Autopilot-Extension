@@ -153,3 +153,35 @@ test('ROI malformed historical or future evidence fails closed, not marketed as 
     request({runEvidenceIds:['record-1']}),{resolveTrustedRunEvidence:resolver([bad])}),
     /future-recorded/);
 });
+
+test('untrusted offline options fail closed before executing getters or reading evidence', async () => {
+  let getters = 0, evidenceReads = 0;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'offline', {
+    enumerable: true,
+    get() { getters += 1; return true; },
+  });
+  const polluted = Object.create({ offline: true });
+  const symbolKey = { offline: true };
+  symbolKey[Symbol('hidden')] = 'owner-policy';
+  const badOptions = [
+    { offline: 'true' }, { offline: 1 }, { offline: null },
+    { offline: false, allowNetwork: true }, accessorOptions,
+    polluted, symbolKey, [true], null,
+  ];
+  const dependencies = {
+    resolveTrustedRunEvidence() {
+      evidenceReads += 1;
+      throw new Error('must not access trusted evidence');
+    },
+  };
+  for (const options of badOptions) {
+    await assert.rejects(buildRoiOwnerAdvisoryV1(request(), dependencies, options),
+      /ROI offline options/);
+  }
+  assert.equal(getters, 0);
+  assert.equal(evidenceReads, 0);
+  const offline = await buildRoiOwnerAdvisoryV1({}, dependencies, { offline: true });
+  assert.equal(offline.status, RoiOwnerAdvisoryStatus.OFFLINE);
+  assert.equal(evidenceReads, 0);
+});
