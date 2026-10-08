@@ -95,3 +95,45 @@ test('event sink validates before publishing', async () => {
   await assert.rejects(() => sink.emit(event({ type: 'unknown-event' })), /Unsupported agent event type/);
   assert.equal(seen.length, 1);
 });
+
+
+test('Plan-1: action and event fields fail closed on authority injection without invoking getters', () => {
+  let reads = 0;
+  const trapped = action();
+  Object.defineProperty(trapped, 'actionId', { enumerable: true, get() { reads += 1; throw new Error('invoked'); } });
+  assert.throws(() => normalizeAgentAction(trapped), /data properties/);
+  assert.equal(reads, 0);
+  assert.throws(() => normalizeAgentAction(action({ permissionGranted: true })), /unknown field/);
+  assert.throws(() => normalizeAgentEvent(event({ executionAuthorized: true })), /unknown field/);
+  const symbolic = action();
+  symbolic[Symbol('hidden')] = true;
+  assert.throws(() => normalizeAgentAction(symbolic), /unknown field/);
+});
+
+test('Plan-1: untrusted nested payload rejects cycles, accessors, prototype pollution, sparse data and excess bytes', () => {
+  const circular = {}; circular.self = circular;
+  assert.throws(() => normalizeAgentAction(action({ data: circular })), /acyclic/);
+  const nested = { ok: {} };
+  let reads = 0;
+  Object.defineProperty(nested.ok, 'unsafe', { enumerable: true, get() { reads += 1; return 'leak'; } });
+  assert.throws(() => normalizeAgentAction(action({ data: nested })), /data properties/);
+  assert.equal(reads, 0);
+  const forbidden = Object.create(null);
+  Object.defineProperty(forbidden, '__proto__', { value: 'pollute', enumerable: true });
+  assert.throws(() => normalizeAgentAction(action({ data: forbidden })), /unsafe property key/);
+  const sparse = []; sparse.length = 2; sparse[0] = 'one';
+  assert.throws(() => normalizeAgentAction(action({ data: { items: sparse } })), /non-canonical array fields|sparse/);
+  assert.throws(() => normalizeAgentAction(action({ data: { prompt: 'x'.repeat(70_000) } })), /size limit/);
+});
+
+test('Plan-1: nested effect data stays immutable and independent of caller mutation', () => {
+  const original = { nested: { effectId: 'effect-1', checked: ['first'] } };
+  const snapshot = normalizeAgentAction(action({ data: original }));
+  original.nested.effectId = 'effect-2';
+  original.nested.checked.push('second');
+  assert.equal(snapshot.data.nested.effectId, 'effect-1');
+  assert.deepEqual(snapshot.data.nested.checked, ['first']);
+  assert.equal(Object.isFrozen(snapshot.data.nested), true);
+  assert.equal(Object.isFrozen(snapshot.data.nested.checked), true);
+  assert.throws(() => normalizeAgentAction(action({ data: { value: Number.POSITIVE_INFINITY } })), /acyclic JSON/);
+});
