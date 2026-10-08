@@ -1206,3 +1206,27 @@ test('Plan4 S2: AI Gateway body expiry fails closed, bounded rejection keeps its
   assert.deepEqual(valid,{text:'safe reply'});
   assert.equal(requests,3);
 });
+
+test('Plan4 S1: exact endpoint identity cannot be erased or aliased at gateway dispatch/discovery', async () => {
+  let effects=0;
+  const seen=[];
+  const client=new AiGatewayClient({
+    fetchFn:async (url,init) => {
+      effects++;
+      seen.push({url,body:init.body});
+      return {ok:true,status:200,text:async()=>JSON.stringify({text:'fixture',models:[]})};
+    },
+  });
+  const input={provider:'openai-compatible',model:'fixture',prompt:'account-bound',timeoutSeconds:5};
+  const corrupt=[undefined,null,'',' ',' endpoint','endpoint ','bad?query','bad#hash','bad&value','a'.repeat(181),42,{},new String('endpoint')];
+  for (const endpointId of corrupt) {
+    await assert.rejects(client.complete({...input,endpointId}),/endpointId must be an exact bounded identity/);
+    await assert.rejects(client.listModels({provider:'openai-compatible',endpointId,timeoutSeconds:5}),/endpointId must be an exact bounded identity/);
+  }
+  assert.equal(effects,0,'corrupted endpoint identity may not dispatch or discover models');
+  await client.complete({...input,endpointId:'local.profile-1'});
+  await client.listModels({provider:'openai-compatible',endpointId:'local.profile-1',timeoutSeconds:5});
+  assert.equal(JSON.parse(seen[0].body).endpointId,'local.profile-1');
+  assert.match(seen[1].url,/endpointId=local.profile-1/);
+  assert.equal(effects,2);
+});
