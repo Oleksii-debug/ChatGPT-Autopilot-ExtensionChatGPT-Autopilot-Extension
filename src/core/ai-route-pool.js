@@ -118,6 +118,12 @@ function exactPromptText(value, label, max = 8_000) {
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
+function optionalBoolean(record, key, label, fallback) {
+  const value = own(record, key);
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
+  return value;
+}
 function own(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
   return descriptor && 'value' in descriptor ? descriptor.value : undefined;
@@ -128,6 +134,9 @@ function priceCap(value, label) {
   return price(value, label);
 }
 function knownPriceDimension(item, priceKey, knownKey, label) {
+  if (Object.hasOwn(item, priceKey) && own(item, priceKey) == null) {
+    throw new Error(`${label} cannot treat missing price as an observed zero`);
+  }
   if (Object.hasOwn(item, knownKey)) {
     const explicitKnown = own(item, knownKey);
     if (typeof explicitKnown !== 'boolean') throw new Error(`${label} must be boolean`);
@@ -148,16 +157,22 @@ export function normalizeAiRoutePool(raw = []) {
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
   const routes = source.map((rawItem, index) => {
     const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
-    if (integer(own(item, 'schemaVersion') ?? AI_ROUTE_POOL_VERSION, 'AI route schemaVersion', AI_ROUTE_POOL_VERSION, AI_ROUTE_POOL_VERSION) !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
+    if (Object.hasOwn(item, 'schemaVersion') && own(item, 'schemaVersion') !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
     const provider = clean(own(item, 'provider'), 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
     const model = clean(own(item, 'model'), 300);
     if (!model) throw new Error('AI route model is required');
     const roles = ids(own(item, 'roles') || [], `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
-    const locality = clean(own(item, 'locality') || (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE), 20);
+    const rawLocality = own(item, 'locality');
+    if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
+    const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
-    const costClass = clean(own(item, 'costClass') || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN), 20);
+    const rawCostClass = own(item, 'costClass');
+    if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
+    // A remote Ollama-compatible endpoint is not provably free merely because its provider name is Ollama.
+    // Only explicitly local Ollama keeps the legacy zero-cost default; all other unpriced routes stay UNKNOWN.
+    const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' && locality === AiRouteLocality.LOCAL ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
@@ -170,17 +185,17 @@ export function normalizeAiRoutePool(raw = []) {
       systemPrompt: exactPromptText(own(item, 'systemPrompt'), 'AI route systemPrompt'),
       workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
       endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
-      roles,
-      capabilityIds: ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64),
+      roles: Object.freeze(roles),
+      capabilityIds: Object.freeze(ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64)),
       priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
-      enabled: own(item, 'enabled') !== false,
+      enabled: optionalBoolean(item, 'enabled', `AI route ${index + 1} enabled`, true),
       locality,
       costClass,
       inputPricePerMillionUsd: price(own(item, 'inputPricePerMillionUsd'), 'AI route input price'),
       outputPricePerMillionUsd: price(own(item, 'outputPricePerMillionUsd'), 'AI route output price'),
       inputPriceKnown,
       outputPriceKnown,
-      supportsVision: own(item, 'supportsVision') === true,
+      supportsVision: optionalBoolean(item, 'supportsVision', `AI route ${index + 1} supportsVision`, false),
       maxWorkers: strictInteger(own(item, 'maxWorkers') ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
     });
   });
@@ -191,15 +206,17 @@ export function normalizeAiRoutePool(raw = []) {
 export function normalizeAiRoutePolicy(raw = {}) {
   if (raw == null) raw = {};
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
-  const locality = clean(own(source, 'locality') || DEFAULT_AI_ROUTE_POLICY.locality, 20);
+  const rawLocality = own(source, 'locality');
+  if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
+  const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
-    autoSwitch: own(source, 'autoSwitch') !== false,
+    autoSwitch: optionalBoolean(source, 'autoSwitch', 'AI route autoSwitch', true),
     pinnedRouteId: id(own(source, 'pinnedRouteId'), 'AI route pinnedRouteId', true),
-    orderedRouteIds: ids(own(source, 'orderedRouteIds') || [], 'AI route orderedRouteIds'),
-    allowRouteIds: ids(own(source, 'allowRouteIds') || [], 'AI route allowRouteIds'),
-    denyRouteIds: ids(own(source, 'denyRouteIds') || [], 'AI route denyRouteIds'),
-    freeOnly: own(source, 'freeOnly') === true,
+    orderedRouteIds: Object.freeze(ids(own(source, 'orderedRouteIds') || [], 'AI route orderedRouteIds')),
+    allowRouteIds: Object.freeze(ids(own(source, 'allowRouteIds') || [], 'AI route allowRouteIds')),
+    denyRouteIds: Object.freeze(ids(own(source, 'denyRouteIds') || [], 'AI route denyRouteIds')),
+    freeOnly: optionalBoolean(source, 'freeOnly', 'AI route freeOnly', false),
     locality,
     maxInputPricePerMillionUsd: priceCap(own(source, 'maxInputPricePerMillionUsd'), 'AI route maximum input price'),
     maxOutputPricePerMillionUsd: priceCap(own(source, 'maxOutputPricePerMillionUsd'), 'AI route maximum output price'),
@@ -350,10 +367,12 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
     && (route.costClass === AiRouteCostClass.FREE
       || (route.costClass === AiRouteCostClass.PAID && route.inputPriceKnown && route.outputPriceKnown))
     && (normalizedPolicy.locality === 'any' || route.locality === normalizedPolicy.locality)
+    // A price cap is a safety policy, not permission to treat an unknown
+    // provider price as zero. Explicitly observed zero remains eligible.
     && (normalizedPolicy.maxInputPricePerMillionUsd === null
-      || route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd)
+      || (route.inputPriceKnown && route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd))
     && (normalizedPolicy.maxOutputPricePerMillionUsd === null
-      || route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd)
+      || (route.outputPriceKnown && route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd))
     && (!route.roles.length || route.roles.includes(normalizedRole))
     && capabilities.every(capabilityId => route.capabilityIds.includes(capabilityId))
     && (!requiresVision || route.supportsVision));
@@ -474,4 +493,78 @@ export function createAiRoutePoolExhaustedError({ attempts = [], retryAt = 0, me
   error.retryAt = Math.max(0, Number(retryAt) || 0);
   error.routeAttempts = structuredClone(attempts).slice(-32);
   return error;
+}
+
+
+// Evidence only: this hashes the canonical router's normalized configuration;
+// it does not select a route, fetch credentials, or grant execution authority.
+export const AI_ROUTE_REGISTRY_EVIDENCE_VERSION = 1;
+
+export async function createAiRouteRegistryEvidenceV1(raw) {
+  const input = dataRecord(raw, new Set(['schemaVersion', 'registryRevision', 'routes', 'endpointProfiles']), 'AI route evidence request');
+  if (own(input, 'schemaVersion') !== AI_ROUTE_REGISTRY_EVIDENCE_VERSION) throw new Error('Unsupported AI route evidence schemaVersion');
+  const registryRevision = strictInteger(own(input, 'registryRevision'), 'AI registry revision', 1, Number.MAX_SAFE_INTEGER);
+  const routes = normalizeAiRoutePool(own(input, 'routes'));
+  const profiles = denseDataArray(own(input, 'endpointProfiles') ?? [], 'AI endpoint profiles', 32);
+  const seen = new Set();
+  const normalizedProfiles = profiles.map((entry, index) => {
+    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless']), `AI endpoint profile ${index + 1}`);
+    if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
+    const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
+    if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
+    seen.add(profileId);
+    const provider = clean(own(item, 'provider'), 40);
+    if (!PROVIDERS.has(provider)) throw new Error('AI endpoint provider is invalid');
+    const endpointId = id(own(item, 'endpointId'), 'AI endpoint endpointId', true);
+    const locality = own(item, 'locality');
+    if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
+    const origin = own(item, 'origin');
+    if (typeof origin !== 'string' || origin !== origin.trim()) throw new Error('AI endpoint origin is invalid');
+    let parsed;
+    try { parsed = new URL(origin); } catch { throw new Error('AI endpoint origin is invalid'); }
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/' || origin !== parsed.origin + '/') {
+      throw new Error('AI endpoint origin must be an exact credential-free origin');
+    }
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname.toLowerCase());
+    if (locality === 'local' && !loopback) throw new Error('Local AI endpoint must use loopback');
+    if (locality === 'remote' && parsed.protocol !== 'https:') throw new Error('Remote AI endpoint must use HTTPS');
+    const credentialRef = own(item, 'credentialRef') === undefined ? '' : id(own(item, 'credentialRef'), 'AI endpoint credentialRef', true);
+    const credentialless = own(item, 'credentialless');
+    if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
+    if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
+    if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
+    return Object.freeze({ schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin, locality, credentialRef, credentialless });
+  });
+  // Endpoint identity is advisory evidence, never a second source of dispatch authority.
+  // Versionless legacy routes may have no endpointId; explicitly record that gap
+  // rather than silently claiming their provider/profile linkage was proven.
+  const byEndpointId = new Map();
+  for (const profile of normalizedProfiles) {
+    if (!profile.endpointId) continue;
+    if (byEndpointId.has(profile.endpointId)) throw new Error('Ambiguous AI endpoint identity');
+    byEndpointId.set(profile.endpointId, profile);
+  }
+  const identities = routes.map(route => {
+    const profile = route.endpointId ? byEndpointId.get(route.endpointId) : null;
+    if (route.endpointId && !profile) throw new Error('AI route endpoint has no registry profile');
+    if (profile && (route.provider !== profile.provider || route.locality !== profile.locality)) {
+      throw new Error('AI route provider/locality does not match its endpoint profile');
+    }
+    return Object.freeze({
+      routeId: route.routeId, provider: route.provider, model: route.model,
+      endpointId: route.endpointId, locality: route.locality,
+      endpointProfileId: profile?.profileId ?? '',
+      endpointBinding: profile ? 'MATCHED' : 'UNRESOLVED_LEGACY',
+    });
+  });
+  const canonical = JSON.stringify({ schemaVersion: 1, registryRevision, routes, endpointProfiles: normalizedProfiles });
+  if (!globalThis.crypto?.subtle) throw new Error('SHA-256 digest is unavailable; AI configuration evidence cannot be issued');
+  const bytes = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`AUTOPILOT_AI_ROUTE_REGISTRY_V1\n${canonical}`));
+  const configSha256 = Array.from(new Uint8Array(bytes), x => x.toString(16).padStart(2, '0')).join('');
+  return Object.freeze({
+    schemaVersion: AI_ROUTE_REGISTRY_EVIDENCE_VERSION, registryRevision,
+    configSha256, routeIdentities: Object.freeze(identities),
+    endpointProfiles: Object.freeze(normalizedProfiles),
+    authority: Object.freeze({ advisoryOnly: true, canSelectRoute: false, canGrantPermission: false, canReadCredentials: false }),
+  });
 }

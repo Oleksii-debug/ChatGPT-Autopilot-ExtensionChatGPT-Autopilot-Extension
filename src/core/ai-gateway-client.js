@@ -47,8 +47,7 @@ export function normalizeGatewayUrl(value) {
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI Gateway must use http:// or https://');
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) throw new Error('AI Gateway must use localhost or 127.0.0.1');
   if (parsed.username || parsed.password) throw new Error('Credentials are not allowed in the AI Gateway URL');
-  parsed.hash = '';
-  parsed.search = '';
+  if (parsed.search || parsed.hash) throw new Error('AI Gateway URL cannot contain query or fragment');
   parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
   return parsed.toString().replace(/\/$/, '');
 }
@@ -158,18 +157,38 @@ async function readResponseTextBounded(response, controller) {
 }
 
 async function parseJson(response, controller) {
-  const text = await readResponseTextBounded(response, controller);
-  let body;
-  try { body = text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
-  if (!response.ok) {
-    const detail = clean(body?.error?.message) || clean(body?.error) || clean(body?.message);
-    const error = new Error(detail ? `AI Gateway error ${response.status}: ${detail}` : `AI Gateway error ${response.status}`);
-    error.status = response.status;
-    if (clean(body?.code)) error.code = clean(body.code);
-    throw error;
+  let text;
+  try {
+    text = await readResponseTextBounded(response, controller);
+  } catch (error) {
+    // On non-2xx, HTTP status remains the authoritative failure even when
+    // an untrusted upstream error stream is oversized or malformed. Never
+    // downgrade AUTH/RATE_LIMIT to an untyped response-size error.
+    if (response.ok || !['AI_GATEWAY_RESPONSE_TOO_LARGE', 'AI_GATEWAY_INVALID_RESPONSE'].includes(error?.code)) throw error;
+    text = '';
   }
-  return body;
+  if (!response.ok) {
+    // Trust the transport status even when the proxy/server returned HTML or
+    // invalid JSON. Never put upstream content, prompts or secrets in errors.
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch { /* HTTP status remains authoritative */ }
+    const status = response.status;
+    const error = new Error(`AI Gateway error ${status}`);
+    error.status = status;
+    const sourceCode = body && typeof body === 'object' && !Array.isArray(body)
+      ? body.code : null;
+    error.code = typeof sourceCode === 'string' && /^AI_[A-Z0-9_]{1,79}$/u.test(sourceCode)
+      ? sourceCode : `AI_GATEWAY_HTTP_${status}`;
+    error.category = status === 401 || status === 403 ? 'AUTH'
+      : status === 429 ? 'RATE_LIMIT'
+      : status === 408 || status === 504 ? 'TIMEOUT'
+      : status >= 500 ? 'UNAVAILABLE'
+      : 'INVALID_REQUEST';
+    error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
+    return Promise.reject(error);
+  }
+  try { return text ? JSON.parse(text) : {}; }
+  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
 }
 
 export class AiGatewayClient {
@@ -209,9 +228,19 @@ export class AiGatewayClient {
       return await parseJson(response, controller);
     } catch (error) {
       if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
-      if (error?.name === 'AbortError') throw new Error(`AI Gateway request timed out after ${timeout} seconds`);
+      if (error?.name === 'AbortError') {
+        const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
+        timeoutError.code = 'AI_GATEWAY_TIMEOUT';
+        timeoutError.category = 'TIMEOUT';
+        timeoutError.retryable = true;
+        throw timeoutError;
+      }
       if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
-      throw new Error(`Could not reach AI Gateway: ${error?.message || 'network error'}`);
+      const unavailable = new Error('Could not reach AI Gateway');
+      unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
+      unavailable.category = 'UNAVAILABLE';
+      unavailable.retryable = true;
+      throw unavailable;
     } finally {
       clearTimeout(timer);
     }

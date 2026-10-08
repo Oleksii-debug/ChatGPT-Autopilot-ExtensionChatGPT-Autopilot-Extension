@@ -65,6 +65,7 @@ export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_S
     ? 'http://127.0.0.1:1234/v1'
     : DEFAULT_LOCAL_AI_SETTINGS.baseUrl);
   const parsed = new URL(raw);
+  if (parsed.search || parsed.hash) throw new Error('Local AI server URL cannot contain query or fragment');
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Local AI server must use http:// or https://');
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) throw new Error('Local AI server must use localhost or 127.0.0.1');
   if (parsed.username || parsed.password) throw new Error('Credentials are not allowed in the Local AI server URL');
@@ -87,7 +88,9 @@ function assertLocalAiRequestUrl(value) {
   if (!['http:', 'https:'].includes(parsed.protocol)
       || !LOCAL_HOSTS.has(parsed.hostname.toLowerCase())
       || parsed.username
-      || parsed.password) {
+      || parsed.password
+      || parsed.search
+      || parsed.hash) {
     throw new Error('Local AI request URL must stay on localhost or 127.0.0.1 without credentials');
   }
   return parsed.toString();
@@ -95,6 +98,9 @@ function assertLocalAiRequestUrl(value) {
 
 export function normalizeLocalAiSettings(raw = {}) {
   const source = snapshotSettingsRecord(raw);
+  for (const key of Object.keys(source)) {
+    if (!['enabled', 'providerType', 'baseUrl', 'model', 'timeoutSeconds'].includes(key)) throw new Error(`Local AI settings contain unknown field: ${key}`);
+  }
   const providerType = source.providerType === undefined
     ? DEFAULT_LOCAL_AI_SETTINGS.providerType
     : source.providerType;
@@ -251,18 +257,29 @@ async function readResponseTextBounded(response) {
 }
 
 async function readJsonResponse(response) {
+  // Non-2xx transport status already supplies the complete error category.
+  // Never read untrusted error bodies: they may be huge, contain secrets, or
+  // stall indefinitely. An oversized 401/429/503 must retain its real status.
+  if (!response.ok) {
+    await cancelResponseBody(response);
+    const status = response.status;
+    const error = new Error(`Local AI server error ${status}`);
+    error.status = status;
+    error.category = status === 401 || status === 403 ? 'AUTH'
+      : status === 429 ? 'RATE_LIMIT'
+      : status === 408 || status === 504 ? 'TIMEOUT'
+      : status >= 500 ? 'UNAVAILABLE'
+      : status === 404 ? 'NOT_FOUND' : 'INVALID_REQUEST';
+    error.code = `LOCAL_AI_${error.category}`;
+    error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
+    throw error;
+  }
   const text = await readResponseTextBounded(response);
-  let body;
   try {
-    body = text ? JSON.parse(text) : {};
+    return text ? JSON.parse(text) : {};
   } catch {
     throw new Error(`Local AI server returned invalid JSON (HTTP ${response.status})`);
   }
-  if (!response.ok) {
-    const detail = nonEmptyString(body?.error?.message) || nonEmptyString(body?.error) || nonEmptyString(body?.message);
-    throw new Error(detail ? `Local AI server error ${response.status}: ${detail}` : `Local AI server error ${response.status}`);
-  }
-  return body;
 }
 
 function modelNamesFromResponse(settings, body) {
@@ -292,6 +309,31 @@ function extractAssistantText(settings, body) {
   return '';
 }
 
+// Unknown provider accounting stays unknown, never silently zero or free.
+function exactTokenCount(value, label) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+export function normalizeLocalAiUsage(providerType, body) {
+  if (!PROVIDER_TYPES.has(providerType)) throw new Error('Unknown Local AI usage provider');
+  const usage = providerType === LocalAiProviderType.OLLAMA ? body : body?.usage;
+  if (usage === undefined || usage === null) return Object.freeze({ inputTokens: null, outputTokens: null, totalTokens: null, source: 'UNREPORTED' });
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) throw new Error('Local AI usage must be a data object');
+  const inputTokens = exactTokenCount(providerType === LocalAiProviderType.OLLAMA ? usage.prompt_eval_count : usage.prompt_tokens, 'Local AI input tokens');
+  const outputTokens = exactTokenCount(providerType === LocalAiProviderType.OLLAMA ? usage.eval_count : usage.completion_tokens, 'Local AI output tokens');
+  const declaredTotal = exactTokenCount(providerType === LocalAiProviderType.OLLAMA ? undefined : usage.total_tokens, 'Local AI total tokens');
+  const totalTokens = inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : declaredTotal;
+  if (totalTokens !== null && !Number.isSafeInteger(totalTokens)) throw new Error('Local AI total tokens overflow');
+  if (declaredTotal !== null && (
+    (inputTokens !== null && declaredTotal < inputTokens)
+    || (outputTokens !== null && declaredTotal < outputTokens)
+    || (inputTokens !== null && outputTokens !== null && declaredTotal !== totalTokens)
+  )) throw new Error('Local AI token accounting mismatch');
+  return Object.freeze({ inputTokens, outputTokens, totalTokens, source: inputTokens === null && outputTokens === null && totalTokens === null ? 'UNREPORTED' : 'PROVIDER_REPORTED' });
+}
+
 export class LocalAiClient {
   constructor({
     fetchFn = globalThis.fetch,
@@ -310,6 +352,13 @@ export class LocalAiClient {
   async request(settings, url, init = {}, consumeResponse = null) {
     const normalized = normalizeLocalAiSettings(settings);
     const requestUrl = assertLocalAiRequestUrl(url);
+    // The transport is not an arbitrary loopback HTTP client. Bind every
+    // request to the configured provider origin and one of its two explicit
+    // API endpoints before attaching prompt content or starting a network effect.
+    if (requestUrl !== endpointFor(normalized, 'models')
+        && requestUrl !== endpointFor(normalized, 'chat')) {
+      throw new Error('Local AI request URL does not match the configured provider endpoint');
+    }
     const controller = new AbortController();
     const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
     let responseReceived = false;
@@ -331,10 +380,18 @@ export class LocalAiClient {
         : response;
     } catch (error) {
       if (controller.signal.aborted || error?.name === 'AbortError') {
-        throw new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
+        const timeout = new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
+        timeout.code = 'LOCAL_AI_TIMEOUT';
+        timeout.category = 'TIMEOUT';
+        timeout.retryable = true;
+        throw timeout;
       }
       if (responseReceived) throw error;
-      throw new Error(`Could not reach Local AI server: ${error?.message || 'network error'}`);
+      const unavailable = new Error('Could not reach Local AI server');
+      unavailable.code = 'LOCAL_AI_UNAVAILABLE';
+      unavailable.category = 'UNAVAILABLE';
+      unavailable.retryable = true;
+      throw unavailable;
     } finally {
       this.clearTimeoutFn(timer);
     }
@@ -357,8 +414,13 @@ export class LocalAiClient {
 
   async complete(rawSettings, prompt, rawOptions = {}) {
     const settings = normalizeLocalAiSettings(rawSettings);
-    if (!settings.enabled) throw new Error('Local AI is disabled');
-    if (!settings.model) throw new Error('Select a Local AI model first');
+    if (!settings.enabled || !settings.model) {
+      const error = new Error(!settings.enabled ? 'Local AI is disabled' : 'Select a Local AI model first');
+      error.code = 'LOCAL_AI_NOT_CONFIGURED';
+      error.category = 'NOT_CONFIGURED';
+      error.retryable = false;
+      throw error;
+    }
     const userPrompt = typeof prompt === 'string' ? prompt.trim() : '';
     if (!userPrompt) throw new Error('Local AI prompt is empty');
     if (userPrompt.length > MAX_PROMPT_LENGTH) throw new Error(`Local AI prompt exceeds ${MAX_PROMPT_LENGTH} characters`);
@@ -387,6 +449,7 @@ export class LocalAiClient {
       providerType: settings.providerType,
       model: settings.model,
       text,
+      usage: normalizeLocalAiUsage(settings.providerType, body),
     };
   }
 }
