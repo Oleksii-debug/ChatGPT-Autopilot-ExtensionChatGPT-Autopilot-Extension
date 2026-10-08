@@ -1006,3 +1006,74 @@ test('native visual drag releases uncertain press on debugger failure', async ()
     'Input.dispatchMouseEvent:mouseReleased', 'detach',
   ]);
 });
+
+ 
+// plan2-coercible-target-identity: never interpret a planner's null/missing/text
+// frame or screenshot coordinate as a valid observed numeric identity.
+test('semantic effect refuses absent and coercible top-frame identifiers', () => {
+  const snapshot = setup();
+  for (const frameId of [undefined, null, '0', '', false]) {
+    const proposed = JSON.stringify({ type: 'click', frameId, ref: 'r1' });
+    assert.throws(() => parseBrowserAgentAction(proposed, snapshot), /outside the current snapshot/);
+  }
+  assert.equal(element.clicked, 0);
+  const valid = parseBrowserAgentAction(JSON.stringify({ type: 'click', frameId: 0, ref: 'r1' }), snapshot);
+  assert.equal(valid.frameId, 0);
+});
+
+test('Enter/Space must retain exact numeric semantic frame identity', () => {
+  const snapshot = setup();
+  for (const key of ['Enter', 'Space']) {
+    for (const frameId of [null, '0', false]) {
+      assert.throws(() => parseBrowserAgentAction(JSON.stringify({ type: 'key', key, frameId, ref: 'r1' }), snapshot), /exact current snapshot frameId/);
+    }
+    const valid = parseBrowserAgentAction(JSON.stringify({ type: 'key', key, frameId: 0, ref: 'r1' }), snapshot);
+    assert.equal(valid.frameId, 0);
+  }
+});
+
+test('vision click/type coordinates refuse null text booleans and missing points', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  for (const type of ['click_at', 'type_at']) {
+    for (const coordinates of [
+      { x: null, y: 20 }, { x: '', y: 20 }, { x: '0', y: 20 },
+      { x: false, y: 20 }, { y: 20 }, { x: 20, y: '20' },
+      { x: 20, y: null }, { x: 20, y: true },
+    ]) {
+      assert.throws(() => parseBrowserAgentAction(JSON.stringify({ type, text: 'safe', ...coordinates }), snapshot), /finite target coordinates/);
+    }
+    const valid = parseBrowserAgentAction(JSON.stringify({ type, text: 'safe', x: 20, y: 20 }), snapshot);
+    assert.equal(valid.x, 20);
+    assert.equal(valid.y, 20);
+  }
+});
+
+test('vision drag and raw coordinate probe require numeric screenshot pixels', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  for (const startX of [null, '', '20', true]) {
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+      type: 'drag_at', startX, startY: 20, endX: 40, endY: 20,
+    }), snapshot), /finite start coordinates/);
+  }
+  assert.equal(probeBrowserCoordinateTarget('20', 20), null);
+  assert.equal(probeBrowserCoordinateTarget(null, 20), null);
+  assert.equal(probeBrowserCoordinateTarget(20, false), null);
+  const valid = parseBrowserAgentAction(JSON.stringify({
+    type: 'drag_at', startX: 20, startY: 20, endX: 40, endY: 20,
+  }), snapshot);
+  assert.equal(valid.startX, 20);
+  assert.equal(valid.endX, 40);
+});
+
+test('tampered screenshot viewport dimensions are not accepted by coordinate parser', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  for (const badWidth of ['500', null, false, Number.POSITIVE_INFINITY]) {
+    snapshot.frames[0].viewport.width = badWidth;
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 20, y: 20 }), snapshot), /current visible viewport/);
+  }
+  snapshot.frames[0].viewport.width = 500;
+  assert.equal(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 20, y: 20 }), snapshot).x, 20);
+});
