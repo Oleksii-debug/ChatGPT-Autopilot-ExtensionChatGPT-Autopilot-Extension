@@ -947,6 +947,11 @@ export class AutomaticSessionExecutor {
         operation.promptText,
       ),
     });
+    // The adapter's finally runs while Core is still SUBMITTING. After the
+    // durable result has changed that phase, release the foreground focus
+    // independently of the longer physical post-Send tab dwell.
+    try { await restorePendingSendTabs(this.chrome, this.repo, { sessionId }); }
+    catch (_) { /* Cold-start reconciliation retains the durable focus lease. */ }
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
       await this.markNormalWorkResumed(sessionId, task.id);
