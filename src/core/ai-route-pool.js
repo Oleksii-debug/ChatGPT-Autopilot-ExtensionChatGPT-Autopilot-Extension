@@ -118,6 +118,12 @@ function exactPromptText(value, label, max = 8_000) {
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
+function optionalBoolean(record, key, label, fallback) {
+  const value = own(record, key);
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
+  return value;
+}
 function own(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key);
   return descriptor && 'value' in descriptor ? descriptor.value : undefined;
@@ -173,14 +179,14 @@ export function normalizeAiRoutePool(raw = []) {
       roles,
       capabilityIds: ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64),
       priority: integer(own(item, 'priority') ?? 0, 'AI route priority', 0, 1_000_000),
-      enabled: own(item, 'enabled') !== false,
+      enabled: optionalBoolean(item, 'enabled', `AI route ${index + 1} enabled`, true),
       locality,
       costClass,
       inputPricePerMillionUsd: price(own(item, 'inputPricePerMillionUsd'), 'AI route input price'),
       outputPricePerMillionUsd: price(own(item, 'outputPricePerMillionUsd'), 'AI route output price'),
       inputPriceKnown,
       outputPriceKnown,
-      supportsVision: own(item, 'supportsVision') === true,
+      supportsVision: optionalBoolean(item, 'supportsVision', `AI route ${index + 1} supportsVision`, false),
       maxWorkers: strictInteger(own(item, 'maxWorkers') ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
     });
   });
@@ -194,12 +200,12 @@ export function normalizeAiRoutePolicy(raw = {}) {
   const locality = clean(own(source, 'locality') || DEFAULT_AI_ROUTE_POLICY.locality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
-    autoSwitch: own(source, 'autoSwitch') !== false,
+    autoSwitch: optionalBoolean(source, 'autoSwitch', 'AI route autoSwitch', true),
     pinnedRouteId: id(own(source, 'pinnedRouteId'), 'AI route pinnedRouteId', true),
     orderedRouteIds: ids(own(source, 'orderedRouteIds') || [], 'AI route orderedRouteIds'),
     allowRouteIds: ids(own(source, 'allowRouteIds') || [], 'AI route allowRouteIds'),
     denyRouteIds: ids(own(source, 'denyRouteIds') || [], 'AI route denyRouteIds'),
-    freeOnly: own(source, 'freeOnly') === true,
+    freeOnly: optionalBoolean(source, 'freeOnly', 'AI route freeOnly', false),
     locality,
     maxInputPricePerMillionUsd: priceCap(own(source, 'maxInputPricePerMillionUsd'), 'AI route maximum input price'),
     maxOutputPricePerMillionUsd: priceCap(own(source, 'maxOutputPricePerMillionUsd'), 'AI route maximum output price'),
