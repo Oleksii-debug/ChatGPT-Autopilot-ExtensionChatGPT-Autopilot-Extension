@@ -590,3 +590,28 @@ test('Plan-1 S2: Outcome Contract intake rejects hostile property keys without l
     return true;
   });
 });
+
+
+test('Plan-1 S2: Outcome budget fields reject JSON-lossy negative zero without changing zero semantics', () => {
+  const original = input();
+  for (const field of ['maxModelCalls', 'maxCostUsdMicros']) {
+    assert.throws(
+      () => createOutcomeContractV1(input({
+        budgetBoundaries: { ...original.budgetBoundaries, [field]: -0 },
+      })),
+      /exact integer/,
+      field + ' must not be silently rewritten by JSON persistence',
+    );
+  }
+  const accepted = createOutcomeContractV1(input({
+    budgetBoundaries: {
+      ...original.budgetBoundaries,
+      maxModelCalls: 0,
+      maxCostUsdMicros: 0,
+    },
+  }));
+  assert.equal(accepted.budgetBoundaries.maxModelCalls, 0);
+  assert.equal(accepted.budgetBoundaries.maxCostUsdMicros, 0);
+  assert.equal(accepted.completionAuthorized, undefined);
+  assert.equal(accepted.executionAuthorized, false);
+});
