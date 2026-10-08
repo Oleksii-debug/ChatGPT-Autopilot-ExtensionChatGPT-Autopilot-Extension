@@ -267,3 +267,33 @@ test('Gateway profile refuses query and fragment secrets before any provider req
   }
   assert.equal(requests, 0);
 });
+
+test('explicit null prices cannot become free under price cap or after persistence', () => {
+  const policy = { maxInputPricePerMillionUsd:0, maxOutputPricePerMillionUsd:0 };
+  const candidate = { ...route, costClass:'free', locality:'local' };
+  for (const priceKey of ['inputPricePerMillionUsd','outputPricePerMillionUsd']) {
+    for (const invalid of [
+      { ...candidate, [priceKey]:null },
+      { ...candidate, [priceKey]:null, inputPriceKnown:false, outputPriceKnown:false }
+    ]) {
+      assert.throws(() => normalizeAiRoutePool([invalid]), /observed zero/);
+      assert.throws(() => normalizeAiRoutePool(JSON.parse(JSON.stringify([invalid]))), /observed zero/);
+    }
+  }
+  const unknown = normalizeAiRoutePool([candidate])[0];
+  assert.equal(unknown.inputPriceKnown,false);
+  assert.equal(unknown.outputPriceKnown,false);
+  assert.deepEqual(selectAiRouteCandidates({routes:[candidate],policy,now:1}).eligibleRouteIds,[]);
+  const known = { ...candidate, inputPricePerMillionUsd:0, outputPricePerMillionUsd:0 };
+  assert.deepEqual(selectAiRouteCandidates({routes:[known],policy,now:1}).eligibleRouteIds,['primary']);
+});
+
+test('owner locality and route cost-class reject implicit coercion', () => {
+  for (const invalid of [null, 0, false, []]) {
+    assert.throws(() => normalizeAiRoutePolicy({locality:invalid}),/locality/);
+    assert.throws(() => normalizeAiRoutePool([{...route,locality:invalid}]),/locality/);
+    assert.throws(() => normalizeAiRoutePool([{...route,costClass:invalid}]),/costClass/);
+  }
+  assert.equal(normalizeAiRoutePolicy({locality:'local'}).locality,'local');
+  assert.equal(normalizeAiRoutePool([route])[0].locality,'local');
+});
