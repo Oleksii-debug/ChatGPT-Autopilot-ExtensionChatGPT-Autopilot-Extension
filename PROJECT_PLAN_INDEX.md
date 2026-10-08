@@ -8,30 +8,54 @@ The current GitHub `main` manifest still reports **0.9.19** and is stale. The mi
 Canonical Drive folder:
 https://drive.google.com/drive/folders/11g-e0-mv_vaKlTg7uYYKh8iTak6YfP_u
 
+## File/folder naming invariant
+
+Inside the project Drive root there is exactly one canonical subfolder named **`Проєктні плани`**.
+The plan file names are deliberately identical across projects and contain **no thematic suffix**:
+
+1. `1. Перший план`
+2. `2. Другий план`
+3. `3. Третій план`
+4. `4. Четвертий план`
+5. `5. П’ятий план`
+6. `6. Шостий план`
+7. `7. Сьомий план`
+8. `8. Восьмий план`
+
+The thematic scope lives **inside** each document and in this index. Workers MUST NOT rename the Drive files to include subsystem names.
+
 ## Plans
 
-1. Перший план — Agent Core, durable робота, policy, memory та artifacts
+1. Drive file: `1. Перший план`
+   Internal scope: Agent Core, durable робота, policy, memory та artifacts
 https://docs.google.com/document/d/1EanwjZPzneKwTMvbomGfsFPWhzY-9b7azZcIgBdpj1g/edit
 
-2. Другий план — Browser, Windows, files, GitHub, Google, MCP та execution providers
+2. Drive file: `2. Другий план`
+   Internal scope: Browser, Windows, files, GitHub, Google, MCP та execution providers
 https://docs.google.com/document/d/1LWRjRhYYv1jQE3CXeDZg20Dn8WD3EJJbKtXNcsohsCo/edit
 
-3. Третій план — Multi-Agent, subagents, Projects, Verifier, Recipes та productivity
+3. Drive file: `3. Третій план`
+   Internal scope: Multi-Agent, subagents, Projects, Verifier, Recipes та productivity
 https://docs.google.com/document/d/1FgqO_2mbIt3ljvn8GN0hX7G_KZCVkoMqcuTCU6YxViY/edit
 
-4. Четвертий план — Models, providers, routing, failover, evals та AI Manager
+4. Drive file: `4. Четвертий план`
+   Internal scope: Models, providers, routing, failover, evals та AI Manager
 https://docs.google.com/document/d/1fx4sR_jCfIoKlFHPed7chAr5zy2eJKwWRQq_mjuALh4/edit
 
-5. П’ятий план — Cloud, remote, team, identity та cross-device control
+5. Drive file: `5. П’ятий план`
+   Internal scope: Cloud, remote, team, identity та cross-device control
 https://docs.google.com/document/d/1uSdYSarW52E9H7RkekA_wQ_7EgYR-xgiVdn51w5unQQ/edit
 
-6. Шостий план — UI, accessibility, security, reliability, observability та packaging
+6. Drive file: `6. Шостий план`
+   Internal scope: UI, accessibility, security, reliability, observability та packaging
 https://docs.google.com/document/d/1fr5Pm7ZbX7IxF-2CZ9nqWSE7vREMEGDCN2r0uHyr_Tk/edit
 
-7. Сьомий план — Commercial, licensing, distribution, SDK, Control Service та metrics
+7. Drive file: `7. Сьомий план`
+   Internal scope: Commercial, licensing, distribution, SDK, Control Service та metrics
 https://docs.google.com/document/d/1hMDxTh8AtFgGR_6z_f9DwvdC3ybWtbaCSSou4UxjGpU/edit
 
-8. Восьмий план — Whole-product convergence, physical acceptance та go-live
+8. Drive file: `8. Восьмий план`
+   Internal scope: Whole-product convergence, physical acceptance та go-live
 https://docs.google.com/document/d/1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM/edit
 
 ## Dependency model
