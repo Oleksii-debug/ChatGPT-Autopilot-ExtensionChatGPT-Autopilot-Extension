@@ -395,3 +395,40 @@ test('Plan-1: direct and reusable-definition intake share one durable Agent Job 
   await assert.rejects(() => restarted.createFromAgentDefinition(launchRequest({ jobId: 'job.defined' })), /already exists/);
   assert.deepEqual(data.autopilotBrowserAgentV1.order, ['job.direct', 'job.defined']);
 });
+
+test('Plan-1: unknown persisted job-store schema fails closed across restart without rewriting original effects', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const [key] = Object.keys(data);
+  const original = structuredClone(data[key]);
+
+  data[key].schemaVersion = original.schemaVersion + 1;
+  const incompatible = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  await assert.rejects(() => restarted.get('job.research-1'), /schemaVersion is unsupported/);
+  await assert.rejects(
+    () => restarted.createFromAgentDefinition(launchRequest({ jobId: 'job.after-upgrade' })),
+    /schemaVersion is unsupported/,
+  );
+  assert.deepEqual(data[key], incompatible, 'failed intake must leave the incompatible store untouched');
+  assert.equal(data[key].byId['job.research-1'].id, 'job.research-1');
+  assert.equal(data[key].byId['job.after-upgrade'], undefined);
+});
+
+test('Plan-1: malformed existing store fails closed instead of silently replacing durable identities', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+  const [key] = Object.keys(data);
+  data[key].order = {};
+  const corrupted = structuredClone(data[key]);
+  const restarted = managerFor(chrome);
+  await assert.rejects(() => restarted.get('job.research-1'), /structure is invalid/);
+  await assert.rejects(() => restarted.createFromAgentDefinition(launchRequest({
+    jobId: 'job.fail-closed',
+  })), /structure is invalid/);
+  assert.deepEqual(data[key], corrupted, 'invalid persisted state must remain intact for explicit recovery');
+});
