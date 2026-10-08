@@ -1190,10 +1190,22 @@ export function executeBrowserPageAction(snapshotId, action) {
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
     ensureUnoccluded(element);
-    const wanted = String(action.value || '').trim().toLowerCase();
-    const option = Array.from(element.options).find(item => String(item.textContent || item.label || '').trim().toLowerCase() === wanted)
-      || Array.from(element.options).find(item => String(item.value || '').trim().toLowerCase() === wanted);
-    if (!option || option.disabled) throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    // A model-facing label can be used only when it resolves to one option.
+    // Prefer exact option values, including case and whitespace; never let
+    // normalized label equality silently pick a different consequential value.
+    if (typeof action.value !== 'string' || !action.value.length || action.value.length > 5000) {
+      throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    }
+    const options = Array.from(element.options);
+    const exact = options.filter(item => String(item.value) === action.value);
+    const normalizeOption = value => String(value ?? '').trim().toLowerCase();
+    const wanted = normalizeOption(action.value);
+    const candidates = exact.length ? exact : options.filter(item =>
+      normalizeOption(item.textContent || item.label || '') === wanted
+      || normalizeOption(item.value) === wanted);
+    if (!candidates.length) throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    if (candidates.length !== 1 || candidates[0].disabled) throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
+    const option = candidates[0];
     element.value = option.value;
     events(element);
     if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
