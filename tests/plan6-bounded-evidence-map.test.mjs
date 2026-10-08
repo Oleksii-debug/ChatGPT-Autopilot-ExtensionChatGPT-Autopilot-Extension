@@ -13,6 +13,7 @@ function sample() {
         { type: 'owner', at: 20, message: 'PRIVATE_OWNER_TOKEN' },
         { type: 'action', at: 30, action: { type: 'click', value: 'PRIVATE_EXTERNAL_ACTION' } },
         { type: 'specialist-provider-succeeded', at: 40, message: 'PRIVATE_PROVIDER_RESPONSE' },
+        { type: 'page-watch-timeout', at: 45, message: 'PRIVATE_RECOVERY_REASON' },
         { type: 'cycle-done', at: 50, message: 'PRIVATE_RESULT' },
       ],
     },
