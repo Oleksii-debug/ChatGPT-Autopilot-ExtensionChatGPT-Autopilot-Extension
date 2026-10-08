@@ -1518,3 +1518,68 @@ test('semantic SELECT ambiguous label does not cause a DOM form effect', () => {
     globalThis.HTMLSelectElement = originalSelect;
   }
 });
+
+
+// Section 1: select effects are bound to the observed option set, not just
+// the SELECT control. A malicious page can retarget values in a focus handler.
+test('semantic SELECT rejects post-snapshot option retargeting before any form effect', () => {
+  setup();
+  const originalSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'approve', textContent: 'Approve', label: 'Approve' },
+    ];
+    element.value = 'keep';
+    let dispatched = 0;
+    element.dispatchEvent = () => { dispatched++; return true; };
+    const page = snapshotBrowserPage('option-focus');
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'Approve',
+    }), { frames: [{ frameId: 0, ...page }], url: page.url });
+    assert.equal(typeof action.expectedOptionFingerprint, 'string');
+    element.focus = () => { element.options[1].value = 'redirected'; };
+    assert.throws(() => executeBrowserPageAction('option-focus', action), /AGENT_SELECT_OPTIONS_STALE/);
+    assert.equal(element.value, 'keep');
+    assert.equal(dispatched, 0);
+    element.focus = () => {};
+    assert.throws(() => executeBrowserPageAction('option-focus',
+      { ...action, expectedOptionFingerprint: undefined }), /AGENT_SELECT_OPTIONS_STALE/);
+    assert.equal(dispatched, 0);
+  } finally {
+    globalThis.HTMLSelectElement = originalSelect;
+  }
+});
+
+test('semantic SELECT binds disabled option group and permits unchanged options', () => {
+  setup();
+  const originalSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    const group = { disabled: false };
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'allow', textContent: 'Allow', label: 'Allow', parentElement: group },
+    ];
+    element.value = 'keep';
+    let dispatched = 0;
+    element.dispatchEvent = () => { dispatched++; return true; };
+    const page = snapshotBrowserPage('option-group');
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'allow',
+    }), { frames: [{ frameId: 0, ...page }], url: page.url });
+    group.disabled = true;
+    assert.throws(() => executeBrowserPageAction('option-group', action), /AGENT_SELECT_OPTIONS_STALE/);
+    assert.equal(dispatched, 0);
+    group.disabled = false;
+    const result = executeBrowserPageAction('option-group', action);
+    assert.equal(result.ok, true);
+    assert.equal(element.value, 'allow');
+    assert.equal(dispatched, 2);
+  } finally {
+    globalThis.HTMLSelectElement = originalSelect;
+  }
+});
