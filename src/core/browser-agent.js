@@ -1273,20 +1273,23 @@ export function browserAgentCoordinateTargetFingerprint(element) {
     editable: element.editable === true,
     sensitive: element.sensitive === true,
     visualOnly: element.visualOnly === true,
-    // Coordinate evidence must survive canonical fingerprint normalization;
-    // otherwise the native pre-effect verifier falsely rejects every target.
+    // Persist exact finite numeric evidence without coercion. Number(null),
+    // Number('') and Number('0') would otherwise turn tampered or legacy
+    // approvals into seemingly valid origin/geometry values after restart.
     ...(element.pageUrl && element.rect ? {
       pageUrl: clean(element.pageUrl, 4096),
-      viewportWidth: Number(element.viewportWidth),
-      viewportHeight: Number(element.viewportHeight),
-      viewportScrollX: Number(element.viewportScrollX),
-      viewportScrollY: Number(element.viewportScrollY),
-      documentEpoch: Number(element.documentEpoch),
-      captureX: Number(element.captureX),
-      captureY: Number(element.captureY),
+      viewportWidth: typeof element.viewportWidth === 'number' && Number.isFinite(element.viewportWidth) ? element.viewportWidth : null,
+      viewportHeight: typeof element.viewportHeight === 'number' && Number.isFinite(element.viewportHeight) ? element.viewportHeight : null,
+      viewportScrollX: typeof element.viewportScrollX === 'number' && Number.isFinite(element.viewportScrollX) ? element.viewportScrollX : null,
+      viewportScrollY: typeof element.viewportScrollY === 'number' && Number.isFinite(element.viewportScrollY) ? element.viewportScrollY : null,
+      documentEpoch: typeof element.documentEpoch === 'number' && Number.isFinite(element.documentEpoch) ? element.documentEpoch : null,
+      captureX: typeof element.captureX === 'number' && Number.isFinite(element.captureX) ? element.captureX : null,
+      captureY: typeof element.captureY === 'number' && Number.isFinite(element.captureY) ? element.captureY : null,
       rect: {
-        left: Number(element.rect.left), top: Number(element.rect.top),
-        width: Number(element.rect.width), height: Number(element.rect.height),
+        left: typeof element.rect.left === 'number' && Number.isFinite(element.rect.left) ? element.rect.left : null,
+        top: typeof element.rect.top === 'number' && Number.isFinite(element.rect.top) ? element.rect.top : null,
+        width: typeof element.rect.width === 'number' && Number.isFinite(element.rect.width) ? element.rect.width : null,
+        height: typeof element.rect.height === 'number' && Number.isFinite(element.rect.height) ? element.rect.height : null,
       },
     } : {}),
   };
