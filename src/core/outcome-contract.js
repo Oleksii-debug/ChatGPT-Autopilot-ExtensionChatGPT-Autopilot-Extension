@@ -173,7 +173,8 @@ function timestamp(value, label) {
 }
 
 function integer(value, label, min, max) {
-  if (!Number.isInteger(value) || value < min || value > max) {
+  // JSON.stringify(-0) becomes 0: do not silently change persisted Outcome budgets.
+  if (!Number.isInteger(value) || Object.is(value, -0) || value < min || value > max) {
     throw new Error(`${label} must be an exact integer in ${min}..${max}`);
   }
   return value;
