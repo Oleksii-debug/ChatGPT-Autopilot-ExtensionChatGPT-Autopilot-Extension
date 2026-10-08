@@ -137,6 +137,13 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
+  // Explicitly erased owner-controlled fields are corrupt, not legacy omissions.
+  // Never silently restore defaults that could change endpoint, account or route.
+  for (const field of ['gatewayUrl', 'primary', 'strong', 'routes', 'routePolicy', 'workerPolicy']) {
+    if (Object.hasOwn(source, field) && source[field] === undefined) {
+      throw new Error(`AI router ${field} cannot be undefined when explicitly supplied`);
+    }
+  }
   const routes = normalizeAiRoutePool(source.routes === undefined ? [] : source.routes);
   const mode = Object.hasOwn(source, 'mode') ? source.mode : DEFAULT_AI_ROUTER_SETTINGS.mode;
   if (!MODES.has(mode)) throw new Error('AI router mode is invalid');
