@@ -43,7 +43,10 @@ export function normalizeGatewayUrl(value) {
   if (value !== undefined && typeof value !== 'string') {
     throw new Error('AI Gateway URL must be text when supplied');
   }
-  const parsed = new URL(clean(value) || DEFAULT_GATEWAY_URL);
+  if (value !== undefined && !clean(value)) {
+    throw new Error('AI Gateway URL cannot be empty when explicitly supplied');
+  }
+  const parsed = new URL(value === undefined ? DEFAULT_GATEWAY_URL : clean(value));
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI Gateway must use http:// or https://');
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) throw new Error('AI Gateway must use localhost or 127.0.0.1');
   if (parsed.username || parsed.password) throw new Error('Credentials are not allowed in the AI Gateway URL');
@@ -306,12 +309,11 @@ export class AiGatewayClient {
     const systemPrompt = optionalText(request.systemPrompt, 'AI Gateway systemPrompt');
     const maxOutputTokens = request.maxOutputTokens === undefined ? 0 : request.maxOutputTokens;
     const imageDataUrl = optionalText(request.imageDataUrl, 'AI Gateway imageDataUrl');
-    if (request.maxOutputTokens !== undefined
-        && (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens))) {
-      throw new Error('AI Gateway maxOutputTokens must be a number');
-    }
-    if (maxOutputTokens < 0 || (maxOutputTokens > 0 && maxOutputTokens < 1)) {
-      throw new Error('AI Gateway maxOutputTokens must be 0 or at least 1');
+    // The budget ceiling is an exact owner-requested integer, never a floating
+    // value to round down into a different provider effect or an unsafe integer.
+    if (typeof maxOutputTokens !== 'number' || !Number.isSafeInteger(maxOutputTokens)
+        || Object.is(maxOutputTokens, -0) || maxOutputTokens < 0) {
+      throw new Error('AI Gateway maxOutputTokens must be a non-negative safe integer');
     }
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
@@ -325,7 +327,7 @@ export class AiGatewayClient {
         ...(clean(endpointId) ? { endpointId: clean(endpointId) } : {}),
         prompt: normalizedPrompt,
         systemPrompt: clean(systemPrompt),
-        ...(maxOutputTokens > 0 ? { maxOutputTokens: Math.floor(maxOutputTokens) } : {}),
+        ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
         ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}),
       }),
     });
