@@ -240,12 +240,48 @@ test('ACTIVE recovered child with an unreconciled ledger never releases a siblin
   assert.deepEqual(inFlight.activationRequests, [], 'ACTIVE child occupies slot');
   assert.equal(inFlight.executionAuthority, false);
   assert.equal(inFlight.activationAuthority, false);
-  // Only a reconciled terminal/idle child frees the parent's slot.
+  // IDLE alone cannot reconcile an unknown previously processed effect.
   occupied.lifecycle = OrchestrationNodeLifecycle.IDLE;
-  const settled = mutateOrchestrationSubagentTopologyV1(request({
+  const unknown = mutateOrchestrationSubagentTopologyV1(request({
     graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 301,
+  }));
+  assert.equal(unknown.decision, 'ALLOW');
+  assert.deepEqual(unknown.activationRequests, []);
+  assert.equal(unknown.executionAuthority, false);
+  // Only explicit durable terminal proof permits capacity reuse.
+  occupied.lastTerminalStatus = 'COMPLETED';
+  const settled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 302,
   }));
   assert.equal(settled.decision, 'ALLOW');
   assert.equal(settled.activationRequests.length, 1);
   assert.equal(settled.activationRequests[0].nodeId, siblingId);
+});
+
+test('lost child ledger and pointer after crash retain UNKNOWN sibling lease until terminal proof', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request());
+  const [occupiedChildId, siblingId] = first.createdNodeIds;
+  const recoveredGraph = structuredClone(first.graph);
+  recoveredGraph.nodesById.root.maxActiveChildren = 1;
+  const recoveredRuntime = structuredClone(first.runtime);
+  const occupied = recoveredRuntime.nodesById[occupiedChildId];
+  occupied.currentActivationId = '';
+  occupied.activationLedger = {};
+  occupied.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  recoveredRuntime.processedEventIds[first.activationRequests[0].eventId] = 250;
+  const unknown = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 300,
+  }));
+  assert.equal(unknown.decision, 'ALLOW');
+  assert.deepEqual(unknown.activationRequests, []);
+  assert.equal(unknown.activationAuthority, false);
+  assert.equal(unknown.executionAuthority, false);
+  occupied.lastTerminalStatus = 'COMPLETED';
+  const reconciled = mutateOrchestrationSubagentTopologyV1(request({
+    graph: recoveredGraph, runtime: recoveredRuntime, nowMs: 301,
+  }));
+  assert.equal(reconciled.decision, 'ALLOW');
+  assert.equal(reconciled.activationRequests.length, 1);
+  assert.equal(reconciled.activationRequests[0].nodeId, siblingId);
+  assert.equal(reconciled.executionAuthority, false);
 });
