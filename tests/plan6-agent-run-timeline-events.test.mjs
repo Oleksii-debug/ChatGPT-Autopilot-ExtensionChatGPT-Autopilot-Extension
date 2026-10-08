@@ -70,3 +70,18 @@ test('restart, filters and unknown event type do not promote event evidence to e
   assert.equal(afterRestart.mayReplayExternalEffect, false);
   assert.doesNotMatch(JSON.stringify(afterRestart), /SECRET_|approve-payment-without-owner/);
 });
+
+test('timeline refresh reports Core failure and keeps keyboard focus recoverable', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const script = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const start = script.indexOf('async function refreshAgentRunTimeline()');
+  const end = script.indexOf('function exportAgentRunTimeline()', start);
+  assert.ok(start >= 0 && end > start);
+  const refresh = script.slice(start, end);
+  assert.match(refresh, /catch\\s*\\{/u);
+  assert.match(refresh, /Core недоступний/u);
+  assert.match(refresh, /button\\.disabled = false/u);
+  assert.match(refresh, /document\\.activeElement/u);
+  assert.match(refresh, /button\\.focus\\(\\)/u);
+  assert.doesNotMatch(refresh, /innerHTML|outerHTML|eval\\(/u);
+});
