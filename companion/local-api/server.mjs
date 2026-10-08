@@ -2,6 +2,7 @@
  * Optional Native Companion LOCAL HTTP transport for canonical Autopilot control.
  * This server has no own scheduler, state, policy, credential broker or effects.
  * The trusted Companion owner injects real canonical scope/dispatch dependencies.
+ * It may also inject its current owner-managed bearer token via tokenProvider.
  * It NEVER starts a listener as a side effect of import.
  */
 import { createServer } from 'node:http';
@@ -49,8 +50,15 @@ function exactToken(input, label) {
  *   server.listen(port, '127.0.0.1')
  * Never pass a remote address or pass an untrusted resolver/dispatcher.
  */
-export function createAutopilotLocalApiServerV1({ token, dependencies } = {}) {
-  const expected = digest(exactToken(token, 'Local API token'));
+export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependencies } = {}) {
+  // The trusted Companion may inject an owner-managed current-token resolver.
+  // This transport does not create, store, rotate, or authorize credentials.
+  // Never silently fall back to a stale static token after a rotation failure.
+  if (tokenProvider !== undefined && (typeof tokenProvider !== 'function' || token !== undefined)) {
+    throw new Error('Use either a static token or a trusted tokenProvider, never both');
+  }
+  const staticExpected = tokenProvider === undefined
+    ? digest(exactToken(token, 'Local API token')) : null;
   if (!dependencies || typeof dependencies.resolveTrustedScope !== 'function'
     || typeof dependencies.dispatchCanonicalControl !== 'function'
     || typeof dependencies.now !== 'function') {
@@ -75,7 +83,18 @@ export function createAutopilotLocalApiServerV1({ token, dependencies } = {}) {
       const authorization = headerString(req.headers.authorization);
       const candidate = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
       const candidateDigest = digest(candidate);
-      if (!timingSafeEqual(candidateDigest, expected)) return reject(res, 401);
+      let activeExpected = staticExpected;
+      if (tokenProvider !== undefined) {
+        try {
+          // Resolve afresh per request; a retired token must not authenticate.
+          // Resolver errors or missing/weak tokens fail closed, no last-good
+          // credential cache and no sensitive diagnostics sent to the client.
+          activeExpected = digest(exactToken(await tokenProvider(), 'Local API token'));
+        } catch {
+          return reject(res, 401);
+        }
+      }
+      if (!timingSafeEqual(candidateDigest, activeExpected)) return reject(res, 401);
       if (req.method !== 'POST' || req.url !== '/v1/control') {
         return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
       }
