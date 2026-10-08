@@ -3,9 +3,8 @@
 This directive governs the new Agent/Models project-plan architecture.
 
 ## CRITICAL 11.x SOURCE RULE
-Drive Agent/Models plans identify **11.0.13 High** as the migration baseline. Current GitHub main manifest is still **0.9.19**.
-Workers MUST NOT use the old main tree to downgrade scope, rebuild already-existing 11.x capability from scratch, or claim 0.9.19 is current product truth.
-Before product-code mutation/closure, resolve and synchronize the exact 11.0.13 High-or-newer source lineage into canonical version control. Until then, safe control/audit/planning work may proceed.
+The exact Drive archive **ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip** has been located and inspected as the 11.0.13 High source baseline. Audit SHA-256: `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329`. Current GitHub main manifest is still **0.9.19** and is stale.
+Workers MUST NOT use the old main tree to downgrade scope or rebuild 11.x from scratch. The first source bootstrap action is to import/synchronize the exact 11.0.13 archive (or a proven newer direct successor) into canonical Git and run current qualification. See `AUTOPILOT_11_0_13_SOURCE_BASELINE.md`.
 
 ## Multi-plan work selection
 Read PROJECT_PLAN_INDEX.md, MULTI_PLAN_PARALLELISM_CONTRACT.md, MULTI_PLAN_CLOSURE_STATE.md, the assigned Drive plan and live source lineage.
