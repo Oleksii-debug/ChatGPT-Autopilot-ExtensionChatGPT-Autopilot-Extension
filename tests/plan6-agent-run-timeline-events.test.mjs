@@ -101,3 +101,22 @@ test('unobserved model cost is UNKNOWN, not an invented zero-dollar observation'
   assert.match(options, /estimatedCostUsd === null/u);
   assert.match(options, /estimatedCostUsd\.toFixed\(6\)/u);
 });
+
+test('timeline offers heading navigation and announces only deliberate filter interaction', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const html = await readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(html, /<h3 id="agent-run-timeline-heading">/u);
+  assert.match(html, /<details id="agent-run-timeline-details">/u);
+  assert.match(html, /<select id="agent-run-timeline-filter">/u);
+  const eventLine = source.indexOf("'agent-run-timeline-filter').addEventListener('change',");
+  assert.ok(eventLine >= 0);
+  const handler = source.slice(eventLine, eventLine + 290);
+  assert.match(handler, /renderAgentRunTimeline\(ui\.agentTimelineJob\)/u);
+  assert.match(handler, /announce\(\$\('agent-run-timeline-status'\)\.textContent\)/u);
+  const background = source.slice(
+    source.indexOf('function renderAgentRunTimeline(job)'),
+    source.indexOf('async function refreshAgentRunTimeline()')
+  );
+  assert.doesNotMatch(background, /announce\(/u);
+});
