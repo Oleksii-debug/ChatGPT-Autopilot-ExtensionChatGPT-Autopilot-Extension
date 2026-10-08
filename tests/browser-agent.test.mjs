@@ -3504,6 +3504,64 @@ test('Plan-1: config edits reject hidden authority, hostile coercion and mutable
   assert.deepEqual(persisted.config.acceptanceCriteria, ['Independent proof']);
 });
 
+test('Plan-1 S1/S2: untrusted intake field names never leak secrets or mutate durable jobs', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  await manager.create({ id: 'redaction-owner-job', goal: 'Preserve the original goal' });
+  const set = chrome.storage.local.set.bind(chrome.storage.local);
+  let writes = 0;
+  chrome.storage.local.set = async values => { writes += 1; return set(values); };
+  const before = writes;
+  const secret = 'PRIVATE_OWNER_TOKEN_DO_NOT_ECHO_12345';
+  const assertRedacted = error => {
+    assert.match(error.message, /unknown field|enumerable own data properties/);
+    assert.doesNotMatch(error.message, /PRIVATE_OWNER_TOKEN_DO_NOT_ECHO_12345/);
+    return true;
+  };
+
+  await assert.rejects(
+    () => manager.create({ id: 'redaction-new-job', goal: 'Denied', [secret]: 'ALLOW' }),
+    assertRedacted,
+  );
+  await assert.rejects(
+    () => manager.updateConfig('redaction-owner-job', { [secret]: 'ALLOW' }),
+    assertRedacted,
+  );
+  await assert.rejects(
+    () => manager.createFromAgentDefinition({ [secret]: 'ALLOW' }),
+    assertRedacted,
+  );
+  await assert.rejects(
+    () => manager.create({
+      id: 'redaction-nested-job', goal: 'Denied',
+      siteRules: [{ pattern: 'https://example.org/*', [secret]: 'ALLOW' }],
+    }),
+    assertRedacted,
+  );
+
+  let accessorReads = 0;
+  const hostile = { id: 'redaction-accessor-job', goal: 'Denied' };
+  Object.defineProperty(hostile, secret, {
+    enumerable: true,
+    get() { accessorReads += 1; throw new Error('SECRET_VALUE_MUST_NOT_RUN'); },
+  });
+  await assert.rejects(() => manager.create(hostile), error => {
+    assertRedacted(error);
+    assert.doesNotMatch(error.message, /SECRET_VALUE_MUST_NOT_RUN/);
+    return true;
+  });
+  assert.equal(accessorReads, 0);
+  assert.equal(writes, before, 'rejected inputs must have no partial store writes');
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
+  });
+  const persisted = await restarted.get('redaction-owner-job');
+  assert.equal(persisted.config.goal, 'Preserve the original goal');
+  assert.deepEqual((await restarted.load()).order, ['redaction-owner-job']);
+});
+
 test('Plan-1: explicit malformed owner policy and ceilings cannot silently reset durable safety', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({
