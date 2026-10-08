@@ -163,3 +163,67 @@ test('transport cannot treat any non-2xx response as proof an effect did not occ
   assert.equal(value.httpStatus,500);
   assert.equal(invocations,1);
 });
+
+
+test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope fields before RECEIVED', async () => {
+  await withServer(async port => {
+    const originalRequest = request('envelope-shape-1');
+    const raw = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(originalRequest),
+    });
+    assert.equal(raw.ok, true);
+    const valid = await raw.json();
+    const mutations = [
+      value => ({ ...value, unexpectedCredential: 'DO_NOT_EXPOSE' }),
+      value => ({ ...value, result: { ...value.result, grantAuthority: true } }),
+      value => ({ ...value, result: {
+        ...value.result, request: { ...value.result.request, hiddenToken: 'DO_NOT_EXPOSE' },
+      } }),
+      value => ({ ...value, result: {
+        ...value.result, scopeProof: { ...value.result.scopeProof, bypass: true },
+      } }),
+      value => ({ ...value, result: {
+        ...value.result, receipt: { ...value.result.receipt, retry: true },
+      } }),
+      value => {
+        const copy = { ...value };
+        copy[Symbol('injected')] = true;
+        return copy;
+      },
+      value => {
+        const copy = { ...value };
+        Object.defineProperty(copy, 'hidden', { value: 'DO_NOT_EXPOSE' });
+        return copy;
+      },
+      value => {
+        const copy = { ...value, result: { ...value.result } };
+        Object.defineProperty(copy.result, 'receipt', {
+          enumerable: true,
+          get() { throw new Error('SECRET_GETTER_EXECUTED'); },
+        });
+        return copy;
+      },
+    ];
+    let calls = 0;
+    for (const mutate of mutations) {
+      const forged = mutate(valid);
+      const client = createAutopilotLocalClientV1({
+        token: TOKEN, port, fetchImpl: async () => {
+          calls += 1;
+          return { ok: true, json: async () => forged };
+        },
+      });
+      const answer = await client.control(originalRequest);
+      assert.equal(answer.status, 'UNKNOWN_NETWORK_RESULT');
+      assert.equal(JSON.stringify(answer).includes('DO_NOT_EXPOSE'), false);
+      assert.equal(JSON.stringify(answer).includes('SECRET_GETTER_EXECUTED'), false);
+    }
+    assert.equal(calls, mutations.length, 'no automatic resends after forged receipts');
+    const correct = createAutopilotLocalClientV1({
+      token: TOKEN, port, fetchImpl: async () => ({ ok: true, json: async () => valid }),
+    });
+    assert.equal((await correct.control(originalRequest)).status, 'RECEIVED');
+  });
+});
