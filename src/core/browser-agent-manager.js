@@ -718,32 +718,65 @@ function appendHistory(runtime, entry) {
 }
 
 function normalizeModelBudgetReservation(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const reservationId = clean(raw.reservationId, 240);
-  const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
-  const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
-  const inputTokens = Math.max(0, Math.floor(Number(raw.inputTokens || 0)));
-  const outputTokens = Math.max(0, Math.floor(Number(raw.outputTokens || 0)));
-  const totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(raw.totalTokens || 0)));
-  const estimatedCostUsd = Math.max(0, Number(raw.estimatedCostUsd || 0));
-  const createdAt = Math.max(0, Number(raw.createdAt || 0));
-  if (!reservationId || !Number.isFinite(estimatedCostUsd)) return null;
+  if (raw == null) return null;
+  // A present but malformed reservation may represent an already-dispatched
+  // model call. Never erase it on cold restart: doing so would permit a blind
+  // retry without conservatively accounting for the outstanding effect.
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Corrupt durable model budget reservation requires explicit reconciliation');
+  }
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Corrupt durable model budget reservation requires explicit reconciliation');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const allowed = new Set([
+    'reservationId', 'controlEpoch', 'modelCalls', 'inputTokens', 'outputTokens',
+    'totalTokens', 'estimatedCostUsd', 'createdAt', 'routeId', 'provider', 'model', 'callNumber',
+  ]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const field = descriptors[key];
+    if (typeof key !== 'string' || !allowed.has(key)
+        || !field || field.enumerable !== true || !Object.hasOwn(field, 'value')) {
+      throw new Error('Corrupt durable model budget reservation requires explicit reconciliation');
+    }
+  }
+  const requireNumber = (key, min, integer = true) => {
+    const field = descriptors[key];
+    const value = field?.value;
+    if (typeof value !== 'number' || !Number.isFinite(value)
+        || (integer && !Number.isSafeInteger(value))
+        || value < min) {
+      throw new Error('Corrupt durable model budget reservation requires explicit reconciliation');
+    }
+    return value;
+  };
+  const requireText = (key, max, nonempty = false) => {
+    const field = descriptors[key];
+    const value = field?.value;
+    if (typeof value !== 'string' || value.length > max
+        || value !== value.trim() || (nonempty && !value)) {
+      throw new Error('Corrupt durable model budget reservation requires explicit reconciliation');
+    }
+    return value;
+  };
+  const reservationId = requireText('reservationId', 240, true);
+  const controlEpoch = requireNumber('controlEpoch', 0);
+  const modelCalls = requireNumber('modelCalls', 1);
+  const inputTokens = requireNumber('inputTokens', 1);
+  const outputTokens = requireNumber('outputTokens', 1);
+  const totalTokens = requireNumber('totalTokens', inputTokens + outputTokens);
+  const estimatedCostUsd = requireNumber('estimatedCostUsd', 0, false);
+  const createdAt = requireNumber('createdAt', 0);
+  const routeId = requireText('routeId', 180);
+  const provider = requireText('provider', 80);
+  const model = requireText('model', 300);
+  const callNumber = requireNumber('callNumber', 1);
   return {
-    reservationId,
-    controlEpoch,
-    modelCalls,
-    inputTokens,
-    outputTokens,
-    totalTokens,
-    estimatedCostUsd,
-    createdAt,
-    routeId: clean(raw.routeId, 180),
-    provider: clean(raw.provider, 80),
-    model: clean(raw.model, 300),
-    callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
+    reservationId, controlEpoch, modelCalls, inputTokens, outputTokens,
+    totalTokens, estimatedCostUsd, createdAt, routeId, provider, model, callNumber,
   };
 }
-
 function normalizeRuntime(raw, now) {
   const base = createBrowserAgentRuntime(now);
   if (!raw || typeof raw !== 'object') return base;
@@ -917,6 +950,13 @@ function normalizeStore(raw, now) {
   for (const id of raw.order) {
     if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
     try {
+      // Stored absence is legacy-compatible; stored explicit null is not.
+      // Silently dropping a previously bound contract could re-enable the
+      // weaker legacy model-only terminal verifier after restart.
+      if (Object.hasOwn(raw.byId[id], 'outcomeContract')
+          && raw.byId[id].outcomeContract == null) {
+        throw new Error('Corrupt persisted Outcome Contract requires explicit recovery');
+      }
       const config = normalizeBrowserAgentConfig({ ...raw.byId[id].config, id }, { id });
       const definitionSelection = raw.byId[id].definitionSelection == null
         ? null
