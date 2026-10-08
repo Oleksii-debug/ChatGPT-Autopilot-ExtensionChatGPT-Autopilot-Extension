@@ -592,7 +592,14 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       action.startY = start.y;
       action.endX = end.x;
       action.endY = end.y;
-      action.durationMs = Math.min(2000, Math.max(120, Number(raw?.durationMs) || 450));
+      // Model JSON may contain null/string/boolean timing. Do not coerce a
+      // malformed effect envelope into a plausible native pointer duration.
+      const durationMs = raw?.durationMs;
+      if (durationMs !== undefined && (typeof durationMs !== 'number'
+        || !Number.isFinite(durationMs) || durationMs < 120 || durationMs > 2000)) {
+        throw new Error('Browser Agent drag_at requires an exact bounded durationMs');
+      }
+      action.durationMs = durationMs === undefined ? 450 : durationMs;
     }
   }
   if (type === BrowserAgentActionType.TRUSTED_SCRIPT) {
@@ -678,7 +685,14 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.value = clean(raw.value, 5000);
     if (!action.value) throw new Error('Browser Agent select action requires value');
   }
-  if (type === BrowserAgentActionType.CHECK) action.checked = raw.checked !== false;
+  if (type === BrowserAgentActionType.CHECK) {
+    // A missing, null, or string "false" model field must not silently
+    // authorize the opposite checkbox/radio side effect.
+    if (typeof raw.checked !== 'boolean') {
+      throw new Error('Browser Agent check requires an explicit boolean checked value');
+    }
+    action.checked = raw.checked;
+  }
   if (type === BrowserAgentActionType.KEY) {
     action.key = raw.key === 'Space' ? ' ' : String(raw.key || '');
     if (!ALLOWED_KEYS.has(action.key)) throw new Error(`Browser Agent key is not allowed: ${action.key}`);
