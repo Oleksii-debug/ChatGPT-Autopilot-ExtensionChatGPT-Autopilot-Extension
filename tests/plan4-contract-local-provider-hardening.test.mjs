@@ -100,3 +100,43 @@ test('successful completion retains local boundary and returns normalized usage'
   assert.equal(result.usage.totalTokens,5);
   assert.equal('permissionAuthority' in result,false);
 });
+
+
+test('endpoint identity must match provider and locality; missing and ambiguous bindings fail closed', async () => {
+  const boundRoute={...route,endpointId:'endpoint.loopback'};
+  const boundEndpoint={...endpoint,endpointId:'endpoint.loopback'};
+  const evidence=await createAiRouteRegistryEvidenceV1({...snapshot,routes:[boundRoute],endpointProfiles:[boundEndpoint]});
+  assert.equal(evidence.routeIdentities[0].endpointBinding,'MATCHED');
+  assert.equal(evidence.routeIdentities[0].endpointProfileId,'local.ollama');
+  assert.equal(evidence.authority.canGrantPermission,false);
+  const legacy=await createAiRouteRegistryEvidenceV1(snapshot);
+  assert.equal(legacy.routeIdentities[0].endpointBinding,'UNRESOLVED_LEGACY');
+  await assert.rejects(createAiRouteRegistryEvidenceV1({...snapshot,routes:[boundRoute]}),/no registry profile/);
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,provider:'openai'}],
+  }),/does not match/);
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,locality:'remote',origin:'https:\/\/provider.example/',credentialless:false,credentialRef:'opaque.ref'}],
+  }),/does not match/);
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...snapshot,routes:[boundRoute],endpointProfiles:[boundEndpoint,{...boundEndpoint,profileId:'other'}],
+  }),/Ambiguous AI endpoint identity/);
+  const changed=await createAiRouteRegistryEvidenceV1({
+    ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,origin:'http:\/\/localhost:11434/'}],
+  });
+  assert.notEqual(changed.configSha256,evidence.configSha256);
+});
+
+for (const [status,category,body] of [
+  [401,'AUTH','<html>sk-secret-provider-response</html>'],
+  [429,'RATE_LIMIT','invalid-json:sk-secret-provider-response'],
+  [503,'UNAVAILABLE',''],
+]) {
+  test('non-JSON HTTP '+status+' retains sanitized transport classification',async()=>{
+    const client=new LocalAiClient({fetchFn:async()=>new Response(body,{status})});
+    await assert.rejects(client.complete(settings,'hi'),e=>
+      e.status===status && e.category===category
+      && e.code==='LOCAL_AI_'+category
+      && !e.message.includes('sk-secret-provider-response'));
+  });
+}
