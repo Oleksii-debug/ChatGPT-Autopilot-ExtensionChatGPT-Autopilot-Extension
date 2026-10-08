@@ -4302,7 +4302,8 @@ export class BrowserAgentManager {
         || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
         || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)
         || Number(proof.target.viewportScrollX) !== Number(topFrame?.viewport?.scrollX ?? 0)
-        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)) {
+        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)
+        || Number(proof.target.documentEpoch) !== Number(topFrame?.viewport?.documentEpoch)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       action.coordinateTarget = clone(proof.target);
@@ -4317,7 +4318,8 @@ export class BrowserAgentManager {
         || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
         || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)
         || Number(proof.target.viewportScrollX) !== Number(topFrame?.viewport?.scrollX ?? 0)
-        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)) {
+        || Number(proof.target.viewportScrollY) !== Number(topFrame?.viewport?.scrollY ?? 0)
+        || Number(proof.target.documentEpoch) !== Number(topFrame?.viewport?.documentEpoch)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error(proof?.target?.sensitive === true ? 'AGENT_SENSITIVE_FIELD_BLOCKED' : 'AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       if (proof.target.visualOnly !== true && proof.target.editable !== true) {
@@ -4343,7 +4345,8 @@ export class BrowserAgentManager {
         && Number(proof.viewportWidth || 0) === expectedWidth
         && Number(proof.viewportHeight || 0) === expectedHeight
         && Number(proof.target.viewportScrollX) === Number(topFrame?.viewport?.scrollX ?? 0)
-        && Number(proof.target.viewportScrollY) === Number(topFrame?.viewport?.scrollY ?? 0);
+        && Number(proof.target.viewportScrollY) === Number(topFrame?.viewport?.scrollY ?? 0)
+        && Number(proof.target.documentEpoch) === Number(topFrame?.viewport?.documentEpoch);
       if (!proofValid(startProof) || !proofValid(endProof)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_DRAG_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
