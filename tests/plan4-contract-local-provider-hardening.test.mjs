@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAiRoutePool, createAiRouteRegistryEvidenceV1 } from '../src/core/ai-route-pool.js';
+import { normalizeAiRoutePool, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
 
@@ -13,6 +13,22 @@ test('route migration accepts versionless v1 and rejects unknown versions', () =
   assert.equal(normalizeAiRoutePool([route])[0].schemaVersion,1);
   assert.throws(() => normalizeAiRoutePool([{...route,schemaVersion:'1'}]));
   assert.throws(() => normalizeAiRoutePool([{...route,schemaVersion:2}]));
+});
+
+test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
+  const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
+    locality:'local', costClass:'free' };
+  const policy = { maxInputPricePerMillionUsd:0, maxOutputPricePerMillionUsd:0 };
+  const select = routes => selectAiRouteCandidates({
+    routes:JSON.parse(JSON.stringify(routes)), policy, now:1,
+  }).candidates.map(item => item.routeId);
+  assert.deepEqual(select([unreported]), []);
+  assert.deepEqual(select([{...unreported,inputPricePerMillionUsd:0}]), []);
+  assert.deepEqual(select([{...unreported,outputPricePerMillionUsd:0}]), []);
+  assert.deepEqual(select([{...unreported,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0}]), ['fixture.free']);
+  assert.deepEqual(select([{...unreported,inputPricePerMillionUsd:1,outputPricePerMillionUsd:0}]), []);
+  assert.deepEqual(select([{...unreported,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0,inputPriceKnown:false}]), []);
+  assert.deepEqual(selectAiRouteCandidates({routes:[unreported],policy:{},now:1}).eligibleRouteIds,['fixture.free']);
 });
 
 test('configuration evidence is deterministic, versioned and non-authoritative', async () => {
