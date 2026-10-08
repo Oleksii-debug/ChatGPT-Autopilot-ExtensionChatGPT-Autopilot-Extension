@@ -207,15 +207,21 @@ function canonicalOrigin(value, label, { optional = false } = {}) {
   return parsed.origin;
 }
 
+function optionalArrayField(record, key) {
+  // A missing legacy field is a valid empty restriction/request, but explicit
+  // undefined is corrupted source data and must never disappear silently.
+  return Object.hasOwn(record, key) ? record[key] : [];
+}
+
 function exactIdList(value, label) {
-  const raw = strictArray(value === undefined ? [] : value, label);
+  const raw = strictArray(value, label);
   const out = raw.map((item, index) => exactId(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
 }
 
 function originList(value, label) {
-  const raw = strictArray(value === undefined ? [] : value, label);
+  const raw = strictArray(value, label);
   const out = raw.map((item, index) => canonicalOrigin(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
@@ -250,7 +256,9 @@ export function normalizeUntrustedContentSourceV1(value) {
     schemaVersion: UNTRUSTED_CONTENT_GUARD_VERSION,
     sourceId: exactId(raw.sourceId, 'UntrustedContentSourceV1 sourceId'),
     sourceKind: raw.sourceKind,
-    sourceOrigin: canonicalOrigin(raw.sourceOrigin, 'UntrustedContentSourceV1 sourceOrigin', { optional: true }),
+    sourceOrigin: canonicalOrigin(raw.sourceOrigin, 'UntrustedContentSourceV1 sourceOrigin', {
+      optional: !Object.hasOwn(raw, 'sourceOrigin') || raw.sourceOrigin === '',
+    }),
     artifactRef,
     observedAt,
     contentTrust: 'UNTRUSTED_DATA',
@@ -266,10 +274,10 @@ export function normalizeUntrustedInfluenceCeilingV1(value) {
     envelopeId: exactId(raw.envelopeId, 'UntrustedInfluenceCeilingV1 envelopeId'),
     agentId: exactId(raw.agentId, 'UntrustedInfluenceCeilingV1 agentId'),
     jobId: exactId(raw.jobId, 'UntrustedInfluenceCeilingV1 jobId'),
-    allowedCapabilityIds: exactIdList(raw.allowedCapabilityIds, 'UntrustedInfluenceCeilingV1 allowedCapabilityIds'),
-    allowedToolIds: exactIdList(raw.allowedToolIds, 'UntrustedInfluenceCeilingV1 allowedToolIds'),
-    allowedProviderIds: exactIdList(raw.allowedProviderIds, 'UntrustedInfluenceCeilingV1 allowedProviderIds'),
-    allowedOutboundOrigins: originList(raw.allowedOutboundOrigins, 'UntrustedInfluenceCeilingV1 allowedOutboundOrigins'),
+    allowedCapabilityIds: exactIdList(optionalArrayField(raw, 'allowedCapabilityIds'), 'UntrustedInfluenceCeilingV1 allowedCapabilityIds'),
+    allowedToolIds: exactIdList(optionalArrayField(raw, 'allowedToolIds'), 'UntrustedInfluenceCeilingV1 allowedToolIds'),
+    allowedProviderIds: exactIdList(optionalArrayField(raw, 'allowedProviderIds'), 'UntrustedInfluenceCeilingV1 allowedProviderIds'),
+    allowedOutboundOrigins: originList(optionalArrayField(raw, 'allowedOutboundOrigins'), 'UntrustedInfluenceCeilingV1 allowedOutboundOrigins'),
     createdAt: timestamp(raw.createdAt, 'UntrustedInfluenceCeilingV1 createdAt'),
   });
 }
@@ -286,11 +294,11 @@ export function normalizeUntrustedInfluenceProposalV1(value) {
     sourceArtifactId: exactId(raw.sourceArtifactId, 'UntrustedInfluenceProposalV1 sourceArtifactId'),
     sourceSha256: exactSha256(raw.sourceSha256, 'UntrustedInfluenceProposalV1 sourceSha256'),
     sourceObservedAt: timestamp(raw.sourceObservedAt, 'UntrustedInfluenceProposalV1 sourceObservedAt'),
-    requestedCapabilityIds: exactIdList(raw.requestedCapabilityIds, 'UntrustedInfluenceProposalV1 requestedCapabilityIds'),
-    requestedToolIds: exactIdList(raw.requestedToolIds, 'UntrustedInfluenceProposalV1 requestedToolIds'),
-    requestedProviderIds: exactIdList(raw.requestedProviderIds, 'UntrustedInfluenceProposalV1 requestedProviderIds'),
-    requestedCredentialRefIds: exactIdList(raw.requestedCredentialRefIds, 'UntrustedInfluenceProposalV1 requestedCredentialRefIds'),
-    outboundOrigins: originList(raw.outboundOrigins, 'UntrustedInfluenceProposalV1 outboundOrigins'),
+    requestedCapabilityIds: exactIdList(optionalArrayField(raw, 'requestedCapabilityIds'), 'UntrustedInfluenceProposalV1 requestedCapabilityIds'),
+    requestedToolIds: exactIdList(optionalArrayField(raw, 'requestedToolIds'), 'UntrustedInfluenceProposalV1 requestedToolIds'),
+    requestedProviderIds: exactIdList(optionalArrayField(raw, 'requestedProviderIds'), 'UntrustedInfluenceProposalV1 requestedProviderIds'),
+    requestedCredentialRefIds: exactIdList(optionalArrayField(raw, 'requestedCredentialRefIds'), 'UntrustedInfluenceProposalV1 requestedCredentialRefIds'),
+    outboundOrigins: originList(optionalArrayField(raw, 'outboundOrigins'), 'UntrustedInfluenceProposalV1 outboundOrigins'),
     createdAt: timestamp(raw.createdAt, 'UntrustedInfluenceProposalV1 createdAt'),
   });
 }
