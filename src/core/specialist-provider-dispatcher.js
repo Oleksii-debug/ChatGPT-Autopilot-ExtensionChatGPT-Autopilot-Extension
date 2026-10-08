@@ -304,6 +304,17 @@ export class SpecialistProviderDispatcherV1 {
       readiness: trustedReadiness,
       dispatchedAt: new Date(startedAtMs).toISOString(),
     });
+    // Recheck immediately before crossing the provider effect boundary. A long
+    // preparation or hostile clock jump cannot consume an expired lease or
+    // a stale readiness observation under a previously valid snapshot.
+    const providerEdgeMs = clock(this.#now);
+    if (providerEdgeMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards before effect');
+    if (Date.parse(ownership.leaseUntil) <= providerEdgeMs) {
+      throw new Error('Specialist execution lease expired before provider effect');
+    }
+    if (providerEdgeMs - Date.parse(trustedReadiness.observedAt) > trustedReadiness.maxAgeMs) {
+      throw new Error('Specialist readiness is stale before provider effect');
+    }
     const rawResult = await binding.execute(request);
     const completedAtMs = clock(this.#now);
     if (completedAtMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards');
