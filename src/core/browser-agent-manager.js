@@ -28,7 +28,6 @@ import {
   browserAgentCoordinateTargetFingerprint,
   verifyBrowserApprovalTarget,
   probeBrowserCoordinateTarget,
-  verifyBrowserCoordinateTarget,
   focusBrowserAgentTarget,
   validateTrustedScriptSource,
   executeBrowserCredentialFill,
@@ -3106,7 +3105,7 @@ export class BrowserAgentManager {
     if (expectedFingerprint) {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [x, y, expectedFingerprint],
       });
       if (!verification?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
@@ -3119,7 +3118,7 @@ export class BrowserAgentManager {
       if (expectedFingerprint) {
         const postAttach = await this.requireScripting().executeScript({
           target: { tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [x, y, expectedFingerprint],
         });
         if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
@@ -3137,7 +3136,7 @@ export class BrowserAgentManager {
     const verifyPoint = async (x, y, fingerprint) => {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [x, y, fingerprint],
       });
       if (!verification?.[0]?.result?.ok) throw new Error('AGENT_DRAG_TARGET_STALE');
@@ -3184,7 +3183,7 @@ export class BrowserAgentManager {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     const verification = await this.requireScripting().executeScript({
       target: { tabId, frameIds: [0] },
-      func: verifyBrowserCoordinateTarget,
+      func: probeBrowserCoordinateTarget,
       args: [action.x, action.y, expectedFingerprint],
     });
     if (!verification?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
@@ -3195,7 +3194,7 @@ export class BrowserAgentManager {
       attached = true;
       const postAttach = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [action.x, action.y, expectedFingerprint],
       });
       if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
@@ -3367,7 +3366,7 @@ export class BrowserAgentManager {
       try {
         const verified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.x, pending.action.y, pending.targetFingerprint],
         });
         proof = verified?.[0]?.result || null;
@@ -3381,12 +3380,12 @@ export class BrowserAgentManager {
       try {
         const startVerified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.startX, pending.action.startY, pending.dragStartFingerprint],
         });
         const endVerified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.endX, pending.action.endY, pending.dragEndFingerprint],
         });
         startProof = startVerified?.[0]?.result || null;
