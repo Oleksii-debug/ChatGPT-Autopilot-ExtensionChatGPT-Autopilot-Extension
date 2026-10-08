@@ -64,6 +64,7 @@ const EVENT_LABELS = Object.freeze({
 const FILTERS = new Set(['ALL', 'ACTION', 'OWNER', 'PLAN', 'RECOVERY', 'CHECKPOINT']);
 const PLAN_STATES = new Set(['PENDING', 'READY', 'RUNNING', 'VERIFIED', 'FAILED', 'BLOCKED', 'SKIPPED', 'CANCELLED', 'COMPLETED']);
 const ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'wait', 'new_tab', 'close_tab', 'download', 'trusted_script', 'click_at', 'type_at', 'drag_at', 'batch']);
+const ACTION_DETAIL_EVENTS = new Set(['action', 'trusted-script-executed', 'effect-not-observed', 'approval-requested', 'approval-approved', 'approval-stale']);
 
 function record(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(name + ' must be a plain record');
@@ -150,7 +151,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
     const rawAction = own(entry, 'action');
     let actionType = '';
-    if (rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
+    if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
       const candidate = own(rawAction, 'type');
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
     }
