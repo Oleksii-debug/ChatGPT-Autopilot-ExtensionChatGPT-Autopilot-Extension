@@ -832,3 +832,46 @@ test('universal contract arrays consume descriptor snapshots without ordinary Pr
   assert.equal(reads, 0, 'evidence array must not perform ordinary caller reads');
 });
 
+test('Plan-1: universal authority, artifact and credential chronology rejects shorthand and calendar rollover', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-chrono-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  };
+  const decision = {
+    schemaVersion: 1,
+    decisionId: 'decision-chrono-1',
+    invocationId: 'invoke-chrono-1',
+    decision: PolicyDecisionKind.DENY,
+    reasonCode: 'OWNER_DENY',
+    decidedAt: AT,
+  };
+  for (const invalid of [
+    '0', '2026-09-19', '2026-09-19T03:00:00',
+    '2026-02-30T03:00:00Z', '2026-13-01T03:00:00Z',
+    '2026-09-19T24:00:00Z', '2026-09-19T03:00:00.1234Z',
+    '2026-09-19T03:00:00+25:00',
+  ]) {
+    for (const [name, verify] of [
+      ['tool invocation', () => normalizeToolInvocationV1({ ...invocation, createdAt: invalid })],
+      ['policy decision', () => normalizePolicyDecisionV1({ ...decision, decidedAt: invalid })],
+      ['artifact', () => normalizeArtifactRefV1(artifact({ createdAt: invalid }))],
+      ['credential expiry', () => normalizeCredentialRefV1(credential({ expiresAt: invalid }))],
+    ]) {
+      assert.throws(verify, /timestamp|calendar date/i, name + ' accepted ' + invalid);
+    }
+  }
+  const canonical = normalizeToolInvocationV1({
+    ...invocation, createdAt: '2026-09-19T05:00:00+02:00',
+  });
+  assert.equal(canonical.createdAt, '2026-09-19T03:00:00.000Z');
+  assert.equal(
+    normalizeArtifactRefV1(artifact({ createdAt: '2026-09-18T22:00:00-05:00' })).createdAt,
+    '2026-09-19T03:00:00.000Z',
+  );
+});
