@@ -139,3 +139,14 @@ test('hostile binding array accessors and holes are rejected before any callback
     /enumerable own data property/u,
   );
 });
+
+test('durable readiness cannot extend the trusted five-minute resolver cap', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  for (const maxAgeMs of [300_001, Number.MAX_SAFE_INTEGER]) {
+    await assert.rejects(f.newDispatcher().execute(f.request({
+      ...valid, maxAgeMs,
+    })), /stale/u);
+  }
+  assert.equal(f.providerCalls, 0);
+});
