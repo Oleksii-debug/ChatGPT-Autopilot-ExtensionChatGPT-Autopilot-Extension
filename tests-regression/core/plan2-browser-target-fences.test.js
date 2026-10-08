@@ -172,12 +172,34 @@ test('semantic check requires explicit true/false and never defaults to a mutati
   }
 });
 
+// Section 2: do not relocate screenshot points or admit fractional
+// duration that may be rounded by Chrome after approval/restart.
+test('visual coordinate actions preserve exact screenshot point identity', () => {
+  const snapshot = setup();
+  snapshot.visionAttached = true;
+  const point = { x: 20.07, y: 20.03 };
+  const click = parseBrowserAgentAction(JSON.stringify({ type: 'click_at', ...point }), snapshot);
+  const typed = parseBrowserAgentAction(JSON.stringify({ type: 'type_at', ...point, text: 'yes' }), snapshot);
+  assert.equal(click.x, point.x);
+  assert.equal(click.y, point.y);
+  assert.equal(typed.x, point.x);
+  assert.equal(typed.y, point.y);
+  const drag = parseBrowserAgentAction(JSON.stringify({
+    type: 'drag_at', startX: 20.07, startY: 20.03, endX: 40.09, endY: 30.08,
+  }), snapshot);
+  assert.equal(drag.startX, 20.07);
+  assert.equal(drag.startY, 20.03);
+  assert.equal(drag.endX, 40.09);
+  assert.equal(drag.endY, 30.08);
+  assert.equal(element.clicked, 0);
+});
+
 // Section 2: explicit visual timing fields must survive JSON/restart uncoerced.
 test('visual drag rejects coercible or unbounded duration before native action', () => {
   const snapshot = setup();
   snapshot.visionAttached = true;
   const base = { type: 'drag_at', startX: 20, startY: 20, endX: 40, endY: 20 };
-  for (const durationMs of [null, '250', false, 0, 119, 2001, {}, [], -1]) {
+  for (const durationMs of [null, '250', false, 0, 119, 120.5, 150.1, 2000.1, 2001, {}, [], -1]) {
     assert.throws(
       () => parseBrowserAgentAction(JSON.stringify({ ...base, durationMs }), snapshot),
       /exact bounded durationMs/,
