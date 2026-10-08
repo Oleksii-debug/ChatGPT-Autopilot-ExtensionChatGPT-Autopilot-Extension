@@ -1748,8 +1748,11 @@ function normalizeActionRiskText(value) {
 
 export function browserAgentSnapshotElement(snapshot, action) {
   if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(action?.type) && action.coordinateTarget && typeof action.coordinateTarget === 'object') return action.coordinateTarget;
-  if (!snapshot || !action || !Number.isInteger(Number(action.frameId)) || !action.ref) return null;
-  const frame = (snapshot.frames || []).find(item => Number(item.frameId) === Number(action.frameId));
+  // Frame IDs are concrete Chrome frame identities. Null/false/empty/text
+  // aliases must not resolve to frame 0 during policy or effect verification.
+  if (!snapshot || !action || !Number.isInteger(action.frameId)
+    || action.frameId < 0 || typeof action.ref !== 'string' || !action.ref) return null;
+  const frame = (snapshot.frames || []).find(item => item.frameId === action.frameId);
   if (!frame) return null;
   return (frame.elements || []).find(item => item.ref === action.ref) || null;
 }
