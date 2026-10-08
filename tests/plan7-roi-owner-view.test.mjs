@@ -17,6 +17,7 @@ function base(overrides={}){
   return {
     schemaVersion:1,status:'OFFLINE',statusText:'Офлайн: немає нових даних',
     opportunities:[],deploymentAuthorized:false,
+    observedRunCount:0,verifiedOutcomeCount:0,
     ...overrides,
   };
 }
@@ -43,7 +44,7 @@ test('accessible view exposes text-only trusted metrics and semantic table heade
   };
   renderRoiOwnerViewV1(root,base({
     status:'PARTIAL_EVIDENCE',statusText:'Часткові докази',
-    verifiedOutcomeCount:2,observedOwnerAttentionSeconds:600,
+    observedRunCount:2,verifiedOutcomeCount:2,observedOwnerAttentionSeconds:600,
     observedOwnerTimeAvoidedSeconds:0,netOwnerTimeLowerSeconds:-600,
     netOwnerTimeUpperSeconds:-600,machineSpendUsdMicros:100000,
     opportunities:[item],
