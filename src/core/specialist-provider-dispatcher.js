@@ -86,6 +86,16 @@ function readiness(input, selection, ownership, nowMs) {
     throw new Error('Specialist readiness revision does not match selection');
   }
   const observed = timestamp(raw.observedAt, 'readiness.observedAt');
+  const resolved = timestamp(raw.resolvedAt, 'readiness.resolvedAt');
+  // The durable readiness record is a historical observation, never a clock
+  // override. Revalidate its complete chronology at the physical effect edge.
+  if (observed.ms > resolved.ms || resolved.ms > nowMs) {
+    throw new Error('Specialist readiness chronology is invalid at provider dispatch');
+  }
+  if (!Number.isSafeInteger(raw.ageMs) || raw.ageMs < 0
+      || raw.ageMs !== resolved.ms - observed.ms) {
+    throw new Error('Specialist readiness observation age is inconsistent');
+  }
   if (!Number.isSafeInteger(raw.maxAgeMs) || raw.maxAgeMs < 1 || nowMs - observed.ms > raw.maxAgeMs) {
     throw new Error('Specialist readiness is stale at provider dispatch');
   }
