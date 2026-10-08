@@ -1353,6 +1353,28 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
   return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
 }
 
+// Compare live coordinate probes with the exact observed screenshot origin.
+// Evidence must be finite numeric source data, never Number(null), defaults,
+// implicit strings, a different document epoch, or an unknown frame.
+export function browserAgentVisionOriginMatches(proof, pageUrl, viewport) {
+  if (!proof || typeof proof !== 'object' || !proof.target
+    || typeof pageUrl !== 'string' || !pageUrl
+    || !viewport || typeof viewport !== 'object' || Array.isArray(viewport)) return false;
+  const numericKeys = ['width', 'height', 'scrollX', 'scrollY', 'documentEpoch'];
+  if (numericKeys.some(key => typeof viewport[key] !== 'number' || !Number.isFinite(viewport[key]))
+    || viewport.width <= 0 || viewport.height <= 0 || viewport.documentEpoch <= 0) return false;
+  const target = proof.target;
+  const actualKeys = ['viewportWidth', 'viewportHeight'];
+  if (actualKeys.some(key => typeof proof[key] !== 'number' || !Number.isFinite(proof[key]))) return false;
+  if (['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch']
+    .some(key => typeof target[key] !== 'number' || !Number.isFinite(target[key]))) return false;
+  return proof.url === pageUrl && target.pageUrl === pageUrl
+    && proof.viewportWidth === viewport.width && proof.viewportHeight === viewport.height
+    && target.viewportWidth === viewport.width && target.viewportHeight === viewport.height
+    && target.viewportScrollX === viewport.scrollX && target.viewportScrollY === viewport.scrollY
+    && target.documentEpoch === viewport.documentEpoch;
+}
+
 export function browserAgentTargetFingerprint(snapshot, action) {
   const element = browserAgentSnapshotElement(snapshot, action);
   if (!element) return null;
