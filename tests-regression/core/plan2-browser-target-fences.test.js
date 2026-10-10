@@ -2640,3 +2640,72 @@ test('Plan2 S1 resumed scroll denies malformed intent without physical scrolling
     else globalThis.scrollBy = previousScrollBy;
   }
 });
+
+
+test('Plan2 S1 recovered FILL refuses malformed text and non-text controls before effects', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'text';
+  element.setAttribute('type', 'text');
+  const initial = snapshotBrowserPage('s1-fill-cold');
+  const snapshot = { frames: [{ frameId: 0, ...initial }], url: initial.url };
+  const approved = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"fill","frameId":0,"ref":"r1","text":"hello"}', snapshot,
+  )));
+  const events = [];
+  element.dispatchEvent = event => { events.push(event.type); return true; };
+  let focuses = 0;
+  element.focus = () => { focuses++; };
+  for (const value of [undefined, null, false, 12, { injected: true }, [], 'x'.repeat(50001)]) {
+    const recovered = JSON.parse(JSON.stringify({ ...approved, text: value }));
+    assert.throws(
+      () => executeBrowserPageAction('s1-fill-cold', recovered),
+      /AGENT_FILL_TEXT_INVALID/,
+    );
+  }
+  assert.equal(events.length, 0, 'invalid recovered FILL cannot emit synthetic input/change');
+  assert.equal(focuses, 0, 'invalid recovered FILL cannot trigger page focus handlers');
+
+  for (const kind of ['checkbox', 'radio', 'range', 'color', 'submit', 'reset', 'button']) {
+    element.type = kind;
+    element.setAttribute('type', kind);
+    const observed = snapshotBrowserPage('s1-fill-' + kind);
+    const current = { frames: [{ frameId: 0, ...observed }], url: observed.url };
+    const restored = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"fill","frameId":0,"ref":"r1","text":"not a text edit"}', current,
+    )));
+    assert.throws(
+      () => executeBrowserPageAction('s1-fill-' + kind, restored),
+      /AGENT_TARGET_NOT_FILLABLE/,
+    );
+    assert.equal(events.length, 0, kind + ' must not emit input/change');
+    assert.equal(focuses, 0, kind + ' must not trigger focus');
+  }
+
+  // A valid text input remains editable after the negative recovery cases.
+  element.type = 'text';
+  element.setAttribute('type', 'text');
+  Object.defineProperty(element, 'value', {
+    configurable: true,
+    get() { return this._value ?? ''; },
+    set(value) { this._value = String(value); },
+  });
+  const priorInput = globalThis.HTMLInputElement;
+  globalThis.HTMLInputElement = class {
+    set value(value) { this._value = String(value); }
+  };
+  try {
+    const currentPage = snapshotBrowserPage('s1-fill-valid');
+    const current = { frames: [{ frameId: 0, ...currentPage }], url: currentPage.url };
+    const exact = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"fill","frameId":0,"ref":"r1","text":"hello"}', current,
+    )));
+    assert.equal(executeBrowserPageAction('s1-fill-valid', exact).effectVerified, true);
+    assert.equal(element.value, 'hello');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(focuses, 1);
+  } finally {
+    if (priorInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = priorInput;
+  }
+});
