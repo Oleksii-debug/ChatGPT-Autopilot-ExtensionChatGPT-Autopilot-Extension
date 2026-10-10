@@ -2510,6 +2510,23 @@ function agentDefinitionModelPolicySummary(definition) {
   return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
 }
 
+function syncAgentDefinitionModelRoutePolicyControls() {
+  const configured = $('agent-definition-model-route-policy-configured').checked;
+  for (const id of [
+    'agent-definition-model-route-auto-switch',
+    'agent-definition-model-route-pinned-id',
+    'agent-definition-model-route-ordered-ids',
+    'agent-definition-model-route-allow-ids',
+    'agent-definition-model-route-deny-ids',
+    'agent-definition-model-route-free-only',
+    'agent-definition-model-route-locality',
+    'agent-definition-model-route-max-input-price',
+    'agent-definition-model-route-max-output-price'
+  ]) {
+    $(id).disabled = !configured;
+  }
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2524,6 +2541,25 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
+  const configDefaults = definition?.configDefaults || {};
+  $('agent-definition-ai-routing-mode').value = Object.hasOwn(configDefaults, 'aiRoutingMode') ? configDefaults.aiRoutingMode : '';
+  $('agent-definition-ai-pinned-route-id').value = Object.hasOwn(configDefaults, 'aiPinnedRouteId') ? configDefaults.aiPinnedRouteId : '';
+  $('agent-definition-ai-primary-provider').value = Object.hasOwn(configDefaults, 'aiPrimaryProvider') ? configDefaults.aiPrimaryProvider : '';
+  $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
+  $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
+  $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
+  const modelRoutePolicy = definition?.modelRoutePolicy || null;
+  $('agent-definition-model-route-policy-configured').checked = Boolean(modelRoutePolicy);
+  $('agent-definition-model-route-auto-switch').checked = modelRoutePolicy?.autoSwitch ?? true;
+  $('agent-definition-model-route-pinned-id').value = modelRoutePolicy?.pinnedRouteId || '';
+  $('agent-definition-model-route-ordered-ids').value = (modelRoutePolicy?.orderedRouteIds || []).join('\\n');
+  $('agent-definition-model-route-allow-ids').value = (modelRoutePolicy?.allowRouteIds || []).join('\\n');
+  $('agent-definition-model-route-deny-ids').value = (modelRoutePolicy?.denyRouteIds || []).join('\\n');
+  $('agent-definition-model-route-free-only').checked = modelRoutePolicy?.freeOnly === true;
+  $('agent-definition-model-route-locality').value = modelRoutePolicy?.locality || 'any';
+  $('agent-definition-model-route-max-input-price').value = modelRoutePolicy?.maxInputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxInputPricePerMillionUsd);
+  $('agent-definition-model-route-max-output-price').value = modelRoutePolicy?.maxOutputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxOutputPricePerMillionUsd);
+  syncAgentDefinitionModelRoutePolicyControls();
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
     : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
@@ -2776,6 +2812,22 @@ function agentDefinitionFormValue() {
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
     enabled: $('agent-definition-enabled').checked,
+    aiRoutingMode: $('agent-definition-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-definition-ai-pinned-route-id').value,
+    aiPrimaryProvider: $('agent-definition-ai-primary-provider').value,
+    aiPrimaryModel: $('agent-definition-ai-primary-model').value,
+    aiStrongProvider: $('agent-definition-ai-strong-provider').value,
+    aiStrongModel: $('agent-definition-ai-strong-model').value,
+    modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
+    modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
+    modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,
+    modelRouteOrderedRouteIdsText: $('agent-definition-model-route-ordered-ids').value,
+    modelRouteAllowRouteIdsText: $('agent-definition-model-route-allow-ids').value,
+    modelRouteDenyRouteIdsText: $('agent-definition-model-route-deny-ids').value,
+    modelRouteFreeOnly: $('agent-definition-model-route-free-only').checked,
+    modelRouteLocality: $('agent-definition-model-route-locality').value,
+    modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
+    modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
   };
 }
 
@@ -5697,6 +5749,7 @@ $('agent-definition-registry-list').addEventListener('change', selectAgentDefini
 $('agent-definition-create-registry-button').addEventListener('click', createAgentDefinitionRegistry);
 $('agent-definition-list').addEventListener('change', selectAgentDefinition);
 $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
+$('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
