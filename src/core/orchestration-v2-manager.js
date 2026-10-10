@@ -118,12 +118,17 @@ function identityChanged(a, b) {
 }
 function freshMeta() { return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function normalizeMeta(raw) {
-  if (!raw || raw.schemaVersion !== MANAGER_SCHEMA_VERSION || !Array.isArray(raw.order) || typeof raw.byId !== 'object') return freshMeta();
+  if (!raw || raw.schemaVersion !== MANAGER_SCHEMA_VERSION || !Array.isArray(raw.order)
+      || !raw.byId || typeof raw.byId !== 'object' || Array.isArray(raw.byId)) return freshMeta();
   const byId = {};
   const order = [];
   for (const id of raw.order) {
-    if (typeof id !== 'string' || !id || !raw.byId[id] || byId[id]) continue;
+    // Persisted JSON may name inherited Object.prototype keys. They are not
+    // orchestra records and must never become a controller/storage identity.
+    if (typeof id !== 'string' || !id || id === '__proto__'
+        || !Object.hasOwn(raw.byId, id) || Object.hasOwn(byId, id)) continue;
     const item = raw.byId[id];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     byId[id] = {
       id,
       name: safeName(item.name, 'Оркестр'),
@@ -135,7 +140,7 @@ function normalizeMeta(raw) {
     };
     order.push(id);
   }
-  return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: byId[raw.selectedId] ? raw.selectedId : (order[0] || ''), order, byId };
+  return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: typeof raw.selectedId === 'string' && Object.hasOwn(byId, raw.selectedId) ? raw.selectedId : (order[0] || ''), order, byId };
 }
 
 export class OrchestrationV2Manager {
