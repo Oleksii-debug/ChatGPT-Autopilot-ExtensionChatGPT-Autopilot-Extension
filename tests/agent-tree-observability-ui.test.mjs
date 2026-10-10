@@ -119,3 +119,50 @@ test('read-only Agent tree rejects inherited and hostile orchestra IDs, then rec
   });
   assert.deepEqual(reads, ['orch-1', 'orch-1']);
 });
+
+
+test('persisted orchestra metadata cannot select inherited identities or malformed entries after restart', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  const valid = { id: 'orch-1', name: 'Recovered orchestra', subagentPolicy: {} };
+  let persisted = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    order: ['__proto__', 'constructor', 'toString', 'bad', 'orch-1', 'orch-1'],
+    selectedId: '__proto__',
+    byId: { 'orch-1': valid, bad: false },
+  }));
+  manager.chrome = { storage: { local: { get: async () => ({
+    autopilotOrchestrationV2Manager: persisted,
+  }) } } };
+  const first = await manager.loadMeta();
+  assert.deepEqual(first.order, ['orch-1']);
+  assert.equal(first.selectedId, 'orch-1');
+  assert.equal(Object.hasOwn(first.byId, '__proto__'), false);
+  assert.equal(Object.hasOwn(first.byId, 'constructor'), false);
+  assert.equal(Object.hasOwn(first.byId, 'toString'), false);
+  assert.equal(first.byId['orch-1'].id, 'orch-1');
+
+  // A forged own __proto__ record must not modify the normalized object's
+  // prototype or steal selectedId; immutable readback remains recoverable.
+  persisted = JSON.parse('{"schemaVersion":1,"order":["__proto__","orch-1"],'
+    + '"selectedId":"__proto__","byId":{"__proto__":{"id":"__proto__"},'
+    + '"orch-1":{"id":"orch-1","name":"Recovered orchestra"}}}');
+  const second = await manager.loadMeta();
+  assert.deepEqual(second.order, ['orch-1']);
+  assert.equal(second.selectedId, 'orch-1');
+  assert.equal(Object.getPrototypeOf(second.byId), Object.prototype);
+  assert.equal(Object.hasOwn(second.byId, '__proto__'), false);
+
+  // Corrupt persisted metadata is reset, not interpreted as authority.
+  for (const invalid of [null, [], 'bad']) {
+    persisted = { schemaVersion: 1, order: ['constructor'], selectedId: 'constructor', byId: invalid };
+    const recovered = await manager.loadMeta();
+    assert.deepEqual(recovered.order, []);
+    assert.equal(recovered.selectedId, '');
+  }
+  persisted = JSON.parse(JSON.stringify({
+    schemaVersion: 1, order: ['orch-1'], selectedId: 'orch-1',
+    byId: { 'orch-1': valid },
+  }));
+  assert.equal((await manager.loadMeta()).selectedId, 'orch-1');
+});
