@@ -56,16 +56,18 @@ jobs:
           node --check tests/browser-agent-definition-launch.test.mjs
           node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
+      # Run the S1 contract regression gates before the independent S2
+      # evidence-verifier gate, so an S2 failure cannot hide S1 results.
+      - name: Agent I/O negative and schema contract tests
+        run: node --test tests/agent-io-contract.test.mjs
+      - name: Universal agent authority and evidence contracts
+        run: node --test tests/universal-agent-contracts.test.mjs
       - name: Outcome Contract canonical goal/evidence and intake non-disclosure
         run: node --test tests/outcome-contract.test.mjs
       - name: Trusted Outcome verification boundary and non-disclosure
         run: node --test tests/outcome-verification-bridge.test.mjs
       - name: Agent Definition canonical route policy and diagnostic non-disclosure
         run: node --test tests/agent-definition-registry.test.mjs
-      - name: Agent I/O negative and schema contract tests
-        run: node --test tests/agent-io-contract.test.mjs
-      - name: Universal agent authority and evidence contracts
-        run: node --test tests/universal-agent-contracts.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
         run: node --test tests/browser-agent-definition-launch.test.mjs
       - name: Adjacent persisted Agent definition regression tests
