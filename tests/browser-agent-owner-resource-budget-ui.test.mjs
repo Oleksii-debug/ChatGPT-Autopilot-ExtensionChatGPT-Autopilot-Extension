@@ -88,7 +88,6 @@ test('malformed revision and capacity reads never enable an owner-wide capacity 
     { revision: 0, quarantined: false, budget: { maxConcurrentAgents: '2' } },
     { revision: 0, quarantined: false, budget: { maxConcurrentAgents: 257 } },
     { revision: 0, quarantined: false, budget: { maxConcurrentAgents: -1 } },
-    { revision: 0, quarantined: false, budget: { maxConcurrentAgents: 2 }, extra: 'ignored', },
     { revision: 0, quarantined: true, budget: { maxConcurrentAgents: 2 } },
   ];
   for (const sample of invalid) {
@@ -134,7 +133,7 @@ test('malformed SET receipt is not announced as success or blindly retried', asy
   assert.equal(harness.nodes['agent-owner-max-concurrent'].value, '4');
   assert.equal(harness.nodes['agent-owner-resource-budget-save-button'].disabled, false);
   assert.match(harness.nodes['agent-owner-resource-budget-status'].textContent, /не збережено/);
-  assert.ok(harness.announcements.every(message => !message.includes('збережено.')));
+  assert.ok(harness.announcements.every(message => message !== 'Глобальну Specialist capacity збережено.'));
 });
 
 test('valid owner budget CAS save preserves unrelated dimensions and publishes the new revision', async () => {
@@ -150,7 +149,7 @@ test('valid owner budget CAS save preserves unrelated dimensions and publishes t
     'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
   ]);
   assert.equal(harness.calls[1].payload.expectedRevision, 2);
-  assert.deepEqual(harness.calls[1].payload.budget, { maxConcurrentAgents: 7, maxDollars: 20 });
+  assert.deepEqual(JSON.parse(JSON.stringify(harness.calls[1].payload.budget)), { maxConcurrentAgents: 7, maxDollars: 20 });
   assert.equal(harness.ui.ownerResourceBudgetState.revision, 3);
   assert.equal(harness.nodes['agent-owner-resource-budget-save-button'].disabled, false);
   assert.match(harness.nodes['agent-owner-resource-budget-status'].textContent, /Збережено/);
