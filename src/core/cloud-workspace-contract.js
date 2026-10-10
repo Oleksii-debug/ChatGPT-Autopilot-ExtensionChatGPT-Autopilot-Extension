@@ -315,6 +315,9 @@ const SCRUB_PROOF_KEYS = new Set([
   'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
   'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
 ]);
+const TEARDOWN_RECEIPT_KEYS = new Set([
+  'schemaVersion', 'workspaceId', 'providerId', 'executionLeaseId', 'completedAt',
+]);
 
 function trustedLifecycleOptions(input, keys, required, label) {
   const raw = dataRecord(input, keys, label);
@@ -550,12 +553,29 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
     executionLeaseId: binding.executionLeaseId,
     executionOwnershipRevision: binding.executionOwnershipRevision,
   });
-  await trusted.teardown(target);
+  // A boolean/undefined teardown response is not evidence that cleanup
+  // finished. An attested completion timestamp must precede fresh scrub proof,
+  // so a previously captured "clean" receipt cannot be replayed post-teardown.
+  const completed = dataRecord(
+    await trusted.teardown(target), TEARDOWN_RECEIPT_KEYS,
+    'Cloud workspace teardown completion',
+  );
+  if (completed.schemaVersion !== CLOUD_WORKSPACE_VERSION
+      || completed.workspaceId !== binding.workspaceId
+      || completed.providerId !== binding.providerId
+      || completed.executionLeaseId !== binding.executionLeaseId) {
+    throw new Error('Cloud workspace teardown completion identity mismatch');
+  }
+  const completedAt = exactTimestamp(completed.completedAt, 'Cloud workspace teardown completedAt');
+  if (Date.parse(completedAt) < Date.parse(binding.boundAt)
+      || Date.parse(completedAt) > Date.parse(trusted.at)) {
+    throw new Error('Cloud workspace teardown completion chronology is invalid');
+  }
   const proof = await trusted.verifyScrub(target);
   const verifiedAt = verifyExactLifecycleProof(
     proof, SCRUB_PROOF_KEYS, binding, trusted.at,
     ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
-    'Cloud workspace scrub proof',
+    'Cloud workspace scrub proof', completedAt,
   );
   // Teardown and attestation cross asynchronous boundaries. A proof about an
   // earlier lease/workspace must never be accepted after the canonical binding
