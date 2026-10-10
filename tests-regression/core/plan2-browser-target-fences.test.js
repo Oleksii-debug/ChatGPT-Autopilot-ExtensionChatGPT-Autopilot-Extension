@@ -3455,3 +3455,73 @@ test('Plan2 S1 credential broker never writes into readonly password or username
     else globalThis.location = previousLocation;
   }
 });
+
+
+test('Plan2 S1 SELECT readonly observation, focus and input-event transitions fail closed', () => {
+  setup();
+  const oldSelect = globalThis.HTMLSelectElement;
+  const oldFocus = element.focus;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.multiple = false;
+    element.value = 'keep';
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'allow', textContent: 'Allow', label: 'Allow' },
+    ];
+    const observed = () => {
+      const snap = snapshotBrowserPage('readonly-select');
+      return { snap, source: { url: snap.url, frames: [{ frameId: 0, ...snap }] } };
+    };
+    const proposed = { type: 'select', frameId: 0, ref: 'r1', value: 'allow' };
+    element.setAttribute('aria-readonly', 'true');
+    const readonlySnapshot = observed();
+    assert.equal(readonlySnapshot.source.frames[0].elements[0].readonly, true);
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify(proposed), readonlySnapshot.source),
+      /select refuses readonly semantic target/,
+    );
+    element.removeAttribute('aria-readonly');
+
+    const { snap, source } = observed();
+    const action = JSON.parse(JSON.stringify(
+      parseBrowserAgentAction(JSON.stringify(proposed), source),
+    ));
+    const events = [];
+    let onInput = () => {};
+    element.dispatchEvent = event => {
+      events.push(event.type);
+      if (event.type === 'input') onInput();
+      return true;
+    };
+    const run = () => executeBrowserPageAction(snap.snapshotId, action);
+
+    element.setAttribute('readonly', '');
+    assert.throws(run, /AGENT_TARGET_READONLY|AGENT_SEMANTIC_TARGET_STALE/);
+    assert.deepEqual(events, [], 'readonly before action must not notify page listeners');
+    element.removeAttribute('readonly');
+
+    element.focus = () => { element.setAttribute('aria-readonly', 'true'); };
+    assert.throws(run, /AGENT_TARGET_READONLY|AGENT_SEMANTIC_TARGET_STALE/);
+    assert.deepEqual(events, [], 'focus-time readonly must not notify page listeners');
+    element.focus = oldFocus;
+    element.removeAttribute('aria-readonly');
+
+    onInput = () => { element.setAttribute('aria-readonly', 'true'); };
+    assert.throws(run, /AGENT_TARGET_READONLY|AGENT_SEMANTIC_TARGET_STALE/);
+    assert.deepEqual(events, ['input'], 'input-time readonly must suppress change event');
+    element.removeAttribute('aria-readonly');
+
+    events.length = 0;
+    onInput = () => {};
+    assert.equal(run().effectVerified, true);
+    assert.equal(element.value, 'allow');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(element.clicked, 0);
+  } finally {
+    element.focus = oldFocus;
+    if (oldSelect === undefined) delete globalThis.HTMLSelectElement;
+    else globalThis.HTMLSelectElement = oldSelect;
+  }
+});
