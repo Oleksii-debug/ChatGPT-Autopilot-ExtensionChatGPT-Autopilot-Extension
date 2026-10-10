@@ -71,9 +71,10 @@ test('service worker composes one trusted durable Specialist readiness path', as
   const probeBranch = source.slice(probeStart, probeEnd);
   assert.doesNotMatch(
     probeBranch,
-    /claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\\.execute|completeSpecialistHandoff/u,
+    /claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff/u,
     'read-only probe may not claim, execute, or complete a Specialist',
-  );  assert.equal(
+  );
+  assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
     0,
     'service worker must not own a second Browser Agent persistence implementation',
