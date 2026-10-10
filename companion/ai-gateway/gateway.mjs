@@ -139,6 +139,16 @@ function resolveCompatibleEndpoint(endpointId = '', registry = COMPATIBLE_ENDPOI
   return endpoint;
 }
 
+// An endpointId is a provider/account identity, not a free-form label. The
+// built-in Ollama/OpenAI transports have one configured origin each and cannot
+// honor an arbitrary registry endpoint. Reject it before any provider I/O.
+function requireBuiltinEndpointUnbound(provider, endpointId) {
+  if (provider === 'openai-compatible') return;
+  if (endpointId !== '') {
+    throw gatewayError('Built-in provider does not support a bound endpointId', 400, 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+  }
+}
+
 export function createInferenceQueue({ maxPending = DEFAULT_MAX_PENDING_INFERENCE } = {}) {
   const limit = Math.min(256, Math.max(1, Number(maxPending) || DEFAULT_MAX_PENDING_INFERENCE));
   const pending = [];
@@ -457,6 +467,7 @@ function openAiText(body) {
 
 export async function listProviderModels(provider, { fetchFn = globalThis.fetch, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
+  requireBuiltinEndpointUnbound(provider, endpointId);
   if (provider === 'ollama') {
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/tags`);
     return (body.models || []).map(item => clean(item?.name || item?.model)).filter(Boolean).sort();
@@ -472,6 +483,7 @@ export async function listProviderModels(provider, { fetchFn = globalThis.fetch,
 
 export async function completeProvider({ provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch, compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
+  requireBuiltinEndpointUnbound(provider, endpointId);
   if (!clean(model)) throw new Error('Model is required');
   if (!clean(prompt)) throw new Error('Prompt is required');
   const visionImage = normalizeImageDataUrl(imageDataUrl);
@@ -530,6 +542,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
 
 export async function probeProvider(provider, { fetchFn = globalThis.fetch, timeoutMs = STATUS_PROBE_TIMEOUT_MS, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
+  requireBuiltinEndpointUnbound(provider, endpointId);
   if (provider === 'openai' && !clean(process.env.OPENAI_API_KEY)) {
     return { provider, configured: false, ok: false, models: 0, reason: 'api-key-not-configured' };
   }
