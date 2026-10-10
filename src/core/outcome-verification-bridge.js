@@ -425,6 +425,13 @@ function criterionResult({
     trustedRecordId: trustedRecord.recordId,
     verificationId: verification.verificationId,
     verificationStatus: verification.status,
+    // These fields originate exclusively from the normalized trusted ledger
+    // record; caller-supplied evidence never mints provenance or authority.
+    invocationId: verification.invocationId,
+    observationId: verification.observationId,
+    trustedReasonCode: verification.reasonCode,
+    trustedEvidenceArtifactRefs: verification.evidenceArtifactIds
+      .map(artifactId => artifactsById.get(artifactId)),
     verifierId: trustedRecord.verifierId,
     verificationAuthorityId: trustedRecord.verificationAuthorityId,
     accepted,
