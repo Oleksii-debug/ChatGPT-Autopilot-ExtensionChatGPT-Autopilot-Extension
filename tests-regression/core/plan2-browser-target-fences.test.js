@@ -2800,3 +2800,62 @@ test('Plan2 S1 credential username denies non-text controls at parse and effect 
     else globalThis.HTMLTextAreaElement = previousTextarea;
   }
 });
+
+
+test('Plan2 S1 ARIA check state ignores spoofed checked properties after JSON recovery', () => {
+  setup();
+  element.setAttribute('role', 'switch');
+  element.setAttribute('aria-checked', 'false');
+  // A page can put an arbitrary checked property on a custom ARIA widget.
+  // It must not masquerade as the native HTMLInputElement checked property.
+  element.checked = true;
+  const before = snapshotBrowserPage('aria-spoofed-property');
+  assert.equal(before.elements[0].checked, false, 'snapshot must use ARIA, not custom .checked');
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+    { frames: [{ frameId: 0, ...before }], url: before.url })));
+  assert.equal(executeBrowserPageAction('aria-spoofed-property', action).checked, false);
+  assert.equal(element.clicked, 0, 'no accidental toggle from a spoofed property');
+
+  for (const corrupt of ['mixed', 'undefined', 'invalid', '']) {
+    if (corrupt) element.setAttribute('aria-checked', corrupt);
+    else element.removeAttribute('aria-checked');
+    const snapshot = snapshotBrowserPage('aria-spoofed-' + (corrupt || 'missing'));
+    assert.equal(snapshot.elements[0].checked, null, 'indeterminate state stays unknown');
+    const recovered = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+      { frames: [{ frameId: 0, ...snapshot }], url: snapshot.url })));
+    assert.throws(() => executeBrowserPageAction('aria-spoofed-' + (corrupt || 'missing'), recovered),
+      /AGENT_CHECK_STATE_INDETERMINATE/);
+    assert.equal(element.clicked, 0, 'malformed ARIA proof never generates a click');
+  }
+
+  element.setAttribute('aria-checked', 'false');
+  element.click = () => { element.clicked++; element.setAttribute('aria-checked', 'true'); };
+  const valid = snapshotBrowserPage('aria-spoofed-recovered');
+  const approved = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...valid }], url: valid.url })));
+  const result = executeBrowserPageAction('aria-spoofed-recovered', approved);
+  assert.equal(result.checked, true, 'explicit ARIA state can recover and transition');
+  assert.equal(element.clicked, 1);
+});
+
+test('Plan2 S1 native checkbox refuses corrupted nonboolean state before any click', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'checkbox';
+  element.setAttribute('type', 'checkbox');
+  element.checked = 'false';
+  const page = snapshotBrowserPage('native-coercion');
+  assert.equal(page.elements[0].checked, null);
+  const restored = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+    { frames: [{ frameId: 0, ...page }], url: page.url })));
+  assert.throws(() => executeBrowserPageAction('native-coercion', restored),
+    /AGENT_CHECK_STATE_INDETERMINATE/);
+  assert.equal(element.clicked, 0);
+  element.checked = false;
+  assert.equal(executeBrowserPageAction('native-coercion', restored).checked, false);
+  assert.equal(element.clicked, 0);
+});
