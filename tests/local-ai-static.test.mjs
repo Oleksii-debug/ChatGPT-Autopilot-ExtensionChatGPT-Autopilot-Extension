@@ -12,7 +12,7 @@ test('manifest grants only explicit local AI hosts in addition to ChatGPT', () =
     assert.ok(manifest.host_permissions.includes(host));
   }
   assert.equal(manifest.version, packageMetadata.version);
-  assert.equal(manifest.version_name, packageMetadata.version.split('.')[0]);
+  assert.equal(manifest.version_name, `${packageMetadata.version} High`);
 });
 
 test('Local AI UI controls and commands are present', () => {
