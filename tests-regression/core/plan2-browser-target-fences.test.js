@@ -3728,3 +3728,54 @@ test('Plan2 S1 malformed or untrusted persisted form destinations fail closed', 
   observed.formAction = 'https://source.test/save';
   assert.equal(verdict().decision, 'ALLOW', 'valid form destination recovers without effects');
 });
+
+
+test('Plan2 S1 image submit uses observed destination before click or keyboard effects after recovery', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.setAttribute('type', 'image');
+  const form = new HTMLFormElement();
+  form.action = 'https://blocked.test/payment';
+  form.method = 'post';
+  element.form = form;
+  element.formAction = form.action;
+  element.formMethod = form.method;
+  const page = snapshotBrowserPage('image-submit-proof');
+  const observed = page.elements[0];
+  assert.equal(observed.type, 'image');
+  assert.equal(observed.submitLike, true, 'input type=image submits the form');
+  assert.equal(observed.formAssociated, true);
+  assert.equal(observed.formAction, form.action);
+  const recovered = JSON.parse(JSON.stringify({
+    url: 'https://source.test/form',
+    frames: [{ frameId: 0, url: 'https://source.test/form', elements: [observed] }],
+  }));
+  const config = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'source.test', defaultDecision: 'ALLOW', actionDecisions: {} },
+      { pattern: 'blocked.test', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.test', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  };
+  const actions = [
+    { type: 'click', ref: observed.ref, frameId: 0 },
+    { type: 'key', key: 'Enter', ref: observed.ref, frameId: 0 },
+    { type: 'key', key: ' ', ref: observed.ref, frameId: 0 },
+  ];
+  for (const action of actions) {
+    const denied = resolveBrowserAgentOwnerPolicy(config, recovered, action);
+    assert.equal(denied.decision, 'DENY', action.type);
+    assert.equal(denied.policyUrl, 'https://blocked.test/payment');
+  }
+  // Corrupt persisted submitLike is not authority to downgrade an image-submit.
+  recovered.frames[0].elements[0].submitLike = false;
+  assert.equal(resolveBrowserAgentOwnerPolicy(config, recovered, actions[0]).decision, 'DENY');
+  recovered.frames[0].elements[0].formAction = 'https://ask.test/confirm';
+  assert.equal(resolveBrowserAgentOwnerPolicy(config, recovered, actions[0]).decision, 'ASK');
+  recovered.frames[0].elements[0].formAction = 'https://source.test/safe';
+  assert.equal(resolveBrowserAgentOwnerPolicy(config, recovered, actions[0]).decision, 'ALLOW');
+  recovered.frames[0].elements[0].formAction = 'javascript:alert(1)';
+  assert.equal(resolveBrowserAgentOwnerPolicy(config, recovered, actions[0]).decision, 'DENY');
+  assert.equal(element.clicked, 0, 'policy probes must never click');
+});
