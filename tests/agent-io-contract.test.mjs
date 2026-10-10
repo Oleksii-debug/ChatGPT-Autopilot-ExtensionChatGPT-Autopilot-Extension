@@ -627,3 +627,50 @@ test('Plan-1 S1: provider capability grants reject hostile lists without effects
     JSON.parse(JSON.stringify([allowed[0], allowed[0]])));
   assert.deepEqual(restart, known, 'duplicate exact IDs must not widen persisted authority');
 });
+
+
+test('Plan-1 S1: own undefined optional durable IDs fail closed before evidence publishing', async () => {
+  const published = [];
+  const sink = new AgentEventSink({ onEvent: observed => published.push(observed) });
+  const invalidActions = [];
+  const invalidEvents = [];
+  for (const field of ['sessionId', 'taskId']) {
+    invalidActions.push(action({ [field]: undefined }));
+    invalidEvents.push(event({ [field]: undefined }));
+  }
+  invalidEvents.push(event({ type: AgentEventType.COMPLETION_OBSERVED, actionId: undefined }));
+  for (const input of invalidActions) {
+    assert.throws(() => normalizeAgentAction(input), /exact ID or canonical null/);
+  }
+  for (const input of invalidEvents) {
+    assert.throws(() => normalizeAgentEvent(input), /exact ID or canonical null/);
+    await assert.rejects(() => sink.emit(input), /exact ID or canonical null/);
+  }
+  assert.equal(published.length, 0, 'invalid evidence cannot enter a subscriber or ledger');
+  assert.equal(invalidActions[0].sessionId, undefined);
+  assert.equal(invalidEvents[0].sessionId, undefined);
+
+  // A missing legacy reference and an explicit canonical null remain legal,
+  // and their normalized snapshots round-trip through a cold JSON restart.
+  const legacyAction = action();
+  delete legacyAction.sessionId;
+  delete legacyAction.taskId;
+  const legacyEvent = event({ type: AgentEventType.COMPLETION_OBSERVED });
+  delete legacyEvent.actionId;
+  delete legacyEvent.sessionId;
+  delete legacyEvent.taskId;
+  const recoveredAction = normalizeAgentAction(legacyAction);
+  const recoveredEvent = normalizeAgentEvent(legacyEvent);
+  assert.equal(recoveredAction.sessionId, null);
+  assert.equal(recoveredAction.taskId, null);
+  assert.equal(recoveredEvent.actionId, null);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(recoveredAction))), recoveredAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(recoveredEvent))), recoveredEvent);
+  const explicitNull = normalizeAgentEvent(event({
+    type: AgentEventType.COMPLETION_OBSERVED,
+    actionId: null,
+    sessionId: null,
+    taskId: null,
+  }));
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(explicitNull))), explicitNull);
+});
