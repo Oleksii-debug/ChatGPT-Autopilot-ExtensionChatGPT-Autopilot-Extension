@@ -53,7 +53,6 @@ import {
 import {
   ExecutionOwnershipState,
   normalizeExecutionOwnershipV1,
-  requireExecutionReconciliationV1,
   recoverExpiredExecutionOwnershipV1,
 } from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
@@ -121,6 +120,36 @@ const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
   'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
   'effectEvidence', 'errorCode',
 ]);
+
+// Version bridge for the original provider execution path. The durable
+// execution-ownership schema remains the sole validator; this transition runs
+// only under BrowserAgentManager's existing serialized storage mutation.
+function requireSpecialistProviderReconciliationV1(raw, { leaseId, reason, at } = {}) {
+  const ownership = normalizeExecutionOwnershipV1(raw);
+  if (ownership.state !== ExecutionOwnershipState.OWNED || ownership.leaseId !== leaseId) {
+    throw new Error('Specialist provider reconciliation requires current owned lease');
+  }
+  if (typeof reason !== 'string' || !reason || reason.length > 1000) {
+    throw new Error('Specialist provider reconciliation needs bounded reason');
+  }
+  const atMs = Date.parse(at);
+  if (!Number.isFinite(atMs) || new Date(atMs).toISOString() !== at
+      || atMs < Date.parse(ownership.updatedAt)) {
+    throw new Error('Specialist provider reconciliation chronology is invalid');
+  }
+  if (!Number.isSafeInteger(ownership.revision + 1)) {
+    throw new Error('Specialist provider reconciliation revision exhausted');
+  }
+  return normalizeExecutionOwnershipV1({
+    ...ownership,
+    state: ExecutionOwnershipState.RECONCILE,
+    handoffToPlane: '',
+    handoffId: '',
+    ambiguityReason: reason,
+    updatedAt: at,
+    revision: ownership.revision + 1,
+  });
+}
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -2225,7 +2254,7 @@ export class BrowserAgentManager {
           errorCode: 'SPECIALIST_PROVIDER_RESULT_AFTER_LEASE',
         };
       } else if (request.reconciliationRequired === true) {
-        ownership = requireExecutionReconciliationV1(ownership, {
+        ownership = requireSpecialistProviderReconciliationV1(ownership, {
           leaseId,
           reason: request.errorCode || 'provider effect may have occurred without verified completion',
           at,
