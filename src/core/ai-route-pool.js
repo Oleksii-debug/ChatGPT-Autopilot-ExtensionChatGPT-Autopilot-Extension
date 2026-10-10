@@ -215,10 +215,14 @@ export function normalizeAiRoutePool(raw = []) {
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const rawLocality = own(item, 'locality');
+    // Omission supports legacy defaults; an explicitly persisted undefined must
+    // not reset a user-approved locality constraint after a partial migration.
+    if (Object.hasOwn(item, 'locality') && rawLocality === undefined) throw new Error('AI route locality cannot be undefined when supplied');
     if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
     const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
     const rawCostClass = own(item, 'costClass');
+    if (Object.hasOwn(item, 'costClass') && rawCostClass === undefined) throw new Error('AI route costClass cannot be undefined when supplied');
     if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
     // A remote Ollama-compatible endpoint is not provably free merely because its provider name is Ollama.
     // Only explicitly local Ollama keeps the legacy zero-cost default; all other unpriced routes stay UNKNOWN.
@@ -262,6 +266,9 @@ export function normalizeAiRoutePolicy(raw = {}) {
     throw new Error('AI route pinnedRouteId must be exact text when explicitly supplied');
   }
   const rawLocality = own(source, 'locality');
+  // An explicit undefined is not a legacy omission: falling back to `any`
+  // would silently widen the owner's persisted locality policy.
+  if (Object.hasOwn(source, 'locality') && rawLocality === undefined) throw new Error('AI route policy locality cannot be undefined when supplied');
   if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
   const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
