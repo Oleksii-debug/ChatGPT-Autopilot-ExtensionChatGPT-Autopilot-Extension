@@ -1,3 +1,4 @@
+import { hasUnsafeAiDispatchUnicode } from './ai-route-pool.js';
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:17621';
 const MIN_TIMEOUT_SECONDS = 5;
@@ -381,7 +382,7 @@ export class AiGatewayClient {
     // Provider identity is an exact dispatch key, not whitespace-normalized
     // display text. A caller outside the orchestrator must not bypass the
     // canonical route/account binding by silently aliasing a persisted ID.
-    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80) {
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80 || hasUnsafeAiDispatchUnicode(provider)) {
       throw new Error('AI provider must be an exact bounded identity');
     }
     const p = encodeURIComponent(provider);
@@ -410,10 +411,10 @@ export class AiGatewayClient {
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
     // Preserve the exact authorized provider/model identity through the
     // final outbound effect. Never trim aliases at this API boundary.
-    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80) {
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80 || hasUnsafeAiDispatchUnicode(provider)) {
       throw new Error('AI provider must be an exact bounded identity');
     }
-    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300) {
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300 || hasUnsafeAiDispatchUnicode(model)) {
       throw new Error('AI model must be an exact bounded identity');
     }
     return this.request(gatewayUrl, timeoutSeconds, '/complete', {
