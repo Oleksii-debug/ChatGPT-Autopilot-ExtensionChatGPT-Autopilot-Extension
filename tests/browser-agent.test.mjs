@@ -3627,3 +3627,53 @@ test('owner approval fence rejects a replacement pending action that races with 
   assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
   assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new', 'stale reject must not clear the replacement approval');
 });
+
+test('Plan4 S1: model budget admission rejects coerced ceilings, call numbers and owner epochs before any reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome, routePrompt:async () => ({ text:'{}' }), now:() => 56_000,
+  });
+  const jobId = 'job-plan4-strict-budget-admission';
+  await manager.create({
+    id:jobId, goal:'Bound a local model call without external providers',
+    maxModelCalls:2, maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    store.byId[jobId].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const base = {
+    jobId, controlEpoch:0, prompt:'fixture', maxOutputTokens:128, callNumber:1,
+    route:{routeId:'local', provider:'ollama', model:'fixture'},
+  };
+  const cases = [
+    ['maxOutputTokens', '128', 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', 127.5, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', true, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', Infinity, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', NaN, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', -0, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', 0, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['callNumber', '1', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['callNumber', 0, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['callNumber', 1.5, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', '0', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', null, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', -0, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+  ];
+  for (const [field, value, errorCode] of cases) {
+    await assert.rejects(
+      () => manager.reserveProviderModelBudget({ ...base, [field]:value }),
+      error => error.code === errorCode, `${field}: malformed input must fail before store or provider effect`,
+    );
+    const readback = await manager.get(jobId);
+    assert.equal(readback.job.runtime.modelBudgetReservation, null, field);
+    assert.equal(readback.job.runtime.modelBudgetReservationSeq, 0, field);
+    assert.equal(readback.job.runtime.modelCalls, 0, field);
+  }
+  const valid = await manager.reserveProviderModelBudget(base);
+  assert.equal(valid.routeId, 'local');
+  assert.equal(valid.callNumber, 1);
+  const readback = await manager.get(jobId);
+  assert.equal(readback.job.runtime.modelBudgetReservation.reservationId, valid.reservationId);
+});
