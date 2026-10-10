@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createExtensionPairingStore, createGatewayServer } from '../companion/ai-gateway/gateway.mjs';
+import { createExtensionPairingStore, createGatewayServer, normalizeCompatibleEndpointRegistry } from '../companion/ai-gateway/gateway.mjs';
 import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
 
 function response(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }); }
@@ -43,6 +43,56 @@ test('extension client talks over real localhost HTTP to gateway which routes Ol
   }
   assert.ok(upstream.some(([url]) => url.endsWith('/api/chat')));
   assert.ok(upstream.some(([url]) => url.endsWith('/responses')));
+});
+
+test('Plan4 S1 real HTTP gateway forbids endpoint alias, duplicate ID and erased POST account before upstream I/O', async () => {
+  const endpoints=normalizeCompatibleEndpointRegistry([
+    {endpointId:'local',baseUrl:'http://127.0.0.1:1234/v1',apiKeyEnv:''},
+    {endpointId:'team',baseUrl:'https://models.example.test/v1',apiKeyEnv:'TEAM_KEY'},
+  ]);
+  const upstream=[];
+  const fetchFn=async (url,init={})=>{
+    upstream.push({url,authorization:init.headers?.authorization});
+    return url.endsWith('/models')
+      ? response({data:[{id:'test-model'}]})
+      : response({choices:[{message:{content:'fixture-ok'}}],usage:{prompt_tokens:3,completion_tokens:2,total_tokens:5}});
+  };
+  const server=createGatewayServer({compatibleEndpoints:endpoints,fetchFn,env:{TEAM_KEY:'fixture-only-key'}});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const root=`http://127.0.0.1:${server.address().port}`;
+  try {
+    for(const query of [
+      'provider=openai-compatible&endpointId=%20team%20',
+      'provider=openai-compatible&endpointId=',
+      'provider=openai-compatible&endpointId=team&endpointId=local',
+    ]) {
+      const result=await fetch(`${root}/models?${query}`);
+      assert.equal(result.status,400);
+      assert.equal((await result.json()).code,'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+    }
+    for(const endpointId of ['', ' team ', null, 42]) {
+      const result=await fetch(`${root}/complete`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({provider:'openai-compatible',endpointId,model:'test-model',prompt:'test'}),
+      });
+      assert.equal(result.status,400);
+      assert.equal((await result.json()).code,'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+    }
+    assert.equal(upstream.length,0,'never contact remote provider for ambiguous or forged account endpoint');
+    const discovery=await fetch(`${root}/models?provider=openai-compatible&endpointId=team`);
+    assert.equal(discovery.status,200);
+    assert.equal((await discovery.json()).endpointId,'team');
+    const completion=await fetch(`${root}/complete`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:'openai-compatible',endpointId:'team',model:'test-model',prompt:'approved'}),
+    });
+    assert.equal(completion.status,200);
+    assert.equal((await completion.json()).endpointId,'team');
+    assert.equal(upstream.length,2);
+    assert.deepEqual(upstream.map(x=>x.authorization),['Bearer fixture-only-key','Bearer fixture-only-key']);
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+  }
 });
 
 test('gateway rejects web origins and binds exactly one Chrome extension during an explicit pairing window', async () => {
