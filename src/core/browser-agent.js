@@ -1278,7 +1278,22 @@ export function executeBrowserPageAction(snapshotId, action) {
     return { ok: true, kind: 'click', effectVerified: false, url: location.href };
   }
   if (action.type === 'fill') {
+    // Approved/recovered actions can bypass planner parsing. Never coerce
+    // missing, non-string or oversized text into a different form effect.
+    if (typeof action.text !== 'string' || action.text.length > 50000) {
+      throw new Error('AGENT_FILL_TEXT_INVALID');
+    }
     const element = ensureTarget();
+    // FILL is a text edit, never an alias for CHECK or a hidden/control
+    // mutation that synthetic input/change events could silently trigger.
+    // Reject before focus handlers, pointer movement, setters or events.
+    const inputTag = String(element.tagName || '').toLowerCase();
+    const inputKind = inputTag === 'input'
+      ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
+    if (inputTag === 'input' && [
+      'hidden', 'password', 'file', 'checkbox', 'radio', 'submit', 'reset',
+      'button', 'image', 'range', 'color',
+    ].includes(inputKind)) throw new Error('AGENT_TARGET_NOT_FILLABLE');
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
     ensureUnoccluded(element);
