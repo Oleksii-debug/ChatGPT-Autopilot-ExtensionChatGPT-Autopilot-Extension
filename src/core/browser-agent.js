@@ -170,17 +170,37 @@ function browserAgentActivatesObservedLink(action) {
     || (action?.type === BrowserAgentActionType.KEY && ['Enter', ' ', 'Space'].includes(action?.key));
 }
 
+// Policy must follow the observed network destination of a form submit,
+// not only an anchor href. Owner rules on a denied destination must win over
+// the current page's ALLOW. Never trust model-proposed formAction/href fields.
+function browserAgentObservedActivationDestination(snapshot, action) {
+  if (!browserAgentActivatesObservedLink(action)) return null;
+  const observed = browserAgentSnapshotElement(snapshot, action);
+  if (!observed) return null;
+  if (typeof observed.href === 'string' && observed.href.trim()) {
+    return { href: observed.href, kind: 'link' };
+  }
+  const inputEnterSubmit = action?.type === BrowserAgentActionType.KEY
+    && action.key === 'Enter' && observed.formAssociated === true
+    && observed.tag === 'input'
+    && ['text', 'search', 'email', 'url', 'tel', 'number', 'password'].includes(observed.type);
+  if (observed.submitLike === true || inputEnterSubmit) {
+    if (observed.formAssociated !== true) return null;
+    // A missing or corrupt persisted form destination must fail closed.
+    return { href: observed.formAction, kind: 'form' };
+  }
+  return null;
+}
+
 function browserAgentPolicyTargetUrl(snapshot, action) {
   const current = clean(snapshot?.url, 4096);
   if ([BrowserAgentActionType.NAVIGATE, BrowserAgentActionType.NEW_TAB, BrowserAgentActionType.DOWNLOAD].includes(action?.type)) {
     return clean(action?.url, 4096) || current;
   }
-  if (browserAgentActivatesObservedLink(action)) {
-    const element = browserAgentSnapshotElement(snapshot, action);
-    const href = clean(element?.href, 4096);
-    if (href) {
-      try { return new URL(href, current || undefined).toString(); } catch { /* current page policy below */ }
-    }
+  const activation = browserAgentObservedActivationDestination(snapshot, action);
+  if (activation && typeof activation.href === 'string' && activation.href.trim()) {
+    try { return new URL(activation.href, current || undefined).toString(); }
+    catch { /* unsafe activation is denied by owner-policy guard */ }
   }
   if (action?.type === BrowserAgentActionType.CLICK_AT) {
     const href = clean(action?.coordinateTarget?.href, 4096);
@@ -196,23 +216,25 @@ export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requi
   // particular javascript:/data:/file:/mailto: cannot fall through an
   // unmatched site rule into a global ALLOW decision for semantic activation.
   // Read only the uniquely observed target, never action/model-supplied href.
-  if (browserAgentActivatesObservedLink(action)) {
-    const observed = browserAgentSnapshotElement(snapshot, action);
-    if (typeof observed?.href === 'string' && observed.href.trim()) {
-      let httpLink = false;
+  const activation = browserAgentObservedActivationDestination(snapshot, action);
+  if (activation) {
+    let safeHttpDestination = false;
+    if (typeof activation.href === 'string' && activation.href.trim()) {
       try {
-        const destination = new URL(observed.href, clean(snapshot?.url, 4096));
-        httpLink = destination.protocol === 'http:' || destination.protocol === 'https:';
-      } catch { /* malformed href is not an actionable network destination */ }
-      if (!httpLink) {
-        return {
-          decision: BrowserAgentPolicyDecision.DENY,
-          source: 'browser:unsafe-link-scheme',
-          pattern: '',
-          policyUrl: clean(snapshot?.url, 4096),
-          reason: 'Browser Agent blocked an unsafe semantic link destination',
-        };
-      }
+        const destination = new URL(activation.href, clean(snapshot?.url, 4096));
+        safeHttpDestination = destination.protocol === 'http:' || destination.protocol === 'https:';
+      } catch { /* malformed destinations cannot inherit current-page ALLOW */ }
+    }
+    if (!safeHttpDestination) {
+      return {
+        decision: BrowserAgentPolicyDecision.DENY,
+        source: activation.kind === 'form' ? 'browser:unsafe-form-action' : 'browser:unsafe-link-scheme',
+        pattern: '',
+        policyUrl: clean(snapshot?.url, 4096),
+        reason: activation.kind === 'form'
+          ? 'Browser Agent blocked an unsafe semantic form destination'
+          : 'Browser Agent blocked an unsafe semantic link destination',
+      };
     }
   }
   const policyUrl = browserAgentPolicyTargetUrl(snapshot, action);
