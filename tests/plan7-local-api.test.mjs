@@ -176,6 +176,51 @@ test('unknown method/route rejects before owner token resolver and Core; valid r
   }
 });
 
+test('bad media and oversized declared payload reject before owner credentials, clean Core request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups += 1; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const endpoint = 'http://127.0.0.1:' + port + '/v1/control';
+    const validBody = JSON.stringify(request('media-preauth-denied'));
+    for (const contentType of ['text/plain', 'application/json; charset=latin1', 'application/json; bogus=yes']) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': contentType },
+        body: validBody,
+      });
+      assert.equal(response.status, 415);
+      assert.deepEqual(await response.json(), {
+        schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE',
+      });
+    }
+    const oversized = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: 'x'.repeat(65_537),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { schemaVersion: 1, status: 'TOO_LARGE' });
+    assert.equal(tokenLookups, 0, 'transport-invalid requests never consult owner bearer');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'transport-invalid requests have no Core admission or effects');
+
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await client.control(request('media-preauth-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3, 'recovered request uses every owner-token check');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(
+      error => error ? reject(error) : resolve()));
+  }
+});
+
 test('Local API is opt-in and rejects missing runtime or short secrets', () => {
   assert.throws(() => createAutopilotLocalApiServerV1(), /high-entropy/u);
   assert.throws(() => createAutopilotLocalApiServerV1({token: TOKEN}), /Trusted canonical/u);
