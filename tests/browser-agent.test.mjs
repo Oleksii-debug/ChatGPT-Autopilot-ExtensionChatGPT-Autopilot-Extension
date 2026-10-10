@@ -92,14 +92,17 @@ test('native click rechecks the same target after debugger attach and uses its n
   let attached = false;
   chrome.scripting.executeScript = async ({ func, args }) => {
     assert.equal(func.name, 'proveBrowserNativeClick');
-    assert.deepEqual(args, ['snapshot-1', 'r1']);
+    assert.deepEqual(args, ['snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }]);
     return [{ result: { x: attached ? 45 : 10, y: attached ? 50 : 15, url: 'https://ais.example.edu/app' } }];
   };
   chrome.debugger.attach = async () => { attached = true; };
   chrome.debugger.detach = async () => { attached = false; };
   chrome.debugger.sendCommand = async (_target, _method, params) => { calls.push(params); };
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
-  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), true);
+  await manager.create({ id: 'direct-native-owner', goal: 'Verify native target', stepDelayMs: 0 });
+  await manager.start('direct-native-owner', { runInitial: false });
+  const epoch = (await manager.get('direct-native-owner')).job.runtime.controlEpoch;
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }, 'direct-native-owner', epoch), true);
   assert.deepEqual(calls.map(({ x, y }) => [x, y]), [[45, 50], [45, 50]]);
   assert.equal(attached, false);
 });
@@ -114,7 +117,10 @@ test('native click never dispatches when the proven target disappears after debu
   chrome.debugger.detach = async () => { detached = true; };
   chrome.debugger.sendCommand = async () => { dispatches += 1; };
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
-  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), false);
+  await manager.create({ id: 'native-missing-owner', goal: 'Reject vanished target', stepDelayMs: 0 });
+  await manager.start('native-missing-owner', { runInitial: false });
+  const epoch = (await manager.get('native-missing-owner')).job.runtime.controlEpoch;
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }, 'native-missing-owner', epoch), false);
   assert.equal(dispatches, 0);
   assert.equal(detached, true);
 });
