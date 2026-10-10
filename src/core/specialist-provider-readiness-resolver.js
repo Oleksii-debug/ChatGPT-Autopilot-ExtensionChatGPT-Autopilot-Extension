@@ -172,6 +172,22 @@ function validateResolvedStates(rawStates, selection) {
   });
 }
 
+// Probe latency is an observation metric, never a capability or authorization
+// fact. A fresh healthy provider may have a different harmless GET latency.
+// Compare all other canonical fields, including health, identity, source,
+// reason code, installation and authentication, at the second admission gate.
+function readinessFactsKey(inspection) {
+  return JSON.stringify({
+    ...inspection,
+    checks: inspection.checks.map(check => ({
+      ...check,
+      providerReadiness: check.providerReadiness === null
+        ? null
+        : { ...check.providerReadiness, latencyMs: null },
+    })),
+  });
+}
+
 /**
  * Owner-constructed, in-memory binding from a Specialist provider identity to
  * the provider-specific function that can resolve fresh readiness facts.
@@ -291,7 +307,7 @@ export class SpecialistProviderReadinessResolverV1 {
         || current.providerId !== readiness.providerId
         || current.registryRevision !== readiness.registryRevision
         || current.definitionRevision !== readiness.definitionRevision
-        || JSON.stringify(current.inspection) !== JSON.stringify(readiness.inspection)) {
+        || readinessFactsKey(current.inspection) !== readinessFactsKey(readiness.inspection)) {
       throw new Error('Provider readiness changed since its trusted observation');
     }
     return true;
