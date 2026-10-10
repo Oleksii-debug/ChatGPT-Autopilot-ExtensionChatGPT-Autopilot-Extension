@@ -2208,3 +2208,66 @@ test('Plan4 S1 worker allocation respects owner no-auto-switch during backoff, r
   assert.equal(recovered.retryAt,0);
   assert.equal(allocateAiRouteWorkers({...manual,now:10_000}).allocations.primary,2);
 });
+
+
+test('Plan4 S1: settled provider response accessors cannot trigger another model charge or leak secrets', async () => {
+  const owner = JSON.parse(JSON.stringify({
+    enabled:true, mode:'primary', primary:{provider:'ollama',model:'llama3'},
+    routePolicy:{autoSwitch:true}, fallbackToStrongOnPrimaryError:true,
+    routes:[
+      {routeId:'first',provider:'ollama',model:'llama3',priority:10,locality:'local',costClass:'free'},
+      {routeId:'backup',provider:'ollama',model:'backup',priority:1,locality:'local',costClass:'free'},
+    ],
+  }));
+  const options = {
+    providerCallBudgetContext:{kind:'browser-agent',jobId:'plan4-response-guard',controlEpoch:1},
+    maxModelCallsForRequest:2, maxOutputTokens:128,
+  };
+  let getters = 0;
+  const cases = [
+    Object.defineProperty({provider:'ollama',model:'llama3',text:'hidden'}, 'usage',
+      {enumerable:true,get(){getters++;throw new Error('sk-private-TIMEOUT');}}),
+    {provider:'ollama',model:'llama3',text:'hidden',usage:
+      Object.defineProperty({outputTokens:1},'inputTokens',
+        {enumerable:true,get(){getters++;throw new Error('sk-private-RATE_LIMIT');}})},
+    Object.defineProperty({provider:'ollama',model:'llama3'},'text',
+      {enumerable:true,get(){getters++;throw new Error('sk-private-UNAVAILABLE');}}),
+  ];
+  for (const payload of cases) {
+    let calls = 0, settlements = 0;
+    const router = new AiOrchestrator({
+      gatewayClient:{async complete(){calls++;return payload;}},
+      providerCallLifecycle:{
+        async beforeProviderCall(){return {reservationId:'plan4-response-guard:1'};},
+        async afterProviderCall({ok}){settlements++;assert.equal(ok,true);return {settled:true};},
+      },
+    });
+    await assert.rejects(
+      router.run(owner,{},'approved prompt',options),
+      error => error.code === 'AI_PROVIDER_RESPONSE_UNVERIFIED'
+        && error.retryable === false
+        && error.routeAttempts?.length === 1
+        && error.routeAttempts[0].outcome === 'UNKNOWN'
+        && !String(error.message).includes('sk-private'),
+    );
+    assert.equal(calls,1,'a consumed call must never retry onto the backup account');
+    assert.equal(settlements,1,'consumed call must settle exactly once');
+    assert.equal(getters,0,'no provider-controlled getter may execute during result publication');
+  }
+  let sends=0;
+  const recovered = new AiOrchestrator({
+    gatewayClient:{async complete(){sends++;return {
+      provider:'ollama',model:'llama3',text:'safe after restart',
+      usage:{inputTokens:1,outputTokens:2,totalTokens:3},
+    };}},
+    providerCallLifecycle:{
+      async beforeProviderCall(){return {reservationId:'plan4-response-guard:recovered'};},
+      async afterProviderCall(){return {settled:true};},
+    },
+  });
+  const verified = await recovered.run(JSON.parse(JSON.stringify(owner)),{},'approved prompt',options);
+  assert.equal(sends,1);
+  assert.equal(verified.text,'safe after restart');
+  assert.equal(verified.usage.totalTokens,3);
+  assert.equal(verified.routing.selectedRouteId,'first');
+});
