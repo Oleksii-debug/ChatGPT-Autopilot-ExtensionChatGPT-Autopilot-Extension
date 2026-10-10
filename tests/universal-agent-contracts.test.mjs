@@ -55,6 +55,49 @@ function credential(overrides = {}) {
   };
 }
 
+test('Plan-1: specialist handoff resource ceilings distinguish absent legacy data from corrupt persisted values', () => {
+  const base = {
+    schemaVersion: 1,
+    handoffId: 'handoff-resource-fence-1',
+    specialistId: 'specialist-1',
+    goal: 'Read an owner-scoped document',
+    requestedCapabilityIds: ['filesystem.read'],
+    artifactRefs: [],
+    credentialRefs: [],
+    createdAt: AT,
+  };
+  const legacy = normalizeSpecialistHandoffV1(base);
+  for (const key of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    assert.equal(legacy[key], 0, key + ' legacy absence must keep its documented default');
+  }
+  assert.equal(Object.isFrozen(legacy), true);
+
+  for (const key of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    for (const value of [null, undefined, -0, -1, 1.5, Number.NaN, Infinity, '10']) {
+      assert.throws(
+        () => normalizeSpecialistHandoffV1({ ...base, [key]: value }),
+        new RegExp(key + ' is invalid'),
+        key + ' must reject an explicitly present non-canonical resource ceiling',
+      );
+    }
+  }
+
+  const explicit = normalizeSpecialistHandoffV1({
+    ...base,
+    maxModelCalls: 3,
+    maxRuntimeSeconds: 120,
+    maxCostUsdMicros: 500,
+  });
+  const restarted = normalizeSpecialistHandoffV1(JSON.parse(JSON.stringify(explicit)));
+  assert.deepEqual(restarted, explicit, 'cold restart must preserve exact resource ceilings');
+  assert.equal(Object.isFrozen(restarted), true);
+  assert.throws(
+    () => normalizeSpecialistHandoffV1({ ...JSON.parse(JSON.stringify(explicit)), maxCostUsdMicros: null }),
+    /maxCostUsdMicros is invalid/,
+    'a corrupt post-restart budget may not be replaced with an implicit default',
+  );
+});
+
 test('nested contract data and list boundaries reject accessors without executing them', () => {
   let reads = 0;
 
