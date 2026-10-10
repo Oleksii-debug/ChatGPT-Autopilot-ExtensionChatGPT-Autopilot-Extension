@@ -159,6 +159,11 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
     activeHttpRequests += 1;
     try {
       if (shuttingDown) return send(res, 503, FAILURE);
+      // Authenticated control accepts only the HTTP/1.1 framing used by the
+      // canonical loopback SDK. Legacy HTTP/1.0 has different body/keep-alive
+      // framing semantics; deny a downgrade before reading bearer credentials,
+      // request identity, or trusted Core authority. This is transport-only.
+      if (req.httpVersion !== '1.1') return reject(res);
       // Remote peers are rejected even if a caller improperly rebinds the server.
       if (req.socket.remoteAddress !== '127.0.0.1') return reject(res);
       // HTTP/1 duplicate sensitive headers are ambiguous even if Node exposes
