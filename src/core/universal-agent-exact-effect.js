@@ -56,10 +56,21 @@ function optionalId(value, label) {
 }
 
 function timestamp(value, label) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  // Exact-effect chronology is part of the persisted ledger identity.
+  // Date.parse accepts calendar rollovers, timezone-free times and shorthand;
+  // a restart must never rewrite an ambiguous timestamp into a new authority.
+  const format = /^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  if (typeof value !== 'string' || !format.test(value)) {
+    throw new Error(`${label} must be a canonical zone-bound timestamp`);
+  }
+  const wallClock = value.match(/^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u)[0];
+  const calendar = new Date(wallClock + 'Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, wallClock.length) !== wallClock) {
+    throw new Error(`${label} contains invalid calendar date`);
+  }
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error(`${label} must be a valid timestamp`);
+  return date.toISOString();
 }
 
 function optionalText(value, label, max = 8000) {
@@ -196,7 +207,8 @@ function normalizedState(input) {
   }
   const phase = raw.phase;
   const attempt = raw.attempt;
-  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
+  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || Object.is(attempt, -0)
+      || attempt < 0 || attempt > MAX_ATTEMPTS) {
     throw new Error('Exact effect attempt is invalid');
   }
   const expectedExecutionId = attempt > 0 ? executionId(effectId, attempt) : '';
