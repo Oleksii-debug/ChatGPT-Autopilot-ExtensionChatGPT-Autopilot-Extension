@@ -85,6 +85,8 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
+  'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
+  'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
 const repo = new StorageRepository(chrome);
@@ -755,6 +757,33 @@ export async function dispatchUiMessage(message, sender = null) {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
+  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
+    result = await browserAgent.listSpecialistProviderConfigs();
+  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
+  } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.setSpecialistProviderConfig(message.payload || {});
+  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    result = await browserAgent.clearSpecialistProviderConfig(message.payload || {});
+  } else if (message.command === 'AUTO_PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.autoPrepareSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.delegation || {},
+      {
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
+        specialistProviderReadinessResolver,
+      },
+    );
+  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS_ACROSS_JOBS') {
+    result = await browserAgent.claimSpecialistHandoffsAcrossJobs(
+      message.payload?.claim || {},
+      {
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
+        specialistProviderReadinessResolver,
+      },
+    );
   } else if (message.command === 'PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION') {
     result = await browserAgent.prepareAutomaticSpecialistDelegation(
       message.payload?.id || '',
