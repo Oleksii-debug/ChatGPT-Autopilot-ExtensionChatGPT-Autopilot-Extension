@@ -1285,8 +1285,20 @@ export function executeBrowserPageAction(snapshotId, action) {
       normalizeOption(item.textContent || item.label || '') === wanted
       || normalizeOption(item.value) === wanted);
     if (!candidates.length) throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
-    if (candidates.length !== 1 || candidates[0].disabled) throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
+    if (candidates.length !== 1) throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
     const option = candidates[0];
+    // Option visibility and optgroup availability are semantic eligibility,
+    // not merely stable fingerprints. A hidden/disabled option must not be
+    // selected through a programmatic change event that a user cannot trigger.
+    // This also applies to an already-unavailable option at snapshot time.
+    if (option.disabled || option.hidden || option.parentElement?.disabled
+      || option.parentElement?.hidden
+      || option.getAttribute?.('aria-disabled') === 'true'
+      || option.getAttribute?.('aria-hidden') === 'true'
+      || option.parentElement?.getAttribute?.('aria-disabled') === 'true'
+      || option.parentElement?.getAttribute?.('aria-hidden') === 'true') {
+      throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
+    }
     element.value = option.value;
     events(element);
     if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
