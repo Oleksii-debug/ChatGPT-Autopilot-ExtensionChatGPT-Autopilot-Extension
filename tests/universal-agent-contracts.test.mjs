@@ -2007,7 +2007,16 @@ test('Plan-1 S1: nested prototype keys fail closed across invocation, observatio
     assert.deepEqual(JSON.parse(JSON.stringify(good)), normalizedJson,
       'validated JSON remains deterministic and serializable for cold recovery');
 
-    for (const unsafeKey of ['__proto__', 'constructor', 'prototype']) {
+    // The existing V1 contract deliberately preserves __proto__ strictly
+    // as an own data member; retaining that behavior is a migration requirement.
+    const legacy = JSON.parse('{"nested":{"__proto__":{"marker":"own-data"}}}');
+    const legacyContract = makeContract(legacy);
+    const legacyData = legacyContract.arguments ?? legacyContract.data ?? legacyContract.attributes;
+    assert.equal(Object.getPrototypeOf(legacyData.nested), Object.prototype);
+    assert.equal(Object.hasOwn(legacyData.nested, '__proto__'), true);
+    assert.deepEqual(legacyData.nested.__proto__, { marker: 'own-data' });
+
+    for (const unsafeKey of ['constructor', 'prototype']) {
       const hostile = JSON.parse(JSON.stringify({ nested: {} }));
       Object.defineProperty(hostile.nested, unsafeKey, {
         value: { authorized: true, secret }, enumerable: true, configurable: true,
