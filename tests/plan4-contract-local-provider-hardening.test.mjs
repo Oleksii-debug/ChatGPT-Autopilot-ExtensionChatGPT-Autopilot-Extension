@@ -1558,3 +1558,56 @@ test('Plan4 S2: forged gateway body AbortError cannot trigger route failover or 
   assert.equal(recovered.text,'verified');
   assert.equal(effects,2);
 });
+
+test('Plan4 S1 wrong provider/model/endpoint receipts settle consumption but never publish or retry a second route', async () => {
+  const owner={enabled:true,mode:'primary',
+    primary:{provider:'openai-compatible',model:'fixture'},
+    fallbackToStrongOnPrimaryError:true,
+    routePolicy:{autoSwitch:true},
+    routes:[
+      {routeId:'owner.primary',provider:'openai-compatible',model:'fixture',endpointId:'owner.local',priority:10},
+      {routeId:'backup',provider:'openai-compatible',model:'backup',endpointId:'backup.local',priority:1},
+    ],
+  };
+  const budgetContext={kind:'browser-agent',jobId:'job-a',controlEpoch:1};
+  const options={providerCallBudgetContext:budgetContext,maxOutputTokens:128,maxModelCallsForRequest:2};
+  const mismatches=[
+    {text:'untrusted',provider:'openai',model:'fixture',endpointId:'owner.local'},
+    {text:'untrusted',provider:'openai-compatible',model:'other-model',endpointId:'owner.local'},
+    {text:'untrusted',provider:'openai-compatible',model:'fixture',endpointId:'other.account'},
+    Object.defineProperty({text:'untrusted',provider:'openai-compatible',endpointId:'owner.local'},
+      'model',{enumerable:true,get(){throw new Error('sk-secret-receipt-accessor');}}),
+  ];
+  for (const value of mismatches) {
+    let networkEffects=0;
+    const settlements=[];
+    const gatewayClient={async complete(){networkEffects++;return value;}};
+    const providerCallLifecycle={
+      async beforeProviderCall(){return {reservationId:'job-a:model-budget:1'};},
+      async afterProviderCall(receipt){settlements.push(receipt.ok);return {settled:true};},
+    };
+    const router=new AiOrchestrator({gatewayClient,providerCallLifecycle});
+    await assert.rejects(router.run(owner,{},'approved',options),error =>
+      error.code==='AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED'
+      && error.retryable===false
+      && !String(error.message).includes('sk-secret')
+      && error.routeAttempts?.[0]?.outcome === 'UNKNOWN');
+    assert.equal(networkEffects,1,'identity mismatch cannot invoke the backup account');
+    assert.deepEqual(settlements,[true],'consumed provider call is settled exactly once before rejection');
+  }
+  let effects=0;
+  const admitted=new AiOrchestrator({
+    gatewayClient:{async complete(){effects++;return {
+      provider:'openai-compatible',model:'fixture',endpointId:'owner.local',
+      text:'verified',usage:{inputTokens:1,outputTokens:1,totalTokens:2},
+    };}},
+    providerCallLifecycle:{
+      async beforeProviderCall(){return {reservationId:'job-a:model-budget:1'};},
+      async afterProviderCall(){return {settled:true};},
+    },
+  });
+  const recovered=await admitted.run(JSON.parse(JSON.stringify(owner)),{},'approved',options);
+  assert.equal(recovered.routeSelection.routeId,'owner.primary');
+  assert.equal(recovered.text,'verified');
+  assert.equal(effects,1);
+});
