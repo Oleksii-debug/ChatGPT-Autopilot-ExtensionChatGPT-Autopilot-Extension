@@ -86,7 +86,9 @@ function version(value, label) {
 }
 
 function id(value, label, { optional = false } = {}) {
-  if ((value == null || value === '') && optional) return null;
+  // Null is canonical for an absent optional reference, but an explicit empty
+  // string cannot erase an effect, approval or parent identity on restart.
+  if (value == null && optional) return null;
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   if (value !== value.trim()) throw new Error(`${label} is invalid: must be an exact canonical ID; exact canonical identity required`);
   if (!ID.test(value)) throw new Error(`${label} is invalid`);
