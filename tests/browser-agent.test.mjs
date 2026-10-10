@@ -480,7 +480,7 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
 test('consequential approval is default policy and classifies multilingual final actions', () => {
   const value = config();
   assert.equal(value.approvalMode, BrowserAgentApprovalMode.CONSEQUENTIAL);
-  const snapshot = { frames: [{ frameId: 0, elements: [
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/login', elements: [
     { ref: 'r1', name: 'Potvrdiť zápis predmetov', href: '' },
     { ref: 'r2', name: 'Search', href: '' },
     { ref: 'r3', name: 'Save', href: '', submitLike: true },
@@ -494,8 +494,8 @@ test('fill_credential parser accepts only a current broker ref and current passw
   const snapshot = {
     url: 'https://ais.example.edu/login',
     frames: [{ frameId: 0, elements: [
-      { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false },
-      { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true },
+      { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false },
+      { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true },
       { ref: 'r3', tag: 'input', role: '', type: 'text', name: 'Other', sensitive: false },
     ] }],
     credentials: [{ ref: 'c1', credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password', scope: ['https://ais.example.edu'], expiresAt: null }],
@@ -512,6 +512,9 @@ test('fill_credential parser accepts only a current broker ref and current passw
   assert.equal(action.credentialId, 'ais-main');
   assert.equal(action.usernameRef, 'r1');
   assert.equal(action.passwordRef, 'r2');
+  assert.equal(action.expectedFrameUrl, snapshot.url);
+  assert.equal(action.expectedPasswordSemanticIdentity, 'fixture-password');
+  assert.equal(action.expectedUsernameSemanticIdentity, 'fixture-username');
 
   assert.throws(() => parseBrowserAgentAction(JSON.stringify({
     type: 'fill_credential',
@@ -569,8 +572,8 @@ test('credential ALLOW runs autonomous login fill while keeping secret out of pr
         title: 'AIS login',
         text: 'Sign in',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
@@ -672,8 +675,8 @@ test('credential ASK waits for owner confirmation before broker resolve and then
         title: 'AIS',
         text: 'Login',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
@@ -752,8 +755,8 @@ test('credential resolve is discarded if page origin changes before secret inser
         title: 'AIS',
         text: 'Login',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
