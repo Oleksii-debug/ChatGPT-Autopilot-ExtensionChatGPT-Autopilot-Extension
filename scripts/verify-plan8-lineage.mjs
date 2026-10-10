@@ -57,6 +57,15 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
     try { regular = statSync(join(root, path)).isFile(); } catch { /* missing */ }
     assert(regular, 'required 11.x source path missing: ' + path);
   }
+  // Prove ancestry before inspecting untrusted sourceCommit as a Git tree:
+  // unknown or unrelated SHAs must fail with the deterministic ancestry error,
+  // not a misleading tree-inspection error. Either failure remains fail-closed.
+  let ancestor = false;
+  try {
+    execFileSync('git', ['-C', root, 'merge-base', '--is-ancestor', sourceCommit, 'HEAD'], { stdio: 'pipe' });
+    ancestor = true;
+  } catch { /* absent/shallow/divergent commit must fail closed */ }
+  assert(ancestor, 'canonical 11.x source commit ' + sourceCommit + ' is not an ancestor of HEAD');
   // Directory existence alone is insufficient: untracked replacements, Git
   // symlinks and later additions cannot establish the imported 11.x baseline.
   for (const path of REQUIRED_PATHS) {
@@ -65,12 +74,6 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
   }
   const provenance = read('PLAN8_11_0_13_SOURCE_CONVERGENCE.md');
   assert(provenance.includes(PLAN8_ARCHIVE_SHA256), 'audited archive digest missing from provenance');
-  let ancestor = false;
-  try {
-    execFileSync('git', ['-C', root, 'merge-base', '--is-ancestor', sourceCommit, 'HEAD'], { stdio: 'pipe' });
-    ancestor = true;
-  } catch { /* absent/shallow/divergent commit must fail closed */ }
-  assert(ancestor, 'canonical 11.x source commit ' + sourceCommit + ' is not an ancestor of HEAD');
   for (const path of ['manifest.json', 'package.json']) {
     let baselineText;
     try {
