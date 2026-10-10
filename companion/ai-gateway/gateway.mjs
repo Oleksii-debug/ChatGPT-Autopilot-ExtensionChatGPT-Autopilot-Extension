@@ -666,7 +666,16 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
         }, { corsOrigin });
       }
       if (req.method === 'GET' && url.pathname === '/models') {
-        const provider = clean(url.searchParams.get('provider'));
+        // Discovery is an account/provider identity boundary. Never silently
+        // select the first of repeated provider keys, trim a forged alias or
+        // ignore extra query parameters that could claim another account.
+        const providerValues = url.searchParams.getAll('provider');
+        if (providerValues.length !== 1 || !PROVIDERS.has(providerValues[0])
+            || providerValues[0] !== providerValues[0].trim()
+            || [...url.searchParams.keys()].some(key => key !== 'provider' && key !== 'endpointId')) {
+          throw gatewayError('Gateway provider query must have one exact supported identity', 400, 'AI_GATEWAY_PROVIDER_ID_INVALID');
+        }
+        const provider = providerValues[0];
         // Preserve exact account binding across the HTTP boundary. Do not
         // trim malicious endpointId query values or pick one of duplicates.
         const endpointIds = url.searchParams.getAll('endpointId');
