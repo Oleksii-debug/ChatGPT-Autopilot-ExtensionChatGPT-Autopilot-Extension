@@ -54,6 +54,7 @@ import {
   ExecutionOwnershipState,
   normalizeExecutionOwnershipV1,
   recoverExpiredExecutionOwnershipV1,
+  resolveExecutionReconciliationV1,
 } from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
@@ -118,7 +119,7 @@ const SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS = new Set(['agentId', 'conversa
 const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
   'agentId', 'leaseId', 'conversationId', 'providerStatus', 'providerSucceeded',
   'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
-  'effectEvidence', 'errorCode',
+  'effectEvidence', 'errorCode', 'providerUpdatedAt', 'providerObservedAt',
 ]);
 
 // Version bridge for the original provider execution path. The durable
@@ -2194,6 +2195,7 @@ export class BrowserAgentManager {
       'Browser Agent Specialist provider execution outcome request',
     );
     for (const key of SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS) {
+      if (key === 'providerUpdatedAt' || key === 'providerObservedAt') continue;
       if (!Object.hasOwn(request, key)) {
         throw new Error(`Browser Agent Specialist provider execution outcome request requires ${key}`);
       }
@@ -2236,6 +2238,8 @@ export class BrowserAgentManager {
         safeToRetry: request.safeToRetry,
         effectEvidence: request.effectEvidence,
         errorCode: request.errorCode,
+        providerUpdatedAt: request.providerUpdatedAt || '',
+        providerObservedAt: request.providerObservedAt || '',
         at,
       };
 
@@ -2257,6 +2261,19 @@ export class BrowserAgentManager {
         ownership = requireSpecialistProviderReconciliationV1(ownership, {
           leaseId,
           reason: request.errorCode || 'provider effect may have occurred without verified completion',
+          at,
+        });
+      } else if (request.manualReviewRequired === true) {
+        if (ownership.state === ExecutionOwnershipState.OWNED) {
+          ownership = requireSpecialistProviderReconciliationV1(ownership, {
+            leaseId,
+            reason: 'provider requires human intervention',
+            at,
+          });
+        }
+        ownership = resolveExecutionReconciliationV1(ownership, {
+          leaseId,
+          outcome: 'MANUAL_REVIEW',
           at,
         });
       } else if (ownership.state === ExecutionOwnershipState.RECONCILE) {
