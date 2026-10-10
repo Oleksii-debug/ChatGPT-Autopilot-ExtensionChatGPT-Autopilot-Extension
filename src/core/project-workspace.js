@@ -247,6 +247,68 @@ export class ProjectWorkspaceRepository {
     return workspace;
   }
 
+  // A read-only bridge for task-scoped Project Context. This is the existing
+  // workspace persistence authority, never a second store or permission grant.
+  async resolveContext(request) {
+    record(request, 'Project workspace context request');
+    const descriptors = Object.getOwnPropertyDescriptors(request);
+    const keys = new Set(['projectId', 'expectedProjectRevisionId', 'capsuleId']);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !keys.has(key)) {
+        throw new Error('Project workspace context request contains unknown field');
+      }
+      const descriptor = descriptors[key];
+      if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error('Project workspace context request requires enumerable own data properties');
+      }
+    }
+    for (const key of ['projectId', 'expectedProjectRevisionId']) {
+      if (!Object.hasOwn(descriptors, key)) {
+        throw new Error('Project workspace context request requires ' + key);
+      }
+    }
+    const projectId = workspaceId(descriptors.projectId.value, 'projectId');
+    const revisionId = workspaceId(
+      descriptors.expectedProjectRevisionId.value,
+      'expectedProjectRevisionId',
+    );
+    const hasCapsule = Object.hasOwn(descriptors, 'capsuleId');
+    const capsuleId = hasCapsule ? workspaceId(descriptors.capsuleId.value, 'capsuleId') : null;
+
+    // Resolve fresh canonical state on every request; never reuse a stale
+    // caller-supplied project snapshot or assume capsule content is current.
+    const workspace = await this.load();
+    const project = requireProject(workspace, projectId);
+    const snapshot = normalizeProjectSnapshotV1(project.snapshot);
+    if (snapshot.revisionId !== revisionId) {
+      throw new Error('Project workspace context revision is stale or mismatched');
+    }
+    let capsule = null;
+    if (hasCapsule) {
+      if (!Object.hasOwn(project.capsulesById, capsuleId)) {
+        throw new Error('Project workspace context capsule not found');
+      }
+      capsule = normalizeContextCapsuleV1(project.capsulesById[capsuleId]);
+      if (capsule.projectId !== projectId || capsule.projectRevisionId !== revisionId) {
+        throw new Error('Project workspace context capsule is stale or mismatched');
+      }
+    }
+    return Object.freeze({
+      schemaVersion: 1,
+      workspaceRevision: workspace.revision,
+      projectId,
+      projectRevisionId: revisionId,
+      snapshot: structuredClone(snapshot),
+      capsule: capsule === null ? null : structuredClone(capsule),
+      ownerStateSource: 'DURABLE_PROJECT_WORKSPACE',
+      sourceAuthorityAuthenticated: false,
+      retrievalAuthorized: false,
+      executionAuthorized: false,
+      mutationAuthorized: false,
+      policyAuthority: false,
+    });
+  }
+
   update(mutator, { nowMs = Date.now() } = {}) {
     const task = this.updateQueue.then(async () => {
       const current = await this.load();
