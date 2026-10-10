@@ -68,6 +68,8 @@ jobs:
       # evidence-verifier gate, so an S2 failure cannot hide S1 results.
       - name: Agent I/O negative and schema contract tests
         run: node --test tests/agent-io-contract.test.mjs
+      - name: Provider capability launch contract and negative recovery
+        run: node --test tests/capability-registry.test.mjs
       - name: Universal agent authority and evidence contracts
         run: node --test tests/universal-agent-contracts.test.mjs
       - name: Durable checkpoint recovery and exact-effect ambiguity negatives
