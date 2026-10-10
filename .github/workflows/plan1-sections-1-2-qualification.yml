@@ -62,10 +62,6 @@ jobs:
         run: node --test tests/agent-io-contract.test.mjs
       - name: Universal agent authority and evidence contracts
         run: node --test tests/universal-agent-contracts.test.mjs
-      - name: Outcome Contract canonical goal/evidence and intake non-disclosure
-        run: node --test tests/outcome-contract.test.mjs
-      - name: Trusted Outcome verification boundary and non-disclosure
-        run: node --test tests/outcome-verification-bridge.test.mjs
       - name: Agent Definition canonical route policy and diagnostic non-disclosure
         run: node --test tests/agent-definition-registry.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
@@ -76,3 +72,10 @@ jobs:
         run: node --test --test-name-pattern='^Plan-1:' tests/browser-agent.test.mjs
       - name: Existing orchestration job-ID and authority compatibility
         run: node --test tests/browser-agent-orchestration-binding.test.mjs
+
+      # S2 assertions deliberately run after all S1 qualification steps.
+      # S2 failures must never hide remaining first-actionable S1 evidence.
+      - name: Outcome Contract canonical goal/evidence and intake non-disclosure
+        run: node --test tests/outcome-contract.test.mjs
+      - name: Trusted Outcome verification boundary and non-disclosure
+        run: node --test tests/outcome-verification-bridge.test.mjs
