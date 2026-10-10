@@ -12,6 +12,7 @@ on:
       - src/core/agent-io-contract.js
       - src/core/universal-agent-contracts.js
       - src/core/browser-agent-manager.js
+      - src/core/browser-agent-orchestration-binding.js
       - src/core/browser-agent.js
       - tests/outcome-contract.test.mjs
       - tests/outcome-verification-bridge.test.mjs
@@ -47,6 +48,7 @@ jobs:
           node --check src/core/agent-io-contract.js
           node --check src/core/universal-agent-contracts.js
           node --check src/core/browser-agent-manager.js
+          node --check src/core/browser-agent-orchestration-binding.js
           node --check src/core/browser-agent.js
           node --check tests/outcome-contract.test.mjs
           node --check tests/outcome-verification-bridge.test.mjs
