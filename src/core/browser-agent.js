@@ -675,7 +675,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     const credentialMatches = Array.isArray(snapshot?.credentials)
       ? snapshot.credentials.filter(item => item && item.ref === credentialRef) : [];
     const credential = credentialMatches.length === 1 ? credentialMatches[0] : null;
-    if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action requires one exact current credential reference');
+    if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action references a credential outside the current snapshot');
 
     const passwordFrameId = raw.passwordFrameId;
     const passwordRef = clean(raw.passwordRef, 120);
