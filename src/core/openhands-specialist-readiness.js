@@ -212,6 +212,22 @@ function classifyProbeFailure(error) {
   });
 }
 
+function requireVerifiedProbeReceipt(probeResult, config) {
+  // Both owner preview and executable binding must enforce identical evidence.
+  // A fulfilled promise (including a no-op mock) never proves provider health.
+  const receipt = record(probeResult, PROBE_RECEIPT_KEYS, 'OpenHands readiness probe receipt');
+  if (receipt.serverTitle !== 'OpenHands Agent Server') {
+    const mismatch = new Error('OpenHands probe server identity mismatch');
+    mismatch.code = 'OPENHANDS_SERVER_IDENTITY_MISMATCH';
+    throw mismatch;
+  }
+  if (receipt.serverVersion !== config.agentServerVersion) {
+    const mismatch = new Error('OpenHands probe server version mismatch');
+    mismatch.code = 'OPENHANDS_SERVER_VERSION_MISMATCH';
+    throw mismatch;
+  }
+}
+
 function readinessState({ health, installed, latencyMs, reasonCode }) {
   return normalizeProviderReadinessV1({
     schemaVersion: 1,
@@ -247,17 +263,7 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
     // service was observed. Only a descriptor-safe exact server receipt may
     // promote readiness; a no-op or forged success remains non-executable.
     const probeResult = await probe.call(client, Object.freeze({ config, conversationId: '' }));
-    const receipt = record(probeResult, PROBE_RECEIPT_KEYS, 'OpenHands readiness probe receipt');
-    if (receipt.serverTitle !== 'OpenHands Agent Server') {
-      const mismatch = new Error('OpenHands probe server identity mismatch');
-      mismatch.code = 'OPENHANDS_SERVER_IDENTITY_MISMATCH';
-      throw mismatch;
-    }
-    if (receipt.serverVersion !== config.agentServerVersion) {
-      const mismatch = new Error('OpenHands probe server version mismatch');
-      mismatch.code = 'OPENHANDS_SERVER_VERSION_MISMATCH';
-      throw mismatch;
-    }
+    requireVerifiedProbeReceipt(probeResult, config);
   } catch (error) {
     classification = classifyProbeFailure(error);
   }
@@ -340,10 +346,11 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
       installed: true,
     });
     try {
-      await probe.call(client, Object.freeze({
+      const probeResult = await probe.call(client, Object.freeze({
         config,
         conversationId: '',
       }));
+      requireVerifiedProbeReceipt(probeResult, config);
     } catch (error) {
       classification = classifyProbeFailure(error);
     }
