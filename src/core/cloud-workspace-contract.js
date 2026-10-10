@@ -316,16 +316,22 @@ function assessment(status, reasonCode, binding, ownership, at) {
 const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation', 'loadCanonicalOwnership']);
 const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding', 'loadCanonicalOwnership']);
 const ISOLATION_PROOF_KEYS = new Set([
+  'schemaVersion',
+  'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId', 'executionOwnerId',
   'workspaceRevision', 'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemIsolated', 'browserIsolated', 'processIsolated',
 ]);
 const SCRUB_PROOF_KEYS = new Set([
+  'schemaVersion',
+  'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId', 'executionOwnerId',
   'workspaceRevision', 'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
 ]);
 const TEARDOWN_RECEIPT_KEYS = new Set([
+  'schemaVersion',
+  'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId', 'executionOwnerId',
   'schemaVersion', 'workspaceId', 'providerId', 'workspaceRevision',
   'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'executionLeaseId', 'executionOwnershipRevision', 'completedAt',
@@ -378,8 +384,21 @@ async function invokeCloudProviderEvidence(callback, target, phase) {
   }
 }
 
+function sameCloudProviderEffectIdentity(input, binding) {
+  return input.taskId === binding.taskId
+    && input.planId === binding.planId
+    && input.nodeId === binding.nodeId
+    && input.effectId === binding.effectId
+    && input.policyEnvelopeId === binding.policyEnvelopeId
+    && input.executionOwnerId === binding.executionOwnerId;
+}
+
 function verifyExactLifecycleProof(input, keys, binding, at, properties, label, minAt = binding.boundAt) {
   const raw = dataRecord(input, keys, label);
+  if (raw.schemaVersion !== CLOUD_WORKSPACE_VERSION
+      || !sameCloudProviderEffectIdentity(raw, binding)) {
+    throw new Error(`${label} does not match exact canonical effect identity`);
+  }
   if (raw.workspaceId !== binding.workspaceId
     || raw.providerId !== binding.providerId
     || raw.executionLeaseId !== binding.executionLeaseId
@@ -712,6 +731,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
     'Cloud workspace teardown completion',
   );
   if (completed.schemaVersion !== CLOUD_WORKSPACE_VERSION
+      || !sameCloudProviderEffectIdentity(completed, binding)
       || completed.workspaceId !== binding.workspaceId
       || completed.providerId !== binding.providerId
       || completed.executionLeaseId !== binding.executionLeaseId
