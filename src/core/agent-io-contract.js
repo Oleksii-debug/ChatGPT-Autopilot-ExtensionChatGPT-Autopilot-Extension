@@ -130,8 +130,11 @@ function normalizeTimestamp(value, label) {
   return date.toISOString();
 }
 
-function cloneData(value, label) {
-  if (value == null) return {};
+function cloneData(value, label, { present = false } = {}) {
+  // Only omitted legacy payloads can be empty. Explicit null/undefined is
+  // corrupted event/effect evidence and must not become a successful {}.
+  if (value == null && !present) return {};
+  if (value == null) throw new Error(`${label} contains corrupt explicitly present data`);
   const seen = new Set();
   let visited = 0;
   function copy(item, depth) {
@@ -205,7 +208,7 @@ export function normalizeAgentAction(input) {
     sessionId: optionalId(action.sessionId, 'sessionId'),
     taskId: optionalId(action.taskId, 'taskId'),
     createdAt: normalizeTimestamp(action.createdAt, 'createdAt'),
-    data: cloneData(action.data, 'action data'),
+    data: cloneData(action.data, 'action data', { present: Object.hasOwn(action, 'data') }),
   };
   return Object.freeze(normalized);
 }
@@ -226,7 +229,7 @@ export function normalizeAgentEvent(input) {
     sessionId: optionalId(event.sessionId, 'sessionId'),
     taskId: optionalId(event.taskId, 'taskId'),
     occurredAt: normalizeTimestamp(event.occurredAt, 'occurredAt'),
-    data: cloneData(event.data, 'event data'),
+    data: cloneData(event.data, 'event data', { present: Object.hasOwn(event, 'data') }),
   };
   if (ACTION_LINKED_EVENT_TYPES.has(type) && normalized.actionId === null) {
     throw new Error('Agent action lifecycle event requires an exact actionId');
