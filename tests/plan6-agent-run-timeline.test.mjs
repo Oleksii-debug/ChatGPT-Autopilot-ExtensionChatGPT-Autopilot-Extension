@@ -1303,7 +1303,13 @@ test('S1 failed Core timeline refresh prevents stale evidence export until accep
   assert.equal(ui.agentTimelineStale, true);
   assert.doesNotMatch(status.textContent, /PRIVATE_CORE_ERROR/u);
 
-  nextRead = async () => ({ applied: true, job: acceptedJob });
+  // Accepted Core refresh that selects a different Agent must update the
+  // selected identity as the real loadBrowserAgentJobs path does. Otherwise
+  // cross-Agent JSON export is rightly rejected by the identity fence.
+  nextRead = async () => {
+    ui.selectedBrowserAgentId = acceptedJob.id;
+    return { applied: true, job: acceptedJob };
+  };
   await refreshAgentRunTimeline();
   assert.equal(ui.agentTimelineStale, false);
   assert.equal(ui.agentTimelineJob, acceptedJob);
