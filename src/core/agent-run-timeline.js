@@ -302,7 +302,7 @@ function recordedSpecialistDispatchEvidence(runtime) {
   // Project only already-durable BrowserAgentManager dispatch records. These
   // counts do not prove execution, provider delivery, artifact provenance,
   // agent-tree linkage or the entire lifetime history.
-  const present = safeHasOwn(runtime, 'specialistDispatchByAgentId');
+  const { present, value: dispatchRecord } = persistedField(runtime, 'specialistDispatchByAgentId');
   if (!present) return freeze({
     source: 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY',
     recordPresent: false,
@@ -313,7 +313,7 @@ function recordedSpecialistDispatchEvidence(runtime) {
     externalEffectVerified: false,
     artifactProvenanceVerified: false,
   });
-  const dispatches = record(own(runtime, 'specialistDispatchByAgentId'), 'Agent specialist dispatch map');
+  const dispatches = record(dispatchRecord, 'Agent specialist dispatch map');
   const keys = safeOwnKeys(dispatches);
   // The map keys are durable Agent identities, not arbitrary provider text.
   // Reject forged/control-character identities before counting any attempt.
@@ -399,8 +399,8 @@ function recordedExecutionOwnershipEvidence(runtime) {
     agentTreeEdgesVerified: false,
     externalEffectVerified: false,
   });
-  if (!safeHasOwn(runtime, 'specialistExecutionOwnerships')) return empty();
-  const records = own(runtime, 'specialistExecutionOwnerships');
+  const { present, value: records } = persistedField(runtime, 'specialistExecutionOwnerships');
+  if (!present) return empty();
   if (!plainArray(records)) throw new Error('Agent execution ownership records must be a bounded dense array');
   const count = own(records, 'length');
   if (!Number.isSafeInteger(count) || count < 0 || count > 128) {
@@ -456,8 +456,12 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const filterValue = own(options, 'filter');
   const filter = filterValue === undefined ? 'ALL' : filterValue;
   if (!FILTERS.has(filter)) throw new Error('Agent timeline filter is invalid');
-  const runtime = record(own(job, 'runtime'), 'Agent timeline runtime');
-  const history = safeHistory(own(runtime, 'history'), safeHasOwn(runtime, 'history'));
+  const runtime = record(persistedField(job, 'runtime').value, 'Agent timeline runtime');
+  // One persisted descriptor is the sole authority for both presence and value.
+  // Separate reads permit hostile storage Proxies to change the apparent
+  // snapshot between validation and projection, or hide it from JSON restart.
+  const { present: historyPresent, value: storedHistory } = persistedField(runtime, 'history');
+  const history = safeHistory(storedHistory, historyPresent);
   const all = history.items.map(({ ordinal, entry }) => {
     record(entry, 'Agent history entry');
     // Timeline data is persisted JSON evidence: a hidden event field may be
@@ -496,8 +500,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // fresh BrowserAgentRuntime sets verifiedOutcome: null until verification;
   // neither null nor omission establishes an external effect receipt. An
   // explicitly persisted undefined is invalid evidence after restart.
-  const outcomePresent = safeHasOwn(runtime, 'verifiedOutcome');
-  const rawOutcome = own(runtime, 'verifiedOutcome');
+  const { present: outcomePresent, value: rawOutcome } = persistedField(runtime, 'verifiedOutcome');
   if (outcomePresent && rawOutcome === undefined) {
     throw new Error('Agent persisted outcome is invalid');
   }
@@ -533,14 +536,14 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // hostile storage Proxy may return a new descriptor on each inspection:
   // repeated reads could mix evidence from distinct snapshots or coerce
   // attacker-controlled objects while preparing an accessible export.
-  const rawEstimatedCostUsd = own(runtime, 'estimatedCostUsd');
+  const rawEstimatedCostUsd = persistedField(runtime, 'estimatedCostUsd').value;
   const estimatedCostUsd = typeof rawEstimatedCostUsd === 'number' &&
     Number.isFinite(rawEstimatedCostUsd) &&
     rawEstimatedCostUsd >= 0 && rawEstimatedCostUsd <= 1000000
       ? Math.round(rawEstimatedCostUsd * 1000000) / 1000000 : null;
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
-    jobId: boundedJobId(own(job, 'id')),
+    jobId: boundedJobId(persistedField(job, 'id').value),
     entryIdentityScope: 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE',
     filter,
     totalRecorded: history.total,
@@ -551,7 +554,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     evidenceOnly: true,
     mayReplayExternalEffect: false,
     includesPrivatePrompts: false,
-    plan: planSummary(own(runtime, 'plan')),
+    plan: planSummary(persistedField(runtime, 'plan').value),
     evidenceMap,
     counters: {
       steps: recordedCounter(runtime, 'stepCount'),

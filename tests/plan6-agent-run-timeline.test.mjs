@@ -1135,3 +1135,61 @@ test('S1 canonical event metadata does not disappear on JSON cold restart', () =
     !error.message.includes('PRIVATE_PROXY_EVENT'));
   assert.doesNotMatch(JSON.stringify(before), /PRIVATE_|NEVER_EXPORT|SENSITIVE/u);
 });
+
+
+test('S1 persisted root and evidence fields refuse hidden descriptors lost at JSON cold restart', () => {
+  const cases = [
+    { holder: x => x, name: 'id' },
+    { holder: x => x, name: 'runtime' },
+    { holder: x => x.runtime, name: 'history' },
+    { holder: x => x.runtime, name: 'verifiedOutcome' },
+    { holder: x => x.runtime, name: 'plan' },
+    { holder: x => x.runtime, name: 'estimatedCostUsd' },
+    { holder: x => x.runtime, name: 'specialistDispatchByAgentId', value: {} },
+    { holder: x => x.runtime, name: 'specialistExecutionOwnerships', value: [] },
+  ];
+  for (const { holder, name, value } of cases) {
+    const input = job();
+    if (value !== undefined) input.runtime[name] = value;
+    const target = holder(input);
+    Object.defineProperty(target, name, {
+      value: target[name], enumerable: false, configurable: true, writable: true,
+    });
+    assert.throws(() => buildAgentRunTimelineV1(input), /enumerable data field/,
+      name + ' must not contribute ephemeral evidence');
+  }
+  const persisted = JSON.parse(JSON.stringify(job()));
+  const result = buildAgentRunTimelineV1(persisted);
+  assert.deepEqual(result, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(persisted))));
+  assert.equal(result.mayReplayExternalEffect, false);
+  assert.equal(result.evidenceMap.externalEffectVerified, false);
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE_|SECRET|SENSITIVE/);
+});
+
+test('S1 mutable storage descriptors are observed once without running getters or replay', () => {
+  for (const field of ['history', 'verifiedOutcome', 'plan', 'estimatedCostUsd',
+    'specialistDispatchByAgentId', 'specialistExecutionOwnerships']) {
+    const input = job();
+    if (field === 'specialistDispatchByAgentId') input.runtime[field] = {};
+    if (field === 'specialistExecutionOwnerships') input.runtime[field] = [];
+    const original = input.runtime;
+    let reads = 0;
+    const marker = 'PRIVATE_SECOND_DESCRIPTOR_' + field;
+    input.runtime = new Proxy(original, {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === field && ++reads > 1) throw Error(marker);
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+      get(target, key) {
+        if (key === field) throw Error('PRIVATE_GET_TRAP_' + field);
+        return Reflect.get(target, key);
+      },
+    });
+    const result = buildAgentRunTimelineV1(input);
+    assert.equal(reads, 1, field + ' must be snapshotted exactly once');
+    assert.equal(result.evidenceOnly, true);
+    assert.equal(result.mayReplayExternalEffect, false);
+    assert.equal(result.evidenceMap.externalEffectVerified, false);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_SECOND_DESCRIPTOR_|PRIVATE_GET_TRAP_/);
+  }
+});
