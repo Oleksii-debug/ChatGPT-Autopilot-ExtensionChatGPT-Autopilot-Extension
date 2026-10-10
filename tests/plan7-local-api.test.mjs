@@ -1052,6 +1052,38 @@ test('duplicate JSON control member identities fail closed before canonical Core
 });
 
 
+test('BOM-prefixed HTTP control JSON fails closed before Core; clean SDK request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const server = await startAutopilotLocalApiLoopbackV1({
+    token: TOKEN, dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const raw = Buffer.concat([
+      Buffer.from([0xef, 0xbb, 0xbf]),
+      Buffer.from(JSON.stringify(request('bom-raw-http')), 'utf8'),
+    ]);
+    const response = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: raw,
+    });
+    assert.equal(response.status, 422);
+    assert.deepEqual(await response.json(), { schemaVersion: 1, status: 'UNAVAILABLE' });
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'UTF-8 BOM must not turn an ambiguous body into canonical Core work');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const clean = await client.control(request('bom-clean-recovered'));
+    assert.equal(clean.status, 'RECEIVED');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 },
+      'later canonical request must remain recoverable without duplicate work');
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+
 test('Companion graceful shutdown prevents NEW Core dispatch after pending scope; restart remains healthy', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   const canonical = dependencies(counters);
