@@ -437,6 +437,20 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
     ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
     'Cloud workspace scrub proof',
   );
+  // Teardown and attestation cross asynchronous boundaries. A proof about an
+  // earlier lease/workspace must never be accepted after the canonical binding
+  // has changed (including same lease with a different checkpoint revision).
+  // Read back from the canonical store AFTER the provider's scrub verification.
+  const finalPersistedBinding = normalizeCloudWorkspaceBindingV1(
+    await trusted.loadCanonicalBinding(Object.freeze({
+      workspaceId: binding.workspaceId,
+      providerId: binding.providerId,
+      executionLeaseId: binding.executionLeaseId,
+    })),
+  );
+  if (JSON.stringify(finalPersistedBinding) !== JSON.stringify(binding)) {
+    throw new Error('cloud workspace canonical binding changed during teardown/scrub');
+  }
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
     workspaceId: binding.workspaceId,
