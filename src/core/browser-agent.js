@@ -1027,8 +1027,8 @@ export function snapshotBrowserPage(snapshotId) {
   const visible = (element) => {
     if (!(element instanceof Element) || !element.isConnected) return false;
     for (let node = element; node; node = node.parentElement) {
-      if (node.hidden || node.inert || node.disabled || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true') return false;
+      if (node.hidden || node.inert || node.disabled || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return false;
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
         || Number(style.opacity) === 0 || style.pointerEvents === 'none') return false;
@@ -1068,9 +1068,9 @@ export function snapshotBrowserPage(snapshotId) {
     const entries = Array.from(options).map(option => [
       String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
       Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
-      option.getAttribute?.('aria-disabled') === 'true', option.getAttribute?.('aria-hidden') === 'true',
-      option.parentElement?.getAttribute?.('aria-disabled') === 'true',
-      option.parentElement?.getAttribute?.('aria-hidden') === 'true',
+      String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true', String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
     ]);
     const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
     if (source.length > 100000) return '';
@@ -1101,7 +1101,7 @@ export function snapshotBrowserPage(snapshotId) {
       type: normalize(controlType, 80),
       name: accessibleName(element),
       semanticIdentity: semanticIdentity(element),
-      disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
+      disabled: Boolean(element.disabled || String(element.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true'),
       submitLike,
       formAssociated: Boolean(form),
       formAction: normalize(effectiveFormAction, 1200),
@@ -1113,10 +1113,10 @@ export function snapshotBrowserPage(snapshotId) {
       item.selected = normalize(element.options?.[element.selectedIndex]?.textContent || '', 500);
       item.options = Array.from(element.options || []).filter(option => !(
         option.disabled || option.hidden || option.parentElement?.disabled || option.parentElement?.hidden
-        || option.getAttribute?.('aria-disabled') === 'true'
-        || option.getAttribute?.('aria-hidden') === 'true'
-        || option.parentElement?.getAttribute?.('aria-disabled') === 'true'
-        || option.parentElement?.getAttribute?.('aria-hidden') === 'true'
+        || String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+        || String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+        || String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
       )).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
     }
     if (inputType === 'checkbox' || inputType === 'radio' || element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'radio') item.checked = Boolean(element.checked || element.getAttribute('aria-checked') === 'true');
@@ -1167,9 +1167,9 @@ export function executeBrowserPageAction(snapshotId, action) {
     const entries = Array.from(options).map(option => [
       String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
       Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
-      option.getAttribute?.('aria-disabled') === 'true', option.getAttribute?.('aria-hidden') === 'true',
-      option.parentElement?.getAttribute?.('aria-disabled') === 'true',
-      option.parentElement?.getAttribute?.('aria-hidden') === 'true',
+      String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true', String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
     ]);
     const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
     if (source.length > 100000) return '';
@@ -1211,8 +1211,8 @@ export function executeBrowserPageAction(snapshotId, action) {
     // Do not activate a target whose ancestor has become hidden/inert or whose
     // computed visibility changed after the planner's semantic observation.
     for (let node = target; node; node = node.parentElement) {
-      if (node.hidden || node.inert || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true' || node.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
+      if (node.hidden || node.inert || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true' || node.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
         || Number(style.opacity) === 0 || style.pointerEvents === 'none') throw new Error('AGENT_TARGET_UNAVAILABLE');
@@ -1319,10 +1319,10 @@ export function executeBrowserPageAction(snapshotId, action) {
     // This also applies to an already-unavailable option at snapshot time.
     if (option.disabled || option.hidden || option.parentElement?.disabled
       || option.parentElement?.hidden
-      || option.getAttribute?.('aria-disabled') === 'true'
-      || option.getAttribute?.('aria-hidden') === 'true'
-      || option.parentElement?.getAttribute?.('aria-disabled') === 'true'
-      || option.parentElement?.getAttribute?.('aria-hidden') === 'true') {
+      || String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+      || String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+      || String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true') {
       throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
     }
     element.value = option.value;
@@ -1421,8 +1421,8 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
       throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
     }
     for (let node = element; node; node = node.parentElement) {
-      if (node.hidden || node.inert || node.disabled || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true') throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+      if (node.hidden || node.inert || node.disabled || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
         || Number(style.opacity) === 0 || style.pointerEvents === 'none') {
@@ -1580,13 +1580,13 @@ export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
       element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId)
     : [];
   const target = matches.length === 1 ? matches[0] : null;
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
+  if (!target || !target.isConnected || target.hidden || target.inert || String(target.getAttribute('aria-hidden') || '').trim().toLowerCase() === 'true' || String(target.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
   // Approval is replayed after a durable wait. A still-connected child of a
   // hidden/inert/disabled ancestor is no longer an actionable control.
   for (let node = target; node; node = node.parentElement) {
     if (node.hidden || node.inert || node.disabled
-      || node.getAttribute?.('aria-hidden') === 'true'
-      || node.getAttribute?.('aria-disabled') === 'true') {
+      || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') {
       return { ok: false, reason: 'target-missing-or-unavailable' };
     }
     const style = getComputedStyle(node);
@@ -1639,8 +1639,8 @@ export function focusBrowserAgentTarget(snapshotId, ref) {
     if (!target || !target.isConnected) return true;
     for (let node = target; node; node = node.parentElement) {
       if (node.hidden || node.inert || node.disabled
-        || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true') return true;
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return true;
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden'
         || style.visibility === 'collapse' || Number(style.opacity) === 0
@@ -1670,8 +1670,8 @@ export function verifyBrowserFileInput(snapshotId, ref) {
     || !target.isConnected) throw new Error('AGENT_FILE_INPUT_STALE');
   for (let node = target; node; node = node.parentElement) {
     if (node.hidden || node.inert || node.disabled
-      || node.getAttribute?.('aria-hidden') === 'true'
-      || node.getAttribute?.('aria-disabled') === 'true') throw new Error('AGENT_FILE_INPUT_STALE');
+      || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') throw new Error('AGENT_FILE_INPUT_STALE');
     const style = getComputedStyle(node);
     if (style.display === 'none' || style.visibility === 'hidden'
       || style.visibility === 'collapse' || Number(style.opacity) === 0
@@ -1724,8 +1724,8 @@ export function proveBrowserNativeClick(snapshotId, ref, expected) {
       || identity(target) !== expected.expectedSemanticIdentity) return false;
     for (let node = target; node; node = node.parentElement) {
       if (node.hidden || node.inert || node.disabled
-        || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true') return false;
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return false;
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden'
         || style.visibility === 'collapse' || Number(style.opacity) === 0
@@ -1798,8 +1798,8 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint, requireTextFocus
     // inaccessible ancestor controls. Check again during each live preflight.
     for (let node = element; node; node = node.parentElement) {
       if (node.hidden || node.inert || node.disabled
-        || node.getAttribute?.('aria-hidden') === 'true'
-        || node.getAttribute?.('aria-disabled') === 'true') return null;
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return null;
       const style = getComputedStyle(node);
       if (style.display === 'none' || style.visibility === 'hidden'
         || style.visibility === 'collapse' || Number(style.opacity) === 0
@@ -1834,7 +1834,7 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint, requireTextFocus
         type: normalize(controlType, 80),
         name: browserCoordinateAccessibleName(element),
         href: normalize(element.href || element.getAttribute?.('href') || '', 1200),
-        disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
+        disabled: Boolean(element.disabled || String(element.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true'),
         submitLike,
         formAssociated: Boolean(form),
         formAction: normalize(effectiveFormAction, 1200),
