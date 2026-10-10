@@ -916,3 +916,47 @@ test('disconnect during async scope cannot dispatch a new Core effect; clean own
     }
   }
 });
+
+
+test('duplicate JSON control member identities fail closed before canonical Core; clean request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const original = JSON.stringify(request('unique-valid-identity'));
+    const idKey = '"requestId":"unique-valid-identity"';
+    assert.ok(original.includes(idKey));
+    const cases = [
+      original.replace(idKey, '"requestId":"forged-first","requestId":"unique-valid-identity"'),
+      original.replace(idKey, '"requestId":"unique-valid-identity","requestId":"forged-last"'),
+      original.replace(idKey, '"requestId":"forged-escaped","\\u0072equestId":"unique-valid-identity"'),
+      original.replace('"principalId":"owner-1"',
+        '"principalId":"other-owner","principalId":"owner-1"'),
+    ];
+    for (const [index, body] of cases.entries()) {
+      const response = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + TOKEN,
+          'Content-Type': 'application/json',
+        },
+        body,
+      });
+      assert.equal(response.status, 422, 'ambiguous identity case ' + index);
+      assert.deepEqual(await response.json(), { schemaVersion: 1, status: 'UNAVAILABLE' });
+      assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+        'duplicate JSON members must not reach the canonical Core');
+    }
+    assert.equal(tokenLookups, 4, 'owner authentication occurs but no Core authority invoked');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    assert.equal((await client.control(request('json-identity-recovered'))).status, 'RECEIVED');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
