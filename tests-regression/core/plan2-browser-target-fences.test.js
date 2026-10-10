@@ -15,6 +15,7 @@ import {
   browserAgentCoordinateTargetFingerprint,
   browserAgentVisionOriginMatches,
   browserAgentSnapshotElement,
+  classifyBrowserAgentActionRisk,
   BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
 import { BrowserAgentManager, buildUniqueBrowserFileInputExpression } from '../../src/core/browser-agent-manager.js';
@@ -1818,6 +1819,45 @@ test('Plan-2 S1: semantic policy lookup accepts exact Chrome frame ID only', () 
   }
   assert.equal(browserAgentSnapshotElement(snapshot, { frameId: 0, ref: [] }), null);
   assert.equal(browserAgentSnapshotElement(snapshot, { frameId: 0, ref: 'missing' }), null);
+});
+
+test('Plan-2 S1: duplicate persisted frame/ref proof cannot silently downgrade click approval', () => {
+  const observed = { ref: 'r1', name: 'Ordinary control', href: '', submitLike: false };
+  const cleanSnapshot = { url: 'https://example.test/editor',
+    frames: [{ frameId: 0, elements: [observed] }] };
+  const click = { type: 'click', frameId: 0, ref: 'r1' };
+  assert.equal(browserAgentSnapshotElement(cleanSnapshot, click), observed);
+  assert.equal(classifyBrowserAgentActionRisk(cleanSnapshot, click).requiresApproval, false);
+
+  // A tampered persisted snapshot can alias a benign element with a
+  // consequential one; selecting the FIRST match would silently misclassify.
+  const duplicateRef = JSON.parse(JSON.stringify(cleanSnapshot));
+  duplicateRef.frames[0].elements.push({ ref: 'r1', name: 'Pay now',
+    href: 'https://example.test/pay', submitLike: true });
+  assert.equal(browserAgentSnapshotElement(duplicateRef, click), null);
+  assert.equal(classifyBrowserAgentActionRisk(duplicateRef, click).requiresApproval, true);
+  assert.equal(classifyBrowserAgentActionRisk(duplicateRef, {
+    type: 'key', key: 'Enter', frameId: 0, ref: 'r1',
+  }).requiresApproval, true);
+
+  const duplicateFrame = JSON.parse(JSON.stringify(cleanSnapshot));
+  duplicateFrame.frames.push({ frameId: 0, elements: [{ ref: 'r1',
+    name: 'Pay now', submitLike: true }] });
+  assert.equal(browserAgentSnapshotElement(duplicateFrame, click), null);
+  assert.equal(classifyBrowserAgentActionRisk(duplicateFrame, click).requiresApproval, true);
+  assert.equal(browserAgentSnapshotElement({
+    frames: [{ frameId: 0, elements: null }],
+  }, click), null);
+  assert.equal(classifyBrowserAgentActionRisk({ frames: [] }, click).requiresApproval, true);
+  // Nonactivating keyboard navigation does not demand a new approval.
+  assert.equal(classifyBrowserAgentActionRisk(duplicateRef, {
+    type: 'key', key: 'Tab', frameId: 0, ref: 'r1',
+  }).requiresApproval, false);
+
+  // Correct evidence stays useful after a normal JSON persistence roundtrip.
+  const recovered = JSON.parse(JSON.stringify(cleanSnapshot));
+  assert.deepEqual(browserAgentSnapshotElement(recovered, click), observed);
+  assert.equal(classifyBrowserAgentActionRisk(recovered, click).requiresApproval, false);
 });
 
 test('Plan-2 S2: restarted visual origin never trusts accessor/inherited evidence', () => {
