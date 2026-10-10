@@ -1174,7 +1174,7 @@ test('Plan4 S2: AI Gateway rejects late fetch completion after its deadline with
   });
   await assert.rejects(
     client.complete({provider:'openai-compatible',model:'fixture',prompt:'do not publish stale output',timeoutSeconds:5}),
-    error => error.code === 'AI_GATEWAY_TIMEOUT' && error.category === 'TIMEOUT' && error.retryable === true,
+    error => error.code === 'AI_GATEWAY_RESPONSE_UNVERIFIED' && error.category === 'UNAVAILABLE' && error.retryable === false,
   );
   assert.equal(requests,1);
 });
