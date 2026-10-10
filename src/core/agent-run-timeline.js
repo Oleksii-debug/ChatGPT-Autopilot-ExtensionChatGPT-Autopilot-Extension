@@ -61,6 +61,9 @@ const EVENT_LABELS = Object.freeze({
   'cycle-done': ['CHECKPOINT', 'Цикл виконання завершено.'],
   done: ['CHECKPOINT', 'Завдання завершено.'],
 });
+// Reject invisible format controls in durable identities and evidence labels.
+// They survive JSON restart but can spoof an accessible status or receipt ID.
+const UNSAFE_RECORDED_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u;
 const FILTERS = new Set(['ALL', 'ACTION', 'OWNER', 'PLAN', 'RECOVERY', 'CHECKPOINT']);
 const PLAN_STATES = new Set(['PENDING', 'READY', 'RUNNING', 'VERIFIED', 'FAILED', 'BLOCKED', 'SKIPPED', 'CANCELLED', 'COMPLETED']);
 const ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'wait', 'new_tab', 'close_tab', 'download', 'trusted_script', 'click_at', 'type_at', 'drag_at', 'batch']);
@@ -137,7 +140,7 @@ function boundedJobId(value) {
   // timeline under an empty identifier after corrupted storage or restart.
   if (typeof value !== 'string' || value.length < 1 || value.length > 128 ||
       value !== value.trim() ||
-      /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)) {
+      UNSAFE_RECORDED_TEXT.test(value)) {
     throw new Error('Agent timeline job identity is invalid');
   }
   return value;
@@ -249,7 +252,7 @@ function planSummary(plan) {
       // A valid future string remains forward-compatible but non-authorizing.
       if (statePresent && (typeof state !== 'string' || state.length < 1 ||
           state.length > 64 || state !== state.trim() ||
-          /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(state))) {
+          UNSAFE_RECORDED_TEXT.test(state))) {
         throw new Error('Agent plan node recorded state is invalid');
       }
       const safeState = PLAN_STATES.has(state) ? state : 'UNKNOWN';
@@ -379,7 +382,7 @@ function recordedSpecialistDispatchEvidence(runtime) {
       // them or counting the same external receipt twice after restart.
       if (typeof receiptId !== 'string' || receiptId.length > 240 ||
           !receiptId.trim() || receiptId !== receiptId.trim() ||
-          /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(receiptId) ||
+          UNSAFE_RECORDED_TEXT.test(receiptId) ||
           seenReceiptIds.has(receiptId)) {
         throw new Error('Agent specialist dispatch receipt identity is invalid or duplicated');
       }
@@ -589,7 +592,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     // legacy event types remain a redacted OTHER observation.
     if (typePresent && (typeof rawType !== 'string' || rawType.length < 1 ||
         rawType.length > 128 || rawType !== rawType.trim() ||
-        /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(rawType))) {
+        UNSAFE_RECORDED_TEXT.test(rawType))) {
       throw new Error('Agent history event type is invalid');
     }
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
@@ -610,7 +613,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       if (actionTypePresent && (typeof candidate !== 'string' ||
           candidate.length < 1 || candidate.length > 64 ||
           candidate !== candidate.trim() ||
-          /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(candidate))) {
+          UNSAFE_RECORDED_TEXT.test(candidate))) {
         throw new Error('Agent history recorded action type is invalid');
       }
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
