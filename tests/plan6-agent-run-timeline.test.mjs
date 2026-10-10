@@ -689,18 +689,17 @@ test('malformed persisted counters fail closed instead of silently reporting zer
 });
 
 
-test('S1 persisted explicit null/undefined verified outcome fails closed; missing legacy outcome remains distinguishable', () => {
-  for (const invalid of [null, undefined]) {
-    const input = job();
-    input.runtime.verifiedOutcome = invalid;
-    assert.throws(() => buildAgentRunTimelineV1(input), /Agent persisted outcome is invalid/u);
-    if (invalid === null) {
-      assert.throws(
-        () => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))),
-        /Agent persisted outcome is invalid/u,
-      );
-    }
-  }
+test('S1 persisted undefined verified outcome fails closed; canonical null and absent legacy outcomes stay nonauthorizing', () => {
+  const corrupt = job();
+  corrupt.runtime.verifiedOutcome = undefined;
+  assert.throws(() => buildAgentRunTimelineV1(corrupt), /Agent persisted outcome is invalid/u);
+  const canonicalUnverified = job();
+  canonicalUnverified.runtime.verifiedOutcome = null;
+  const noOutcome = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(canonicalUnverified)));
+  assert.equal(noOutcome.evidenceMap.recordedOutcome.recordPresent, false);
+  assert.equal(noOutcome.evidenceMap.recordedOutcome.externalEffectVerified, false);
+  assert.equal(noOutcome.mayReplayExternalEffect, false);
+  assert.deepEqual(noOutcome, buildAgentRunTimelineV1(canonicalUnverified));
   const missing = job();
   delete missing.runtime.verifiedOutcome;
   const projection = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(missing)));
@@ -711,4 +710,20 @@ test('S1 persisted explicit null/undefined verified outcome fails closed; missin
   assert.equal(projection.mayReplayExternalEffect, false);
   assert.doesNotMatch(JSON.stringify(projection), /PRIVATE_|NEVER_EXPORT/u);
   assert.deepEqual(projection, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(missing))));
+});
+
+
+test('S1 actual fresh canonical BrowserAgentRuntime projects an inspectable timeline without effect replay after cold JSON restart', async () => {
+  const { createBrowserAgentRuntime } = await import('../src/core/browser-agent.js');
+  const fresh = { id: 'agent-fresh', config: {}, runtime: createBrowserAgentRuntime(1234) };
+  assert.equal(fresh.runtime.plan, null);
+  assert.equal(fresh.runtime.verifiedOutcome, null, 'canonical unverified sentinel must not be treated as corrupt');
+  const first = buildAgentRunTimelineV1(fresh);
+  assert.equal(first.jobId, 'agent-fresh');
+  assert.equal(first.totalRecorded, 0);
+  assert.equal(first.evidenceMap.recordedOutcome.recordPresent, false);
+  assert.equal(first.evidenceMap.recordedOutcome.externalEffectVerified, false);
+  assert.equal(first.evidenceOnly, true);
+  assert.equal(first.mayReplayExternalEffect, false);
+  assert.deepEqual(first, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(fresh))));
 });
