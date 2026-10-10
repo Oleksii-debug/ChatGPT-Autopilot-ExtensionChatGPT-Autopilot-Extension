@@ -113,7 +113,10 @@ test('Simplified Sessions preserve prompt bytes and expose truthful lifecycle bu
 });
 
 test('UI removes tutorial prose globally while keeping runtime and safety status', () => {
-  assert.doesNotMatch(html, /class="[^"]*field-help/u);
+  const safetyHelp = [...html.matchAll(/<p class="field-help">([^<]*)<\\/p>/gu)].map(match => match[1]);
+  assert.equal(safetyHelp.length, 1, 'only the read-only Agent-tree safety disclosure may remain as field help');
+  assert.match(safetyHelp[0], /Лише читання:[\\s\\S]*без prompt body, transcript або hidden reasoning/u);
+  assert.match(safetyHelp[0], /не запускає, не відновлює та не переплановує Agent/u);
   assert.doesNotMatch(html, /class="notice"/u);
   assert.doesNotMatch(html, /Один чат і один промпт можна повторювати без обмеження часу/u);
   assert.doesNotMatch(html, /0 означає «без окремого ліміту»/u);
