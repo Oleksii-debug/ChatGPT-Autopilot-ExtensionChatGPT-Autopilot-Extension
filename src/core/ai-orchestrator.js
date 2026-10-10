@@ -86,10 +86,17 @@ function ownerRoutingBoolean(raw, field, fallback) {
 // Snapshot only data fields before interpreting owner-controlled model routing.
  // Accessor/prototype coercion must never select a different provider or route.
 function snapshotRouterOwnerData(raw, label) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${label} must be a plain data object`);
-  const prototype = Object.getPrototypeOf(raw);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
-  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  // Owner settings and slots are security-relevant. A malicious or revoked
+  // Proxy must fail closed without exposing trap-supplied secret text.
+  let descriptors;
+  try {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid owner object');
+    const prototype = Object.getPrototypeOf(raw);
+    if (prototype !== Object.prototype && prototype !== null) throw new Error('invalid owner prototype');
+    descriptors = Object.getOwnPropertyDescriptors(raw);
+  } catch {
+    throw new Error(`${label} must contain inspectable own data fields`);
+  }
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const descriptor = descriptors[key];
