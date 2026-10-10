@@ -4,6 +4,7 @@ import {
 } from './agent-plan.js';
 import { normalizeOutcomeContractV1 } from './outcome-contract.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+import { compactOrchestrationEventId } from './orchestration-hierarchy.js';
 
 export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
 
@@ -346,6 +347,28 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
     completionAuthority: false,
   });
 }
+
+/**
+ * Deterministic identity for an exact normalized untrusted task handoff.
+ * A replay/content fence only: it never grants execution or verification authority.
+ */
+export function deriveSubagentTaskDispatchIdentityV1(input) {
+  const canonical = JSON.stringify(normalizeSubagentTaskEnvelopeV1(input));
+  const prefix = 'subagent-task-dispatch';
+  const lanes = [];
+  for (let lane = 0; lane < 4; lane += 1) {
+    const compact = compactOrchestrationEventId(
+      prefix,
+      'SubagentTaskEnvelopeV1',
+      String(SUBAGENT_TASK_ENVELOPE_VERSION),
+      String(lane),
+      canonical,
+    );
+    lanes.push(compact.slice(prefix.length + 1));
+  }
+  return 'subagent-task:' + lanes.join('');
+}
+
 
 /**
  * Bind one canonical AgentPlan node to one child Agent task.
