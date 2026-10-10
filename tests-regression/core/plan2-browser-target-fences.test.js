@@ -227,6 +227,39 @@ test('semantic action rechecks identical observed target before effect', () => {
   assert.equal(element.clicked, 1);
 });
 
+test('semantic DOM action rejects duplicate snapshot refs after JSON restart without effects', () => {
+  const snapshot = setup();
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"click","frameId":0,"ref":"r1"}', snapshot,
+  )));
+  const clone = new FakeElement('Save');
+  clone.setAttribute('data-autopilot-agent-ref', action.ref);
+  clone.setAttribute('data-autopilot-agent-snapshot', snapshot.frames[0].snapshotId);
+  const originalQuery = document.querySelectorAll;
+  try {
+    for (const matches of [[clone, element], [element, clone]]) {
+      document.querySelectorAll = selector => selector.includes('data-autopilot-agent-ref')
+        ? matches : originalQuery(selector);
+      assert.throws(
+        () => executeBrowserPageAction(snapshot.frames[0].snapshotId, action),
+        /AGENT_TARGET_STALE/,
+      );
+      assert.equal(element.clicked, 0, 'original observed target was not clicked');
+      assert.equal(clone.clicked, 0, 'injected duplicate was not clicked');
+    }
+    assert.throws(
+      () => executeBrowserPageAction(snapshot.frames[0].snapshotId, { ...action, ref: 1 }),
+      /AGENT_TARGET_STALE/,
+    );
+    assert.equal(element.clicked, 0);
+  } finally {
+    document.querySelectorAll = originalQuery;
+  }
+  const result = executeBrowserPageAction(snapshot.frames[0].snapshotId, action);
+  assert.equal(result.ok, true, 'unique observed ref still succeeds');
+  assert.equal(element.clicked, 1);
+});
+
 test('hidden ancestor after observation cannot be clicked', () => {
   const snapshot = setup();
   const action = parseBrowserAgentAction('{"type":"click","frameId":0,"ref":"r1"}', snapshot);
