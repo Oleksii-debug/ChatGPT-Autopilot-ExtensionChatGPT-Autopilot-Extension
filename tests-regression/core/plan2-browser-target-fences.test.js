@@ -3779,3 +3779,30 @@ test('Plan2 S1 image submit uses observed destination before click or keyboard e
   assert.equal(resolveBrowserAgentOwnerPolicy(config, recovered, actions[0]).decision, 'DENY');
   assert.equal(element.clicked, 0, 'policy probes must never click');
 });
+
+
+// Section 1: parser normalization is not a security boundary for durable replay.
+test('Plan2 S1 persisted HTTP URLs with embedded userinfo never inherit owner ALLOW', () => {
+  const snapshot = JSON.parse(JSON.stringify(setup()));
+  const owner = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [{ pattern: 'example.test', defaultDecision: 'ALLOW', actionDecisions: {} }],
+  };
+  for (const type of ['navigate', 'new_tab', 'download']) {
+    for (const url of [
+      'https://alice:secret@example.test/private',
+      'https://bob@example.test/private',
+      'http://user:%70ass@example.test/private',
+    ]) {
+      const persisted = JSON.parse(JSON.stringify({ type, url }));
+      const result = resolveBrowserAgentOwnerPolicy(owner, snapshot, persisted);
+      assert.equal(result.decision, 'DENY', type + ': ' + url);
+      assert.equal(result.source, 'browser:unsafe-direct-url');
+      assert.equal(result.policyUrl, snapshot.url);
+    }
+    const clean = resolveBrowserAgentOwnerPolicy(owner, snapshot,
+      JSON.parse(JSON.stringify({ type, url: 'https://example.test/allowed' })));
+    assert.equal(clean.decision, 'ALLOW');
+  }
+  assert.equal(element.clicked, 0, 'policy checks cannot cause a DOM click');
+});
