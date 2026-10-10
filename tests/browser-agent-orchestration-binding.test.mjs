@@ -296,7 +296,7 @@ test('binding request and trusted resolver dependency boundaries are exact-shape
   });
   await assert.rejects(
     () => manager.bindOrchestrationNode('job-1', hostileRequest, dependencies),
-    /enumerable own data property/,
+    /enumerable own data properties/,
   );
   assert.equal(requestReads, 0);
 
@@ -1691,7 +1691,7 @@ test('Plan-1: S1 orchestration binding contract redacts hostile keys and symbols
   assert.throws(
     () => normalizeBrowserAgentOrchestrationBindingRequestV1(accessor),
     error => {
-      assert.match(error.message, /enumerable own data properties/);
+      assert.match(error.message, /enumerable own data property/);
       assert.ok(!error.message.includes(secret));
       return true;
     },
