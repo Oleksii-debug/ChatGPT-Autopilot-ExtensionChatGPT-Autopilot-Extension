@@ -1928,13 +1928,13 @@ test('Plan-1 S1: corrupt persisted artifact digest cannot erase evidence across 
         schemaVersion: 1, observationId: 'obs-corrupt-sha',
         invocationId: 'invoke-1', status: ObservationStatus.OK,
         artifactRefs: [ref], observedAt: AT,
-      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+      }), /artifactRefs\[0\].*sha256 is invalid/);
       assert.throws(() => normalizeSpecialistHandoffV1({
         schemaVersion: 1, handoffId: 'handoff-corrupt-sha',
         specialistId: 'specialist-1', goal: 'Verify artifact',
         requestedCapabilityIds: ['filesystem.read'],
         artifactRefs: [ref], createdAt: AT,
-      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+      }), /artifactRefs\[0\].*sha256 is invalid/);
     };
     rejectEveryEvidencePath(corrupt);
     assert.deepEqual(corrupt, original, 'rejected evidence must never mutate caller data');
