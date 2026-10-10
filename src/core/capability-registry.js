@@ -123,9 +123,27 @@ export function orchestrationProviderContract(providerId) {
 
 export function resolveAgentProviderLaunchUrl(providerId, requestedUrl = '') {
   const descriptor = orchestrationProviderContract(providerId);
-  const launchUrl = String(requestedUrl || '').trim() || String(descriptor.defaultLaunchUrl || '').trim();
-  if (!launchUrl) throw new Error(`Agent provider ${descriptor.id} has no launch URL`);
-  if (!descriptor.siteAdapterId) throw new Error(`Agent provider ${descriptor.id} has no site adapter for browser launch`);
-  requireSiteAdapterUrl(descriptor.siteAdapterId, launchUrl);
+  // A provider launch request is a data contract. Calling String() on a caller
+  // object would execute untrusted coercion hooks before site/policy admission.
+  // Preserve the absent/null legacy default without coercing other input types.
+  if (requestedUrl != null && typeof requestedUrl !== 'string') {
+    throw new Error('Agent provider launch URL must be text');
+  }
+  const launchUrl = (requestedUrl == null || requestedUrl === '')
+    ? descriptor.defaultLaunchUrl
+    : requestedUrl.trim();
+  if (typeof launchUrl !== 'string' || !launchUrl) {
+    throw new Error('Agent provider has no valid launch URL');
+  }
+  if (!descriptor.siteAdapterId) {
+    throw new Error('Agent provider has no site adapter for browser launch');
+  }
+  try {
+    requireSiteAdapterUrl(descriptor.siteAdapterId, launchUrl);
+  } catch {
+    // The site adapter is the only host authority. Never echo rejected URLs:
+    // paths, query tokens and Proxy exception messages can contain secrets.
+    throw new Error('Agent provider launch URL rejected by site adapter');
+  }
   return launchUrl;
 }
