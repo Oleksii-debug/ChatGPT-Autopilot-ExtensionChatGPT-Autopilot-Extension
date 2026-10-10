@@ -298,7 +298,9 @@ export function normalizePolicyDecisionV1(input) {
   const raw = plain(input, 'PolicyDecisionV1');
   exactKeys(raw, POLICY_KEYS, 'PolicyDecisionV1');
   if (typeof raw.decision !== 'string') throw new Error('decision must be text');
-  const decision = raw.decision.trim().toUpperCase();
+  // Persisted permission decisions are exact canonical enum values, not case/space aliases.
+  // Never turn malformed input into ALLOW during an authorization readback.
+  const decision = raw.decision;
   if (!POLICY_KINDS.has(decision)) throw new Error('decision is invalid');
   const approvalId = id(raw.approvalId, 'approvalId', { optional: true });
   if (decision === PolicyDecisionKind.REQUIRE_APPROVAL && !approvalId) {
@@ -373,7 +375,8 @@ export function normalizeObservationV1(input) {
   const raw = plain(input, 'ObservationV1');
   exactKeys(raw, OBSERVATION_KEYS, 'ObservationV1');
   if (typeof raw.status !== 'string') throw new Error('status must be text');
-  const status = raw.status.trim().toUpperCase();
+  // Persisted evidence status must retain exact canonical identity across restarts.
+  const status = raw.status;
   if (!OBSERVATION_STATUSES.has(status)) throw new Error('status is invalid');
   const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1);
   return frozen({
@@ -397,7 +400,8 @@ export function normalizeVerificationV1(input) {
   const raw = plain(input, 'VerificationV1');
   exactKeys(raw, VERIFICATION_KEYS, 'VerificationV1');
   if (typeof raw.status !== 'string') throw new Error('status must be text');
-  const status = raw.status.trim().toUpperCase();
+  // Persisted evidence status must retain exact canonical identity across restarts.
+  const status = raw.status;
   if (!VERIFICATION_STATUSES.has(status)) throw new Error('status is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'VerificationV1'),
