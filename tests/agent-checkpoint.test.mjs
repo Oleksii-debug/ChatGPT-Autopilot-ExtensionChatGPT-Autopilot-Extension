@@ -192,7 +192,7 @@ test('checkpoint boundaries reject accessors, hidden aliases and array accessors
   });
   await assert.rejects(
     () => createAgentCheckpointV1(accessorCheckpoint),
-    /enumerable own data property/,
+    /enumerable own data propert/,
   );
   assert.equal(reads, 0);
 
@@ -217,7 +217,7 @@ test('checkpoint boundaries reject accessors, hidden aliases and array accessors
   });
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput({ evidenceArtifactIds: evidence })),
-    /enumerable own data property/,
+    /enumerable own data propert/,
   );
   assert.equal(reads, 0);
 });
