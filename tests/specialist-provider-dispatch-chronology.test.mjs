@@ -167,6 +167,32 @@ test('untrusted nested readiness accessor cannot execute getter or dispatch prov
   assert.equal(f.providerCalls, 0);
 });
 
+test('Section 1 hostile nested readiness field identity stays opaque before provider effects', async () => {
+  const f = fixture();
+  const valid = await f.trustedResolver.resolve(f.selection);
+  const privateField = 'PRIVATE_READINESS_FIELD_7CC';
+  let getterCalls = 0;
+  for (const shape of ['accessor', 'hidden']) {
+    const check = { ...valid.inspection.checks[0] };
+    if (shape === 'accessor') {
+      Object.defineProperty(check, privateField, {
+        enumerable: true,
+        get() { getterCalls += 1; throw new Error('PRIVATE_GETTER_MESSAGE_7CC'); },
+      });
+    } else {
+      Object.defineProperty(check, privateField, { enumerable: false, value: 'private' });
+    }
+    const forged = { ...valid, inspection: { ...valid.inspection, checks: [check] } };
+    await assert.rejects(f.newDispatcher().execute(f.request(forged)), error =>
+      error instanceof Error
+      && /enumerable own data properties/u.test(error.message)
+      && !error.message.includes(privateField)
+      && !error.message.includes('PRIVATE_GETTER_MESSAGE_7CC'));
+  }
+  assert.equal(getterCalls, 0, 'hostile accessor must not be evaluated');
+  assert.equal(f.providerCalls, 0, 'no provider effect on invalid readiness');
+});
+
 test('sparse nested specialist inspection arrays fail closed before provider effects', async () => {
   const f = fixture();
   const valid = await f.trustedResolver.resolve(f.selection);
