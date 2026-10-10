@@ -493,7 +493,7 @@ test('consequential approval is default policy and classifies multilingual final
 test('fill_credential parser accepts only a current broker ref and current password field', () => {
   const snapshot = {
     url: 'https://ais.example.edu/login',
-    frames: [{ frameId: 0, elements: [
+    frames: [{ frameId: 0, url: 'https://ais.example.edu/login', elements: [
       { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false },
       { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true },
       { ref: 'r3', tag: 'input', role: '', type: 'text', name: 'Other', sensitive: false },
