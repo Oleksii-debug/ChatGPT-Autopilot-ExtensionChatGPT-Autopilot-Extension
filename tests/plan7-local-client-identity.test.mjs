@@ -596,3 +596,65 @@ test('SDK one total deadline includes owner-token lookup and retains safe recove
   assert.equal(recovered.result.receipt.status, 'COMPLETED');
   assert.equal(calls, 2);
 });
+
+
+test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors and recover', async () => {
+  const encode = text => new TextEncoder().encode(text);
+  const canonical = encode(JSON.stringify(transportResponse()));
+  // Stream deliberately has no Content-Length: size enforcement must count
+  // actual bytes, not trust headers or res.json() allocation behavior.
+  const streamReply = (bytes, headers = {}) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
+  const replies = [
+    streamReply(canonical, { 'Content-Type': 'text/html' }),
+    streamReply(canonical, { 'Content-Length': '999999999' }),
+    streamReply(new Uint8Array(262_145)),
+    streamReply(new Uint8Array([0xc3, 0x28])),
+    streamReply(encode('\uFEFF' + JSON.stringify(transportResponse()))),
+    streamReply(canonical),
+  ];
+  let transmissions = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => replies[transmissions++],
+  });
+  for (let i = 0; i < replies.length - 1; i += 1) {
+    const denied = await client.control(BASE);
+    assert.equal(denied.status, 'UNKNOWN_NETWORK_RESULT',
+      'malformed or unbounded transport receipt cannot become Core evidence');
+    assert.equal(denied.instruction.includes('Reconcile'), true);
+  }
+  const valid = await client.control(BASE);
+  assert.equal(valid.status, 'RECEIVED',
+    'fresh valid bounded JSON request must recover without cached denial');
+  assert.equal(valid.result.receipt.status, 'COMPLETED');
+  assert.equal(transmissions, replies.length, 'SDK must never blindly resend');
+});
+
+test('SDK total deadline covers a stalled streamed HTTP 200 body with clean recovery', async () => {
+  let transmissions = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async () => {
+      transmissions += 1;
+      if (transmissions === 1) {
+        return new Response(new ReadableStream({ start() {} }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(transportResponse()), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+  const stalled = await client.control(BASE);
+  assert.equal(stalled.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(transmissions, 1);
+  const recovered = await client.control(BASE);
+  assert.equal(recovered.status, 'RECEIVED');
+  assert.equal(transmissions, 2);
+});
