@@ -84,7 +84,7 @@ function timestamp(value, label) {
 
 function clock(now) {
   const value = now();
-  if (!Number.isSafeInteger(value) || value < 0 || value > 8_640_000_000_000_000) throw new Error('Specialist dispatcher clock returned an invalid time');
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0 || value > 8_640_000_000_000_000) throw new Error('Specialist dispatcher clock returned an invalid time');
   return value;
 }
 
@@ -238,7 +238,7 @@ function readiness(input, selection, ownership, nowMs) {
   if (observed.ms > resolved.ms || resolved.ms > nowMs) {
     throw new Error('Specialist readiness chronology is invalid at provider dispatch');
   }
-  if (!Number.isSafeInteger(raw.ageMs) || raw.ageMs < 0
+  if (!Number.isSafeInteger(raw.ageMs) || Object.is(raw.ageMs, -0) || raw.ageMs < 0
       || raw.ageMs !== resolved.ms - observed.ms) {
     throw new Error('Specialist readiness observation age is inconsistent');
   }
