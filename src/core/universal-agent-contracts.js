@@ -206,10 +206,20 @@ function idList(value, label, { optional = true, max = MAX_LIST, present = false
   return out;
 }
 
-function stringList(value, label, { optional = true, max = MAX_LIST, itemMax = 500 } = {}) {
+function stringList(value, label, { optional = true, max = MAX_LIST, itemMax = 500, exact = false, unique = false } = {}) {
   if (value == null && optional) return [];
   const items = dataArray(value, label, max);
-  return items.map((item, index) => text(item, `${label}[${index}]`, { max: itemMax }));
+  const normalized = items.map((item, index) => {
+    const member = text(item, `${label}[${index}]`, { max: itemMax });
+    // Broker scopes are authority identifiers, not display labels. Never
+    // transform stored scope values into newly granted privileges on restart.
+    if (exact && item !== member) throw new Error(`${label}[${index}] must be exact text`);
+    return member;
+  });
+  if (unique && new Set(normalized).size !== normalized.length) {
+    throw new Error(`${label} contains duplicate entries`);
+  }
+  return normalized;
 }
 
 function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
@@ -488,7 +498,7 @@ export function normalizeCredentialRefV1(input) {
     credentialId: id(raw.credentialId, 'credentialId'),
     brokerId: id(raw.brokerId, 'brokerId'),
     kind: id(raw.kind, 'kind'),
-    scope: stringList(raw.scope, 'scope', { optional: false, max: 64, itemMax: 1000 }),
+    scope: stringList(raw.scope, 'scope', { optional: false, max: 64, itemMax: 1000, exact: true, unique: true }),
     expiresAt: timestamp(raw.expiresAt, 'expiresAt', { optional: true }),
   });
 }
