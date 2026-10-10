@@ -1247,3 +1247,80 @@ test('Plan 6 S1: hidden nodes/checks refuse non-durable evidence; JSON restart s
   assert.equal(after.evidenceOnly, true);
   assert.equal(after.mayReplayExternalEffect, false);
 });
+
+
+test('S1 failed Core timeline refresh prevents stale evidence export until accepted recovery', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { runInNewContext } = await import('node:vm');
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const begin = source.indexOf('async function refreshAgentRunTimeline()');
+  const exportAt = source.indexOf('function exportAgentRunTimeline()', begin);
+  // GitHub Windows checkout may use CRLF; identify the function boundary in both OS formats.
+  const boundary = /\r?\n\r?\n/gu;
+  boundary.lastIndex = exportAt;
+  const end = boundary.exec(source)?.index ?? -1;
+  assert.ok(begin >= 0 && exportAt > begin && end > exportAt);
+  const selectedJob = { id: 'agent-one', runtime: { history: [] } };
+  const acceptedJob = { id: 'agent-new', runtime: { history: [] } };
+  const button = { disabled: false, focusCalls: 0, focus() { this.focusCalls += 1; } };
+  const status = { textContent: '' };
+  const elements = {
+    'agent-run-timeline-refresh-button': button,
+    'agent-run-timeline-status': status,
+    'agent-run-timeline-filter': { value: 'ALL' },
+  };
+  let nextRead = async () => ({ applied: false });
+  let downloads = 0;
+  const painted = [];
+  const messages = [];
+  const ui = { agentTimelineJob: selectedJob, selectedBrowserAgentId: 'agent-one', agentTimelineStale: false };
+  const { refreshAgentRunTimeline, exportAgentRunTimeline } = runInNewContext(
+    source.slice(begin, end) + '\n({ refreshAgentRunTimeline, exportAgentRunTimeline });',
+    {
+      ui,
+      $: id => elements[id],
+      document: { activeElement: button, body: {} },
+      loadBrowserAgentJobs: () => nextRead(),
+      renderAgentRunTimeline: job => { painted.push(job); ui.agentTimelineJob = job; },
+      buildAgentRunTimelineV1: () => ({ evidenceOnly: true, mayReplayExternalEffect: false }),
+      downloadJson: () => { downloads += 1; },
+      announce: message => messages.push(message),
+    },
+  );
+  await refreshAgentRunTimeline();
+  assert.equal(ui.agentTimelineStale, true);
+  assert.equal(ui.agentTimelineJob, selectedJob, 'an unconfirmed read may not replace a selected job');
+  exportAgentRunTimeline();
+  assert.equal(downloads, 0, 'old read-only evidence must never be re-exported as freshly confirmed');
+  assert.match(status.textContent, /Експорт заблоковано/u);
+  assert.equal(button.disabled, false);
+  assert.ok(messages.some(message => /заблоковано/u.test(message)));
+
+  nextRead = async () => { throw Error('PRIVATE_CORE_ERROR_NOT_FOR_EXPORT'); };
+  await refreshAgentRunTimeline();
+  exportAgentRunTimeline();
+  assert.equal(downloads, 0, 'network failures must not promote a stale snapshot');
+  assert.equal(ui.agentTimelineStale, true);
+  assert.doesNotMatch(status.textContent, /PRIVATE_CORE_ERROR/u);
+
+  nextRead = async () => ({ applied: true, job: acceptedJob });
+  await refreshAgentRunTimeline();
+  assert.equal(ui.agentTimelineStale, false);
+  assert.equal(ui.agentTimelineJob, acceptedJob);
+  assert.equal(painted.at(-1), acceptedJob);
+  exportAgentRunTimeline();
+  assert.equal(downloads, 1, 'only an accepted Core read re-enables redacted export');
+  assert.equal(button.disabled, false);
+  assert.ok(messages.some(message => /оновлено з Core/u.test(message)));
+});
+
+test('S1 stale timeline warning persists across filter renders after failed Core refresh', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const renderStart = source.indexOf('function renderAgentRunTimeline(job)');
+  const renderEnd = source.indexOf('async function refreshAgentRunTimeline()', renderStart);
+  const render = source.slice(renderStart, renderEnd);
+  assert.match(render, /ui\.agentTimelineStale\s*\?\s*' Увага: останнє оновлення з Core не підтверджене/u);
+  assert.match(render, /експорт заблоковано до успішного оновлення/u);
+  assert.doesNotMatch(render, /innerHTML|outerHTML|insertAdjacentHTML/u);
+});
