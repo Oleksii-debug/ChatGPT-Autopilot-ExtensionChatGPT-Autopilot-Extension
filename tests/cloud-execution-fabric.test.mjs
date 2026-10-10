@@ -967,6 +967,29 @@ test('S1 cloud owner input reflection fence redacts secrets and recovers after J
   assert.equal(recovered.provisioningAuthorized, false);
 });
 
+test('S1 rejects explicit null cloud budget evidence after durable JSON restart', () => {
+  // Missing legacy fields may still use canonical zero defaults, but an
+  // explicitly persisted null is corruption and must not be normalized away.
+  for (const field of ['resourceBudget', 'resourceUsage', 'cloudResourceRequest']) {
+    const original = request({ [field]: null });
+    for (const candidate of [original, JSON.parse(JSON.stringify(original))]) {
+      assert.throws(
+        () => assessCloudExecutionFabricV1(candidate),
+        error => error instanceof Error
+          && error.message.includes('CloudFabricRequestV1.' + field)
+          && error.message.includes('must be an object'),
+      );
+    }
+  }
+  const valid = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(valid.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(valid.dispatchAuthorized, false);
+  assert.equal(valid.executionAuthorized, false);
+  assert.equal(valid.provisioningAuthorized, false);
+});
+
 test('S1 cloud budget and usage reflection boundary redacts hostile metadata and recovers', () => {
   const privateText = 'PRIVATE_CLOUD_BUDGET_TOKEN_NOT_FOR_DIAGNOSTICS';
   let reflectionCalls = 0;
