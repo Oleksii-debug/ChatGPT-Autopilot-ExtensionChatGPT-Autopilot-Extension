@@ -2244,3 +2244,71 @@ test('Plan-1 S1: explicitly corrupt provider capabilities never disappear on col
   });
   assert.equal(reads, 0, 'provider capability getter must never execute');
 });
+
+
+test('Plan-1 S1: present corrupt optional evidence and policy text cannot be erased by JSON restart', () => {
+  // Scope only persisted evidence/provenance/policy descriptions. Omitted V1
+  // fields remain compatible; canonical empty text is explicit and stable.
+  const cases = [
+    [normalizeArtifactRefV1, (() => {
+      const value = artifact({ artifactId: 'artifact-optional-media' });
+      delete value.mediaType;
+      return value;
+    })(), 'mediaType'],
+    [normalizeObservationV1, {
+      schemaVersion: 1, observationId: 'obs-optional-summary',
+      invocationId: 'invoke-optional-summary', status: ObservationStatus.OK,
+      observedAt: AT,
+    }, 'summary'],
+    [normalizeVerificationV1, {
+      schemaVersion: 1, verificationId: 'verify-optional-summary',
+      invocationId: 'invoke-optional-summary', observationId: 'obs-optional-summary',
+      status: VerificationStatus.VERIFIED, reasonCode: 'POSTCONDITION_MATCH',
+      verifiedAt: AT,
+    }, 'summary'],
+    [normalizePolicyDecisionV1, {
+      schemaVersion: 1, decisionId: 'decision-optional-reason',
+      invocationId: 'invoke-optional-reason', decision: PolicyDecisionKind.DENY,
+      reasonCode: 'DENIED_BY_OWNER', decidedAt: AT,
+    }, 'reason'],
+  ];
+  for (const [normalize, legacy, field] of cases) {
+    const accepted = normalize(legacy);
+    assert.equal(accepted[field], '');
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(accepted))), accepted);
+    const canonical = normalize({ ...legacy, [field]: '' });
+    assert.equal(canonical[field], '');
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(canonical))), canonical);
+    for (const corrupt of [null, undefined]) {
+      const input = Object.freeze({ ...legacy, [field]: corrupt });
+      assert.throws(() => normalize(input), error => {
+        assert.match(error.message, /must be canonical optional text/);
+        assert.doesNotMatch(error.message, /OWNER_PRIVATE_SECRET/);
+        return true;
+      }, field + ' must not lose its persisted presence');
+      assert.equal(Object.hasOwn(input, field), true);
+      assert.equal(input[field], corrupt, 'denial never mutates the caller');
+      if (corrupt === null) {
+        assert.throws(() => normalize(JSON.parse(JSON.stringify(input))),
+          /must be canonical optional text/,
+          'JSON-preserved explicit null must still be rejected on recovery');
+      }
+    }
+    const named = normalize({ ...legacy, [field]: 'Documented evidence' });
+    assert.equal(named[field], 'Documented evidence');
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(named))), named);
+  }
+  const maliciousArtifact = artifact({ mediaType: null });
+  assert.throws(() => normalizeObservationV1({
+    schemaVersion: 1, observationId: 'obs-reject-malformed-artifact',
+    invocationId: 'invoke-reject-malformed-artifact', status: ObservationStatus.OK,
+    artifactRefs: [maliciousArtifact], observedAt: AT,
+  }), /artifactRefs\[0\].*mediaType must be canonical optional text/);
+  assert.throws(() => normalizeSpecialistHandoffV1({
+    schemaVersion: 1, handoffId: 'handoff-reject-malformed-artifact',
+    specialistId: 'specialist-reject-malformed-artifact',
+    goal: 'Verify provenance without changing authority',
+    requestedCapabilityIds: ['filesystem.read'], artifactRefs: [maliciousArtifact],
+    createdAt: AT,
+  }), /artifactRefs\[0\].*mediaType must be canonical optional text/);
+});
