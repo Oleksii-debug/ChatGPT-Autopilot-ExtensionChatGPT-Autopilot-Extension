@@ -1,3 +1,8 @@
+### PLAN4_S1_RESERVATION_ID_PROXY_FENCE_3A9E7EA8_20261010 — NONTERMINAL 0/2
+- Scope canonical Plan4 only; S1 FIRST ACTIONABLE IN_PROGRESS/NOT DONE; S2 NOT ADVANCED/NOT DONE. Existing 11.0.13 High feature PR #700 + child #821 (head `3a9e7ea83f11ae02afb0f0be2d41c37b659d8e59` DRAFT/UNMERGED), not stale main 0.9.19.
+- Existing AiOrchestrator durable reservation pre-I/O receipt rejects empty/padded/control-character/overlong/coerced/accessor/hostile Proxy `reservationId` and hostile bound route descriptor traps; no second route or budget authority. Source blob `cbbfc7cd7e8614e6bc9e4e5a9d7f5f74bd0eeca0`; test blob `dcc9d1421ddc1058aad35bead99789ce59d2513d`, exact Github readback. Isolated exact-source V8 receipt 12/12 negatives plus 1 positive; synthetic parse 2/2 PASS. NOT Node CI. Core #38078738454, Chrome #38078738360, Release #38078738489 QUEUED at initial readback.
+- Terminal gaps: trusted provider/profile/account/credential→effect, UNKNOWN budget restart/failover, dual-OS/Chrome exact-head CI, aggregate Release GREEN, safe canonical 11.x→main integration and postintegration SHA. No real credential or NVDA claim. S1 and S2 NOT terminal; 0/2. Evidence PR #821 comment #6101176388 and canonical Plan4 Drive checkpoint.
+
 
 ### PLAN8_S1_DUAL_ANCESTOR_GATE_F8157C04_20261010 — NONTERMINAL 0/2
 - Scope only canonical Plan8 Drive `1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM`. Section1 FIRST ACTIONABLE IN_PROGRESS / NOT DONE. Section2 WAITING_UPSTREAM / NOT ADVANCED / NOT DONE. No other plans changed.
