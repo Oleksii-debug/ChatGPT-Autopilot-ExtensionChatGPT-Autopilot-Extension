@@ -678,6 +678,13 @@ export function assessCloudExecutionFabricV1(input) {
     if (Date.parse(slot.observedAt) > Date.parse(request.assessedAt)
         || Date.parse(request.assessedAt) >= Date.parse(slot.expiresAt)) {
       reasonCode = 'STALE_SLOT_OBSERVATION';
+    } else if (existingBinding
+        && slot.workspaceId === existingBinding.workspaceId
+        && Date.parse(slot.observedAt) < Date.parse(existingBinding.boundAt)) {
+      // An old slot health/capacity observation cannot attest a workspace
+      // created or rebound later. Never recommend resuming from capacity
+      // evidence that predates the canonical durable workspace binding.
+      reasonCode = 'SLOT_OBSERVATION_PREDATES_BINDING';
     } else if (slot.health === CloudSlotHealth.UNAVAILABLE) {
       reasonCode = 'SLOT_UNAVAILABLE';
     } else if (slot.workspaceId && slotWorkspaceCounts.get(slot.workspaceId) > 1) {
