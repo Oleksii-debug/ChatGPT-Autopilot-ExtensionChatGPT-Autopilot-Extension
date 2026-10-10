@@ -610,6 +610,14 @@ test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors a
     },
   }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
   const replies = [
+    // A real streamed HTTP 200 cannot omit media type and still assert a
+    // trustworthy canonical Core receipt. Fake json() test stubs are separate.
+    new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(canonical);
+        controller.close();
+      },
+    }), { status: 200 }),
     streamReply(canonical, { 'Content-Type': 'text/html' }),
     streamReply(canonical, { 'Content-Length': '999999999' }),
     streamReply(canonical, { 'Content-Length': '1' }),
