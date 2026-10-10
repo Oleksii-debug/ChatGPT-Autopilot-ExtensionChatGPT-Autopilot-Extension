@@ -577,3 +577,54 @@ test('scrub rejects forged caller binding before any provider teardown', async (
   );
   assert.equal(teardowns, 0);
 });
+
+test('scrub does not accept a provider proof when canonical binding drifts after teardown', async () => {
+  const { binding } = bindingAndOwnership();
+  for (const driftOn of ['teardown', 'verification']) {
+    let current = binding;
+    let loads = 0;
+    let teardowns = 0;
+    let verifies = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(binding, {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => { loads++; return current; },
+        teardown: async () => {
+          teardowns++;
+          if (driftOn === 'teardown') {
+            current = { ...binding, checkpointSha256: 'f'.repeat(64) };
+          }
+        },
+        verifyScrub: async () => {
+          verifies++;
+          if (driftOn === 'verification') {
+            current = { ...binding, executionOwnershipRevision: binding.executionOwnershipRevision + 1 };
+          }
+          return scrubProof();
+        },
+      }),
+      /canonical binding changed during teardown\/scrub/u,
+    );
+    assert.equal(loads, 2, 'post-teardown canonical readback is mandatory');
+    assert.equal(teardowns, 1);
+    assert.equal(verifies, 1);
+  }
+});
+
+test('scrub fails closed when final canonical binding readback fails', async () => {
+  const { binding } = bindingAndOwnership();
+  let loads = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => {
+        if (++loads === 2) throw new Error('canonical store readback unavailable');
+        return binding;
+      },
+      teardown: async () => {},
+      verifyScrub: async () => scrubProof(),
+    }),
+    /canonical store readback unavailable/u,
+  );
+  assert.equal(loads, 2);
+});
