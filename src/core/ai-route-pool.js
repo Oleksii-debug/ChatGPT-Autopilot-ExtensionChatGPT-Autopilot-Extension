@@ -675,6 +675,10 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   }
   const profiles = denseDataArray(suppliedProfiles === undefined ? [] : suppliedProfiles, 'AI endpoint profiles', 32);
   const seen = new Set();
+  // Match the existing Gateway credential-origin fence in hashed route evidence.
+  // Opaque credential references are account-scoped, not portable across
+  // unrelated network origins after saved settings are reloaded.
+  const credentialOrigins = new Map();
   const normalizedProfiles = profiles.map((entry, index) => {
     const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless', 'accountId', 'capabilityIds', 'modelIds']), `AI endpoint profile ${index + 1}`);
     if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
@@ -712,6 +716,13 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
     if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
     if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
+    if (credentialRef) {
+      const previousOrigin = credentialOrigins.get(credentialRef);
+      if (previousOrigin && previousOrigin !== parsed.origin) {
+        throw new Error('AI endpoint credential reference cannot bind distinct origins');
+      }
+      credentialOrigins.set(credentialRef, parsed.origin);
+    }
     // Account and capability evidence extends the existing registry; it never
     // becomes an independent routing, authentication or permission authority.
     // Omitted fields preserve the legacy V1 evidence hash after cold restart.
