@@ -39,6 +39,14 @@ function transportResponse(requestChanges = {}, receiptChanges = {}) {
   };
 }
 
+// Build a canonical Core reply for the exact fresh request identity used during
+// negative/recovery tests. No same-identity resend after an ambiguous transport.
+function transportResponseForRequest(request) {
+  const reply = transportResponse({ requestId: request.requestId }, { requestId: request.requestId });
+  reply.result.scopeProof.requestId = request.requestId;
+  return reply;
+}
+
 async function attempt(response) {
   let invocations = 0;
   const client = createAutopilotLocalClientV1({
@@ -577,11 +585,11 @@ test('SDK one total deadline includes owner-token lookup and retains safe recove
     },
     port: 12345,
     timeoutMs: 250,
-    fetchImpl: async (_url, { signal }) => {
+    fetchImpl: async (_url, { signal, body }) => {
       calls += 1;
       lastSignal = signal;
       if (slow) await new Promise(resolve => setTimeout(resolve, 190));
-      return { ok: true, status: 200, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponseForRequest(JSON.parse(body)) };
     },
   });
   const late = await client.control(BASE);
@@ -591,8 +599,13 @@ test('SDK one total deadline includes owner-token lookup and retains safe recove
     'late uncooperative transport must be aborted even after owner lookup');
   assert.equal(calls, 1, 'uncertain operation may never be retried automatically');
   slow = false;
-  const recovered = await client.control(BASE);
-  assert.equal(recovered.status, 'RECEIVED', 'fresh request after timeout recovers');
+  // Reconciliation is required before reusing the ambiguous requestId. A
+  // distinct, never-transmitted identity can proceed on this SAME SDK client.
+  const refused = await client.control(BASE);
+  assert.equal(refused.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(calls, 1, 'ambiguous identity must never be blindly replayed');
+  const recovered = await client.control({ ...BASE, requestId: 'fresh-after-timeout' });
+  assert.equal(recovered.status, 'RECEIVED', 'fresh requestId after timeout recovers');
   assert.equal(recovered.result.receipt.status, 'COMPLETED');
   assert.equal(calls, 2);
 });
@@ -633,14 +646,14 @@ test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors a
     fetchImpl: async () => replies[transmissions++],
   });
   for (let i = 0; i < replies.length - 1; i += 1) {
-    const denied = await client.control(BASE);
+    const denied = await client.control({ ...BASE, requestId: 'malformed-stream-' + i });
     assert.equal(denied.status, 'UNKNOWN_NETWORK_RESULT',
       'malformed or unbounded transport receipt cannot become Core evidence');
     assert.equal(denied.instruction.includes('Reconcile'), true);
   }
   const valid = await client.control(BASE);
   assert.equal(valid.status, 'RECEIVED',
-    'fresh valid bounded JSON request must recover without cached denial');
+    'fresh never-transmitted requestId must recover without cached denial');
   assert.equal(valid.result.receipt.status, 'COMPLETED');
   assert.equal(transmissions, replies.length, 'SDK must never blindly resend');
 });
@@ -696,14 +709,14 @@ test('SDK total deadline covers a stalled streamed HTTP 200 body with clean reco
   let transmissions = 0;
   const client = createAutopilotLocalClientV1({
     token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
-    fetchImpl: async () => {
+    fetchImpl: async (_url, { body }) => {
       transmissions += 1;
       if (transmissions === 1) {
         return new Response(new ReadableStream({ start() {} }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         });
       }
-      return new Response(JSON.stringify(transportResponse()), {
+      return new Response(JSON.stringify(transportResponseForRequest(JSON.parse(body))), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
     },
@@ -711,7 +724,10 @@ test('SDK total deadline covers a stalled streamed HTTP 200 body with clean reco
   const stalled = await client.control(BASE);
   assert.equal(stalled.status, 'UNKNOWN_NETWORK_RESULT');
   assert.equal(transmissions, 1);
-  const recovered = await client.control(BASE);
+  const repeat = await client.control(BASE);
+  assert.equal(repeat.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(transmissions, 1, 'stalled ambiguous identity remains fenced');
+  const recovered = await client.control({ ...BASE, requestId: 'fresh-after-stalled-body' });
   assert.equal(recovered.status, 'RECEIVED');
   assert.equal(transmissions, 2);
 });
