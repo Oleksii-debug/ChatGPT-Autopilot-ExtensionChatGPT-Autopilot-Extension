@@ -2252,3 +2252,43 @@ test('credential parser refuses duplicated broker and password/username snapshot
   assert.equal(element.clicked, 0, 'broker selection must remain effect-free');
 });
 
+test('Plan-2 S1: focus-time check transition never dispatches a stale second toggle after JSON restart', () => {
+  for (const desired of [true, false]) {
+    setup();
+    element.tagName = 'INPUT';
+    element.type = 'checkbox';
+    element.setAttribute('type', 'checkbox');
+    element.checked = !desired;
+    element.click = () => { element.clicked++; element.checked = !element.checked; };
+    const observed = snapshotBrowserPage('focus-check-recovery');
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'check', frameId: 0, ref: 'r1', checked: desired,
+    }), { frames: [{ frameId: 0, ...observed }], url: observed.url })));
+    // Hostile page focus mutates the state to the requested value. A stale
+    // pre-focus decision would click again, invert it, and cause side effects.
+    element.focus = () => { element.checked = desired; };
+    const result = executeBrowserPageAction('focus-check-recovery', action);
+    assert.equal(result.checked, desired);
+    assert.equal(element.checked, desired);
+    assert.equal(element.clicked, 0, 'already-satisfied post-focus state must not be clicked');
+  }
+});
+
+test('Plan-2 S1: focus-time state mutation does not bypass a new overlay', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'checkbox';
+  element.setAttribute('type', 'checkbox');
+  element.checked = false;
+  element.click = () => { element.clicked++; element.checked = !element.checked; };
+  const observed = snapshotBrowserPage('focus-check-overlay');
+  const action = parseBrowserAgentAction(JSON.stringify({
+    type: 'check', frameId: 0, ref: 'r1', checked: true,
+  }), { frames: [{ frameId: 0, ...observed }], url: observed.url });
+  element.focus = () => {
+    element.checked = true;
+    document.elementFromPoint = () => new FakeElement('Untrusted overlay');
+  };
+  assert.throws(() => executeBrowserPageAction('focus-check-overlay', action), /AGENT_TARGET_OCCLUDED/);
+  assert.equal(element.clicked, 0, 'an overlay must prevent synthetic click after focus');
+});
