@@ -172,7 +172,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
   if (typeof fetchImpl !== 'function') throw new Error('A fetch transport is required');
   // This instance-local concurrency fence does not replace Core's durable
   // request/effect deduplication or authorize retry after ambiguity.
-  const inFlightRequestIds = new Set();
+  const inFlightRequests = new Set();
   return Object.freeze({
     async control(request) {
       // Canonical Core preflight snapshots own data descriptors before any
@@ -183,13 +183,18 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       // JSON request bodies only; no automatic retry of ambiguous mutations.
       const body = JSON.stringify(sentRequest);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
-      if (inFlightRequestIds.has(sentRequest.requestId)) {
+      // Match the server/Core-scoped identity, not a bare caller-chosen ID.
+      // Different principals or projects must not block each other.
+      const requestKey = JSON.stringify([
+        sentRequest.principalId, sentRequest.projectId, sentRequest.requestId,
+      ]);
+      if (inFlightRequests.has(requestKey)) {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
           instruction: 'An identical requestId is already in flight; reconcile canonical job state before retrying.',
         });
       }
-      inFlightRequestIds.add(sentRequest.requestId);
+      inFlightRequests.add(requestKey);
       let timeoutHandle;
       try {
       // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
@@ -313,7 +318,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       } finally {
         clearTimeout(timeoutHandle);
-        inFlightRequestIds.delete(sentRequest.requestId);
+        inFlightRequests.delete(requestKey);
       }
     },
   });
