@@ -497,17 +497,22 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
         - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER)
       || (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0);
   });
-  const available = candidates.filter(route => {
+  // Owner autoSwitch=false pins the FIRST eligible route, including while
+  // it is in durable backoff or its circuit is open. Filtering for health
+  // before taking the first route silently dispatches to a different model.
+  // Automatic fallback is allowed only when the owner enabled autoSwitch.
+  const admitted = normalizedPolicy.autoSwitch ? candidates : candidates.slice(0, 1);
+  const available = admitted.filter(route => {
     const state = own(states, route.routeId);
     return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= selectionNow;
   });
-  const retryAt = candidates.length && !available.length
-    ? Math.min(...candidates.map(route => {
+  const retryAt = admitted.length && !available.length
+    ? Math.min(...admitted.map(route => {
       const state = own(states, route.routeId);
       return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
     }).filter(value => value > selectionNow))
     : 0;
-  return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
+  return Object.freeze({ candidates: Object.freeze(available), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
 }
 
 export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy = {}, routeStates = {}, role = AiRouteRole.FAST_WORKER, capabilityIds = [], requiresVision = false, desiredWorkers = 0, now = Date.now() } = {}) {
