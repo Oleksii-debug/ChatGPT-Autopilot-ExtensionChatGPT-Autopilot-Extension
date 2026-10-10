@@ -479,7 +479,8 @@ test('Plan4 S1 actual route evidence to HTTP provider and durable budget lifecyc
   const route = {
     schemaVersion:1, routeId:'owner-route', provider:'openai-compatible',
     model:'fixture-model', endpointId:'owner.account', locality:'remote',
-    costClass:'paid', priority:10,
+    costClass:'paid', priority:10, inputPriceKnown:true, outputPriceKnown:true,
+    inputPricePerMillionUsd:1, outputPricePerMillionUsd:2,
   };
   const profile = {
     schemaVersion:1, profileId:'owner.profile', provider:'openai-compatible',
