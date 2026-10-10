@@ -87,7 +87,7 @@ test('Plan-1 S1: credential scope authority stays exact and unique across restar
     'canonical scope authority must be stable through a cold JSON restart');
 
   for (const scope of [
-    [' drive.file'], ['drive.file '], ['drive.file\\t'],
+    [' drive.file'], ['drive.file '], ['drive.file\t'],
     ['drive.file', 'drive.file'], ['drive.file', ' drive.file'],
   ]) {
     const corrupt = credential({ scope });
