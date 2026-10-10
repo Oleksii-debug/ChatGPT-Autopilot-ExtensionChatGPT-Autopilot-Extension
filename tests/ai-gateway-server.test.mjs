@@ -325,6 +325,34 @@ test('compatible endpoint registry loads local non-secret settings unless an exp
 });
 
 
+test('Plan4 S1: corrupt present settings file cannot resurrect implicit gateway endpoint', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-corrupt-saved-endpoints-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    for (const serialized of ['null', '[]', '0', 'false', '"erased-registry"']) {
+      fs.writeFileSync(configFile, serialized);
+      assert.throws(
+        () => loadCompatibleEndpointRegistry({env:{},configFile}),
+        error => error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+        'a present malformed settings root must not enable an implicit endpoint',
+      );
+    }
+    fs.writeFileSync(configFile, JSON.stringify({compatibleEndpoints:[]}));
+    assert.deepEqual(
+      loadCompatibleEndpointRegistry({env:{},configFile}),[],
+      'valid persisted zero-endpoint registry is not silently reset',
+    );
+    fs.writeFileSync(configFile, JSON.stringify({}));
+    assert.equal(loadCompatibleEndpointRegistry({env:{},configFile})[0].endpointId,'default',
+      'legacy settings object that genuinely omitted the registry remains compatible');
+    fs.rmSync(configFile);
+    assert.equal(loadCompatibleEndpointRegistry({env:{},configFile})[0].endpointId,'default',
+      'genuinely absent settings file keeps the documented local default');
+  } finally {
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+
 test('Plan4 S1: explicit erased endpoint env override cannot rebind saved credential origin on cold restart', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-env-endpoint-'));
   const configFile = path.join(dir, 'gateway-settings.json');
