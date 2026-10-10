@@ -13,6 +13,7 @@ export const OPENHANDS_SPECIALIST_READINESS_VERSION = 1;
 
 const FACTORY_KEYS = new Set(['config', 'client', 'maxAgeMs', 'now']);
 const PROBE_KEYS = new Set(['config', 'client', 'now']);
+const PROBE_RECEIPT_KEYS = new Set(['serverTitle', 'serverVersion']);
 const REQUEST_KEYS = new Set([
   'schemaVersion',
   'registryId',
@@ -242,7 +243,21 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
     installed: true,
   });
   try {
-    await probe.call(client, Object.freeze({ config, conversationId: '' }));
+    // A resolved injected probe is not proof that the admitted OpenHands
+    // service was observed. Only a descriptor-safe exact server receipt may
+    // promote readiness; a no-op or forged success remains non-executable.
+    const probeResult = await probe.call(client, Object.freeze({ config, conversationId: '' }));
+    const receipt = record(probeResult, PROBE_RECEIPT_KEYS, 'OpenHands readiness probe receipt');
+    if (receipt.serverTitle !== 'OpenHands Agent Server') {
+      const mismatch = new Error('OpenHands probe server identity mismatch');
+      mismatch.code = 'OPENHANDS_SERVER_IDENTITY_MISMATCH';
+      throw mismatch;
+    }
+    if (receipt.serverVersion !== config.agentServerVersion) {
+      const mismatch = new Error('OpenHands probe server version mismatch');
+      mismatch.code = 'OPENHANDS_SERVER_VERSION_MISMATCH';
+      throw mismatch;
+    }
   } catch (error) {
     classification = classifyProbeFailure(error);
   }
