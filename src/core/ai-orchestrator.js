@@ -12,6 +12,7 @@ import {
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
+import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 
 export const AiRouterMode = Object.freeze({
   PRIMARY: 'primary',
@@ -271,7 +272,10 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
+  constructor({
+    gatewayClient, now = () => Date.now(), providerCallLifecycle = null,
+    routeQualityEvidenceResolver = null, routeQualityEvidenceTimeoutMs = 150,
+  } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -280,9 +284,20 @@ export class AiOrchestrator {
     )) {
       throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
     }
+    if (routeQualityEvidenceResolver != null && typeof routeQualityEvidenceResolver !== 'function') {
+      throw new Error('AI route quality evidence resolver must be a function');
+    }
+    if (typeof routeQualityEvidenceTimeoutMs !== 'number'
+        || !Number.isSafeInteger(routeQualityEvidenceTimeoutMs)
+        || Object.is(routeQualityEvidenceTimeoutMs, -0)
+        || routeQualityEvidenceTimeoutMs < 1 || routeQualityEvidenceTimeoutMs > 5000) {
+      throw new Error('AI route quality evidence timeout must be a whole number from 1 to 5000 milliseconds');
+    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
+    this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
+    this.routeQualityEvidenceTimeoutMs = routeQualityEvidenceTimeoutMs;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -462,7 +477,53 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      const requiresVision = Boolean(clean(imageDataUrl));
+      const selectCanonical = () => selectAiRouteCandidates({
+        routes:settings.routes, policy:settings.routePolicy, routeStates,
+        role:requestedRole, capabilityIds, requiresVision, now:this.now(),
+      });
+      let selected = selectCanonical();
+      // Existing quality governor is advisory only. It may reorder an exact,
+      // freshly authorized route set, never introduce a new route or perform
+      // model I/O. Explicit owner pins and no-auto-switch bypass quality lookup.
+      if (this.routeQualityEvidenceResolver && settings.routePolicy.autoSwitch
+          && !settings.routePolicy.pinnedRouteId && selected.candidates.length > 1) {
+        const lookup = Object.freeze({
+          routeIds:Object.freeze(selected.candidates.map(candidate => candidate.routeId)),
+          role:requestedRole,
+          requiresVision,
+        });
+        let timer = null;
+        try {
+          const evidence = await Promise.race([
+            Promise.resolve().then(() => this.routeQualityEvidenceResolver(lookup)),
+            new Promise(resolve => { timer = setTimeout(() => resolve(null), this.routeQualityEvidenceTimeoutMs); }),
+          ]);
+          if (evidence !== null) {
+            const ranking = await rankAiRouteCandidatesByEvidenceV1({
+              routes:settings.routes, policy:settings.routePolicy,
+              routeStates, role:requestedRole, capabilityIds,
+              requiresVision, now:this.now(), benchmarkRequests:evidence,
+            });
+            const fresh = selectCanonical();
+            const order = new Map(ranking.rankedRouteIds.map((routeId,index) => [routeId,index]));
+            selected = {
+              ...fresh,
+              candidates:[...fresh.candidates].sort((left,right) =>
+                (order.get(left.routeId) ?? Number.MAX_SAFE_INTEGER)
+                - (order.get(right.routeId) ?? Number.MAX_SAFE_INTEGER)),
+            };
+          } else {
+            selected = selectCanonical();
+          }
+        } catch {
+          // Invalid/unavailable quality evidence cannot grant authority or
+          // prevent canonical routing; reselect after its asynchronous lookup.
+          selected = selectCanonical();
+        } finally {
+          if (timer !== null) clearTimeout(timer);
+        }
+      }
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,
