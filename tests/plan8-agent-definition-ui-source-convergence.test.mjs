@@ -87,3 +87,53 @@ test('Plan8 11.x source: cold-restart model defaults and Router policy retain ow
   );
   assert.equal(accessed, 0);
 });
+
+
+test('Plan8 11.x source: reserved prototype keys fail closed in persisted Agent settings', () => {
+  const base = {
+    agentDefinitionId:'agent.research', label:'Research', description:'',
+    instructions:'Read only approved evidence.', capabilityIdsText:'',
+    toolIdsText:'', tagsText:'', acceptanceCriteriaText:'', enabled:true,
+  };
+  // JSON and object-descriptor data can contain reserved keys even though
+  // ordinary object literals do not expose them as own data properties.
+  const injected = JSON.parse('{"__proto__":{"owner":true}}');
+  const originalPrototype = Object.getPrototypeOf(injected);
+  assert.equal(Object.hasOwn(injected, '__proto__'), true);
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(base, {configDefaults:injected}),
+    /заборонене поле/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(base, {modelRoutePolicy:injected}),
+    /заборонене поле/u,
+  );
+  assert.equal(Object.getPrototypeOf(injected), originalPrototype);
+  assert.equal({}.owner, undefined);
+
+  let getterCalls = 0;
+  const hostile = Object.create(null);
+  Object.defineProperty(hostile, 'constructor', {
+    enumerable:true,
+    get() { getterCalls++; throw new Error('ATTACKER_GETTER_EXECUTED'); },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(base, {configDefaults:hostile}),
+    /заборонене поле/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(base, {modelRoutePolicy:hostile}),
+    /заборонене поле/u,
+  );
+  assert.equal(getterCalls, 0);
+
+  // A clean durable restart remains compatible and receives no new authority.
+  const valid = buildAgentDefinitionFromFormV1(base, {
+    configDefaults:{aiRoutingMode:'auto'},
+  });
+  const restarted = buildAgentDefinitionFromFormV1(base, {
+    configDefaults:JSON.parse(JSON.stringify(valid.configDefaults)),
+  });
+  assert.deepEqual(restarted.configDefaults, valid.configDefaults);
+  assert.equal(Object.hasOwn(restarted.configDefaults, 'owner'), false);
+});
