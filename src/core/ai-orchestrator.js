@@ -70,6 +70,99 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
 
 const clean = value => typeof value === 'string' ? value.trim() : '';
 
+// Reuse BrowserAgentManager's sole durable model-budget reservation authority.
+// The router only validates and copies its pre-dispatch receipt; it never
+// creates a competing budget ledger or authorizes another provider effect.
+function providerBudgetAdmissionError(detail) {
+  const error = new Error('AI provider budget reservation missing or invalid: ' + detail);
+  error.code = 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
+  return error;
+}
+function providerBudgetSettlementError(detail) {
+  const error = new Error('Provider call did not settle the durable budget reservation: ' + detail);
+  error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
+  return error;
+}
+const PROVIDER_RESERVATION_FIELDS = Object.freeze([
+  'reservationId', 'controlEpoch', 'modelCalls', 'inputTokens',
+  'outputTokens', 'totalTokens', 'estimatedCostUsd', 'createdAt',
+  'routeId', 'provider', 'model', 'callNumber',
+]);
+function admittedProviderBudgetReservation(value, context, route, callNumber) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    throw providerBudgetAdmissionError('expected a plain data object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const allowed = new Set(PROVIDER_RESERVATION_FIELDS);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw providerBudgetAdmissionError('unknown reservation field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw providerBudgetAdmissionError(key + ' must be an enumerable own data property');
+    }
+  }
+  const receipt = {};
+  for (const key of PROVIDER_RESERVATION_FIELDS) {
+    if (!Object.hasOwn(descriptors, key)) {
+      throw providerBudgetAdmissionError(key + ' must be an enumerable own data property');
+    }
+    receipt[key] = descriptors[key].value;
+  }
+  if (typeof context?.jobId !== 'string' || !context.jobId
+      || typeof receipt.reservationId !== 'string'
+      || !receipt.reservationId.startsWith(context.jobId + ':model-budget:')
+      || !/^[1-9][0-9]*$/u.test(receipt.reservationId.slice((context.jobId + ':model-budget:').length))) {
+    throw providerBudgetAdmissionError('reservationId does not match admitted Browser Agent job');
+  }
+  if (!Number.isSafeInteger(receipt.controlEpoch) || Object.is(receipt.controlEpoch, -0)
+      || receipt.controlEpoch !== context.controlEpoch) {
+    throw providerBudgetAdmissionError('controlEpoch does not match admission');
+  }
+  if (!Number.isSafeInteger(receipt.callNumber) || receipt.callNumber !== callNumber) {
+    throw providerBudgetAdmissionError('callNumber does not match admission');
+  }
+  if (receipt.modelCalls !== 1) {
+    throw providerBudgetAdmissionError('a reservation must admit exactly one model call');
+  }
+  for (const key of ['routeId', 'provider', 'model']) {
+    if (typeof receipt[key] !== 'string' || receipt[key] !== route[key]) {
+      throw providerBudgetAdmissionError(key + ' does not match admitted route');
+    }
+  }
+  for (const key of ['inputTokens', 'outputTokens', 'totalTokens', 'createdAt']) {
+    if (!Number.isSafeInteger(receipt[key]) || receipt[key] < 0 || Object.is(receipt[key], -0)) {
+      throw providerBudgetAdmissionError(key + ' must be a nonnegative safe integer');
+    }
+  }
+  if (receipt.totalTokens < receipt.inputTokens + receipt.outputTokens
+      || typeof receipt.estimatedCostUsd !== 'number'
+      || !Number.isFinite(receipt.estimatedCostUsd) || receipt.estimatedCostUsd < 0
+      || Object.is(receipt.estimatedCostUsd, -0)) {
+    throw providerBudgetAdmissionError('reserved model budget has invalid amounts');
+  }
+  return Object.freeze(receipt);
+}
+function requireProviderBudgetSettlement(value) {
+  // Legacy callbacks may resolve void; an explicit settlement response must
+  // prove success without accessing getters or accepting a forged status.
+  if (value === undefined) return;
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    throw providerBudgetSettlementError('invalid settlement status');
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, 'settled');
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw providerBudgetSettlementError('settled must be an enumerable own data property');
+  }
+  if (descriptor.value !== true) {
+    throw providerBudgetSettlementError('settled was not true');
+  }
+}
+
+
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
   const model = clean(raw?.model);
@@ -287,7 +380,7 @@ export class AiOrchestrator {
       });
       let reservation = null;
       if (lifecycle) {
-        reservation = await lifecycle.beforeProviderCall({
+        const admitted = await lifecycle.beforeProviderCall({
           context: providerCallBudgetContext,
           route: routeIdentity,
           prompt: callPrompt,
@@ -295,6 +388,9 @@ export class AiOrchestrator {
           maxOutputTokens: bounded,
           callNumber: callsUsed + 1,
         });
+        reservation = admittedProviderBudgetReservation(
+          admitted, providerCallBudgetContext, routeIdentity, callsUsed + 1,
+        );
       }
       callsUsed += 1;
       let value;
@@ -313,13 +409,14 @@ export class AiOrchestrator {
       } catch (error) {
         if (lifecycle) {
           try {
-            await lifecycle.afterProviderCall({
+            const settlement = await lifecycle.afterProviderCall({
               context: providerCallBudgetContext,
               reservation,
               route: routeIdentity,
               ok: false,
               error,
             });
+            requireProviderBudgetSettlement(settlement);
           } catch (settlementError) {
             const classification = classifyAiRouteError(settlementError);
             routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
@@ -332,13 +429,14 @@ export class AiOrchestrator {
       }
       if (lifecycle) {
         try {
-          await lifecycle.afterProviderCall({
+          const settlement = await lifecycle.afterProviderCall({
             context: providerCallBudgetContext,
             reservation,
             route: routeIdentity,
             ok: true,
             result: value,
           });
+          requireProviderBudgetSettlement(settlement);
         } catch (settlementError) {
           const classification = classifyAiRouteError(settlementError);
           routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
@@ -352,7 +450,7 @@ export class AiOrchestrator {
         model: routeIdentity.model,
         endpointId: routeIdentity.endpointId,
       });
-      return value;
+      return reservation ? { ...value, providerReservation: reservation } : value;
     };
     const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
       const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));
@@ -547,6 +645,9 @@ export class AiOrchestrator {
         failoverChain:structuredClone(routeAttempts),
       },
       runtime: nextRuntime,
+      ...(finalResult?.providerReservation
+        ? { providerReservation: finalResult.providerReservation }
+        : {}),
     };
   }
 }
