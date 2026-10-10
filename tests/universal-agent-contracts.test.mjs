@@ -1495,3 +1495,62 @@ test('Plan-1 S1: explicitly persisted verification attempt cannot be silently re
   assert.ok(Object.isFrozen(legal));
   assert.deepEqual(normalizeVerificationV1(JSON.parse(JSON.stringify(legal))), legal);
 });
+
+
+test('Plan-1 S1: persisted evidence-list presence cannot silently erase verification and effect identity', () => {
+  const observation = {
+    schemaVersion: 1,
+    observationId: 'observation-evidence-presence',
+    invocationId: 'invoke-1',
+    status: ObservationStatus.OK,
+    observedAt: AT,
+  };
+  const verification = {
+    schemaVersion: 1,
+    verificationId: 'verification-evidence-presence',
+    invocationId: 'invoke-1',
+    observationId: observation.observationId,
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+  };
+  const handoff = {
+    schemaVersion: 1,
+    handoffId: 'handoff-evidence-presence',
+    specialistId: 'specialist-1',
+    goal: 'Continue exact evidence-bound work',
+    requestedCapabilityIds: ['filesystem.read'],
+    createdAt: AT,
+  };
+  // Truly absent fields are supported by older stored V1 records.
+  assert.deepEqual(normalizeObservationV1(observation).artifactRefs, []);
+  assert.deepEqual(normalizeVerificationV1(verification).evidenceArtifactIds, []);
+  assert.deepEqual(normalizeSpecialistHandoffV1(handoff).artifactRefs, []);
+  assert.deepEqual(normalizeSpecialistHandoffV1(handoff).credentialRefs, []);
+
+  const cases = [
+    [normalizeObservationV1, observation, 'artifactRefs'],
+    [normalizeVerificationV1, verification, 'evidenceArtifactIds'],
+    [normalizeSpecialistHandoffV1, handoff, 'artifactRefs'],
+    [normalizeSpecialistHandoffV1, handoff, 'credentialRefs'],
+  ];
+  for (const [normalize, base, field] of cases) {
+    for (const corrupt of [null, undefined]) {
+      assert.throws(
+        () => normalize({ ...base, [field]: corrupt }),
+        /must be a bounded plain array/,
+        field + ' explicit malformed presence must be rejected',
+      );
+    }
+    // JSON cold restart retains explicit null, so it must remain fail-closed.
+    assert.throws(
+      () => normalize(JSON.parse(JSON.stringify({ ...base, [field]: null }))),
+      /must be a bounded plain array/,
+      field + ' must not be rewritten as empty across restart',
+    );
+    const valid = normalize({ ...base, [field]: [] });
+    assert.deepEqual(valid[field], []);
+    assert.ok(Object.isFrozen(valid));
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(valid))), valid);
+  }
+});
