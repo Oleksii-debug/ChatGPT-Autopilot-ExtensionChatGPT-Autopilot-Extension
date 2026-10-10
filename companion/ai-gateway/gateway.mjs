@@ -464,8 +464,8 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
   return body;
 }
 
-function openAiHeaders() {
-  const key = clean(process.env.OPENAI_API_KEY);
+function openAiHeaders(env = process.env) {
+  const key = clean(env?.OPENAI_API_KEY);
   if (!key) throw new Error('OPENAI_API_KEY is not configured in the local AI Gateway environment');
   return { authorization: `Bearer ${key}` };
 }
@@ -515,7 +515,7 @@ export async function listProviderModels(provider, { fetchFn = globalThis.fetch,
     return (body.models || []).map(item => clean(item?.name || item?.model)).filter(Boolean).sort();
   }
   if (provider === 'openai') {
-    const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders() });
+    const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders(env) });
     return (body.data || []).map(item => clean(item?.id)).filter(Boolean).sort();
   }
   const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
@@ -570,7 +570,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
     if (tokenLimit) payload.max_output_tokens = tokenLimit;
     const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/responses`, {
       method: 'POST',
-      headers: openAiHeaders(),
+      headers: openAiHeaders(env),
       body: JSON.stringify(payload),
     });
     const text = openAiText(body);
@@ -603,7 +603,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
 export async function probeProvider(provider, { fetchFn = globalThis.fetch, timeoutMs = STATUS_PROBE_TIMEOUT_MS, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   requireBuiltinEndpointUnbound(provider, endpointId);
-  if (provider === 'openai' && !clean(process.env.OPENAI_API_KEY)) {
+  if (provider === 'openai' && !clean(env?.OPENAI_API_KEY)) {
     return { provider, configured: false, ok: false, models: 0, reason: 'api-key-not-configured' };
   }
   try {
@@ -612,7 +612,7 @@ export async function probeProvider(provider, { fetchFn = globalThis.fetch, time
       const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/tags`, {}, { timeoutMs });
       models = (body.models || []).map(item => clean(item?.name || item?.model)).filter(Boolean);
     } else if (provider === 'openai') {
-      const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders() }, { timeoutMs });
+      const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders(env) }, { timeoutMs });
       models = (body.data || []).map(item => clean(item?.id)).filter(Boolean);
     } else {
       const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
