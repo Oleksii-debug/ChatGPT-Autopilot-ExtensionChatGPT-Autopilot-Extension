@@ -1565,8 +1565,8 @@ test('Plan4 S1 wrong provider/model/endpoint receipts settle consumption but nev
     fallbackToStrongOnPrimaryError:true,
     routePolicy:{autoSwitch:true},
     routes:[
-      {routeId:'owner.primary',provider:'openai-compatible',model:'fixture',endpointId:'owner.local',priority:10},
-      {routeId:'backup',provider:'openai-compatible',model:'backup',endpointId:'backup.local',priority:1},
+      {routeId:'owner.primary',provider:'openai-compatible',model:'fixture',endpointId:'owner.local',priority:10,locality:'local',costClass:'free'},
+      {routeId:'backup',provider:'openai-compatible',model:'backup',endpointId:'backup.local',priority:1,locality:'local',costClass:'free'},
     ],
   };
   const budgetContext={kind:'browser-agent',jobId:'job-a',controlEpoch:1};
