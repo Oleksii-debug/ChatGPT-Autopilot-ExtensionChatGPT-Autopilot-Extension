@@ -196,6 +196,17 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       if (req.method !== 'POST' || req.url !== '/v1/control') {
         return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
       }
+      // Reject invalid media type and declared body size before invoking the
+      // owner credential resolver. These are public transport constraints,
+      // not authentication or Core authorization decisions. A malformed
+      // request must not exhaust DPAPI/credential-broker capacity.
+      if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(headerString(req.headers['content-type']))) {
+        return send(res, 415, { schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE' });
+      }
+      const len = req.headers['content-length'];
+      if (len !== undefined && (!/^\d+$/u.test(len) || Number(len) > MAX_BODY_BYTES)) {
+        return send(res, 413, { schemaVersion: 1, status: 'TOO_LARGE' });
+      }
       const authorization = headerString(req.headers.authorization);
       const candidate = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
       // Do not invoke the credential broker on malformed anonymous requests.
@@ -217,13 +228,6 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
         }
       }
       if (!timingSafeEqual(candidateDigest, activeExpected)) return reject(res, 401);
-      if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(headerString(req.headers['content-type']))) {
-        return send(res, 415, { schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE' });
-      }
-      const len = req.headers['content-length'];
-      if (len !== undefined && (!/^\d+$/u.test(len) || Number(len) > MAX_BODY_BYTES)) {
-        return send(res, 413, { schemaVersion: 1, status: 'TOO_LARGE' });
-      }
       let chunks = [], total = 0;
       for await (const chunk of req) {
         total += chunk.length;
