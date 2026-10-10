@@ -285,6 +285,9 @@ export function prepareAutomaticAgentSpecialistDelegationV1(input = {}) {
 
   const binding = bindSpecialistHandoffToRegistryV1({
     registry,
+    // Read-only preparation must bind the selection to the exact normalized
+    // registry snapshot; BrowserAgentManager revalidates durable CAS at commit.
+    expectedRegistryBindingKey: registry.bindingKey,
     selection,
     handoff,
     parentCapabilityIds,
