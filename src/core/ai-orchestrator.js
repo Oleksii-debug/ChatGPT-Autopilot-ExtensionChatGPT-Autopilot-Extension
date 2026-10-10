@@ -1,6 +1,7 @@
 import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js';
 import {
   AiRouteRole,
+  hasUnsafeAiDispatchUnicode,
   DEFAULT_AI_ROUTE_POLICY,
   DEFAULT_AI_WORKER_POLICY,
   classifyAiRouteError,
@@ -106,7 +107,8 @@ function normalizeSlot(raw, fallback) {
   const provider = Object.hasOwn(slot, 'provider') ? slot.provider : fallback.provider;
   if (!PROVIDERS.has(provider)) throw new Error('AI model slot provider is invalid');
   const model = Object.hasOwn(slot, 'model') ? slot.model : '';
-  if (typeof model !== 'string' || model !== model.trim() || model.length > 300) {
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300
+      || hasUnsafeAiDispatchUnicode(model)) {
     throw new Error('AI model slot name must be exact trimmed text of at most 300 characters');
   }
   return { provider, model };
