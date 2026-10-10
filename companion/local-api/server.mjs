@@ -182,6 +182,10 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // This v1 endpoint accepts only literal strict UTF-8 JSON bytes. Reject
       // Content-Encoding at admission, before consulting the owner token
       // provider or canonical Core; decompression is not an API feature.
+      // Trailer declarations change the control envelope after header admission.
+      // Reject them before Companion credentials or Core; this v1 endpoint
+      // accepts one bounded JSON document with no trailing metadata.
+      if (req.headers.trailer !== undefined) return reject(res);
       if (req.headers['content-encoding'] !== undefined) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
@@ -236,6 +240,9 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       }
       // Fail closed on invalid UTF-8 and duplicate JSON member identities before
       // any scope lookup or canonical dispatch. No second JSON/API authority.
+      // HTTP/1.1 chunked clients can send undeclared trailers after the body.
+      // They must not be silently ignored in an authenticated control request.
+      if (req.rawTrailers.length !== 0) return reject(res);
       const parsed = parseStrictControlJsonV1(Buffer.concat(chunks));
       // Reuse the exact Core request schema before touching request identities.
       // A second authenticated SDK/CLI instance must not race the same
