@@ -76,6 +76,71 @@ test('Plan-1 S1: empty optional effect and approval references cannot be erased 
 });
 
 
+
+test('Plan-1 S1: explicitly undefined durable identity links cannot disappear in JSON recovery', () => {
+  // Missing legacy links and explicit canonical null are compatible, but an
+  // own undefined identity would vanish during JSON.stringify and silently
+  // detach a child, approval, verifier or exact effect from its provenance.
+  const cases = [
+    [normalizeToolDescriptorV1, {
+      schemaVersion: 1, toolId: 'fs.read', providerId: 'native-companion',
+      label: 'Read file', capabilityIds: ['filesystem.read'],
+    }, ['inputSchemaRef', 'outputSchemaRef']],
+    [normalizePolicyDecisionV1, {
+      schemaVersion: 1, decisionId: 'decision-identity',
+      invocationId: 'invoke-identity', decision: PolicyDecisionKind.ALLOW,
+      reasonCode: 'OWNER_OK', decidedAt: AT,
+    }, ['approvalId']],
+    [normalizeToolInvocationV1, {
+      schemaVersion: 1, invocationId: 'invoke-identity', toolId: 'fs.read',
+      providerId: 'native-companion', requestedCapabilityIds: ['filesystem.read'],
+      policyDecisionId: 'decision-identity', arguments: {}, createdAt: AT,
+    }, ['parentInvocationId']],
+    [normalizeArtifactRefV1, {
+      schemaVersion: 1, artifactId: 'artifact-identity', kind: 'file',
+      uri: 'artifact://identity/1', createdAt: AT,
+    }, ['producerInvocationId']],
+    [normalizeVerificationV1, {
+      schemaVersion: 1, verificationId: 'verification-identity',
+      invocationId: 'invoke-identity', status: VerificationStatus.NOT_APPLICABLE,
+      reasonCode: 'NOT_REQUIRED', verifiedAt: AT,
+    }, ['observationId', 'verifierId', 'verificationAuthorityId', 'effectId', 'executionId']],
+    [normalizeSpecialistHandoffV1, {
+      schemaVersion: 1, handoffId: 'handoff-identity',
+      specialistId: 'specialist-identity', goal: 'Verify ledger link',
+      requestedCapabilityIds: ['filesystem.read'], createdAt: AT,
+    }, ['parentInvocationId']],
+  ];
+  for (const [normalize, input, links] of cases) {
+    const legacy = normalize(input);
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(legacy))), legacy,
+      'legacy omitted optional identity must survive a cold JSON restart');
+    for (const link of links) {
+      const corrupt = Object.freeze({ ...input, [link]: undefined });
+      assert.throws(() => normalize(corrupt), error => {
+        assert.match(error.message, new RegExp(link + ' must be a canonical null or exact ID'));
+        assert.doesNotMatch(error.message, /PRIVATE_IDENTITY_SECRET/);
+        return true;
+      }, 'explicitly undefined identity must fail before durable admission');
+      assert.equal(Object.hasOwn(corrupt, link), true, 'no caller mutation allowed');
+      assert.equal(corrupt[link], undefined);
+      const canonical = normalize({ ...input, [link]: null });
+      assert.equal(canonical[link], null);
+      assert.deepEqual(normalize(JSON.parse(JSON.stringify(canonical))), canonical,
+        'canonical null is a stable explicit no-link across restart');
+      const withBinding = normalize({
+        ...input,
+        ...(link === 'approvalId' ? { decision: PolicyDecisionKind.REQUIRE_APPROVAL } : {}),
+        [link]: 'bound-identity-1',
+      });
+      assert.equal(withBinding[link], 'bound-identity-1');
+      assert.deepEqual(normalize(JSON.parse(JSON.stringify(withBinding))), withBinding,
+        'exact binding must survive JSON recovery unchanged');
+    }
+  }
+});
+
+
 test('Plan-1 S1: credential scope authority stays exact and unique across restart', () => {
   const base = credential();
   const accepted = normalizeCredentialRefV1({
