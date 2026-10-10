@@ -64,7 +64,7 @@ async function readBoundedControlResponseJson(res, deadline) {
     // Even a bounded stream must agree with declared framing. A fabricated
     // Content-Length is not evidence that a truncated/extended Core receipt
     // was delivered, so the SDK reports ambiguity without any retry.
-    if (declared !== null && size !== Number(declared)) {
+    if (declared != null && size !== Number(declared)) {
       throw new Error('Local API response content length mismatch');
     }
     const bytes = new Uint8Array(size);
