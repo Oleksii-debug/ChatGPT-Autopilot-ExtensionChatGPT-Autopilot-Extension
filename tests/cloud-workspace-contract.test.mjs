@@ -469,12 +469,19 @@ test('trusted cloud isolation adapter binds canonical owner and cannot authorize
     verifyIsolation: async target => {
       called++;
       assert.deepEqual(target, {
+        schemaVersion: 1,
         workspaceId: 'workspace.cloud.1',
         providerId: 'cloud.provider.1',
         workspaceRevision: 'rev.10',
         environmentSha256: ENV_SHA,
         checkpointArtifactId: 'artifact.checkpoint.10',
         checkpointSha256: CHECKPOINT_SHA,
+        taskId: 'task.cloud.1',
+        planId: 'plan.cloud.1',
+        nodeId: 'node.cloud.1',
+        effectId: 'effect.cloud.1',
+        policyEnvelopeId: 'policy.cloud.1',
+        executionOwnerId: 'worker.cloud.1',
         executionLeaseId: 'lease.cloud.1',
         executionOwnershipRevision: 2,
       });
@@ -1448,4 +1455,62 @@ test('S1 owner revocation during async binding read fences destructive cloud tea
     assert.equal(teardowns, 0, 'never send destructive provider I/O with revoked lease');
     assert.equal(scrubCalls, 0, 'never attest scrub if teardown did not start');
   }
+});
+
+test('S1 isolation and scrub targets carry full exact canonical identity after JSON cold restart', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  const savedBinding = JSON.parse(JSON.stringify(binding));
+  const savedOwner = JSON.parse(JSON.stringify(ownership));
+  const targets = [];
+  const readOwner = async () => JSON.parse(JSON.stringify(savedOwner));
+  const checkTarget = target => {
+    targets.push(target);
+    assert.equal(Object.isFrozen(target), true);
+    assert.deepEqual(target, {
+      schemaVersion: 1,
+      workspaceId: savedBinding.workspaceId,
+      providerId: savedBinding.providerId,
+      workspaceRevision: savedBinding.workspaceRevision,
+      environmentSha256: savedBinding.environmentSha256,
+      checkpointArtifactId: savedBinding.checkpointArtifactId,
+      checkpointSha256: savedBinding.checkpointSha256,
+      taskId: savedBinding.taskId,
+      planId: savedBinding.planId,
+      nodeId: savedBinding.nodeId,
+      effectId: savedBinding.effectId,
+      policyEnvelopeId: savedBinding.policyEnvelopeId,
+      executionOwnerId: savedBinding.executionOwnerId,
+      executionLeaseId: savedBinding.executionLeaseId,
+      executionOwnershipRevision: savedBinding.executionOwnershipRevision,
+    });
+  };
+  const isolation = await verifyCloudWorkspaceIsolationV1(
+    JSON.parse(JSON.stringify(observation())), savedOwner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: readOwner,
+      verifyIsolation: async target => {
+        checkTarget(target);
+        return isolationProof();
+      },
+    },
+  );
+  assert.equal(isolation.executionAuthorized, false);
+  const receipt = await teardownAndVerifyCloudWorkspaceV1(savedBinding, {
+    at: SCRUB_AT,
+    loadCanonicalOwnership: readOwner,
+    loadCanonicalBinding: async () => JSON.parse(JSON.stringify(savedBinding)),
+    teardown: async target => {
+      checkTarget(target);
+      return teardownCompletion();
+    },
+    verifyScrub: async target => {
+      checkTarget(target);
+      return scrubProof();
+    },
+  });
+  assert.equal(targets.length, 3);
+  assert.equal(receipt.scrubVerified, true);
+  assert.equal(receipt.leaseReleaseAuthorized, false);
+  assert.equal(receipt.reuseAuthorized, false);
+  assert.equal(receipt.requiresCanonicalRuntime, true);
 });
