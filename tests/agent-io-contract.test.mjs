@@ -394,3 +394,52 @@ test('Plan-1 S1: nested Agent I/O array snapshots never invoke hostile Proxy len
   );
   assert.equal(lengthReads, 0, 'negative validation must never invoke the untrusted getter');
 });
+
+
+test('Plan-1 S1: optional Agent I/O references cannot erase a corrupt durable identity', async () => {
+  const liveEvents = [];
+  const sink = new AgentEventSink({ onEvent: observed => liveEvents.push(observed) });
+  const validAction = normalizeAgentAction(action({ sessionId: null, taskId: null }));
+  const validEvent = normalizeAgentEvent(event({ sessionId: null, taskId: null }));
+  assert.equal(validAction.sessionId, null);
+  assert.equal(validEvent.taskId, null);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(validAction))), validAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(validEvent))), validEvent);
+
+  for (const field of ['sessionId', 'taskId']) {
+    const invalidAction = action({ [field]: '' });
+    const invalidEvent = event({ [field]: '' });
+    assert.throws(() => normalizeAgentAction(invalidAction), /is invalid/);
+    assert.throws(() => normalizeAgentEvent(invalidEvent), /is invalid/);
+    await assert.rejects(() => sink.emit(invalidEvent), /is invalid/);
+    assert.equal(invalidAction[field], '', 'rejected action must not be modified');
+    assert.equal(invalidEvent[field], '', 'rejected event must not be modified');
+  }
+  const nonLinked = event({ type: AgentEventType.COMPLETION_OBSERVED, actionId: '' });
+  assert.throws(() => normalizeAgentEvent(nonLinked), /actionId is invalid/);
+  await assert.rejects(() => sink.emit(nonLinked), /actionId is invalid/);
+  assert.equal(liveEvents.length, 0, 'invalid evidence never reaches the event sink');
+});
+
+test('Plan-1 S1: signed extended ISO years agree across Agent contracts and cold restart', () => {
+  const signed = '+010000-02-29T03:04:05+01:00';
+  const expected = '+010000-02-29T02:04:05.000Z';
+  const normalizedAction = normalizeAgentAction(action({ createdAt: signed }));
+  const normalizedEvent = normalizeAgentEvent(event({ occurredAt: signed }));
+  assert.equal(normalizedAction.createdAt, expected);
+  assert.equal(normalizedEvent.occurredAt, expected);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(normalizedAction))), normalizedAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(normalizedEvent))), normalizedEvent);
+  for (const invalid of [
+    '+010000-02-30T03:04:05Z',
+    '+010000-13-01T03:04:05Z',
+    '+010000-02-29T24:04:05Z',
+    '+10000-02-29T03:04:05Z',
+    '10000-02-29T03:04:05Z',
+  ]) {
+    assert.throws(() => normalizeAgentAction(action({ createdAt: invalid })),
+      /timestamp|calendar date/i, 'invalid action date must fail closed: ' + invalid);
+    assert.throws(() => normalizeAgentEvent(event({ occurredAt: invalid })),
+      /timestamp|calendar date/i, 'invalid event date must fail closed: ' + invalid);
+  }
+});
