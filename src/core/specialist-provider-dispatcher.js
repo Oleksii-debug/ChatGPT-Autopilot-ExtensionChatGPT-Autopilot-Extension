@@ -13,9 +13,16 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain data object`);
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Proxy reflection errors are lower-trust data and may contain secrets.
+    throw new Error(`${label} cannot be inspected safely`);
+  }
   if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain data object`);
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field`);
@@ -29,12 +36,21 @@ function record(value, allowed, label) {
 }
 
 function array(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(`${label} cannot be inspected safely`);
+  }
+  if (!isArray || proto !== Array.prototype) {
     throw new Error(`${label} must be a bounded canonical array`);
   }
-  // Inspect descriptors before reading any element. Array#map reads accessors
-  // and silently skips holes, which is unsafe for untrusted provider data.
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  // Inspect descriptors before reading any element, including 'length'.
+  // A Proxy or getter must not cause an effect or expose its exception text.
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || length < 0 || length > max) {
     throw new Error(`${label} must be a bounded canonical array`);
@@ -98,9 +114,15 @@ function cloneReadinessEvidence(value, label, depth = 0, budget = { count: 0 }, 
     result = array(value, label, 512).map((item, index) =>
       cloneReadinessEvidence(item, `${label}[${index}]`, depth + 1, budget, ancestors));
   } else {
-    const proto = Object.getPrototypeOf(value);
+    let proto;
+    let descriptors;
+    try {
+      proto = Object.getPrototypeOf(value);
+      descriptors = Object.getOwnPropertyDescriptors(value);
+    } catch {
+      throw new Error(`${label} cannot be inspected safely`);
+    }
     if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain data object`);
-    const descriptors = Object.getOwnPropertyDescriptors(value);
     if (Reflect.ownKeys(descriptors).length > 128) throw new Error(`${label} has too many fields`);
     result = Object.create(null);
     for (const key of Reflect.ownKeys(descriptors)) {
