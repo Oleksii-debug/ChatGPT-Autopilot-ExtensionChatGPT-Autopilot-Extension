@@ -1,4 +1,5 @@
 import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -209,7 +210,7 @@ const MODEL_DEFAULT_FIELDS = Object.freeze([
   'aiRoutingMode', 'aiPinnedRouteId', 'aiPrimaryProvider',
   'aiPrimaryModel', 'aiStrongProvider', 'aiStrongModel',
 ]);
-const MODEL_ROUTING_MODES = new Set(['auto', 'primary', 'strong', 'hybrid-rules', 'inherit']);
+const MODEL_ROUTING_MODES = new Set(['auto', 'primary', 'strong', 'hybrid-rules', 'hybrid-auto', 'inherit']);
 export function mergeAgentDefinitionModelDefaultsV1(input = {}, persisted = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)
       || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) {
@@ -250,6 +251,37 @@ export function mergeAgentDefinitionModelDefaultsV1(input = {}, persisted = {}) 
   return result;
 }
 
+
+function resolveSpecialistDelegationFromFormV1(input, persisted) {
+  const configured = ownData(input, 'specialistDelegationConfigured', 'Specialist delegation configured');
+  if (!configured.present) {
+    return persisted === undefined ? undefined
+      : persisted === null ? null : normalizeAgentSpecialistDelegationProfileV1(persisted);
+  }
+  if (typeof configured.value !== 'boolean') {
+    throw new Error('Specialist delegation configured має бути boolean.');
+  }
+  if (configured.value === false) return persisted === undefined ? undefined : null;
+  const field = (key) => ownData(input, key, key);
+  const enabled = field('specialistDelegationEnabled');
+  if (!enabled.present || typeof enabled.value !== 'boolean') {
+    throw new Error('Specialist delegation enabled має бути boolean.');
+  }
+  const get = key => field(key).value;
+  return normalizeAgentSpecialistDelegationProfileV1({
+    schemaVersion: 1,
+    registryId: parseCanonicalAgentIdentity(get('specialistRegistryId'), 'Specialist registry ID'),
+    requiredCapabilityIds: listFromLines(get('specialistCapabilityIdsText'), 'Specialist capability ID', { maxItems:64, itemMax:180, identity:true }),
+    requiredToolIds: listFromLines(get('specialistToolIdsText'), 'Specialist tool ID', { maxItems:128, itemMax:180, identity:true }),
+    policyEnvelopeId: parseCanonicalAgentIdentity(get('specialistPolicyEnvelopeId'), 'Specialist policy envelope ID'),
+    deadlineSeconds: exactIntegerText(get('specialistDeadlineSeconds'), 'Specialist deadline', { min:1, max:31536000 }),
+    maxConcurrentHandoffs: exactIntegerText(get('specialistMaxConcurrentHandoffs'), 'Specialist concurrency', { min:0, max:256 }),
+    leaseSeconds: exactIntegerText(get('specialistLeaseSeconds'), 'Specialist lease', { min:1, max:86400 }),
+    priority: exactIntegerText(get('specialistPriority'), 'Specialist priority', { min:0, max:1000000 }),
+    enabled: enabled.value,
+  });
+}
+
 export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
@@ -260,6 +292,9 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
+  const enabled = ownData(input, 'enabled', 'Agent definition enabled');
+  if (enabled.present && typeof enabled.value !== 'boolean') throw new Error('Agent definition enabled має бути boolean.');
+  const resolvedSpecialist = resolveSpecialistDelegationFromFormV1(input, specialistDelegationProfile);
   const effectiveConfigDefaults = mergeAgentDefinitionModelDefaultsV1(input, configDefaults);
   const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
     persistedPolicy: copyModelRoutePolicy(modelRoutePolicy),
@@ -288,10 +323,8 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: effectiveConfigDefaults,
     modelRoutePolicy: effectiveModelRoutePolicy,
-    ...(specialistDelegationProfile === undefined ? {} : {
-      specialistDelegationProfile: copyStructuredData(specialistDelegationProfile, 'specialistDelegationProfile'),
-    }),
-    enabled: input.enabled === true,
+    ...(resolvedSpecialist === undefined ? {} : { specialistDelegationProfile: resolvedSpecialist }),
+    enabled: enabled.value === true,
     definitionRevision,
   };
 }
