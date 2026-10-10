@@ -545,17 +545,29 @@ function exactProviderModelId(model) {
   return model;
 }
 
+// An independently callable HTTP gateway must honor exact owner-provided output
+// ceilings even if requests bypass the extension client. Coercing a negative,
+// null or string limit to 0 silently removes the bound before provider I/O.
+function exactProviderOutputCeiling(value) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)
+      || Object.is(value, -0) || value < 0) {
+    throw gatewayError('AI provider maxOutputTokens must be a non-negative safe integer', 400, 'AI_PROVIDER_OUTPUT_LIMIT_INVALID');
+  }
+  return value;
+}
+
 export async function completeProvider({ provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch, compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   requireBuiltinEndpointUnbound(provider, endpointId);
   const dispatchModel = exactProviderModelId(model);
+  const tokenLimit = exactProviderOutputCeiling(maxOutputTokens);
   if (!clean(prompt)) throw new Error('Prompt is required');
   const visionImage = normalizeImageDataUrl(imageDataUrl);
   if (provider === 'ollama') {
     const messages = [];
     if (clean(systemPrompt)) messages.push({ role: 'system', content: clean(systemPrompt) });
     messages.push({ role: 'user', content: clean(prompt), ...(visionImage ? { images: [visionImage.replace(/^data:image\/(?:jpeg|png|webp);base64,/, '')] } : {}) });
-    const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
+
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
       body: JSON.stringify({ model: dispatchModel, messages, stream: false, ...(tokenLimit ? { options: { num_predict: tokenLimit } } : {}) }),
@@ -570,7 +582,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
   if (provider === 'openai') {
     const payload = { model: dispatchModel, input: visionImage ? [{ role: 'user', content: [{ type: 'input_text', text: clean(prompt) }, { type: 'input_image', image_url: visionImage }] }] : clean(prompt) };
     if (clean(systemPrompt)) payload.instructions = clean(systemPrompt);
-    const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
+
     if (tokenLimit) payload.max_output_tokens = tokenLimit;
     const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/responses`, {
       method: 'POST',
@@ -589,7 +601,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
   const messages = [];
   if (clean(systemPrompt)) messages.push({ role: 'system', content: clean(systemPrompt) });
   messages.push({ role: 'user', content: visionImage ? [{ type: 'text', text: clean(prompt) }, { type: 'image_url', image_url: { url: visionImage } }] : clean(prompt) });
-  const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
+
   const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: compatibleHeaders(endpoint, env),
