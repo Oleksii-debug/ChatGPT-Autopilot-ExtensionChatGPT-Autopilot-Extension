@@ -2351,13 +2351,11 @@ export class BrowserAgentManager {
         const ownership = (job.runtime.specialistExecutionOwnerships || [])
           .map(normalizeExecutionOwnershipV1)
           .find(item => item.planId === plan.planId && item.nodeId === binding.nodeId);
-        if (!ownership
-            || ownership.state !== ExecutionOwnershipState.OWNED
-            || ownership.ownerId !== agentId
-            || ownership.leaseId !== assignment.leaseId
-            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
-          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
-        }
+        const matchesCanonicalOwnedLease = Boolean(ownership
+          && ownership.state === ExecutionOwnershipState.OWNED
+          && ownership.ownerId === agentId
+          && ownership.leaseId === assignment.leaseId
+          && ownership.leaseUntil === assignment.leaseExpiresAt);
 
         const configQuarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
         if (Object.hasOwn(configQuarantine, selection.providerId)) {
@@ -2386,6 +2384,14 @@ export class BrowserAgentManager {
               || execution.leaseUntil !== assignment.leaseExpiresAt) {
             throw new Error('Specialist provider execution identity drifted from current lease');
           }
+          const securelyFenced = (execution.status === SpecialistProviderExecutionStatus.MANUAL_REVIEW
+              && ownership?.state === ExecutionOwnershipState.MANUAL_REVIEW)
+            || (execution.status === SpecialistProviderExecutionStatus.RECONCILE
+              && ownership?.state === ExecutionOwnershipState.RECONCILE
+              && ownership.leaseId === assignment.leaseId);
+          if (!matchesCanonicalOwnedLease && !securelyFenced) {
+            throw new Error('Specialist provider execution requires matching canonical OWNED lease or fenced recovery evidence');
+          }
           const dispatchable = [
             SpecialistProviderExecutionStatus.PREPARED,
             SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
@@ -2404,6 +2410,9 @@ export class BrowserAgentManager {
           return store;
         }
 
+        if (!matchesCanonicalOwnedLease) {
+          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
+        }
         if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
           throw new Error('Specialist provider execution provenance capacity is exhausted');
         }
