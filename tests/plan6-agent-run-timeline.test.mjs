@@ -1521,7 +1521,7 @@ test('S1 persisted plan-node state integrity rejects corrupted evidence without 
   assert.equal(buildAgentRunTimelineV1(legacy).plan.stateCounts.UNKNOWN, 1);
   assert.deepEqual(buildAgentRunTimelineV1(legacy),
     buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
-  for (const state of [undefined, null, false, 1, '', ' READY ', 'PRIVATE\\u202eVERIFIED', 'x'.repeat(65)]) {
+  for (const state of [undefined, null, false, 1, '', ' READY ', 'PRIVATE\u202eVERIFIED', 'x'.repeat(65)]) {
     const corrupt = job();
     corrupt.runtime.plan.nodes[0].state = state;
     assert.throws(() => buildAgentRunTimelineV1(corrupt), /recorded state is invalid/u);
