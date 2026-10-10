@@ -11,6 +11,8 @@ import {
   normalizeCloudWorkspaceObservationV1,
   verifyCloudWorkspaceIsolationV1,
   teardownAndVerifyCloudWorkspaceV1,
+  commitVerifiedCloudWorkspaceBindingV1,
+  reconcileCloudWorkspaceBindingCommitV1,
 } from '../src/core/cloud-workspace-contract.js';
 import {
   claimExecutionOwnershipV1,
@@ -627,4 +629,115 @@ test('scrub fails closed when final canonical binding readback fails', async () 
     /canonical store readback unavailable/u,
   );
   assert.equal(loads, 2);
+});
+
+test('S1 canonical runtime atomically persists the isolation-verified binding and reads it back', async () => {
+  const owner = cloudOwnership();
+  const store = { owner, binding: null, commits: 0 };
+  const result = await commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+    at: ISOLATION_AT,
+    loadCanonicalOwnership: async () => store.owner,
+    verifyIsolation: async () => isolationProof(),
+    atomicCommitCanonicalBinding: async tx => {
+      assert.equal(tx.requireAtomicOwnerLeaseCompareAndSet, true);
+      assert.equal(tx.requireExactCheckpoint, true);
+      assert.equal(tx.expectedOwnershipRevision, owner.revision);
+      assert.equal(tx.executionLeaseId, owner.leaseId);
+      assert.equal(tx.binding.checkpointSha256, CHECKPOINT_SHA);
+      assert.equal(Object.isFrozen(tx), true);
+      store.binding = JSON.parse(JSON.stringify(tx.binding));
+      store.commits++;
+    },
+    loadCanonicalBinding: async ({ workspaceId, executionLeaseId }) => {
+      assert.equal(workspaceId, 'workspace.cloud.1');
+      assert.equal(executionLeaseId, owner.leaseId);
+      return store.binding;
+    },
+  });
+  assert.equal(store.commits, 1);
+  assert.equal(result.status, 'CANONICAL_BINDING_DURABLE_READBACK');
+  assert.equal(result.isolationVerified, true);
+  assert.equal(result.durableBindingVerified, true);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.resumeAuthorized, false);
+  assert.equal(Object.isFrozen(result.binding), true);
+});
+
+test('S1 binding bridge fails closed on missing or forged canonical persistence', async () => {
+  const owner = cloudOwnership();
+  for (const mode of ['missing', 'checkpoint-drift', 'ownership-drift']) {
+    let commits = 0;
+    let storeOwner = owner;
+    let binding = null;
+    await assert.rejects(
+      () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+        at: ISOLATION_AT,
+        loadCanonicalOwnership: async () => storeOwner,
+        verifyIsolation: async () => isolationProof(),
+        atomicCommitCanonicalBinding: async tx => {
+          commits++;
+          binding = tx.binding;
+          if (mode === 'ownership-drift') {
+            storeOwner = { ...owner, revision: owner.revision + 1 };
+          }
+        },
+        loadCanonicalBinding: async () => {
+          if (mode === 'missing') return null;
+          if (mode === 'checkpoint-drift') return { ...binding, checkpointSha256: 'f'.repeat(64) };
+          return binding;
+        },
+      }),
+      /not durably persisted|binding readback mismatch|ownership changed during binding commit/u,
+    );
+    assert.equal(commits, 1);
+  }
+});
+
+test('S1 ambiguous canonical binding write recovers by read-only lookup without a second commit', async () => {
+  const owner = cloudOwnership();
+  let commits = 0;
+  let persisted = null;
+  await assert.rejects(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => owner,
+      verifyIsolation: async () => isolationProof(),
+      atomicCommitCanonicalBinding: async tx => {
+        commits++;
+        persisted = JSON.parse(JSON.stringify(tx.binding));
+        throw new Error('connection dropped after atomic commit');
+      },
+      loadCanonicalBinding: async () => persisted,
+    }),
+    /connection dropped after atomic commit/u,
+  );
+  assert.equal(commits, 1);
+  const recovered = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
+    loadCanonicalBinding: async () => persisted,
+  });
+  assert.equal(recovered.status, 'CANONICAL_BINDING_DURABLE_READBACK');
+  assert.equal(recovered.durableBindingVerified, true);
+  assert.equal(recovered.safeRetryAuthorized, false);
+  assert.equal(recovered.executionAuthorized, false);
+  assert.equal(commits, 1);
+  const absent = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
+    loadCanonicalBinding: async () => null,
+  });
+  assert.equal(absent.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+  assert.equal(absent.safeRetryAuthorized, false);
+});
+
+test('S1 recovery refuses a mismatched checkpoint without mutating canonical state', async () => {
+  const { binding } = bindingAndOwnership();
+  let lookups = 0;
+  await assert.rejects(
+    () => reconcileCloudWorkspaceBindingCommitV1(binding, {
+      loadCanonicalBinding: async () => {
+        lookups++;
+        return { ...binding, environmentSha256: 'f'.repeat(64) };
+      },
+    }),
+    /binding readback mismatch/u,
+  );
+  assert.equal(lookups, 1);
 });
