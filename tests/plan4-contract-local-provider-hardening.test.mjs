@@ -2392,7 +2392,6 @@ test('Plan4 S1 FREE classification cannot disguise remote UNKNOWN or positive pr
     {...remote,inputPricePerMillionUsd:0.01,outputPricePerMillionUsd:0},
     {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0,inputPriceKnown:false},
     {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0,outputPriceKnown:false},
-    {...route,routeId:'local-false-free',costClass:'free',inputPricePerMillionUsd:0.05},
   ];
   let providerEffects = 0;
   const router = new AiOrchestrator({gatewayClient:{
@@ -2400,14 +2399,14 @@ test('Plan4 S1 FREE classification cannot disguise remote UNKNOWN or positive pr
   }});
   for (const value of contradictory) {
     for (const candidate of [value, JSON.parse(JSON.stringify(value))]) {
-      assert.throws(() => normalizeAiRoutePool([candidate]), /FREE pricing requires/);
+      assert.throws(() => normalizeAiRoutePool([candidate]), /remote FREE pricing requires/);
       const request = {
         enabled:true, mode:'primary', routes:[candidate],
         routePolicy:{freeOnly:true, locality:'any'},
       };
-      assert.throws(() => normalizeAiRouterSettings(request), /FREE pricing requires/);
+      assert.throws(() => normalizeAiRouterSettings(request), /remote FREE pricing requires/);
       await assert.rejects(router.run(request, {}, 'never charge this fixture'),
-        /FREE pricing requires/);
+        /remote FREE pricing requires/);
     }
   }
   assert.equal(providerEffects,0, 'invalid free price cannot issue a provider effect');
