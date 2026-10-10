@@ -792,8 +792,19 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     }
   }
   if (type === BrowserAgentActionType.SCROLL) {
-    action.direction = raw.direction === 'up' ? 'up' : 'down';
-    action.amount = Math.min(3, Math.max(0.25, Number(raw.amount) || 0.8));
+    // Never reinterpret a malformed or recovered owner scroll intent as "down".
+    // Legacy omission of amount keeps the documented default; an explicitly
+    // present null/string/boolean/out-of-range value is not a safe default.
+    if (raw?.direction !== 'up' && raw?.direction !== 'down') {
+      throw new Error('Browser Agent scroll requires an explicit up/down direction');
+    }
+    const amount = raw?.amount;
+    if (amount !== undefined && (typeof amount !== 'number'
+      || !Number.isFinite(amount) || amount < 0.25 || amount > 3)) {
+      throw new Error('Browser Agent scroll requires an exact bounded amount');
+    }
+    action.direction = raw.direction;
+    action.amount = amount === undefined ? 0.8 : amount;
   }
   if (type === BrowserAgentActionType.NAVIGATE) action.url = safeHttpUrl(raw.url);
   if (type === BrowserAgentActionType.WAIT) action.seconds = Math.min(60, Math.max(1, Number(raw.seconds) || 2));
@@ -1388,8 +1399,16 @@ export function executeBrowserPageAction(snapshotId, action) {
     return { ok: true, kind: 'check', effectVerified: true, checked: observed, url: location.href };
   }
   if (action.type === 'scroll') {
-    const amount = Math.max(0.25, Math.min(3, Number(action.amount) || 0.8));
-    const delta = innerHeight * amount * (action.direction === 'up' ? -1 : 1);
+    // The executor also receives persisted actions after JSON cold restart.
+    // Never silently turn corrupted direction/amount into a different scroll.
+    if (action.direction !== 'up' && action.direction !== 'down') {
+      throw new Error('AGENT_SCROLL_DIRECTION_INVALID');
+    }
+    if (typeof action.amount !== 'number' || !Number.isFinite(action.amount)
+      || action.amount < 0.25 || action.amount > 3) {
+      throw new Error('AGENT_SCROLL_AMOUNT_INVALID');
+    }
+    const delta = innerHeight * action.amount * (action.direction === 'up' ? -1 : 1);
     scrollBy({ top: delta, left: 0, behavior: 'instant' });
     return { ok: true, kind: 'scroll', url: location.href };
   }
