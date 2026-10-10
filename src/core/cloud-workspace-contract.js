@@ -928,10 +928,6 @@ export function assessCloudWorkspaceContinuityV1(
   if (Date.parse(binding.boundAt) > Date.parse(assessedAt)) {
     return assessment(CloudWorkspaceContinuityStatus.BLOCKED, 'BINDING_FROM_FUTURE', binding, ownership, assessedAt);
   }
-  if (Date.parse(binding.boundAt) < Date.parse(ownership.updatedAt)) {
-    return assessment(CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED,
-      'BINDING_PREDATES_CANONICAL_OWNER_REVISION', binding, ownership, assessedAt);
-  }
   if (ownership.state === ExecutionOwnershipState.RECONCILE
       || ownership.state === ExecutionOwnershipState.MANUAL_REVIEW) {
     return assessment(
@@ -959,6 +955,10 @@ export function assessCloudWorkspaceContinuityV1(
       ownership,
       assessedAt,
     );
+  }
+  if (Date.parse(binding.boundAt) < Date.parse(ownership.updatedAt)) {
+    return assessment(CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED,
+      'BINDING_PREDATES_CANONICAL_OWNER_REVISION', binding, ownership, assessedAt);
   }
   if (Date.parse(assessedAt) >= Date.parse(ownership.leaseUntil)) {
     return assessment(
