@@ -149,6 +149,18 @@ test('tracked candidate HEAD downgrade cannot be concealed by unstaged 11.x file
   }
 }));
 
+test('committed candidate provenance cannot be faked with uncommitted audit text', () => withFixture(f => {
+  const path = 'PLAN8_11_0_13_SOURCE_CONVERGENCE.md';
+  f.put(path, 'Unverified archive source!\\n');
+  f.git('add', path);
+  f.git('commit', '-m', 'Commit invalid provenance');
+  // A clean-looking worktree cannot override what is actually in the commit.
+  f.put(path, 'Audited source archive SHA-256: ' + PLAN8_ARCHIVE_SHA256 + '\\n');
+  assert.throws(() => verifyPlan8Lineage({ root: f.root,
+    sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }),
+    /candidate HEAD audited archive digest missing from provenance/u);
+}));
+
 test('source-only candidate cannot impersonate the preserved predecessor history', () => withFixture(f => {
   f.git('checkout', '-b', 'source-only-candidate', f.baseline);
   assert.throws(() => verifyPlan8Lineage({ root: f.root,
