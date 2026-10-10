@@ -1,5 +1,12 @@
 ### PLAN8_S1_LINEAGE_PROVENANCE_AND_OWNER_BUDGET_CONVERGENCE_C71F303D_20261010 — NONTERMINAL 0/2
 
+### PLAN3_S1_AGED_PROVIDER_OBSERVATION_07662608_20261010 — EXACT READBACK / NONTERMINAL 0/2
+- ONLY canonical Drive Plan 3, Section 1 FIRST ACTIONABLE IN_PROGRESS / NOT TERMINAL DONE. Section 2 NOT ADVANCED / NOT DONE. Other Drive plans unchanged.
+- Existing 11.0.13 High owner PR #706 and child #828 reused. Current scoped child HEAD `07662608d47fa2d67275c9a4d72bf9d57e3d9cec`; source `src/core/specialist-provider-readiness-resolver.js` blob `0b6c1499ff50e5f77d8fbb8a8cb10d84757fa441`; regression test blob `27054b404627504b05cdb99a362d7dec7184d346`. Additional exact-source V8 probe (isolated mocks, NOT Node/CI): initial trusted observation aged 29999ms, revalidation 1ms later at TTL exactly 30000ms ALLOW; 2ms later at age 30001ms DENY; both re-probed twice. Together with previous RED→GREEN stale-token test demonstrates bound is against actual provider observation, not merely resolution time. Both blobs independently reread from GitHub.
+- Latest exact head Plan3 Actions #38081754113, Core #38081754110, Chrome #38081754271, Release #38081754118 were QUEUED, not passed. Unmerged child #828, owning #706, Plan8 11.x→main #716, prior aggregate Release red, main 0.9.19: Section1 NOT DONE, so S2 remains not advanced and terminal DONE stays 0/2. No live provider credentials/NVDA evidence asserted.
+- PR https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/828
+
+
 ### PLAN3_S1_READINESS_TOKEN_TTL_FENCE_703CBA0B_20261010 — SOURCE AND ISOLATED V8 VERIFIED; 0/2 TERMINAL
 - Exclusive scope: canonical Drive `3. Третій план` (1FgqO_2mbIt3ljvn8GN0hX7G_KZCVkoMqcuTCU6YxViY), Section 1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. Section 2 Subagent topology NOT ADVANCED / NOT DONE. No other plans mutated.
 - REUSE existing 11.0.13 High PR #706 plus scoped child PR #828 on branch `plan3/s1-blocked-final-reconcile-fence-20261010`. Exact two-commit candidate HEAD `703cba0b3555cbbc13f0298801c4a19a0229d935`. Existing trusted `SpecialistProviderReadinessResolverV1.assertCurrent` now denies expired original owner-issued readiness even if a second healthy re-probe has identical facts. No new execution, scheduler, router, lease or policy authority. Code blob `0b6c1499ff50e5f77d8fbb8a8cb10d84757fa441`; regression blob `a6b55f5c3ac0124401a93e53c97bc707a5b13d34`; both GitHub readback match.
