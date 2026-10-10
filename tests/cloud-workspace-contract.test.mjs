@@ -413,12 +413,19 @@ const ISOLATION_AT = '2026-09-25T06:08:00.000Z';
 const SCRUB_AT = '2026-09-25T06:10:00.000Z';
 function isolationProof(overrides = {}) {
   return {
+    schemaVersion: 1,
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
     workspaceRevision: 'rev.10',
     environmentSha256: ENV_SHA,
     checkpointArtifactId: 'artifact.checkpoint.10',
     checkpointSha256: CHECKPOINT_SHA,
+    taskId: 'task.cloud.1',
+    planId: 'plan.cloud.1',
+    nodeId: 'node.cloud.1',
+    effectId: 'effect.cloud.1',
+    policyEnvelopeId: 'policy.cloud.1',
+    executionOwnerId: 'worker.cloud.1',
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:07:00.000Z',
@@ -430,12 +437,19 @@ function isolationProof(overrides = {}) {
 }
 function scrubProof(overrides = {}) {
   return {
+    schemaVersion: 1,
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
     workspaceRevision: 'rev.10',
     environmentSha256: ENV_SHA,
     checkpointArtifactId: 'artifact.checkpoint.10',
     checkpointSha256: CHECKPOINT_SHA,
+    taskId: 'task.cloud.1',
+    planId: 'plan.cloud.1',
+    nodeId: 'node.cloud.1',
+    effectId: 'effect.cloud.1',
+    policyEnvelopeId: 'policy.cloud.1',
+    executionOwnerId: 'worker.cloud.1',
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:09:00.000Z',
@@ -455,6 +469,12 @@ function teardownCompletion(overrides = {}) {
     environmentSha256: ENV_SHA,
     checkpointArtifactId: 'artifact.checkpoint.10',
     checkpointSha256: CHECKPOINT_SHA,
+    taskId: 'task.cloud.1',
+    planId: 'plan.cloud.1',
+    nodeId: 'node.cloud.1',
+    effectId: 'effect.cloud.1',
+    policyEnvelopeId: 'policy.cloud.1',
+    executionOwnerId: 'worker.cloud.1',
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     completedAt: '2026-09-25T06:08:30.000Z',
@@ -498,6 +518,15 @@ test('trusted cloud isolation adapter binds canonical owner and cannot authorize
 test('cloud isolation proof rejects mismatched, incomplete, stale, future and forged adapter receipts', async () => {
   for (const mutation of [
     { workspaceId: 'workspace.other' },
+    { schemaVersion: 2 },
+    { schemaVersion: undefined },
+    { taskId: 'other.task' },
+    { planId: 'other.plan' },
+    { nodeId: 'other.node' },
+    { effectId: 'other.effect' },
+    { policyEnvelopeId: 'other.policy' },
+    { executionOwnerId: 'other.owner' },
+    { executionOwnerId: undefined },
     { workspaceRevision: 'rev.stale' },
     { workspaceRevision: undefined },
     { environmentSha256: 'c'.repeat(64) },
@@ -561,6 +590,45 @@ test('trusted cloud teardown must verify filesystem/browser/process/secret scrub
   assert.equal(receipt.leaseReleaseAuthorized, false);
   assert.equal(receipt.reuseAuthorized, false);
 });
+test('S1 rejects cross-tenant effect/owner replay at provider teardown before scrub', async () => {
+  const { binding } = bindingAndOwnership();
+  for (const field of ['schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId', 'executionOwnerId']) {
+    const original = teardownCompletion();
+    const replayed = { ...original, [field]: field === 'schemaVersion' ? 2 : 'other.identity' };
+    let scrubCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+        at: SCRUB_AT,
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+        teardown: async () => JSON.parse(JSON.stringify(replayed)),
+        verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+      }),
+      /completion identity mismatch/u,
+    );
+    assert.equal(scrubCalls, 0, 'no scrub proof after wrong tenant/effect completion');
+  }
+});
+
+test('S1 rejects cross-tenant scrub proof even after valid teardown; no clean lease', async () => {
+  const { binding } = bindingAndOwnership();
+  for (const field of ['schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId', 'executionOwnerId']) {
+    const proof = { ...scrubProof(), [field]: field === 'schemaVersion' ? 2 : 'other.identity' };
+    let teardowns = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+        at: SCRUB_AT,
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+        teardown: async () => { teardowns++; return teardownCompletion(); },
+        verifyScrub: async () => JSON.parse(JSON.stringify(proof)),
+      }),
+      /scrub proof does not match exact canonical effect identity/u,
+    );
+    assert.equal(teardowns, 1, 'destructive provider call must not be retried');
+  }
+});
+
 test('cloud teardown never reports clean on incomplete/hostile proof or failed teardown', async () => {
   const { binding } = bindingAndOwnership();
   for (const mutation of [
