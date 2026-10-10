@@ -361,7 +361,7 @@ export function normalizeCapabilityV1(input) {
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'CapabilityV1'),
     capabilityId: id(raw.capabilityId, 'capabilityId'),
-    description: text(raw.description, 'description', { optional: true, max: 2000 }),
+    description: text(raw.description, 'description', { optional: true, max: 2000, present: Object.hasOwn(raw, 'description') }),
     // Absent legacy metadata has documented defaults; explicitly persisted
     // null/undefined is corruption and must never downgrade the risk class.
     riskClass: capabilityRiskClass(raw.riskClass, Object.hasOwn(raw, 'riskClass')),
@@ -381,7 +381,7 @@ export function normalizeToolDescriptorV1(input) {
     toolId: id(raw.toolId, 'toolId'),
     providerId: id(raw.providerId, 'providerId'),
     label: text(raw.label, 'label', { max: 300 }),
-    description: text(raw.description, 'description', { optional: true, max: 4000 }),
+    description: text(raw.description, 'description', { optional: true, max: 4000, present: Object.hasOwn(raw, 'description') }),
     capabilityIds: idList(raw.capabilityIds, 'capabilityIds', { optional: false }),
     inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'inputSchemaRef') }),
     outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'outputSchemaRef') }),
