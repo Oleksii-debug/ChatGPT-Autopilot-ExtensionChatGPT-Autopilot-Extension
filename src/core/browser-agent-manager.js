@@ -54,6 +54,7 @@ import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execut
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
+  createAgentDefinitionRegistryV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
@@ -63,6 +64,7 @@ import {
 } from './agent-definition-registry.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
+  createSpecialistRegistryV1,
   bindSpecialistHandoffToRegistryV1,
   normalizeSpecialistSelectionV1,
   normalizeSpecialistDefinitionV1,
@@ -219,7 +221,7 @@ function inspectUnavailableOrchestrationAuthority(binding, error) {
 }
 
 function canonicalAgentDefinitionRegistryId(value) {
-  return normalizeAgentDefinitionRegistryV1({
+  return createAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
@@ -227,7 +229,7 @@ function canonicalAgentDefinitionRegistryId(value) {
   }).registryId;
 }
 function canonicalSpecialistRegistryId(value) {
-  return normalizeSpecialistRegistryV1({
+  return createSpecialistRegistryV1({
     schemaVersion: SPECIALIST_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
@@ -1000,7 +1002,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
-      created = normalizeAgentDefinitionRegistryV1({
+      created = createAgentDefinitionRegistryV1({
         schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
         registryId,
         revision: 1,
@@ -1094,7 +1096,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
         throw new Error('Specialist registry capacity is exhausted');
       }
-      created = normalizeSpecialistRegistryV1({
+      created = createSpecialistRegistryV1({
         schemaVersion: SPECIALIST_REGISTRY_VERSION,
         registryId,
         revision: 1,
