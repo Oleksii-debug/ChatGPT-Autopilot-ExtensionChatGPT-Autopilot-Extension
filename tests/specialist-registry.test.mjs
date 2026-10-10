@@ -224,14 +224,14 @@ test('disabled, removed or revision-drifted specialist definitions fail closed a
 
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ enabled: false })],
-  })), /missing or disabled/);
+  })), /selection registry identity, revision or bindingKey drifted|missing or disabled/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition()],
-  })), /missing or disabled/);
+  })), /selection registry identity, revision or bindingKey drifted|missing or disabled/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ definitionRevision: 8 })],
-  })), /drifted from current registry definition/);
-  assert.throws(() => bind(registry({ revision: 4 })), /registry identity or revision drifted/);
+  })), /selection registry identity, revision or bindingKey drifted|drifted from current registry definition/);
+  assert.throws(() => bind(registry({ revision: 4 })), /selection registry identity, revision or bindingKey drifted/);
 });
 
 test('parent capability or tool-scope drift requires rediscovery instead of widening or silently changing child authority', () => {
