@@ -845,3 +845,63 @@ test('S1 hostile evidence array traps never execute getters or expose private di
     error instanceof Error && !error.message.includes(marker));
   assert.equal(reads, 0);
 });
+
+
+test('S1 canonical retained history refuses malformed earlier events beyond the last-N window', () => {
+  // A forged event count must not include holes outside the scanned suffix.
+  const sparse = job();
+  sparse.runtime.history = Array.from({ length: 2300 }, (_, at) => ({ at, type: 'action' }));
+  delete sparse.runtime.history[0];
+  assert.throws(() => buildAgentRunTimelineV1(sparse), /canonical dense array/u);
+
+  const concealed = job();
+  concealed.runtime.history = Array.from({ length: 2300 }, (_, at) => ({ at, type: 'action' }));
+  Object.defineProperty(concealed.runtime.history, '0', { enumerable: false });
+  assert.throws(() => buildAgentRunTimelineV1(concealed), /canonical dense array/u);
+
+  const injected = job();
+  injected.runtime.history.extra = { type: 'done', secret: 'PRIVATE_FAKE_HISTORY' };
+  assert.throws(() => buildAgentRunTimelineV1(injected), error =>
+    error instanceof Error && /canonical dense array/u.test(error.message) &&
+    !error.message.includes('PRIVATE_FAKE_HISTORY'));
+  const symbolic = job();
+  symbolic.runtime.history[Symbol('PRIVATE_FAKED_HISTORY')] = { type: 'done' };
+  assert.throws(() => buildAgentRunTimelineV1(symbolic), /canonical dense array/u);
+});
+
+test('S1 retained history descriptor inspection does not invoke getters or disclose trap errors', () => {
+  const marker = 'PRIVATE_HISTORY_DESCRIPTOR_TRAP';
+  let reads = 0;
+  const input = job();
+  const history = Array.from({ length: 2200 }, (_, at) => ({ at, type: 'action' }));
+  input.runtime.history = new Proxy(history, {
+    get(target, key, receiver) {
+      if (key === '0' || key === 'length') {
+        reads += 1;
+        throw new Error(marker);
+      }
+      return Reflect.get(target, key, receiver);
+    },
+    getOwnPropertyDescriptor(target, key) {
+      if (key === '0') throw new Error(marker);
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(input), error =>
+    error instanceof Error && /cannot be safely inspected/u.test(error.message) &&
+    !error.message.includes(marker));
+  assert.equal(reads, 0);
+});
+
+test('S1 canonical retained history still bounds last-N evidence and survives JSON restart', () => {
+  const input = job();
+  input.runtime.history = Array.from({ length: 2300 }, (_, at) => ({ at, type: 'action' }));
+  const projected = buildAgentRunTimelineV1(input, { limit: 2 });
+  assert.equal(projected.totalRecorded, 2300);
+  assert.equal(projected.inspectedEntries, 2048);
+  assert.equal(projected.returnedEntries, 2);
+  assert.equal(projected.evidenceMap.completeLifetimeHistoryKnown, false);
+  assert.equal(projected.evidenceMap.externalEffectVerified, false);
+  assert.equal(projected.mayReplayExternalEffect, false);
+  assert.deepEqual(projected, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input)), { limit: 2 }));
+});
