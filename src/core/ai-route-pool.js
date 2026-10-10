@@ -685,6 +685,12 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     const endpointId = optionalIdentity(item, 'endpointId', 'AI endpoint endpointId');
     const locality = own(item, 'locality');
     if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
+    // Evidence cannot relabel the built-in OpenAI transport as local: it always
+    // uses a remote API, independent of any endpoint profile's claimed origin.
+    // Keep this aligned with normalizeAiRoutePool's route-level locality fence.
+    if (provider === 'openai' && locality !== AiRouteLocality.REMOTE) {
+      throw new Error('AI endpoint built-in OpenAI provider requires remote locality');
+    }
     const origin = own(item, 'origin');
     if (typeof origin !== 'string' || origin !== origin.trim()) throw new Error('AI endpoint origin is invalid');
     let parsed;
