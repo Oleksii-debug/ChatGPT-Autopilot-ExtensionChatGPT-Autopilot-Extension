@@ -282,6 +282,12 @@ export function normalizeAiRoutePool(raw = []) {
     if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
     const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
+    // The built-in OpenAI gateway always dispatches to a remote API. A
+    // persisted owner route must not relabel that transport as local to pass
+    // a local-only policy filter and send private prompts off-device.
+    if (provider === 'openai' && locality !== AiRouteLocality.REMOTE) {
+      throw new Error('AI route built-in OpenAI provider requires remote locality');
+    }
     const rawCostClass = own(item, 'costClass');
     if (Object.hasOwn(item, 'costClass') && rawCostClass === undefined) throw new Error('AI route costClass cannot be undefined when supplied');
     if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
