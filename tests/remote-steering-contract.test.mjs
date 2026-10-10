@@ -5,6 +5,7 @@ import {
   RemoteSteeringAction,
   RemoteSteeringRedirectKind,
   assessRemoteSteeringCommandV1,
+  submitRemoteSteeringViaCanonicalRuntimeV1,
 } from '../src/core/remote-steering-contract.js';
 
 const OBSERVED_AT = '2026-09-25T03:30:00.000Z';
@@ -511,6 +512,143 @@ test('remote control epoch rejects string, zero, unsafe or accessor authority wi
   });
   await assert.rejects(
     () => assess(attacker, currentSnapshot({ controlEpoch: 9 })),
+    /data properties only/u,
+  );
+  assert.equal(reads, 0);
+});
+
+function epochCommand() {
+  return validInput({ command: { expectedControlEpoch: 9 } });
+}
+function durableReceipt(tx, overrides = {}) {
+  return {
+    schemaVersion: 1,
+    commandId: tx.commandId,
+    commandFingerprint: tx.commandFingerprint,
+    jobId: tx.jobId,
+    planId: tx.planId,
+    sourcePrincipalId: tx.sourcePrincipalId,
+    sourceDeviceId: tx.sourceDeviceId,
+    policyEnvelopeId: tx.policyEnvelopeId,
+    expectedControlEpoch: tx.expectedControlEpoch,
+    outcome: 'APPLIED',
+    authenticated: true,
+    policyRechecked: true,
+    controlEpochRechecked: true,
+    durablyDeduplicated: true,
+    persisted: true,
+    ...overrides,
+  };
+}
+test('remote runtime bridge authenticates and commits via canonical transaction with exact durable readback', async () => {
+  const store = { controlEpoch: 9, receipts: Object.create(null), writes: 0 };
+  const committed = await submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), {
+    assessmentAt: ASSESSMENT_AT,
+    resolveCurrentSnapshot: async () => currentSnapshot({ controlEpoch: store.controlEpoch }),
+    atomicAuthenticateAuthorizeAndCommit: async tx => {
+      assert.equal(tx.expectedControlEpoch, store.controlEpoch);
+      assert.equal(tx.requireAtomicAuthentication, true);
+      assert.equal(tx.requireFreshPolicy, true);
+      assert.equal(tx.requireExactEpochRecheck, true);
+      assert.equal(tx.requireDurableDeduplication, true);
+      assert.equal(Object.isFrozen(tx), true);
+      store.receipts[tx.commandId] = JSON.parse(JSON.stringify(durableReceipt(tx)));
+      store.controlEpoch++;
+      store.writes++;
+    },
+    readDurableReceipt: async key => {
+      assert.equal(key.commandId, 'steer-1');
+      return JSON.parse(JSON.stringify(store.receipts[key.commandId]));
+    },
+  });
+  assert.equal(store.writes, 1);
+  assert.equal(committed.status, 'CANONICAL_DURABLE_READBACK');
+  assert.equal(committed.controlEpoch, 9);
+  assert.equal(committed.outcome, 'APPLIED');
+  assert.equal(committed.readbackVerified, true);
+  assert.equal(committed.mutationAuthorized, false);
+  assert.equal(Object.isFrozen(committed), true);
+});
+test('runtime bridge fails closed on old epoch and does not touch canonical transaction', async () => {
+  let writes = 0;
+  const options = {
+    assessmentAt: ASSESSMENT_AT,
+    resolveCurrentSnapshot: async () => currentSnapshot({ controlEpoch: 10 }),
+    atomicAuthenticateAuthorizeAndCommit: async () => { writes++; },
+    readDurableReceipt: async () => null,
+  };
+  await assert.rejects(
+    () => submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), options),
+    /control epoch/u,
+  );
+  assert.equal(writes, 0);
+  await assert.rejects(
+    () => submitRemoteSteeringViaCanonicalRuntimeV1(validInput(), {
+      ...options, resolveCurrentSnapshot: async () => currentSnapshot(),
+    }), /control-epoch binding/u,
+  );
+  assert.equal(writes, 0);
+});
+test('runtime bridge detects recheck race: epoch changes between proposal and atomic commit', async () => {
+  let atomicCalls = 0, readbackCalls = 0;
+  let storedEpoch = 9;
+  await assert.rejects(
+    () => submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), {
+      assessmentAt: ASSESSMENT_AT,
+      resolveCurrentSnapshot: async () => {
+        const old = currentSnapshot({ controlEpoch: storedEpoch });
+        storedEpoch = 10; // another local device STOPs after snapshot
+        return old;
+      },
+      atomicAuthenticateAuthorizeAndCommit: async tx => {
+        atomicCalls++;
+        if (tx.expectedControlEpoch !== storedEpoch) {
+          throw new Error('canonical transaction rejects stale control epoch');
+        }
+      },
+      readDurableReceipt: async () => { readbackCalls++; return null; },
+    }), /stale control epoch/u,
+  );
+  assert.equal(atomicCalls, 1);
+  assert.equal(readbackCalls, 0);
+});
+test('runtime bridge rejects forged durable receipts and does not confuse callback completion with persistence', async () => {
+  const invalid = [
+    { authenticated: false },
+    { policyRechecked: false },
+    { controlEpochRechecked: false },
+    { durablyDeduplicated: false },
+    { persisted: false },
+    { outcome: 'PROPOSED' },
+    { commandFingerprint: 'sha256:' + 'f'.repeat(64) },
+    { expectedControlEpoch: 8 },
+    { sourcePrincipalId: 'attacker' },
+    { extraAuthority: true },
+  ];
+  for (const mutation of invalid) {
+    let transaction = null;
+    await assert.rejects(
+      () => submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), {
+        assessmentAt: ASSESSMENT_AT,
+        resolveCurrentSnapshot: async () => currentSnapshot({ controlEpoch: 9 }),
+        atomicAuthenticateAuthorizeAndCommit: async tx => { transaction = tx; },
+        readDurableReceipt: async () => durableReceipt(transaction, mutation),
+      }), /durable receipt|unknown field/u,
+    );
+  }
+});
+test('runtime bridge rejects forged callback options without invoking accessors', async () => {
+  const options = {
+    assessmentAt: ASSESSMENT_AT,
+    resolveCurrentSnapshot: async () => currentSnapshot({ controlEpoch: 9 }),
+    readDurableReceipt: async () => null,
+  };
+  let reads = 0;
+  Object.defineProperty(options, 'atomicAuthenticateAuthorizeAndCommit', {
+    enumerable: true, get() { reads++; return async () => {}; },
+  });
+  await assert.rejects(
+    () => submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), options),
     /data properties only/u,
   );
   assert.equal(reads, 0);
