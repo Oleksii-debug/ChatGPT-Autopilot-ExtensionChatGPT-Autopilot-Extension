@@ -13,6 +13,7 @@ on:
       - src/core/agent-io-contract.js
       - src/core/capability-registry.js
       - src/core/universal-agent-contracts.js
+      - src/core/agent-checkpoint.js
       - src/core/browser-agent-manager.js
       - src/core/browser-agent-orchestration-binding.js
       - src/core/browser-agent.js
@@ -21,6 +22,7 @@ on:
       - tests/agent-definition-registry.test.mjs
       - tests/agent-io-contract.test.mjs
       - tests/universal-agent-contracts.test.mjs
+      - tests/agent-checkpoint.test.mjs
       - tests/browser-agent-definition-launch.test.mjs
       - tests/browser-agent.test.mjs
       - tests/browser-agent-orchestration-binding.test.mjs
@@ -49,6 +51,7 @@ jobs:
           node --check src/core/agent-definition-registry.js
           node --check src/core/agent-io-contract.js
           node --check src/core/universal-agent-contracts.js
+          node --check src/core/agent-checkpoint.js
           node --check src/core/browser-agent-manager.js
           node --check src/core/browser-agent-orchestration-binding.js
           node --check src/core/browser-agent.js
@@ -57,6 +60,7 @@ jobs:
           node --check tests/agent-definition-registry.test.mjs
           node --check tests/agent-io-contract.test.mjs
           node --check tests/universal-agent-contracts.test.mjs
+          node --check tests/agent-checkpoint.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
           node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
@@ -66,6 +70,8 @@ jobs:
         run: node --test tests/agent-io-contract.test.mjs
       - name: Universal agent authority and evidence contracts
         run: node --test tests/universal-agent-contracts.test.mjs
+      - name: Durable checkpoint recovery and exact-effect ambiguity negatives
+        run: node --test tests/agent-checkpoint.test.mjs
       - name: Agent Definition canonical route policy and diagnostic non-disclosure
         run: node --test tests/agent-definition-registry.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
