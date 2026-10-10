@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createExtensionPairingStore, createGatewayServer, normalizeCompatibleEndpointRegistry } from '../companion/ai-gateway/gateway.mjs';
 import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
+import { createAiRouteRegistryEvidenceV1 } from '../src/core/ai-route-pool.js';
 
 function response(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }); }
 
@@ -470,5 +472,137 @@ test('Plan4 S1 direct HTTP provider output ceiling is exact and never coerced to
       'explicit numeric zero keeps the documented legacy unlimited setting');
   } finally {
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('Plan4 S1 actual route evidence to HTTP provider and durable budget lifecycle', async () => {
+  const route = {
+    schemaVersion:1, routeId:'owner-route', provider:'openai-compatible',
+    model:'fixture-model', endpointId:'owner.account', locality:'remote',
+    costClass:'paid', priority:10, inputPriceKnown:true, outputPriceKnown:true,
+    inputPricePerMillionUsd:1, outputPricePerMillionUsd:2,
+  };
+  const profile = {
+    schemaVersion:1, profileId:'owner.profile', provider:'openai-compatible',
+    endpointId:'owner.account', origin:'https://fixture-provider.example.test/',
+    locality:'remote', credentialRef:'PLAN4_E2E_KEY', credentialless:false,
+    accountId:'owner', modelIds:['fixture-model'],
+  };
+  const registry = {schemaVersion:1, registryRevision:10, routes:[route], endpointProfiles:[profile]};
+  const evidence = await createAiRouteRegistryEvidenceV1(registry);
+  const restartedEvidence = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(registry)));
+  assert.equal(restartedEvidence.configSha256, evidence.configSha256);
+  assert.equal(evidence.routeIdentities[0].endpointBinding, 'MATCHED');
+  assert.equal(evidence.routeIdentities[0].endpointProfileId, 'owner.profile');
+
+  let upstreamCalls = 0;
+  for (const changed of [
+    {...route, endpointId:'wrong-account'},
+    {...route, model:'unapproved-model'},
+    {...route, locality:'local'},
+  ]) {
+    await assert.rejects(createAiRouteRegistryEvidenceV1({
+      ...registry, routes:[changed],
+    }), /endpoint|model|locality/i);
+  }
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...registry, endpointProfiles:[profile, {
+      ...profile, profileId:'owner.other', endpointId:'other.account',
+      origin:'https://second-provider.example.test/',
+    }],
+  }), /credential reference cannot bind distinct origins/);
+  assert.equal(upstreamCalls,0,'invalid registry evidence cannot dispatch a provider request');
+
+  const endpoints = normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([
+    {endpointId:'owner.account',baseUrl:'https://fixture-provider.example.test/v1',
+      apiKeyEnv:'PLAN4_E2E_KEY'},
+  ])));
+  const dispatched = [];
+  const gateway = createGatewayServer({
+    compatibleEndpoints:endpoints, env:{PLAN4_E2E_KEY:'fixture-token-not-real'},
+    fetchFn:async (url,init={}) => {
+      upstreamCalls++;
+      dispatched.push({url,authorization:init.headers?.authorization,
+        payload:JSON.parse(init.body)});
+      return response({
+        choices:[{message:{content:'fixture-approved'}}],
+        usage:{prompt_tokens:3,completion_tokens:2,total_tokens:5},
+      });
+    },
+  });
+  await new Promise(resolve => gateway.listen(0,'127.0.0.1',resolve));
+  const gatewayUrl=`http://127.0.0.1:${gateway.address().port}`;
+  try {
+    const ownerSettings = JSON.parse(JSON.stringify({
+      enabled:true,mode:'primary',
+      primary:{provider:'openai-compatible',model:'fixture-model'},
+      fallbackToStrongOnPrimaryError:false, gatewayUrl,
+      routes:[route],routePolicy:{pinnedRouteId:'owner-route',autoSwitch:false},
+    }));
+    const budgetContext = {jobId:'plan4-end-to-end',controlEpoch:3};
+    const options = {
+      providerCallBudgetContext:budgetContext,
+      maxModelCallsForRequest:1,maxOutputTokens:12,
+    };
+    const events = [];
+    const lifecycle = {
+      async beforeProviderCall({context,route:selected,maxOutputTokens,callNumber}) {
+        assert.equal(context,budgetContext);
+        assert.deepEqual({
+          routeId:selected.routeId,provider:selected.provider,
+          model:selected.model,endpointId:selected.endpointId,
+        }, {
+          routeId:'owner-route',provider:'openai-compatible',
+          model:'fixture-model',endpointId:'owner.account',
+        });
+        assert.equal(maxOutputTokens,12);
+        assert.equal(callNumber,1);
+        events.push('reserved');
+        return {reservationId:'plan4-end-to-end:reserved:1'};
+      },
+      async afterProviderCall({reservation,route:selected,ok,result}) {
+        assert.equal(reservation.reservationId,'plan4-end-to-end:reserved:1');
+        assert.equal(selected.endpointId,'owner.account');
+        assert.equal(ok,true);
+        assert.equal(result.provider,'openai-compatible');
+        assert.equal(result.model,'fixture-model');
+        assert.equal(result.endpointId,'owner.account');
+        assert.equal(result.usage.totalTokens,5);
+        events.push('settled');
+        return {settled:true};
+      },
+    };
+    const router=new AiOrchestrator({
+      gatewayClient:new AiGatewayClient(),providerCallLifecycle:lifecycle,
+    });
+    const completed=await router.run(ownerSettings,{},'approved owner prompt',options);
+    assert.equal(completed.routing.selectedRouteId,'owner-route');
+    assert.equal(completed.routing.selectedEndpointId,'owner.account');
+    assert.equal(completed.text,'fixture-approved');
+    assert.deepEqual(events,['reserved','settled']);
+    assert.equal(upstreamCalls,1,'exactly one actual compatible provider dispatch');
+    assert.equal(dispatched[0].url,'https://fixture-provider.example.test/v1/chat/completions');
+    assert.equal(dispatched[0].authorization,'Bearer fixture-token-not-real');
+    assert.equal(dispatched[0].payload.model,'fixture-model');
+    assert.equal(dispatched[0].payload.max_tokens,12);
+    assert.equal(dispatched[0].payload.messages.at(-1).content,'approved owner prompt');
+    assert.equal(JSON.stringify(completed).includes('fixture-token-not-real'),false);
+
+    // A consumed provider result with UNKNOWN settlement must not be replayed
+    // into a second model call or published as a successful answer.
+    const unverified = new AiOrchestrator({
+      gatewayClient:new AiGatewayClient(),
+      providerCallLifecycle:{
+        async beforeProviderCall(){return {reservationId:'plan4-unknown:1'};},
+        async afterProviderCall(){return {settled:false};},
+      },
+    });
+    await assert.rejects(unverified.run(JSON.parse(JSON.stringify(ownerSettings)),{},
+      'approved retry safety',options),
+      error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN'
+        && error.routeAttempts?.[0]?.outcome==='UNKNOWN');
+    assert.equal(upstreamCalls,2,'UNKNOWN settlement must not retry a second provider');
+  } finally {
+    await new Promise(resolve => gateway.close(resolve));
   }
 });
