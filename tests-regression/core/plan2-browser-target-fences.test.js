@@ -8,6 +8,7 @@ import {
   executeBrowserCredentialFill,
   proveBrowserNativeClick,
   verifyBrowserApprovalTarget,
+  focusBrowserAgentTarget,
   verifyBrowserFileInput,
   probeBrowserCoordinateTarget,
   verifyBrowserCoordinateTarget,
@@ -258,6 +259,68 @@ test('semantic DOM action rejects duplicate snapshot refs after JSON restart wit
   const result = executeBrowserPageAction(snapshot.frames[0].snapshotId, action);
   assert.equal(result.ok, true, 'unique observed ref still succeeds');
   assert.equal(element.clicked, 1);
+});
+
+test('approval, native proof and focus reject cloned snapshot markers before effects', () => {
+  const snapshot = setup();
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"click","frameId":0,"ref":"r1"}', snapshot,
+  )));
+  const proof = browserAgentCoordinateTargetFingerprint(snapshot.frames[0].elements[0]);
+  const clone = new FakeElement('Save');
+  clone.setAttribute('data-autopilot-agent-ref', action.ref);
+  clone.setAttribute('data-autopilot-agent-snapshot', snapshot.frames[0].snapshotId);
+  let focusCalls = 0;
+  element.focus = () => { focusCalls++; };
+  clone.focus = () => { focusCalls++; };
+  const originalQuery = document.querySelectorAll;
+  try {
+    for (const matches of [[clone, element], [element, clone]]) {
+      document.querySelectorAll = selector => selector.includes('data-autopilot-agent-ref')
+        ? matches : originalQuery(selector);
+      assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, false);
+      assert.equal(focusBrowserAgentTarget('s1', 'r1').ok, false);
+      assert.equal(proveBrowserNativeClick('s1', 'r1', action), null);
+      assert.equal(focusCalls, 0, 'no duplicated marker was focused');
+      assert.equal(element.clicked, 0);
+      assert.equal(clone.clicked, 0);
+    }
+  } finally {
+    document.querySelectorAll = originalQuery;
+  }
+  assert.equal(verifyBrowserApprovalTarget('s1', 'r1', proof).ok, true);
+});
+
+test('file input rejects duplicated snapshot refs before dispatching upload events', () => {
+  const snapshot = setup();
+  element.tagName = 'INPUT';
+  element.type = 'file';
+  element.setAttribute('type', 'file');
+  element.files = [{ name: 'fixture.txt', size: 1, type: 'text/plain' }];
+  let dispatched = 0;
+  element.dispatchEvent = () => { dispatched++; };
+  const clone = new FakeElement('Save');
+  clone.setAttribute('data-autopilot-agent-ref', 'r1');
+  clone.setAttribute('data-autopilot-agent-snapshot', snapshot.frames[0].snapshotId);
+  const originalQuery = document.querySelectorAll;
+  const originalInput = globalThis.HTMLInputElement;
+  globalThis.HTMLInputElement = FakeElement;
+  try {
+    for (const matches of [[clone, element], [element, clone]]) {
+      document.querySelectorAll = selector => selector.includes('data-autopilot-agent-ref')
+        ? matches : originalQuery(selector);
+      assert.throws(() => verifyBrowserFileInput('s1', 'r1'), /AGENT_FILE_INPUT_STALE/);
+      assert.equal(dispatched, 0, 'no unverified upload events emitted');
+    }
+    document.querySelectorAll = originalQuery;
+    const result = verifyBrowserFileInput('s1', 'r1');
+    assert.equal(result.ok, true, 'a unique observed file input is allowed');
+    assert.equal(dispatched, 2);
+  } finally {
+    document.querySelectorAll = originalQuery;
+    if (originalInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = originalInput;
+  }
 });
 
 test('hidden ancestor after observation cannot be clicked', () => {
