@@ -523,7 +523,10 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
     ? Math.max(requested, normalizedWorkerPolicy.minWorkers) : requested, normalizedWorkerPolicy.maxParallelWorkers);
   const selected = selectAiRouteCandidates({
     routes: pool,
-    policy: { ...normalizeAiRoutePolicy(routePolicy), autoSwitch: true },
+    // Worker allocation must honor the same owner no-auto-switch policy as
+    // individual model dispatch. Bypassing it here would allocate to a backup
+    // provider while the preferred route is in durable backoff/circuit-open.
+    policy: normalizeAiRoutePolicy(routePolicy),
     routeStates,
     role,
     capabilityIds,
