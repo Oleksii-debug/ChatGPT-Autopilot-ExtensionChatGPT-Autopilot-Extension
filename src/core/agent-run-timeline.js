@@ -155,6 +155,28 @@ function safeHistory(history, present) {
   }
   return { items, total };
 }
+// Only count persisted evidence from an ordinary, enumerable, dense array.
+// This checks fixed numeric descriptors without running getters or leaking
+// attacker-controlled Proxy exceptions. Read every element just once.
+function canonicalEvidenceElements(value, length, label) {
+  const keys = safeOwnKeys(value);
+  if (keys.length !== length + 1 || !keys.includes('length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= length))) {
+    throw new Error(label + ' must be a canonical dense array');
+  }
+  const elements = [];
+  for (let index = 0; index < length; index += 1) {
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(value, String(index)); }
+    catch { throw new Error(label + ' cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + ' must be a canonical dense array');
+    }
+    elements.push(descriptor.value);
+  }
+  return elements;
+}
 function freeze(value) {
   if (Array.isArray(value)) { value.forEach(freeze); return Object.freeze(value); }
   if (value && typeof value === 'object') { Object.values(value).forEach(freeze); return Object.freeze(value); }
@@ -178,8 +200,7 @@ function planSummary(plan) {
     if (!Number.isSafeInteger(nodeLength) || nodeLength < 0 || nodeLength > 4096) {
       throw new Error('Agent plan nodes length is invalid');
     }
-    for (let i = 0; i < nodeLength; i += 1) {
-      const node = own(nodes, String(i));
+    for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent plan nodes')) {
       record(node, 'Agent plan node');
       const state = own(node, 'state');
       const safeState = PLAN_STATES.has(state) ? state : 'UNKNOWN';
@@ -213,8 +234,7 @@ function recordedOutcomeSummary(value) {
     if (!Number.isSafeInteger(checksLength) || checksLength < 0 || checksLength > 20) {
       throw new Error('Agent recorded outcome checks length is invalid (must be a bounded dense array)');
     }
-    for (let i = 0; i < checksLength; i += 1) {
-      const item = own(checks, String(i));
+    for (const item of canonicalEvidenceElements(checks, checksLength, 'Agent recorded outcome checks')) {
       if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
       record(item, 'Agent recorded outcome check');
     }
@@ -297,8 +317,8 @@ function recordedSpecialistDispatchEvidence(runtime) {
     if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
       throw new Error('Agent specialist artifact reference count is invalid');
     }
-    for (let index = 0; index < length; index += 1) {
-      record(own(refs, String(index)), 'Agent specialist artifact reference');
+    for (const ref of canonicalEvidenceElements(refs, length, 'Agent specialist artifact references')) {
+      record(ref, 'Agent specialist artifact reference');
       artifactReferencesRecorded += 1;
     }
   }
