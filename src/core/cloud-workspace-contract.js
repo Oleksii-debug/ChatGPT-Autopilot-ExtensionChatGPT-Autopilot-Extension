@@ -345,6 +345,31 @@ function trustedLifecycleOptions(input, keys, required, label) {
 // Provider callbacks can throw errors containing credentials, paths or browser
 // content. Do not let those untrusted diagnostics escape into the canonical
 // job timeline. An ambiguous side effect must be reconciled, not retried.
+// A provider needs the complete canonical effect/tenant/owner fence to scope
+// isolation and destructive cleanup. A leaseId alone is not sufficient:
+// providers must compare the full target before touching tenant resources.
+// This is a read-only projection of the existing canonical binding, never
+// a second ownership, policy or execution authority.
+function cloudProviderTarget(binding) {
+  return Object.freeze({
+    schemaVersion: CLOUD_WORKSPACE_VERSION,
+    workspaceId: binding.workspaceId,
+    providerId: binding.providerId,
+    workspaceRevision: binding.workspaceRevision,
+    environmentSha256: binding.environmentSha256,
+    checkpointArtifactId: binding.checkpointArtifactId,
+    checkpointSha256: binding.checkpointSha256,
+    taskId: binding.taskId,
+    planId: binding.planId,
+    nodeId: binding.nodeId,
+    effectId: binding.effectId,
+    policyEnvelopeId: binding.policyEnvelopeId,
+    executionOwnerId: binding.executionOwnerId,
+    executionLeaseId: binding.executionLeaseId,
+    executionOwnershipRevision: binding.executionOwnershipRevision,
+  });
+}
+
 async function invokeCloudProviderEvidence(callback, target, phase) {
   try {
     return await callback(target);
@@ -408,16 +433,7 @@ export async function verifyCloudWorkspaceIsolationV1(
   const binding = createCloudWorkspaceBindingV1(
     observationInput, persistedOwner, { at: trusted.at },
   );
-  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, Object.freeze({
-    workspaceId: binding.workspaceId,
-    providerId: binding.providerId,
-    workspaceRevision: binding.workspaceRevision,
-    environmentSha256: binding.environmentSha256,
-    checkpointArtifactId: binding.checkpointArtifactId,
-    checkpointSha256: binding.checkpointSha256,
-    executionLeaseId: binding.executionLeaseId,
-    executionOwnershipRevision: binding.executionOwnershipRevision,
-  }), 'isolation attestation');
+  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, cloudProviderTarget(binding), 'isolation attestation');
   // Fail closed if the lease changed while asynchronous provider attestation
   // was in flight. This remains non-authorizing evidence, not a new lease.
   const ownerAfter = normalizeExactExecutionOwnershipV1(
@@ -687,16 +703,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   if (JSON.stringify(ownerBeforeProvider) !== JSON.stringify(ownerBefore)) {
     throw new Error('cloud workspace canonical owner changed before provider teardown');
   }
-  const target = Object.freeze({
-    workspaceId: binding.workspaceId,
-    providerId: binding.providerId,
-    workspaceRevision: binding.workspaceRevision,
-    environmentSha256: binding.environmentSha256,
-    checkpointArtifactId: binding.checkpointArtifactId,
-    checkpointSha256: binding.checkpointSha256,
-    executionLeaseId: binding.executionLeaseId,
-    executionOwnershipRevision: binding.executionOwnershipRevision,
-  });
+  const target = cloudProviderTarget(binding);
   // A boolean/undefined teardown response is not evidence that cleanup
   // finished. An attested completion timestamp must precede fresh scrub proof,
   // so a previously captured "clean" receipt cannot be replayed post-teardown.
