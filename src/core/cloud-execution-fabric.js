@@ -317,6 +317,19 @@ export function normalizeCloudExecutionSlotV1(input) {
 // by a caller or a recovered JSON job.  Do not let proxy reflection, getters
 // or attacker-controlled field names escape into diagnostics from the shared
 // ownership normalizer.  It remains the sole semantic ownership authority.
+// Budget fields are provider/request input at this boundary. Snapshot them
+// before the existing ResourceBudgetGovernor so malicious Proxy traps, accessors
+// and unknown field names cannot surface tenant data in a canonical timeline.
+const FABRIC_BUDGET_KEYS = new Set([
+  'maxConcurrentAgents', 'maxChildAgents', 'maxModelCalls',
+  'maxModelInputTokens', 'maxModelOutputTokens', 'maxRuntimeSeconds',
+  'maxCostUsdMicros',
+]);
+const FABRIC_RESOURCE_KEYS = new Set([
+  'concurrentAgents', 'childAgents', 'modelCalls', 'modelInputTokens',
+  'modelOutputTokens', 'runtimeSeconds', 'costUsdMicros',
+]);
+
 const FABRIC_OWNERSHIP_KEYS = new Set([
   'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId',
   'policyEnvelopeId', 'state', 'ownerPlane', 'ownerId', 'leaseId',
@@ -586,9 +599,9 @@ export function assessCloudExecutionFabricV1(input) {
     }
   }
   const budget = evaluateResourceBudgetV1({
-    budget: raw.resourceBudget,
-    usage: raw.resourceUsage,
-    request: raw.cloudResourceRequest,
+    budget: snapshotRecord(raw.resourceBudget ?? {}, 'CloudFabricRequestV1.resourceBudget', FABRIC_BUDGET_KEYS),
+    usage: snapshotRecord(raw.resourceUsage ?? {}, 'CloudFabricRequestV1.resourceUsage', FABRIC_RESOURCE_KEYS),
+    request: snapshotRecord(raw.cloudResourceRequest ?? {}, 'CloudFabricRequestV1.cloudResourceRequest', FABRIC_RESOURCE_KEYS),
   });
 
   const baseArgs = {
