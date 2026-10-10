@@ -679,6 +679,20 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   if (JSON.stringify(ownerAfter) !== JSON.stringify(ownerBefore)) {
     throw new Error('cloud workspace canonical ownership changed during teardown/scrub');
   }
+  // The final canonical ownership read crosses another asynchronous boundary.
+  // A concurrent writer may revoke or replace the workspace binding while
+  // that owner read resolves, even when the owner itself remains unchanged.
+  // Never publish scrubVerified for a binding that no longer exists exactly.
+  const bindingAfterOwner = normalizeCloudWorkspaceBindingV1(
+    await trusted.loadCanonicalBinding(Object.freeze({
+      workspaceId: binding.workspaceId,
+      providerId: binding.providerId,
+      executionLeaseId: binding.executionLeaseId,
+    })),
+  );
+  if (JSON.stringify(bindingAfterOwner) !== JSON.stringify(binding)) {
+    throw new Error('cloud workspace canonical binding changed after final owner readback');
+  }
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
     workspaceId: binding.workspaceId,
