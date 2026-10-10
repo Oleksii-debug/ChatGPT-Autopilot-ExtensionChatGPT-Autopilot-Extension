@@ -27,6 +27,59 @@ import {
 
 const AT = '2026-09-19T03:00:00Z';
 
+test('Plan-1 S1: hostile Proxy reflection traps never disclose secret error text or authorize evidence', () => {
+  const secret = 'PRIVATE-AGENT-CONTRACT-PROXY-DIAGNOSTIC-SECRET';
+  let trapInvocations = 0;
+  const failTrap = () => {
+    trapInvocations += 1;
+    throw new Error(secret);
+  };
+  const assertRedacted = error => {
+    assert.match(error.message, /cannot be safely inspected/);
+    assert.doesNotMatch(error.message, /PRIVATE-AGENT-CONTRACT-PROXY-DIAGNOSTIC-SECRET/);
+    return true;
+  };
+
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const source = {
+      schemaVersion: 1, capabilityId: 'cap-owner-read',
+      description: 'Read only', riskClass: 'R0', attributes: {},
+    };
+    const hostile = new Proxy(source, { [trap]: failTrap });
+    assert.throws(() => normalizeCapabilityV1(hostile), assertRedacted,
+      trap + ' must fail closed before any capability is admitted');
+  }
+
+  const invocation = {
+    schemaVersion: 1, invocationId: 'invoke-proxy-trap',
+    toolId: 'file.read', providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'], policyDecisionId: 'decision-1',
+    arguments: { fileRef: 'workspace:report.txt' }, createdAt: AT,
+  };
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const hostileList = new Proxy(['filesystem.read'], { [trap]: failTrap });
+    assert.throws(
+      () => normalizeToolInvocationV1({ ...invocation, requestedCapabilityIds: hostileList }),
+      assertRedacted,
+      trap + ' must fail closed for authority-bearing capability arrays',
+    );
+  }
+
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const hostileArgs = new Proxy({ fileRef: 'workspace:report.txt' }, { [trap]: failTrap });
+    assert.throws(() => normalizeToolInvocationV1({ ...invocation, arguments: hostileArgs }),
+      assertRedacted, trap + ' must fail closed for nested effect arguments');
+  }
+  assert.equal(trapInvocations, 9, 'each negative case must reach exactly one hostile reflection trap');
+
+  const legal = normalizeToolInvocationV1(invocation);
+  assert.equal(legal.arguments.fileRef, 'workspace:report.txt');
+  assert.equal(Object.isFrozen(legal.arguments), true);
+  assert.equal(Object.isFrozen(legal.requestedCapabilityIds), true);
+  assert.deepEqual(normalizeToolInvocationV1(JSON.parse(JSON.stringify(legal))), legal,
+    'valid authority-free contract normalization remains stable after JSON cold restart');
+});
+
 function artifact(overrides = {}) {
   return {
     schemaVersion: 1,
