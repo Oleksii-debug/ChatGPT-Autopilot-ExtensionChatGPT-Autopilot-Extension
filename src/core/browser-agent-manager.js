@@ -95,7 +95,7 @@ const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
@@ -2153,6 +2153,13 @@ export class BrowserAgentManager {
       if (!registry) throw new Error('Agent definition registry not found');
       if (registry.revision !== request.expectedRegistryRevision) {
         throw new Error('Agent definition registry revision drifted before launch');
+      }
+      // An explicit caller-side content CAS fence must match the exact durable
+      // registry snapshot at serialized launch. Older launch callers without
+      // that field retain their existing revision+definition checks.
+      if (Object.hasOwn(request, 'expectedRegistryBindingKey')
+          && request.expectedRegistryBindingKey !== registry.bindingKey) {
+        throw new Error('Agent definition registry bindingKey drifted before launch');
       }
 
       const selection = selectAgentDefinitionV1({
