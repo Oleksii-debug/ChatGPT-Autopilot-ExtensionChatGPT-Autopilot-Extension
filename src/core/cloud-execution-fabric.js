@@ -105,15 +105,24 @@ function snapshotRecord(value, label, allowed) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  let prototype;
+  let descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Provider/slot inputs can be hostile Proxies. Never forward their
+    // trap's exception message (which may contain credentials or page text).
+    throw new Error(`${label} has invalid own-data descriptors`);
+  }
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+    // Untrusted property names may embed secrets or page content. Never echo them.
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
     const descriptor = descriptors[key];
     if (!descriptor
         || descriptor.enumerable !== true
@@ -131,10 +140,22 @@ function snapshotRecord(value, label, allowed) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let prototype;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    if (isArray) {
+      prototype = Object.getPrototypeOf(value);
+      descriptors = Object.getOwnPropertyDescriptors(value);
+    }
+  } catch {
+    // Revoked Proxies and reflection traps are untrusted input, not log text.
+    throw new Error(`${label} has invalid own-data descriptors`);
+  }
+  if (!isArray || prototype !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
@@ -289,13 +310,26 @@ export function normalizeCloudExecutionSlotV1(input) {
   });
 }
 
+// Provider readiness is an untrusted discovery payload. Snapshot and allowlist
+// descriptors before entering the shared capability normalizer, so hostile
+// Proxy traps and getter text can never become cloud diagnostics.
+const PROVIDER_STATE_KEYS = new Set([
+  'schemaVersion', 'providerId', 'toolId', 'health',
+  'installationRequired', 'installed', 'authenticationRequired',
+  'authenticated', 'pathKind', 'latencyMs', 'reasonCode',
+]);
+
 function normalizeProviderStates(value) {
   const inputs = dataArray(value, 'CloudFabricRequestV1.providerStates', MAX_PROVIDER_STATES);
   const states = inputs.map((item, index) => {
+    const label = `CloudFabricRequestV1.providerStates[${index}]`;
+    const safeRecord = snapshotRecord(item, label, PROVIDER_STATE_KEYS);
     try {
-      return normalizeProviderReadinessV1(item);
+      // Only plain allowlisted own-data fields reach the shared normalizer.
+      return normalizeProviderReadinessV1(safeRecord);
     } catch (error) {
-      throw new Error(`CloudFabricRequestV1.providerStates[${index}]: ${error.message}`);
+      // After the snapshot, the normalizer sees no caller-controlled getters.
+      throw new Error(`${label}: ${error.message}`);
     }
   });
   const seen = new Set();
@@ -304,7 +338,7 @@ function normalizeProviderStates(value) {
       throw new Error('CloudFabricRequestV1 provider readiness must be provider-level');
     }
     if (seen.has(state.providerId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate provider readiness: ${state.providerId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate provider readiness');
     }
     seen.add(state.providerId);
   }
@@ -323,7 +357,7 @@ function normalizeWorkspaceBindings(value) {
   const seen = new Set();
   for (const binding of bindings) {
     if (seen.has(binding.workspaceId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate workspace binding: ${binding.workspaceId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate workspace binding');
     }
     seen.add(binding.workspaceId);
   }
@@ -521,13 +555,23 @@ export function assessCloudExecutionFabricV1(input) {
   const slotIds = new Set();
   for (const slot of slots) {
     if (slotIds.has(slot.slotId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate slot: ${slot.slotId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate slot');
     }
     slotIds.add(slot.slotId);
   }
   const providerStates = normalizeProviderStates(raw.providerStates);
   const providerById = new Map(providerStates.map(state => [state.providerId, state]));
   const workspaceBindings = normalizeWorkspaceBindings(raw.workspaceBindings);
+  // A capacity observation is not ownership evidence. A provider's warm slot
+  // must not advertise a workspace already bound to another canonical effect,
+  // even when the current job is AVAILABLE and has no cloud binding itself.
+  const bindingByWorkspace = new Map(workspaceBindings.map(binding => [binding.workspaceId, binding]));
+  const slotWorkspaceCounts = new Map();
+  for (const slot of slots) {
+    if (slot.workspaceId) {
+      slotWorkspaceCounts.set(slot.workspaceId, (slotWorkspaceCounts.get(slot.workspaceId) ?? 0) + 1);
+    }
+  }
   const budget = evaluateResourceBudgetV1({
     budget: raw.resourceBudget,
     usage: raw.resourceUsage,
@@ -551,8 +595,39 @@ export function assessCloudExecutionFabricV1(input) {
   if (ownership.state === ExecutionOwnershipState.VERIFIED) {
     return blocked(baseArgs, 'EXECUTION_ALREADY_VERIFIED');
   }
+  // A detached binding for the *same effect* is not free cloud capacity.
+  // Following a lost lease, local handoff or policy rotation the canonical
+  // execution ledger must reconcile that old workspace before a new one is
+  // proposed. Other effects' bindings remain independent.
+  const effectBindings = workspaceBindings.filter(binding =>
+    binding.taskId === ownership.taskId
+    && binding.planId === ownership.planId
+    && binding.nodeId === ownership.nodeId
+    && binding.effectId === ownership.effectId);
+  if (effectBindings.length > 1) {
+    return blocked(baseArgs, 'AMBIGUOUS_CLOUD_EFFECT_BINDINGS',
+      CloudFabricDisposition.RECONCILE_REQUIRED);
+  }
+  if (effectBindings.length === 1
+      && (ownership.state !== ExecutionOwnershipState.OWNED
+        || ownership.ownerPlane !== AgentExecutionPlane.CLOUD
+        || !ownershipMatchesBinding(ownership, effectBindings[0]))) {
+    return blocked(baseArgs, 'ORPHANED_CLOUD_EFFECT_BINDING',
+      CloudFabricDisposition.RECONCILE_REQUIRED);
+  }
+  // A canonical ownership revision cannot be observed before it exists,
+  // including AVAILABLE owners which have no lease yet. Clock rollback must
+  // not allow a new local/cloud claim, even as an advisory recommendation.
+  // An OWNED lease is exclusive at its deadline.
+  if (Date.parse(request.assessedAt) < Date.parse(ownership.updatedAt)) {
+    return blocked(
+      baseArgs,
+      'EXECUTION_CLOCK_ROLLBACK',
+      CloudFabricDisposition.RECONCILE_REQUIRED,
+    );
+  }
   if (ownership.state === ExecutionOwnershipState.OWNED
-      && Date.parse(request.assessedAt) > Date.parse(ownership.leaseUntil)) {
+      && Date.parse(request.assessedAt) >= Date.parse(ownership.leaseUntil)) {
     return blocked(
       baseArgs,
       'EXECUTION_LEASE_EXPIRED',
@@ -580,6 +655,18 @@ export function assessCloudExecutionFabricV1(input) {
         CloudFabricDisposition.RECONCILE_REQUIRED,
       );
     }
+    // A canonical workspace cannot be bound in the future relative to this
+    // assessment, or before the current execution-owner revision existed.
+    // A replayed/future binding is not continuity evidence even if the lease,
+    // effect, checkpoint and policy identifiers happen to match.
+    if (Date.parse(existingBinding.boundAt) > Date.parse(request.assessedAt)
+        || Date.parse(existingBinding.boundAt) < Date.parse(ownership.updatedAt)) {
+      return blocked(
+        baseArgs,
+        'CLOUD_WORKSPACE_BINDING_CHRONOLOGY',
+        CloudFabricDisposition.RECONCILE_REQUIRED,
+      );
+    }
   }
 
   const localEligible = capabilitySubset(request.requiredCapabilities, request.localCapabilities);
@@ -591,8 +678,31 @@ export function assessCloudExecutionFabricV1(input) {
     if (Date.parse(slot.observedAt) > Date.parse(request.assessedAt)
         || Date.parse(request.assessedAt) >= Date.parse(slot.expiresAt)) {
       reasonCode = 'STALE_SLOT_OBSERVATION';
+    } else if (existingBinding
+        && slot.workspaceId === existingBinding.workspaceId
+        && Date.parse(slot.observedAt) < Date.parse(existingBinding.boundAt)) {
+      // An old slot health/capacity observation cannot attest a workspace
+      // created or rebound later. Never recommend resuming from capacity
+      // evidence that predates the canonical durable workspace binding.
+      reasonCode = 'SLOT_OBSERVATION_PREDATES_BINDING';
     } else if (slot.health === CloudSlotHealth.UNAVAILABLE) {
       reasonCode = 'SLOT_UNAVAILABLE';
+    } else if (slot.workspaceId && slotWorkspaceCounts.get(slot.workspaceId) > 1) {
+      // Multiple slot identities for one existing workspace are ambiguous;
+      // do not select one based on temperature, provider or cost ordering.
+      reasonCode = 'AMBIGUOUS_WORKSPACE_SLOT';
+    } else if (slot.workspaceId && !bindingByWorkspace.has(slot.workspaceId)
+        && !existingBinding) {
+      // A warm workspace ID advertised by an untrusted capacity feed is not
+      // proof that this tenant/effect owns it or that prior resources were
+      // scrubbed. Only an exact persisted canonical binding can admit reuse.
+      // Unbound workspaces must be reconciled by the existing runtime, never
+      // selected for dispatch or implicitly adopted by this advisory fabric.
+      reasonCode = 'UNBOUND_WORKSPACE_REQUIRES_RECONCILIATION';
+    } else if (slot.workspaceId && bindingByWorkspace.has(slot.workspaceId)
+        && (!existingBinding || existingBinding.workspaceId !== slot.workspaceId
+          || existingBinding.providerId !== slot.providerId)) {
+      reasonCode = 'WORKSPACE_BOUND_TO_OTHER_EXECUTION';
     } else if (!providerExecutable(provider)) {
       reasonCode = 'PROVIDER_NOT_READY';
     } else if (!capabilitySubset(request.requiredCapabilities, slot.capabilities)) {
