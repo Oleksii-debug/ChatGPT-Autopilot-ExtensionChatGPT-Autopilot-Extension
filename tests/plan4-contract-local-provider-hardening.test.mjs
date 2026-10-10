@@ -52,9 +52,9 @@ test('Plan4 S1 persisted route and endpoint identity is exact, not a whitespace 
   for (const changed of [
     {...route,routeId:' primary '},
     {...route,routeId:'primary '},
-    {...route,routeId:'\\tprimary'},
+    {...route,routeId:'\tprimary'},
     {...route,endpointId:' endpoint.local '},
-    {...route,endpointId:'endpoint.local\\n'},
+    {...route,endpointId:'endpoint.local\n'},
   ]) {
     assert.throws(()=>normalizeAiRoutePool([changed]),/exact bounded identifier/);
     assert.throws(()=>normalizeAiRoutePool(JSON.parse(JSON.stringify([changed]))),/exact bounded identifier/);
