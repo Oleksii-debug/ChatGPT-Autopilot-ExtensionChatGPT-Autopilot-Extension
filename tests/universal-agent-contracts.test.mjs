@@ -1109,3 +1109,87 @@ test('Plan-1 S1: tool policy authorization envelope rejects accessor, alias and 
     'hardened intake must not relax the canonical owner policy',
   );
 });
+
+
+test('Plan-1 S1: canonical registry adapters reject hostile options without executing getters', () => {
+  const secret = 'PRIVATE-ADAPTER-OWNER-TOKEN';
+  let reads = 0;
+  for (const field of ['description', 'riskClass', 'attributes']) {
+    const options = {};
+    Object.defineProperty(options, field, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(secret);
+      },
+    });
+    assert.throws(
+      () => capabilityV1FromRegistry('filesystem.read', options),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+        return true;
+      },
+    );
+  }
+
+  const provider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
+  for (const field of ['toolId', 'label', 'description', 'readOnly']) {
+    const options = { toolId: 'chatgpt.inspect' };
+    Object.defineProperty(options, field, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(secret);
+      },
+    });
+    assert.throws(
+      () => toolDescriptorV1FromAgentProvider(provider, options),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+        return true;
+      },
+    );
+  }
+  assert.equal(reads, 0, 'neither adapter may execute option getters');
+
+  const symbolOptions = { toolId: 'chatgpt.inspect', [Symbol(secret)]: 'filesystem.write' };
+  assert.throws(() => toolDescriptorV1FromAgentProvider(provider, symbolOptions), /unknown field/);
+  assert.throws(
+    () => capabilityV1FromRegistry('filesystem.read', { description: 'Read', [secret]: 'R0' }),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+      return true;
+    },
+  );
+  const inherited = Object.assign(Object.create({ readOnly: true }), { toolId: 'chatgpt.inspect' });
+  assert.throws(() => toolDescriptorV1FromAgentProvider(provider, inherited), /plain object/);
+  const validTool = toolDescriptorV1FromAgentProvider(provider, {
+    toolId: 'chatgpt.inspect',
+    label: 'Inspect page',
+    description: 'Read-only visual inspection',
+    readOnly: true,
+  });
+  assert.equal(validTool.readOnly, true);
+  assert.equal(validTool.providerId, AgentProviderId.CHATGPT_BROWSER);
+  assert.deepEqual(
+    toolDescriptorV1FromAgentProvider(provider, JSON.parse(JSON.stringify({
+      toolId: 'chatgpt.inspect',
+      label: 'Inspect page',
+      description: 'Read-only visual inspection',
+      readOnly: true,
+    }))),
+    validTool,
+  );
+  const validCapability = capabilityV1FromRegistry('filesystem.read', {
+    description: 'Read file', riskClass: 'R1', attributes: { provider: 'native' },
+  });
+  assert.deepEqual(
+    capabilityV1FromRegistry('filesystem.read', JSON.parse(JSON.stringify({
+      description: 'Read file', riskClass: 'R1', attributes: { provider: 'native' },
+    }))),
+    validCapability,
+  );
+});
