@@ -59,8 +59,8 @@ test('provider identities are exact text and never trimmed or coerced', () => {
 test('provider launch URL is bound to its declared site adapter', () => {
   assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, ''), 'https://chatgpt.com/');
   assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://chatgpt.com/c/example'), 'https://chatgpt.com/c/example');
-  assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://example.com/'), /does not accept URL/);
-  assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://www.chatgpt.com/'), /does not accept URL/);
+  assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://example.com/'), /rejected by site adapter/);
+  assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://www.chatgpt.com/'), /rejected by site adapter/);
 });
 
 
