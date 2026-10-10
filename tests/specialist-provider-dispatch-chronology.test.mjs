@@ -678,3 +678,67 @@ test('Section 1 canonical resolver-positive path is preserved after hostile inpu
   assert.equal(actual.authority.providerExecutionAuthorized, false);
   assert.equal(f.providerCalls, 0);
 });
+
+
+test('Section 1 rejects a Proxy-forged negative-zero array length before any provider effect', async () => {
+  const forged = new Proxy([], {
+    getOwnPropertyDescriptor(target, property) {
+      const original = Reflect.getOwnPropertyDescriptor(target, property);
+      return property === 'length' ? { ...original, value: -0 } : original;
+    },
+  });
+  assert.throws(
+    () => new SpecialistProviderDispatcherV1({ bindings: forged }),
+    /bounded canonical array/u,
+  );
+
+  const f = fixture();
+  const observed = await f.trustedResolver.resolve(f.selection);
+  const untrustedInspection = {
+    ...observed.inspection,
+    requiredToolIds: forged,
+  };
+  await assert.rejects(
+    f.newDispatcher().execute(f.request({ ...observed, inspection: untrustedInspection })),
+    /bounded canonical array/u,
+  );
+  assert.equal(f.providerCalls, 0, 'noncanonical evidence cannot trigger provider work');
+});
+
+test('Section 1 clock exceptions are opaque before either effect boundary and cold-restart succeeds', async () => {
+  const f = fixture();
+  const ready = JSON.parse(JSON.stringify(await f.trustedResolver.resolve(f.selection)));
+  const secret = 'PRIVATE_CLOCK_OWNER_TOKEN_234';
+  let providerEffects = 0;
+
+  for (const failAtCall of [1, 2]) {
+    let clockCalls = 0;
+    const dispatcher = new SpecialistProviderDispatcherV1({
+      now() {
+        clockCalls += 1;
+        if (clockCalls === failAtCall) throw new Error(secret);
+        return T0;
+      },
+      bindings: [{
+        providerId: 'provider.local',
+        execute: async () => { providerEffects += 1; },
+      }],
+    });
+    await assert.rejects(
+      dispatcher.execute(f.request(JSON.parse(JSON.stringify(ready)))),
+      error => error instanceof Error
+        && error.message === 'Specialist dispatcher clock could not be observed safely'
+        && !error.message.includes(secret)
+        && !Object.hasOwn(error, 'cause'),
+    );
+    assert.equal(providerEffects, 0, 'failed clock may not reach provider');
+  }
+
+  // Valid persisted readiness can still resume via the same existing dispatcher
+  // after the injected clock dependency is repaired.
+  await assert.rejects(
+    f.newDispatcher().execute(f.request(JSON.parse(JSON.stringify(ready)))),
+    /Specialist provider outcome is UNKNOWN/u,
+  );
+  assert.equal(f.providerCalls, 1);
+});
