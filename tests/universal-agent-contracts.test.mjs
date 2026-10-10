@@ -1424,3 +1424,31 @@ test('Plan-1 S1: explicitly present malformed artifact byte length fails closed 
   assert.ok(Object.isFrozen(normalized));
   assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(normalized))), normalized);
 });
+
+
+test('Plan-1 S1: explicitly persisted verification attempt cannot be silently reset on restart', () => {
+  const base = {
+    schemaVersion: 1, verificationId: 'verify-attempt-1',
+    invocationId: 'invoke-attempt-1', observationId: 'observation-attempt-1',
+    status: VerificationStatus.VERIFIED, reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+  };
+  // Legacy omission is distinguishable from explicitly corrupt evidence.
+  assert.equal(normalizeVerificationV1(base).attempt, 0);
+  assert.equal(normalizeVerificationV1({ ...base, attempt: 0 }).attempt, 0);
+  assert.equal(normalizeVerificationV1({ ...base, attempt: 1 }).attempt, 1);
+  for (const attempt of [undefined, null, -0, -1, 1.5, 65, NaN, Infinity, '1']) {
+    const corrupted = { ...base, attempt };
+    assert.throws(() => normalizeVerificationV1(corrupted), /attempt is invalid/);
+  }
+  for (const attempt of [null, -1, 1.5, 65, '1']) {
+    assert.throws(
+      () => normalizeVerificationV1(JSON.parse(JSON.stringify({ ...base, attempt }))),
+      /attempt is invalid/,
+      'persisted malformed retry identity must not be admitted after JSON restart',
+    );
+  }
+  const legal = normalizeVerificationV1({ ...base, attempt: 1 });
+  assert.ok(Object.isFrozen(legal));
+  assert.deepEqual(normalizeVerificationV1(JSON.parse(JSON.stringify(legal))), legal);
+});
