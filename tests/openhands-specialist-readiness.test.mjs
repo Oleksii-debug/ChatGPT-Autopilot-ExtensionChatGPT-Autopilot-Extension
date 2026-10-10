@@ -599,7 +599,10 @@ test('binding holds admitted OpenHands probe identity across later client method
   let originalCalls = 0;
   let replacementCalls = 0;
   const client = {
-    async probe() { originalCalls += 1; },
+    async probe() {
+      originalCalls += 1;
+      return { serverTitle: 'OpenHands Agent Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    },
   };
   const binding = createOpenHandsSpecialistReadinessBindingV1({
     config: config(), client, now: monotonicNow([T0, T1]),
@@ -624,4 +627,64 @@ test('binding holds admitted OpenHands probe identity across later client method
   assert.equal(replacementCalls, 0);
   assert.equal(observation.providerStates[0].health, 'READY');
   assert.equal(JSON.stringify(observation).includes('SECRET'), false);
+});
+
+test('resolved OpenHands probe must present exact server receipt; no-op, version drift and hostile data stay non-ready', async () => {
+  const validConfig = config();
+  const noOp = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {} },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(noOp.providerState.health, 'UNKNOWN');
+  assert.equal(noOp.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(noOp.authority.providerExecutionAuthorized, false);
+
+  const wrongServer = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      return { serverTitle: 'Unrelated Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(wrongServer.providerState.health, 'UNAVAILABLE');
+  assert.equal(wrongServer.providerState.reasonCode, 'OPENHANDS_SERVER_IDENTITY_MISMATCH');
+
+  const wrongVersion = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      return { serverTitle: 'OpenHands Agent Server', serverVersion: 'mismatched-version' };
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(wrongVersion.providerState.health, 'UNAVAILABLE');
+  assert.equal(wrongVersion.providerState.reasonCode, 'OPENHANDS_SERVER_VERSION_MISMATCH');
+
+  let getterCalls = 0;
+  const malicious = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      const receipt = { serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+      Object.defineProperty(receipt, 'serverTitle', {
+        enumerable: true,
+        get() { getterCalls += 1; throw new Error('PRIVATE_PROBE_RECEIPT_SECRET'); },
+      });
+      return receipt;
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(getterCalls, 0);
+  assert.equal(malicious.providerState.health, 'UNKNOWN');
+  assert.equal(malicious.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(JSON.stringify(malicious).includes('PRIVATE_PROBE_RECEIPT_SECRET'), false);
+
+  const coldRestart = JSON.parse(JSON.stringify({ serverTitle: 'OpenHands Agent Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION }));
+  const valid = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() { return coldRestart; } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(valid.providerState.health, 'READY');
+  assert.equal(valid.authority.providerExecutionAuthorized, false);
+  assert.equal(valid.authority.completionAuthorized, false);
 });
