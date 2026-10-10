@@ -3649,3 +3649,82 @@ test('Plan2 S1 outcome verifier preserves typed criterion IDs after JSON cold re
   }
   assert.deepEqual(parseRecovered({ verified: false, checks: [] }), { verified: false, checks: [] });
 });
+
+
+test('Plan2 S1 observed form submit destination enforces owner DENY/ASK after JSON recovery', () => {
+  const sourceUrl = 'https://source.test/profile';
+  const target = {
+    ref: 'r1', tag: 'button', type: 'submit', submitLike: true,
+    formAssociated: true, formAction: 'https://blocked.test/submit', formMethod: 'post',
+    name: 'Submit', semanticIdentity: 'observed-form-submit',
+  };
+  const snapshot = {
+    url: sourceUrl, frames: [{ frameId: 0, url: sourceUrl, elements: [target] }],
+  };
+  const config = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'source.test', defaultDecision: 'ALLOW', actionDecisions: {} },
+      { pattern: 'blocked.test', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.test', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  };
+  const judge = action => resolveBrowserAgentOwnerPolicy(
+    config, JSON.parse(JSON.stringify(snapshot)), JSON.parse(JSON.stringify(action)));
+  const activating = [
+    { type: 'click', frameId: 0, ref: 'r1' },
+    { type: 'key', key: 'Enter', frameId: 0, ref: 'r1' },
+    { type: 'key', key: ' ', frameId: 0, ref: 'r1' },
+  ];
+  for (const action of activating) {
+    assert.equal(judge(action).decision, 'DENY', 'submit cannot inherit source-site ALLOW');
+    assert.equal(judge(action).policyUrl, 'https://blocked.test/submit');
+    target.formAction = 'https://ask.test/confirm';
+    assert.equal(judge(action).decision, 'ASK', 'destination-specific ASK survives restart');
+    target.formAction = '/local-save';
+    assert.equal(judge(action).decision, 'ALLOW', 'same-origin submission stays allowed');
+    assert.equal(judge(action).policyUrl, 'https://source.test/local-save');
+    target.formAction = 'https://blocked.test/submit';
+  }
+  target.formAction = '/local-save';
+  assert.equal(judge({ ...activating[0], formAction: 'https://blocked.test/forged' }).decision, 'ALLOW',
+    'model-proposed destination must never replace the observed form');
+  // Non-submitting controls must retain their ordinary source-page policy.
+  target.submitLike = false;
+  target.formAction = 'https://blocked.test/submit';
+  assert.equal(judge(activating[0]).decision, 'ALLOW', 'ordinary button is not a form submission');
+  // Enter on a form-associated text input can submit without a submit button.
+  target.tag = 'input';
+  target.type = 'text';
+  assert.equal(judge(activating[1]).decision, 'DENY', 'text Enter uses observed parent form action');
+  assert.equal(judge(activating[2]).decision, 'ALLOW', 'Space on text is not a submit shortcut');
+});
+
+test('Plan2 S1 malformed or untrusted persisted form destinations fail closed', () => {
+  const sourceUrl = 'https://source.test/form';
+  const observed = {
+    ref: 'r1', tag: 'input', type: 'submit', name: 'Pay',
+    submitLike: true, formAssociated: true, formAction: 'https://source.test/save',
+  };
+  const snapshot = {
+    url: sourceUrl, frames: [{ frameId: 0, url: sourceUrl, elements: [observed] }],
+  };
+  const config = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [{ pattern: 'source.test', defaultDecision: 'ALLOW', actionDecisions: {} }],
+  };
+  const action = { type: 'click', frameId: 0, ref: 'r1' };
+  const verdict = () => resolveBrowserAgentOwnerPolicy(
+    config, JSON.parse(JSON.stringify(snapshot)), JSON.parse(JSON.stringify(action)));
+  for (const corrupted of [
+    undefined, null, '', 42, false, 'javascript:alert(1)',
+    'data:text/html,malicious', 'file:///tmp/escape', 'http://[bad',
+  ]) {
+    observed.formAction = corrupted;
+    const result = verdict();
+    assert.equal(result.decision, 'DENY', String(corrupted));
+    assert.equal(result.source, 'browser:unsafe-form-action', String(corrupted));
+  }
+  observed.formAction = 'https://source.test/save';
+  assert.equal(verdict().decision, 'ALLOW', 'valid form destination recovers without effects');
+});
