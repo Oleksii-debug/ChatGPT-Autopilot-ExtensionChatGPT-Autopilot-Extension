@@ -597,7 +597,16 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const rawAction = persistedField(entry, 'action').value;
     let actionType = '';
     if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
-      const candidate = persistedField(rawAction, 'type').value;
+      // An explicitly persisted malformed action kind must not be laundered
+      // into an innocuous missing kind in a read-only exported timeline.
+      // Unknown well-formed future kinds remain non-authorizing/undisclosed.
+      const { present: actionTypePresent, value: candidate } = persistedField(rawAction, 'type');
+      if (actionTypePresent && (typeof candidate !== 'string' ||
+          candidate.length < 1 || candidate.length > 64 ||
+          candidate !== candidate.trim() ||
+          /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(candidate))) {
+        throw new Error('Agent history recorded action type is invalid');
+      }
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
     }
     return {
