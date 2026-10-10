@@ -481,6 +481,20 @@ export class AiOrchestrator {
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
         }
+        // A recovered/stale receipt for another model-call ordinal cannot
+        // authorize this call, even if it carries a valid reservationId.
+        // Older credentialless local lifecycle fixtures may omit callNumber.
+        let ordinal = null;
+        let ordinalReflectionFailed = false;
+        try { ordinal = Object.getOwnPropertyDescriptor(reservation, 'callNumber'); }
+        catch { ordinalReflectionFailed = true; }
+        if (ordinalReflectionFailed || (ordinal && (
+          !Object.hasOwn(ordinal, 'value') || ordinal.value !== callsUsed + 1
+        ))) {
+          const mismatch = new Error('Model-budget reservation call ordinal does not match authorized dispatch');
+          mismatch.code = 'AI_MODEL_BUDGET_RECEIPT_CALL_NUMBER_MISMATCH';
+          throw mismatch;
+        }
         // Existing BrowserAgentManager persists route/account provenance in
         // the reservation. A lifecycle receipt must not override the selected
         // provider/model/endpoint after durable admission. Unbound legacy
