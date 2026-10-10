@@ -280,6 +280,8 @@ export function normalizeAiRoutePool(raw = []) {
     // not reset a user-approved locality constraint after a partial migration.
     if (Object.hasOwn(item, 'locality') && rawLocality === undefined) throw new Error('AI route locality cannot be undefined when supplied');
     if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
+    // Locality is an owner/security boundary: never turn an invalid persisted alias into an allowed destination.
+    if (rawLocality !== undefined && rawLocality !== rawLocality.trim()) throw new Error('AI route locality must be exact');
     const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
     // The built-in OpenAI gateway always dispatches to a remote API. A
@@ -293,6 +295,8 @@ export function normalizeAiRoutePool(raw = []) {
     if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
     // A remote Ollama-compatible endpoint is not provably free merely because its provider name is Ollama.
     // Only explicitly local Ollama keeps the legacy zero-cost default; all other unpriced routes stay UNKNOWN.
+    // A stored cost tier must be an exact enum, not a whitespace-repaired alias.
+    if (rawCostClass !== undefined && rawCostClass !== rawCostClass.trim()) throw new Error('AI route costClass must be exact');
     const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' && locality === AiRouteLocality.LOCAL ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
@@ -353,6 +357,8 @@ export function normalizeAiRoutePolicy(raw = {}) {
   // would silently widen the owner's persisted locality policy.
   if (Object.hasOwn(source, 'locality') && rawLocality === undefined) throw new Error('AI route policy locality cannot be undefined when supplied');
   if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
+  // In particular, ' any ' must not silently widen an owner's locality restriction.
+  if (rawLocality !== undefined && rawLocality !== rawLocality.trim()) throw new Error('AI route policy locality must be exact');
   const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
