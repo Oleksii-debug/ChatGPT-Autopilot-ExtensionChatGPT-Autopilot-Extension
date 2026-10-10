@@ -456,3 +456,62 @@ test('does not trust hidden or unknown dependency-injection option fields', asyn
   );
   assert.equal(getterReads, 0);
 });
+
+test('epoch-bound remote command accepts only the exact trusted current control epoch', async () => {
+  const result = await assess(
+    validInput({ command: { expectedControlEpoch: 9 } }),
+    currentSnapshot({ controlEpoch: 9 }),
+  );
+  assert.equal(result.status, 'READY_FOR_CANONICAL_AUTHORIZATION');
+  assert.equal(result.controlEpoch, 9);
+  assert.equal(result.controlEpochBound, true);
+  assert.equal(result.requiresCanonicalControlEpochRecheck, true);
+  assert.equal(result.sourceAuthenticated, false);
+  assert.equal(result.mutationAuthorized, false);
+
+  await assert.rejects(
+    () => assess(validInput({ command: { expectedControlEpoch: 8 } }), currentSnapshot({ controlEpoch: 9 })),
+    /control epoch/u,
+  );
+  await assert.rejects(
+    () => assess(validInput(), currentSnapshot({ controlEpoch: 9 })),
+    /control epoch/u,
+  );
+  await assert.rejects(
+    () => assess(validInput({ command: { expectedControlEpoch: 9 } }), currentSnapshot()),
+    /control epoch/u,
+  );
+});
+
+test('epoch-specific command fingerprints are stable and prevent stale replay aliasing', async () => {
+  const old = await assess(validInput({ command: { expectedControlEpoch: 9 } }), currentSnapshot({ controlEpoch: 9 }));
+  const next = await assess(validInput({ command: { expectedControlEpoch: 10 } }), currentSnapshot({ controlEpoch: 10 }));
+  assert.notEqual(old.commandFingerprint, next.commandFingerprint);
+  const replay = await assess(validInput({ command: { expectedControlEpoch: 9 } }), currentSnapshot({ controlEpoch: 9 }));
+  assert.equal(replay.commandFingerprint, old.commandFingerprint);
+  assert.equal((await assess(validInput())).controlEpochBound, false);
+});
+
+test('remote control epoch rejects string, zero, unsafe or accessor authority without reading getters', async () => {
+  for (const invalid of ['9', 0, -1, Number.MAX_SAFE_INTEGER + 1, null]) {
+    await assert.rejects(
+      () => assess(validInput({ command: { expectedControlEpoch: invalid } }), currentSnapshot({ controlEpoch: 9 })),
+      /positive safe integer/u,
+    );
+    await assert.rejects(
+      () => assess(validInput({ command: { expectedControlEpoch: 9 } }), currentSnapshot({ controlEpoch: invalid })),
+      /positive safe integer/u,
+    );
+  }
+  let reads = 0;
+  const attacker = validInput();
+  Object.defineProperty(attacker.command, 'expectedControlEpoch', {
+    enumerable: true,
+    get() { reads += 1; return 9; },
+  });
+  await assert.rejects(
+    () => assess(attacker, currentSnapshot({ controlEpoch: 9 })),
+    /data properties only/u,
+  );
+  assert.equal(reads, 0);
+});
