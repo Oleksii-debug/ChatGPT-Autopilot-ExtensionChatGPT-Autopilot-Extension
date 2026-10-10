@@ -1178,3 +1178,51 @@ test('Companion graceful shutdown prevents NEW Core dispatch after pending scope
       recovered.close(error => error ? reject(error) : resolve()));
   }
 });
+
+
+test('SDK does not resend an ambiguous same-identity control after a real Core dispatch; a fresh request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let attempts = 0;
+  let credentialLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    token: TOKEN,
+    dependencies: dependencies(counters),
+  });
+  try {
+    const client = createAutopilotLocalClientV1({
+      tokenProvider() {
+        credentialLookups += 1;
+        return TOKEN;
+      },
+      port: server.address().port,
+      fetchImpl: async (...args) => {
+        attempts += 1;
+        const result = await fetch(...args);
+        if (attempts === 1) {
+          // The operation DID execute on canonical Core, but the transport
+          // loses the acknowledgement after dispatch. SDK must not infer
+          // zero effects, nor accept the same requestId again.
+          await result.arrayBuffer();
+          throw new Error('simulated lost post-dispatch response');
+        }
+        return result;
+      },
+    });
+    const first = await client.control(request('lost-after-core-dispatch'));
+    assert.equal(first.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+    const repeated = await client.control(request('lost-after-core-dispatch'));
+    assert.equal(repeated.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.match(repeated.instruction, /reconcile canonical job state/u);
+    assert.equal(attempts, 1, 'no same-identity blind re-transmission');
+    assert.equal(credentialLookups, 1, 'no second owner token lookup for unresolved identity');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+    const fresh = await client.control(request('different-verified-request'));
+    assert.equal(fresh.status, 'RECEIVED');
+    assert.equal(fresh.result.receipt.status, 'COMPLETED');
+    assert.equal(attempts, 2, 'a distinct canonical request remains usable');
+    assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
