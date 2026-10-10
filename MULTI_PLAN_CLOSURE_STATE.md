@@ -1,3 +1,8 @@
+### PLAN8_S1_ADMISSION_RUNNING_RACE_7F92480E_FINAL_CORE_20261010 — SAME-SHA CORE GREEN; AGGREGATE RED
+- Exact Git HEAD `7f92480eb040aa20a7d274c9c3b6859cac605660`; Core #38066107211 COMPLETED SUCCESS, raw job 114253962442: 483/483 Core PASS and 59/59 deterministic web PASS, 0 fail/cancelled/skipped. Chrome #38066107311 SUCCESS; Release #38066107240 Linux 3629/3393 PASS/225 FAIL/11 CANCELLED, Windows package SUCCESS. This corrects only the earlier Core-pending checkpoint; aggregate is still FAILURE.
+- Scope remains ONLY Plan8 S1 FIRST ACTIONABLE/IN_PROGRESS/NOT DONE, S2 WAITING_UPSTREAM/NOT DONE. PR #716 open/draft/unmerged; no main 11.x integration/post-main acceptance. Terminal closures 0/2. No other Drive plans mutated.
+- https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/38066107211
+
 ### PLAN8_S1_ADMISSION_RUNNING_RACE_7F92480E_20261010 — TARGETED RESTART PASS; RELEASE RED; NONTERMINAL
 - ONLY canonical Drive 8. Восьмий план (1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM); S1 FIRST ACTIONABLE/IN_PROGRESS/NOT DONE; S2 WAITING_UPSTREAM/NOT DONE and untouched; no other Drive plan mutation.
 - Existing 11.0.13 High PR #716 reused. Source commit 92cf2d38f2c67c3453cd4d6325de7b935cf81a02 adds preflight AND serialized-post-readiness parent RUNNING guard in the SAME BrowserAgentManager admission authority; no duplicate scheduler/provider/Agent/policy. Negative/recovery fixture commit/head 7f92480eb040aa20a7d274c9c3b6859cac605660; live source/test blobs e153a66445ecb4c4a27acf2e352f21c0202a0122 / c19f5a1cb2c8cdac382313a0321ae6a8d82e3a52 MATCH.
