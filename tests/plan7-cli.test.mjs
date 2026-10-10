@@ -87,3 +87,25 @@ test('shared CLI/HTTP strict JSON rejects malformed UTF-8 without replacement co
   assert.equal(r.stdout, '');
   assert.match(r.stderr, /Помилка CLI/u);
 });
+
+test('strict control JSON rejects leading UTF-8 BOM before CLI network access and recovers', () => {
+  // TextDecoder defaults to stripping the BOM. That must not reinterpret
+  // noncanonical raw bytes as an authorized control request.
+  const prefixed = Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]),
+    Buffer.from(CANONICAL_CLI_INPUT, 'utf8'),
+  ]);
+  assert.throws(() => parseStrictControlJsonV1(prefixed),
+    'BOM-prefixed control JSON must not be canonicalized by TextDecoder');
+  const result = spawnSync(process.execPath, [cli], {
+    input: prefixed, encoding: 'utf8', timeout: 10_000,
+    env: { ...process.env, AUTOPILOT_LOCAL_API_TOKEN: secret,
+      AUTOPILOT_LOCAL_API_PORT: '1' },
+  });
+  assert.equal(result.status, 1, 'CLI must reject before attempting transport');
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /Помилка CLI/u);
+  assert.equal((result.stderr + result.stdout).includes(secret), false);
+  assert.deepEqual(parseStrictControlJsonV1(Buffer.from(CANONICAL_CLI_INPUT)),
+    JSON.parse(CANONICAL_CLI_INPUT), 'clean JSON still parses after denial');
+});
