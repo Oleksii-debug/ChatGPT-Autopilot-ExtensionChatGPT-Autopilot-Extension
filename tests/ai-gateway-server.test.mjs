@@ -143,6 +143,65 @@ test('Plan4 S1 custom account is never selected without its exact endpointId, in
   assert.equal(calls[0][0], 'http://127.0.0.1:1234/v1/models');
 });
 
+test('Plan4 S1 ordinary credential references cannot migrate to a second origin after cold restart', async () => {
+  const endpoints = [
+    { endpointId:'team-first', baseUrl:'https://first.example.test/v1', apiKeyEnv:'OWNER_TEAM_KEY' },
+    { endpointId:'team-second', baseUrl:'https://second.example.test/v1', apiKeyEnv:'OWNER_TEAM_KEY' },
+  ];
+  let upstreamEffects = 0;
+  for (const value of [endpoints, JSON.parse(JSON.stringify(endpoints))]) {
+    assert.throws(
+      () => normalizeCompatibleEndpointRegistry(value),
+      error => error.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH'
+        && error.statusCode === 500 && !String(error.message).includes('fixture-secret'),
+      'a reused credential reference must not silently authorize a different origin',
+    );
+  }
+  assert.equal(upstreamEffects, 0, 'invalid persisted account binding never authorizes I/O');
+  // Exercise the actual on-disk Gateway settings loader, not merely a JSON
+  // clone: an invalid persisted account must be refused after cold restart.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan4-credential-origin-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:endpoints }));
+    assert.throws(() => loadCompatibleEndpointRegistry({ env:{}, configFile }),
+      error => error.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+    const recovered = [endpoints[0],
+      { endpointId:'team-alias', baseUrl:'https://first.example.test/other-v1', apiKeyEnv:'OWNER_TEAM_KEY' }];
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:recovered }));
+    assert.deepEqual(loadCompatibleEndpointRegistry({ env:{}, configFile }),
+      normalizeCompatibleEndpointRegistry(recovered));
+  } finally {
+    fs.rmSync(dir, { recursive:true, force:true });
+  }
+
+  // Two named endpoints on the *same* provider origin remain valid, including
+  // after JSON cold restart. This rule constrains the credential's destination,
+  // not the legitimate number of endpoint profiles for that one origin.
+  const sameOrigin = normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([
+    endpoints[0],
+    { endpointId:'team-alias', baseUrl:'https://first.example.test/other-v1', apiKeyEnv:'OWNER_TEAM_KEY' },
+  ])));
+  const options = {
+    compatibleEndpoints:sameOrigin,
+    env:{ OWNER_TEAM_KEY:'fixture-secret' },
+    fetchFn:async (url, init) => {
+      upstreamEffects += 1;
+      assert.ok(String(url).startsWith('https://first.example.test/'));
+      assert.equal(init.headers.authorization, 'Bearer fixture-secret');
+      if (String(url).endsWith('/models')) return response({ data:[{ id:'model-fixture' }] });
+      return response({ choices:[{ message:{ content:'verified' } }] });
+    },
+  };
+  assert.deepEqual(await listProviderModels('openai-compatible', { ...options, endpointId:'team-alias' }), ['model-fixture']);
+  const receipt = await completeProvider({
+    provider:'openai-compatible', endpointId:'team-first', model:'model-fixture', prompt:'approved fixture',
+  }, options);
+  assert.equal(receipt.endpointId,'team-first');
+  assert.equal(receipt.text,'verified');
+  assert.equal(upstreamEffects,2);
+});
+
 test('compatible endpoint registry rejects duplicate IDs, inline secrets and insecure remote HTTP', () => {
   assert.throws(() => normalizeCompatibleEndpointRegistry([
     { endpointId:'same', baseUrl:'https://one.example/v1', apiKeyEnv:'DUPLICATE_ONE_KEY' },

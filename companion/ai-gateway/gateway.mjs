@@ -80,6 +80,9 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
   const seenPinnedCredentialRefs = new Set();
+  // A credential reference identifies one provider origin, not a transferable
+  // bearer token for any other endpoint after an imported config/cold restart.
+  const credentialOrigins = new Map();
   return Object.freeze(entries.map((candidate, index) => {
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     // Persisted endpoint/account identities may arrive from lower-trust config.
@@ -131,6 +134,18 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
         500,
         'AI_COMPATIBLE_CREDENTIAL_REF_REQUIRED',
       );
+    }
+    if (apiKeyEnv) {
+      const origin = new URL(baseUrl).origin;
+      const previousOrigin = credentialOrigins.get(apiKeyEnv);
+      if (previousOrigin && previousOrigin !== origin) {
+        throw gatewayError(
+          'One OpenAI-compatible credential reference cannot authorize different endpoint origins',
+          500,
+          'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH',
+        );
+      }
+      credentialOrigins.set(apiKeyEnv, origin);
     }
     const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
     if (pinnedCredential) {
