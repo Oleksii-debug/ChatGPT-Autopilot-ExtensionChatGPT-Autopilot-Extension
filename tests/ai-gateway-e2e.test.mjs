@@ -322,3 +322,55 @@ test('Plan4 S1 remote compatible registry requires credential ref before provide
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('Plan4 S1 built-in OpenAI uses exact injected gateway credential scope for health, discovery, probe and completion', async () => {
+  for (const configured of [false, true]) {
+    const env = configured ? { OPENAI_API_KEY: 'scope-only-fixture-key' } : {};
+    const upstream = [];
+    const fetchFn = async (url, init = {}) => {
+      if (url.startsWith('https://api.openai.com/v1/')) {
+        upstream.push({ url, auth: init.headers?.authorization });
+        assert.equal(init.headers?.authorization, 'Bearer scope-only-fixture-key');
+        return url.endsWith('/models')
+          ? response({ data: [{ id: 'scope-fixture-model' }] })
+          : response({
+              output_text: 'scope-fixture-reply',
+              usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+            });
+      }
+      return response({ models: [] });
+    };
+    const server = createGatewayServer({ env, fetchFn });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const root = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const health = await (await fetch(`${root}/health`)).json();
+      assert.equal(health.openaiConfigured, configured, 'health must reflect the injected account');
+      const status = await (await fetch(`${root}/status`)).json();
+      const openai = status.providers.find(item => item.provider === 'openai');
+      assert.equal(openai.configured, configured, 'probe must agree with the same account scope');
+      assert.equal(openai.ok, configured);
+      const discovery = await fetch(`${root}/models?provider=openai`);
+      const completion = await fetch(`${root}/complete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'openai', model: 'scope-fixture-model', prompt: 'bounded fixture prompt' }),
+      });
+      if (configured) {
+        assert.equal(discovery.status, 200);
+        assert.deepEqual((await discovery.json()).models, ['scope-fixture-model']);
+        assert.equal(completion.status, 200);
+        assert.equal((await completion.json()).text, 'scope-fixture-reply');
+        assert.equal(upstream.length, 3, 'one readiness probe, one discovery, one completion');
+        assert.ok(upstream.every(call => call.auth === 'Bearer scope-only-fixture-key'));
+      } else {
+        assert.equal(discovery.status, 400);
+        assert.equal(completion.status, 400);
+        assert.equal(upstream.length, 0, 'unconfigured account never inherits host credentials or dispatches');
+      }
+      assert.equal(JSON.stringify(health).includes('scope-only-fixture-key'), false);
+      assert.equal(JSON.stringify(status).includes('scope-only-fixture-key'), false);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  }
+});
