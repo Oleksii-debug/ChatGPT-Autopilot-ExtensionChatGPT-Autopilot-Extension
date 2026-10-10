@@ -420,3 +420,38 @@ test('Section 1 opaque clock failure does not poison canonical cold-restart reco
   assert.equal(durable.authority.providerExecutionAuthorized, false);
   assert.equal(providerCalls, 2);
 });
+
+test('Section 1: second trusted admission accepts harmless probe latency drift, never skips probe', async () => {
+  let probes = 0;
+  const resolver = runtime([binding(async () => ({
+    observedAt: NOW,
+    providerStates: [state({ latencyMs: ++probes === 1 ? 5 : 29 })],
+  }))]);
+  const first = await resolver.resolve(selection());
+  assert.equal(first.executable, true);
+  assert.equal(first.inspection.checks[0].providerReadiness.latencyMs, 5);
+  assert.equal(await resolver.assertCurrent(first), true);
+  assert.equal(probes, 2, 'readiness admission must perform a second fresh probe');
+});
+
+test('Section 1: second trusted admission refuses provider health and reason drift', async () => {
+  for (const second of [
+    { health: 'UNAVAILABLE', reasonCode: 'OPENHANDS_TRANSPORT_FAILURE' },
+    { health: 'READY', reasonCode: 'CHANGED_READY_PROVENANCE' },
+    { installed: false, installationRequired: true },
+  ]) {
+    let probes = 0;
+    const resolver = runtime([binding(async () => ({
+      observedAt: NOW,
+      providerStates: [state(++probes === 1 ? {} : second)],
+    }))]);
+    const first = await resolver.resolve(selection());
+    assert.equal(first.executable, true);
+    await assert.rejects(
+      resolver.assertCurrent(first),
+      /Provider readiness changed since its trusted observation/,
+    );
+    assert.equal(probes, 2);
+    assert.equal(first.authority.providerExecutionAuthorized, false);
+  }
+});
