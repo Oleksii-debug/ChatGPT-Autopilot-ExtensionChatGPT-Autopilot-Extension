@@ -520,7 +520,11 @@ test('Section 1 pre-effect clock failure still prevents provider dispatch', asyn
     now: () => { throw new Error('trusted clock unavailable'); },
     bindings: [{ providerId: 'provider.local', execute: async () => { calls += 1; } }],
   });
-  await assert.rejects(dispatcher.execute(f.request(readiness)), /trusted clock unavailable/u);
+  await assert.rejects(dispatcher.execute(f.request(readiness)), error =>
+    error instanceof Error
+    && error.message === 'Specialist dispatcher clock could not be observed safely'
+    && !error.message.includes('trusted clock unavailable')
+    && !Object.hasOwn(error, 'cause'));
   assert.equal(calls, 0, 'no effect exists before the dispatch boundary');
 });
 
