@@ -157,7 +157,11 @@ function resolveCompatibleEndpoint(endpointId = '', registry = COMPATIBLE_ENDPOI
   if (typeof endpointId !== 'string' || endpointId !== endpointId.trim()) {
     throw gatewayError('OpenAI-compatible requested endpointId must be exact', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
   }
-  const requested = endpointId || (registry.length === 1 ? registry[0].endpointId : 'default');
+  // A missing endpoint identity is compatible only with the historical
+  // literal 'default' binding. Selecting the sole custom endpoint would
+  // silently promote an unbound request into a different provider account.
+  // Discovery, status probes and completion must use the same rule.
+  const requested = endpointId || 'default';
   const endpoint = registry.find(item => item.endpointId === requested);
   if (!endpoint) throw gatewayError(`Unknown OpenAI-compatible endpointId: ${requested}`, 404, 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
   return endpoint;
