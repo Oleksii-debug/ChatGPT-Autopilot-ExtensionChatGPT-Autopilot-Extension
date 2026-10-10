@@ -2501,7 +2501,11 @@ test('vision can drive a bounded native coordinate click without a DOM ref under
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: false },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: false },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: true } }];
@@ -2580,7 +2584,11 @@ test('visual-only coordinate click waits for approval and stale coordinate appro
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'canvas', role: '', type: '', name: '', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'canvas', role: '', type: '', name: '', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: verifyOk } }];
@@ -2621,6 +2629,10 @@ test('vision can drive a bounded native coordinate drag under explicit ALLOW_ALL
       return [{ frameId: 0, result: {
         x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
         target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 },
           tag: 'div', role: '', type: '', name: isSource ? 'Course A' : 'Monday slot', href: '', disabled: false,
           submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true,
         },
@@ -2709,7 +2721,11 @@ test('coordinate drag approval is TOCTOU-safe and stale source/destination dispa
       const [x, y] = details.args;
       return [{ frameId: 0, result: {
         x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'div', role: '', type: '', name: x < 400 ? 'Course A' : 'Monday slot', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'div', role: '', type: '', name: x < 400 ? 'Course A' : 'Monday slot', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') {
@@ -2749,7 +2765,11 @@ test('vision can focus a coordinate text target and insert text through native C
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: true } }];
