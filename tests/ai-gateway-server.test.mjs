@@ -158,6 +158,22 @@ test('Plan4 S1 ordinary credential references cannot migrate to a second origin 
     );
   }
   assert.equal(upstreamEffects, 0, 'invalid persisted account binding never authorizes I/O');
+  // Exercise the actual on-disk Gateway settings loader, not merely a JSON
+  // clone: an invalid persisted account must be refused after cold restart.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan4-credential-origin-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:endpoints }));
+    assert.throws(() => loadCompatibleEndpointRegistry({ env:{}, configFile }),
+      error => error.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+    const recovered = [endpoints[0],
+      { endpointId:'team-alias', baseUrl:'https://first.example.test/other-v1', apiKeyEnv:'OWNER_TEAM_KEY' }];
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:recovered }));
+    assert.deepEqual(loadCompatibleEndpointRegistry({ env:{}, configFile }),
+      normalizeCompatibleEndpointRegistry(recovered));
+  } finally {
+    fs.rmSync(dir, { recursive:true, force:true });
+  }
 
   // Two named endpoints on the *same* provider origin remain valid, including
   // after JSON cold restart. This rule constrains the credential's destination,
