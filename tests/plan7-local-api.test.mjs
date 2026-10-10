@@ -459,7 +459,7 @@ test('network uncertainty cannot cause an automatic replay', async () => {
 
 test('client rejects forged success response and never treats it as acknowledged', async () => {
   const client=createAutopilotLocalClientV1({token:TOKEN,port:12345,fetchImpl:async()=>({
-    ok:true,json:async()=>({schemaVersion:1,status:'RECEIVED',result:{request:{requestId:'wrong'}}}),
+    ok:true, status: 200, json:async()=>({schemaVersion:1,status:'RECEIVED',result:{request:{requestId:'wrong'}}}),
   })});
   const result=await client.control(request());
   assert.equal(result.status,'UNKNOWN_NETWORK_RESULT');
@@ -541,7 +541,7 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
       const client = createAutopilotLocalClientV1({
         token: TOKEN, port, fetchImpl: async () => {
           calls += 1;
-          return { ok: true, json: async () => forged };
+          return { ok: true, status: 200, json: async () => forged };
         },
       });
       const answer = await client.control(originalRequest);
@@ -552,7 +552,7 @@ test('SDK rejects extra, accessor, symbol and nonenumerable transport envelope f
     assert.equal(calls, mutations.length, 'no automatic resends after forged receipts');
     assert.equal(getterCalls, 0, 'accessors must never run during transport response validation');
     const correct = createAutopilotLocalClientV1({
-      token: TOKEN, port, fetchImpl: async () => ({ ok: true, json: async () => valid }),
+      token: TOKEN, port, fetchImpl: async () => ({ ok: true, status: 200, json: async () => valid }),
     });
     assert.equal((await correct.control(originalRequest)).status, 'RECEIVED');
   });
@@ -578,7 +578,7 @@ test('SDK binds read-only vs mutating receipt classification to canonical operat
       const forged = { ...valid, result:{ ...valid.result, ...patch } };
       let calls=0;
       const client = createAutopilotLocalClientV1({
-        token:TOKEN,port,fetchImpl:async()=>{calls++;return {ok:true,json:async()=>forged};},
+        token:TOKEN,port,fetchImpl:async()=>{calls++;return {ok:true, status: 200, json:async()=>forged};},
       });
       assert.equal((await client.control(originalRequest)).status,'UNKNOWN_NETWORK_RESULT');
       assert.equal(calls,1);
