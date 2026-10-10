@@ -15,6 +15,8 @@ export const AgentEventType = Object.freeze({
   RECOVERY_REQUIRED: 'recovery-required',
 });
 
+// Action/event enum values are durable effect/evidence identities; whitespace aliases
+// must not be silently normalized into a different persisted authority record.
 const ACTION_TYPES = new Set(Object.values(AgentActionType));
 const EVENT_TYPES = new Set(Object.values(AgentEventType));
 
@@ -37,13 +39,13 @@ const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
 });
 
 export function getAgentActionRequiredCapability(actionType) {
-  const type = typeof actionType === 'string' ? actionType.trim() : '';
+  const type = typeof actionType === 'string' ? actionType : '';
   if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
   return ACTION_CAPABILITY_REQUIREMENTS[type] || null;
 }
 
 export function getAgentEventRequiredCapability(eventType) {
-  const type = typeof eventType === 'string' ? eventType.trim() : '';
+  const type = typeof eventType === 'string' ? eventType : '';
   if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
   return EVENT_CAPABILITY_REQUIREMENTS[type] || null;
 }
@@ -198,7 +200,7 @@ function cloneData(value, label, { present = false } = {}) {
 export function normalizeAgentAction(input) {
   const action = requirePlainObject(input, 'Agent action', ACTION_FIELDS);
   if (action.schemaVersion !== 1) throw new Error('Unsupported agent action schemaVersion');
-  const type = typeof action.type === 'string' ? action.type.trim() : '';
+  const type = typeof action.type === 'string' ? action.type : '';
   if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
   const providerId = requireId(action.providerId, 'providerId');
   requireProviderCapabilityForAction(providerId, type);
@@ -218,7 +220,7 @@ export function normalizeAgentAction(input) {
 export function normalizeAgentEvent(input) {
   const event = requirePlainObject(input, 'Agent event', EVENT_FIELDS);
   if (event.schemaVersion !== 1) throw new Error('Unsupported agent event schemaVersion');
-  const type = typeof event.type === 'string' ? event.type.trim() : '';
+  const type = typeof event.type === 'string' ? event.type : '';
   if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
   const providerId = requireId(event.providerId, 'providerId');
   requireProviderCapabilityForEvent(providerId, type);
@@ -245,7 +247,7 @@ export class AgentActionHandlerRegistry {
   }
 
   register(providerId, actionType, handler) {
-    const type = typeof actionType === 'string' ? actionType.trim() : '';
+    const type = typeof actionType === 'string' ? actionType : '';
     const provider = requireProviderCapabilityForAction(providerId, type);
     if (typeof handler !== 'function') throw new Error('Agent action handler must be a function');
     const key = `${provider.id}:${type}`;
