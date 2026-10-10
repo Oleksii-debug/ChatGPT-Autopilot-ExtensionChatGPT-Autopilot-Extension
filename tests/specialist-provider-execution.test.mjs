@@ -392,3 +392,40 @@ test('terminal provider failure cannot be rewritten as success or execute hostil
   assert.equal(restored.effectEvidence, 'VERIFIED_FAILURE_RECEIPT');
   assert.equal(restored.safeToRetry, false);
 });
+
+test('Section 1: provider update must not occur after its observation, including cold JSON restart', () => {
+  const preEffect = prepared();
+  const terminal = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_PROVIDER_TERMINAL_RECEIPT',
+    errorCode: '',
+    providerUpdatedAt: T2,
+    providerObservedAt: T1,
+    at: T1,
+  };
+  assert.throws(
+    () => recordSpecialistProviderExecutionOutcomeV1(preEffect, terminal),
+    /update cannot postdate its observation/,
+  );
+  // Invalid lower-trust observation cannot mutate a previously valid record.
+  assert.equal(preEffect.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(preEffect.updatedAt, T0);
+  const valid = recordSpecialistProviderExecutionOutcomeV1(preEffect, {
+    ...terminal,
+    providerUpdatedAt: T0,
+  });
+  assert.equal(valid.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  const restarted = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(valid)));
+  assert.deepEqual(restarted, valid);
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify({
+      ...restarted,
+      providerUpdatedAt: T2,
+    }))),
+    /update cannot postdate its observation/,
+  );
+});

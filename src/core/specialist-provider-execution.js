@@ -209,6 +209,12 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   if (Boolean(providerUpdatedAt) !== Boolean(providerObservedAt)) {
     throw new Error('Specialist provider chronology requires both providerUpdatedAt and providerObservedAt');
   }
+  if (providerUpdatedAt && Date.parse(providerUpdatedAt) > Date.parse(providerObservedAt)) {
+    // A provider cannot be updated after the exact snapshot was observed.
+    // Fail closed on inconsistent provider chronology rather than accepting
+    // a future-dated status as proven execution evidence.
+    throw new Error('Specialist provider update cannot postdate its observation');
+  }
   if (providerObservedAt && Date.parse(providerObservedAt) > Date.parse(updatedAt)) {
     throw new Error('Specialist provider observation cannot postdate durable outcome');
   }
