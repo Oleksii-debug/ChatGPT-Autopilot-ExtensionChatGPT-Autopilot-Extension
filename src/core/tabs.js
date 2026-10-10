@@ -137,6 +137,7 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   wait = waitMs,
   allowPostSendNavigation = false,
   allowLoadingDocument = false,
+  wakeTimeoutMs = 1500,
 } = {}) {
   if (!chromeApi?.tabs?.get) {
     throw new TabReadinessError(
@@ -159,6 +160,8 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   const startedAt = now();
   const deadline = startedAt + Math.max(0, timeoutMs);
   let lastTab = null;
+  let wakeAttempted = false;
+  let wakeDeadline = 0;
 
   while (true) {
     try {
@@ -171,10 +174,34 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
       );
     }
 
-    if (lastTab.frozen === true) {
-      throw new TabReadinessError('TAB_DOCUMENT_FROZEN', 'Owned ChatGPT document is frozen; retain the tab and retry after waking it');
-    }
     const observedUrl = normalizedTabUrl(lastTab);
+    if (lastTab.frozen === true || lastTab.discarded === true) {
+      // A suspended document is not a ready document. Wake at most once and
+      // only after proving that it is the exact selected conversation.
+      if (!sameChatConversationUrl(observedUrl, normalizedExpected)) {
+        throw new TabReadinessError(
+          'TAB_NAVIGATION_URL_MISMATCH',
+          'Suspended ChatGPT tab is not the admitted conversation; it will not be reloaded',
+        );
+      }
+      if (!wakeAttempted) {
+        if (typeof chromeApi.tabs.reload !== 'function') {
+          throw new TabReadinessError('TAB_WAKE_API_UNAVAILABLE', 'Chrome reload API is unavailable for suspended ChatGPT tab');
+        }
+        wakeAttempted = true;
+        wakeDeadline = Math.min(deadline, now() + Math.max(1, wakeTimeoutMs));
+        try {
+          await chromeApi.tabs.reload(tabId);
+        } catch (error) {
+          throw new TabReadinessError('TAB_WAKE_FAILED', 'Selected suspended ChatGPT tab could not be woken', error);
+        }
+      }
+      if (now() >= wakeDeadline) {
+        throw new TabReadinessError('TAB_WAKE_TIMEOUT', 'Suspended ChatGPT tab remained unavailable after one bounded wake attempt');
+      }
+      await wait(Math.max(1, Math.min(pollIntervalMs, wakeDeadline - now())));
+      continue;
+    }
     if (isChatAuthUrl(lastTab.url)) {
       throw new TabReadinessError('TAB_AUTH_REQUIRED', 'Увійдіть у ChatGPT у поточній вкладці; Пілот збереже її та повторить перевірку.');
     }
