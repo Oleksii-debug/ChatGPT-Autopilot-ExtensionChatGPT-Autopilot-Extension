@@ -221,13 +221,27 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
         });
       }
-      if (!res.ok) {
-        // An authenticated server may have dispatched the physical operation
-        // before receipt validation or a transport failure. HTTP failure is
-        // never proof of zero effect; require reconciliation, no blind retry.
+      // A malformed/custom transport may throw from response.ok/status after
+      // the request was already transmitted. These property reads are NOT
+      // evidence that no effect occurred; never expose upstream error text.
+      let responseOk, responseStatus = null;
+      try {
+        responseOk = res?.ok === true;
+        if (!responseOk) {
+          const observedStatus = res?.status;
+          responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
+        }
+      } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
-          httpStatus: Number.isInteger(res.status) ? res.status : null,
+          instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
+        });
+      }
+      if (!responseOk) {
+        // HTTP failure is not proof of no external effect. No blind retry.
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          httpStatus: responseStatus,
           instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
         });
       }
