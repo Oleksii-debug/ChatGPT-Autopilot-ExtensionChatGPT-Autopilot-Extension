@@ -1383,7 +1383,12 @@ export function executeBrowserPageAction(snapshotId, action) {
       throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
     }
     element.value = option.value;
+    // Even a selected option observed in the current snapshot may fail to
+    // become the selected value. Verify the accepted mutation before invoking
+    // page listeners; otherwise change handlers can persist a different state.
+    if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     events(element);
+    // Listeners can change selection synchronously; never claim that as DONE.
     if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     return { ok: true, kind: 'select', effectVerified: true, selected: String(option.textContent || option.label || option.value).trim(), url: location.href };
   }
