@@ -575,7 +575,7 @@ test('trusted clock, not caller timestamps, controls scope freshness through dis
         return {};
       },
     }),
-    /unknown field: assessedAt/u,
+    /AutopilotProgrammaticRequestV1 contains an unknown field/u,
   );
 });
 

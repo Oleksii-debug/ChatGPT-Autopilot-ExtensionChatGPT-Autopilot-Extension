@@ -303,6 +303,10 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
           operation: original.operation, targetId: original.targetId,
           payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
         });
+        // OUTCOME_SUBMIT is consequential; its transport acknowledgement
+        // must preserve Core's non-read-only, downstream-authority contract.
+        reply.result.readOnly = false;
+        reply.result.downstreamAuthorityRequired = true;
         return reply;
       }};
     },
@@ -316,6 +320,9 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
       operation: original.operation, targetId: original.targetId,
       payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
     });
+    // Negative cases must differ ONLY by their hostile ArtifactRef shape.
+    reply.result.readOnly = false;
+    reply.result.downstreamAuthorityRequired = true;
     const ref = reply.result.request.payloadArtifactRef;
     if (shape === 'extra') ref.privateToken = 'MUST_NOT_LEAK';
     if (shape === 'symbol') ref[Symbol('secret')] = 'MUST_NOT_LEAK';
@@ -384,4 +391,84 @@ test('SDK returns detached immutable transport receipts after successful validat
   wire.result.scopeProof.allowed = false;
   assert.equal(accepted.result.receipt.status, 'COMPLETED');
   assert.equal(accepted.result.scopeProof.allowed, true);
+});
+
+
+test('SDK deadline refuses late transport completion even when fetch ignores AbortSignal', async () => {
+  let calls = 0;
+  let signal;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async (_url, options) => {
+      calls += 1;
+      signal = options.signal;
+      return new Promise(resolve => setTimeout(
+        () => resolve({ ok: true, json: async () => transportResponse() }), 250,
+      ));
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(signal.aborted, true, 'late uncooperative transport must be aborted');
+  assert.equal(calls, 1, 'deadline must never resend an ambiguous request');
+});
+
+test('SDK deadline covers slow JSON body after early HTTP headers', async () => {
+  let calls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async () => {
+      calls += 1;
+      return {
+        ok: true,
+        json: () => new Promise(resolve => setTimeout(() => resolve(transportResponse()), 250)),
+      };
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(calls, 1, 'response parsing must not trigger a second effect');
+});
+
+test('SDK treats throwing HTTP response metadata as ambiguous without credentials or resend', async () => {
+  for (const property of ['ok', 'status']) {
+    let calls = 0, reads = 0;
+    const privateMessage = 'PRIVATE_HTTP_RESPONSE_DIAGNOSTIC';
+    const response = { ok: false, status: 503 };
+    Object.defineProperty(response, property, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(privateMessage);
+      },
+    });
+    const client = createAutopilotLocalClientV1({
+      token: 'test-only-'.repeat(5), port: 12345,
+      fetchImpl: async () => {
+        calls += 1;
+        return response;
+      },
+    });
+    const reply = await client.control(BASE);
+    assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT', property);
+    assert.equal(reply.instruction.includes('Reconcile'), true);
+    assert.equal(calls, 1, property + ' must never cause blind resend');
+    assert.equal(reads, 1, property + ' should be read at most once');
+    assert.equal(JSON.stringify(reply).includes(privateMessage), false);
+  }
+});
+
+test('SDK preserves safe HTTP error status but never treats it as zero-effect evidence', async () => {
+  let calls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => {
+      calls += 1;
+      return { ok: false, status: 503 };
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(reply.httpStatus, 503);
+  assert.equal(calls, 1);
 });

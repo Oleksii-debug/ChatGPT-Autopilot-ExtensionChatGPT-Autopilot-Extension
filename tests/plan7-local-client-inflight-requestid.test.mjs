@@ -75,3 +75,51 @@ test('unknown preflight fields fail before any local network transport', async (
 
 // The guard is intentionally only per SDK instance. It never claims to be
 // durable across browser/process restart; canonical Core owns effect dedup.
+
+
+test('scoped identity permits the same requestId for different owners and projects', async () => {
+  const seen = [];
+  let firstStarted;
+  const started = new Promise(resolve => { firstStarted = resolve; });
+  let releaseFirst;
+  const client = createAutopilotLocalClientV1({
+    token: TEST_TOKEN,
+    port: 45678,
+    fetchImpl: async (_url, options) => {
+      const sent = JSON.parse(options.body);
+      seen.push([sent.principalId, sent.projectId, sent.requestId]);
+      if (sent.principalId === 'owner-1' && sent.projectId === 'project-1') {
+        const pending = new Promise(resolve => { releaseFirst = resolve; });
+        firstStarted();
+        return pending;
+      }
+      return { ok: false, status: 503 };
+    },
+  });
+  const original = request('scoped-shared-id');
+  const held = client.control(original);
+  await started;
+  const exactDuplicate = await client.control(request('scoped-shared-id'));
+  assert.equal(exactDuplicate.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(seen.length, 1, 'same scoped identity must be fenced');
+
+  const differentOwner = await client.control({
+    ...request('scoped-shared-id'), principalId: 'owner-2',
+  });
+  const differentProject = await client.control({
+    ...request('scoped-shared-id'), projectId: 'project-2',
+  });
+  assert.equal(differentOwner.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(differentProject.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.deepEqual(seen, [
+    ['owner-1', 'project-1', 'scoped-shared-id'],
+    ['owner-2', 'project-1', 'scoped-shared-id'],
+    ['owner-1', 'project-2', 'scoped-shared-id'],
+  ]);
+  releaseFirst({ ok: false, status: 503 });
+  const first = await held;
+  assert.equal(first.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(first.httpStatus, 503);
+  // Never treat an HTTP failure as an assertion that no effect occurred.
+  assert.equal(first.instruction.includes('Reconcile'), true);
+});

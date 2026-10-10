@@ -172,7 +172,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
   if (typeof fetchImpl !== 'function') throw new Error('A fetch transport is required');
   // This instance-local concurrency fence does not replace Core's durable
   // request/effect deduplication or authorize retry after ambiguity.
-  const inFlightRequestIds = new Set();
+  const inFlightRequests = new Set();
   return Object.freeze({
     async control(request) {
       // Canonical Core preflight snapshots own data descriptors before any
@@ -183,46 +183,78 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       // JSON request bodies only; no automatic retry of ambiguous mutations.
       const body = JSON.stringify(sentRequest);
       if (Buffer.byteLength(body, 'utf8') > 65_536) throw new Error('Local API request exceeds limit');
-      if (inFlightRequestIds.has(sentRequest.requestId)) {
+      // Match the server/Core-scoped identity, not a bare caller-chosen ID.
+      // Different principals or projects must not block each other.
+      const requestKey = JSON.stringify([
+        sentRequest.principalId, sentRequest.projectId, sentRequest.requestId,
+      ]);
+      if (inFlightRequests.has(requestKey)) {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
           instruction: 'An identical requestId is already in flight; reconcile canonical job state before retrying.',
         });
       }
-      inFlightRequestIds.add(sentRequest.requestId);
+      inFlightRequests.add(requestKey);
+      let timeoutHandle;
       try {
+      // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
+      // Enforce one wall-clock deadline across transport AND body parsing.
+      // Timeout is always ambiguous, not evidence of zero external effects.
+      const abortController = new AbortController();
+      const deadline = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          abortController.abort();
+          reject(new Error('Local API deadline expired'));
+        }, timeoutMs);
+      });
       let res;
       try {
-        res = await fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
+        res = await Promise.race([fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
           method: 'POST',
           headers: {
             Authorization: 'Bearer ' + token,
             'Content-Type': 'application/json',
           },
           body,
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: abortController.signal,
           cache: 'no-store',
           redirect: 'error',
-        });
+        }), deadline]);
       } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
           instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
         });
       }
-      if (!res.ok) {
-        // An authenticated server may have dispatched the physical operation
-        // before receipt validation or a transport failure. HTTP failure is
-        // never proof of zero effect; require reconciliation, no blind retry.
+      // A malformed/custom transport may throw from response.ok/status after
+      // the request was already transmitted. These property reads are NOT
+      // evidence that no effect occurred; never expose upstream error text.
+      let responseOk, responseStatus = null;
+      try {
+        responseOk = res?.ok === true;
+        if (!responseOk) {
+          const observedStatus = res?.status;
+          responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
+        }
+      } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
-          httpStatus: Number.isInteger(res.status) ? res.status : null,
+          instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
+        });
+      }
+      if (!responseOk) {
+        // HTTP failure is not proof of no external effect. No blind retry.
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          httpStatus: responseStatus,
           instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
         });
       }
       try {
         // Validate and return only immutable snapshots, never original Proxies.
-        const envelope = snapshotTransportRecord(await res.json(), RESPONSE_FIELDS);
+        const body = await Promise.race([res.json(), deadline]);
+        if (abortController.signal.aborted) throw new Error('Late Local API response');
+        const envelope = snapshotTransportRecord(body, RESPONSE_FIELDS);
         const outer = snapshotTransportRecord(envelope.result, RESULT_FIELDS);
         const requestSnapshot = snapshotTransportRecord(outer.request, REQUEST_FIELDS);
         const receiptSnapshot = snapshotTransportRecord(outer.receipt, RECEIPT_FIELDS);
@@ -276,6 +308,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           || value?.result?.storeMutationAuthority !== false) {
           throw new Error('Unbound response');
         }
+        if (abortController.signal.aborted) throw new Error('Late Local API receipt');
         return value;
       } catch {
         return Object.freeze({
@@ -284,7 +317,8 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       } finally {
-        inFlightRequestIds.delete(sentRequest.requestId);
+        clearTimeout(timeoutHandle);
+        inFlightRequests.delete(requestKey);
       }
     },
   });
