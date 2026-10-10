@@ -90,7 +90,7 @@ function assertNoDuplicateJsonMembers(source) {
         if (source[i] === '"') break;
       }
       let next = i + 1;
-      while (/\\s/u.test(source[next] || '')) next += 1;
+      while (/\s/u.test(source[next] || '')) next += 1;
       const frame = frames[frames.length - 1];
       if (frame?.keys && source[next] === ':') {
         const key = JSON.parse(source.slice(start, i + 1));
