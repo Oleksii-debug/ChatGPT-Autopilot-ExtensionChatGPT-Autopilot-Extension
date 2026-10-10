@@ -483,11 +483,22 @@ export class AiOrchestrator {
       // binding); declared mismatches and accessors fail closed.
       let receiptIdentityMismatch = false;
       try {
+        // A specifically bound compatible endpoint must supply all three
+        // exact receipt identities. Treat missing fields (and malformed
+        // responses) as UNKNOWN, not as successful account provenance.
+        // Unbound legacy slots retain the earlier compatibility behavior.
+        const requiresBoundReceipt = Boolean(routeIdentity.endpointId);
+        if (requiresBoundReceipt && (!value || typeof value !== 'object' || Array.isArray(value))) {
+          receiptIdentityMismatch = true;
+        }
         if (value && typeof value === 'object' && !Array.isArray(value)) {
           const fields = Object.getOwnPropertyDescriptors(value);
           for (const field of ['provider', 'model', 'endpointId']) {
-            if (field === 'endpointId' && !routeIdentity.endpointId) continue;
-            if (!Object.hasOwn(fields, field)) continue;
+            if (field === 'endpointId' && !requiresBoundReceipt) continue;
+            if (!Object.hasOwn(fields, field)) {
+              if (requiresBoundReceipt) receiptIdentityMismatch = true;
+              continue;
+            }
             if (!Object.hasOwn(fields[field], 'value')
                 || fields[field].value !== routeIdentity[field]) receiptIdentityMismatch = true;
           }
