@@ -551,3 +551,46 @@ test('S1 fails closed when two cloud slots advertise the same workspace identity
   assert.equal(unique.requiredExecutionTransition, 'NONE');
   assert.equal(unique.executionAuthorized, false);
 });
+
+
+test('untrusted cloud capacity property names stay out of diagnostics; recovery stays usable', () => {
+  const secretField = 'bearer-token-private-credential-content';
+  const malformedRequest = request();
+  malformedRequest[secretField] = 'value';
+  assert.throws(
+    () => assessCloudExecutionFabricV1(malformedRequest),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secretField),
+  );
+
+  let getterInvocations = 0;
+  const malformedSlot = slot();
+  Object.defineProperty(malformedSlot, secretField, {
+    enumerable: true,
+    get() {
+      getterInvocations += 1;
+      throw new Error('private provider credentials');
+    },
+  });
+  assert.throws(
+    () => normalizeCloudExecutionSlotV1(malformedSlot),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secretField)
+      && !error.message.includes('private provider credentials'),
+  );
+  assert.equal(getterInvocations, 0);
+
+  const coldRestart = JSON.parse(JSON.stringify(request()));
+  coldRestart.cloudSlots[0][secretField] = 'private provider credentials';
+  assert.throws(
+    () => assessCloudExecutionFabricV1(coldRestart),
+    error => !error.message.includes(secretField)
+      && !error.message.includes('private provider credentials'),
+  );
+  const recovered = assessCloudExecutionFabricV1(request());
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.executionAuthorized, false);
+});
