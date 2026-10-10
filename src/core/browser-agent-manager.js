@@ -577,6 +577,7 @@ function normalizeModelBudgetReservation(raw) {
     routeId: clean(raw.routeId, 180),
     provider: clean(raw.provider, 80),
     model: clean(raw.model, 300),
+    endpointId: clean(raw.endpointId, 180),
     callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
   };
 }
@@ -2438,6 +2439,7 @@ export class BrowserAgentManager {
         routeId: clean(route?.routeId, 180),
         provider: clean(route?.provider, 80),
         model: clean(route?.model, 300),
+        endpointId: clean(route?.endpointId, 180),
         callNumber: Math.max(1, Math.floor(Number(callNumber || 1))),
       };
       job.runtime.modelBudgetReservationSeq = sequence;
