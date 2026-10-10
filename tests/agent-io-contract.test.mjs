@@ -674,3 +674,60 @@ test('Plan-1 S1: own undefined optional durable IDs fail closed before evidence 
   }));
   assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(explicitNull))), explicitNull);
 });
+
+
+test('Plan-1 S1: unknown-version action and event recovery never executes or publishes', async () => {
+  // The handler/sink are the existing dispatch/publication authorities.
+  // Unknown durable schema must fail at both surfaces before any effect.
+  let effects = 0;
+  const published = [];
+  const handlers = new AgentActionHandlerRegistry();
+  handlers.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT, () => {
+    effects += 1;
+    return 'executed';
+  });
+  const sink = new AgentEventSink({ onEvent: e => published.push(e) });
+
+  const normalAction = normalizeAgentAction(action());
+  const normalEvent = normalizeAgentEvent(event());
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(normalAction))), normalAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(normalEvent))), normalEvent);
+
+  for (const version of [0, 2, null, undefined, '1']) {
+    const inputAction = action({ schemaVersion: version });
+    const inputEvent = event({ schemaVersion: version });
+    assert.throws(() => normalizeAgentAction(inputAction), /schemaVersion/);
+    assert.throws(() => normalizeAgentEvent(inputEvent), /schemaVersion/);
+    await assert.rejects(() => handlers.execute(inputAction), /schemaVersion/);
+    await assert.rejects(() => sink.emit(inputEvent), /schemaVersion/);
+    assert.equal(inputAction.schemaVersion, version, 'failed migration cannot mutate caller');
+    assert.equal(inputEvent.schemaVersion, version, 'failed migration cannot mutate caller');
+  }
+  const noVersionAction = action();
+  const noVersionEvent = event();
+  delete noVersionAction.schemaVersion;
+  delete noVersionEvent.schemaVersion;
+  await assert.rejects(() => handlers.execute(noVersionAction), /schemaVersion/);
+  await assert.rejects(() => sink.emit(noVersionEvent), /schemaVersion/);
+
+  let unsafeGetterCalls = 0;
+  for (const envelope of [action(), event()]) {
+    Object.defineProperty(envelope, 'schemaVersion', {
+      enumerable: true,
+      get() { unsafeGetterCalls += 1; throw new Error('PRIVATE_SCHEMA_VERSION_SECRET'); },
+    });
+    const normalize = Object.hasOwn(envelope, 'actionId') ? normalizeAgentAction : normalizeAgentEvent;
+    assert.throws(() => normalize(envelope), error => {
+      assert.match(error.message, /data properties/);
+      assert.doesNotMatch(error.message, /PRIVATE_SCHEMA_VERSION_SECRET/);
+      return true;
+    });
+  }
+  assert.equal(unsafeGetterCalls, 0, 'untrusted migration getter never executes');
+  assert.equal(effects, 0, 'unknown schema never reaches consequential handler');
+  assert.equal(published.length, 0, 'unknown schema never becomes persisted completion evidence');
+  assert.equal(await handlers.execute(action()), 'executed');
+  assert.equal((await sink.emit(event())).schemaVersion, 1);
+  assert.equal(effects, 1, 'valid legacy V1 authority survives rejection');
+  assert.equal(published.length, 1, 'valid V1 evidence still publishes');
+});
