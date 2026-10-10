@@ -2709,3 +2709,94 @@ test('Plan2 S1 recovered FILL refuses malformed text and non-text controls befor
     else globalThis.HTMLInputElement = priorInput;
   }
 });
+
+
+// Section 1: an owner broker username is a text edit, not permission to
+// mutate an arbitrary input control through its value setter after restart.
+test('Plan2 S1 credential username denies non-text controls at parse and effect boundaries', () => {
+  const previousInput = globalThis.HTMLInputElement;
+  const previousTextarea = globalThis.HTMLTextAreaElement;
+  const effects = [];
+  class CredentialField extends FakeElement {
+    constructor(type, name) {
+      super('');
+      this.tagName = 'INPUT';
+      this.attrs = new Map([['type', type], ['aria-label', name]]);
+      this.type = type;
+      this.value = '';
+      this.form = null;
+      this.labels = null;
+      this.id = '';
+    }
+    dispatchEvent(event) { effects.push(event.type); return true; }
+  }
+  globalThis.HTMLInputElement = CredentialField;
+  globalThis.HTMLTextAreaElement = class extends FakeElement {};
+  try {
+    const username = new CredentialField('text', 'Username');
+    const password = new CredentialField('password', 'Password');
+    password.rect = { left: 220, top: 10, width: 90, height: 30 };
+    const nodes = [username, password];
+    pageUrl = 'https://example.test/login';
+    globalThis.location = { get href() { return pageUrl; } };
+    globalThis.document = {
+      title: 'Login', body: { innerText: 'Owner credential fixture' },
+      documentElement: { scrollHeight: 500 }, getElementById: () => null,
+      querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
+        ? nodes.filter(node => node.getAttribute('data-autopilot-agent-ref')) : nodes,
+      elementFromPoint: x => (x < 150 ? username : password),
+    };
+    const observed = id => {
+      const page = snapshotBrowserPage(id);
+      return { url: page.url, frames: [{ frameId: 0, ...page }],
+        credentials: [{ ref: 'c1', credentialId: 'fixture-owner-broker' }] };
+    };
+    const plan = { type: 'fill_credential', credentialRef: 'c1',
+      usernameFrameId: 0, usernameRef: 'r1', passwordFrameId: 0, passwordRef: 'r2' };
+    const original = parseBrowserAgentAction(JSON.stringify(plan), observed('safe-original'));
+    assert.equal(original.usernameRef, 'r1');
+    for (const kind of ['checkbox', 'radio', 'submit', 'reset', 'button', 'hidden', 'date', 'number', 'range', 'color', 'file']) {
+      username.type = kind;
+      username.setAttribute('type', kind);
+      username.value = '';
+      password.value = '';
+      const id = 'unsafe-user-' + kind;
+      const snapshot = observed(id);
+      assert.throws(() => parseBrowserAgentAction(JSON.stringify(plan), snapshot),
+        /credential username target is not a non-sensitive editable field/,
+        kind + ' is not a username text control');
+      // Simulate a hostile, JSON-recovered envelope with its semantic proof
+      // rewritten to match the current non-text element. The Chrome-injected
+      // executor must independently deny it before focus, input or secret.
+      const recovered = JSON.parse(JSON.stringify({
+        ...original,
+        expectedUsernameSemanticIdentity: snapshot.frames[0].elements[0].semanticIdentity,
+        expectedUsernameName: snapshot.frames[0].elements[0].name,
+      }));
+      assert.throws(() => executeBrowserCredentialFill(id, recovered, 'alice', 'fixture-secret'),
+        /AGENT_CREDENTIAL_USERNAME_TARGET_STALE/);
+      assert.equal(username.value, '', 'invalid username field never changed');
+      assert.equal(password.value, '', 'no secret delivered after invalid username target');
+      assert.equal(effects.length, 0, 'no synthetic input or change effects');
+    }
+    // A valid username field still works after all failures and cold JSON
+    // reconstruction, proving the guard is not an accidental total deny.
+    for (const kind of ['text', 'email', 'search', 'tel', 'url']) {
+      username.type = kind;
+      username.setAttribute('type', kind);
+      username.value = '';
+      password.value = '';
+      const id = 'safe-user-' + kind;
+      const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+        JSON.stringify(plan), observed(id))));
+      assert.equal(executeBrowserCredentialFill(id, action, 'alice', 'fixture-secret').passwordFilled, true);
+      assert.equal(username.value, 'alice');
+      assert.equal(password.value, 'fixture-secret');
+    }
+  } finally {
+    if (previousInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = previousInput;
+    if (previousTextarea === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = previousTextarea;
+  }
+});
