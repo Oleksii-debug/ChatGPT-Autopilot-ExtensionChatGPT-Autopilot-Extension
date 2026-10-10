@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js';
 
 const html = await readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8');
 const options = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
@@ -75,4 +76,46 @@ test('orchestra selection rejects stale async responses before status or Agent t
     select.slice(catchIndex),
     /if \(epoch !== orchestrationV2ActionEpoch\) return;[\s\S]*?Не вдалося вибрати оркестр/u,
   );
+});
+
+
+test('read-only Agent tree rejects inherited and hostile orchestra IDs, then recovers after JSON restart', async () => {
+  // Exercise the actual manager method, not a replacement status/projection
+  // authority: invalid selection may not reach runtime storage or execute a
+  // coercing toString getter. A legitimate persisted ID remains readable.
+  const persisted = JSON.parse(JSON.stringify({
+    selectedId: 'orch-1',
+    byId: { 'orch-1': { id: 'orch-1' } },
+  }));
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.loadMeta = async () => persisted;
+  const reads = [];
+  manager.controllerFor = id => {
+    reads.push(id);
+    return { runtimeRepository: { load: async () => ({ hierarchy: null }) } };
+  };
+  let coercionCalls = 0;
+  const forgedId = {
+    toString() {
+      coercionCalls += 1;
+      throw new Error('untrusted id coercion executed');
+    },
+  };
+  for (const invalidId of ['__proto__', 'constructor', 'toString', forgedId, 7, true]) {
+    assert.deepEqual(await manager.getAgentTreeProjection(invalidId), {
+      selectedId: '',
+      projection: null,
+    });
+  }
+  assert.equal(coercionCalls, 0, 'untrusted ID must never be coerced');
+  assert.deepEqual(reads, [], 'invalid IDs must not open a runtime repository');
+  assert.deepEqual(await manager.getAgentTreeProjection('orch-1'), {
+    selectedId: 'orch-1',
+    projection: null,
+  });
+  assert.deepEqual(await manager.getAgentTreeProjection(), {
+    selectedId: 'orch-1',
+    projection: null,
+  });
+  assert.deepEqual(reads, ['orch-1', 'orch-1']);
 });
