@@ -4,6 +4,7 @@ on:
   push:
     branches: ["main", "source/0.9.19-canonical-convergence", "plan8/11-0-13-source-convergence-20261010"]
     paths:
+      - "PLAN8_11_0_13_SOURCE_CONVERGENCE.md"
       - "src/core/**"
       - "src/shared/**"
       - "src/background/**"
