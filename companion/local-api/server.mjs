@@ -104,7 +104,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // Do not invoke the credential broker on malformed anonymous requests.
       // In particular, remote sites cannot make an Origin-denied request
       // trigger owner credential operations.
-      if (candidate.length < 32 || candidate.length > 512 || /[^\\x21-\\x7e]/u.test(candidate)) {
+      if (candidate.length < 32 || candidate.length > 512 || /[^!-~]/u.test(candidate)) {
         return reject(res, 401);
       }
       const candidateDigest = digest(candidate);
