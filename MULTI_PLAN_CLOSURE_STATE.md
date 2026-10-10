@@ -1,3 +1,9 @@
+### PLAN1_S1_CAPABILITY_DIAGNOSTIC_NONDISCLOSURE_F7B2B79_20261010 — NONTERMINAL
+- ONLY canonical Drive `1. Перший план` Section 1 first ACTIONABLE; S1 IN_PROGRESS / NOT TERMINAL DONE; S2 ACTIONABLE / IN_PROGRESS / NOT DONE and not advanced; S3+ and other Drive plans untouched.
+- REUSE existing 11.0.13 High [draft PR #717](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/717). Redacted untrusted capability IDs from canonical owner-grant/provider-descriptor/specialist-scope denial diagnostics without relaxing authority. Source commit `aaa66f483b8a8f1d23783628cdcb07f4efb5754f`; blob `099e4a1acc6afd72d622ff13c6f0467200183dd4`.
+- Added negative/positive/cold JSON-restart cases; aligned two older tests that incorrectly required leaking rejected IDs. Exact current head `f7b2b79a4fc2e13c72a4d554321f856306a3ec66`, test blob `5352652be69d8a2e698fc25b015ca675f87051ef`. Both live files re-read. Exact-source isolated V8 probes **5/5 PASS**, not full Node CI. [PR evidence comment](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/717#issuecomment-6097447185).
+- GitHub commit-specific workflow_runs=[] and combined statuses=[] on readback: **NO CI PASS**. PR OPEN/DRAFT, mergeable=false, unmerged. Missing full cross-contract schema/migration/restart/exact-effect proof, complete dual-OS/Release qualification, safe canonical 11.x main integration and postmerge SHA readback. Section 1 NOT TERMINAL DONE; Section 2 NOT DONE; do not skip. No real provider/NVDA claim.
+
 ### PLAN6_S1_RECEIPT_IDENTITY_PR728_20261010 — NONTERMINAL
 
 - Scope **only** canonical Drive `6. Шостий план` (ID `1fr5Pm7ZbX7IxF-2CZ9nqWSE7vREMEGDCN2r0uHyr_Tk`). S1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE; S2 ACTIONABLE / NOT DONE (unchanged); no other plan's Drive document modified.
