@@ -3545,6 +3545,8 @@ function renderAgentRunTimeline(job) {
       ' Збережені метадані Specialist: спроб ' + timeline.evidenceMap.specialistProviderDispatch.inspectedAttempts +
       ', записаних ідентифікаторів квитанцій ' + timeline.evidenceMap.specialistProviderDispatch.receiptIdsRecorded +
       ', записаних посилань на артефакти ' + timeline.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded +
+      ', різних ідентифікаторів артефактів ' + timeline.evidenceMap.specialistProviderDispatch.distinctArtifactIdsRecorded +
+      ', повторних посилань ' + timeline.evidenceMap.specialistProviderDispatch.reusedArtifactReferencesRecorded +
       ', неоднозначних станів ' + timeline.evidenceMap.specialistProviderDispatch.statusCounts.AMBIGUOUS +
       '. Це лише збережені метадані, не доказ зовнішнього виконання чи походження артефактів.' +
       ' Структурні зв’язки Specialist із планом: ' + timeline.evidenceMap.specialistPlanLinks.structurallyLinkedChildren +
