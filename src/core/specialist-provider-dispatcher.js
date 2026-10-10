@@ -368,10 +368,12 @@ export class SpecialistProviderDispatcherV1 {
     // post-effect outcome, never evidence that the effect did not occur.
     try {
       const completedAtMs = clock(this.#now);
-      if (completedAtMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards');
+      if (completedAtMs < providerEdgeMs) throw new Error('Specialist dispatcher clock moved backwards after provider effect');
       const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
+      // A provider-owned receipt cannot predate the actual effect boundary.
+      // Historical pre-dispatch receipts are not fresh completion evidence.
       const observed = timestamp(result.observedAt, 'provider result observedAt');
-      if (observed.ms < startedAtMs || observed.ms > completedAtMs) throw new Error('Specialist provider result chronology is invalid');
+      if (observed.ms < providerEdgeMs || observed.ms > completedAtMs) throw new Error('Specialist provider result chronology is invalid');
       // A provider receipt is lower-trust input, even after the provider call.
       // Snapshot descriptor-safe artifact metadata before contract normalization:
       // getters and proxies must not run while verifying completion evidence.
@@ -384,7 +386,7 @@ export class SpecialistProviderDispatcherV1 {
       for (const ref of refs) {
         if (!ref.sha256) throw new Error(`Specialist result artifact requires sha256: ${ref.artifactId}`);
         const created = timestamp(ref.createdAt, `artifact ${ref.artifactId} createdAt`);
-        if (created.ms < startedAtMs || created.ms > observed.ms) throw new Error(`Specialist result artifact chronology is invalid: ${ref.artifactId}`);
+        if (created.ms < providerEdgeMs || created.ms > observed.ms) throw new Error(`Specialist result artifact chronology is invalid: ${ref.artifactId}`);
         if (ref.producerInvocationId !== leaseId) throw new Error(`Specialist result artifact producer does not match execution lease: ${ref.artifactId}`);
       }
       return freeze({
