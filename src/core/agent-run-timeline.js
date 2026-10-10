@@ -146,12 +146,30 @@ function safeHistory(history, present) {
   if (!Number.isSafeInteger(total) || total < 0 || total > MAX_HISTORY_LENGTH) {
     throw new Error('Agent history length is invalid');
   }
+  // A retained event count must describe an actual dense canonical array,
+  // not a sparse/hidden/extra-key history whose holes were outside the last-N
+  // scan. Verify structure without property get traps and without exporting
+  // arbitrary keys or stored event payloads.
+  const keys = safeOwnKeys(history);
+  if (keys.length !== total + 1 || !keys.includes('length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= total))) {
+    throw new Error('Agent history must be a canonical dense array');
+  }
   const start = Math.max(0, total - MAX_HISTORY_SCAN);
   const items = [];
-  for (let i = start; i < total; i += 1) {
-    const entry = own(history, String(i));
-    if (entry === undefined) throw new Error('Agent history must be dense');
-    items.push({ ordinal: i, entry });
+  for (let i = 0; i < total; i += 1) {
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(history, String(i)); }
+    catch { throw new Error('Agent history cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent history must be a canonical dense array');
+    }
+    if (i >= start) {
+      const entry = descriptor.value;
+      if (entry === undefined) throw new Error('Agent history must be dense');
+      items.push({ ordinal: i, entry });
+    }
   }
   return { items, total };
 }
