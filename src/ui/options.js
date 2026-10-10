@@ -94,6 +94,9 @@ function beginAgentOwnerOperation(command, id = ui.selectedBrowserAgentId) {
 function finishAgentOwnerOperation(operation) {
   agentOwnerOperations.delete(operation.key);
   agentJobsReadGate.invalidate();
+  // Completion changes the durable state *after* any concurrent Core read.
+  // Only a subsequent accepted read may reauthorize read-only export.
+  ui.agentTimelineStale = true;
 }
 function agentOwnerResult(operation, message) {
   if (operation.sequence === agentOwnerOperationSequence) $('agent-command-result').textContent = message;
@@ -3569,15 +3572,16 @@ async function refreshAgentRunTimeline() {
   button.disabled = true;
   try {
     const result = await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
-    if (result.applied) {
-      ui.agentTimelineStale = false;
-      // loadBrowserAgentJobs may have painted while the read was pending.
-      // Clear the stale warning only after the read has been accepted.
+    // An accepted read is not sufficient while an owner operation is live,
+    // or after a selection switch. Never override the shared freshness gate.
+    if (result.applied && !ui.agentTimelineStale &&
+        (!result.job || result.job.id === ui.selectedBrowserAgentId)) {
       renderAgentRunTimeline(result.job || null);
       announce('Хронологію Agent оновлено з Core.');
     } else {
-      $('agent-run-timeline-status').textContent = 'Не вдалося оновити. Перевірте Core і повторіть.';
-      announce('Хронологію Agent не оновлено. Перевірте Core.');
+      ui.agentTimelineStale = true;
+      $('agent-run-timeline-status').textContent = 'Хронологію не підтверджено: перевірте Core, завершення команди власника та вибране завдання. Оновіть ще раз.';
+      announce('Актуальність хронології Agent не підтверджена. Експорт заблоковано.');
     }
   } catch {
     // A failed Core read must not leave a disabled keyboard control or an unhandled UI rejection.
@@ -3691,7 +3695,9 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
     // The ticket/read-gate checks above have accepted this exact Core read.
     // Only this path (or a successful per-Agent Core selection) refreshes
     // export authority; local selection and cached rendering never do.
-    ui.agentTimelineStale = false;
+    // A Core snapshot accepted during an in-flight owner command may predate
+    // the command's durable effect; it must not make export available.
+    ui.agentTimelineStale = agentOwnerOperations.size > 0;
     renderBrowserAgentJob(job);
     return { applied: true, job };
   } catch (error) {
@@ -3713,7 +3719,7 @@ async function selectBrowserAgentJob() {
     const data = await core('SELECT_BROWSER_AGENT_JOB', { id });
     if (!agentViewFence.current(ticket)) return;
     if (data?.job && data.job.id !== id) throw new Error('Core повернув інше завдання Agent.');
-    if (data?.job) ui.agentTimelineStale = false;
+    if (data?.job && agentOwnerOperations.size === 0) ui.agentTimelineStale = false;
     renderBrowserAgentJob(data?.job || null);
     renderBrowserAgentList();
   } catch (error) {
