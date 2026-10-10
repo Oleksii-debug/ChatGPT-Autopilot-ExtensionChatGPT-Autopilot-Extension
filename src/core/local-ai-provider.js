@@ -19,6 +19,14 @@ const MAX_TIMEOUT_SECONDS = 600;
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 const PROVIDER_TYPES = new Set(Object.values(LocalAiProviderType));
 
+// Trust only errors issued inside our bounded response decoder. A provider
+// body reader can throw arbitrary text/codes after a request was dispatched.
+const trustedLocalResponseFailures = new WeakSet();
+function trustedLocalResponseFailure(error) {
+  trustedLocalResponseFailures.add(error);
+  return error;
+}
+
 function nonEmptyString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -204,7 +212,7 @@ async function readResponseTextBounded(response) {
   const declaredBytes = declaredResponseBytes(response);
   if (declaredBytes != null && declaredBytes > MAX_RESPONSE_BYTES) {
     await cancelResponseBody(response);
-    throw new Error('Local AI response is too large');
+    throw trustedLocalResponseFailure(new Error('Local AI response is too large'));
   }
 
   const readable = response?.body;
@@ -225,7 +233,7 @@ async function readResponseTextBounded(response) {
           } catch {
             // Best-effort cleanup; fail closed regardless of cancel outcome.
           }
-          throw new Error('Local AI response contains too many chunks');
+          throw trustedLocalResponseFailure(new Error('Local AI response contains too many chunks'));
         }
         if (!(value instanceof Uint8Array)) {
           try {
@@ -233,7 +241,7 @@ async function readResponseTextBounded(response) {
           } catch {
             // Best-effort cleanup; fail closed regardless of cancel outcome.
           }
-          throw new Error('Local AI server returned an invalid response stream');
+          throw trustedLocalResponseFailure(new Error('Local AI server returned an invalid response stream'));
         }
         const chunk = value;
         totalBytes += chunk.byteLength;
@@ -243,7 +251,7 @@ async function readResponseTextBounded(response) {
           } catch {
             // Best-effort cleanup; fail closed regardless of cancel outcome.
           }
-          throw new Error('Local AI response is too large');
+          throw trustedLocalResponseFailure(new Error('Local AI response is too large'));
         }
         text += decoder.decode(chunk, { stream: true });
       }
@@ -260,7 +268,7 @@ async function readResponseTextBounded(response) {
 
   const text = await response.text();
   if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
-    throw new Error('Local AI response is too large');
+    throw trustedLocalResponseFailure(new Error('Local AI response is too large'));
   }
   return text;
 }
@@ -281,13 +289,13 @@ async function readJsonResponse(response) {
       : status === 404 ? 'NOT_FOUND' : 'INVALID_REQUEST';
     error.code = `LOCAL_AI_${error.category}`;
     error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
-    throw error;
+    throw trustedLocalResponseFailure(error);
   }
   const text = await readResponseTextBounded(response);
   try {
     return text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(`Local AI server returned invalid JSON (HTTP ${response.status})`);
+    throw trustedLocalResponseFailure(new Error(`Local AI server returned invalid JSON (HTTP ${response.status})`));
   }
 }
 
@@ -452,7 +460,16 @@ export class LocalAiClient {
         timeout.retryable = true;
         throw timeout;
       }
-      if (responseReceived) throw error;
+      if (responseReceived) {
+        if (error && typeof error === 'object' && trustedLocalResponseFailures.has(error)) throw error;
+        // After POST dispatch, the provider effect may already have occurred.
+        // Never leak forged reader diagnostics or blindly resend uncertain work.
+        const unverifiable = new Error('Local AI response could not be verified');
+        unverifiable.code = 'LOCAL_AI_RESPONSE_UNVERIFIED';
+        unverifiable.category = 'UNAVAILABLE';
+        unverifiable.retryable = false;
+        throw unverifiable;
+      }
       const unavailable = new Error('Could not reach Local AI server');
       unavailable.code = 'LOCAL_AI_UNAVAILABLE';
       unavailable.category = 'UNAVAILABLE';
