@@ -81,11 +81,21 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
     if (extra.length) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has unsupported field: ${extra[0]}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-    const endpointId = clean(item.endpointId);
+    // Endpoint identity is bound to an account/credential namespace; never
+    // canonicalize a corrupt persisted identity by trimming whitespace.
+    if (typeof item.endpointId !== 'string' || item.endpointId !== item.endpointId.trim()) {
+      throw gatewayError('OpenAI-compatible endpoint requires an exact endpointId', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
+    const endpointId = item.endpointId;
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(endpointId)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has an invalid endpointId`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     if (seen.has(endpointId)) throw gatewayError(`Duplicate OpenAI-compatible endpointId: ${endpointId}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     seen.add(endpointId);
-    const apiKeyEnv = clean(item.apiKeyEnv);
+    // apiKeyEnv is an opaque credential reference, not free-form text.
+    if (item.apiKeyEnv !== undefined && (typeof item.apiKeyEnv !== 'string'
+        || item.apiKeyEnv !== item.apiKeyEnv.trim())) {
+      throw gatewayError('OpenAI-compatible credential reference must be exact', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
+    const apiKeyEnv = item.apiKeyEnv === undefined ? '' : item.apiKeyEnv;
     if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const baseUrl = normalizeCompatibleBaseUrl(item.baseUrl);
     const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
@@ -117,7 +127,13 @@ export function loadCompatibleEndpointRegistry({ env = process.env, configFile =
 const COMPATIBLE_ENDPOINTS = loadCompatibleEndpointRegistry();
 
 function resolveCompatibleEndpoint(endpointId = '', registry = COMPATIBLE_ENDPOINTS) {
-  const requested = clean(endpointId) || (registry.length === 1 ? registry[0].endpointId : 'default');
+  // A provided endpointId must match the stored account endpoint exactly,
+  // including at runtime after JSON cold restart. Only genuine omission ('')
+  // retains legacy default selection.
+  if (typeof endpointId !== 'string' || endpointId !== endpointId.trim()) {
+    throw gatewayError('OpenAI-compatible requested endpointId must be exact', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+  }
+  const requested = endpointId || (registry.length === 1 ? registry[0].endpointId : 'default');
   const endpoint = registry.find(item => item.endpointId === requested);
   if (!endpoint) throw gatewayError(`Unknown OpenAI-compatible endpointId: ${requested}`, 404, 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
   return endpoint;
