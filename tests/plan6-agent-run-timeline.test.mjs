@@ -1471,3 +1471,40 @@ test('S1 verification metadata cannot become proof via hidden fields or hostile 
   assert.equal(projected.evidenceMap.externalEffectVerified, false);
   assert.equal(projected.mayReplayExternalEffect, false);
 });
+
+
+test('S1 persisted event types refuse forged data and Unicode spoofing across JSON cold restart', () => {
+  const marker = 'PRIVATE_EVENT_TYPE_VALUE_NEVER_EXPORT';
+  const valid = job();
+  valid.runtime.history[0].type = 'forward-compatible-event';
+  const forward = buildAgentRunTimelineV1(valid);
+  assert.equal(forward.entries[0].event, 'OTHER');
+  assert.equal(forward.entries[0].category, 'RECOVERY');
+  assert.deepEqual(forward, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+  assert.equal(forward.evidenceOnly, true);
+  assert.equal(forward.mayReplayExternalEffect, false);
+
+  const legacy = job();
+  delete legacy.runtime.history[0].type;
+  assert.equal(buildAgentRunTimelineV1(legacy).entries[0].event, 'OTHER');
+  assert.deepEqual(buildAgentRunTimelineV1(legacy),
+    buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
+
+  const forged = [
+    undefined, null, false, 7, {}, [], '', ' ', ' action', 'action ',
+    'bad\nkind', 'bad\u202ekind', 'bad\u2066kind', 'x'.repeat(129),
+    marker + '\u0000',
+  ];
+  for (const value of forged) {
+    const input = job();
+    input.runtime.history[0].type = value;
+    assert.throws(() => buildAgentRunTimelineV1(input), error =>
+      error instanceof Error && /Agent history event type is invalid/u.test(error.message) &&
+      !error.message.includes(marker));
+    if (value !== undefined) {
+      const cold = JSON.parse(JSON.stringify(input));
+      assert.throws(() => buildAgentRunTimelineV1(cold), /Agent history event type is invalid/u);
+    }
+  }
+  assert.equal(buildAgentRunTimelineV1(job()).entries[1].event, 'action');
+});

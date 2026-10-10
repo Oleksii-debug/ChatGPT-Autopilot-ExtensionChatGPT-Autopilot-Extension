@@ -496,7 +496,13 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     // visible before restart but disappear afterward. Snapshot each fixed
     // descriptor exactly once without invoking getters/Proxy get traps.
     const { present: typePresent, value: rawType } = persistedField(entry, 'type');
-    if (typePresent && rawType === undefined) {
+    // A present stored event type is durable evidence, not arbitrary text.
+    // Preserve forward-compatible unknown event names, but reject malformed,
+    // noncanonical or spoofed values before classifying them as OTHER. Missing
+    // legacy event types remain a redacted OTHER observation.
+    if (typePresent && (typeof rawType !== 'string' || rawType.length < 1 ||
+        rawType.length > 128 || rawType !== rawType.trim() ||
+        /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(rawType))) {
       throw new Error('Agent history event type is invalid');
     }
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
