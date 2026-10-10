@@ -61,6 +61,9 @@ const EVENT_LABELS = Object.freeze({
   'cycle-done': ['CHECKPOINT', 'Цикл виконання завершено.'],
   done: ['CHECKPOINT', 'Завдання завершено.'],
 });
+// Reject invisible format controls in durable identities and evidence labels.
+// They survive JSON restart but can spoof an accessible status or receipt ID.
+const UNSAFE_RECORDED_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u;
 const FILTERS = new Set(['ALL', 'ACTION', 'OWNER', 'PLAN', 'RECOVERY', 'CHECKPOINT']);
 const PLAN_STATES = new Set(['PENDING', 'READY', 'RUNNING', 'VERIFIED', 'FAILED', 'BLOCKED', 'SKIPPED', 'CANCELLED', 'COMPLETED']);
 const ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'wait', 'new_tab', 'close_tab', 'download', 'trusted_script', 'click_at', 'type_at', 'drag_at', 'batch']);
@@ -83,6 +86,25 @@ function own(value, key) {
   if (!Object.hasOwn(descriptor, 'value')) throw new Error('Agent timeline refuses accessor-backed ' + String(key));
   return descriptor.value;
 }
+// Durable JSON-backed evidence must be an enumerable own data field.
+// A hidden property can be visible before restart and silently disappear
+// after serialization, falsifying the timeline's counter or plan evidence.
+// Inspect one descriptor only; never invoke a getter or expose trap text.
+function persistedField(value, key) {
+  let descriptor;
+  try { descriptor = Object.getOwnPropertyDescriptor(value, key); }
+  catch { throw new Error('Agent timeline persisted field cannot be safely inspected'); }
+  if (!descriptor) return { present: false, value: undefined };
+  // Preserve the existing fixed-field accessor refusal diagnostic for
+  // compatibility with prior error classification; do not echo values.
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new Error('Agent timeline refuses accessor-backed ' + key);
+  }
+  if (!descriptor.enumerable) {
+    throw new Error('Agent timeline persisted field must be an enumerable data field');
+  }
+  return { present: true, value: descriptor.value };
+}
 function safeOwnKeys(value) {
   try { return Reflect.ownKeys(value); }
   catch { throw new Error('Agent timeline options cannot be safely inspected'); }
@@ -98,19 +120,30 @@ function plainArray(value) {
 function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   return Number.isSafeInteger(value) && value >= min && value <= max ? value : 0;
 }
+// Recorded counters are evidence, not defaults. A truly absent legacy field
+// projects zero; a present corrupt value must not become a plausible zero in
+// the accessible timeline or its exported JSON after storage/restart.
+function recordedCounter(recordValue, field) {
+  const fieldValue = persistedField(recordValue, field);
+  if (!fieldValue.present) return 0;
+  const observed = fieldValue.value;
+  if (!Number.isSafeInteger(observed) || Object.is(observed, -0) || observed < 0) {
+    // All field names are fixed code-owned literals. Never emit hostile values.
+    throw new Error('Agent timeline persisted counter is invalid');
+  }
+  return observed;
+}
 function boundedJobId(value) {
   // Durable BrowserAgentManager identities are bounded text, not trusted
   // display/HTML content. Never export corrupt oversized/control-char IDs.
   // A persisted Agent must have a real identity; never export an orphan
   // timeline under an empty identifier after corrupted storage or restart.
   if (typeof value !== 'string' || value.length < 1 || value.length > 128 ||
-      /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)) {
+      value !== value.trim() ||
+      UNSAFE_RECORDED_TEXT.test(value)) {
     throw new Error('Agent timeline job identity is invalid');
   }
   return value;
-}
-function safeTime(value) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
 }
 function storedEventTime(value, present) {
   // Absent legacy timestamps remain compatible but are explicitly identified
@@ -137,14 +170,54 @@ function safeHistory(history, present) {
   if (!Number.isSafeInteger(total) || total < 0 || total > MAX_HISTORY_LENGTH) {
     throw new Error('Agent history length is invalid');
   }
+  // A retained event count must describe an actual dense canonical array,
+  // not a sparse/hidden/extra-key history whose holes were outside the last-N
+  // scan. Verify structure without property get traps and without exporting
+  // arbitrary keys or stored event payloads.
+  const keys = safeOwnKeys(history);
+  if (keys.length !== total + 1 || !keys.includes('length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= total))) {
+    throw new Error('Agent history must be a canonical dense array');
+  }
   const start = Math.max(0, total - MAX_HISTORY_SCAN);
   const items = [];
-  for (let i = start; i < total; i += 1) {
-    const entry = own(history, String(i));
-    if (entry === undefined) throw new Error('Agent history must be dense');
-    items.push({ ordinal: i, entry });
+  for (let i = 0; i < total; i += 1) {
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(history, String(i)); }
+    catch { throw new Error('Agent history cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent history must be a canonical dense array');
+    }
+    if (i >= start) {
+      const entry = descriptor.value;
+      if (entry === undefined) throw new Error('Agent history must be dense');
+      items.push({ ordinal: i, entry });
+    }
   }
   return { items, total };
+}
+// Only count persisted evidence from an ordinary, enumerable, dense array.
+// This checks fixed numeric descriptors without running getters or leaking
+// attacker-controlled Proxy exceptions. Read every element just once.
+function canonicalEvidenceElements(value, length, label) {
+  const keys = safeOwnKeys(value);
+  if (keys.length !== length + 1 || !keys.includes('length') ||
+      keys.some(key => key !== 'length' &&
+        (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= length))) {
+    throw new Error(label + ' must be a canonical dense array');
+  }
+  const elements = [];
+  for (let index = 0; index < length; index += 1) {
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(value, String(index)); }
+    catch { throw new Error(label + ' cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + ' must be a canonical dense array');
+    }
+    elements.push(descriptor.value);
+  }
+  return elements;
 }
 function freeze(value) {
   if (Array.isArray(value)) { value.forEach(freeze); return Object.freeze(value); }
@@ -154,29 +227,40 @@ function freeze(value) {
 function planSummary(plan) {
   if (plan == null) return freeze({ revision: 0, nodeCount: 0, stateCounts: {} });
   record(plan, 'Agent plan');
-  const nodes = own(plan, 'nodes');
+  // One descriptor is both presence and value: a hostile persisted Proxy
+  // cannot show one plan shape at validation and another in the projection.
+  const { present: nodesPresent, value: nodes } = persistedField(plan, 'nodes');
   const stateCounts = {};
   let nodeCount = 0;
   // An explicitly persisted malformed plan must not be presented as an
   // empty plan after restart. Only a genuinely absent optional nodes field
   // preserves the legacy zero-node projection.
-  if (safeHasOwn(plan, 'nodes') && !plainArray(nodes)) {
+  if (nodesPresent && !plainArray(nodes)) {
     throw new Error('Agent plan nodes must be a plain array');
   }
   if (Array.isArray(nodes)) {
     // Proxy get traps must not read array length or throw private exceptions.
     const nodeLength = own(nodes, 'length');
-    if (nodeLength > 4096) throw new Error('Agent plan is too large');
-    for (let i = 0; i < nodeLength; i += 1) {
-      const node = own(nodes, String(i));
+    if (!Number.isSafeInteger(nodeLength) || nodeLength < 0 || nodeLength > 4096) {
+      throw new Error('Agent plan nodes length is invalid');
+    }
+    for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent plan nodes')) {
       record(node, 'Agent plan node');
-      const state = own(node, 'state');
+      const { present: statePresent, value: state } = persistedField(node, 'state');
+      // A missing field in a legacy plan is UNKNOWN, never VERIFIED. Explicitly
+      // malformed persisted states must not become credible UNKNOWN evidence.
+      // A valid future string remains forward-compatible but non-authorizing.
+      if (statePresent && (typeof state !== 'string' || state.length < 1 ||
+          state.length > 64 || state !== state.trim() ||
+          UNSAFE_RECORDED_TEXT.test(state))) {
+        throw new Error('Agent plan node recorded state is invalid');
+      }
       const safeState = PLAN_STATES.has(state) ? state : 'UNKNOWN';
       stateCounts[safeState] = (stateCounts[safeState] || 0) + 1;
       nodeCount += 1;
     }
   }
-  return freeze({ revision: integer(own(plan, 'revision')), nodeCount, stateCounts });
+  return freeze({ revision: recordedCounter(plan, 'revision'), nodeCount, stateCounts });
 }
 function recordedOutcomeSummary(value) {
   // The persisted outcome record is observable Core state, not an external
@@ -189,29 +273,288 @@ function recordedOutcomeSummary(value) {
     externalEffectVerified: false,
   });
   record(value, 'Agent recorded outcome');
-  const checks = own(value, 'checks');
+  // Only a genuinely absent legacy field can mean "not recorded". An
+  // explicit null/undefined after restart is corrupt evidence, not zero checks.
+  // Read once, preserving the enumerable JSON-persisted evidence boundary.
+  // Two independent reads would permit a hostile descriptor to switch the
+  // outcome proof between validation and export.
+  const { present: checksPresent, value: checks } = persistedField(value, 'checks');
   let count = 0;
-  if (checks != null) {
-    if (!plainArray(checks) || own(checks, 'length') > 20) {
+  if (checksPresent) {
+    if (!plainArray(checks)) {
       throw new Error('Agent recorded outcome checks must be a bounded dense array');
     }
     const checksLength = own(checks, 'length');
-    for (let i = 0; i < checksLength; i += 1) {
-      const item = own(checks, String(i));
-      if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
-      record(item, 'Agent recorded outcome check');
+    if (!Number.isSafeInteger(checksLength) || checksLength < 0 || checksLength > 20) {
+      throw new Error('Agent recorded outcome checks length is invalid (must be a bounded dense array)');
     }
-    count = checksLength;
+    const seenCriteria = new Set();
+    for (const item of canonicalEvidenceElements(checks, checksLength, 'Agent recorded outcome checks')) {
+      if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
+      const check = record(item, 'Agent recorded outcome check');
+      // BrowserAgentManager persists only verified criteria with canonical
+      // positive indexes and nonempty bounded text/detail. An empty check or
+      // repeated index must not inflate an accessible evidence count. Inspect
+      // descriptors, not property getters; never export private check content.
+      const criterion = persistedField(check, 'criterion').value;
+      const text = persistedField(check, 'text').value;
+      const detail = persistedField(check, 'detail').value;
+      if (!Number.isSafeInteger(criterion) || criterion <= 0 || seenCriteria.has(criterion) ||
+          typeof text !== 'string' || !text.trim() || text.length > 1000 ||
+          typeof detail !== 'string' || !detail.trim() || detail.length > 1000) {
+        throw new Error('Agent recorded outcome criterion evidence is invalid');
+      }
+      seenCriteria.add(criterion);
+    }
+    count = seenCriteria.size;
   }
-  const at = safeTime(own(value, 'verifiedAt'));
+  const { present: timePresent, value: rawAt } = persistedField(value, 'verifiedAt');
+  if (timePresent && (!Number.isSafeInteger(rawAt) || Object.is(rawAt, -0) ||
+      rawAt < 0 || rawAt > 8_640_000_000_000_000)) {
+    throw new Error('Agent recorded outcome verifiedAt is invalid');
+  }
+  // 0 is the canonical unverified placeholder; do not fabricate an observed
+  // timestamp or external-effect receipt from it. Missing legacy time is null.
+  const at = timePresent ? rawAt : null;
   return freeze({
     source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
     recordPresent: true,
     criteriaRecorded: count,
-    recordedAt: at || null,
+    recordedAt: at === 0 ? null : at,
     externalEffectVerified: false,
   });
 }
+const SPECIALIST_DISPATCH_STATES = new Set([
+  'DISPATCHING', 'FAILED_SAFE', 'AMBIGUOUS', 'PROVIDER_SUCCEEDED',
+]);
+
+function recordedSpecialistDispatchEvidence(runtime) {
+  // Project only already-durable BrowserAgentManager dispatch records. These
+  // counts do not prove execution, provider delivery, artifact provenance,
+  // agent-tree linkage or the entire lifetime history.
+  const { present, value: dispatchRecord } = persistedField(runtime, 'specialistDispatchByAgentId');
+  if (!present) return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY',
+    recordPresent: false,
+    inspectedAttempts: 0,
+    statusCounts: { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 },
+    receiptIdsRecorded: 0,
+    artifactReferencesRecorded: 0,
+    externalEffectVerified: false,
+    artifactProvenanceVerified: false,
+  });
+  const dispatches = record(dispatchRecord, 'Agent specialist dispatch map');
+  const keys = safeOwnKeys(dispatches);
+  // The map keys are durable Agent identities, not arbitrary provider text.
+  // Reject forged/control-character identities before counting any attempt.
+  // Reuse the canonical ownership ID grammar; do not expose IDs in export.
+  if (keys.length > 128 || keys.some(key => typeof key !== 'string' || !RECORDED_OWNERSHIP_ID.test(key))) {
+    throw new Error('Agent specialist dispatch map exceeds the bounded record schema');
+  }
+  const statusCounts = { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 };
+  let receiptIdsRecorded = 0;
+  let artifactReferencesRecorded = 0;
+  // One receipt identity cannot prove multiple independently recorded
+  // provider attempts. This remains metadata, not trusted external proof.
+  const seenReceiptIds = new Set();
+  for (const key of keys) {
+    // Durable JSON serialization omits hidden and accessor-backed map keys.
+    // Counting either as evidence would change the audit trail after restart.
+    // Snapshot each own descriptor once; do not invoke untrusted getters or
+    // expose Proxy trap messages in diagnostics.
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(dispatches, key); }
+    catch { throw new Error('Agent specialist dispatch record cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent specialist dispatch record must be an enumerable data field');
+    }
+    // Persisted evidence must survive JSON cold restart. Hidden scalar fields
+    // are not durable receipts/identities and must fail before counting.
+    const attempt = record(descriptor.value, 'Agent specialist dispatch attempt');
+    const state = persistedField(attempt, 'state').value;
+    if (!SPECIALIST_DISPATCH_STATES.has(state)) {
+      throw new Error('Agent specialist dispatch state is invalid');
+    }
+    statusCounts[state] += 1;
+    const receiptId = persistedField(attempt, 'providerReceiptId').value;
+    if (receiptId !== undefined && receiptId !== null && receiptId !== '') {
+      // Refuse corrupt/spoofed persisted IDs instead of silently dropping
+      // them or counting the same external receipt twice after restart.
+      if (typeof receiptId !== 'string' || receiptId.length > 240 ||
+          !receiptId.trim() || receiptId !== receiptId.trim() ||
+          UNSAFE_RECORDED_TEXT.test(receiptId) ||
+          seenReceiptIds.has(receiptId)) {
+        throw new Error('Agent specialist dispatch receipt identity is invalid or duplicated');
+      }
+      seenReceiptIds.add(receiptId);
+      receiptIdsRecorded += 1;
+    }
+    const { present: referencesPresent, value: refs } = persistedField(attempt, 'resultArtifactRefs');
+    if (!referencesPresent) continue;
+    if (!plainArray(refs)) throw new Error('Agent specialist artifact references must be a bounded dense array');
+    const length = own(refs, 'length');
+    if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
+      throw new Error('Agent specialist artifact reference count is invalid');
+    }
+    for (const ref of canonicalEvidenceElements(refs, length, 'Agent specialist artifact references')) {
+      record(ref, 'Agent specialist artifact reference');
+      // A recorded artifact reference must carry a durable, canonical ID.
+      // Counting {} or a hidden/accessor-backed ID creates false evidence:
+      // it is visible before JSON cold restart but vanishes afterward. This
+      // remains metadata only; it never attests provenance or effect success.
+      const { present: artifactIdPresent, value: artifactId } = persistedField(ref, 'artifactId');
+      if (!artifactIdPresent || typeof artifactId !== 'string' ||
+          !RECORDED_OWNERSHIP_ID.test(artifactId)) {
+        throw new Error('Agent specialist artifact reference identity is invalid');
+      }
+      artifactReferencesRecorded += 1;
+    }
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY',
+    recordPresent: true,
+    inspectedAttempts: keys.length,
+    statusCounts,
+    receiptIdsRecorded,
+    artifactReferencesRecorded,
+    externalEffectVerified: false,
+    artifactProvenanceVerified: false,
+  });
+}
+
+// This is a *structural* correlation of already persisted Specialist child
+// handoffs against their canonical parent job and AgentPlan nodes. It is not
+// independent execution or Agent-tree verification, and never grants authority.
+const RECORDED_HANDOFF_STATES = new Set(['READY', 'LEASED', 'COMPLETED', 'FAILED', 'CANCELLED']);
+const EXTERNAL_NODE_PLANES = new Set(['LOCAL', 'CLOUD', 'REMOTE']);
+function recordedSpecialistPlanLinks(runtime, plan, jobId) {
+  const { present, value: rawHandoffs } = persistedField(runtime, 'specialistHandoffs');
+  const empty = () => freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_HANDOFF_METADATA_ONLY',
+    recordPresent: false,
+    inspectedHandoffs: 0,
+    structurallyLinkedChildren: 0,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+  if (!present) return empty();
+  if (!plainArray(rawHandoffs)) throw new Error('Agent specialist handoffs must be a bounded dense array');
+  const length = own(rawHandoffs, 'length');
+  if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
+    throw new Error('Agent specialist handoff length is invalid');
+  }
+  const handoffs = canonicalEvidenceElements(rawHandoffs, length, 'Agent specialist handoffs');
+  if (length === 0) return freeze({ ...empty(), recordPresent: true });
+  const durablePlan = record(plan, 'Agent specialist linked plan');
+  const planId = persistedField(durablePlan, 'planId').value;
+  if (typeof planId !== 'string' || !RECORDED_OWNERSHIP_ID.test(planId)) {
+    throw new Error('Agent specialist linked plan identity is invalid');
+  }
+  const { present: nodesPresent, value: nodes } = persistedField(durablePlan, 'nodes');
+  if (!nodesPresent || !plainArray(nodes)) throw new Error('Agent specialist linked plan nodes are invalid');
+  const nodeLength = own(nodes, 'length');
+  if (!Number.isSafeInteger(nodeLength) || nodeLength < 0 || nodeLength > 4096) {
+    throw new Error('Agent specialist linked plan node length is invalid');
+  }
+  const expectedAgents = new Set();
+  for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent specialist linked plan nodes')) {
+    record(node, 'Agent specialist linked plan node');
+    const nodeId = persistedField(node, 'nodeId').value;
+    const plane = persistedField(node, 'executionPlane').value;
+    if (typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId)) {
+      throw new Error('Agent specialist linked plan node identity is invalid');
+    }
+    if (EXTERNAL_NODE_PLANES.has(plane)) {
+      const canonicalAgentId = 'specialist:' + planId + ':' + nodeId;
+      if (!RECORDED_OWNERSHIP_ID.test(canonicalAgentId) || expectedAgents.has(canonicalAgentId)) {
+        throw new Error('Agent specialist linked plan agent identity is invalid or duplicated');
+      }
+      expectedAgents.add(canonicalAgentId);
+    }
+  }
+  const seen = new Set();
+  for (const item of handoffs) {
+    const handoff = record(item, 'Agent specialist linked handoff');
+    const agentId = persistedField(handoff, 'agentId').value;
+    const parentAgentId = persistedField(handoff, 'parentAgentId').value;
+    const persistedJobId = persistedField(handoff, 'jobId').value;
+    const state = persistedField(handoff, 'state').value;
+    if (typeof agentId !== 'string' || !expectedAgents.has(agentId) || seen.has(agentId) ||
+        parentAgentId !== 'browser-agent:' + jobId || persistedJobId !== jobId ||
+        !RECORDED_HANDOFF_STATES.has(state)) {
+      throw new Error('Agent specialist handoff is not structurally bound to its parent plan');
+    }
+    seen.add(agentId);
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_HANDOFF_METADATA_ONLY',
+    recordPresent: true,
+    inspectedHandoffs: handoffs.length,
+    structurallyLinkedChildren: seen.size,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+}
+
+// Read-only projection of the EXISTING durable ExecutionOwnershipV1 records.
+// State and structural link counts are NOT Agent-tree ancestry, execution
+// receipts, independent verification or permission to resume/replay effects.
+const RECORDED_OWNERSHIP_STATES = new Set([
+  'AVAILABLE', 'OWNED', 'HANDOFF_PENDING', 'RECONCILE', 'VERIFIED', 'MANUAL_REVIEW',
+]);
+const RECORDED_OWNERSHIP_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+function recordedExecutionOwnershipEvidence(runtime) {
+  const empty = () => freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_OWNERSHIP_METADATA_ONLY',
+    recordPresent: false,
+    inspectedRecords: 0,
+    stateCounts: { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 },
+    structurallyBoundNodeRecords: 0,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+  const { present, value: records } = persistedField(runtime, 'specialistExecutionOwnerships');
+  if (!present) return empty();
+  if (!plainArray(records)) throw new Error('Agent execution ownership records must be a bounded dense array');
+  const count = own(records, 'length');
+  if (!Number.isSafeInteger(count) || count < 0 || count > 128) {
+    throw new Error('Agent execution ownership length is invalid');
+  }
+  // Reuse the canonical descriptor-only array inspection. A non-enumerable
+  // element is observable here but disappears from JSON storage/restart:
+  // it must not be counted as durable evidence. Never invoke its getter.
+  const elements = canonicalEvidenceElements(records, count, 'Agent execution ownership records');
+  const stateCounts = { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 };
+  const seenNodes = new Set();
+  const seenEffects = new Set();
+  for (const element of elements) {
+    // A non-enumerable state/node/effect identity vanishes after restart:
+    // never export its pre-restart value as durable evidence.
+    const item = record(element, 'Agent execution ownership record');
+    const state = persistedField(item, 'state').value;
+    const nodeId = persistedField(item, 'nodeId').value;
+    const effectId = persistedField(item, 'effectId').value;
+    if (!RECORDED_OWNERSHIP_STATES.has(state) ||
+        typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId) ||
+        typeof effectId !== 'string' || !RECORDED_OWNERSHIP_ID.test(effectId) ||
+        seenNodes.has(nodeId) || seenEffects.has(effectId)) {
+      throw new Error('Agent execution ownership record has invalid or duplicate identity/state');
+    }
+    seenNodes.add(nodeId);
+    seenEffects.add(effectId);
+    stateCounts[state] += 1;
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_OWNERSHIP_METADATA_ONLY',
+    recordPresent: true,
+    inspectedRecords: count,
+    stateCounts,
+    structurallyBoundNodeRecords: seenNodes.size,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+}
+
 export function buildAgentRunTimelineV1(job, options = {}) {
   record(job, 'Agent timeline job');
   record(options, 'Agent timeline options');
@@ -227,23 +570,57 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const filterValue = own(options, 'filter');
   const filter = filterValue === undefined ? 'ALL' : filterValue;
   if (!FILTERS.has(filter)) throw new Error('Agent timeline filter is invalid');
-  const runtime = record(own(job, 'runtime'), 'Agent timeline runtime');
-  const history = safeHistory(own(runtime, 'history'), safeHasOwn(runtime, 'history'));
+  const runtime = record(persistedField(job, 'runtime').value, 'Agent timeline runtime');
+  // Snapshot these durable fields once for all projections to avoid mixing
+  // a different job/plan identity into the evidence map on a hostile Proxy.
+  const durableJobId = boundedJobId(persistedField(job, 'id').value);
+  const durablePlan = persistedField(runtime, 'plan').value;
+  // One persisted descriptor is the sole authority for both presence and value.
+  // Separate reads permit hostile storage Proxies to change the apparent
+  // snapshot between validation and projection, or hide it from JSON restart.
+  const { present: historyPresent, value: storedHistory } = persistedField(runtime, 'history');
+  const history = safeHistory(storedHistory, historyPresent);
   const all = history.items.map(({ ordinal, entry }) => {
     record(entry, 'Agent history entry');
-    const rawType = own(entry, 'type');
+    // Timeline data is persisted JSON evidence: a hidden event field may be
+    // visible before restart but disappear afterward. Snapshot each fixed
+    // descriptor exactly once without invoking getters/Proxy get traps.
+    const { present: typePresent, value: rawType } = persistedField(entry, 'type');
+    // A present stored event type is durable evidence, not arbitrary text.
+    // Preserve forward-compatible unknown event names, but reject malformed,
+    // noncanonical or spoofed values before classifying them as OTHER. Missing
+    // legacy event types remain a redacted OTHER observation.
+    if (typePresent && (typeof rawType !== 'string' || rawType.length < 1 ||
+        rawType.length > 128 || rawType !== rawType.trim() ||
+        UNSAFE_RECORDED_TEXT.test(rawType))) {
+      throw new Error('Agent history event type is invalid');
+    }
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
-    const hasRecordedTime = safeHasOwn(entry, 'at');
-    const rawAction = own(entry, 'action');
+    const { present: hasRecordedTime, value: recordedTime } = persistedField(entry, 'at');
+    const { present: actionPresent, value: rawAction } = persistedField(entry, 'action');
     let actionType = '';
-    if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
-      const candidate = own(rawAction, 'type');
+    if (known && ACTION_DETAIL_EVENTS.has(rawType) && actionPresent && rawAction !== null) {
+      // A stored action payload may be genuinely absent in legacy history,
+      // or null when Core recorded no detail. An explicitly stored malformed
+      // payload (array/scalar/exotic/undefined) is corrupt durable evidence,
+      // not a harmless omission. Reuse the existing descriptor-only guard.
+      record(rawAction, 'Agent history recorded action');
+      // An explicitly persisted malformed action kind must not be laundered
+      // into an innocuous missing kind in a read-only exported timeline.
+      // Unknown well-formed future kinds remain non-authorizing/undisclosed.
+      const { present: actionTypePresent, value: candidate } = persistedField(rawAction, 'type');
+      if (actionTypePresent && (typeof candidate !== 'string' ||
+          candidate.length < 1 || candidate.length > 64 ||
+          candidate !== candidate.trim() ||
+          UNSAFE_RECORDED_TEXT.test(candidate))) {
+        throw new Error('Agent history recorded action type is invalid');
+      }
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
     }
     return {
       entryId: 'agent-history:' + ordinal,
-      at: storedEventTime(own(entry, 'at'), hasRecordedTime),
+      at: storedEventTime(recordedTime, hasRecordedTime),
       timeEvidence: hasRecordedTime ? 'RECORDED' : 'MISSING_LEGACY',
       category: spec[0],
       event: known ? rawType : 'OTHER',
@@ -257,7 +634,15 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // These are presence counts within the bounded canonical history, not proof
   // that an external operation committed or that missing evidence never existed.
   // Do not infer receipts, artifacts or before/after snapshots from free text.
-  const recordedOutcome = recordedOutcomeSummary(own(runtime, 'verifiedOutcome'));
+  // A genuinely missing legacy outcome means "not recorded". A canonical
+  // fresh BrowserAgentRuntime sets verifiedOutcome: null until verification;
+  // neither null nor omission establishes an external effect receipt. An
+  // explicitly persisted undefined is invalid evidence after restart.
+  const { present: outcomePresent, value: rawOutcome } = persistedField(runtime, 'verifiedOutcome');
+  if (outcomePresent && rawOutcome === undefined) {
+    throw new Error('Agent persisted outcome is invalid');
+  }
+  const recordedOutcome = recordedOutcomeSummary(rawOutcome);
   const evidenceMap = {
     scope: 'INSPECTED_CANONICAL_HISTORY_ONLY',
     // BrowserAgentManager also caps its persisted history. Even reading all
@@ -282,10 +667,22 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     ],
     externalEffectVerified: false,
     recordedOutcome,
+    specialistProviderDispatch: recordedSpecialistDispatchEvidence(runtime),
+    specialistPlanLinks: recordedSpecialistPlanLinks(runtime, durablePlan, durableJobId),
+    specialistExecutionOwnership: recordedExecutionOwnershipEvidence(runtime),
   };
+  // Preserve a single observation of this persisted accounting field. A
+  // hostile storage Proxy may return a new descriptor on each inspection:
+  // repeated reads could mix evidence from distinct snapshots or coerce
+  // attacker-controlled objects while preparing an accessible export.
+  const rawEstimatedCostUsd = persistedField(runtime, 'estimatedCostUsd').value;
+  const estimatedCostUsd = typeof rawEstimatedCostUsd === 'number' &&
+    Number.isFinite(rawEstimatedCostUsd) &&
+    rawEstimatedCostUsd >= 0 && rawEstimatedCostUsd <= 1000000
+      ? Math.round(rawEstimatedCostUsd * 1000000) / 1000000 : null;
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
-    jobId: boundedJobId(own(job, 'id')),
+    jobId: durableJobId,
     entryIdentityScope: 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE',
     filter,
     totalRecorded: history.total,
@@ -296,18 +693,14 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     evidenceOnly: true,
     mayReplayExternalEffect: false,
     includesPrivatePrompts: false,
-    plan: planSummary(own(runtime, 'plan')),
+    plan: planSummary(durablePlan),
     evidenceMap,
     counters: {
-      steps: integer(own(runtime, 'stepCount')),
-      cycles: integer(own(runtime, 'completedCycles')),
-      modelCalls: integer(own(runtime, 'modelCalls')),
-      totalTokens: integer(own(runtime, 'totalTokens')),
-      estimatedCostUsd: typeof own(runtime, 'estimatedCostUsd') === 'number' &&
-        Number.isFinite(own(runtime, 'estimatedCostUsd')) &&
-        own(runtime, 'estimatedCostUsd') >= 0 &&
-        own(runtime, 'estimatedCostUsd') <= 1000000
-          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : null,
+      steps: recordedCounter(runtime, 'stepCount'),
+      cycles: recordedCounter(runtime, 'completedCycles'),
+      modelCalls: recordedCounter(runtime, 'modelCalls'),
+      totalTokens: recordedCounter(runtime, 'totalTokens'),
+      estimatedCostUsd,
       verifiedChecks: recordedOutcome.criteriaRecorded,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },

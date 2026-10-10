@@ -145,10 +145,17 @@ test('malformed persisted outcome fails closed without running foreign getters',
   assert.throws(() => buildAgentRunTimelineV1(input), /bounded/);
   input.runtime.verifiedOutcome = { checks: 'PRIVATE_NOT_AN_ARRAY' };
   assert.throws(() => buildAgentRunTimelineV1(input), /bounded/);
+  // A persisted negative verification time is corrupt, not missing.
   input.runtime.verifiedOutcome = { verifiedAt: -1, checks: [] };
+  assert.throws(() => buildAgentRunTimelineV1(input), /verifiedAt is invalid/);
+  assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))), /verifiedAt is invalid/);
+  // A legitimately missing legacy time still records zero criteria, never an
+  // external receipt; explicit canonical placeholder zero also remains unknown.
+  input.runtime.verifiedOutcome = { checks: [] };
   const safe = buildAgentRunTimelineV1(input);
   assert.equal(safe.evidenceMap.recordedOutcome.recordedAt, null);
   assert.equal(safe.evidenceMap.recordedOutcome.criteriaRecorded, 0);
+  assert.equal(safe.evidenceMap.externalEffectVerified, false);
 });
 
 test('explicit null persisted history fails closed; legacy absent history remains valid', () => {
