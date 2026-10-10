@@ -135,11 +135,20 @@ function cloneData(value, label) {
     seen.add(item);
     let output;
     if (Array.isArray(item)) {
-      if (Object.getPrototypeOf(item) !== Array.prototype || item.length > MAX_DATA_NODES) throw new Error(`${label} must be a bounded plain array`);
+      if (Object.getPrototypeOf(item) !== Array.prototype) throw new Error(`${label} must be a bounded plain array`);
+      // Untrusted Proxy arrays may implement a hostile get('length') trap.
+      // Read the own data descriptor once instead; a forged, missing or
+      // nonnumeric length is never coerced into an effect/event payload.
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(item, 'length');
+      const length = lengthDescriptor?.value;
+      if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
+          || !Number.isSafeInteger(length) || length < 0 || length > MAX_DATA_NODES) {
+        throw new Error(`${label} must be a bounded plain array`);
+      }
       const keys = Reflect.ownKeys(item);
-      if (keys.length !== item.length + 1) throw new Error(`${label} contains non-canonical array fields`);
+      if (keys.length !== length + 1) throw new Error(`${label} contains non-canonical array fields`);
       output = [];
-      for (let i = 0; i < item.length; i += 1) {
+      for (let i = 0; i < length; i += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(item, String(i));
         if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) throw new Error(`${label} contains sparse/accessor array entries`);
         output.push(copy(descriptor.value, depth + 1));
