@@ -269,3 +269,56 @@ test('Plan4 S1 HTTP boundary rejects foreign endpointId for built-in account bef
     await new Promise(resolve=>server.close(resolve));
   }
 });
+
+test('Plan4 S1 remote compatible registry requires credential ref before provider I/O and after JSON restart', async () => {
+  const remote = { endpointId: 'tenant-account', baseUrl: 'https://tenant.example.test/v1' };
+  const unauthenticated = [remote, { ...remote, apiKeyEnv: '' }];
+  for (const entry of unauthenticated) {
+    for (const snapshot of [entry, JSON.parse(JSON.stringify(entry))]) {
+      assert.throws(
+        () => normalizeCompatibleEndpointRegistry([snapshot]),
+        error => error?.code === 'AI_COMPATIBLE_CREDENTIAL_REF_REQUIRED',
+        'remote compatible account cannot silently become credentialless',
+      );
+    }
+  }
+
+  // The existing explicitly credentialless loopback configuration stays valid.
+  const local = normalizeCompatibleEndpointRegistry([
+    { endpointId: 'local-only', baseUrl: 'http://127.0.0.1:1234/v1', apiKeyEnv: '' },
+  ]);
+  assert.equal(local[0].apiKeyEnv, '');
+
+  const persisted = JSON.stringify([{ ...remote, apiKeyEnv: 'TENANT_TEST_KEY' }]);
+  const compatibleEndpoints = normalizeCompatibleEndpointRegistry(JSON.parse(persisted));
+  assert.equal(compatibleEndpoints[0].apiKeyEnv, 'TENANT_TEST_KEY');
+  let upstreamCalls = 0;
+  const server = createGatewayServer({
+    compatibleEndpoints,
+    env: {},
+    fetchFn: async () => {
+      upstreamCalls += 1;
+      throw new Error('unconfigured remote account must not dispatch');
+    },
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const root = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const discovery = await fetch(`${root}/models?provider=openai-compatible&endpointId=tenant-account`);
+    assert.equal(discovery.status, 428);
+    assert.equal((await discovery.json()).code, 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
+    const completion = await fetch(`${root}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'openai-compatible', endpointId: 'tenant-account', model: 'fixture',
+        prompt: 'private fixture must never be sent',
+      }),
+    });
+    assert.equal(completion.status, 428);
+    assert.equal((await completion.json()).code, 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
+    assert.equal(upstreamCalls, 0, 'missing remote credentials never trigger discovery or completion effect');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
