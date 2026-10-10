@@ -551,8 +551,19 @@ export function assessCloudExecutionFabricV1(input) {
   if (ownership.state === ExecutionOwnershipState.VERIFIED) {
     return blocked(baseArgs, 'EXECUTION_ALREADY_VERIFIED');
   }
+  // An owned lease is exclusive at its deadline. An assessment earlier than
+  // the canonical ownership update is a clock rollback, not valid capacity.
+  // Neither case may recommend a cloud/local execution plane.
   if (ownership.state === ExecutionOwnershipState.OWNED
-      && Date.parse(request.assessedAt) > Date.parse(ownership.leaseUntil)) {
+      && Date.parse(request.assessedAt) < Date.parse(ownership.updatedAt)) {
+    return blocked(
+      baseArgs,
+      'EXECUTION_CLOCK_ROLLBACK',
+      CloudFabricDisposition.RECONCILE_REQUIRED,
+    );
+  }
+  if (ownership.state === ExecutionOwnershipState.OWNED
+      && Date.parse(request.assessedAt) >= Date.parse(ownership.leaseUntil)) {
     return blocked(
       baseArgs,
       'EXECUTION_LEASE_EXPIRED',
