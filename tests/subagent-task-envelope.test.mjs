@@ -482,3 +482,52 @@ test('Plan8 exact optional parent authority identity survives JSON recovery and 
   assert.throws(() => createSubagentTaskEnvelopeV1(forged), /enumerable own data property/u);
   assert.equal(getterReads, 0);
 });
+
+test('Plan8 source-hash lineage compatibility preserves immutable child input through JSON recovery', () => {
+  const legacy = createSubagentTaskEnvelopeV1(request());
+  assert.equal(Object.hasOwn(legacy.inputSourceRefs[0], 'contentSha256'), false);
+  const hashed = structuredClone(legacy);
+  hashed.inputSourceRefs[0].contentSha256 = 'a'.repeat(64);
+  const canonical = normalizeSubagentTaskEnvelopeV1(hashed);
+  assert.equal(canonical.inputSourceRefs[0].contentSha256, 'a'.repeat(64));
+  assert.deepEqual(
+    normalizeSubagentTaskEnvelopeV1(JSON.parse(JSON.stringify(canonical))),
+    canonical,
+  );
+  assert.equal(Object.isFrozen(canonical.inputSourceRefs[0]), true);
+  assert.notEqual(
+    deriveSubagentTaskDispatchIdentityV1(canonical),
+    deriveSubagentTaskDispatchIdentityV1(legacy),
+    'adding immutable source bytes must change exact dispatch/replay identity',
+  );
+  const tampered = structuredClone(canonical);
+  tampered.inputSourceRefs[0].contentSha256 = 'b'.repeat(64);
+  assert.notEqual(
+    deriveSubagentTaskDispatchIdentityV1(tampered),
+    deriveSubagentTaskDispatchIdentityV1(canonical),
+    'substituted source bytes must not reuse the original dispatch identity',
+  );
+});
+
+test('Plan8 source-hash lineage compatibility rejects noncanonical and accessor bytes without executing getters', () => {
+  const canonical = createSubagentTaskEnvelopeV1(request());
+  for (const invalid of [undefined, null, 1, 'a'.repeat(63), 'A'.repeat(64), 'z'.repeat(64)]) {
+    const malformed = structuredClone(canonical);
+    malformed.inputSourceRefs[0].contentSha256 = invalid;
+    assert.throws(
+      () => normalizeSubagentTaskEnvelopeV1(malformed),
+      /contentSha256 must be canonical lowercase SHA-256/u,
+    );
+  }
+  let getterCalls = 0;
+  const hostile = structuredClone(canonical);
+  Object.defineProperty(hostile.inputSourceRefs[0], 'contentSha256', {
+    enumerable: true,
+    get() { getterCalls += 1; return 'a'.repeat(64); },
+  });
+  assert.throws(
+    () => normalizeSubagentTaskEnvelopeV1(hostile),
+    /contentSha256 must be an enumerable own data property/u,
+  );
+  assert.equal(getterCalls, 0);
+});
