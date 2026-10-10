@@ -128,8 +128,14 @@ function integer(value, label, min, max, { optional = false, fallback = 0 } = {}
   return value;
 }
 
-function bool(value, label, fallback = false) {
-  if (value == null) return fallback;
+function bool(value, label, fallback = false, { present = false } = {}) {
+  // Omitted legacy metadata may use a default. An explicitly present null
+  // or undefined must not silently change a privacy or execution permission
+  // flag during a durable JSON round-trip.
+  if (value == null) {
+    if (present) throw new Error(`${label} must be boolean`);
+    return fallback;
+  }
   if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
   return value;
 }
@@ -280,7 +286,7 @@ export function normalizeToolDescriptorV1(input) {
     capabilityIds: idList(raw.capabilityIds, 'capabilityIds', { optional: false }),
     inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true }),
     outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true }),
-    readOnly: bool(raw.readOnly, 'readOnly', false),
+    readOnly: bool(raw.readOnly, 'readOnly', false, { present: Object.hasOwn(raw, 'readOnly') }),
   });
 }
 
@@ -355,7 +361,7 @@ export function normalizeArtifactRefV1(input) {
     sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, { optional: true, fallback: 0 }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     producerInvocationId: id(raw.producerInvocationId, 'producerInvocationId', { optional: true }),
-    sensitive: bool(raw.sensitive, 'sensitive', false),
+    sensitive: bool(raw.sensitive, 'sensitive', false, { present: Object.hasOwn(raw, 'sensitive') }),
   });
 }
 
@@ -455,11 +461,15 @@ export function normalizeSpecialistHandoffV1(input) {
   });
 }
 
-export function capabilityV1FromRegistry(capabilityId, {
-  description = '',
-  riskClass = 'R0',
-  attributes = {},
-} = {}) {
+const CAPABILITY_ADAPTER_OPTION_KEYS = new Set(['description', 'riskClass', 'attributes']);
+const TOOL_ADAPTER_OPTION_KEYS = new Set(['toolId', 'label', 'description', 'readOnly']);
+
+export function capabilityV1FromRegistry(capabilityId, options = {}) {
+  // Provider metadata and adapter options are descriptors, not executable
+  // authority. Reject accessors before unpacking user-controlled values.
+  const config = plain(options, 'capability adapter options');
+  exactKeys(config, CAPABILITY_ADAPTER_OPTION_KEYS, 'capability adapter options');
+  const { description = '', riskClass = 'R0', attributes = {} } = config;
   return normalizeCapabilityV1({
     schemaVersion: 1,
     capabilityId,
@@ -469,12 +479,10 @@ export function capabilityV1FromRegistry(capabilityId, {
   });
 }
 
-export function toolDescriptorV1FromAgentProvider(provider, {
-  toolId,
-  label = '',
-  description = '',
-  readOnly = false,
-} = {}) {
+export function toolDescriptorV1FromAgentProvider(provider, options = {}) {
+  const config = plain(options, 'tool adapter options');
+  exactKeys(config, TOOL_ADAPTER_OPTION_KEYS, 'tool adapter options');
+  const { toolId, label = '', description = '', readOnly = false } = config;
   const raw = plain(provider, 'agent provider');
   return normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -496,12 +504,17 @@ function assertSubset(requested, allowed, label) {
   if (missing.length) throw new Error(`${label} exceeds granted capabilities: ${missing.join(', ')}`);
 }
 
-export function assertToolInvocationAuthorizedV1({
-  invocation,
-  policyDecision,
-  toolDescriptor,
-  grantedCapabilityIds = [],
-} = {}) {
+const TOOL_AUTHORIZATION_ENVELOPE_KEYS = new Set([
+  'invocation', 'policyDecision', 'toolDescriptor', 'grantedCapabilityIds',
+]);
+export function assertToolInvocationAuthorizedV1(input = {}) {
+  // Treat the authorization wrapper as untrusted too. Destructuring directly
+  // from caller input invokes getters before the policy check and can conceal
+  // injected authority fields. The same descriptor-only boundary used by the
+  // canonical V1 contracts must apply before any nested normalization.
+  const request = plain(input, 'Tool authorization request');
+  exactKeys(request, TOOL_AUTHORIZATION_ENVELOPE_KEYS, 'Tool authorization request');
+  const { invocation, policyDecision, toolDescriptor, grantedCapabilityIds = [] } = request;
   const normalizedInvocation = normalizeToolInvocationV1(invocation);
   const normalizedDecision = normalizePolicyDecisionV1(policyDecision);
   const normalizedTool = normalizeToolDescriptorV1(toolDescriptor);

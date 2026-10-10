@@ -1024,3 +1024,203 @@ test('Plan-1 S1: nested contract JSON diagnostics never expose attacker-owned me
     'valid durable argument identity must survive cold JSON restart',
   );
 });
+
+
+test('Plan-1 S1: tool policy authorization envelope rejects accessor, alias and inherited authority before effects', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-envelope-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-envelope-1',
+    arguments: { fileRef: 'workspace:README.md' },
+    createdAt: AT,
+  };
+  const policyDecision = {
+    schemaVersion: 1,
+    decisionId: 'decision-envelope-1',
+    invocationId: 'invoke-envelope-1',
+    decision: 'ALLOW',
+    reasonCode: 'OWNER_APPROVED',
+    decidedAt: AT,
+  };
+  const toolDescriptor = {
+    schemaVersion: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    label: 'Read file',
+    capabilityIds: ['filesystem.read'],
+    readOnly: true,
+  };
+  const authorized = { invocation, policyDecision, toolDescriptor, grantedCapabilityIds: ['filesystem.read'] };
+  let reads = 0;
+  for (const name of ['invocation', 'policyDecision', 'toolDescriptor', 'grantedCapabilityIds']) {
+    const hostile = { ...authorized };
+    Object.defineProperty(hostile, name, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error('PRIVATE-OWNER-SECRET-GETTER');
+      },
+    });
+    assert.throws(
+      () => assertToolInvocationAuthorizedV1(hostile),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-OWNER-SECRET-GETTER/);
+        return true;
+      },
+      name,
+    );
+  }
+  assert.equal(reads, 0, 'never evaluate untrusted authority wrapper accessors');
+
+  const secret = 'PRIVATE-OWNER-SECRET-ALIAS';
+  const unknownAuthority = { ...authorized, [secret]: { permission: 'ALLOW' } };
+  assert.throws(
+    () => assertToolInvocationAuthorizedV1(unknownAuthority),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.doesNotMatch(error.message, /PRIVATE-OWNER-SECRET/);
+      return true;
+    },
+  );
+  const symbolAuthority = { ...authorized, [Symbol(secret)]: 'ALLOW' };
+  assert.throws(() => assertToolInvocationAuthorizedV1(symbolAuthority), /unknown field/);
+  const inheritedAuthority = Object.assign(Object.create({ policyDecision }), {
+    invocation, toolDescriptor, grantedCapabilityIds: ['filesystem.read'],
+  });
+  assert.throws(() => assertToolInvocationAuthorizedV1(inheritedAuthority), /plain object/);
+  const nonEnumerable = { ...authorized };
+  Object.defineProperty(nonEnumerable, 'policyDecision', { value: policyDecision, enumerable: false });
+  assert.throws(() => assertToolInvocationAuthorizedV1(nonEnumerable), /data properties/);
+
+  const verified = assertToolInvocationAuthorizedV1(authorized);
+  assert.equal(verified.policyDecision.decision, PolicyDecisionKind.ALLOW);
+  assert.deepEqual(verified.grantedCapabilityIds, ['filesystem.read']);
+  assert.equal(Object.isFrozen(verified), true);
+  const cold = assertToolInvocationAuthorizedV1(JSON.parse(JSON.stringify(authorized)));
+  assert.deepEqual(cold, verified, 'valid authorization identity survives JSON cold restart');
+
+  assert.throws(
+    () => assertToolInvocationAuthorizedV1({ ...authorized, policyDecision: { ...policyDecision, decision: 'DENY' } }),
+    /not authorized/,
+    'hardened intake must not relax the canonical owner policy',
+  );
+});
+
+
+test('Plan-1 S1: canonical registry adapters reject hostile options without executing getters', () => {
+  const secret = 'PRIVATE-ADAPTER-OWNER-TOKEN';
+  let reads = 0;
+  for (const field of ['description', 'riskClass', 'attributes']) {
+    const options = {};
+    Object.defineProperty(options, field, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(secret);
+      },
+    });
+    assert.throws(
+      () => capabilityV1FromRegistry('filesystem.read', options),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+        return true;
+      },
+    );
+  }
+
+  const provider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
+  for (const field of ['toolId', 'label', 'description', 'readOnly']) {
+    const options = { toolId: 'chatgpt.inspect' };
+    Object.defineProperty(options, field, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(secret);
+      },
+    });
+    assert.throws(
+      () => toolDescriptorV1FromAgentProvider(provider, options),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+        return true;
+      },
+    );
+  }
+  assert.equal(reads, 0, 'neither adapter may execute option getters');
+
+  const symbolOptions = { toolId: 'chatgpt.inspect', [Symbol(secret)]: 'filesystem.write' };
+  assert.throws(() => toolDescriptorV1FromAgentProvider(provider, symbolOptions), /unknown field/);
+  assert.throws(
+    () => capabilityV1FromRegistry('filesystem.read', { description: 'Read', [secret]: 'R0' }),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.doesNotMatch(error.message, /PRIVATE-ADAPTER/);
+      return true;
+    },
+  );
+  const inherited = Object.assign(Object.create({ readOnly: true }), { toolId: 'chatgpt.inspect' });
+  assert.throws(() => toolDescriptorV1FromAgentProvider(provider, inherited), /plain object/);
+  const validTool = toolDescriptorV1FromAgentProvider(provider, {
+    toolId: 'chatgpt.inspect',
+    label: 'Inspect page',
+    description: 'Read-only visual inspection',
+    readOnly: true,
+  });
+  assert.equal(validTool.readOnly, true);
+  assert.equal(validTool.providerId, AgentProviderId.CHATGPT_BROWSER);
+  assert.deepEqual(
+    toolDescriptorV1FromAgentProvider(provider, JSON.parse(JSON.stringify({
+      toolId: 'chatgpt.inspect',
+      label: 'Inspect page',
+      description: 'Read-only visual inspection',
+      readOnly: true,
+    }))),
+    validTool,
+  );
+  const validCapability = capabilityV1FromRegistry('filesystem.read', {
+    description: 'Read file', riskClass: 'R1', attributes: { provider: 'native' },
+  });
+  assert.deepEqual(
+    capabilityV1FromRegistry('filesystem.read', JSON.parse(JSON.stringify({
+      description: 'Read file', riskClass: 'R1', attributes: { provider: 'native' },
+    }))),
+    validCapability,
+  );
+});
+
+
+test('Plan-1 S1: explicit unknown privacy and read-only flags cannot downgrade at restart', () => {
+  const descriptor = {
+    schemaVersion: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    label: 'Read file',
+    capabilityIds: ['filesystem.read'],
+  };
+  const report = artifact({ sensitive: true });
+  for (const invalid of [null, undefined, 'false', 0]) {
+    assert.throws(
+      () => normalizeToolDescriptorV1({ ...descriptor, readOnly: invalid }),
+      /readOnly must be boolean/,
+      'explicitly unknown readOnly permission cannot turn into false',
+    );
+    assert.throws(
+      () => normalizeArtifactRefV1({ ...report, sensitive: invalid }),
+      /sensitive must be boolean/,
+      'explicitly unknown artifact sensitivity cannot turn into public metadata',
+    );
+  }
+  assert.equal(normalizeToolDescriptorV1(descriptor).readOnly, false, 'omitted legacy flag retains default');
+  assert.equal(normalizeArtifactRefV1(artifact({ sensitive: false })).sensitive, false);
+  assert.equal(normalizeArtifactRefV1(report).sensitive, true);
+  const durableTool = normalizeToolDescriptorV1({ ...descriptor, readOnly: true });
+  const durableArtifact = normalizeArtifactRefV1(report);
+  assert.deepEqual(normalizeToolDescriptorV1(JSON.parse(JSON.stringify(durableTool))), durableTool);
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(durableArtifact))), durableArtifact);
+});
