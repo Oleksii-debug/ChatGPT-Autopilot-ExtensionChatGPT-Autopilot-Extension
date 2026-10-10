@@ -3704,17 +3704,42 @@ async function saveBrowserAgentExecutionPolicy() {
   }
 }
 
+function isWritableOwnerResourceBudgetSnapshot(state) {
+  const n = state?.budget?.maxConcurrentAgents;
+  return Boolean(state)
+    && typeof state === 'object'
+    && !Array.isArray(state)
+    && state.quarantined === false
+    && typeof state.revision === 'number'
+    && Number.isSafeInteger(state.revision)
+    && !Object.is(state.revision, -0)
+    && state.revision >= 0
+    && state.revision < Number.MAX_SAFE_INTEGER
+    && state.budget !== null
+    && typeof state.budget === 'object'
+    && !Array.isArray(state.budget)
+    && typeof n === 'number'
+    && Number.isSafeInteger(n)
+    && !Object.is(n, -0)
+    && n >= 0
+    && n <= 256;
+}
+
 async function loadBrowserAgentOwnerResourceBudget() {
   const status = $('agent-owner-resource-budget-status');
   const input = $('agent-owner-max-concurrent');
   const saveButton = $('agent-owner-resource-budget-save-button');
   try {
     const state = await core('GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET');
+    const quarantined = state?.quarantined === true;
+    const writable = isWritableOwnerResourceBudgetSnapshot(state);
+    if (!quarantined && !writable) {
+      throw new Error('Некоректний durable ResourceBudgetV1 або revision; запис заборонено');
+    }
     ui.ownerResourceBudgetState = state;
     input.value = String(state?.budget?.maxConcurrentAgents ?? 0);
-    const quarantined = state?.quarantined === true;
-    input.disabled = quarantined;
-    saveButton.disabled = quarantined;
+    input.disabled = !writable;
+    saveButton.disabled = !writable;
     status.textContent = quarantined
       ? `ResourceBudgetV1 у карантині як пошкоджений; нова Specialist capacity закрита. Revision ${state?.revision ?? 0}.`
       : `Глобальна Specialist capacity: ${state?.budget?.maxConcurrentAgents ?? 0}; revision ${state?.revision ?? 0}.`;
@@ -3731,7 +3756,7 @@ async function saveBrowserAgentOwnerResourceBudget() {
   const input = $('agent-owner-max-concurrent');
   const saveButton = $('agent-owner-resource-budget-save-button');
   const state = ui.ownerResourceBudgetState;
-  if (!state || state.quarantined === true) {
+  if (!isWritableOwnerResourceBudgetSnapshot(state)) {
     status.textContent = 'ResourceBudgetV1 недоступний для безпечного збереження; спочатку перечитайте стан.';
     return;
   }
@@ -3758,8 +3783,11 @@ async function saveBrowserAgentOwnerResourceBudget() {
         maxConcurrentAgents,
       },
     });
+    if (!isWritableOwnerResourceBudgetSnapshot(committed)) {
+      throw new Error('Некоректне підтвердження durable ResourceBudgetV1; потрібне повторне читання');
+    }
     ui.ownerResourceBudgetState = committed;
-    input.value = String(committed?.budget?.maxConcurrentAgents ?? 0);
+    input.value = String(committed.budget.maxConcurrentAgents);
     status.textContent = `Збережено глобальну Specialist capacity ${committed?.budget?.maxConcurrentAgents ?? 0}; revision ${committed?.revision ?? 0}.`;
     announce('Глобальну Specialist capacity збережено.');
   } catch (error) {
@@ -3768,7 +3796,7 @@ async function saveBrowserAgentOwnerResourceBudget() {
     announce('Глобальну Specialist capacity не збережено.');
     return;
   } finally {
-    if (ui.ownerResourceBudgetState && ui.ownerResourceBudgetState.quarantined !== true) {
+    if (isWritableOwnerResourceBudgetSnapshot(ui.ownerResourceBudgetState)) {
       input.disabled = false;
       saveButton.disabled = false;
     }
