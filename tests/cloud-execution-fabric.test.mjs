@@ -920,3 +920,49 @@ test('S1 redacts duplicate cloud capacity identity values before logging errors'
   assert.equal(afterRecovery.dispatchAuthorized, false);
   assert.equal(afterRecovery.executionAuthorized, false);
 });
+
+test('S1 cloud owner input reflection fence redacts secrets and recovers after JSON restart', () => {
+  const privateText = 'PRIVATE_OWNER_STORE_TOKEN_NEVER_FOR_DIAGNOSTICS';
+  let getterCalls = 0;
+  let reflectionCalls = 0;
+  const hostileTrap = () => {
+    reflectionCalls += 1;
+    throw new Error(privateText);
+  };
+  const accessorOwner = { ...availableOwnership() };
+  Object.defineProperty(accessorOwner, 'taskId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error(privateText);
+    },
+  });
+  const scenarios = [
+    new Proxy(availableOwnership(), { getPrototypeOf: hostileTrap }),
+    new Proxy(availableOwnership(), { ownKeys: hostileTrap }),
+    accessorOwner,
+    { ...availableOwnership(), [privateText]: 'do not echo the key' },
+  ];
+  for (const executionOwnership of scenarios) {
+    assert.throws(
+      () => assessCloudExecutionFabricV1(request({ executionOwnership })),
+      error => error instanceof Error
+        && /CloudFabricRequestV1\.executionOwnership/u.test(error.message)
+        && !error.message.includes(privateText),
+    );
+  }
+  assert.equal(reflectionCalls, 2);
+  assert.equal(getterCalls, 0);
+
+  // A persisted, structurally valid owner still follows the same single
+  // canonical normalizer and remains advisory after a cold restart.
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request({ executionOwnership: availableOwnership() }))),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.recommendedPlane, 'CLOUD');
+  assert.equal(recovered.executionAuthorized, false);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.provisioningAuthorized, false);
+});
