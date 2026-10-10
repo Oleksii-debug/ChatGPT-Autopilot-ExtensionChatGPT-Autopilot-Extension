@@ -51,6 +51,54 @@ async function withServer(run, deps = dependencies()) {
   finally { await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve())); }
 }
 
+test('declared and undeclared HTTP trailers never enter owner broker or Core; clean control recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const body = JSON.stringify(request('untrusted-trailer-identity'));
+    async function chunkedWithTrailer(advertise) {
+      const socket = netConnect({ host: '127.0.0.1', port });
+      socket.setTimeout(4_000, () => socket.destroy(new Error('trailer request timeout')));
+      const requestWire = [
+        'POST /v1/control HTTP/1.1',
+        'Host: 127.0.0.1:' + port,
+        'Authorization: Bearer ' + TOKEN,
+        'Content-Type: application/json',
+        'Transfer-Encoding: chunked',
+        ...(advertise ? ['Trailer: X-Injected-Authority'] : []),
+        'Connection: close', '', '',
+      ].join('\\r\\n')
+        + Buffer.byteLength(body).toString(16) + '\\r\\n'
+        + body + '\\r\\n0\\r\\nX-Injected-Authority: false\\r\\n\\r\\n';
+      socket.once('connect', () => socket.end(requestWire));
+      const chunks = [];
+      for await (const chunk of socket) chunks.push(chunk);
+      return Buffer.concat(chunks).toString('utf8');
+    }
+    assert.match(await chunkedWithTrailer(true), /^HTTP\\/1\\.1 403\\b/u,
+      'declared trailer must fail pre-auth');
+    assert.match(await chunkedWithTrailer(false), /^HTTP\\/1\\.1 403\\b/u,
+      'undeclared trailing fields must fail after streaming and before Core');
+    assert.equal(tokenLookups, 1,
+      'only the unadvertised trailer reaches the initial credential lookup');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'neither trailer shape can enter Core');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await client.control(request('trailer-free-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 4);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('legacy HTTP/1.0 downgrade is denied before owner-token lookup or Core and HTTP/1.1 recovers', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   let tokenLookups = 0;
