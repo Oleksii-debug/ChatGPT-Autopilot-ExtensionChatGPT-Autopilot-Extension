@@ -922,9 +922,9 @@ test('vision coordinate typing is screenshot-turn-only and visual-only targets r
 
 
 test('Enter/Space activation keys require an exact snapshot target and Enter on a form cannot bypass approval', () => {
-  const snapshot = { frames: [{ frameId: 0, elements: [
-    { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' },
-    { ref: 'r2', tag: 'button', role: '', type: 'button', name: 'Open details', formAssociated: false },
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [
+    { ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' },
+    { ref: 'r2', tag: 'button', semanticIdentity: 'fixture-r2-button-v1', role: '', type: 'button', name: 'Open details', formAssociated: false },
   ] }] };
   assert.throws(() => parseBrowserAgentAction(JSON.stringify({ type: 'key', key: 'Enter' }), snapshot), /requires an exact current snapshot/);
   const enter = parseBrowserAgentAction(JSON.stringify({ type: 'key', key: 'Enter', frameId: 0, ref: 'r1' }), snapshot);
@@ -945,7 +945,7 @@ test('approved Enter focuses the exact approved form control before native key d
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Course form',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }],
       } }];
     }
     if (details.func?.name === 'focusBrowserAgentTarget') { focused += 1; return [{ frameId: 0, result: { ok: true } }]; }
@@ -980,7 +980,7 @@ test('consequential click pauses before physical action and explicit approval ex
         url: 'https://ais.example.edu/app',
         title: 'AIS',
         text: 'Final registration',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1022,7 +1022,7 @@ test('approved submit click is never automatically repeated by native fallback o
         url: 'https://ais.example.edu/app',
         title: 'AIS',
         text: 'Unchanged form after async submit',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1063,7 +1063,7 @@ test('pending approval preserves full form fingerprint across manager restart', 
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final form',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/enrollment/save', formMethod: 'post' }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/enrollment/save', formMethod: 'post' }],
       } }];
     }
     return original(details);
@@ -1094,7 +1094,7 @@ test('approval fails closed when the live target fingerprint changes before owne
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final registration',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true }],
       } }];
     }
     if (details.func?.name === 'verifyBrowserApprovalTarget') {
@@ -1127,7 +1127,7 @@ test('rejecting consequential action pauses agent and never executes pending cli
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Odoslať prihlášku', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Odoslať prihlášku', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1152,7 +1152,7 @@ test('ALLOW_ALL approval policy keeps fully autonomous click execution available
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1552,7 +1552,7 @@ test('INTERVAL completion schedules the next autonomous cycle instead of ending 
 test('planner parser accepts bounded fill/select/check batch and rejects invented refs', () => {
   const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [
     { ref: 'r1', tag: 'input', name: 'A', semanticIdentity: 'input-a-v1' },
-    { ref: 'r2', tag: 'select', name: 'B', semanticIdentity: 'select-b-v1' },
+    { ref: 'r2', tag: 'select', name: 'B', semanticIdentity: 'select-b-v1', optionFingerprint: 'fixture-option-b-v1' },
   ] }] };
   const action = parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions: [
     { type: 'fill', frameId: 0, ref: 'r1', text: 'A' },
@@ -1751,7 +1751,7 @@ test('partial batch preserves successful prefix evidence and replans instead of 
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'form',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'text', name: 'A' }, { ref: 'r2', tag: 'select', role: '', type: '', name: 'B', options: ['X'] }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'A' }, { ref: 'r2', tag: 'select', semanticIdentity: 'fixture-r2-select-v1', role: '', type: '', name: 'B', options: ['X'], optionFingerprint: 'fixture-option-x-v1' }],
       } }];
     }
     if (details.func?.name === 'executeBrowserPageAction' && details.args[1]?.ref === 'r2') throw new Error('select changed under us');
@@ -2119,7 +2119,7 @@ test('new owner instruction supersedes an armed approval instead of leaving stal
   chrome.scripting.executeScript = async details => {
     if (details.func?.name === 'snapshotBrowserPage') {
       const snapshotId = details.args[0];
-      return [{ frameId: 0, result: { snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final', elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }] } }];
+      return [{ frameId: 0, result: { snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final', elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }] } }];
     }
     return original(details);
   };
@@ -2385,7 +2385,7 @@ test('upload_download accepts only completed tracked download handle and always 
   const complete = { ref: 'd1', filename: 'plan.pdf', state: 'complete' };
   Object.defineProperty(complete, 'downloadId', { value: 42, enumerable: false });
   const snapshot = {
-    frames: [{ frameId: 0, elements: [{ ref: 'r1', tag: 'input', role: '', type: 'file', name: 'Attach plan', sensitive: true }] }],
+    frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'file', name: 'Attach plan', sensitive: true }] }],
     downloads: [complete],
   };
   const action = parseBrowserAgentAction(JSON.stringify({ type: 'upload_download', frameId: 0, ref: 'r1', downloadRef: 'd1' }), snapshot);
@@ -2425,7 +2425,7 @@ test('approved upload_download uses internal tracked path through CDP and verifi
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Upload',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'file', name: 'Attach study plan', sensitive: true }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'file', name: 'Attach study plan', sensitive: true }],
       } }];
     }
     if (details.func?.name === 'verifyBrowserFileInput') return [{ frameId: 0, result: { ok: true, files: [{ name: 'plan.pdf', size: 100, type: 'application/pdf' }] } }];
