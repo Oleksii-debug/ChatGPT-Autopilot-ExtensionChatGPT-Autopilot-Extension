@@ -3671,6 +3671,13 @@ test('Plan4 S1: model budget admission rejects coerced ceilings, call numbers an
     assert.equal(readback.job.runtime.modelBudgetReservationSeq, 0, field);
     assert.equal(readback.job.runtime.modelCalls, 0, field);
   }
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({ ...base, maxOutputTokens:129 }),
+    error => error.code === 'AI_MODEL_BUDGET_EXHAUSTED'
+      && error.safeBudgetReason === 'maximum per-call output-token budget reached',
+    'a direct lifecycle caller may not bypass the owner per-call output ceiling',
+  );
+  assert.equal((await manager.get(jobId)).job.runtime.modelBudgetReservationSeq, 0);
   const valid = await manager.reserveProviderModelBudget(base);
   assert.equal(valid.routeId, 'local');
   assert.equal(valid.callNumber, 1);
