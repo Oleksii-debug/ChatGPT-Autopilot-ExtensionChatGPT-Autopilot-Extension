@@ -190,6 +190,12 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       if (req.headers.origin !== undefined || req.headers['access-control-request-method'] !== undefined) {
         return reject(res);
       }
+      // Refuse unknown methods/routes before consulting the trusted owner's
+      // credential resolver. An irrelevant endpoint cannot consume bearer
+      // broker capacity or touch canonical Core, even with a valid token.
+      if (req.method !== 'POST' || req.url !== '/v1/control') {
+        return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
+      }
       const authorization = headerString(req.headers.authorization);
       const candidate = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
       // Do not invoke the credential broker on malformed anonymous requests.
@@ -211,9 +217,6 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
         }
       }
       if (!timingSafeEqual(candidateDigest, activeExpected)) return reject(res, 401);
-      if (req.method !== 'POST' || req.url !== '/v1/control') {
-        return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
-      }
       if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(headerString(req.headers['content-type']))) {
         return send(res, 415, { schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE' });
       }
