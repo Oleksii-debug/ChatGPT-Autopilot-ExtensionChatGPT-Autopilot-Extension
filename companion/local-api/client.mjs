@@ -56,7 +56,16 @@ async function readBoundedControlResponseJson(res, deadline) {
         void reader.cancel().catch(() => {});
         throw new Error('Local API response is too large');
       }
-      chunks.push(chunk.value);
+      // Snapshot bytes at the reader boundary: a custom stream can recycle
+      // its backing buffer after read() resolves. Never validate a different
+      // receipt from the bytes observed at read time.
+      chunks.push(chunk.value.slice());
+    }
+    // Even a bounded stream must agree with declared framing. A fabricated
+    // Content-Length is not evidence that a truncated/extended Core receipt
+    // was delivered, so the SDK reports ambiguity without any retry.
+    if (declared !== null && size !== Number(declared)) {
+      throw new Error('Local API response content length mismatch');
     }
     const bytes = new Uint8Array(size);
     let offset = 0;
