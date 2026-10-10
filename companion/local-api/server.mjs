@@ -136,7 +136,16 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   // Keep the transport's overlapping request population strictly bounded.
   const inFlight = new Set();
   const MAX_IN_FLIGHT = 256;
+  // Bound admission *before* token resolution, body streaming and Core calls.
+  // The per-identity inFlight fence alone cannot limit distinct IDs or slow
+  // authenticated uploads. This transport quota never grants Core authority.
+  const MAX_ACTIVE_HTTP_REQUESTS = 64;
+  let activeHttpRequests = 0;
   const server = createServer(async (req, res) => {
+    if (activeHttpRequests >= MAX_ACTIVE_HTTP_REQUESTS) {
+      return send(res, 503, FAILURE);
+    }
+    activeHttpRequests += 1;
     try {
       // Remote peers are rejected even if a caller improperly rebinds the server.
       if (req.socket.remoteAddress !== '127.0.0.1') return reject(res);
@@ -216,6 +225,10 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
     } catch {
       // Do not echo payloads, caller credentials, provider errors, or stack traces.
       return send(res, 422, FAILURE);
+    } finally {
+      // A malformed body, early denial, network abort or rejected Core action
+      // must not permanently consume capacity for subsequent valid requests.
+      activeHttpRequests -= 1;
     }
   });
   // Node's default HTTP/1 behavior automatically sends 100 Continue before
