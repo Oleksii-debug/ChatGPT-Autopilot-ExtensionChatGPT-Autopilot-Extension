@@ -78,6 +78,9 @@ function copyModelRoutePolicy(value) {
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error('modelRoutePolicy містить заборонене поле.');
+    }
     if (!MODEL_ROUTE_POLICY_KEYS.has(key)) {
       throw new Error('modelRoutePolicy містить неканонічне поле: ' + key);
     }
