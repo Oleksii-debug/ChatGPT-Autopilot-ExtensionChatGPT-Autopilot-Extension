@@ -484,3 +484,57 @@ test('Plan-1 S1: durable action and event type enums reject whitespace aliases',
   assert.equal(await guarded.execute(action()), 'executed');
   assert.equal(executions, 1, 'canonical action remains dispatchable');
 });
+
+
+test('Plan-1 S1: unknown action/event types never disclose untrusted input in diagnostics', async () => {
+  const secret = 'PRIVATE-ACTION-TYPE-CANARY-DO-NOT-LOG';
+  const invalidActionType = `submit-prompt-${secret}`;
+  const invalidEventType = `action-succeeded-${secret}`;
+  const checkRejection = (operation, kind) => {
+    assert.throws(operation, error => {
+      assert.match(error.message, new RegExp(`Unsupported agent ${kind} type`));
+      assert.doesNotMatch(error.message, /PRIVATE-ACTION-TYPE-CANARY-DO-NOT-LOG/,
+        'untrusted type content must not be promoted to logs or diagnostics');
+      return true;
+    });
+  };
+  const registry = new AgentActionHandlerRegistry();
+  let effects = 0;
+  registry.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT,
+    () => { effects += 1; return 'handled'; });
+  const published = [];
+  const sink = new AgentEventSink({ onEvent: observed => published.push(observed) });
+
+  const invalidAction = action({ type: invalidActionType });
+  const invalidEvent = event({ type: invalidEventType });
+  checkRejection(() => getAgentActionRequiredCapability(invalidActionType), 'action');
+  checkRejection(() => getAgentEventRequiredCapability(invalidEventType), 'event');
+  checkRejection(() => normalizeAgentAction(invalidAction), 'action');
+  checkRejection(() => normalizeAgentEvent(invalidEvent), 'event');
+  checkRejection(
+    () => registry.register(AgentProviderId.CHATGPT_BROWSER, invalidActionType, () => {}),
+    'action',
+  );
+  await assert.rejects(() => registry.execute(invalidAction), error => {
+    assert.match(error.message, /Unsupported agent action type/);
+    assert.doesNotMatch(error.message, /PRIVATE-ACTION-TYPE-CANARY-DO-NOT-LOG/);
+    return true;
+  });
+  await assert.rejects(() => sink.emit(invalidEvent), error => {
+    assert.match(error.message, /Unsupported agent event type/);
+    assert.doesNotMatch(error.message, /PRIVATE-ACTION-TYPE-CANARY-DO-NOT-LOG/);
+    return true;
+  });
+  assert.equal(effects, 0, 'invalid action must never dispatch an effect');
+  assert.equal(published.length, 0, 'invalid event must never publish evidence');
+  assert.equal(invalidAction.type, invalidActionType);
+  assert.equal(invalidEvent.type, invalidEventType);
+
+  const canonicalAction = normalizeAgentAction(action());
+  const canonicalEvent = await sink.emit(event());
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(canonicalAction))), canonicalAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(canonicalEvent))), canonicalEvent);
+  assert.equal(await registry.execute(action()), 'handled');
+  assert.equal(effects, 1);
+  assert.equal(published.length, 1);
+});
