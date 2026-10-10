@@ -1599,12 +1599,28 @@ export function focusBrowserAgentTarget(snapshotId, ref) {
       && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
     : [];
   const target = matches.length === 1 ? matches[0] : null;
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) {
-    return { ok: false, reason: 'target-missing-or-unavailable' };
-  }
+  // Focus itself can trigger page-authored handlers. Do not focus a control
+  // hidden or disabled by any ancestor, including after scroll reflow.
+  const unavailable = () => {
+    if (!target || !target.isConnected) return true;
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true') return true;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return true;
+    }
+    return false;
+  };
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
   target.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
   target.focus?.({ preventScroll: true });
-  return { ok: document.activeElement === target || target.contains?.(document.activeElement), reason: document.activeElement === target || target.contains?.(document.activeElement) ? '' : 'target-focus-failed' };
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
+  const focused = document.activeElement === target || Boolean(target.contains?.(document.activeElement));
+  return { ok: focused, reason: focused ? '' : 'target-focus-failed' };
 }
 
 export function verifyBrowserFileInput(snapshotId, ref) {
