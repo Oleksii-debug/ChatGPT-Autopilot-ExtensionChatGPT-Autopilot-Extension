@@ -256,10 +256,11 @@ async function fixture({
     routePrompt: async () => ({ text: '{}' }),
     now: () => Date.parse(T0),
   });
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const createdRegistry = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: createdRegistry.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: agentDefinition(),
   });
