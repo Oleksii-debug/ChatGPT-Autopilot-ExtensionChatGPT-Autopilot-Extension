@@ -307,6 +307,18 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
             // the socket closes. Recheck at the last synchronous dispatch
             // boundary, including static-token callers.
             if (res.destroyed) throw disconnectedBeforeDispatch;
+            // Core validated scope freshness before awaiting this transport-only
+            // owner-token lookup. It may have expired (or the trusted clock may
+            // have regressed) while that lookup was pending. Check the *same*
+            // canonical proof again at the last synchronous dispatch boundary;
+            // never launch a new effect under an elapsed Core authorization.
+            // Core remains the sole authority for policy and exact effects.
+            const atUse = trustedDependencies.now();
+            if (!Number.isSafeInteger(atUse) || atUse < 0
+                || atUse < Date.parse(envelope.dispatchAt)
+                || atUse > Date.parse(envelope.scopeProof.validThrough)) {
+              throw new Error('Canonical scope elapsed before dispatch');
+            }
             // Retain the pinned Core function and its original call semantics.
             return trustedDependencies.dispatchCanonicalControl(envelope);
           },
