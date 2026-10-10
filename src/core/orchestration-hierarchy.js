@@ -1266,6 +1266,14 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       const parentAction = maybePrepareParentReconciliation(graph, runtime, node.parentId, nowMs);
       if (parentAction) actions.push(parentAction);
     }
+    // An in-flight WORK node can acquire dynamically spawned direct children.
+    // If all children terminalized before the parent, their barrier must be
+    // evaluated again as this parent's WORK activation becomes terminal.
+    // The canonical reducer/prepareActivation fences duplicate reconciliation.
+    if (ledger.purpose === OrchestrationActivationPurpose.WORK && node.childIds.length) {
+      const action = maybePrepareParentReconciliation(graph, runtime, nodeId, nowMs);
+      if (action) actions.push(action);
+    }
     if (!node.parentId && ledger.purpose === OrchestrationActivationPurpose.RECONCILE) {
       const nextRoundAction = prepareNextContinuousRound(graph, runtime, nodeId, nowMs);
       if (nextRoundAction) {
