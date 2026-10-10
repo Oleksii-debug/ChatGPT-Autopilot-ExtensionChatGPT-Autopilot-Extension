@@ -2331,3 +2331,45 @@ test('Plan4 S1 rejects hostile owner route reflection without leaking trap conte
   assert.equal(good.routes[0].routeId, 'fixture');
   assert.equal(good.workerPolicy.manualRouteWorkers.fixture, 1);
 });
+
+
+test('Plan4 S1 built-in OpenAI may never masquerade as local to bypass local-only owner policy', async () => {
+  const raw = {
+    enabled:true, mode:'primary',
+    routePolicy:{locality:'local', autoSwitch:true},
+    routes:[
+      {routeId:'remote-masquerade',provider:'openai',model:'gpt-fixture',locality:'local',priority:10},
+      {routeId:'approved-loopback',provider:'ollama',model:'llama-fixture',locality:'local',priority:1},
+    ],
+  };
+  for (const persisted of [raw, JSON.parse(JSON.stringify(raw))]) {
+    assert.throws(() => normalizeAiRoutePool(persisted.routes),
+      /built-in OpenAI provider requires remote locality/);
+    assert.throws(() => normalizeAiRouterSettings(persisted),
+      /built-in OpenAI provider requires remote locality/);
+  }
+  let dispatched = 0;
+  const orchestrator = new AiOrchestrator({gatewayClient:{
+    async complete() { dispatched += 1; return {text:'must not run'}; },
+  }});
+  await assert.rejects(
+    orchestrator.run(JSON.parse(JSON.stringify(raw)), {}, 'private fixture input'),
+    /built-in OpenAI provider requires remote locality/,
+  );
+  assert.equal(dispatched, 0, 'corrupt route must be rejected before either provider effect');
+
+  const corrected = JSON.parse(JSON.stringify(raw));
+  corrected.routes[0].locality = 'remote';
+  const routes = normalizeAiRoutePool(corrected.routes);
+  assert.equal(routes[0].locality, 'remote');
+  assert.deepEqual(
+    selectAiRouteCandidates({routes,policy:corrected.routePolicy}).candidates.map(x=>x.routeId),
+    ['approved-loopback'],
+    'local-only owner policy must exclude the actual remote built-in OpenAI transport',
+  );
+  assert.deepEqual(
+    selectAiRouteCandidates({routes,policy:{locality:'remote'}}).candidates.map(x=>x.routeId),
+    ['remote-masquerade'],
+    'explicit remote policy must retain the correct built-in OpenAI route',
+  );
+});
