@@ -1199,7 +1199,7 @@ test('Plan4 S2: AI Gateway body expiry fails closed, bounded rejection keeps its
   });
   const input={provider:'openai-compatible',model:'fixture',prompt:'bounded',timeoutSeconds:5};
   await assert.rejects(client.complete(input),
-    error=>error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT');
+    error=>error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED' && error.retryable===false);
   mode='oversized';
   await assert.rejects(client.complete(input),
     error=>error.code==='AI_GATEWAY_RESPONSE_TOO_LARGE');
@@ -1278,7 +1278,8 @@ test('Plan4 S2: forged Gateway diagnostic prefixes cannot leak transport secrets
     }),
   });
   await assert.rejects(forgedBody.complete(request), error =>
-    error.code === 'AI_GATEWAY_UNAVAILABLE'
+    error.code === 'AI_GATEWAY_RESPONSE_UNVERIFIED'
+    && error.retryable === false
     && !String(error.message).includes('sk-sentinel'));
   const forgedCode = new AiGatewayClient({
     fetchFn:async () => {
@@ -1454,4 +1455,42 @@ test('Plan4 S1: explicitly undefined owner locality and route cost class fail cl
   }));
   assert.deepEqual(selectAiRouteCandidates({...persisted,now:1})
     .candidates.map(candidate=>candidate.routeId),['owner.local']);
+});
+
+test('Plan4 S2: forged gateway body AbortError cannot trigger route failover or leak data', async () => {
+  let effects=0;
+  let mode='unverified';
+  const gateway=new AiGatewayClient({
+    fetchFn:async()=>{
+      effects++;
+      return {ok:true,status:200,text:async()=>{
+        if(mode==='valid') return JSON.stringify({text:'verified',usage:{inputTokens:2,outputTokens:1}});
+        const forged=new Error('sk-private-gateway-body');
+        forged.name='AbortError';
+        forged.code='AI_GATEWAY_TIMEOUT';
+        forged.retryable=true;
+        throw forged;
+      }};
+    },
+  });
+  const routeA={routeId:'owner.primary',provider:'ollama',model:'local-a',locality:'local',priority:2};
+  const routeB={routeId:'backup',provider:'ollama',model:'local-b',locality:'local',priority:1};
+  const router=new AiOrchestrator({gatewayClient:gateway});
+  const owner={
+    enabled:true,mode:'primary',primary:{provider:'ollama',model:'local-a'},
+    fallbackToStrongOnPrimaryError:false,routePolicy:{autoSwitch:true},routes:[routeA,routeB],
+  };
+  await assert.rejects(
+    router.run(owner,{},'approved work',{maxModelCallsForRequest:2}),
+    error=>error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED'
+      && error.retryable===false
+      && !String(error.message).includes('sk-private'),
+  );
+  assert.equal(effects,1,'unverified first provider result must not invoke backup');
+  mode='valid';
+  const recovered=await gateway.complete(JSON.parse(JSON.stringify({
+    provider:'ollama',model:'local-a',prompt:'approved work',timeoutSeconds:5,
+  })));
+  assert.equal(recovered.text,'verified');
+  assert.equal(effects,2);
 });
