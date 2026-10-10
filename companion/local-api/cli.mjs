@@ -15,6 +15,8 @@ const help = `ChatGPT Автопілот — локальний CLI, API v1
   Дані запиту: JSON із schemaVersion, requestId, principalId, projectId,
   operation, targetId, payloadArtifactRef, requestedAt.
   Операції проходять звичайні перевірки політик і дозволів Core.
+  RECEIVED не означає, що задачу завершено; перевіряйте Core receipt.status.
+  Код 0: Core ACCEPTED (ще виконується) або COMPLETED; код 2: REJECTED/UNKNOWN.
   UNKNOWN_NETWORK_RESULT: перевірте стан за requestId, не повторюйте ефект сліпо.
 `;
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
@@ -39,7 +41,12 @@ async function main() {
   const result = await client.control(raw);
   // Output is structured text, accessible to NVDA and shell scripts.
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  if (result.status !== 'RECEIVED') process.exitCode = 2;
+  // RECEIVED is an authenticated transport acknowledgement, not a successful
+  // Core outcome. A canonical REJECTED receipt must never exit zero and mislead
+  // shell automation into treating a denied control operation as successful.
+  if (result.status !== 'RECEIVED' || result.result?.receipt?.status === 'REJECTED') {
+    process.exitCode = 2;
+  }
 }
 main().catch(() => {
   // No stack traces or secrets in diagnostics.
