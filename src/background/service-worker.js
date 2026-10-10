@@ -268,6 +268,7 @@ const specialistProviderReadinessResolver = Object.freeze({
     specialistReadinessConfigProvenance.set(readiness, Object.freeze({
       providerId,
       configSnapshot: JSON.stringify(persisted.config),
+      resolver,
     }));
     return readiness;
   },
@@ -279,7 +280,10 @@ const specialistProviderReadinessResolver = Object.freeze({
         || JSON.stringify(persisted.config) !== provenance.configSnapshot) {
       throw new Error('Specialist provider config changed after readiness probe');
     }
-    return true;
+    // A stable owner config does not prove live provider health. Re-probe
+    // through the SAME trusted resolver/selection before durable admission;
+    // latency drift alone is not permission drift or a second authority.
+    return provenance.resolver.assertCurrent(readiness);
   },
 });
 const specialistReadinessResolver = specialistProviderReadinessResolver;
