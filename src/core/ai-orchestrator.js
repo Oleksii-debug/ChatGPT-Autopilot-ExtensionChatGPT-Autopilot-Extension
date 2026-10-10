@@ -470,7 +470,10 @@ export class AiOrchestrator {
         }
         const receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId');
         if (!receipt || !Object.hasOwn(receipt, 'value')
-            || typeof receipt.value !== 'string' || receipt.value.length < 1 || receipt.value.length > 240) {
+            || typeof receipt.value !== 'string'
+            || receipt.value.length < 1 || receipt.value.length > 240
+            || receipt.value !== receipt.value.trim()
+            || /[\\u0000-\\u001f\\u007f]/u.test(receipt.value)) {
           const unreserved = new Error('Model-budget reservation has no exact durable identity');
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
