@@ -301,12 +301,17 @@ export function normalizeAiRoutePool(raw = []) {
     // account. Both input/output prices must be observed zero, including
     // after JSON cold restart. Preserve existing local-only pricing behavior:
     // local price caps still independently check observed dimensions.
-    if (costClass === AiRouteCostClass.FREE && locality === AiRouteLocality.REMOTE && (
-      !inputPriceKnown || !outputPriceKnown
-      || price(own(item, 'inputPricePerMillionUsd'), 'AI route input price') !== 0
-      || price(own(item, 'outputPricePerMillionUsd'), 'AI route output price') !== 0
-    )) {
-      throw new Error('AI route remote FREE pricing requires observed zero input and output cost');
+    if (costClass === AiRouteCostClass.FREE && locality === AiRouteLocality.REMOTE) {
+      // Retain the existing canonical cost-meter error contract for
+      // contradictory paid dimensions, and separately fail closed on
+      // missing remote FREE evidence before any provider request.
+      if ((inputPriceKnown && price(own(item, 'inputPricePerMillionUsd'), 'AI route input price') !== 0)
+          || (outputPriceKnown && price(own(item, 'outputPricePerMillionUsd'), 'AI route output price') !== 0)) {
+        throw new Error('Free AI route cannot declare non-zero paid pricing');
+      }
+      if (!inputPriceKnown || !outputPriceKnown) {
+        throw new Error('AI route remote FREE pricing requires observed zero input and output cost');
+      }
     }
     return Object.freeze({
       schemaVersion: AI_ROUTE_POOL_VERSION,
