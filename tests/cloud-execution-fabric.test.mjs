@@ -73,7 +73,7 @@ function slot(slotId = 'slot-a', overrides = {}) {
     artifactSyncSupported: true,
     secureScrubSupported: true,
     evidenceRetentionSupported: true,
-    observedAt: '2026-09-25T10:00:01.000Z',
+    observedAt: '2026-09-25T10:00:04.000Z',
     expiresAt: '2026-09-25T10:20:00.000Z',
     ...overrides,
   };
@@ -299,6 +299,84 @@ test('a live CLOUD owner requires exact existing workspace continuity binding an
   assert.equal(checkpointMismatch.reasonCode, 'CLOUD_CHECKPOINT_BINDING_MISMATCH');
 });
 
+test('S1 same-effect orphan and duplicate cloud bindings require canonical reconciliation after JSON restart', () => {
+  const cloud = ownedCloud();
+  const local = claimExecutionOwnershipV1(availableOwnership(), {
+    plane: 'LOCAL',
+    ownerId: 'local-owner',
+    leaseId: 'lease-local',
+    leaseUntil: '2026-09-25T10:30:00.000Z',
+    at: '2026-09-25T10:00:01.000Z',
+  });
+  const binding = workspaceBinding(cloud);
+  const cases = [
+    {
+      name: 'AVAILABLE with prior effect workspace',
+      owner: availableOwnership(),
+      bindings: [binding],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'LOCAL handoff with unswept cloud workspace',
+      owner: local,
+      bindings: [binding],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'same effect/lease with rotated policy',
+      owner: cloud,
+      bindings: [workspaceBinding(cloud, { policyEnvelopeId: 'policy-rotated' })],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'two separate workspaces for one effect',
+      owner: cloud,
+      bindings: [binding, workspaceBinding(cloud, { workspaceId: 'workspace-b' })],
+      reason: 'AMBIGUOUS_CLOUD_EFFECT_BINDINGS',
+    },
+  ];
+  for (const scenario of cases) {
+    const original = request({
+      affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+      executionOwnership: scenario.owner,
+      cloudSlots: [slot('clean-new', { workspaceId: '' })],
+      workspaceBindings: scenario.bindings,
+    });
+    for (const input of [original, JSON.parse(JSON.stringify(original))]) {
+      const assessed = assessCloudExecutionFabricV1(input);
+      assert.equal(assessed.disposition, CloudFabricDisposition.RECONCILE_REQUIRED, scenario.name);
+      assert.equal(assessed.reasonCode, scenario.reason, scenario.name);
+      assert.equal(assessed.selectedSlotId, '', scenario.name);
+      assert.equal(assessed.requiredExecutionTransition, '', scenario.name);
+      assert.equal(assessed.dispatchAuthorized, false, scenario.name);
+      assert.equal(assessed.provisioningAuthorized, false, scenario.name);
+      assert.equal(assessed.executionAuthorized, false, scenario.name);
+      assert.equal(assessed.resumeAuthorized, false, scenario.name);
+    }
+  }
+
+  // A reconciled (removed) stale workspace record restores ordinary capacity
+  // assessment; this component still cannot authorize its actual provision.
+  const recovered = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('clean-new', { workspaceId: '' })],
+    workspaceBindings: [],
+  }))));
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.selectedSlotId, 'clean-new');
+  assert.equal(recovered.provisioningAuthorized, false);
+
+  // A single current CLOUD owner/binding is legitimate continuity, not orphanage.
+  const current = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: cloud,
+    cloudSlots: [slot('current', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [binding],
+  }))));
+  assert.equal(current.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(current.requiredExecutionTransition, 'NONE');
+});
+
 test('expired execution ownership always requires reconciliation before fabric routing', () => {
   const ownership = ownedCloud({ leaseUntil: '2026-09-25T10:01:00.000Z' });
   const result = assessCloudExecutionFabricV1(request({
@@ -308,6 +386,50 @@ test('expired execution ownership always requires reconciliation before fabric r
   assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
   assert.equal(result.reasonCode, 'EXECUTION_LEASE_EXPIRED');
   assert.equal(result.recommendedPlane, '');
+});
+
+test('cloud lease deadline is exclusive before and after JSON cold restart', () => {
+  const owner = ownedCloud({ leaseUntil: '2026-09-25T10:01:00.000Z' });
+  const raw = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('slot-owned', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  });
+  const prior = assessCloudExecutionFabricV1({
+    ...raw,
+    assessedAt: '2026-09-25T10:00:59.999Z',
+  });
+  assert.equal(prior.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(prior.executionAuthorized, false);
+
+  for (const assessedAt of [
+    '2026-09-25T10:01:00.000Z',
+    '2026-09-25T10:01:00.001Z',
+  ]) {
+    const restarted = JSON.parse(JSON.stringify({ ...raw, assessedAt }));
+    const result = assessCloudExecutionFabricV1(restarted);
+    assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+    assert.equal(result.reasonCode, 'EXECUTION_LEASE_EXPIRED');
+    assert.equal(result.recommendedPlane, '');
+    assert.equal(result.executionAuthorized, false);
+  }
+});
+
+test('owner clock rollback fails closed before cloud slot recommendation', () => {
+  const owner = ownedCloud({
+    at: '2026-09-25T10:10:00.000Z',
+    leaseUntil: '2026-09-25T10:30:00.000Z',
+  });
+  const result = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    executionOwnership: owner,
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  }))));
+  assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+  assert.equal(result.reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+  assert.equal(result.recommendedPlane, '');
+  assert.equal(result.executionAuthorized, false);
 });
 
 test('checkpoint resume requires a complete exact artifact identity', () => {
@@ -383,4 +505,418 @@ test('accessor-backed outer authority is rejected without executing the getter',
     /enumerable own data properties/u,
   );
   assert.equal(reads, 0);
+});
+
+test('S1 cloud fabric rejects provider Proxy reflection traps without leaking untrusted secrets', () => {
+  const privateText = 'CLOUD_PROVIDER_ACCESS_TOKEN_MUST_NOT_APPEAR_IN_ERRORS';
+  let trapCalls = 0;
+  const hostileTrap = () => {
+    trapCalls += 1;
+    throw new Error(privateText);
+  };
+  const cases = [
+    () => normalizeCloudExecutionSlotV1(new Proxy(slot(), { getPrototypeOf: hostileTrap })),
+    () => normalizeCloudExecutionSlotV1(new Proxy(slot(), { ownKeys: hostileTrap })),
+    () => assessCloudExecutionFabricV1(new Proxy(request(), { getPrototypeOf: hostileTrap })),
+    () => assessCloudExecutionFabricV1(new Proxy(request(), { ownKeys: hostileTrap })),
+    () => assessCloudExecutionFabricV1(request({
+      cloudSlots: new Proxy([slot()], { getPrototypeOf: hostileTrap }),
+    })),
+    () => assessCloudExecutionFabricV1(request({
+      cloudSlots: new Proxy([slot()], { ownKeys: hostileTrap }),
+    })),
+  ];
+  for (const run of cases) {
+    assert.throws(run, error => {
+      assert.equal(error.message.includes(privateText), false, 'provider secrets must be redacted');
+      assert.match(error.message, /invalid own-data descriptors/u);
+      return true;
+    });
+  }
+  assert.equal(trapCalls, cases.length);
+});
+
+test('S1 cloud fabric rejects revoked provider-array Proxy on JSON cold restart', () => {
+  const { proxy, revoke } = Proxy.revocable([slot()], {});
+  revoke();
+  assert.throws(
+    () => assessCloudExecutionFabricV1({
+      ...JSON.parse(JSON.stringify(request())),
+      cloudSlots: proxy,
+    }),
+    error => {
+      assert.match(error.message, /invalid own-data descriptors/u);
+      assert.equal(error.message.includes('TypeError'), false);
+      return true;
+    },
+  );
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.executionAuthorized, false);
+});
+
+test('S1 refuses a warm workspace belonging to another canonical execution after JSON restart', () => {
+  const foreignOwner = ownedCloud();
+  const foreignBinding = workspaceBinding(foreignOwner, {
+    taskId: 'task-foreign',
+    planId: 'plan-foreign',
+    nodeId: 'node-foreign',
+    effectId: 'effect-foreign',
+    policyEnvelopeId: 'policy-foreign',
+  });
+  const current = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('occupied', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [foreignBinding],
+  });
+  for (const input of [current, JSON.parse(JSON.stringify(current))]) {
+    const blocked = assessCloudExecutionFabricV1(input);
+    assert.equal(blocked.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(blocked.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(blocked.candidateAssessments[0].reasonCode, 'WORKSPACE_BOUND_TO_OTHER_EXECUTION');
+    assert.equal(blocked.selectedWorkspaceId, '');
+    assert.equal(blocked.dispatchAuthorized, false);
+    assert.equal(blocked.executionAuthorized, false);
+  }
+
+  // Unbound capacity remains selectable without reusing another job's state.
+  const recovered = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('occupied', { workspaceId: 'workspace-a' }),
+      slot('clean-cold', {
+        workspaceId: '',
+        temperature: 'COLD',
+        estimatedStartupMs: 2500,
+      }),
+    ],
+    workspaceBindings: [foreignBinding],
+  }))));
+  assert.equal(recovered.selectedSlotId, 'clean-cold');
+  assert.equal(recovered.workspaceProvisioningRequired, true);
+  assert.equal(recovered.executionAuthorized, false);
+});
+
+test('S1 fails closed when two cloud slots advertise the same workspace identity', () => {
+  const duplicate = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('warm-one', { workspaceId: 'workspace-a' }),
+      slot('warm-two', { workspaceId: 'workspace-a' }),
+    ],
+  });
+  for (const input of [duplicate, JSON.parse(JSON.stringify(duplicate))]) {
+    const result = assessCloudExecutionFabricV1(input);
+    assert.equal(result.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(result.selectedSlotId, '');
+    assert.equal(result.candidateAssessments.length, 2);
+    assert.ok(result.candidateAssessments.every(
+      candidate => candidate.reasonCode === 'AMBIGUOUS_WORKSPACE_SLOT',
+    ));
+    assert.equal(result.executionAuthorized, false);
+  }
+  // Existing canonical binding remains eligible when the slot is unique.
+  const owner = ownedCloud();
+  const unique = assessCloudExecutionFabricV1(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('current', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }));
+  assert.equal(unique.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(unique.requiredExecutionTransition, 'NONE');
+  assert.equal(unique.executionAuthorized, false);
+});
+
+
+test('untrusted cloud capacity property names stay out of diagnostics; recovery stays usable', () => {
+  const secretField = 'bearer-token-private-credential-content';
+  const malformedRequest = request();
+  malformedRequest[secretField] = 'value';
+  assert.throws(
+    () => assessCloudExecutionFabricV1(malformedRequest),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secretField),
+  );
+
+  let getterInvocations = 0;
+  const malformedSlot = slot();
+  Object.defineProperty(malformedSlot, secretField, {
+    enumerable: true,
+    get() {
+      getterInvocations += 1;
+      throw new Error('private provider credentials');
+    },
+  });
+  assert.throws(
+    () => normalizeCloudExecutionSlotV1(malformedSlot),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secretField)
+      && !error.message.includes('private provider credentials'),
+  );
+  assert.equal(getterInvocations, 0);
+
+  const coldRestart = JSON.parse(JSON.stringify(request()));
+  coldRestart.cloudSlots[0][secretField] = 'private provider credentials';
+  assert.throws(
+    () => assessCloudExecutionFabricV1(coldRestart),
+    error => !error.message.includes(secretField)
+      && !error.message.includes('private provider credentials'),
+  );
+  const recovered = assessCloudExecutionFabricV1(request());
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.executionAuthorized, false);
+});
+
+
+test('AVAILABLE execution ownership clock rollback is fenced before any new claim', () => {
+  const rollback = assessCloudExecutionFabricV1(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  }));
+  assert.equal(rollback.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+  assert.equal(rollback.reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+  assert.equal(rollback.selectedSlotId, '');
+  assert.equal(rollback.dispatchAuthorized, false);
+  assert.equal(rollback.executionAuthorized, false);
+  const afterRestart = JSON.parse(JSON.stringify(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  })));
+  assert.equal(assessCloudExecutionFabricV1(afterRestart).reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+
+  const forwardClock = assessCloudExecutionFabricV1(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:06:00.000Z',
+  }));
+  assert.equal(forwardClock.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(forwardClock.dispatchAuthorized, false);
+  assert.equal(forwardClock.executionAuthorized, false);
+});
+
+test('S1 provider readiness rejects hostile reflection without secret disclosure or side effects', () => {
+  const privateText = 'PRIVATE_PROVIDER_CREDENTIAL_NOT_FOR_DIAGNOSTICS';
+  let getterCalls = 0;
+  let reflectionCalls = 0;
+  const hostileReflection = () => {
+    reflectionCalls += 1;
+    throw new Error(privateText);
+  };
+  const cases = [
+    new Proxy(provider(), { getPrototypeOf: hostileReflection }),
+    new Proxy(provider(), { ownKeys: hostileReflection }),
+    Object.defineProperty(provider(), 'health', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        throw new Error(privateText);
+      },
+    }),
+    { ...provider(), [privateText]: 'forbidden' },
+  ];
+  for (const state of cases) {
+    assert.throws(
+      () => assessCloudExecutionFabricV1(request({ providerStates: [state] })),
+      error => error instanceof Error
+        && !error.message.includes(privateText)
+        && /providerStates\[0\]/u.test(error.message),
+    );
+  }
+  assert.equal(reflectionCalls, 2);
+  assert.equal(getterCalls, 0);
+
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request({ providerStates: [provider()] }))),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.executionAuthorized, false);
+});
+
+
+test('S1 refuses future and pre-owner cloud workspace bindings after JSON cold restart', () => {
+  const owner = ownedCloud();
+  const scenarios = [
+    {
+      label: 'future canonical binding',
+      binding: workspaceBinding(owner, {
+        boundAt: '2026-09-25T10:06:00.000Z',
+      }),
+    },
+    {
+      label: 'binding predates current owner epoch',
+      binding: workspaceBinding(owner, {
+        baselineObservedAt: '2026-09-25T09:59:59.000Z',
+        boundAt: '2026-09-25T10:00:00.000Z',
+      }),
+    },
+  ];
+  for (const scenario of scenarios) {
+    const input = request({
+      affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+      executionOwnership: owner,
+      cloudSlots: [slot('current-slot', { workspaceId: 'workspace-a' })],
+      workspaceBindings: [scenario.binding],
+    });
+    for (const durableInput of [input, JSON.parse(JSON.stringify(input))]) {
+      const result = assessCloudExecutionFabricV1(durableInput);
+      assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED, scenario.label);
+      assert.equal(result.reasonCode, 'CLOUD_WORKSPACE_BINDING_CHRONOLOGY', scenario.label);
+      assert.equal(result.selectedWorkspaceId, '', scenario.label);
+      assert.equal(result.requiredExecutionTransition, '', scenario.label);
+      assert.equal(result.provisioningAuthorized, false, scenario.label);
+      assert.equal(result.dispatchAuthorized, false, scenario.label);
+      assert.equal(result.executionAuthorized, false, scenario.label);
+      assert.equal(result.resumeAuthorized, false, scenario.label);
+    }
+  }
+  // A freshly bound workspace remains eligible for an advisory assessment.
+  const valid = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('current-slot', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }))));
+  assert.equal(valid.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(valid.selectedWorkspaceId, 'workspace-a');
+  assert.equal(valid.requiredExecutionTransition, 'NONE');
+  assert.equal(valid.executionAuthorized, false);
+});
+
+test('S1 unbound warm workspace cannot be reused without a canonical owner binding after cold restart', () => {
+  const orphan = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('orphan-slot', { workspaceId: 'orphan-workspace' })],
+    workspaceBindings: [],
+  });
+  for (const durableInput of [orphan, JSON.parse(JSON.stringify(orphan))]) {
+    const outcome = assessCloudExecutionFabricV1(durableInput);
+    assert.equal(outcome.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(outcome.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(outcome.selectedSlotId, '');
+    assert.equal(outcome.candidateAssessments[0].reasonCode,
+      'UNBOUND_WORKSPACE_REQUIRES_RECONCILIATION');
+    for (const authority of ['provisioningAuthorized', 'dispatchAuthorized',
+      'executionAuthorized', 'resumeAuthorized', 'teardownAuthorized']) {
+      assert.equal(outcome[authority], false, authority);
+    }
+  }
+
+  // A distinct, empty slot can still be proposed for canonical provisioning;
+  // the preexisting unbound workspace must never be selected as a shortcut.
+  const safe = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('unbound', { workspaceId: 'orphan-workspace', estimatedCostUsdMicros: 1 }),
+      slot('new-unbound-capacity', { workspaceId: '' }),
+    ],
+  }))));
+  assert.equal(safe.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(safe.selectedSlotId, 'new-unbound-capacity');
+  assert.equal(safe.workspaceProvisioningRequired, true);
+  assert.equal(safe.provisioningAuthorized, false);
+
+  // Exact canonical ownership and persisted workspace identity are retained
+  // as advisory continuity, not a new permission to execute.
+  const owner = ownedCloud();
+  const authorizedBinding = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('bound', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }))));
+  assert.equal(authorizedBinding.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(authorizedBinding.selectedWorkspaceId, 'workspace-a');
+  assert.equal(authorizedBinding.executionAuthorized, false);
+});
+
+test('S1 bound workspace requires slot evidence at or after canonical binding across JSON restart', () => {
+  const owner = ownedCloud();
+  const binding = workspaceBinding(owner);
+  const stale = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('stale-after-owner-before-binding', {
+      workspaceId: 'workspace-a',
+      observedAt: '2026-09-25T10:00:02.000Z',
+    })],
+    workspaceBindings: [binding],
+  });
+  for (const input of [stale, JSON.parse(JSON.stringify(stale))]) {
+    const outcome = assessCloudExecutionFabricV1(input);
+    assert.equal(outcome.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(outcome.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(outcome.candidateAssessments[0].reasonCode,
+      'SLOT_OBSERVATION_PREDATES_BINDING');
+    assert.equal(outcome.selectedWorkspaceId, '');
+    assert.equal(outcome.requiredExecutionTransition, '');
+    assert.equal(outcome.dispatchAuthorized, false);
+    assert.equal(outcome.executionAuthorized, false);
+    assert.equal(outcome.resumeAuthorized, false);
+  }
+  // A new, independently observed slot after the durable binding may be
+  // recommended, but even then execution authority remains in canonical Core.
+  const fresh = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('fresh-bound', {
+      workspaceId: 'workspace-a',
+      observedAt: binding.boundAt,
+    })],
+    workspaceBindings: [binding],
+  }))));
+  assert.equal(fresh.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(fresh.selectedWorkspaceId, 'workspace-a');
+  assert.equal(fresh.workspaceProvisioningRequired, false);
+  assert.equal(fresh.requiredExecutionTransition, 'NONE');
+  assert.equal(fresh.dispatchAuthorized, false);
+  assert.equal(fresh.executionAuthorized, false);
+});
+
+
+test('S1 redacts duplicate cloud capacity identity values before logging errors', () => {
+  const secret = 'PRIVATE_CLOUD_CREDENTIAL_SHOULD_NEVER_BE_DIAGNOSTIC_TEXT';
+  const cases = [
+    {
+      input: request({ providerStates: [provider(secret), provider(secret)] }),
+      reason: /duplicate provider readiness/u,
+    },
+    {
+      input: request({ cloudSlots: [slot(secret), slot(secret)] }),
+      reason: /duplicate slot/u,
+    },
+    {
+      input: request({
+        workspaceBindings: [
+          workspaceBinding(ownedCloud(), { workspaceId: secret }),
+          workspaceBinding(ownedCloud(), { workspaceId: secret }),
+        ],
+      }),
+      reason: /duplicate workspace binding/u,
+    },
+  ];
+  for (const { input, reason } of cases) {
+    // Both in-memory provider inputs and persistence-rehydrated inputs must
+    // be rejected without copying a potentially private identity to logs.
+    for (const candidate of [input, JSON.parse(JSON.stringify(input))]) {
+      assert.throws(
+        () => assessCloudExecutionFabricV1(candidate),
+        error => error instanceof Error
+          && reason.test(error.message)
+          && !error.message.includes(secret),
+      );
+    }
+  }
+  const afterRecovery = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(afterRecovery.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(afterRecovery.dispatchAuthorized, false);
+  assert.equal(afterRecovery.executionAuthorized, false);
 });

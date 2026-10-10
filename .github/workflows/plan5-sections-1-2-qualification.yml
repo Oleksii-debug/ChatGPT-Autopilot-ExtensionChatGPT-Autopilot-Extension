@@ -1,0 +1,32 @@
+name: Plan 5 S1-S2 Cloud and Remote Safety Qualification
+on:
+  push:
+    branches:
+      - plan5/**
+  pull_request:
+    paths:
+      - 'src/core/cloud-workspace-contract.js'
+      - 'src/core/cloud-execution-fabric.js'
+      - 'src/core/remote-steering-contract.js'
+      - 'tests/cloud-workspace-contract.test.mjs'
+      - 'tests/cloud-execution-fabric.test.mjs'
+      - 'tests/remote-steering-contract.test.mjs'
+      - 'tests/plan5-cross-plane-restart.test.mjs'
+      - '.github/workflows/plan5-sections-1-2-qualification.yml'
+permissions:
+  contents: read
+jobs:
+  plan5-component-tests:
+    name: Node 22 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact 11.x cloud/ownership and remote steering contracts
+        run: node --test tests/cloud-workspace-contract.test.mjs tests/cloud-execution-fabric.test.mjs tests/execution-plane-ownership.test.mjs tests/remote-steering-contract.test.mjs tests/plan5-cross-plane-restart.test.mjs
