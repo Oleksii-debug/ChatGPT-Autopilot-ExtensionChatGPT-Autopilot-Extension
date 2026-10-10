@@ -225,7 +225,14 @@ export function normalizeAiRoutePool(raw = []) {
     if (typeof provider !== 'string' || provider !== provider.trim() || provider.length > 40
         || !PROVIDERS.has(provider)) throw new Error('AI route provider must be an exact supported identity');
     const model = own(item, 'model');
-    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300) {
+    // Exact provider dispatch IDs must never contain terminal control characters,
+    // bidi overrides or malformed Unicode. Do not normalize valid Unicode IDs.
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300
+        || /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(model)
+        || Array.from(model).some(char => {
+          const point = char.codePointAt(0);
+          return point >= 0xd800 && point <= 0xdfff;
+        })) {
       throw new Error('AI route model must be an exact bounded identity');
     }
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
