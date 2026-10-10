@@ -463,6 +463,34 @@ test('semantic check cannot toggle through a focus-time overlay', () => {
   assert.equal(element.clicked, 0);
 });
 
+test('resumed semantic check refuses missing or coerced intent at DOM effect boundary', () => {
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'checkbox';
+  element.checked = false;
+  element.setAttribute('type', 'checkbox');
+  element.click = () => { element.clicked++; element.checked = true; };
+  const observed = snapshotBrowserPage('check-resumed-intent');
+  const valid = parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url },
+  );
+  for (const checked of [undefined, null, 'false', 'true', 0, 1, {}, []]) {
+    const resumed = JSON.parse(JSON.stringify(valid));
+    if (checked === undefined) delete resumed.checked;
+    else resumed.checked = checked;
+    assert.throws(
+      () => executeBrowserPageAction('check-resumed-intent', resumed),
+      /AGENT_CHECK_STATE_INVALID/,
+    );
+    assert.equal(element.clicked, 0, 'bad persisted intent must dispatch no click');
+    assert.equal(element.checked, false);
+  }
+  const admitted = JSON.parse(JSON.stringify(valid));
+  assert.equal(executeBrowserPageAction('check-resumed-intent', admitted).checked, true);
+  assert.equal(element.clicked, 1);
+});
+
 test('semantic check still toggles a stable and visible target', () => {
   setup();
   element.tagName = 'INPUT';
