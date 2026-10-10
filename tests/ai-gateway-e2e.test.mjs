@@ -95,6 +95,54 @@ test('Plan4 S1 real HTTP gateway forbids endpoint alias, duplicate ID and erased
   }
 });
 
+test('Plan4 S1 loopback HTTP never infers a custom provider account from a single configured endpoint', async () => {
+  const stored=JSON.stringify([{endpointId:'only-account',baseUrl:'https://tenant.example.test/v1',
+    apiKeyEnv:'TENANT_KEY'}]);
+  const endpoints=normalizeCompatibleEndpointRegistry(JSON.parse(stored));
+  let upstream=0;
+  const server=createGatewayServer({
+    compatibleEndpoints:endpoints,env:{TENANT_KEY:'fixture-token-only'},
+    fetchFn:async (url,init={})=>{
+      upstream++;
+      assert.equal(url.startsWith('https://tenant.example.test/v1/'),true);
+      assert.equal(init.headers.authorization,'Bearer fixture-token-only');
+      return url.endsWith('/models') ? response({data:[{id:'model-x'}]})
+        : response({choices:[{message:{content:'verified'}}]});
+    },
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const root=`http://127.0.0.1:${server.address().port}`;
+  try {
+    const health=await fetch(`${root}/health`);
+    assert.equal(health.status,200);
+    assert.deepEqual((await health.json()).compatibleEndpoints.map(x=>x.endpointId),['only-account']);
+    const discovery=await fetch(`${root}/models?provider=openai-compatible`);
+    assert.equal(discovery.status,404);
+    assert.equal((await discovery.json()).code,'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
+    const completion=await fetch(`${root}/complete`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:'openai-compatible',model:'model-x',prompt:'no bound account'}),
+    });
+    assert.equal(completion.status,404);
+    assert.equal((await completion.json()).code,'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
+    assert.equal(upstream,0,'no credential or prompt leaves without explicit account identity');
+    const models=await fetch(`${root}/models?provider=openai-compatible&endpointId=only-account`);
+    assert.equal(models.status,200);
+    assert.equal((await models.json()).endpointId,'only-account');
+    const exact=await fetch(`${root}/complete`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:'openai-compatible',endpointId:'only-account',model:'model-x',prompt:'approved'}),
+    });
+    assert.equal(exact.status,200);
+    const result=await exact.json();
+    assert.equal(result.endpointId,'only-account');
+    assert.equal(result.text,'verified');
+    assert.equal(upstream,2);
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+  }
+});
+
 test('gateway rejects web origins and binds exactly one Chrome extension during an explicit pairing window', async () => {
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-gateway-e2e-pair-'));
   const pairingStore = createExtensionPairingStore({ configDir });
