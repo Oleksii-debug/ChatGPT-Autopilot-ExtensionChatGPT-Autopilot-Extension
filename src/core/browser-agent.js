@@ -1541,7 +1541,11 @@ export function browserAgentCoordinateTargetFingerprint(element) {
 export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const target = Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === String(ref || '') && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll(`[${marker}]`)).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
   if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
   // Approval is replayed after a durable wait. A still-connected child of a
   // hidden/inert/disabled ancestor is no longer an actionable control.
@@ -1589,7 +1593,12 @@ export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
 }
 
 export function focusBrowserAgentTarget(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === String(ref || '') && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
   if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) {
     return { ok: false, reason: 'target-missing-or-unavailable' };
   }
@@ -1601,9 +1610,12 @@ export function focusBrowserAgentTarget(snapshotId, ref) {
 export function verifyBrowserFileInput(snapshotId, ref) {
   // Chrome serializes this function into the page. Site-visible input/change
   // events are effects: prove target availability and chosen files first.
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element =>
-    element.getAttribute('data-autopilot-agent-ref') === String(ref || '')
-    && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
   if (!(target instanceof HTMLInputElement) || String(target.type || '').toLowerCase() !== 'file'
     || !target.isConnected) throw new Error('AGENT_FILE_INPUT_STALE');
   for (let node = target; node; node = node.parentElement) {
@@ -1639,9 +1651,12 @@ export function proveBrowserNativeClick(snapshotId, ref, expected) {
     || typeof expected.expectedSemanticHref !== 'string'
     || typeof expected.expectedSemanticFormAction !== 'string'
     || typeof expected.expectedSemanticFormMethod !== 'string') return null;
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element =>
-    element.getAttribute('data-autopilot-agent-ref') === ref
-    && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId);
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
   if (!target || !target.isConnected) return null;
   const normalized = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   const identity = element => {
