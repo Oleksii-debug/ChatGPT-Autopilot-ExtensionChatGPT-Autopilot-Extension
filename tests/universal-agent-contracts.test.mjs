@@ -76,6 +76,36 @@ test('Plan-1 S1: empty optional effect and approval references cannot be erased 
 });
 
 
+test('Plan-1 S1: credential scope authority stays exact and unique across restart', () => {
+  const base = credential();
+  const accepted = normalizeCredentialRefV1({
+    ...base, scope: ['drive.file', 'drive.metadata.readonly'],
+  });
+  assert.deepEqual(accepted.scope, ['drive.file', 'drive.metadata.readonly']);
+  assert.ok(Object.isFrozen(accepted.scope));
+  assert.deepEqual(normalizeCredentialRefV1(JSON.parse(JSON.stringify(accepted))), accepted,
+    'canonical scope authority must be stable through a cold JSON restart');
+
+  for (const scope of [
+    [' drive.file'], ['drive.file '], ['drive.file\\t'],
+    ['drive.file', 'drive.file'], ['drive.file', ' drive.file'],
+  ]) {
+    const corrupt = credential({ scope });
+    const prior = JSON.parse(JSON.stringify(corrupt));
+    assert.throws(() => normalizeCredentialRefV1(corrupt), /scope/,
+      'credential scope must never be trimmed or deduplicated into new authority');
+    assert.deepEqual(corrupt, prior, 'failed credential admission must not mutate caller data');
+    assert.throws(() => normalizeCredentialRefV1(JSON.parse(JSON.stringify(corrupt))), /scope/,
+      'persisted corrupt scope must remain rejected after cold restart');
+  }
+
+  const secret = 'UNTRUSTED_SCOPE_SECRET_MUST_NOT_LEAK';
+  assert.throws(() => normalizeCredentialRefV1(credential({ scope: [secret + ' '] })), error => {
+    assert.doesNotMatch(error.message, /UNTRUSTED_SCOPE_SECRET_MUST_NOT_LEAK/);
+    return true;
+  });
+});
+
 test('Plan-1 S1: credential expiry cannot be erased by empty timestamp on recovery', () => {
   const legacy = credential();
   delete legacy.expiresAt;
