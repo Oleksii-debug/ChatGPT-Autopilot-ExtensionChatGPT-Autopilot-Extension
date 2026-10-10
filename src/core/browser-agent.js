@@ -1265,8 +1265,12 @@ export function executeBrowserPageAction(snapshotId, action) {
     return { ok: true, kind: 'select', effectVerified: true, selected: String(option.textContent || option.label || option.value).trim(), url: location.href };
   }
   if (action.type === 'check') {
+    // The parser validates model JSON, but resumed/approved actions may reach
+    // this executor through persisted job state. Never let a missing or
+    // coercible checked value turn into an implicit true side effect.
+    if (typeof action.checked !== 'boolean') throw new Error('AGENT_CHECK_STATE_INVALID');
     const element = ensureTarget();
-    const desired = action.checked !== false;
+    const desired = action.checked;
     const role = element.getAttribute('role');
     const current = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
     if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
