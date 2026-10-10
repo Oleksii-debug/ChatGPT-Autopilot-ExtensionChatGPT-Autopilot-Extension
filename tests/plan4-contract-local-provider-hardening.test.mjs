@@ -2377,3 +2377,53 @@ test('Plan4 S1 built-in OpenAI may never masquerade as local to bypass local-onl
     'explicit remote policy must retain the correct built-in OpenAI route',
   );
 });
+
+
+test('Plan4 S1 FREE classification cannot disguise remote UNKNOWN or positive provider price across restart', async () => {
+  const remote = {
+    routeId:'remote-free', provider:'openai-compatible', model:'fixture-remote',
+    locality:'remote', costClass:'free',
+  };
+  const contradictory = [
+    remote,
+    {...remote,inputPricePerMillionUsd:0},
+    {...remote,outputPricePerMillionUsd:0},
+    {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0.01},
+    {...remote,inputPricePerMillionUsd:0.01,outputPricePerMillionUsd:0},
+    {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0,inputPriceKnown:false},
+    {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0,outputPriceKnown:false},
+    {...route,routeId:'local-false-free',costClass:'free',inputPricePerMillionUsd:0.05},
+  ];
+  let providerEffects = 0;
+  const router = new AiOrchestrator({gatewayClient:{
+    async complete() { providerEffects += 1; return {text:'unexpected charge'}; },
+  }});
+  for (const value of contradictory) {
+    for (const candidate of [value, JSON.parse(JSON.stringify(value))]) {
+      assert.throws(() => normalizeAiRoutePool([candidate]), /FREE pricing requires/);
+      const request = {
+        enabled:true, mode:'primary', routes:[candidate],
+        routePolicy:{freeOnly:true, locality:'any'},
+      };
+      assert.throws(() => normalizeAiRouterSettings(request), /FREE pricing requires/);
+      await assert.rejects(router.run(request, {}, 'never charge this fixture'),
+        /FREE pricing requires/);
+    }
+  }
+  assert.equal(providerEffects,0, 'invalid free price cannot issue a provider effect');
+
+  const verified = {...remote,inputPricePerMillionUsd:0,outputPricePerMillionUsd:0};
+  const normalized = normalizeAiRoutePool([verified]);
+  const persisted = normalizeAiRoutePool(JSON.parse(JSON.stringify(normalized)));
+  assert.equal(persisted[0].inputPriceKnown,true);
+  assert.equal(persisted[0].outputPriceKnown,true);
+  assert.deepEqual(
+    selectAiRouteCandidates({routes:persisted,policy:{freeOnly:true,locality:'remote'},now:1}).eligibleRouteIds,
+    ['remote-free'],
+  );
+  const local = normalizeAiRoutePool([{...route,routeId:'local-ollama-free'}]);
+  assert.deepEqual(
+    selectAiRouteCandidates({routes:local,policy:{freeOnly:true,locality:'local'},now:1}).eligibleRouteIds,
+    ['local-ollama-free'],
+  );
+});
