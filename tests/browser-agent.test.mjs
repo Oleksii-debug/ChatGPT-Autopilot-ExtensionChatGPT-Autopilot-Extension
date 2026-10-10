@@ -3127,7 +3127,7 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
     prompt:'bounded prompt',
     systemPrompt:'bounded system',
     maxOutputTokens:128,
-    route:{ routeId:'primary', provider:'ollama', model:'qwen:8b' },
+    route:{ routeId:'primary', provider:'openai-compatible', model:'fixture-model', endpointId:'owner.endpoint' },
     callNumber:1,
   });
   const beforeRestart = await manager.get('job-budget-restart');
@@ -3135,6 +3135,11 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.reservationId, reservation.reservationId);
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.modelCalls, 1);
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.outputTokens, 128);
+  assert.equal(reservation.endpointId, 'owner.endpoint', 'reservation exposes exact account endpoint');
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.endpointId, 'owner.endpoint',
+    'the canonical durable store preserves endpoint attribution before dispatch');
+  assert.equal(JSON.parse(JSON.stringify(beforeRestart.job.runtime.modelBudgetReservation)).endpointId,
+    'owner.endpoint', 'JSON persistence must not erase endpoint identity');
 
   await assert.rejects(
     () => manager.reserveProviderModelBudget({
@@ -3151,6 +3156,9 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
   );
 
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 51_000 });
+  const cold = await restarted.get('job-budget-restart');
+  assert.equal(cold.job.runtime.modelBudgetReservation.endpointId, 'owner.endpoint',
+    'cold restart must retain the endpoint of the consumed provider attempt');
   assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-budget-restart'), true);
   const recovered = await restarted.get('job-budget-restart');
   assert.equal(recovered.job.runtime.modelBudgetReservation, null);
