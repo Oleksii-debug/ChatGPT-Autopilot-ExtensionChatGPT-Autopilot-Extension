@@ -580,3 +580,73 @@ test('Section 1 negative-zero injected clock is denied before the provider bound
   );
   assert.equal(effects, 0, 'noncanonical clock must not dispatch any provider effect');
 });
+
+
+test('Section 1 readiness provider rejects hostile reflection without leaking untrusted exception text', async () => {
+  const selection = fixture().selection;
+  let providerEffects = 0;
+  const resolverFor = resolveReadiness => new SpecialistProviderReadinessResolverV1({
+    now: () => T0,
+    bindings: [{ providerId: 'provider.local', maxAgeMs: 300_000, resolveReadiness }],
+  });
+  const poisonedResult = new Proxy({}, {
+    getPrototypeOf() { throw new Error('SECRET_RESOLVER_RESULT_PROTO_162'); },
+  });
+  const poisonedArray = new Proxy([], {
+    ownKeys() { throw new Error('SECRET_RESOLVER_ARRAY_KEYS_163'); },
+  });
+  const poisonedState = new Proxy({}, {
+    getPrototypeOf() { throw new Error('SECRET_RESOLVER_NESTED_STATE_164'); },
+  });
+  for (const [result, secret] of [
+    [poisonedResult, 'SECRET_RESOLVER_RESULT_PROTO_162'],
+    [{ observedAt: ts(T0), providerStates: poisonedArray }, 'SECRET_RESOLVER_ARRAY_KEYS_163'],
+    [{ observedAt: ts(T0), providerStates: [poisonedState] }, 'SECRET_RESOLVER_NESTED_STATE_164'],
+  ]) {
+    const resolver = resolverFor(() => result);
+    await assert.rejects(resolver.resolve(selection), error =>
+      !error.message.includes(secret)
+      && (/cannot be inspected safely|not canonical provider evidence/u).test(error.message));
+  }
+  assert.equal(providerEffects, 0, 'invalid provider readiness cannot dispatch effects');
+});
+
+test('Section 1 rejects secret-bearing provider resolver failures with opaque diagnostics', async () => {
+  const selection = fixture().selection;
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    now: () => T0,
+    bindings: [{
+      providerId: 'provider.local',
+      maxAgeMs: 300_000,
+      resolveReadiness: async () => {
+        throw new Error('SECRET_PROVIDER_CREDENTIAL_165');
+      },
+    }],
+  });
+  await assert.rejects(resolver.resolve(selection), error =>
+    error.message === 'Trusted readiness provider resolution failed'
+    && !error.message.includes('SECRET_PROVIDER_CREDENTIAL_165')
+    && !Object.hasOwn(error, 'cause'));
+});
+
+test('Section 1 rejects hostile resolver binding reflection before any resolution', () => {
+  let calls = 0;
+  const poisonedBinding = new Proxy({}, {
+    ownKeys() { throw new Error('SECRET_RESOLVER_BINDING_166'); },
+  });
+  assert.throws(() => new SpecialistProviderReadinessResolverV1({
+    bindings: [poisonedBinding],
+    now: () => { calls += 1; return T0; },
+  }), error => /cannot be inspected safely/u.test(error.message)
+    && !error.message.includes('SECRET_RESOLVER_BINDING_166'));
+  assert.equal(calls, 0);
+});
+
+test('Section 1 canonical resolver-positive path is preserved after hostile input hardening', async () => {
+  const f = fixture();
+  const actual = await f.trustedResolver.resolve(f.selection);
+  assert.equal(actual.executable, true);
+  assert.equal(actual.trustedResolverInvoked, true);
+  assert.equal(actual.authority.providerExecutionAuthorized, false);
+  assert.equal(f.providerCalls, 0);
+});
