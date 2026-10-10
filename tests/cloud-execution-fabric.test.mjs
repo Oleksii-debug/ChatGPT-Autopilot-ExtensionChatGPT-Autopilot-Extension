@@ -920,3 +920,123 @@ test('S1 redacts duplicate cloud capacity identity values before logging errors'
   assert.equal(afterRecovery.dispatchAuthorized, false);
   assert.equal(afterRecovery.executionAuthorized, false);
 });
+
+test('S1 cloud owner input reflection fence redacts secrets and recovers after JSON restart', () => {
+  const privateText = 'PRIVATE_OWNER_STORE_TOKEN_NEVER_FOR_DIAGNOSTICS';
+  let getterCalls = 0;
+  let reflectionCalls = 0;
+  const hostileTrap = () => {
+    reflectionCalls += 1;
+    throw new Error(privateText);
+  };
+  const accessorOwner = { ...availableOwnership() };
+  Object.defineProperty(accessorOwner, 'taskId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error(privateText);
+    },
+  });
+  const scenarios = [
+    new Proxy(availableOwnership(), { getPrototypeOf: hostileTrap }),
+    new Proxy(availableOwnership(), { ownKeys: hostileTrap }),
+    accessorOwner,
+    { ...availableOwnership(), [privateText]: 'do not echo the key' },
+  ];
+  for (const executionOwnership of scenarios) {
+    assert.throws(
+      () => assessCloudExecutionFabricV1(request({ executionOwnership })),
+      error => error instanceof Error
+        && /CloudFabricRequestV1\.executionOwnership/u.test(error.message)
+        && !error.message.includes(privateText),
+    );
+  }
+  assert.equal(reflectionCalls, 2);
+  assert.equal(getterCalls, 0);
+
+  // A persisted, structurally valid owner still follows the same single
+  // canonical normalizer and remains advisory after a cold restart.
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request({ executionOwnership: availableOwnership() }))),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.recommendedPlane, 'CLOUD');
+  assert.equal(recovered.executionAuthorized, false);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.provisioningAuthorized, false);
+});
+
+test('S1 rejects explicit null cloud budget evidence after durable JSON restart', () => {
+  // Missing legacy fields may still use canonical zero defaults, but an
+  // explicitly persisted null is corruption and must not be normalized away.
+  for (const field of ['resourceBudget', 'resourceUsage', 'cloudResourceRequest']) {
+    const original = request({ [field]: null });
+    for (const candidate of [original, JSON.parse(JSON.stringify(original))]) {
+      assert.throws(
+        () => assessCloudExecutionFabricV1(candidate),
+        error => error instanceof Error
+          && error.message.includes('CloudFabricRequestV1.' + field)
+          && error.message.includes('must be an object'),
+      );
+    }
+  }
+  const valid = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(valid.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(valid.dispatchAuthorized, false);
+  assert.equal(valid.executionAuthorized, false);
+  assert.equal(valid.provisioningAuthorized, false);
+});
+
+test('S1 cloud budget and usage reflection boundary redacts hostile metadata and recovers', () => {
+  const privateText = 'PRIVATE_CLOUD_BUDGET_TOKEN_NOT_FOR_DIAGNOSTICS';
+  let reflectionCalls = 0;
+  let getterCalls = 0;
+  const hostileReflection = () => {
+    reflectionCalls += 1;
+    throw new Error(privateText);
+  };
+  const hostileAccessorBudget = { ...resourceBudget() };
+  Object.defineProperty(hostileAccessorBudget, 'maxCostUsdMicros', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error(privateText);
+    },
+  });
+  const cases = [
+    { field: 'resourceBudget', value: new Proxy(resourceBudget(), { getPrototypeOf: hostileReflection }) },
+    { field: 'resourceUsage', value: new Proxy({}, { ownKeys: hostileReflection }) },
+    { field: 'cloudResourceRequest', value: new Proxy(cloudResourceRequest(), { getPrototypeOf: hostileReflection }) },
+    { field: 'resourceBudget', value: hostileAccessorBudget },
+    { field: 'resourceUsage', value: { [privateText]: 1 } },
+    { field: 'cloudResourceRequest', value: { ...cloudResourceRequest(), [privateText]: 1 } },
+  ];
+  for (const { field, value } of cases) {
+    assert.throws(
+      () => assessCloudExecutionFabricV1(request({ [field]: value })),
+      error => error instanceof Error
+        && error.message.includes('CloudFabricRequestV1.' + field)
+        && !error.message.includes(privateText),
+    );
+  }
+  assert.equal(reflectionCalls, 3);
+  assert.equal(getterCalls, 0);
+
+  // The existing shared governor still adjudicates a valid durable request;
+  // boundary hardening does not grant execution or bypass budget denial.
+  const valid = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request())));
+  assert.equal(valid.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(valid.dispatchAuthorized, false);
+  assert.equal(valid.executionAuthorized, false);
+  assert.equal(valid.provisioningAuthorized, false);
+
+  const denied = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    resourceBudget: resourceBudget(0),
+  }))));
+  assert.equal(denied.disposition, CloudFabricDisposition.BLOCKED);
+  assert.equal(denied.executionAuthorized, false);
+});

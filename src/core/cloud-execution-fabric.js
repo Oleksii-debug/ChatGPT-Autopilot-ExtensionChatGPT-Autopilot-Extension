@@ -313,6 +313,30 @@ export function normalizeCloudExecutionSlotV1(input) {
 // Provider readiness is an untrusted discovery payload. Snapshot and allowlist
 // descriptors before entering the shared capability normalizer, so hostile
 // Proxy traps and getter text can never become cloud diagnostics.
+// The canonical execution owner is supplied to this advisory capacity boundary
+// by a caller or a recovered JSON job.  Do not let proxy reflection, getters
+// or attacker-controlled field names escape into diagnostics from the shared
+// ownership normalizer.  It remains the sole semantic ownership authority.
+// Budget fields are provider/request input at this boundary. Snapshot them
+// before the existing ResourceBudgetGovernor so malicious Proxy traps, accessors
+// and unknown field names cannot surface tenant data in a canonical timeline.
+const FABRIC_BUDGET_KEYS = new Set([
+  'maxConcurrentAgents', 'maxChildAgents', 'maxModelCalls',
+  'maxModelInputTokens', 'maxModelOutputTokens', 'maxRuntimeSeconds',
+  'maxCostUsdMicros',
+]);
+const FABRIC_RESOURCE_KEYS = new Set([
+  'concurrentAgents', 'childAgents', 'modelCalls', 'modelInputTokens',
+  'modelOutputTokens', 'runtimeSeconds', 'costUsdMicros',
+]);
+
+const FABRIC_OWNERSHIP_KEYS = new Set([
+  'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId',
+  'policyEnvelopeId', 'state', 'ownerPlane', 'ownerId', 'leaseId',
+  'leaseUntil', 'handoffToPlane', 'handoffId', 'ambiguityReason',
+  'updatedAt', 'revision',
+]);
+
 const PROVIDER_STATE_KEYS = new Set([
   'schemaVersion', 'providerId', 'toolId', 'health',
   'installationRequired', 'installed', 'authenticationRequired',
@@ -543,7 +567,9 @@ export function assessCloudExecutionFabricV1(input) {
     throw new Error('CloudFabricRequestV1 checkpoint identity must be complete');
   }
 
-  const ownership = normalizeExecutionOwnershipV1(raw.executionOwnership);
+  const ownership = normalizeExecutionOwnershipV1(snapshotRecord(
+    raw.executionOwnership, 'CloudFabricRequestV1.executionOwnership', FABRIC_OWNERSHIP_KEYS,
+  ));
   const slots = dataArray(raw.cloudSlots, 'CloudFabricRequestV1.cloudSlots', MAX_SLOTS)
     .map((item, index) => {
       try {
@@ -573,9 +599,9 @@ export function assessCloudExecutionFabricV1(input) {
     }
   }
   const budget = evaluateResourceBudgetV1({
-    budget: raw.resourceBudget,
-    usage: raw.resourceUsage,
-    request: raw.cloudResourceRequest,
+    budget: snapshotRecord(raw.resourceBudget === undefined ? {} : raw.resourceBudget, 'CloudFabricRequestV1.resourceBudget', FABRIC_BUDGET_KEYS),
+    usage: snapshotRecord(raw.resourceUsage === undefined ? {} : raw.resourceUsage, 'CloudFabricRequestV1.resourceUsage', FABRIC_RESOURCE_KEYS),
+    request: snapshotRecord(raw.cloudResourceRequest === undefined ? {} : raw.cloudResourceRequest, 'CloudFabricRequestV1.cloudResourceRequest', FABRIC_RESOURCE_KEYS),
   });
 
   const baseArgs = {

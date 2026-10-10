@@ -838,25 +838,38 @@ test('scrub fails closed when final canonical binding readback fails', async () 
   assert.equal(loads, 3);
 });
 
-test('S1 scrub refuses stale canonical owner before any external teardown, even if binding matches', async () => {
+test('S1 scrub refuses stale or cross-tenant canonical owner before external teardown', async () => {
   const { binding, ownership } = bindingAndOwnership();
   let teardownCalls = 0;
+  let scrubCalls = 0;
   for (const drift of [
+    { taskId: 'task.other.tenant' },
+    { planId: 'plan.other.tenant' },
+    { nodeId: 'node.other.tenant' },
+    { effectId: 'effect.other.tenant' },
     { revision: ownership.revision + 1 },
     { ownerId: 'worker.cloud.reassigned' },
     { leaseId: 'lease.cloud.reassigned' },
     { policyEnvelopeId: 'policy.cloud.replaced' },
     { ownerPlane: 'LOCAL' },
   ]) {
-    await assert.rejects(() => teardownAndVerifyCloudWorkspaceV1(binding, {
-      at: SCRUB_AT,
-      loadCanonicalBinding: async () => binding,
-      loadCanonicalOwnership: async () => ({ ...ownership, ...drift }),
-      teardown: async () => { teardownCalls += 1; return teardownCompletion(); },
-      verifyScrub: async () => scrubProof(),
-    }), /canonical ownership mismatch/u);
+    // Both live store records and records reconstructed from durable JSON
+    // must be rejected without invoking either provider teardown or scrub.
+    for (const persistedOwner of [
+      { ...ownership, ...drift },
+      JSON.parse(JSON.stringify({ ...ownership, ...drift })),
+    ]) {
+      await assert.rejects(() => teardownAndVerifyCloudWorkspaceV1(binding, {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => binding,
+        loadCanonicalOwnership: async () => persistedOwner,
+        teardown: async () => { teardownCalls += 1; return teardownCompletion(); },
+        verifyScrub: async () => { scrubCalls += 1; return scrubProof(); },
+      }), /canonical ownership mismatch/u);
+    }
   }
-  assert.equal(teardownCalls, 0, 'no stale owner may trigger provider teardown');
+  assert.equal(teardownCalls, 0, 'cross-tenant owner readback cannot delete cloud resources');
+  assert.equal(scrubCalls, 0, 'cross-tenant owner cannot produce clean scrub proof');
 });
 
 test('S1 teardown refuses expired owner lease and rolled-back clocks before provider I/O', async () => {
