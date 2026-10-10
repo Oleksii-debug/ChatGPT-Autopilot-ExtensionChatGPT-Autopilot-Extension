@@ -6,6 +6,7 @@ import {
   RemoteSteeringRedirectKind,
   assessRemoteSteeringCommandV1,
   submitRemoteSteeringViaCanonicalRuntimeV1,
+  reconcileRemoteSteeringPersistedCommitV1,
 } from '../src/core/remote-steering-contract.js';
 
 const OBSERVED_AT = '2026-09-25T03:30:00.000Z';
@@ -652,4 +653,58 @@ test('runtime bridge rejects forged callback options without invoking accessors'
     /data properties only/u,
   );
   assert.equal(reads, 0);
+});
+
+test('ambiguous remote commit recovers from persisted JSON receipt without blind replay', async () => {
+  const ledger = {};
+  let attempts = 0;
+  await assert.rejects(() => submitRemoteSteeringViaCanonicalRuntimeV1(epochCommand(), {
+    assessmentAt: ASSESSMENT_AT,
+    resolveCurrentSnapshot: async () => currentSnapshot({ controlEpoch: 9 }),
+    atomicAuthenticateAuthorizeAndCommit: async tx => {
+      attempts++;
+      ledger[tx.commandId] = JSON.parse(JSON.stringify(durableReceipt(tx)));
+      throw new Error('transport reset after durable commit');
+    },
+    readDurableReceipt: async () => ledger['steer-1'],
+  }), /transport reset/u);
+  const recovered = await reconcileRemoteSteeringPersistedCommitV1(epochCommand(), {
+    readDurableReceipt: async ({ commandId }) => JSON.parse(JSON.stringify(ledger[commandId])),
+  });
+  assert.equal(recovered.status, 'CANONICAL_DURABLE_READBACK');
+  assert.equal(recovered.outcome, 'APPLIED');
+  assert.equal(attempts, 1);
+  assert.equal(recovered.mutationAuthorized, false);
+});
+test('unresolved remote commit remains UNKNOWN without permitting retry or mutation', async () => {
+  let reads = 0;
+  const unknown = await reconcileRemoteSteeringPersistedCommitV1(epochCommand(), {
+    readDurableReceipt: async () => { reads++; return null; },
+  });
+  assert.equal(reads, 1);
+  assert.equal(unknown.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+  assert.equal(unknown.safeRetryAuthorized, false);
+  await assert.rejects(
+    () => reconcileRemoteSteeringPersistedCommitV1(validInput(), {
+      readDurableReceipt: async () => null,
+    }), /control-epoch binding/u,
+  );
+});
+test('read-only remote recovery refuses a mismatched persisted command fingerprint', async () => {
+  await assert.rejects(
+    () => reconcileRemoteSteeringPersistedCommitV1(epochCommand(), {
+      readDurableReceipt: async () => ({
+        ...durableReceipt({
+          commandId: 'steer-1',
+          commandFingerprint: 'sha256:' + 'e'.repeat(64),
+          jobId: 'job-1',
+          planId: 'plan-1',
+          sourcePrincipalId: 'owner-1',
+          sourceDeviceId: 'device-web-1',
+          policyEnvelopeId: 'policy-1',
+          expectedControlEpoch: 9,
+        }),
+      }),
+    }), /durable receipt identity mismatch/u,
+  );
 });
