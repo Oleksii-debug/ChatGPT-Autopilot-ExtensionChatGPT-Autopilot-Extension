@@ -1,3 +1,11 @@
+### PLAN7_S1_BOUNDED_OWNER_TOKEN_9B5245CF_20261010 — NONTERMINAL
+
+- Scope ONLY Drive `7. Сьомий план` (doc `1hMDxTh8AtFgGR_6z_f9DwvdC3ybWtbaCSSou4UxjGpU`), first ACTIONABLE Section 1. Section 2 remains ACTIONABLE / IN_PROGRESS / NOT DONE; other plans unchanged.
+- Reused canonical 11.0.13 High existing PR #712 (OPEN/DRAFT/UNMERGED, not stale main), exact source head `9b5245cfaa128c7e9ba2af223c0b754f952d1a65`.
+- Owner tokenProvider liveness bounded to 2000ms, malformed bearer never invokes owner credential resolver; timeout/error/late token fail closed and do not reach Core. Commits `b5cccba93c32ae9614d9c43a23b1b48cb66d1069`, `ee922e63c434f7e3ae4d2aeb1080402e6d9e4006`; source blob `aaeac8773c2c41ef6f4fecbcfe82759eaef0357a`. Two new regression tests for invalid credentials, pending resolver, late completion and next-request recovery: exact tests blob `3fe73630a1b52134277fa9e61ec3caaff8c365e0`. GitHub readback verified. Exact head CI Plan7 #38049115804 / Core #38049115910 / Release #38049115782 were initiated, not yet terminal at checkpoint.
+- Missing actual production Native Companion/Core binding, durable restart/effect reconciliation, owner token lifecycle integration, canonical 11.x source integration, passing aggregate Release and postintegration readback. **S1 ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE; S2 ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE.** No real credentials, second effect/policy/scheduler authority or NVDA claim.
+
+
 # ChatGPT Autopilot — Multi-Plan Closure State
 
 ### PLAN4_S1_CI_FIX_44638C5C_EXACT_READBACK_20261010 — NONTERMINAL
