@@ -365,8 +365,13 @@ export class AiGatewayClient {
     const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     const provider = request.provider;
     const endpointId = endpointIdFromRequest(request);
-    const p = encodeURIComponent(clean(provider));
-    if (!p) throw new Error('AI provider is required');
+    // Provider identity is an exact dispatch key, not whitespace-normalized
+    // display text. A caller outside the orchestrator must not bypass the
+    // canonical route/account binding by silently aliasing a persisted ID.
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80) {
+      throw new Error('AI provider must be an exact bounded identity');
+    }
+    const p = encodeURIComponent(provider);
     const endpoint = clean(endpointId);
     return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}${endpoint ? `&endpointId=${encodeURIComponent(endpoint)}` : ''}`);
   }
@@ -390,13 +395,19 @@ export class AiGatewayClient {
     }
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
-    if (!clean(provider)) throw new Error('AI provider is required');
-    if (!clean(model)) throw new Error('AI model is required');
+    // Preserve the exact authorized provider/model identity through the
+    // final outbound effect. Never trim aliases at this API boundary.
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80) {
+      throw new Error('AI provider must be an exact bounded identity');
+    }
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300) {
+      throw new Error('AI model must be an exact bounded identity');
+    }
     return this.request(gatewayUrl, timeoutSeconds, '/complete', {
       method: 'POST',
       body: JSON.stringify({
-        provider: clean(provider),
-        model: clean(model),
+        provider,
+        model,
         ...(clean(endpointId) ? { endpointId: clean(endpointId) } : {}),
         prompt: normalizedPrompt,
         systemPrompt: clean(systemPrompt),
