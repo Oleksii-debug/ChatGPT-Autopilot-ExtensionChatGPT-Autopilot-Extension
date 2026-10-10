@@ -415,12 +415,13 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // These are presence counts within the bounded canonical history, not proof
   // that an external operation committed or that missing evidence never existed.
   // Do not infer receipts, artifacts or before/after snapshots from free text.
-  // A genuinely missing legacy outcome means "not recorded". A persisted
-  // explicit null/undefined instead signals corrupt evidence and must never
-  // be projected as an apparently clean empty verification after restart.
+  // A genuinely missing legacy outcome means "not recorded". A canonical
+  // fresh BrowserAgentRuntime sets verifiedOutcome: null until verification;
+  // neither null nor omission establishes an external effect receipt. An
+  // explicitly persisted undefined is invalid evidence after restart.
   const outcomePresent = safeHasOwn(runtime, 'verifiedOutcome');
   const rawOutcome = own(runtime, 'verifiedOutcome');
-  if (outcomePresent && rawOutcome == null) {
+  if (outcomePresent && rawOutcome === undefined) {
     throw new Error('Agent persisted outcome is invalid');
   }
   const recordedOutcome = recordedOutcomeSummary(rawOutcome);
