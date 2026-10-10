@@ -45,3 +45,32 @@ test('Plan 8 integration: forged registry binding values and getters fail closed
   assert.throws(() => normalizeSpecialistSelectionV1(hostile), /data property/u);
   assert.equal(getterCalls, 0, 'untrusted getters must not run');
 });
+
+import { SpecialistProviderReadinessResolverV1 } from '../src/core/specialist-provider-readiness-resolver.js';
+
+test('Plan 8 integration: trusted readiness preserves optional registry binding across JSON restart', async () => {
+  const requests = [];
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [{
+      providerId: 'provider:one',
+      maxAgeMs: 5000,
+      resolveReadiness: async request => {
+        requests.push(request);
+        throw new Error('fixture: no network probe permitted');
+      },
+    }],
+    now: () => Date.parse('2026-10-10T12:00:00.000Z'),
+  });
+  const bound = normalizeSpecialistSelectionV1({
+    ...base, registryBindingKey: 'registry-binding:v1',
+  });
+  await assert.rejects(resolver.resolve(JSON.parse(JSON.stringify(bound))), /fixture: no network probe/u);
+  assert.equal(requests[0].registryBindingKey, 'registry-binding:v1');
+  assert.equal(Object.isFrozen(requests[0]), true);
+
+  const legacy = normalizeSpecialistSelectionV1(base);
+  await assert.rejects(resolver.resolve(JSON.parse(JSON.stringify(legacy))), /fixture: no network probe/u);
+  assert.equal(Object.hasOwn(requests[1], 'registryBindingKey'), false,
+    'legacy readiness must not invent a binding or silently insert undefined');
+  assert.equal(requests.length, 2);
+});

@@ -109,6 +109,11 @@ function resolutionRequest(selection, asOf) {
     schemaVersion: SPECIALIST_PROVIDER_READINESS_RESOLVER_VERSION,
     registryId: selection.registryId,
     registryRevision: selection.registryRevision,
+    // Preserve an authenticated binding when present, without minting one for
+    // legacy selections. Explicit undefined was rejected by normalization.
+    ...(Object.hasOwn(selection, 'registryBindingKey')
+      ? { registryBindingKey: selection.registryBindingKey }
+      : {}),
     specialistId: selection.specialistId,
     providerId: selection.providerId,
     definitionRevision: selection.definitionRevision,
