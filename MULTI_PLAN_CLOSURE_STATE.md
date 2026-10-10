@@ -1,3 +1,6 @@
+### PLAN5_S1_C84C6E4_CORE_FINAL_READBACK_20261010 — NONTERMINAL
+- Exact PR #714 head `c84c6e46523b7ab175b5e3486619d6a30160edbe`: Core [#38051335460](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/38051335460) now completed **SUCCESS**, job `core-tests` SUCCESS. This replaces the earlier IN_PROGRESS snapshot for Core only. Plan5 dual-OS 94/94 each and Chrome SUCCESS; Release #38051335397 remains FAILURE (118 FAIL/11 CANCELLED), so S1 and S2 remain NOT TERMINAL DONE. S2 unchanged.
+
 ### PLAN5_S1_LIVE_LEASE_FENCE_C84C6E4_20261010 — NONTERMINAL
 - Scope ONLY canonical Drive `5. П’ятий план`, S1 first ACTIONABLE. S1 ACTIONABLE/IN_PROGRESS/NOT TERMINAL DONE; S2 ACTIONABLE/IN_PROGRESS/NOT TERMINAL DONE and unchanged. No other Drive plans edited.
 - Existing 11.0.13 High Plan5 [draft PR #714](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/714) head `c84c6e46523b7ab175b5e3486619d6a30160edbe`. Source commit `9b7c43d082616409515f48612175473fd9303ae1`, blob `909755c0efe1ae31ab774703687613d337379d67`: canonical cloud scrub now rejects expired owner lease and rollback clock before any provider teardown. Test commit `c84c6e4`, blob `7a93a785090ad37080919264d5a6e5cb5573f163`; four adversarial scenarios assert zero provider teardown/attestation. Both GitHub blobs read back.
