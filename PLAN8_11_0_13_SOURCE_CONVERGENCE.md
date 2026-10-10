@@ -30,3 +30,21 @@ Exact-head run evidence at `3e837a3c92f7bb3a6b4280e16ee915c58e6adccd`:
 - Release https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/38049392549: Windows release packaging gate SUCCESS; Ubuntu aggregate FAILURE, 3585 tests; 3256 passed, 318 failed, 11 cancelled. This is three fewer failures than previous SHA 567cc694569a0de23839b06bdbff280e19d41834 (321), not aggregate PASS.
 
 Unresolved: core durable route-budget reserve/settle, READ_ASSISTANT_REPORT missing/frozen/discarded tab recovery, Agent form/registry/route-policy/UI and Specialist authorization, 11.x integration into main and postintegration qualification and physical NVDA/authenticated service acceptance. Never treat PR, signed-zero repair, 3 additional passes or Windows-only release gate as terminal DONE; no real provider credentials were used or required for repository engineering.
+
+## Plan 8 S1 integration compatibility fixes — exact code SHA 16bac9bc (2026-10-10; NONTERMINAL)
+
+Only canonical Drive Plan 8, first actionable Section 1; Section 2 remains WAITING_UPSTREAM. Reused existing 11.0.13 High PR #716 and canonical modules. Changes at commits `16242c7`, `becfeb0`, `f893cb3`, `0c3f17d`, `16bac9b`:
+
+- `src/core/subagent-task-envelope.js` preserves optional exact lowercase SHA-256 identity on child source references, so Project Context can verify unmodified immutable bytes across recovery; accessor and noncanonical-hash inputs fail closed. Existing unhashed legacy SourceRefs remain valid. Regression tests assert changed bytes produce changed dispatch identity after JSON recovery.
+- `src/core/schema.js` connects existing canonical `TrustedOutcomeVerificationLedgerV1` initial state and validation: legacy missing schema-v2 ledger accepted; explicitly malformed/revision-drift ledger rejected before durable restart. No second ledger.
+- `src/core/project-workspace.js` adds non-authorizing `ProjectWorkspaceRepository.resolveContext` reading **the existing** durable workspace and enforcing project/snapshot/capsule/current revision. No second store, source authentication, retrieval, mutation, policy or execution authority. Added two negative and cold-restart tests in `tests/subagent-context-projection.test.mjs`.
+
+Exact source/test blobs independently read back at SHA `16bac9bc50d1884cd9400d4cd29c5e69d2e93dfa`: `0fee3d85de18e965c9ad5454ea70338a1b235ffa`, `e9dc400d58e97b6da25994bb946e182f516e4fcd`, `6708eb9cf36b168b9b58ac9f3f6327d8b72e2397`, `f420fd7dd3e9b9ef2e43a3e6624c9b6e30687b1c`, `8c239be9be2e33449f4e70c89b90b08b6cf032bb` respectively.
+
+CI exact **code** head `16bac9bc50d1884cd9400d4cd29c5e69d2e93dfa`:
+- Release #38058349443: Windows packaging SUCCESS, Ubuntu aggregate FAILURE: **3615 tests / 3369 PASS / 235 FAIL / 11 CANCELLED**. Previous exact head 4850b898: 3611 / 3352 PASS / 248 FAIL / 11 CANCELLED. Four new negative/recovery cases PASS; repaired existing ProjectWorkspace cold restart case PASS and trusted-ledger state/restart cases PASS. Full aggregate remains red, never treat partial passing as DONE.
+- Core #38058349406 SUCCESS: 483/483 core + 59/59 web deterministic, zero fail/cancelled (job 114231373132).
+- UI #38058349285, Interaction #38058349395, Chrome #38058349368 SUCCESS.
+- Canonical shared registry `MULTI_PLAN_CLOSURE_STATE.md` updated on Plan8 PR lineage, without changing status of other plans.
+
+**S1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE; S2 WAITING_UPSTREAM / NOT DONE.** 11.x candidate remains DRAFT / UNMERGED, main manifest is still 0.9.19; outstanding 235 test failures + 11 cancelled, 11.x postmain integration/readback and full required upstream convergence. No physical Windows/NVDA/authenticated provider effects/release assertions. No real provider credentials required for these repository repairs.
