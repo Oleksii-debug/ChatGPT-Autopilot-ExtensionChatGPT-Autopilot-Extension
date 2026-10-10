@@ -416,6 +416,7 @@ function isolationProof(overrides = {}) {
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
     executionLeaseId: 'lease.cloud.1',
+    executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:07:00.000Z',
     filesystemIsolated: true,
     browserIsolated: true,
@@ -428,6 +429,7 @@ function scrubProof(overrides = {}) {
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
     executionLeaseId: 'lease.cloud.1',
+    executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:09:00.000Z',
     filesystemScrubbed: true,
     browserScrubbed: true,
@@ -442,6 +444,7 @@ function teardownCompletion(overrides = {}) {
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
     executionLeaseId: 'lease.cloud.1',
+    executionOwnershipRevision: 2,
     completedAt: '2026-09-25T06:08:30.000Z',
     ...overrides,
   };
@@ -904,4 +907,51 @@ test('S1 recovery refuses a mismatched checkpoint without mutating canonical sta
     /binding readback mismatch/u,
   );
   assert.equal(lookups, 1);
+});
+
+test('S1 provider isolation proof refuses replay across owner revisions on same workspace and lease', async () => {
+  const owner = cloudOwnership();
+  const calls = { owners: 0, verifications: 0 };
+  for (const forged of [
+    isolationProof({ executionOwnershipRevision: 3 }),
+    isolationProof({ executionOwnershipRevision: undefined }),
+    JSON.parse(JSON.stringify(isolationProof({ executionOwnershipRevision: 1 }))),
+  ]) {
+    await assert.rejects(
+      () => verifyCloudWorkspaceIsolationV1(observation(), owner, {
+        at: ISOLATION_AT,
+        loadCanonicalOwnership: async () => { calls.owners++; return owner; },
+        verifyIsolation: async () => { calls.verifications++; return forged; },
+      }),
+      /exact cloud workspace\/lease identity/u,
+    );
+  }
+  assert.equal(calls.verifications, 3);
+  assert.equal(calls.owners, 6);
+});
+
+test('S1 teardown refuses revision-replayed completion or scrub, including cold JSON restart', async () => {
+  const { binding } = bindingAndOwnership();
+  for (const replayKind of ['completion', 'scrub']) {
+    for (const revision of [1, 3, undefined]) {
+      let verifications = 0;
+      const trusted = {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+        teardown: async () => teardownCompletion(replayKind === 'completion'
+          ? { executionOwnershipRevision: revision } : {}),
+        verifyScrub: async () => {
+          verifications++;
+          return scrubProof(replayKind === 'scrub'
+            ? { executionOwnershipRevision: revision } : {});
+        },
+      };
+      await assert.rejects(
+        () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), trusted),
+        /identity mismatch|exact cloud workspace\/lease identity/u,
+      );
+      assert.equal(verifications, replayKind === 'completion' ? 0 : 1);
+    }
+  }
 });
