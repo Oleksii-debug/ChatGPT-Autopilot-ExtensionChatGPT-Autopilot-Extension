@@ -1792,6 +1792,9 @@ test('Plan4 S1: direct gateway dispatch never aliases provider/model identities 
     '', ' ', ' ollama', 'ollama ', '\tollama', 'ollama\n', 'x'.repeat(81)];
   for (const invalid of invalidIds) {
     for (const persisted of [false, true]) {
+      // undefined is not JSON-serializable; boxed String serializes to a
+      // different primitive identity and is not a persisted-invalid case.
+      if (persisted && (invalid === undefined || invalid instanceof String)) continue;
       const value = persisted ? JSON.parse(JSON.stringify(invalid)) : invalid;
       await assert.rejects(gateway.complete({...base,provider:value}), /AI provider must be an exact bounded identity/);
       await assert.rejects(gateway.listModels({provider:value}), /AI provider must be an exact bounded identity/);
@@ -1800,6 +1803,9 @@ test('Plan4 S1: direct gateway dispatch never aliases provider/model identities 
   for (const invalid of [null, undefined, 7, false, {}, [], new String('model'),
     '', ' ', ' name', 'name ', 'model\t', 'model\n', 'x'.repeat(301)]) {
     for (const persisted of [false, true]) {
+      // undefined is not JSON-serializable; boxed String serializes to a
+      // different primitive identity and is not a persisted-invalid case.
+      if (persisted && (invalid === undefined || invalid instanceof String)) continue;
       const value = persisted ? JSON.parse(JSON.stringify(invalid)) : invalid;
       await assert.rejects(gateway.complete({...base,model:value}), /AI model must be an exact bounded identity/);
     }
