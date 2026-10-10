@@ -11,6 +11,7 @@ import {
   SUBAGENT_TASK_ENVELOPE_VERSION,
   createSubagentTaskEnvelopeV1,
   normalizeSubagentTaskEnvelopeV1,
+  deriveSubagentTaskDispatchIdentityV1,
 } from '../src/core/subagent-task-envelope.js';
 
 const T0 = '2026-09-27T10:00:00.000Z';
@@ -436,4 +437,25 @@ test('caller-owned arrays and canonical inputs cannot mutate the frozen derived 
     location: 'project://source-1',
     revisionId: 'rev-1',
   }]);
+});
+
+test('Plan8 convergence dispatch identity is stable after canonical JSON restart and fails before hidden authority reads', () => {
+  const canonical = createSubagentTaskEnvelopeV1(request());
+  const first = deriveSubagentTaskDispatchIdentityV1(canonical);
+  assert.match(first, /^subagent-task:[a-f0-9]+$/u);
+  assert.equal(deriveSubagentTaskDispatchIdentityV1(JSON.parse(JSON.stringify(canonical))), first);
+  const drift = structuredClone(canonical);
+  drift.envelopeId = 'envelope-changed';
+  assert.notEqual(deriveSubagentTaskDispatchIdentityV1(drift), first,
+    'same task under changed immutable handoff identity must never replay as the original');
+  let getterReads = 0;
+  const forged = structuredClone(canonical);
+  Object.defineProperty(forged, 'executionAuthority', {
+    enumerable: true, get() { getterReads++; return false; },
+  });
+  assert.throws(() => deriveSubagentTaskDispatchIdentityV1(forged), /enumerable own data property/u);
+  assert.equal(getterReads, 0);
+  assert.throws(() => deriveSubagentTaskDispatchIdentityV1({
+    ...structuredClone(canonical), executionAuthority: true,
+  }), /cannot grant executionAuthority/u);
 });
