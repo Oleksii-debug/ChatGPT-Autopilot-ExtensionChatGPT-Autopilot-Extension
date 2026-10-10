@@ -242,6 +242,66 @@ test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not i
 });
 
 
+test('Plan-1 S1: hostile Proxy reflection never leaks errors or publishes false action/effect evidence', async () => {
+  const secret = 'PRIVATE-OWNER-CREDENTIAL-IN-REFLECTION-TRAP';
+  let traps = 0;
+  const hostile = (target, operation) => new Proxy(target, {
+    [operation]() {
+      traps += 1;
+      throw new Error(secret);
+    },
+  });
+  const assertSafeDenial = operation => {
+    assert.throws(operation, error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.doesNotMatch(error.message, /PRIVATE-OWNER|CREDENTIAL|REFLECTION-TRAP/);
+      return true;
+    });
+  };
+
+  for (const operation of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    assertSafeDenial(() => normalizeAgentAction(hostile(action(), operation)));
+    assertSafeDenial(() => normalizeAgentEvent(hostile(event(), operation)));
+    assertSafeDenial(() => normalizeAgentAction(action({
+      data: { nested: hostile({ effectId: 'effect-not-committed' }, operation) },
+    })));
+    assertSafeDenial(() => normalizeAgentEvent(event({
+      data: { nested: hostile({ verified: false }, operation) },
+    })));
+    assertSafeDenial(() => normalizeAgentAction(action({
+      data: { stages: hostile(['pending'], operation) },
+    })));
+    assertSafeDenial(() => normalizeAgentEvent(event({
+      data: { observations: hostile(['not-verified'], operation) },
+    })));
+  }
+  assert.equal(traps, 18, 'each hostile trap must be rejected without re-evaluation');
+
+  const recorded = [];
+  const sink = new AgentEventSink({ onEvent: value => recorded.push(value) });
+  await assert.rejects(
+    () => sink.emit(hostile(event(), 'ownKeys')),
+    error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.doesNotMatch(error.message, /PRIVATE-OWNER|CREDENTIAL/);
+      return true;
+    },
+  );
+  assert.equal(recorded.length, 0, 'denied evidence cannot reach the event sink');
+  assert.equal(traps, 19);
+
+  // A rejected hostile input must not poison the normal path or cold recovery.
+  const stableAction = normalizeAgentAction(action({ data: {
+    effectId: 'effect-verified-before-commit', status: 'PENDING',
+  } }));
+  const stableEvent = await sink.emit(event({ data: { observed: true, attempts: [1] } }));
+  assert.equal(recorded.length, 1);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(stableAction))), stableAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(stableEvent))), stableEvent);
+  assert.ok(Object.isFrozen(stableAction.data));
+  assert.ok(Object.isFrozen(stableEvent.data.attempts));
+});
+
 test('Plan-1 S1: direct actions and events reject JSON-lossy negative zero across restart', () => {
   const validAction = normalizeAgentAction(action({ data: { offset: 0 } }));
   const validEvent = normalizeAgentEvent(event({ data: { metrics: [{ offset: 0 }] } }));
