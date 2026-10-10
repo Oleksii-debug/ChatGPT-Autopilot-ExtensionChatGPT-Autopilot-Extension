@@ -1015,9 +1015,15 @@ test('S1 binding bridge fails closed on missing or forged canonical persistence'
           }
         },
         loadCanonicalBinding: async () => {
+          // The new fail-closed duplicate-binding preflight runs BEFORE
+          // atomicCommitCanonicalBinding. A post-commit corruption fixture
+          // must not manufacture a persisted record before that first write.
+          if (binding === null) return null;
           if (mode === 'missing') return null;
-          if (mode === 'checkpoint-drift') return { ...binding, checkpointSha256: 'f'.repeat(64) };
-          return binding;
+          if (mode === 'checkpoint-drift') {
+            return { ...JSON.parse(JSON.stringify(binding)), checkpointSha256: 'f'.repeat(64) };
+          }
+          return JSON.parse(JSON.stringify(binding));
         },
       }),
       /not durably persisted|binding readback mismatch|ownership changed during binding commit/u,
