@@ -89,6 +89,53 @@ test('legacy HTTP/1.0 downgrade is denied before owner-token lookup or Core and 
   }
 });
 
+test('encoded and duplicate Content-Encoding requests are rejected before owner token/Core; plain JSON recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const body = JSON.stringify(request('encoded-must-not-dispatch'));
+    async function rejected(contentEncoding) {
+      return new Promise((resolve, reject) => {
+        const req = httpRequest({
+          hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + TOKEN,
+            'Content-Type': 'application/json',
+            'Content-Encoding': contentEncoding,
+          },
+        }, res => {
+          res.resume();
+          res.once('end', () => resolve(res.statusCode));
+          res.once('error', reject);
+        });
+        req.once('error', reject);
+        req.end(body);
+      });
+    }
+    assert.equal(await rejected('gzip'), 403);
+    assert.equal(await rejected(['gzip', 'br']), 403);
+    assert.equal(tokenLookups, 0,
+      'encoded bodies must be refused before credential broker resolution');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'encoded bodies must never obtain canonical scope or dispatch');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const clean = await client.control(request('plain-json-recovery'));
+    assert.equal(clean.status, 'RECEIVED');
+    assert.equal(clean.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 },
+      'a legitimate unencoded recovery request uses the original Core only once');
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('Local API is opt-in and rejects missing runtime or short secrets', () => {
   assert.throws(() => createAutopilotLocalApiServerV1(), /high-entropy/u);
   assert.throws(() => createAutopilotLocalApiServerV1({token: TOKEN}), /Trusted canonical/u);
