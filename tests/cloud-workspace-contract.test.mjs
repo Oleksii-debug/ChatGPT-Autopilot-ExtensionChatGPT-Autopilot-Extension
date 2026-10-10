@@ -1859,3 +1859,147 @@ test('S1 provider lifecycle keeps trusted callback receivers across JSON restart
   assert.equal(scrub.leaseReleaseAuthorized, false);
   assert.equal(scrub.reuseAuthorized, false);
 });
+
+
+test('S1 undefined canonical preflight never authorizes a duplicate cloud binding commit', async () => {
+  const owner = cloudOwnership();
+  for (const coldStart of [false, true]) {
+    const inputOwner = coldStart ? JSON.parse(JSON.stringify(owner)) : owner;
+    const inputObservation = coldStart
+      ? JSON.parse(JSON.stringify(observation())) : observation();
+    let writes = 0;
+    await assert.rejects(
+      () => commitVerifiedCloudWorkspaceBindingV1(inputObservation, inputOwner, {
+        at: ISOLATION_AT,
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(owner)),
+        verifyIsolation: async () => isolationProof(),
+        // A broken adapter may silently return undefined rather than the
+        // explicit null required for a trustworthy absence observation.
+        loadCanonicalBinding: async () => undefined,
+        atomicCommitCanonicalBinding: async () => { writes += 1; },
+      }),
+      /binding preflight is ambiguous; reconciliation required/u,
+    );
+    assert.equal(writes, 0, 'missing store evidence must not cause any write');
+  }
+});
+
+test('S1 undefined post-commit binding readback cannot assert durable success', async () => {
+  const owner = cloudOwnership();
+  let writes = 0;
+  let reads = 0;
+  await assert.rejects(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => owner,
+      verifyIsolation: async () => isolationProof(),
+      loadCanonicalBinding: async () => {
+        reads += 1;
+        return reads === 1 ? null : undefined;
+      },
+      atomicCommitCanonicalBinding: async () => { writes += 1; },
+    }),
+    /binding readback is ambiguous; reconciliation required/u,
+  );
+  assert.equal(reads, 2, 'post-commit uncertainty must remain observable');
+  assert.equal(writes, 1, 'an ambiguous post-commit readback must not trigger blind replay');
+});
+
+test('S1 undefined read-only binding recovery fails closed after JSON cold restart', async () => {
+  const owner = cloudOwnership();
+  const binding = JSON.parse(JSON.stringify(createCloudWorkspaceBindingV1(
+    observation(), owner, { at: ISOLATION_AT },
+  )));
+  let ownerReads = 0;
+  await assert.rejects(
+    () => reconcileCloudWorkspaceBindingCommitV1(binding, {
+      at: '2026-09-25T06:09:00.000Z',
+      loadCanonicalBinding: async () => undefined,
+      loadCanonicalOwnership: async () => { ownerReads += 1; return owner; },
+    }),
+    /binding readback is ambiguous; reconciliation required/u,
+  );
+  assert.equal(ownerReads, 0, 'ambiguous store read has no right to assume matching ownership');
+  const knownAbsent = await reconcileCloudWorkspaceBindingCommitV1(binding, {
+    at: '2026-09-25T06:09:00.000Z',
+    loadCanonicalBinding: async () => null,
+    loadCanonicalOwnership: async () => { ownerReads += 1; return owner; },
+  });
+  assert.equal(knownAbsent.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+  assert.equal(knownAbsent.safeRetryAuthorized, false);
+  assert.equal(knownAbsent.executionAuthorized, false);
+  assert.equal(ownerReads, 0);
+});
+
+
+test('S1 persisted binding predating canonical owner revision cannot be reused, scrubbed or reconciled', async () => {
+  const { binding } = bindingAndOwnership();
+  // Opaque lease/effect IDs match, but this owner revision was actually
+  // observed after the binding was allegedly committed. Identity equality
+  // is not chronological proof that this persisted workspace belongs to it.
+  const revisedOwner = {
+    ...cloudOwnership(),
+    updatedAt: '2026-09-25T06:07:00.000Z',
+  };
+  for (const coldStart of [false, true]) {
+    const persistedBinding = coldStart
+      ? JSON.parse(JSON.stringify(binding)) : binding;
+    const persistedOwner = coldStart
+      ? JSON.parse(JSON.stringify(revisedOwner)) : revisedOwner;
+    const advisory = assessCloudWorkspaceContinuityV1(
+      persistedBinding,
+      observation({
+        observedAt: '2026-09-25T06:08:00.000Z',
+        expiresAt: '2026-09-25T06:30:00.000Z',
+      }),
+      persistedOwner,
+      { at: SCRUB_AT },
+    );
+    assert.equal(advisory.status, CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED);
+    assert.equal(advisory.reasonCode, 'BINDING_PREDATES_CANONICAL_OWNER_REVISION');
+    assert.equal(advisory.workspaceReady, false);
+    assert.equal(advisory.executionAuthorized, false);
+    assert.equal(advisory.resumeAuthorized, false);
+
+    let destructiveCalls = 0;
+    let verifyCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(persistedBinding, {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(persistedBinding)),
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(persistedOwner)),
+        teardown: async () => { destructiveCalls++; return teardownCompletion(); },
+        verifyScrub: async () => { verifyCalls++; return scrubProof(); },
+      }),
+      /live canonical owner lease/u,
+    );
+    assert.equal(destructiveCalls, 0, 'no provider teardown against pre-owner binding');
+    assert.equal(verifyCalls, 0, 'no scrub verification follows unauthorized teardown');
+
+    let readOnlyLookups = 0;
+    const recovered = await reconcileCloudWorkspaceBindingCommitV1(persistedBinding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => {
+        readOnlyLookups++;
+        return JSON.parse(JSON.stringify(persistedBinding));
+      },
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(persistedOwner)),
+    });
+    assert.equal(readOnlyLookups, 1);
+    assert.equal(recovered.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+    assert.equal(recovered.durableBindingVerified, false);
+    assert.equal(recovered.safeRetryAuthorized, false);
+    assert.equal(recovered.executionAuthorized, false);
+  }
+
+  const clean = await reconcileCloudWorkspaceBindingCommitV1(
+    JSON.parse(JSON.stringify(binding)), {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+    },
+  );
+  assert.equal(clean.status, 'CANONICAL_BINDING_DURABLE_READBACK');
+  assert.equal(clean.executionAuthorized, false);
+  assert.equal(clean.safeRetryAuthorized, false);
+});

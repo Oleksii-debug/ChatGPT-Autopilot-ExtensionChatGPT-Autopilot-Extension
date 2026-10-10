@@ -508,7 +508,13 @@ function cloudBindingLookupKey(binding) {
 }
 
 function cloudBindingReadback(binding, persisted) {
-  if (persisted == null) return null;
+  // An adapter returning undefined has not proven that the canonical store
+  // contains no binding. Only an explicit null is a verified absent record.
+  // A silent/partial read must never enable another commit or report recovery.
+  if (persisted === undefined) {
+    throw new Error('canonical cloud binding readback is ambiguous; reconciliation required');
+  }
+  if (persisted === null) return null;
   const canonical = normalizeCloudWorkspaceBindingV1(persisted);
   if (JSON.stringify(canonical) !== JSON.stringify(binding)) {
     throw new Error('canonical cloud workspace binding readback mismatch');
@@ -566,7 +572,10 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
   // This is a preflight fence, NOT a replacement for the canonical store's
   // atomic owner/lease/absence compare-and-set: another writer may race it.
   const beforeCommit = await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, cloudBindingLookupKey(binding), 'binding', trusted);
-  if (beforeCommit != null) {
+  if (beforeCommit === undefined) {
+    throw new Error('canonical cloud binding preflight is ambiguous; reconciliation required');
+  }
+  if (beforeCommit !== null) {
     throw new Error('canonical cloud workspace binding already exists; use read-only reconciliation');
   }
   // A provider response cannot commit or authenticate its own binding.
@@ -647,6 +656,9 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
       && sameExecutionIdentity(binding, ownerBefore)
       && Date.parse(at) >= Date.parse(binding.boundAt)
       && Date.parse(at) >= Date.parse(ownerBefore.updatedAt)
+      // A canonical owner revision cannot validate a binding timestamped
+      // before that revision was created, even with matching opaque IDs.
+      && Date.parse(binding.boundAt) >= Date.parse(ownerBefore.updatedAt)
       && Boolean(ownerBefore.leaseUntil)
       && Date.parse(at) < Date.parse(ownerBefore.leaseUntil);
     if (current) {
@@ -728,6 +740,9 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   if (!ownerBefore.leaseUntil
       || Date.parse(trusted.at) < Date.parse(binding.boundAt)
       || Date.parse(trusted.at) < Date.parse(ownerBefore.updatedAt)
+      // A persisted binding predating this canonical owner revision cannot
+      // authorize destructive provider I/O, regardless of matching lease IDs.
+      || Date.parse(binding.boundAt) < Date.parse(ownerBefore.updatedAt)
       || Date.parse(trusted.at) >= Date.parse(ownerBefore.leaseUntil)) {
     throw new Error('cloud workspace teardown requires a live canonical owner lease');
   }
@@ -940,6 +955,10 @@ export function assessCloudWorkspaceContinuityV1(
       ownership,
       assessedAt,
     );
+  }
+  if (Date.parse(binding.boundAt) < Date.parse(ownership.updatedAt)) {
+    return assessment(CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED,
+      'BINDING_PREDATES_CANONICAL_OWNER_REVISION', binding, ownership, assessedAt);
   }
   if (Date.parse(assessedAt) >= Date.parse(ownership.leaseUntil)) {
     return assessment(
