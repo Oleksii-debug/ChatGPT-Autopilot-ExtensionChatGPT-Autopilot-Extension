@@ -325,9 +325,98 @@ test('selection boundary and injected clock are exact and non-coercive', async (
   await assert.rejects(backwardClock.resolve(selection()), /clock moved backwards/u);
 });
 
-test('trusted resolver failures propagate and cannot be converted into READY fallback', async () => {
+test('trusted resolver failures fail closed with opaque diagnostics and cannot become READY', async () => {
   const resolver = runtime([binding(async () => {
     throw new Error('provider probe failed');
   })]);
-  await assert.rejects(resolver.resolve(selection()), /provider probe failed/u);
+  await assert.rejects(resolver.resolve(selection()), error =>
+    error.message === 'Trusted readiness provider resolution failed'
+    && !error.message.includes('provider probe failed')
+    && !Object.hasOwn(error, 'cause'));
+});
+
+test('revalidation rejects trusted clock rollback even when READY provider facts are identical; monotonic recovery passes', async () => {
+  const instant = Date.parse(NOW);
+  const makeResolver = ticks => new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(async request => ({
+      observedAt: request.asOf,
+      providerStates: [state()],
+    }))],
+    now: () => {
+      assert.ok(ticks.length, 'clock fixture must not permit an extra observation');
+      return ticks.shift();
+    },
+  });
+
+  // Each individual resolve has a locally consistent start/end clock and
+  // fresh trusted facts. The second attempt nevertheless predates the first.
+  const rollback = makeResolver([instant, instant, instant - 1, instant - 1]);
+  const first = await rollback.resolve(selection());
+  assert.equal(first.readiness, 'READY');
+  await assert.rejects(
+    rollback.assertCurrent(first),
+    /readiness revalidation moved backwards/u,
+  );
+
+  // A new provider observation at the same or later clock time remains valid.
+  const monotonic = makeResolver([instant, instant, instant + 1, instant + 1]);
+  const accepted = await monotonic.resolve(selection());
+  assert.equal(await monotonic.assertCurrent(accepted), true);
+});
+
+test('Section 1 clock exceptions are opaque at both clock boundaries; no phantom READY is published', async () => {
+  const secret = 'SECRET_OWNER_CLOCK_CREDENTIAL_20261010';
+  for (const failAt of [1, 2]) {
+    let clockReads = 0;
+    let providerCalls = 0;
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [binding(async () => {
+        providerCalls += 1;
+        return { observedAt: NOW, providerStates: [state()] };
+      })],
+      now: () => {
+        clockReads += 1;
+        if (clockReads === failAt) throw new Error(secret);
+        return NOW_MS;
+      },
+    });
+    await assert.rejects(resolver.resolve(selection()), error =>
+      error instanceof Error
+      && error.message === 'Trusted readiness resolver clock could not be observed safely'
+      && !error.message.includes(secret)
+      && !Object.hasOwn(error, 'cause'));
+    assert.equal(clockReads, failAt);
+    assert.equal(providerCalls, failAt - 1, 'first clock failure prevents provider probe');
+  }
+});
+
+test('Section 1 opaque clock failure does not poison canonical cold-restart recovery', async () => {
+  let clockReads = 0;
+  let providerCalls = 0;
+  const callback = async () => {
+    providerCalls += 1;
+    return { observedAt: NOW, providerStates: [state()] };
+  };
+  const broken = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(callback)],
+    now: () => {
+      if (++clockReads === 2) throw new Error('SECRET_CLOCK_AFTER_PROBE');
+      return NOW_MS;
+    },
+  });
+  await assert.rejects(broken.resolve(selection()), error =>
+    error.message === 'Trusted readiness resolver clock could not be observed safely'
+    && !error.message.includes('SECRET_CLOCK_AFTER_PROBE'));
+  assert.equal(providerCalls, 1);
+
+  const recovered = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(callback)],
+    now: () => NOW_MS,
+  });
+  const durable = JSON.parse(JSON.stringify(await recovered.resolve(selection())));
+  assert.equal(durable.readiness, 'READY');
+  assert.equal(durable.executable, true);
+  assert.equal(durable.trustedResolverInvoked, true);
+  assert.equal(durable.authority.providerExecutionAuthorized, false);
+  assert.equal(providerCalls, 2);
 });

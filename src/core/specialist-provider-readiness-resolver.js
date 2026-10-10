@@ -17,15 +17,22 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Provider-owned Proxy traps may contain credentials or private data.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -37,10 +44,19 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) {
     throw new Error(label + ' must be a canonical array');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < 0 || length > max) {
     throw new Error(label + ' has invalid length');
@@ -88,6 +104,23 @@ function timestamp(value, label) {
   return Object.freeze({ value, ms });
 }
 
+// Clock dependencies are lower-trust callbacks. They must not leak error text,
+// error causes or property-access side effects into readiness diagnostics.
+// Keep identical bounds at both observation points, before and after probing.
+function trustedClockMs(now) {
+  let value;
+  try {
+    value = now();
+  } catch {
+    throw new Error('Trusted readiness resolver clock could not be observed safely');
+  }
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)
+      || Object.is(value, -0) || value < 0 || value > MAX_DATE_MS) {
+    throw new Error('Trusted readiness resolver clock returned an invalid time');
+  }
+  return value;
+}
+
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freeze(child);
@@ -122,7 +155,13 @@ function resolutionRequest(selection, asOf) {
 function validateResolvedStates(rawStates, selection) {
   const selectedTools = new Set(selection.grantedToolIds);
   return denseArray(rawStates, 'providerStates', MAX_PROVIDER_STATES).map((rawState, index) => {
-    const state = normalizeProviderReadinessV1(rawState);
+    let state;
+    try {
+      state = normalizeProviderReadinessV1(rawState);
+    } catch {
+      // Nested state belongs to the provider, not to the trusted caller.
+      throw new Error(`providerStates[${index}] is not canonical provider evidence`);
+    }
     if (state.providerId !== selection.providerId) {
       throw new Error(`providerStates[${index}] does not belong to selected provider`);
     }
@@ -145,6 +184,7 @@ function validateResolvedStates(rawStates, selection) {
 export class SpecialistProviderReadinessResolverV1 {
   #bindings;
   #now;
+  #selectionByReadiness = new WeakMap();
 
   constructor(input = {}) {
     const raw = record(input, RESOLVER_KEYS, 'Specialist provider readiness resolver options');
@@ -169,20 +209,18 @@ export class SpecialistProviderReadinessResolverV1 {
     const bound = this.#bindings.get(selection.providerId);
     if (!bound) throw new Error('No trusted readiness resolver is bound for selected provider');
 
-    const startedAtMs = this.#now();
-    if (typeof startedAtMs !== 'number' || !Number.isSafeInteger(startedAtMs)
-        || Object.is(startedAtMs, -0) || startedAtMs < 0 || startedAtMs > MAX_DATE_MS) {
-      throw new Error('Trusted readiness resolver clock returned an invalid time');
-    }
+    const startedAtMs = trustedClockMs(this.#now);
     const asOf = new Date(startedAtMs).toISOString();
     const request = resolutionRequest(selection, asOf);
-    const rawResult = await bound.resolveReadiness(request);
-
-    const resolvedAtMs = this.#now();
-    if (typeof resolvedAtMs !== 'number' || !Number.isSafeInteger(resolvedAtMs)
-        || Object.is(resolvedAtMs, -0) || resolvedAtMs < 0 || resolvedAtMs > MAX_DATE_MS) {
-      throw new Error('Trusted readiness resolver clock returned an invalid time');
+    let rawResult;
+    try {
+      rawResult = await bound.resolveReadiness(request);
+    } catch {
+      // A provider failure is not trustworthy diagnostic text.
+      throw new Error('Trusted readiness provider resolution failed');
     }
+
+    const resolvedAtMs = trustedClockMs(this.#now);
     if (resolvedAtMs < startedAtMs) {
       throw new Error('Trusted readiness resolver clock moved backwards');
     }
@@ -196,7 +234,7 @@ export class SpecialistProviderReadinessResolverV1 {
     const providerStates = validateResolvedStates(result.providerStates, selection);
     const inspection = inspectSpecialistProviderReadinessV1({ selection, providerStates });
 
-    return freeze({
+    const canonicalReadiness = freeze({
       schemaVersion: SPECIALIST_PROVIDER_READINESS_RESOLVER_VERSION,
       registryId: selection.registryId,
       registryRevision: selection.registryRevision,
@@ -225,6 +263,38 @@ export class SpecialistProviderReadinessResolverV1 {
         capacityReserved: false,
       },
     });
+    this.#selectionByReadiness.set(canonicalReadiness, selection);
+    return canonicalReadiness;
+  }
+
+  /**
+   * Re-probe the very same trusted selection to exclude provider-readiness
+   * drift at the serialized durable admission boundary. Opaque caller
+   * readiness objects cannot impersonate an owner-issued observation.
+   */
+  async assertCurrent(readiness) {
+    if (!readiness || typeof readiness !== 'object') {
+      throw new Error('Trusted readiness observation is required');
+    }
+    const selection = this.#selectionByReadiness.get(readiness);
+    if (!selection) throw new Error('Readiness observation lacks trusted resolver provenance');
+    const current = await this.resolve(selection);
+    // A later trusted re-probe cannot move causally behind the original
+    // observation. Equal facts after a wall-clock rollback are not proof
+    // of renewed provider readiness; require monotonic fresh evidence.
+    // These timestamps are canonical ISO-8601 UTC, so lexical order is exact.
+    if (current.resolvedAt < readiness.resolvedAt
+        || current.observedAt < readiness.observedAt) {
+      throw new Error('Trusted provider readiness revalidation moved backwards');
+    }
+    if (!current.executable || current.readiness !== readiness.readiness
+        || current.providerId !== readiness.providerId
+        || current.registryRevision !== readiness.registryRevision
+        || current.definitionRevision !== readiness.definitionRevision
+        || JSON.stringify(current.inspection) !== JSON.stringify(readiness.inspection)) {
+      throw new Error('Provider readiness changed since its trusted observation');
+    }
+    return true;
   }
 }
 

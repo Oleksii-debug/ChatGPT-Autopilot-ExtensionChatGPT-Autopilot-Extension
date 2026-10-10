@@ -52,15 +52,29 @@ function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain object');
   }
-  const prototype = Object.getPrototypeOf(value);
+  // Lower-trust Proxy reflection traps may throw arbitrary secret-bearing
+  // exceptions. Keep the canonical object validator, but redact trap failures.
+  let prototype;
+  let keys;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    keys = Reflect.ownKeys(value);
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(label + ' must be a plain object');
   }
   const out = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of keys) {
     if (typeof key !== 'string') throw new Error(label + ' contains symbol field');
     if (!allowed.has(key)) throw new Error(label + ' contains unknown field');
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    let descriptor;
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(value, key);
+    } catch {
+      throw new Error(label + ' cannot be inspected safely');
+    }
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' must be an enumerable own data property');
     }

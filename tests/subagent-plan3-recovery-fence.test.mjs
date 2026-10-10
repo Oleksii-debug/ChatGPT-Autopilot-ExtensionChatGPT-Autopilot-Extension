@@ -322,3 +322,21 @@ test('section 2: invalid spawn field names cannot disclose attacker-controlled s
   assert.equal(canonical.executionAuthority, false);
   assert.equal(canonical.activationAuthority, false);
 });
+
+test('Section 2 untrusted spawn metadata Proxy trap errors cannot leak credentials', () => {
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    let trapCalls = 0;
+    const hostile = new Proxy({ nowMs: 250 }, {
+      [trap]() { trapCalls += 1; throw new Error('SPAWN_PRIVATE_CREDENTIAL_731'); },
+    });
+    assert.throws(() => mutateOrchestrationSubagentTopologyV1(hostile), error =>
+      error instanceof Error
+      && /cannot be inspected safely/u.test(error.message)
+      && !error.message.includes('SPAWN_PRIVATE_CREDENTIAL_731'));
+    assert.equal(trapCalls, 1);
+  }
+  const recovered = mutateOrchestrationSubagentTopologyV1(request());
+  assert.equal(recovered.decision, 'ALLOW', 'canonical bounded admission remains available');
+  assert.equal(recovered.executionAuthority, false);
+  assert.equal(recovered.activationAuthority, false);
+});

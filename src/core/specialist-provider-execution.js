@@ -27,6 +27,10 @@ const OUTCOME_KEYS = new Set([
   'providerUpdatedAt', 'providerObservedAt', 'at',
 ]);
 const OPTIONAL_OUTCOME_KEYS = new Set(['providerUpdatedAt', 'providerObservedAt']);
+const PREPARE_KEYS = new Set([
+  'planId', 'nodeId', 'agentId', 'handoffId', 'providerId',
+  'leaseId', 'leaseUntil', 'conversationId', 'providerConfig', 'at',
+]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TERMINAL = new Set(['finished', 'error', 'stuck']);
@@ -36,15 +40,24 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const prototype = Object.getPrototypeOf(value);
+  let prototype;
+  let descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // The execution snapshot is provider/caller-adjacent data. Proxy traps
+    // may throw secret-bearing text; never surface that exception or its cause.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      // An unknown key is attacker-controlled and may contain a credential.
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -196,6 +209,18 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   if (Boolean(providerUpdatedAt) !== Boolean(providerObservedAt)) {
     throw new Error('Specialist provider chronology requires both providerUpdatedAt and providerObservedAt');
   }
+  if (providerUpdatedAt && Date.parse(providerUpdatedAt) > Date.parse(providerObservedAt)) {
+    // A provider cannot be updated after the exact snapshot was observed.
+    // Fail closed on inconsistent provider chronology rather than accepting
+    // a future-dated status as proven execution evidence.
+    throw new Error('Specialist provider update cannot postdate its observation');
+  }
+  if (providerObservedAt && Date.parse(providerObservedAt) < Date.parse(preparedAt)) {
+    // A provider observation from before this exact handoff was prepared cannot
+    // prove its terminal outcome. Historical provider updates may be older,
+    // but their observation must belong to this attempt's timeline.
+    throw new Error('Specialist provider observation predates exact preparation');
+  }
   if (providerObservedAt && Date.parse(providerObservedAt) > Date.parse(updatedAt)) {
     throw new Error('Specialist provider observation cannot postdate durable outcome');
   }
@@ -247,10 +272,13 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   });
 }
 
-export function createSpecialistProviderExecutionV1({
-  planId, nodeId, agentId, handoffId, providerId, leaseId, leaseUntil,
-  conversationId, providerConfig, at,
-} = {}) {
+export function createSpecialistProviderExecutionV1(input = {}) {
+  // Do not destructure a potentially hostile preparation object: property
+  // reads could execute getters/Proxy get traps before canonical admission.
+  const {
+    planId, nodeId, agentId, handoffId, providerId, leaseId, leaseUntil,
+    conversationId, providerConfig, at,
+  } = record(input, PREPARE_KEYS, 'Specialist provider preparation request');
   return normalizeSpecialistProviderExecutionV1({
     schemaVersion: SPECIALIST_PROVIDER_EXECUTION_VERSION,
     planId,
@@ -279,7 +307,16 @@ export function createSpecialistProviderExecutionV1({
 
 export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcomeInput) {
   const current = normalizeSpecialistProviderExecutionV1(currentInput);
-  if (current.status === SpecialistProviderExecutionStatus.RECONCILE) return current;
+  // A terminal provider outcome is immutable evidence for this exact lease and
+  // conversation. Late or duplicate observations (including after JSON restart)
+  // cannot turn a success/failure into a retryable or contradictory outcome.
+  // Reconciliation or a genuinely new attempt belongs to the existing canonical
+  // effect/lease authority, never an overwrite of this historical record.
+  if (current.status === SpecialistProviderExecutionStatus.RECONCILE
+      || current.status === SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED
+      || current.status === SpecialistProviderExecutionStatus.PROVIDER_FAILED) {
+    return current;
+  }
   const raw = record(outcomeInput, OUTCOME_KEYS, 'Specialist provider execution outcome');
   for (const key of OUTCOME_KEYS) {
     if (!OPTIONAL_OUTCOME_KEYS.has(key) && !Object.hasOwn(raw, key)) {
