@@ -878,3 +878,45 @@ test('S1 bound workspace requires slot evidence at or after canonical binding ac
   assert.equal(fresh.dispatchAuthorized, false);
   assert.equal(fresh.executionAuthorized, false);
 });
+
+
+test('S1 redacts duplicate cloud capacity identity values before logging errors', () => {
+  const secret = 'PRIVATE_CLOUD_CREDENTIAL_SHOULD_NEVER_BE_DIAGNOSTIC_TEXT';
+  const cases = [
+    {
+      input: request({ providerStates: [provider(secret), provider(secret)] }),
+      reason: /duplicate provider readiness/u,
+    },
+    {
+      input: request({ cloudSlots: [slot(secret), slot(secret)] }),
+      reason: /duplicate slot/u,
+    },
+    {
+      input: request({
+        workspaceBindings: [
+          workspaceBinding(ownedCloud(), { workspaceId: secret }),
+          workspaceBinding(ownedCloud(), { workspaceId: secret }),
+        ],
+      }),
+      reason: /duplicate workspace binding/u,
+    },
+  ];
+  for (const { input, reason } of cases) {
+    // Both in-memory provider inputs and persistence-rehydrated inputs must
+    // be rejected without copying a potentially private identity to logs.
+    for (const candidate of [input, JSON.parse(JSON.stringify(input))]) {
+      assert.throws(
+        () => assessCloudExecutionFabricV1(candidate),
+        error => error instanceof Error
+          && reason.test(error.message)
+          && !error.message.includes(secret),
+      );
+    }
+  }
+  const afterRecovery = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(afterRecovery.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(afterRecovery.dispatchAuthorized, false);
+  assert.equal(afterRecovery.executionAuthorized, false);
+});
