@@ -53,6 +53,45 @@ test('Local API is opt-in and rejects missing runtime or short secrets', () => {
   assert.throws(() => createAutopilotLocalClientV1({token: TOKEN,port:0}), /port/u);
 });
 
+test('Local API listener rejects unsafe bind addresses and ambiguous Node overloads', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const server = createAutopilotLocalApiServerV1({
+    token: TOKEN, dependencies: dependencies(counters),
+  });
+  // Node's default omitted-host listen() can bind a wildcard socket.
+  // A valid bearer must not make such a listener safe to expose.
+  for (const args of [
+    [0], [0, '0.0.0.0'], [0, '::'], [0, '::1'], [0, 'localhost'],
+    [{ port: 0, host: '127.0.0.1' }], [65536, '127.0.0.1'],
+    [-1, '127.0.0.1'], ['0', '127.0.0.1'],
+  ]) {
+    assert.throws(() => server.listen(...args),
+      /explicit 127\.0\.0\.1 TCP binding/u);
+    assert.equal(server.listening, false);
+    assert.equal(server.address(), null);
+  }
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  try {
+    assert.equal(server.address().address, '127.0.0.1');
+    const client = createAutopilotLocalClientV1({
+      token: TOKEN, port: server.address().port,
+    });
+    const result = await client.control(request('listener-loopback-positive'));
+    assert.equal(result.status, 'RECEIVED');
+    assert.equal(result.result.receipt.status, 'COMPLETED');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('SDK authenticated loopback request dispatches only through canonical resolver', async () => {
   const counters = {scopes:0, dispatches:0};
   await withServer(async port => {
