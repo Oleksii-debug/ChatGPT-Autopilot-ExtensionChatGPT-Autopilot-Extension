@@ -581,6 +581,28 @@ test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any mo
     assert.equal(settlementCalls, 0, 'no model effect exists to settle');
   }
   assert.equal(getterReads, 0, 'an untrusted receipt getter must never execute');
+
+  let validatedProviderCalls = 0;
+  let validatedSettlements = 0;
+  const validRouter = new AiOrchestrator({
+    now:() => 82_000,
+    gatewayClient:{ async complete(req) {
+      validatedProviderCalls += 1;
+      return { provider:req.provider, model:req.model, text:'bound completion',
+        usage:{inputTokens:2, outputTokens:2, totalTokens:4} };
+    } },
+    providerCallLifecycle:{
+      async beforeProviderCall({route}) { return {reservationId:'reservation-verified', ...route}; },
+      async afterProviderCall() { validatedSettlements += 1; return {settled:true}; },
+    },
+  });
+  const valid = await validRouter.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'budget-valid', controlEpoch:0},
+  });
+  assert.equal(valid.text, 'bound completion');
+  assert.equal(validatedProviderCalls, 1);
+  assert.equal(validatedSettlements, 1);
 });
 
 test('selected model profile adds only its own prompts to the gateway request', async () => {
