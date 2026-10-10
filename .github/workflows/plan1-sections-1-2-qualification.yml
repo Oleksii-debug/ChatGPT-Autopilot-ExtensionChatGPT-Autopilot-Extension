@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - plan1/11.0.13-agent-contract-intake-converge-20261008
+      - plan1/s1-nested-diagnostic-redaction-20261010
   pull_request:
     paths:
       - src/core/outcome-contract.js
