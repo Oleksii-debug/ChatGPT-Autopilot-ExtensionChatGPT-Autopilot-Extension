@@ -145,8 +145,8 @@ test('Plan4 S1 custom account is never selected without its exact endpointId, in
 
 test('compatible endpoint registry rejects duplicate IDs, inline secrets and insecure remote HTTP', () => {
   assert.throws(() => normalizeCompatibleEndpointRegistry([
-    { endpointId:'same', baseUrl:'https://one.example/v1' },
-    { endpointId:'same', baseUrl:'https://two.example/v1' },
+    { endpointId:'same', baseUrl:'https://one.example/v1', apiKeyEnv:'DUPLICATE_ONE_KEY' },
+    { endpointId:'same', baseUrl:'https://two.example/v1', apiKeyEnv:'DUPLICATE_TWO_KEY' },
   ]), /Duplicate/);
   assert.throws(() => normalizeCompatibleEndpointRegistry([
     { endpointId:'leak', baseUrl:'https://one.example/v1', apiKey:'inline-secret' },
@@ -256,7 +256,7 @@ test('compatible endpoint registry loads local non-secret settings unless an exp
     fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:[{ endpointId:'saved', baseUrl:'https://saved.example/v1', apiKeyEnv:'SAVED_KEY' }] }));
     assert.equal(loadCompatibleEndpointRegistry({ env:{}, configFile })[0].endpointId, 'saved');
     const overridden = loadCompatibleEndpointRegistry({
-      env:{ AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:JSON.stringify([{ endpointId:'env', baseUrl:'https://env.example/v1' }]) },
+      env:{ AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:JSON.stringify([{ endpointId:'env', baseUrl:'https://env.example/v1', apiKeyEnv:'ENV_KEY' }]) },
       configFile,
     });
     assert.equal(overridden[0].endpointId, 'env');
