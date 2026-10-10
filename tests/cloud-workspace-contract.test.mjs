@@ -1779,3 +1779,22 @@ test('S1 read-only JSON restart reconciliation redacts owner lookup failures', a
   assert.equal(bindingReads, 1);
   assert.equal(ownerReads, 1);
 });
+
+
+test('S1 canonical readback wrapper preserves trusted adapter method receiver', async () => {
+  const owner = JSON.parse(JSON.stringify(cloudOwnership()));
+  let reads = 0;
+  const result = await verifyCloudWorkspaceIsolationV1(observation(), owner, {
+    at: ISOLATION_AT,
+    loadCanonicalOwnership: async function () {
+      reads++;
+      assert.equal(this.at, ISOLATION_AT, 'canonical callback must retain trusted options as this');
+      return JSON.parse(JSON.stringify(owner));
+    },
+    verifyIsolation: async () => isolationProof(),
+  });
+  assert.equal(reads, 2);
+  assert.equal(result.isolationVerified, true);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.resumeAuthorized, false);
+});
