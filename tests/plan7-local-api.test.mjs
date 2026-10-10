@@ -150,6 +150,46 @@ test('duplicate Host or Authorization headers fail closed before token lookup or
   }
 });
 
+test('Expect 100-continue is rejected before pre-auth body upload, token and Core dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups += 1; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    let continueEvents = 0;
+    const status = await new Promise((resolve, reject) => {
+      const req = httpRequest({
+        hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+        headers: {
+          Host: '127.0.0.1:' + port,
+          Authorization: 'Bearer ' + TOKEN,
+          'Content-Type': 'application/json',
+          Expect: '100-continue',
+        },
+      }, res => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      req.on('continue', () => { continueEvents += 1; });
+      req.once('error', reject);
+      req.end(JSON.stringify(request('no-continue-auth-leak')));
+    });
+    assert.equal(status, 417);
+    assert.equal(continueEvents, 0, 'pre-auth request must not receive a 100 Continue');
+    assert.equal(tokenLookups, 0, 'rejected handshake must not consult owner credential broker');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    assert.equal((await client.control(request('continue-fence-recovery'))).status, 'RECEIVED');
+    assert.equal(tokenLookups, 1);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
+
 test('unauthenticated, wrong-host, origin and preflight requests do not reach Core', async () => {
   const counters={scopes:0, dispatches:0};
   await withServer(async port => {
