@@ -70,21 +70,30 @@ function optionalText(value, label, max = 8000) {
   return out;
 }
 
+// Persisted effect receipts are security-critical. Hostile Proxy reflection
+// traps can contain private provider tokens in their errors; diagnostics must
+// never echo untrusted keys or exception messages.
+function safeEffectReflection(label, inspect) {
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function dataRecord(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object'
+      || safeEffectReflection(label, () => Array.isArray(value))) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = safeEffectReflection(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
   const output = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeEffectReflection(label, () => Reflect.ownKeys(value))) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol fields`);
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
-      throw new Error(`${label}.${key} must be an enumerable own data property`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
+    const descriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, key));
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
     }
     output[key] = descriptor.value;
   }
@@ -92,24 +101,31 @@ function dataRecord(value, allowed, label) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!safeEffectReflection(label, () => Array.isArray(value)
+      && Object.getPrototypeOf(value) === Array.prototype)) {
     throw new Error(`${label} must be a plain dense array`);
   }
-  if (value.length > max) throw new Error(`${label} is invalid`);
+  // Read own descriptors instead of attacker-controlled array length getters.
+  const lengthDescriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, 'length'));
+  const length = lengthDescriptor?.value;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(length) || length < 0 || length > max) {
+    throw new Error(`${label} is invalid`);
+  }
   const output = [];
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeEffectReflection(label, () => Reflect.ownKeys(value))) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains non-index fields`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index >= value.length) {
+    if (!Number.isSafeInteger(index) || index >= length) {
       throw new Error(`${label} contains invalid indices`);
     }
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, String(index)));
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label}[${index}] must be an enumerable own data item`);
     }
     output.push(descriptor.value);
