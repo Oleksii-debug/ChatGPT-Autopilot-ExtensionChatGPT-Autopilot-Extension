@@ -207,6 +207,9 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
         });
       }
       inFlightRequests.add(requestKey);
+      // Use one monotonic budget for trusted token resolution, HTTP and
+      // receipt parsing. Token lookup may not extend a caller's effect deadline.
+      const controlStartedAt = performance.now();
       let timeoutHandle;
       try {
       // An owner-issued token is a credential read, not a second authorization
@@ -235,6 +238,15 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
           throw new Error('Trusted local API owner token unavailable before transmission');
         }
       }
+      const transportBudgetMs = timeoutMs - (performance.now() - controlStartedAt);
+      if (transportBudgetMs <= 0) {
+        // Even a successfully resolved owner token cannot authorize a fresh
+        // transmission after this SDK call's original deadline elapsed.
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
+        });
+      }
       // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
       // Enforce one wall-clock deadline across transport AND body parsing.
       // Timeout is always ambiguous, not evidence of zero external effects.
@@ -243,7 +255,7 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
         timeoutHandle = setTimeout(() => {
           abortController.abort();
           reject(new Error('Local API deadline expired'));
-        }, timeoutMs);
+        }, transportBudgetMs);
       });
       let res;
       try {

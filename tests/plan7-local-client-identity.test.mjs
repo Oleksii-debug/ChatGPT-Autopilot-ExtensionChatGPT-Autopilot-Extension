@@ -564,3 +564,35 @@ test('hung SDK owner-token lookup is bounded and cannot dispatch or become stick
   assert.equal((await client.control(BASE)).status, 'RECEIVED');
   assert.equal(sent, 1);
 });
+
+test('SDK one total deadline includes owner-token lookup and retains safe recovery', async () => {
+  const token = 'test-only-'.repeat(5);
+  let slow = true;
+  let calls = 0;
+  let lastSignal;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => {
+      if (slow) await new Promise(resolve => setTimeout(resolve, 100));
+      return token;
+    },
+    port: 12345,
+    timeoutMs: 250,
+    fetchImpl: async (_url, { signal }) => {
+      calls += 1;
+      lastSignal = signal;
+      if (slow) await new Promise(resolve => setTimeout(resolve, 190));
+      return { ok: true, status: 200, json: async () => transportResponse() };
+    },
+  });
+  const late = await client.control(BASE);
+  assert.equal(late.status, 'UNKNOWN_NETWORK_RESULT',
+    'owner lookup must consume the same budget as network and receipt parsing');
+  assert.equal(lastSignal.aborted, true,
+    'late uncooperative transport must be aborted even after owner lookup');
+  assert.equal(calls, 1, 'uncertain operation may never be retried automatically');
+  slow = false;
+  const recovered = await client.control(BASE);
+  assert.equal(recovered.status, 'RECEIVED', 'fresh request after timeout recovers');
+  assert.equal(recovered.result.receipt.status, 'COMPLETED');
+  assert.equal(calls, 2);
+});
