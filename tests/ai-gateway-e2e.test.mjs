@@ -70,6 +70,20 @@ test('Plan4 S1 real HTTP gateway forbids endpoint alias, duplicate ID and erased
       assert.equal(result.status,400);
       assert.equal((await result.json()).code,'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
     }
+    // Provider selection must be exact even on raw HTTP callers: duplicate,
+    // whitespace-aliased or extra query fields cannot select an account.
+    const malformedQueries = [
+      'provider=ollama&provider=openai-compatible',
+      'provider=openai-compatible&provider=openai-compatible&endpointId=team',
+      'provider=%20openai-compatible%20&endpointId=team',
+      'provider=&endpointId=team',
+      'provider=openai-compatible&endpointId=team&credentialRef=fixture',
+    ];
+    for (const query of JSON.parse(JSON.stringify(malformedQueries))) {
+      const result = await fetch(`${root}/models?${query}`);
+      assert.equal(result.status, 400);
+      assert.equal((await result.json()).code, 'AI_GATEWAY_PROVIDER_ID_INVALID');
+    }
     for(const endpointId of ['', ' team ', null, 42]) {
       const result=await fetch(`${root}/complete`,{
         method:'POST',headers:{'Content-Type':'application/json'},
