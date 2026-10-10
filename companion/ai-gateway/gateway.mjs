@@ -643,7 +643,7 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
           service: 'chatgpt-autopilot-ai-gateway',
           version: GATEWAY_VERSION,
           providers: [...PROVIDERS],
-          openaiConfigured: Boolean(clean(process.env.OPENAI_API_KEY)),
+          openaiConfigured: Boolean(clean(env?.OPENAI_API_KEY)),
           compatibleApiKeyConfigured: compatibleEndpoints.some(item => item.apiKeyEnv && clean(env[item.apiKeyEnv])),
           // [] is a valid explicitly disabled account registry. Health must
           // stay readable without conjuring an implicit default endpoint.
