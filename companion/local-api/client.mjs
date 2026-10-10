@@ -269,11 +269,13 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
       // evidence that no effect occurred; never expose upstream error text.
       let responseOk, responseStatus = null;
       try {
-        responseOk = res?.ok === true;
-        if (!responseOk) {
-          const observedStatus = res?.status;
-          responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
-        }
+        // The canonical Companion V1 endpoint acknowledges only with HTTP 200.
+        // Custom transports may supply an inconsistent { ok: true, status: 401 }
+        // alongside a plausible JSON receipt. Treat the entire response as
+        // ambiguous, never as a verified Core acknowledgement or retry signal.
+        const observedStatus = res?.status;
+        responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
+        responseOk = res?.ok === true && responseStatus === 200;
       } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
