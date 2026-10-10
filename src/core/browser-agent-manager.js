@@ -78,6 +78,27 @@ import {
   normalizeBrowserAgentOrchestrationNodeBindingV1,
 } from './browser-agent-orchestration-binding.js';
 
+// Resolve the CDP upload node using the same unique typed snapshot identity as
+// the semantic preflight. A page may clone a marked input between preflight and
+// Runtime.evaluate; document.querySelector would silently choose the first.
+export function buildUniqueBrowserFileInputExpression(ref, snapshotId) {
+  if (typeof ref !== 'string' || !ref || typeof snapshotId !== 'string' || !snapshotId) {
+    throw new Error('AGENT_FILE_INPUT_STALE');
+  }
+  const identity = JSON.stringify({ ref, snapshotId });
+  return `(() => {
+    const expected = ${identity};
+    const matches = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]'))
+      .filter(node => node.getAttribute('data-autopilot-agent-ref') === expected.ref
+        && node.getAttribute('data-autopilot-agent-snapshot') === expected.snapshotId);
+    if (matches.length !== 1) return null;
+    const input = matches[0];
+    return input instanceof HTMLInputElement
+      && String(input.type || '').toLowerCase() === 'file'
+      && input.isConnected ? input : null;
+  })()`;
+}
+
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
@@ -3990,7 +4011,7 @@ export class BrowserAgentManager {
         attached = true;
         await requireOwner();
         await proveInput();
-        const expression = `document.querySelector('[data-autopilot-agent-ref="' + ${JSON.stringify(String(action.ref || ''))} + '"][data-autopilot-agent-snapshot="' + ${JSON.stringify(String(snapshot.snapshotId || ''))} + '"]')`;
+        const expression = buildUniqueBrowserFileInputExpression(action.ref, snapshot.snapshotId);
         const evaluated = await this.chrome.debugger.sendCommand(target, 'Runtime.evaluate', { expression, returnByValue: false });
         const objectId = evaluated?.result?.objectId;
         if (!objectId) throw new Error('AGENT_FILE_INPUT_STALE');
