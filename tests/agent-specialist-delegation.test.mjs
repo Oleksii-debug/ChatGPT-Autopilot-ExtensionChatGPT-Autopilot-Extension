@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { prepareAutomaticAgentSpecialistDelegationV1 } from '../src/core/agent-specialist-delegation.js';
+import { createSpecialistRegistryV1 } from '../src/core/specialist-registry.js';
 
 const T0 = '2026-09-27T03:00:00.000Z';
 const T1 = '2026-09-27T04:00:00.000Z';
@@ -56,12 +57,19 @@ function definition(specialistId, capabilityIds, toolIds, overrides = {}) {
 }
 
 function registry(definitions) {
-  return {
+  const input = {
     schemaVersion: 1,
     registryId: 'registry:default',
     revision: 4,
     definitions,
   };
+  // Positive fixtures carry the durable CAS identity; malformed cases
+  // remain malformed so adversarial validation is not short-circuited.
+  try {
+    return { ...input, bindingKey: createSpecialistRegistryV1(input).bindingKey };
+  } catch {
+    return input;
+  }
 }
 
 function request(overrides = {}) {
