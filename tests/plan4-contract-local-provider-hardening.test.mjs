@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAiRoutePool, normalizeAiRoutePolicy, normalizeAiWorkerPolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates } from '../src/core/ai-route-pool.js';
+import { normalizeAiRoutePool, normalizeAiRoutePolicy, normalizeAiWorkerPolicy, createAiRouteRegistryEvidenceV1, selectAiRouteCandidates, allocateAiRouteWorkers } from '../src/core/ai-route-pool.js';
 import { LocalAiClient, normalizeLocalAiSettings, normalizeLocalAiBaseUrl, normalizeLocalAiUsage } from '../src/core/local-ai-provider.js';
 import { AiGatewayClient, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
 import { AiOrchestrator, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
@@ -2163,4 +2163,48 @@ test('Plan4 S1 owner no-auto-switch never selects an alternative during durable 
   assert.equal(providerCalls,1);
   assert.equal(result.routing.selectedRouteId,'primary');
   assert.equal(result.routing.selectedModel,'llama3');
+});
+
+test('Plan4 S1 worker allocation respects owner no-auto-switch during backoff, restart and recovery', () => {
+  const primary = {...route, priority:100, maxWorkers:2};
+  const secondary = {...route, routeId:'worker-backup', model:'backup-model', priority:1, maxWorkers:2};
+  const input = {
+    routes:[primary, secondary],
+    routePolicy:{autoSwitch:false},
+    workerPolicy:{allocationMode:'auto', minWorkers:1, maxParallelWorkers:4},
+    routeStates:{primary:{backoffUntil:10_000}},
+    desiredWorkers:2,
+    now:100,
+  };
+  const guarded = allocateAiRouteWorkers(input);
+  assert.equal(guarded.assignedWorkers,0);
+  assert.equal(guarded.unassignedWorkers,2);
+  assert.equal(guarded.retryAt,10_000);
+  assert.deepEqual(guarded.eligibleRouteIds,['primary','worker-backup']);
+  assert.equal(guarded.allocations['worker-backup'],0,
+    'owner autoSwitch=false cannot quietly allocate to a different model while the primary is blocked');
+  assert.deepEqual(allocateAiRouteWorkers(JSON.parse(JSON.stringify(input))),guarded,
+    'durable JSON restart must not expand the owner route policy');
+
+  const allowed = allocateAiRouteWorkers({
+    ...input,routePolicy:{autoSwitch:true},
+  });
+  assert.equal(allowed.assignedWorkers,2);
+  assert.equal(allowed.allocations['worker-backup'],2,
+    'explicitly authorized automatic failover still works');
+
+  const manual = {...input,workerPolicy:{
+    allocationMode:'manual',minWorkers:1,maxParallelWorkers:4,
+    manualRouteWorkers:{primary:2,'worker-backup':2},
+  }};
+  const blockedManual = allocateAiRouteWorkers(manual);
+  assert.equal(blockedManual.assignedWorkers,0,
+    'manual allocation cannot bypass an owner no-auto-switch/backoff decision');
+
+  const recovered = allocateAiRouteWorkers({...input,now:10_000});
+  assert.equal(recovered.assignedWorkers,2);
+  assert.equal(recovered.allocations.primary,2);
+  assert.equal(recovered.allocations['worker-backup'],0);
+  assert.equal(recovered.retryAt,0);
+  assert.equal(allocateAiRouteWorkers({...manual,now:10_000}).allocations.primary,2);
 });
