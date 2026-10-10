@@ -1567,13 +1567,24 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   };
-  const setInputValue = (element, value) => {
+  const setInputValue = (element, value, kind) => {
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
       const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
       if (setter) setter.call(element, value); else element.value = value;
     } else element.textContent = value;
+    // Native typed setters can reject/sanitize a credential without throwing.
+    // Never emit page-owned input/change handlers for a value not accepted.
+    const accepted = () => element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+      ? element.value : element.textContent;
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    // The setter itself may retarget, hide, or occlude a credential field.
+    // This is the existing semantic/geometry proof, not a second authority.
+    ensureUnoccluded(element, kind);
     dispatch(element);
+    // Event listeners may synchronously overwrite the field or its identity.
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    proof(element, kind);
   };
   let usernameFilled = false;
   if (user) {
@@ -1582,7 +1593,7 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     proof(user, 'username');
     proof(password, 'password');
     ensureUnoccluded(user, 'username');
-    setInputValue(user, typeof username === 'string' ? username : '');
+    setInputValue(user, typeof username === 'string' ? username : '', 'username');
     usernameFilled = true;
   }
   // Username handlers may alter the password target. No secret is written
@@ -1592,7 +1603,7 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
   password.focus?.({ preventScroll: true });
   proof(password, 'password');
   ensureUnoccluded(password, 'password');
-  setInputValue(password, secret);
+  setInputValue(password, secret, 'password');
   if (String(password.value || '') !== secret) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
   return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
 }
