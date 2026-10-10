@@ -947,7 +947,10 @@ export async function dispatchUiMessage(message, sender = null) {
           providerObservedAt: providerResult.providerObservedAt || '',
         };
       } catch (error) {
-        providerDispatched = error?.effectMayHaveOccurred === true;
+        // Unknown thrown primitives have no trustworthy provider effect marker.
+        if (error !== null && error !== undefined) {
+          providerDispatched = error.effectMayHaveOccurred === true;
+        }
         outcome = error instanceof OpenHandsCodingSpecialistError
           ? {
             providerStatus: '',
