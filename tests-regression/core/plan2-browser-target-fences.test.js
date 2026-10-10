@@ -1788,6 +1788,7 @@ test('Plan-2 S1: credential fill enforces exact frame and field proof through fo
   try {
     const user = new FakeInput('text', 'Username');
     const password = new FakeInput('password', 'Password');
+    password.rect = { left: 210, top: 10, width: 90, height: 30 };
     const nodes = [user, password];
     pageUrl = 'https://example.test/login';
     globalThis.location = { get href() { return pageUrl; } };
@@ -1797,7 +1798,7 @@ test('Plan-2 S1: credential fill enforces exact frame and field proof through fo
       querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
         ? nodes.filter(input => input.getAttribute('data-autopilot-agent-ref'))
         : nodes,
-      elementFromPoint: () => password,
+      elementFromPoint: x => (x < 150 ? user : password),
     };
     const snap = snapshotBrowserPage('credential-proof');
     const observed = {
@@ -1864,6 +1865,24 @@ test('Plan-2 S1: credential fill enforces exact frame and field proof through fo
     assert.equal(password.value, '', 'password focus handler cannot redirect the secret');
     password.focus = () => {};
     password.setAttribute('aria-label', 'Password');
+
+    // An overlay introduced before or during focus must not be bypassed
+    // by a broker-backed programmatic secret fill.
+    reset();
+    const overlay = new FakeElement('Modal overlay');
+    document.elementFromPoint = x => (x < 150 ? user : overlay);
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_OCCLUDED/);
+    assert.equal(password.value, '', 'covered password control receives no secret');
+    document.elementFromPoint = x => (x < 150 ? user : password);
+
+    reset();
+    password.focus = () => { document.elementFromPoint = () => overlay; };
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_OCCLUDED/);
+    assert.equal(password.value, '', 'focus-time modal receives no hidden secret');
+    password.focus = () => {};
+    document.elementFromPoint = x => (x < 150 ? user : password);
 
     reset();
     nodes.push(password);
