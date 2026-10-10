@@ -482,3 +482,62 @@ test('AgentPlan live evolution rejects stale, shrinking or mutating replacement 
   mutating.nodes.push(node('later', ['discover']));
   assert.throws(() => evolveAgentPlanV1(current, mutating, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /cannot replace existing nodes/);
 });
+
+
+test('Plan-1 S1: plan schema reflection stays data-only and budget signed zero never survives recovery', () => {
+  const original = plan([node('discover')]);
+  const canonical = normalizeAgentPlanV1(original);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(canonical))), canonical);
+
+  const secret = 'OWNER_PRIVATE_PLAN_REFLECTION_SECRET';
+  let traps = 0;
+  for (const operation of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const hostile = raw => new Proxy(raw, {
+      [operation]() { traps += 1; throw new Error(secret); },
+    });
+    for (const input of [
+      hostile(original),
+      plan([hostile(node('discover'))]),
+      plan([node('discover', [], [], hostile({ maxCostUsdMicros: 1 }))]),
+    ]) {
+      assert.throws(() => normalizeAgentPlanV1(input), error => {
+        assert.equal(error.message.includes(secret), false);
+        assert.equal(error.message.includes('cannot be safely inspected'), true);
+        return true;
+      }, 'hostile input must never disclose trapped private provider data');
+    }
+  }
+  assert.equal(traps, 9);
+
+  const hostileField = { ...original };
+  Object.defineProperty(hostileField, secret, { enumerable: true, value: 'GRANT_ALL' });
+  assert.throws(() => normalizeAgentPlanV1(hostileField), error => {
+    assert.equal(error.message.includes(secret), false);
+    assert.equal(error.message.includes('contains unknown field'), true);
+    return true;
+  });
+
+  let lengthReads = 0;
+  const array = new Proxy([node('discover')], {
+    get(target, property, receiver) {
+      if (property === 'length') { lengthReads += 1; throw new Error(secret); }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  assert.equal(normalizeAgentPlanV1(plan(array)).nodes.length, 1);
+  assert.equal(lengthReads, 0, 'array descriptor snapshot avoids untrusted length getter');
+
+  for (const key of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    const corruptBudget = { [key]: -0 };
+    assert.equal(Object.is(corruptBudget[key], -0), true);
+    assert.throws(() => normalizeAgentPlanV1(plan([
+      node('discover', [], [], corruptBudget),
+    ])), /invalid/, 'budget negative zero cannot become a new canonical zero');
+    assert.equal(Object.is(corruptBudget[key], -0), true);
+  }
+  assert.throws(() => normalizeAgentPlanV1({
+    ...original, revision: -0,
+  }), /revision is invalid/);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(canonical))), canonical,
+    'denied hostile and lossy inputs never poison original durable plan');
+});
