@@ -623,7 +623,7 @@ test('S1 recorded Specialist dispatch receipt identities must be unique and stru
 
 test('S1 refuses non-string, control and accessor Specialist receipt identities without disclosure or replay', () => {
   const marker = 'PRIVATE_RECEIPT_TRAP_DO_NOT_LEAK';
-  for (const value of [7, {}, true, 'receipt-\\u202e-hidden', 'receipt-\\n-wrong', 'a'.repeat(241)]) {
+  for (const value of [7, {}, true, 'receipt-\u202e-hidden', 'receipt-\n-wrong', 'a'.repeat(241)]) {
     const input = job();
     input.runtime.specialistDispatchByAgentId = {
       first: { state: 'PROVIDER_SUCCEEDED', providerReceiptId: value },
