@@ -666,7 +666,10 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     const declaredModels = Object.hasOwn(item, 'modelIds')
       ? Object.freeze(endpointModelIds(own(item, 'modelIds'), 'AI endpoint modelIds')) : null;
     return Object.freeze({
-      schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin,
+      // The profile returned as evidence must itself remain a valid canonical
+      // registry input after JSON persistence. A bare parsed.origin drops the
+      // required trailing slash and breaks the very next cold-restart read.
+      schemaVersion: 1, profileId, provider, endpointId, origin: `${parsed.origin}/`,
       locality, credentialRef, credentialless,
       ...(accountId ? { accountId } : {}),
       ...(declaredCapabilities !== null ? { capabilityIds: declaredCapabilities } : {}),
