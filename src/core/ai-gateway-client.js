@@ -245,9 +245,11 @@ export class AiGatewayClient {
       (safeInit.method !== undefined && safeInit.method !== 'GET')
       || safeInit.body !== undefined
     )) throw new Error('AI Gateway read-only endpoint requires GET without a request body');
-    if (completion && (safeInit.method !== 'POST' || typeof safeInit.body !== 'string')) {
+    if (completion && safeInit.method !== 'POST') {
       throw new Error('AI Gateway completion requires explicit POST JSON');
     }
+    // Keep invalid completion bodies machine-readable without performing I/O.
+    if (completion && typeof safeInit.body !== 'string') throw invalidRequestBodyError();
     if (completion) {
       let payload;
       try { payload = JSON.parse(safeInit.body); } catch { throw invalidRequestBodyError(); }
