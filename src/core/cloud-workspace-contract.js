@@ -636,6 +636,20 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
       || Date.parse(trusted.at) >= Date.parse(ownerBefore.leaseUntil)) {
     throw new Error('cloud workspace teardown requires a live canonical owner lease');
   }
+  // The owner lookup above is asynchronous. Re-read the exact canonical
+  // workspace binding before invoking destructive provider teardown: a
+  // reassignment or checkpoint replacement during that await must not allow
+  // a stale worker to delete a potentially reused cloud workspace.
+  const bindingBeforeTeardown = normalizeCloudWorkspaceBindingV1(
+    await trusted.loadCanonicalBinding(Object.freeze({
+      workspaceId: binding.workspaceId,
+      providerId: binding.providerId,
+      executionLeaseId: binding.executionLeaseId,
+    })),
+  );
+  if (JSON.stringify(bindingBeforeTeardown) !== JSON.stringify(binding)) {
+    throw new Error('cloud workspace canonical binding changed before provider teardown');
+  }
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
