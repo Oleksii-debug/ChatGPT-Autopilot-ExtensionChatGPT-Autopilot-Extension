@@ -234,7 +234,7 @@ export class OrchestrationV2Controller {
           || !Object.hasOwn(descriptor, 'value')) {
         throw new Error(key === 'type'
           ? 'Hierarchy scope event type must be an enumerable own data property'
-          : 'Hierarchy scope event fields must be enumerable own data properties');
+          : 'Hierarchy scope event ' + key + ' must be an enumerable own data property');
       }
       snapshot[key] = descriptor.value;
     }
