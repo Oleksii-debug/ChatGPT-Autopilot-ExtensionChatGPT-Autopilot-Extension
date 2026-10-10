@@ -60,7 +60,8 @@ function makeVisionChrome() {
     scripting: {
       async executeScript(details) {
         const name = details.func?.name || '';
-        if (!name) {
+        // JavaScript infers the property name 'func' for an anonymous Chrome-injected arrow.
+        if (!name || name === 'func') {
           const tab = tabs.get(details.target.tabId);
           return [{ frameId: 0, result: {
             url: tab?.url || '',
