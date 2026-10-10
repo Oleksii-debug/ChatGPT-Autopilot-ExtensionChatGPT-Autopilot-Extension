@@ -107,6 +107,65 @@ test('SDK authenticated loopback request dispatches only through canonical resol
 });
 
 
+test('pre-dispatch slow owner-token lookup cannot dispatch after Core scope expiry, and fresh scope recovers', async () => {
+  let clock = Date.parse('2026-10-08T11:02:00.000Z');
+  let tokenLookups = 0;
+  const counters = { scopes: 0, dispatches: 0 };
+  const deps = {
+    now() { return clock; },
+    resolveTrustedScope({ request: r }) {
+      counters.scopes += 1;
+      return {
+        schemaVersion: 1, scopeRevisionId: 'expiry-bound-scope',
+        requestId: r.requestId, principalId: r.principalId,
+        projectId: r.projectId, operation: r.operation, targetId: r.targetId,
+        payloadArtifactId: null, payloadSha256: null, allowed: true,
+        verifiedAt: new Date(clock).toISOString(),
+        validThrough: new Date(clock + 1000).toISOString(),
+      };
+    },
+    dispatchCanonicalControl({ request: r }) {
+      counters.dispatches += 1;
+      return {
+        schemaVersion: 1, requestId: r.requestId,
+        projectId: r.projectId, operation: r.operation,
+        dispatchId: 'expiry-bound-dispatch', status: 'COMPLETED',
+        resultArtifactRef: null, observedAt: new Date(clock).toISOString(),
+      };
+    },
+  };
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => {
+      tokenLookups += 1;
+      // First request's final token lookup completes after the Core proof
+      // already expired. Admission and pre-scope checks were both valid.
+      if (tokenLookups === 3) clock += 2000;
+      return TOKEN;
+    },
+    dependencies: deps,
+  });
+  try {
+    const client = createAutopilotLocalClientV1({
+      token: TOKEN, port: server.address().port,
+    });
+    const stale = await client.control(request('scope-expires-during-owner-token'));
+    assert.equal(stale.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(stale.httpStatus, 422);
+    assert.equal(tokenLookups, 3);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 0 },
+      'expired scope must not dispatch an effect or read-only command');
+    // A new request obtains a new trusted proof and dispatches exactly once.
+    const fresh = await client.control(request('scope-expiry-fresh-recovery'));
+    assert.equal(fresh.status, 'RECEIVED');
+    assert.equal(fresh.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 6);
+    assert.deepEqual(counters, { scopes: 2, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(
+      error => error ? reject(error) : resolve()));
+  }
+});
+
 test('duplicate Host or Authorization headers fail closed before token lookup or Core dispatch', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   let tokenLookups = 0;
