@@ -127,14 +127,28 @@ function normalizeMeta(raw) {
     // orchestra records and must never become a controller/storage identity.
     if (typeof id !== 'string' || !id || id === '__proto__'
         || !Object.hasOwn(raw.byId, id) || Object.hasOwn(byId, id)) continue;
-    const item = raw.byId[id];
+    // A forged accessor or hidden entry is not persisted JSON authority.
+    // Never evaluate a user-supplied getter during cold-start recovery.
+    const entry = Object.getOwnPropertyDescriptor(raw.byId, id);
+    if (!entry?.enumerable || !Object.hasOwn(entry, 'value')) continue;
+    const item = entry.value;
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const policyField = Object.getOwnPropertyDescriptor(item, 'subagentPolicy');
+    if (policyField && (!policyField.enumerable || !Object.hasOwn(policyField, 'value'))) continue;
+    let subagentPolicy;
+    try {
+      // Do not let one malformed owner policy make all healthy orchestras
+      // unrecoverable, and do not restore that corrupted orchestra as runnable.
+      subagentPolicy = storedSubagentPolicy(policyField?.value);
+    } catch {
+      continue;
+    }
     byId[id] = {
       id,
       name: safeName(item.name, 'Оркестр'),
       ownerPaused: item.ownerPaused === true,
       pausedSessionIds: Array.isArray(item.pausedSessionIds) ? [...new Set(item.pausedSessionIds.filter(v => typeof v === 'string'))] : [],
-      subagentPolicy: storedSubagentPolicy(item.subagentPolicy),
+      subagentPolicy,
       createdAt: Math.max(0, Number(item.createdAt || 0)),
       updatedAt: Math.max(0, Number(item.updatedAt || 0)),
     };
