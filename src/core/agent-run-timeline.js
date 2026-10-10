@@ -83,6 +83,20 @@ function own(value, key) {
   if (!Object.hasOwn(descriptor, 'value')) throw new Error('Agent timeline refuses accessor-backed ' + String(key));
   return descriptor.value;
 }
+// Durable JSON-backed evidence must be an enumerable own data field.
+// A hidden property can be visible before restart and silently disappear
+// after serialization, falsifying the timeline's counter or plan evidence.
+// Inspect one descriptor only; never invoke a getter or expose trap text.
+function persistedField(value, key) {
+  let descriptor;
+  try { descriptor = Object.getOwnPropertyDescriptor(value, key); }
+  catch { throw new Error('Agent timeline persisted field cannot be safely inspected'); }
+  if (!descriptor) return { present: false, value: undefined };
+  if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error('Agent timeline persisted field must be an enumerable data field');
+  }
+  return { present: true, value: descriptor.value };
+}
 function safeOwnKeys(value) {
   try { return Reflect.ownKeys(value); }
   catch { throw new Error('Agent timeline options cannot be safely inspected'); }
@@ -102,8 +116,9 @@ function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
 // projects zero; a present corrupt value must not become a plausible zero in
 // the accessible timeline or its exported JSON after storage/restart.
 function recordedCounter(recordValue, field) {
-  if (!safeHasOwn(recordValue, field)) return 0;
-  const observed = own(recordValue, field);
+  const fieldValue = persistedField(recordValue, field);
+  if (!fieldValue.present) return 0;
+  const observed = fieldValue.value;
   if (!Number.isSafeInteger(observed) || Object.is(observed, -0) || observed < 0) {
     // All field names are fixed code-owned literals. Never emit hostile values.
     throw new Error('Agent timeline persisted counter is invalid');
@@ -220,7 +235,7 @@ function planSummary(plan) {
     }
     for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent plan nodes')) {
       record(node, 'Agent plan node');
-      const state = own(node, 'state');
+      const state = persistedField(node, 'state').value;
       const safeState = PLAN_STATES.has(state) ? state : 'UNKNOWN';
       stateCounts[safeState] = (stateCounts[safeState] || 0) + 1;
       nodeCount += 1;
@@ -258,8 +273,7 @@ function recordedOutcomeSummary(value) {
     }
     count = checksLength;
   }
-  const timePresent = safeHasOwn(value, 'verifiedAt');
-  const rawAt = own(value, 'verifiedAt');
+  const { present: timePresent, value: rawAt } = persistedField(value, 'verifiedAt');
   if (timePresent && (!Number.isSafeInteger(rawAt) || Object.is(rawAt, -0) ||
       rawAt < 0 || rawAt > 8_640_000_000_000_000)) {
     throw new Error('Agent recorded outcome verifiedAt is invalid');
