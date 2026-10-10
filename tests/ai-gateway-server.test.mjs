@@ -136,6 +136,46 @@ test('Plan4 S1 real gateway registry preserves exact account endpoint and creden
   }
 });
 
+test('Plan4 S1 endpoint descriptor traps cannot redirect credentials after validation or JSON restart', async () => {
+  const authorized = {endpointId:'team', baseUrl:'https://models.example.test/v1', apiKeyEnv:'TEAM_KEY'};
+  const canonical = normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([authorized])));
+  assert.deepEqual(canonical[0], authorized);
+  let accessorCalls = 0;
+  const accessor = Object.defineProperty({...authorized}, 'baseUrl', {
+    enumerable:true, get(){accessorCalls++;throw new Error('sk-private-accessor-secret');},
+  });
+  const inherited = Object.assign(Object.create({accountId:'inherited-owner'}), authorized);
+  const hidden = Object.defineProperty({...authorized}, 'accountId', {value:'secret',enumerable:false});
+  const withSymbol = {...authorized};
+  withSymbol[Symbol('sk-private-symbol')] = 'secret';
+  const throwingProxy = new Proxy({...authorized}, {
+    ownKeys(){throw new Error('sk-private-proxy-secret');},
+  });
+  for (const candidate of [accessor, inherited, hidden, withSymbol, throwingProxy]) {
+    assert.throws(() => normalizeCompatibleEndpointRegistry([candidate]), error =>
+      error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'
+      && !String(error.message).includes('sk-private')
+      && !String(error.message).includes('secret'));
+  }
+  assert.equal(accessorCalls, 0, 'no lower-trust accessor may execute');
+  let outbound = 0;
+  const request = await completeProvider(
+    {provider:'openai-compatible',endpointId:'team',model:'fixture',prompt:'approved fixture'},
+    {
+      compatibleEndpoints:canonical,env:{TEAM_KEY:'fixture-only-key'},
+      fetchFn:async (url,init) => {
+        outbound++;
+        assert.equal(url,'https://models.example.test/v1/chat/completions');
+        assert.equal(init.headers.authorization,'Bearer fixture-only-key');
+        return response({choices:[{message:{content:'verified fixture'}}]});
+      },
+    },
+  );
+  assert.equal(request.endpointId,'team');
+  assert.equal(request.text,'verified fixture');
+  assert.equal(outbound,1);
+});
+
 test('Plan4 S1 real gateway denies malformed endpoint IDs before account credential/network effect', async () => {
   const compatibleEndpoints=normalizeCompatibleEndpointRegistry([
     {endpointId:'local',baseUrl:'http://127.0.0.1:1234/v1',apiKeyEnv:''},
