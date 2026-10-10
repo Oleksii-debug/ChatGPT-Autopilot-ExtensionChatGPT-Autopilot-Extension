@@ -688,3 +688,68 @@ test('resolved OpenHands probe must present exact server receipt; no-op, version
   assert.equal(valid.authority.providerExecutionAuthorized, false);
   assert.equal(valid.authority.completionAuthorized, false);
 });
+
+test('executable OpenHands readiness requires verified server identity/version after restart, never just a resolved probe', async () => {
+  const evaluate = async probe => {
+    // Treat every case as a fresh/cold-restored binding; no cached READY authority.
+    const binding = createOpenHandsSpecialistReadinessBindingV1({
+      config: JSON.parse(JSON.stringify(config())),
+      client: { probe },
+      now: monotonicNow([T0, T1]),
+    });
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [binding],
+      now: () => T1,
+    });
+    return resolver.resolve(JSON.parse(JSON.stringify(selection())));
+  };
+
+  let called = 0;
+  const noOp = await evaluate(async () => { called += 1; });
+  assert.equal(called, 1);
+  assert.equal(noOp.readiness, 'NEEDS_HEALTH_CHECK');
+  assert.equal(noOp.executable, false);
+  assert.equal(noOp.inspection.checks[0].providerReadiness.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+
+  const wrongServer = await evaluate(async () => ({
+    serverTitle: 'Unrelated Service',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  }));
+  assert.equal(wrongServer.readiness, 'UNAVAILABLE');
+  assert.equal(wrongServer.executable, false);
+  assert.equal(wrongServer.inspection.checks[0].providerReadiness.reasonCode,
+    'OPENHANDS_SERVER_IDENTITY_MISMATCH');
+
+  const wrongVersion = await evaluate(async () => ({
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: 'forged-version',
+  }));
+  assert.equal(wrongVersion.readiness, 'UNAVAILABLE');
+  assert.equal(wrongVersion.executable, false);
+  assert.equal(wrongVersion.inspection.checks[0].providerReadiness.reasonCode,
+    'OPENHANDS_SERVER_VERSION_MISMATCH');
+
+  let getterReads = 0;
+  const hostile = await evaluate(async () => {
+    const receipt = { serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    Object.defineProperty(receipt, 'serverTitle', {
+      enumerable: true,
+      get() { getterReads += 1; throw new Error('PRIVATE_READY_CANARY'); },
+    });
+    return receipt;
+  });
+  assert.equal(getterReads, 0);
+  assert.equal(hostile.readiness, 'NEEDS_HEALTH_CHECK');
+  assert.equal(hostile.executable, false);
+  assert.equal(JSON.stringify(hostile).includes('PRIVATE_READY_CANARY'), false);
+
+  const verified = await evaluate(async () => JSON.parse(JSON.stringify({
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  })));
+  assert.equal(verified.readiness, 'READY');
+  assert.equal(verified.executable, true);
+  assert.equal(verified.inspection.checks[0].providerReadiness.reasonCode, 'OPENHANDS_PROBE_READY');
+  assert.equal(verified.authority.providerExecutionAuthorized, false);
+  assert.equal(verified.authority.capacityReserved, false);
+});
