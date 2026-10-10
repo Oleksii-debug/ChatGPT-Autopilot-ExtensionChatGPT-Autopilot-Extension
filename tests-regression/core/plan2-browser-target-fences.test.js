@@ -1992,3 +1992,50 @@ test('Plan-2 S1: credential fill enforces exact frame and field proof through fo
     else globalThis.HTMLTextAreaElement = previousTextarea;
   }
 });
+
+test('Plan-2 S1: resumed focus refuses ancestor concealment and scroll-time drift', () => {
+  const snapshot = setup();
+  const persisted = JSON.parse(JSON.stringify({
+    snapshotId: snapshot.frames[0].snapshotId, ref: 'r1',
+  }));
+  const ancestor = new FakeElement('Panel');
+  element.parentElement = ancestor;
+  let focusEffects = 0;
+  element.focus = () => { focusEffects++; document.activeElement = element; };
+  const originalStyle = globalThis.getComputedStyle;
+  const unavailable = () => focusBrowserAgentTarget(persisted.snapshotId, persisted.ref);
+  try {
+    ancestor.setAttribute('aria-hidden', 'true');
+    assert.deepEqual(unavailable(), { ok: false, reason: 'target-missing-or-unavailable' });
+    ancestor.removeAttribute('aria-hidden');
+    ancestor.inert = true;
+    assert.equal(unavailable().ok, false);
+    ancestor.inert = false;
+    ancestor.disabled = true;
+    assert.equal(unavailable().ok, false);
+    ancestor.disabled = false;
+    for (const hidden of [
+      { display: 'none' }, { visibility: 'hidden' },
+      { opacity: 0 }, { pointerEvents: 'none' },
+    ]) {
+      globalThis.getComputedStyle = node => ({
+        display: 'block', visibility: 'visible', opacity: 1, pointerEvents: 'auto',
+        ...(node === ancestor ? hidden : {}),
+      });
+      assert.equal(unavailable().ok, false, 'hidden ancestor blocked');
+      assert.equal(focusEffects, 0);
+    }
+    globalThis.getComputedStyle = originalStyle;
+    element.scrollIntoView = () => { ancestor.setAttribute('aria-hidden', 'true'); };
+    assert.equal(unavailable().ok, false, 'scroll-time ancestor change is stale');
+    assert.equal(focusEffects, 0, 'page focus event never fired for unsafe target');
+    ancestor.removeAttribute('aria-hidden');
+    element.scrollIntoView = () => {};
+    assert.equal(unavailable().ok, true, 'visible observed control may still focus');
+    assert.equal(focusEffects, 1);
+  } finally {
+    globalThis.getComputedStyle = originalStyle;
+    delete element.parentElement;
+    delete document.activeElement;
+  }
+});
