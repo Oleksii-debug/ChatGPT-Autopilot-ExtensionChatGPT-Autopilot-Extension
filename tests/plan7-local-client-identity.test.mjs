@@ -429,3 +429,46 @@ test('SDK deadline covers slow JSON body after early HTTP headers', async () => 
   assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
   assert.equal(calls, 1, 'response parsing must not trigger a second effect');
 });
+
+test('SDK treats throwing HTTP response metadata as ambiguous without credentials or resend', async () => {
+  for (const property of ['ok', 'status']) {
+    let calls = 0, reads = 0;
+    const privateMessage = 'PRIVATE_HTTP_RESPONSE_DIAGNOSTIC';
+    const response = { ok: false, status: 503 };
+    Object.defineProperty(response, property, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error(privateMessage);
+      },
+    });
+    const client = createAutopilotLocalClientV1({
+      token: 'test-only-'.repeat(5), port: 12345,
+      fetchImpl: async () => {
+        calls += 1;
+        return response;
+      },
+    });
+    const reply = await client.control(BASE);
+    assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT', property);
+    assert.equal(reply.instruction.includes('Reconcile'), true);
+    assert.equal(calls, 1, property + ' must never cause blind resend');
+    assert.equal(reads, 1, property + ' should be read at most once');
+    assert.equal(JSON.stringify(reply).includes(privateMessage), false);
+  }
+});
+
+test('SDK preserves safe HTTP error status but never treats it as zero-effect evidence', async () => {
+  let calls = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => {
+      calls += 1;
+      return { ok: false, status: 503 };
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(reply.httpStatus, 503);
+  assert.equal(calls, 1);
+});
