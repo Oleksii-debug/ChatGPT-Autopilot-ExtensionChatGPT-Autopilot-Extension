@@ -1273,3 +1273,86 @@ test('Plan-1 S1: persisted policy and evidence enums reject alias promotion acro
     assert.ok(Object.isFrozen(restarted));
   }
 });
+
+
+test('Plan-1 S1: denied capability diagnostics never disclose untrusted identifiers', () => {
+  const secret = 'provider.token.PRIVATE-CREDENTIAL-777';
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-denied-cap-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read', secret],
+    policyDecisionId: 'decision-denied-cap-1',
+    arguments: {},
+    createdAt: AT,
+  };
+  const authorized = {
+    invocation,
+    policyDecision: {
+      schemaVersion: 1,
+      decisionId: 'decision-denied-cap-1',
+      invocationId: invocation.invocationId,
+      decision: PolicyDecisionKind.ALLOW,
+      reasonCode: 'OWNER_APPROVED',
+      decidedAt: AT,
+    },
+    toolDescriptor: {
+      schemaVersion: 1,
+      toolId: invocation.toolId,
+      providerId: invocation.providerId,
+      label: 'Read file',
+      capabilityIds: ['filesystem.read', secret],
+      readOnly: true,
+    },
+    grantedCapabilityIds: ['filesystem.read'],
+  };
+  const assertRedacted = error => {
+    assert.match(error.message, /exceeds granted capabilities/);
+    assert.doesNotMatch(error.message, /PRIVATE-CREDENTIAL|provider\.token/);
+    return true;
+  };
+
+  // Even if the descriptor advertises it, the owner grant remains the
+  // authoritative subset. A denied ID may contain a sensitive provider ref.
+  assert.throws(() => assertToolInvocationAuthorizedV1(authorized), assertRedacted);
+  assert.throws(
+    () => assertToolInvocationAuthorizedV1({
+      ...authorized,
+      toolDescriptor: { ...authorized.toolDescriptor, capabilityIds: ['filesystem.read'] },
+      grantedCapabilityIds: ['filesystem.read', secret],
+    }),
+    assertRedacted,
+    'provider descriptor denial must be redacted too',
+  );
+
+  const handoff = {
+    schemaVersion: 1,
+    handoffId: 'handoff-denied-cap-1',
+    specialistId: 'specialist-1',
+    goal: 'Read a workspace report',
+    requestedCapabilityIds: ['filesystem.read', secret],
+    createdAt: AT,
+  };
+  assert.throws(() => assertSpecialistHandoffScopedV1(handoff, ['filesystem.read']), assertRedacted);
+
+  // Rejection cannot mutate persisted grants or weaken the existing authority.
+  assert.deepEqual(authorized.grantedCapabilityIds, ['filesystem.read']);
+  assert.deepEqual(handoff.requestedCapabilityIds, ['filesystem.read', secret]);
+  const validAuthorization = assertToolInvocationAuthorizedV1({
+    ...authorized,
+    grantedCapabilityIds: ['filesystem.read', secret],
+  });
+  assert.deepEqual(validAuthorization.invocation.requestedCapabilityIds, ['filesystem.read', secret]);
+  assert.deepEqual(
+    assertToolInvocationAuthorizedV1(JSON.parse(JSON.stringify({
+      ...authorized, grantedCapabilityIds: ['filesystem.read', secret],
+    }))),
+    validAuthorization,
+    'canonical permission survives JSON cold restart without an alias',
+  );
+  assert.deepEqual(
+    assertSpecialistHandoffScopedV1(JSON.parse(JSON.stringify(handoff)), ['filesystem.read', secret]),
+    assertSpecialistHandoffScopedV1(handoff, ['filesystem.read', secret]),
+  );
+});
