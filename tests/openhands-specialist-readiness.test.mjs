@@ -476,3 +476,71 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     /maxAgeMs is invalid/u,
   );
 });
+
+
+test('hostile provider failure descriptor becomes UNKNOWN without leaking remote exception text', async () => {
+  let probeCalls = 0;
+  let descriptorTraps = 0;
+  const remoteError = new Proxy(new Error('SECRET_REMOTE_DIAGNOSTIC'), {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'code') {
+        descriptorTraps += 1;
+        throw new Error('SECRET_REMOTE_DESCRIPTOR');
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const result = await probeOpenHandsSpecialistProviderConfigV1({
+    config: config(),
+    client: { async probe() { probeCalls += 1; throw remoteError; } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(probeCalls, 1);
+  assert.equal(descriptorTraps, 1);
+  assert.equal(result.providerState.health, 'UNKNOWN');
+  assert.equal(result.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(result.authority.providerExecutionAuthorized, false);
+  assert.equal(result.authority.verificationAuthorized, false);
+  assert.equal(JSON.stringify(result).includes('SECRET'), false);
+});
+
+test('hostile OpenHands probe options and unknown secret-named keys fail closed before provider I/O', async () => {
+  let calls = 0;
+  const client = { async probe() { calls += 1; } };
+  const hostile = new Proxy({ config: config(), client }, {
+    ownKeys() { throw new Error('SECRET_OPTIONS_TRAP'); },
+  });
+  await assert.rejects(
+    () => probeOpenHandsSpecialistProviderConfigV1(hostile),
+    error => error.message.includes('cannot be inspected safely')
+      && !error.message.includes('SECRET'),
+  );
+  await assert.rejects(
+    () => probeOpenHandsSpecialistProviderConfigV1({
+      config: config(), client, SECRET_OWNER_PASSWORD_CANARY: 'private',
+    }),
+    error => error.message.includes('unknown field')
+      && !error.message.includes('SECRET_OWNER_PASSWORD_CANARY'),
+  );
+  assert.equal(calls, 0);
+});
+
+test('hostile readiness capability-array reflection fails before the OpenHands provider effect', async () => {
+  let calls = 0;
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client: { async probe() { calls += 1; } },
+    now: monotonicNow([T0, T1]),
+  });
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding], now: () => T1,
+  });
+  const caps = new Proxy(['code.write'], {
+    ownKeys() { throw new Error('SECRET_ARRAY_TRAP'); },
+  });
+  await assert.rejects(
+    () => resolver.resolve(selection({ requestedCapabilityIds: caps })),
+    error => !error.message.includes('SECRET_ARRAY_TRAP'),
+  );
+  assert.equal(calls, 0);
+});
