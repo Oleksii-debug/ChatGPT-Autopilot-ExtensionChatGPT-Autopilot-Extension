@@ -1341,7 +1341,8 @@ test('Plan4 S1/S2: budgeted dispatch refuses missing or forged durable reservati
 });
 
 test('Plan4 S2: canonical service-worker lifecycle requires settled durable owner receipt', async () => {
-  const serviceWorkerSource = await readFile(new URL('../src/background/service-worker.js', import.meta.url),'utf8');
+  // Git checkout on Windows may use CRLF. Parse the same source on both CI OSes.
+  const serviceWorkerSource = (await readFile(new URL('../src/background/service-worker.js', import.meta.url),'utf8')).replace(/\r\n/gu, '\n');
   const marker='providerCallLifecycle: {';
   const start=serviceWorkerSource.indexOf(marker);
   const end=serviceWorkerSource.indexOf('\n  },\n});',start);
