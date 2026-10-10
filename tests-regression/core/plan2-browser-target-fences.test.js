@@ -2341,3 +2341,66 @@ test('semantic select omits ARIA-ineligible options and rejects focus-time ARIA 
     globalThis.HTMLSelectElement = priorSelect;
   }
 });
+
+
+test('Plan-2 S1: mixed-case ARIA state denies stale semantic effects and recovers', () => {
+  for (const [attribute, blockedValue] of [['aria-hidden', 'TRUE'], ['aria-disabled', 'TrUe']]) {
+    const observed = setup();
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'click', frameId: 0, ref: 'r1',
+    }), observed)));
+    element.setAttribute(attribute, blockedValue);
+    assert.equal(snapshotBrowserPage('mixed-case-observation').elements.length, 0,
+      'ineligible controls must not enter a fresh semantic snapshot');
+    // A previously approved/restarted target is still subject to live ARIA checks.
+    // Refresh the original observation marker to simulate a pending old action.
+    element.setAttribute('data-autopilot-agent-ref', action.ref);
+    element.setAttribute('data-autopilot-agent-snapshot', 's1');
+    assert.throws(() => executeBrowserPageAction('s1', action), /AGENT_TARGET_UNAVAILABLE/);
+    assert.equal(verifyBrowserApprovalTarget('s1', action.ref).ok, false);
+    assert.equal(focusBrowserAgentTarget('s1', action.ref).ok, false);
+    assert.equal(proveBrowserNativeClick('s1', action.ref, action), null);
+    assert.equal(element.clicked, 0, 'ineligible target must produce zero click effects');
+
+    element.removeAttribute(attribute);
+    assert.equal(executeBrowserPageAction('s1', action).kind, 'click');
+    assert.equal(element.clicked, 1, 'restored eligible control may be activated');
+  }
+});
+
+test('Plan-2 S1: case-insensitive ARIA option state is fail-closed across focus', () => {
+  setup();
+  const previous = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    const attrs = {};
+    const option = (value, getAttribute = () => null) => ({
+      value, textContent: value, label: value, disabled: false, hidden: false,
+      parentElement: null, getAttribute,
+    });
+    const first = option('Keep');
+    const choice = option('Choice', name => attrs[name] ?? null);
+    const blocked = option('Blocked', name => name === 'aria-hidden' ? 'TRUE' : null);
+    element.options = [first, choice, blocked];
+    element.selectedIndex = 0;
+    element.value = 'Keep';
+    let dispatched = 0;
+    element.dispatchEvent = () => { dispatched += 1; return true; };
+    const snapshot = snapshotBrowserPage('mixed-option');
+    assert.deepEqual(snapshot.elements[0].options, ['Keep', 'Choice']);
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'Choice',
+    }), { frames: [{ frameId: 0, ...snapshot }], url: snapshot.url })));
+    element.focus = () => { attrs['aria-disabled'] = 'TRUE'; };
+    assert.throws(() => executeBrowserPageAction('mixed-option', action), /AGENT_SELECT_OPTIONS_STALE/);
+    assert.equal(element.value, 'Keep');
+    assert.equal(dispatched, 0);
+    delete attrs['aria-disabled'];
+    element.focus = () => {};
+    assert.equal(executeBrowserPageAction('mixed-option', action).ok, true);
+    assert.equal(element.value, 'Choice');
+  } finally {
+    globalThis.HTMLSelectElement = previous;
+  }
+});
