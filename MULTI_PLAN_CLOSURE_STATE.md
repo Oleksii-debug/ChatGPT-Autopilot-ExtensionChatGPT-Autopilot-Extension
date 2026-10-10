@@ -1,3 +1,11 @@
+### PLAN1_S1_PERSISTED_ENUM_EXACTNESS_1F40DB63_20261010 — NONTERMINAL
+
+- Scope ONLY canonical Drive `1. Перший план`, Section 1 first ACTIONABLE unfinished. S1 IN_PROGRESS / NOT TERMINAL DONE; S2 ACTIONABLE / NOT DONE; S3+ and other Drive plans unchanged.
+- REUSE existing 11.0.13 High feature [PR #717](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/717), without creating a duplicate authority. Source commit `2a78188f262e00f3c9d52768174dac03768b3524` blob `25c0e12a72c72386008fc012b469171fa203246b`; test commit / exact head `1f40db639db301db3647090ba77492e9c489b5a8` blob `a6b11f58d6a801b0f54aac0208e67b1326453371`. Live files re-read at those blob SHAs.
+- Fix: PolicyDecisionV1/ObservationV1/VerificationV1 persisted enums reject lowercase, padding, and mixed-case aliases rather than converting malformed `allow` to `ALLOW` or `verified` to `VERIFIED`. No policy, verifier, scheduler, store or effect authority #2.
+- Exact-source V8 execution: 13 negative alias cases PASS, 3 canonical positive frozen JSON cold-restart checks PASS. This is NOT full Node/Ubuntu/Windows CI. PR [checkpoint comment #6097325005](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/717#issuecomment-6097325005); new exact-head GitHub CI not verified PASS, PR still OPEN/DRAFT/unmerged and mergeability false at readback.
+- S1 terminal blockers: full versioned contract migration/restart/owner-epoch/effect matrix, exact-head multi-OS/aggregate Release qualification, canonical 11.x main integration plus postmerge readback. S2 remains ACTIONABLE / NOT DONE due trusted Outcome Contract completion, all intake/import paths and integration qualification. Do not mark either DONE. Physical NVDA/real-provider proof not claimed.
+
 ### PLAN6_S1_DUPLICATE_EFFECT_OWNERSHIP_POSTMERGE_66DF6B8E_20261010 — NONTERMINAL
 
 - Scope ONLY canonical Drive `6. Шостий план` S1 (first ACTIONABLE); S2 ACTIONABLE / NOT DONE untouched due S1 absolute priority; Sections 3–11 and other Drive plans untouched.
