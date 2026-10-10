@@ -169,6 +169,24 @@ test('Plan4 S1 exact endpoint account and capability provenance is versioned, im
   assert.notEqual(changedAccount.configSha256,accepted.configSha256);
 });
 
+test('Plan4 S1 endpoint registry preserves exact provider/account identity after cold restart', async () => {
+  const bound = {...route, endpointId:'owner.loopback'};
+  const boundProfile = {...endpoint, endpointId:'owner.loopback'};
+  const valid = {...snapshot, routes:[bound], endpointProfiles:[boundProfile]};
+  const accepted = await createAiRouteRegistryEvidenceV1(valid);
+  const restored = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(valid)));
+  assert.equal(accepted.routeIdentities[0].endpointBinding, 'MATCHED');
+  assert.equal(accepted.configSha256, restored.configSha256);
+  for (const provider of [' ollama', 'ollama ', '\tollama', 'ollama\n', 'OpenAI', null, 0]) {
+    const changed = {...valid, endpointProfiles:[{...boundProfile, provider}]};
+    await assert.rejects(createAiRouteRegistryEvidenceV1(changed), /AI endpoint provider/);
+    await assert.rejects(
+      createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(changed))),
+      /AI endpoint provider/,
+    );
+  }
+});
+
 test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
   const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
     locality:'local', costClass:'free' };
