@@ -1040,3 +1040,43 @@ test('Plan-1 S1: hostile exact-effect reflection cannot leak secrets or publish 
   assert.equal(began.state.phase, ExactEffectPhase.EXECUTING);
   assert.equal(began.state.attempt, 1);
 });
+
+
+test('Plan-1 S1: exact-effect chronology and negative-zero attempt survive cold restart unchanged', () => {
+  const initial = createExactEffectStateV1(invocation(), { createdAt: AT });
+  assert.equal(initial.attempt, 0);
+  const invalidTimes = [
+    '0', '2026-09-19', '2026-09-19T12:00:00',
+    '2026-02-30T12:00:00Z', '2026-13-01T12:00:00Z',
+    '2026-09-19T24:00:00Z', '2026-09-19T12:00:00.1234Z',
+    '2026-09-19T12:00:00+25:00',
+  ];
+  for (const instant of invalidTimes) {
+    const corrupt = { ...initial, updatedAt: instant };
+    assert.throws(() => normalizeExactEffectStateV1(corrupt),
+      /timestamp|calendar date/i, 'persisted effect timestamp is never rolled on recovery');
+    assert.equal(corrupt.updatedAt, instant);
+    assert.throws(() => reduceExactEffectV1(initial, event(
+      ExactEffectEventType.BEGIN_EXECUTION, 'invalid-clock-event',
+      instant,
+    )), /timestamp|calendar date/i,
+    'invalid event cannot execute before a durable exact timestamp');
+    assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(initial))), initial);
+  }
+  const bogusAttempt = { ...initial, attempt: -0 };
+  assert.equal(Object.is(bogusAttempt.attempt, -0), true);
+  assert.throws(() => normalizeExactEffectStateV1(bogusAttempt), /attempt is invalid/,
+    'negative-zero attempt would be silently rewritten to zero by JSON');
+  assert.throws(() => exactEffectCanExecuteV1(bogusAttempt), /attempt is invalid/);
+  assert.equal(Object.is(bogusAttempt.attempt, -0), true);
+
+  const validAt = '2026-09-19T13:00:01+01:00';
+  const started = reduceExactEffectV1(initial, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'canonical-time-event', validAt,
+  )).state;
+  assert.equal(started.updatedAt, '2026-09-19T12:00:01.000Z');
+  assert.equal(started.attempt, 1);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(started))), started);
+  assert.equal(initial.phase, ExactEffectPhase.PREPARED,
+    'failed and positive normalization never mutate the input ledger');
+});
