@@ -103,6 +103,19 @@ function copyModelRoutePolicy(value) {
   return out;
 }
 
+function exactIntegerText(value, label, { min, max }) {
+  // Form controls return text. Reject coercion, padded/negative aliases and
+  // imprecise numbers before they enter the durable specialist profile.
+  if (typeof value !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(value)) {
+    throw new Error(label + ' має бути в канонічному форматі цілого числа.');
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(label + ' виходить за дозволеним діапазоном.');
+  }
+  return parsed;
+}
+
 function optionalPriceText(value, label) {
   if (typeof value !== 'string' || value !== value.trim()) throw new Error(label + ' має бути канонічним числом або порожнім.');
   if (value === '') return null;
