@@ -115,7 +115,18 @@ function exactPromptText(value, label, max = 8_000) {
   if (value.length > max) throw new Error(`${label} is too long`);
   return value;
 }
-function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
+function id(value, label, optional = false) {
+  if (optional && (value == null || value === '')) return '';
+  // Route, profile, endpoint and credential identifiers are exact identities.
+  // Silent trim would alias a corrupt persisted identity to a different
+  // authorized provider/endpoint after JSON restart.
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(`${label} must be an exact bounded identifier`);
+  }
+  const out = clean(value, 180);
+  if (!ID.test(out)) throw new Error(`${label} is invalid`);
+  return out;
+}
 // Optional identity may be absent in legacy snapshots, but an explicitly
 // persisted null/undefined cannot erase a previously bound endpoint or credential.
 function optionalIdentity(record, key, label) {
