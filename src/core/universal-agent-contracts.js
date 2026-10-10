@@ -505,7 +505,9 @@ export function toolDescriptorV1FromAgentProvider(provider, options = {}) {
 function assertSubset(requested, allowed, label) {
   const allowedSet = new Set(allowed);
   const missing = requested.filter(item => !allowedSet.has(item));
-  if (missing.length) throw new Error(`${label} exceeds granted capabilities: ${missing.join(', ')}`);
+  // Capability identifiers originate in an untrusted invocation/handoff and may
+  // encode sensitive provider references. Refuse without echoing denied IDs.
+  if (missing.length) throw new Error(`${label} exceeds granted capabilities`);
 }
 
 const TOOL_AUTHORIZATION_ENVELOPE_KEYS = new Set([
