@@ -457,7 +457,7 @@ test('Plan-1 S1: durable action and event type enums reject whitespace aliases',
   guarded.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT,
     () => { executions += 1; return 'executed'; });
 
-  for (const alias of [' submit-prompt', 'submit-prompt ', '\\tsubmit-prompt']) {
+  for (const alias of [' submit-prompt', 'submit-prompt ', '\tsubmit-prompt']) {
     const invalid = action({ type: alias });
     assert.throws(() => normalizeAgentAction(invalid), /Unsupported agent action type/);
     await assert.rejects(() => guarded.execute(invalid), /Unsupported agent action type/);
@@ -466,7 +466,7 @@ test('Plan-1 S1: durable action and event type enums reject whitespace aliases',
     assert.equal(invalid.type, alias, 'rejection must not mutate persisted caller data');
     assert.throws(() => registry.register(AgentProviderId.CHATGPT_BROWSER, alias, () => {}), /Unsupported agent action type/);
   }
-  for (const alias of [' action-succeeded', 'action-succeeded ', '\\taction-succeeded']) {
+  for (const alias of [' action-succeeded', 'action-succeeded ', '\taction-succeeded']) {
     const invalid = event({ type: alias });
     assert.throws(() => normalizeAgentEvent(invalid), /Unsupported agent event type/);
     await assert.rejects(() => sink.emit(invalid), /Unsupported agent event type/);
