@@ -1350,7 +1350,10 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
   };
   const proof = (element, kind) => {
     const label = kind === 'password' ? 'PASSWORD' : 'USERNAME';
-    if (!element || !element.isConnected || !(element instanceof HTMLInputElement)
+    if (!element || !element.isConnected
+      || (kind === 'password' && !(element instanceof HTMLInputElement))
+      || (kind === 'username' && !(element instanceof HTMLInputElement
+        || element instanceof HTMLTextAreaElement || element.isContentEditable))
       || !action || typeof action.expectedFrameUrl !== 'string' || !action.expectedFrameUrl
       || location.href !== action.expectedFrameUrl) throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
     const inputType = String(element.getAttribute('type') || 'text').toLowerCase();
@@ -1397,8 +1400,11 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
   };
   const setInputValue = (element, value) => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    if (setter) setter.call(element, value); else element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+      if (setter) setter.call(element, value); else element.value = value;
+    } else element.textContent = value;
     dispatch(element);
   };
   let usernameFilled = false;
