@@ -404,6 +404,126 @@ export async function verifyCloudWorkspaceIsolationV1(
   });
 }
 
+const CANONICAL_BINDING_COMMIT_OPTIONS = new Set([
+  'at', 'loadCanonicalOwnership', 'verifyIsolation',
+  'atomicCommitCanonicalBinding', 'loadCanonicalBinding',
+]);
+const CANONICAL_BINDING_RECOVERY_OPTIONS = new Set(['loadCanonicalBinding']);
+
+function cloudBindingLookupKey(binding) {
+  return Object.freeze({
+    workspaceId: binding.workspaceId,
+    providerId: binding.providerId,
+    executionLeaseId: binding.executionLeaseId,
+  });
+}
+
+function cloudBindingReadback(binding, persisted) {
+  if (persisted == null) return null;
+  const canonical = normalizeCloudWorkspaceBindingV1(persisted);
+  if (JSON.stringify(canonical) !== JSON.stringify(binding)) {
+    throw new Error('canonical cloud workspace binding readback mismatch');
+  }
+  return canonical;
+}
+
+/**
+ * Only the existing canonical job runtime may supply these trusted callbacks.
+ * Its atomicCommitCanonicalBinding must compare the exact owner revision/lease
+ * AND persist the binding in the same transaction. This module is not a second
+ * job store, scheduler, provider authority, or permission grant.
+ *
+ * On an ambiguous commit failure, NEVER call this function again blindly:
+ * use reconcileCloudWorkspaceBindingCommitV1 with the original binding.
+ */
+export async function commitVerifiedCloudWorkspaceBindingV1(
+  observationInput, executionOwnershipInput, options,
+) {
+  const trusted = dataRecord(
+    options, CANONICAL_BINDING_COMMIT_OPTIONS, 'Canonical cloud binding commit options',
+  );
+  for (const name of [
+    'loadCanonicalOwnership', 'verifyIsolation',
+    'atomicCommitCanonicalBinding', 'loadCanonicalBinding',
+  ]) {
+    if (typeof trusted[name] !== 'function') {
+      throw new Error('canonical cloud binding commit requires trusted ' + name);
+    }
+  }
+  const at = exactTimestamp(trusted.at, 'Canonical cloud binding commit at');
+  const originalOwner = normalizeExactExecutionOwnershipV1(executionOwnershipInput);
+  const isolation = await verifyCloudWorkspaceIsolationV1(observationInput, originalOwner, {
+    at, verifyIsolation: trusted.verifyIsolation,
+    loadCanonicalOwnership: trusted.loadCanonicalOwnership,
+  });
+  const binding = isolation.binding;
+  const transaction = Object.freeze({
+    binding,
+    taskId: binding.taskId,
+    planId: binding.planId,
+    nodeId: binding.nodeId,
+    effectId: binding.effectId,
+    policyEnvelopeId: binding.policyEnvelopeId,
+    executionOwnerId: binding.executionOwnerId,
+    executionLeaseId: binding.executionLeaseId,
+    expectedOwnershipRevision: binding.executionOwnershipRevision,
+    requireAtomicOwnerLeaseCompareAndSet: true,
+    requireExactCheckpoint: true,
+  });
+  // A provider response cannot commit or authenticate its own binding.
+  await trusted.atomicCommitCanonicalBinding(transaction);
+  const persisted = cloudBindingReadback(
+    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+  );
+  if (!persisted) throw new Error('canonical cloud workspace binding was not durably persisted');
+  const ownerAfter = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(Object.freeze({
+      taskId: binding.taskId, planId: binding.planId,
+      nodeId: binding.nodeId, effectId: binding.effectId,
+    })),
+  );
+  if (JSON.stringify(ownerAfter) !== JSON.stringify(originalOwner)) {
+    throw new Error('canonical cloud workspace ownership changed during binding commit');
+  }
+  return frozen({
+    schemaVersion: CLOUD_WORKSPACE_VERSION,
+    status: 'CANONICAL_BINDING_DURABLE_READBACK',
+    binding: persisted,
+    isolationVerified: true,
+    durableBindingVerified: true,
+    executionAuthorized: false,
+    resumeAuthorized: false,
+    requiresFreshPolicy: true,
+    requiresCanonicalRuntime: true,
+  });
+}
+
+/** READ-ONLY post-crash reconciliation; never resubmit an ambiguous commit. */
+export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, options) {
+  const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
+  const trusted = dataRecord(
+    options, CANONICAL_BINDING_RECOVERY_OPTIONS, 'Canonical cloud binding recovery options',
+  );
+  if (typeof trusted.loadCanonicalBinding !== 'function') {
+    throw new Error('canonical cloud binding recovery requires trusted loadCanonicalBinding');
+  }
+  const persisted = cloudBindingReadback(
+    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+  );
+  return frozen({
+    schemaVersion: CLOUD_WORKSPACE_VERSION,
+    status: persisted
+      ? 'CANONICAL_BINDING_DURABLE_READBACK'
+      : 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION',
+    binding: persisted,
+    durableBindingVerified: Boolean(persisted),
+    safeRetryAuthorized: false,
+    executionAuthorized: false,
+    resumeAuthorized: false,
+    requiresCanonicalRuntime: true,
+  });
+}
+
 /**
  * Executes provider teardown and verifies four independent scrub dimensions.
  * A failed/ambiguous provider result never generates a clean receipt. The
