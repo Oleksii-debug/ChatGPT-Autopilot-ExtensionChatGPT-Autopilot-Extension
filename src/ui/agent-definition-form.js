@@ -275,15 +275,15 @@ function resolveSpecialistDelegationFromFormV1(input, persisted) {
     throw new Error('Specialist delegation configured має бути boolean.');
   }
   if (configured.value === false) return persisted === undefined ? undefined : null;
-  const field = (key) => ownData(input, key, key);
+  const field = (key, label = key) => ownData(input, key, label);
   const enabled = field('specialistDelegationEnabled');
   if (!enabled.present || typeof enabled.value !== 'boolean') {
     throw new Error('Specialist delegation enabled має бути boolean.');
   }
-  const get = key => field(key).value;
+  const get = (key, label = key) => field(key, label).value;
   return normalizeAgentSpecialistDelegationProfileV1({
     schemaVersion: 1,
-    registryId: parseCanonicalAgentIdentity(get('specialistRegistryId'), 'Specialist registry ID'),
+    registryId: parseCanonicalAgentIdentity(get('specialistRegistryId', 'Specialist registry ID'), 'Specialist registry ID'),
     requiredCapabilityIds: listFromLines(get('specialistCapabilityIdsText'), 'Specialist capability ID', { maxItems:64, itemMax:180, identity:true }),
     requiredToolIds: listFromLines(get('specialistToolIdsText'), 'Specialist tool ID', { maxItems:128, itemMax:180, identity:true }),
     policyEnvelopeId: parseCanonicalAgentIdentity(get('specialistPolicyEnvelopeId'), 'Specialist policy envelope ID'),
@@ -305,6 +305,14 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
+  // Validate every directly-read owner input before evaluation. An accessor may
+  // otherwise run during form serialization, beyond the canonical Core fence.
+  for (const [key, label] of [
+    ['agentDefinitionId', 'Agent definition ID'],
+    ['label', 'Назва'], ['description', 'Опис'], ['instructions', 'Інструкції'],
+    ['capabilityIdsText', 'Capability ID'], ['toolIdsText', 'Tool ID'],
+    ['tagsText', 'Тег'], ['acceptanceCriteriaText', 'Критерій завершення'],
+  ]) ownData(input, key, label);
   const enabled = ownData(input, 'enabled', 'Agent definition enabled');
   if (enabled.present && typeof enabled.value !== 'boolean') throw new Error('Agent definition enabled має бути boolean.');
   const resolvedSpecialist = resolveSpecialistDelegationFromFormV1(input, specialistDelegationProfile);
