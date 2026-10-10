@@ -3255,6 +3255,77 @@ test('Plan4 S1: corrupt persisted pre-dispatch budget is quarantined across JSON
   assert.equal(modelEffects, 0);
 });
 
+test('Plan4 S1: model budget route identities reject getters, coercion and persisted endpoint drift', async () => {
+  const chrome = makeChrome();
+  let modelEffects = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome, now:() => 55_000,
+    routePrompt:async () => { modelEffects += 1; return { text:'{}' }; },
+  });
+  await manager.create({
+    id:'job-route-provenance',
+    goal:'Preserve exact route identity',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    store.byId['job-route-provenance'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  let getterReads = 0;
+  const getterRoute = { routeId:'route-1', provider:'ollama', model:'fixture' };
+  Object.defineProperty(getterRoute, 'endpointId', {
+    enumerable:true,
+    get() { getterReads += 1; throw new Error('route getter must not execute'); },
+  });
+  const rejectedRoutes = [
+    getterRoute,
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:null },
+    { routeId:' route-1', provider:'ollama', model:'fixture' },
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'account\\nspoof' },
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'x'.repeat(181) },
+  ];
+  for (const route of rejectedRoutes) {
+    await assert.rejects(
+      () => manager.reserveProviderModelBudget({
+        jobId:'job-route-provenance', controlEpoch:0,
+        prompt:'do not call model', maxOutputTokens:128, route,
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID',
+    );
+    assert.equal((await manager.get('job-route-provenance')).job.runtime.modelBudgetReservation, null);
+  }
+  assert.equal(getterReads, 0, 'untrusted route identity getters may not execute');
+  assert.equal(modelEffects, 0);
+
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-route-provenance', controlEpoch:0,
+    prompt:'valid route', maxOutputTokens:128,
+    route:{ routeId:'route-1', provider:'ollama', model:'fixture' },
+  });
+  assert.equal(reservation.endpointId, '', 'legacy local route without endpoint remains supported');
+  await manager.update(store => {
+    store.byId['job-route-provenance'].runtime.modelBudgetReservation.endpointId = null;
+    return store;
+  });
+  const restarted = new BrowserAgentManager({
+    chromeApi:chrome, now:() => 56_000,
+    routePrompt:async () => { modelEffects += 1; return { text:'{}' }; },
+  });
+  const cold = await restarted.get('job-route-provenance');
+  assert.equal(cold.job.runtime.modelBudgetReservation, null);
+  assert.equal(cold.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(cold.job.runtime.runState, 'PAUSED');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-route-provenance', controlEpoch:0, prompt:'never replay',
+      maxOutputTokens:128, route:{ routeId:'route-1', provider:'ollama', model:'fixture' },
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+});
+
 test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 60_000 });
