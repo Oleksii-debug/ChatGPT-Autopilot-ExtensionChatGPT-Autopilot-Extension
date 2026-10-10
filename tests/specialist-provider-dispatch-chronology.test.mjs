@@ -746,3 +746,91 @@ test('Section 1 clock exceptions are opaque before either effect boundary and co
   );
   assert.equal(f.providerCalls, 1);
 });
+
+
+test('Section 1 provider receipts before the actual effect edge remain UNKNOWN, not verified', async () => {
+  for (const scenario of [
+    { name: 'receipt predates effect', observed: 500, artifact: 500, completed: 2000 },
+    { name: 'artifact predates effect', observed: 1500, artifact: 500, completed: 2000 },
+    { name: 'post-effect clock rolls backward', observed: 500, artifact: 500, completed: 500 },
+  ]) {
+    const f = fixture();
+    const readiness = JSON.parse(JSON.stringify(await f.trustedResolver.resolve(f.selection)));
+    let effects = 0;
+    let clockReads = 0;
+    const times = [T0, T0 + 1000, T0 + scenario.completed];
+    const dispatcher = new SpecialistProviderDispatcherV1({
+      now: () => times[Math.min(clockReads++, times.length - 1)],
+      bindings: [{
+        providerId: 'provider.local',
+        execute: async () => {
+          effects += 1;
+          return {
+            providerReceiptId: 'receipt.local',
+            observedAt: ts(T0 + scenario.observed),
+            resultArtifactRefs: [{
+              schemaVersion: 1,
+              artifactId: 'artifact.local',
+              kind: 'report',
+              uri: 'artifact://local/report',
+              mediaType: 'application/json',
+              sha256: 'a'.repeat(64),
+              sizeBytes: 123,
+              createdAt: ts(T0 + scenario.artifact),
+              producerInvocationId: 'lease.read',
+              sensitive: false,
+            }],
+          };
+        },
+      }],
+    });
+    await assert.rejects(dispatcher.execute(f.request(readiness)), error =>
+      error instanceof Error
+      && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+      && /reconcile the canonical effect/u.test(error.message)
+      && !Object.hasOwn(error, 'cause'),
+    scenario.name);
+    assert.equal(effects, 1, scenario.name + ': ambiguous provider effect cannot be blindly retried');
+    assert.equal(clockReads, 3, scenario.name + ': the actual effect edge must be timestamped');
+  }
+});
+
+test('Section 1 chronological provider receipt at/after the effect edge survives JSON restart', async () => {
+  const f = fixture();
+  const readiness = JSON.parse(JSON.stringify(await f.trustedResolver.resolve(f.selection)));
+  let effects = 0;
+  let clockReads = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => [T0, T0 + 1000, T0 + 2000][Math.min(clockReads++, 2)],
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => {
+        effects += 1;
+        return {
+          providerReceiptId: 'receipt.local',
+          observedAt: ts(T0 + 1500),
+          resultArtifactRefs: [{
+            schemaVersion: 1,
+            artifactId: 'artifact.local',
+            kind: 'report',
+            uri: 'artifact://local/report',
+            mediaType: 'application/json',
+            sha256: 'a'.repeat(64),
+            sizeBytes: 123,
+            createdAt: ts(T0 + 1000),
+            producerInvocationId: 'lease.read',
+            sensitive: false,
+          }],
+        };
+      },
+    }],
+  });
+  const receipt = await dispatcher.execute(f.request(readiness));
+  assert.equal(receipt.executionId, 'lease.read');
+  assert.equal(receipt.observedAt, ts(T0 + 1500));
+  assert.equal(receipt.resultArtifactRefs[0].createdAt, ts(T0 + 1000));
+  assert.equal(receipt.completionAuthorized, false);
+  assert.equal(receipt.verificationRequired, true);
+  assert.equal(effects, 1);
+  assert.equal(clockReads, 3);
+});
