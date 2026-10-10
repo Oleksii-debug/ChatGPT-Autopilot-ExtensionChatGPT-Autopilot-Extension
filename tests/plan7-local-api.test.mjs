@@ -150,6 +150,69 @@ test('duplicate Host or Authorization headers fail closed before token lookup or
   }
 });
 
+
+test('Local API bounds concurrent authenticated slow uploads before owner broker or Core', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let ownerLookups = 0, notifyFull;
+  const allHeld = new Promise(resolve => { notifyFull = resolve; });
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => {
+      ownerLookups += 1;
+      if (ownerLookups === 64) notifyFull();
+      return TOKEN;
+    },
+    dependencies: dependencies(counters),
+  });
+  const held = [];
+  try {
+    const port = server.address().port;
+    // Hold headers open without submitting a JSON body. Previously distinct
+    // request IDs bypassed the transport's later, Core-only inFlight limit.
+    for (let n = 0; n < 64; n += 1) {
+      const req = httpRequest({
+        hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + TOKEN,
+          'Content-Type': 'application/json',
+          'Content-Length': '1',
+        },
+      });
+      req.on('error', () => {});
+      req.on('response', response => response.resume());
+      held.push(req);
+      req.flushHeaders();
+    }
+    await Promise.race([
+      allHeld,
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Local API admission fixtures did not enter')), 10_000)),
+    ]);
+    const overload = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(request('transport-overload-no-core')),
+    });
+    assert.equal(overload.status, 503);
+    assert.deepEqual(await overload.json(), { schemaVersion: 1, status: 'UNAVAILABLE' });
+    assert.equal(ownerLookups, 64, 'overload must be rejected before resolving a 65th token');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+  } finally {
+    for (const req of held) req.destroy();
+    await new Promise(resolve => setTimeout(resolve, 150));
+    try {
+      const client = createAutopilotLocalClientV1({
+        token: TOKEN, port: server.address().port,
+      });
+      const recovered = await client.control(request('transport-capacity-recovered'));
+      assert.equal(recovered.status, 'RECEIVED', 'aborted uploads release admission');
+      assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+    } finally {
+      await new Promise((resolve, reject) => server.close(
+        error => error ? reject(error) : resolve()));
+    }
+  }
+});
+
 test('Expect 100-continue is rejected before pre-auth body upload, token and Core dispatch', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   let tokenLookups = 0;
