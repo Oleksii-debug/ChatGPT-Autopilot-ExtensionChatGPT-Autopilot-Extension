@@ -3547,6 +3547,9 @@ function renderAgentRunTimeline(job) {
       ', записаних посилань на артефакти ' + timeline.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded +
       ', неоднозначних станів ' + timeline.evidenceMap.specialistProviderDispatch.statusCounts.AMBIGUOUS +
       '. Це лише збережені метадані, не доказ зовнішнього виконання чи походження артефактів.' +
+      ' Структурні зв’язки Specialist із планом: ' + timeline.evidenceMap.specialistPlanLinks.structurallyLinkedChildren +
+      ' із ' + timeline.evidenceMap.specialistPlanLinks.inspectedHandoffs +
+      ' записаних передач. Це лише відповідність збережених ідентифікаторів плану та Agent, не підтверджене дерево виконання.' +
       ' Збережені ExecutionOwnership records: ' + timeline.evidenceMap.specialistExecutionOwnership.inspectedRecords +
       ', вузлів зі структурними ідентифікаторами ' + timeline.evidenceMap.specialistExecutionOwnership.structurallyBoundNodeRecords +
       ', станів звірки ' + timeline.evidenceMap.specialistExecutionOwnership.stateCounts.RECONCILE +
