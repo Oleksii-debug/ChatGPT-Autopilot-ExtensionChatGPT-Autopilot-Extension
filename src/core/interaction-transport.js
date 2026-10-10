@@ -159,7 +159,36 @@ export class ChromeInteractionTransport {
     return response;
   }
 
-  async execute(tabId, request) {
+  async readAssistantReportInTemporaryTab(request) {
+    // Temporary replacement is strictly READ_ASSISTANT_REPORT and must carry
+    // the exact validated conversation URL. Never replay any Send or effect.
+    if (request?.mode !== 'READ_ASSISTANT_REPORT' || !request.expectedUrl
+        || typeof this.chrome.tabs.create !== 'function'
+        || typeof this.chrome.tabs.remove !== 'function') {
+      throw diagnosticError(
+        'ASSISTANT_REPORT_REPLACEMENT_UNAVAILABLE',
+        'Read-only replacement tab is not available for the admitted report',
+        null,
+        request,
+      );
+    }
+    const details = {
+      url: request.expectedUrl,
+      active: false,
+      ...(Number.isInteger(request.expectedWindowId) ? { windowId: request.expectedWindowId } : {}),
+    };
+    const tab = await this.chrome.tabs.create(details);
+    if (!Number.isSafeInteger(tab?.id)) {
+      throw diagnosticError('ASSISTANT_REPORT_REPLACEMENT_INVALID', 'Temporary read tab did not receive an ID', null, request);
+    }
+    try {
+      return await this.execute(tab.id, request, { allowReadOnlyTabReplacement: false });
+    } finally {
+      await this.chrome.tabs.remove(tab.id);
+    }
+  }
+
+  async execute(tabId, request, { allowReadOnlyTabReplacement = true } = {}) {
     if (tabId == null) throw new Error('Interaction tab id is required');
 
     try {
@@ -239,6 +268,14 @@ export class ChromeInteractionTransport {
 
       response = await this.waitForCheckOnlyUiReady(tabId, request, response);
 
+      if (allowReadOnlyTabReplacement
+          && request?.mode === 'READ_ASSISTANT_REPORT'
+          && response?.ok === true
+          && response.data?.status === InteractionResult.TEMPORARY_ERROR
+          && ['ASSISTANT_RESPONSE_TAB_MISSING', 'ASSISTANT_RESPONSE_TAB_FROZEN'].includes(response.data?.safeDiagnosticCode)) {
+        return this.readAssistantReportInTemporaryTab(request);
+      }
+
       if (!response?.ok || !response.data?.status) {
         throw diagnosticError(
           response?.error?.safeDiagnosticCode || response?.error?.code || 'INTERACTION_RESPONSE_INVALID',
@@ -257,6 +294,15 @@ export class ChromeInteractionTransport {
       }
       return response.data;
     } catch (error) {
+      // A read-only report may be recovered from one new exact-conversation
+      // tab only when the original is provably gone or remained suspended
+      // after its bounded one-time wake. Never hide URL/auth/window errors.
+      if (allowReadOnlyTabReplacement
+          && request?.mode === 'READ_ASSISTANT_REPORT'
+          && request.expectedUrl
+          && ['TAB_UNAVAILABLE_DURING_READINESS_CHECK', 'TAB_WAKE_TIMEOUT', 'TAB_WAKE_API_UNAVAILABLE'].includes(error?.safeDiagnosticCode)) {
+        return this.readAssistantReportInTemporaryTab(request);
+      }
       throw attachRequestContext(error, request);
     }
   }
