@@ -89,8 +89,20 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
     assertTrackedRegularSource(root, mainAncestorCommit, path, 'main ancestor');
     assertTrackedRegularSource(root, 'HEAD', path, 'candidate HEAD');
   }
-  const provenance = read('PLAN8_11_0_13_SOURCE_CONVERGENCE.md');
+  const provenancePath = 'PLAN8_11_0_13_SOURCE_CONVERGENCE.md';
+  const provenance = read(provenancePath);
   assert(provenance.includes(PLAN8_ARCHIVE_SHA256), 'audited archive digest missing from provenance');
+  // An untracked or unstaged note is not durable release provenance.
+  assertTrackedRegularSource(root, 'HEAD', provenancePath, 'candidate HEAD');
+  let committedProvenance;
+  try {
+    committedProvenance = execFileSync('git', ['-C', root, 'show', 'HEAD:' + provenancePath],
+      { encoding: 'utf8', stdio: 'pipe' });
+  } catch {
+    throw new Error('PLAN8_LINEAGE_INVALID: candidate HEAD lacks audited provenance');
+  }
+  assert(committedProvenance.includes(PLAN8_ARCHIVE_SHA256),
+    'candidate HEAD audited archive digest missing from provenance');
   for (const path of ['manifest.json', 'package.json']) {
     let baselineText;
     try {
