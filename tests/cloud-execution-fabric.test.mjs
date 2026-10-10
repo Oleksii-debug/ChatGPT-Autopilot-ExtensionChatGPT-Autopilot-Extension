@@ -788,3 +788,50 @@ test('S1 refuses future and pre-owner cloud workspace bindings after JSON cold r
   assert.equal(valid.requiredExecutionTransition, 'NONE');
   assert.equal(valid.executionAuthorized, false);
 });
+
+test('S1 unbound warm workspace cannot be reused without a canonical owner binding after cold restart', () => {
+  const orphan = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('orphan-slot', { workspaceId: 'orphan-workspace' })],
+    workspaceBindings: [],
+  });
+  for (const durableInput of [orphan, JSON.parse(JSON.stringify(orphan))]) {
+    const outcome = assessCloudExecutionFabricV1(durableInput);
+    assert.equal(outcome.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(outcome.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(outcome.selectedSlotId, '');
+    assert.equal(outcome.candidateAssessments[0].reasonCode,
+      'UNBOUND_WORKSPACE_REQUIRES_RECONCILIATION');
+    for (const authority of ['provisioningAuthorized', 'dispatchAuthorized',
+      'executionAuthorized', 'resumeAuthorized', 'teardownAuthorized']) {
+      assert.equal(outcome[authority], false, authority);
+    }
+  }
+
+  // A distinct, empty slot can still be proposed for canonical provisioning;
+  // the preexisting unbound workspace must never be selected as a shortcut.
+  const safe = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('unbound', { workspaceId: 'orphan-workspace', estimatedCostUsdMicros: 1 }),
+      slot('new-unbound-capacity', { workspaceId: '' }),
+    ],
+  }))));
+  assert.equal(safe.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(safe.selectedSlotId, 'new-unbound-capacity');
+  assert.equal(safe.workspaceProvisioningRequired, true);
+  assert.equal(safe.provisioningAuthorized, false);
+
+  // Exact canonical ownership and persisted workspace identity are retained
+  // as advisory continuity, not a new permission to execute.
+  const owner = ownedCloud();
+  const authorizedBinding = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('bound', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }))));
+  assert.equal(authorizedBinding.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(authorizedBinding.selectedWorkspaceId, 'workspace-a');
+  assert.equal(authorizedBinding.executionAuthorized, false);
+});
