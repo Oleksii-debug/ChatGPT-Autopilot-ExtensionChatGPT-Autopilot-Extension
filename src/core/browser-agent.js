@@ -184,6 +184,31 @@ function browserAgentPolicyTargetUrl(snapshot, action) {
 }
 
 export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requiresApproval = false } = {}) {
+  // A page-provided link destination is never owner policy authority. In
+  // particular javascript:/data:/file:/mailto: cannot fall through an
+  // unmatched site rule into a global ALLOW decision for semantic activation.
+  // Read only the uniquely observed target, never action/model-supplied href.
+  const activatesLink = action?.type === BrowserAgentActionType.CLICK
+    || (action?.type === BrowserAgentActionType.KEY && ['Enter', ' ', 'Space'].includes(action?.key));
+  if (activatesLink) {
+    const observed = browserAgentSnapshotElement(snapshot, action);
+    if (typeof observed?.href === 'string' && observed.href.trim()) {
+      let httpLink = false;
+      try {
+        const destination = new URL(observed.href, clean(snapshot?.url, 4096));
+        httpLink = destination.protocol === 'http:' || destination.protocol === 'https:';
+      } catch { /* malformed href is not an actionable network destination */ }
+      if (!httpLink) {
+        return {
+          decision: BrowserAgentPolicyDecision.DENY,
+          source: 'browser:unsafe-link-scheme',
+          pattern: '',
+          policyUrl: clean(snapshot?.url, 4096),
+          reason: 'Browser Agent blocked an unsafe semantic link destination',
+        };
+      }
+    }
+  }
   const policyUrl = browserAgentPolicyTargetUrl(snapshot, action);
   const rule = bestMatchingSiteRule(config?.siteRules || [], policyUrl);
   const explicit = rule?.actionDecisions?.[action?.type]
