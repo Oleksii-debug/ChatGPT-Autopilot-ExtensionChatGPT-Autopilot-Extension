@@ -254,3 +254,47 @@ test('Plan-1 S1: direct actions and events reject JSON-lossy negative zero acros
   assert.deepEqual(JSON.parse(JSON.stringify(validAction.data)), { offset: 0 });
   assert.deepEqual(JSON.parse(JSON.stringify(validEvent.data)), { metrics: [{ offset: 0 }] });
 });
+
+test('Plan-1 S1: nested Agent I/O array snapshots never invoke hostile Proxy length getters', () => {
+  const secret = 'PRIVATE-PROXY-ARRAY-LENGTH-TRAP';
+  let lengthReads = 0;
+  const wrap = items => new Proxy(items, {
+    get(target, property, receiver) {
+      if (property === 'length') {
+        lengthReads += 1;
+        throw new Error(secret);
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalizedAction = normalizeAgentAction(action({
+    data: { steps: wrap([{ effectId: 'effect-1', attempt: 1 }]) },
+  }));
+  const normalizedEvent = normalizeAgentEvent(event({
+    data: { observations: wrap(['observed']) },
+  }));
+  assert.deepEqual(normalizedAction.data.steps, [{ effectId: 'effect-1', attempt: 1 }]);
+  assert.deepEqual(normalizedEvent.data.observations, ['observed']);
+  assert.equal(lengthReads, 0, 'descriptor-only normalization must not evaluate the length getter');
+
+  // Neither a cold JSON roundtrip nor immutable snapshots should change evidence.
+  const coldAction = normalizeAgentAction(JSON.parse(JSON.stringify(normalizedAction)));
+  const coldEvent = normalizeAgentEvent(JSON.parse(JSON.stringify(normalizedEvent)));
+  assert.deepEqual(coldAction.data, normalizedAction.data);
+  assert.deepEqual(coldEvent.data, normalizedEvent.data);
+  assert.ok(Object.isFrozen(normalizedAction.data.steps));
+  assert.ok(Object.isFrozen(normalizedEvent.data.observations));
+
+  const smuggled = ['observed'];
+  smuggled.injectedPermission = 'ALLOW';
+  assert.throws(
+    () => normalizeAgentEvent(event({ data: { observations: wrap(smuggled) } })),
+    error => {
+      assert.match(error.message, /non-canonical array fields/);
+      assert.doesNotMatch(error.message, /PRIVATE-PROXY-ARRAY-LENGTH-TRAP/);
+      return true;
+    },
+  );
+  assert.equal(lengthReads, 0, 'negative validation must never invoke the untrusted getter');
+});
