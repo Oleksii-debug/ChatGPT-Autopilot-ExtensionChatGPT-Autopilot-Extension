@@ -1540,3 +1540,65 @@ test('Plan8 11.x convergence: paused durable parent cannot create an automatic S
   assert.deepEqual(recovered.job.runtime, before.job.runtime,
     'cold reload must not resurrect a handoff rejected under the paused parent');
 });
+
+
+test('Plan8: Specialist admission rejects a paused parent before readiness and after JSON restart', async () => {
+  const { chrome, manager } = await fixture();
+  let readinessCalls = 0;
+  const resolver = {
+    async resolve() {
+      readinessCalls += 1;
+      throw new Error('readiness must not run for a paused parent');
+    },
+  };
+  manager.specialistReadinessResolver = resolver;
+  const payload = {
+    registryId: 'specialists:project-1',
+    expectedRegistryRevision: 4,
+    expectedPlanRevision: 7,
+    agentId: 'specialist:nonexistent',
+    maxConcurrentHandoffs: 2,
+  };
+  await manager.update(store => {
+    store.byId['job.auto'].runtime.runState = 'PAUSED';
+    store.byId['job.auto'].runtime.controlEpoch = 2;
+    return store;
+  });
+  const before = await manager.get('job.auto');
+  await assert.rejects(
+    () => manager.admitAutomaticSpecialistHandoff('job.auto', payload),
+    /Automatic specialist admission parent must be RUNNING/u,
+  );
+  assert.equal(readinessCalls, 0);
+  assert.deepEqual((await manager.get('job.auto')).job.runtime, before.job.runtime);
+
+  // StorageRepository's persisted Chrome data is JSON-shaped across new instances.
+  const coldChrome = chromeFake();
+  for (const [key, value] of Object.entries(chrome.data)) {
+    coldChrome.data[key] = JSON.parse(JSON.stringify(value));
+  }
+  const restarted = new BrowserAgentManager({
+    chromeApi: coldChrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+    specialistReadinessResolver: resolver,
+  });
+  await assert.rejects(
+    () => restarted.admitAutomaticSpecialistHandoff('job.auto', payload),
+    /Automatic specialist admission parent must be RUNNING/u,
+  );
+  assert.equal(readinessCalls, 0);
+  assert.deepEqual((await restarted.get('job.auto')).job.runtime, before.job.runtime);
+
+  // A legitimate resumed parent proceeds to normal assignment admission checks.
+  await restarted.update(store => {
+    store.byId['job.auto'].runtime.runState = 'RUNNING';
+    store.byId['job.auto'].runtime.controlEpoch = 3;
+    return store;
+  });
+  await assert.rejects(
+    () => restarted.admitAutomaticSpecialistHandoff('job.auto', payload),
+    /Specialist handoff must be READY before admission/u,
+  );
+  assert.equal(readinessCalls, 0);
+});
