@@ -2399,14 +2399,14 @@ test('Plan4 S1 FREE classification cannot disguise remote UNKNOWN or positive pr
   }});
   for (const value of contradictory) {
     for (const candidate of [value, JSON.parse(JSON.stringify(value))]) {
-      assert.throws(() => normalizeAiRoutePool([candidate]), /remote FREE pricing requires/);
+      assert.throws(() => normalizeAiRoutePool([candidate]), /remote FREE pricing requires|Free AI route cannot declare non-zero paid pricing/);
       const request = {
         enabled:true, mode:'primary', routes:[candidate],
         routePolicy:{freeOnly:true, locality:'any'},
       };
-      assert.throws(() => normalizeAiRouterSettings(request), /remote FREE pricing requires/);
+      assert.throws(() => normalizeAiRouterSettings(request), /remote FREE pricing requires|Free AI route cannot declare non-zero paid pricing/);
       await assert.rejects(router.run(request, {}, 'never charge this fixture'),
-        /remote FREE pricing requires/);
+        /remote FREE pricing requires|Free AI route cannot declare non-zero paid pricing/);
     }
   }
   assert.equal(providerEffects,0, 'invalid free price cannot issue a provider effect');
