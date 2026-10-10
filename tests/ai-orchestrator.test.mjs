@@ -481,6 +481,7 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
     },
     async afterProviderCall({ context, reservation, route, ok, result }) {
       events.push(['after', context.jobId, reservation.reservationId, route.model, ok, result.usage.totalTokens]);
+      return {settled:true};
     },
   };
   const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 80_000 });
@@ -516,6 +517,7 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
     },
     async afterProviderCall({ reservation, route, ok, error }) {
       events.push(['after', reservation.reservationId, route.model, ok, error.message]);
+      return {settled:true};
     },
   };
   const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 81_000 });
