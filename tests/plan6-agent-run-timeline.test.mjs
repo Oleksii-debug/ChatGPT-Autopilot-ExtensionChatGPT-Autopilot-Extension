@@ -358,3 +358,95 @@ test('S1 cost evidence observes one descriptor and never coerces attacker-contro
     assert.equal(projected.mayReplayExternalEffect, false);
   }
 });
+
+test('S1 uses canonical bounded Specialist dispatch metadata without treating it as effect proof', () => {
+  const input = job();
+  input.runtime.specialistDispatchByAgentId = {
+    'secret-agent-1': {
+      state: 'PROVIDER_SUCCEEDED',
+      providerId: 'PRIVATE_PROVIDER_DO_NOT_EXPORT',
+      providerReceiptId: 'PRIVATE_RECEIPT_DO_NOT_EXPORT',
+      resultArtifactRefs: [
+        { artifactId: 'PRIVATE_ARTIFACT_DO_NOT_EXPORT', sha256: 'a'.repeat(64) },
+      ],
+    },
+    'secret-agent-2': {
+      state: 'AMBIGUOUS', effectMayHaveOccurred: true, errorCode: 'PRIVATE_ERROR_DO_NOT_EXPORT',
+      resultArtifactRefs: [],
+    },
+    'secret-agent-3': {
+      state: 'FAILED_SAFE', providerReceiptId: '', resultArtifactRefs: [],
+    },
+  };
+  const timeline = buildAgentRunTimelineV1(input);
+  const dispatch = timeline.evidenceMap.specialistProviderDispatch;
+  assert.equal(dispatch.source, 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY');
+  assert.equal(dispatch.inspectedAttempts, 3);
+  assert.equal(dispatch.statusCounts.PROVIDER_SUCCEEDED, 1);
+  assert.equal(dispatch.statusCounts.AMBIGUOUS, 1);
+  assert.equal(dispatch.statusCounts.FAILED_SAFE, 1);
+  assert.equal(dispatch.receiptIdsRecorded, 1);
+  assert.equal(dispatch.artifactReferencesRecorded, 1);
+  assert.equal(dispatch.externalEffectVerified, false);
+  assert.equal(dispatch.artifactProvenanceVerified, false);
+  assert.equal(timeline.mayReplayExternalEffect, false);
+  assert.equal(Object.isFrozen(dispatch), true);
+  assert.equal(Object.isFrozen(dispatch.statusCounts), true);
+  assert.doesNotMatch(JSON.stringify(timeline), /PRIVATE_|secret-agent/);
+  assert.deepEqual(timeline, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))));
+
+  const legacy = job();
+  delete legacy.runtime.specialistDispatchByAgentId;
+  const omitted = buildAgentRunTimelineV1(legacy).evidenceMap.specialistProviderDispatch;
+  assert.equal(omitted.recordPresent, false);
+  assert.equal(omitted.inspectedAttempts, 0);
+  assert.equal(omitted.externalEffectVerified, false);
+});
+
+test('S1 Specialist projection fails closed on hostile or corrupted persisted dispatch evidence', () => {
+  const marker = 'PRIVATE_DISPATCH_TRAP_MUST_NOT_LEAK';
+  const cases = [
+    () => { const x = job(); x.runtime.specialistDispatchByAgentId = null; return x; },
+    () => { const x = job(); x.runtime.specialistDispatchByAgentId = { a: { state: 'OWNER_ALLOW' } }; return x; },
+    () => {
+      const x = job();
+      x.runtime.specialistDispatchByAgentId = { a: { state: 'PROVIDER_SUCCEEDED', resultArtifactRefs: new Array(2) } };
+      return x;
+    },
+    () => {
+      const x = job();
+      const map = {};
+      Object.defineProperty(map, 'a', { enumerable: true, get() { throw Error(marker); } });
+      x.runtime.specialistDispatchByAgentId = map;
+      return x;
+    },
+    () => {
+      const x = job();
+      x.runtime.specialistDispatchByAgentId = new Proxy({}, { ownKeys() { throw Error(marker); } });
+      return x;
+    },
+    () => {
+      const x = job();
+      const map = {};
+      map[Symbol(marker)] = { state: 'DISPATCHING' };
+      x.runtime.specialistDispatchByAgentId = map;
+      return x;
+    },
+  ];
+  for (const produce of cases) {
+    assert.throws(() => buildAgentRunTimelineV1(produce()), error =>
+      error instanceof Error && !error.message.includes(marker));
+  }
+  const oversized = job();
+  oversized.runtime.specialistDispatchByAgentId = Object.fromEntries(
+    Array.from({ length: 129 }, (_, index) => ['agent-' + index, { state: 'DISPATCHING' }]),
+  );
+  assert.throws(() => buildAgentRunTimelineV1(oversized), /bounded record schema/);
+
+  const corruptRestart = job();
+  corruptRestart.runtime.specialistDispatchByAgentId = { a: { state: 'UNKNOWN' } };
+  assert.throws(
+    () => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corruptRestart))),
+    /dispatch state is invalid/,
+  );
+});

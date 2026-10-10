@@ -217,6 +217,69 @@ function recordedOutcomeSummary(value) {
     externalEffectVerified: false,
   });
 }
+const SPECIALIST_DISPATCH_STATES = new Set([
+  'DISPATCHING', 'FAILED_SAFE', 'AMBIGUOUS', 'PROVIDER_SUCCEEDED',
+]);
+
+function recordedSpecialistDispatchEvidence(runtime) {
+  // Project only already-durable BrowserAgentManager dispatch records. These
+  // counts do not prove execution, provider delivery, artifact provenance,
+  // agent-tree linkage or the entire lifetime history.
+  const present = safeHasOwn(runtime, 'specialistDispatchByAgentId');
+  if (!present) return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY',
+    recordPresent: false,
+    inspectedAttempts: 0,
+    statusCounts: { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 },
+    receiptIdsRecorded: 0,
+    artifactReferencesRecorded: 0,
+    externalEffectVerified: false,
+    artifactProvenanceVerified: false,
+  });
+  const dispatches = record(own(runtime, 'specialistDispatchByAgentId'), 'Agent specialist dispatch map');
+  const keys = safeOwnKeys(dispatches);
+  if (keys.length > 128 || keys.some(key => typeof key !== 'string' || !key || key.length > 180)) {
+    throw new Error('Agent specialist dispatch map exceeds the bounded record schema');
+  }
+  const statusCounts = { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 };
+  let receiptIdsRecorded = 0;
+  let artifactReferencesRecorded = 0;
+  for (const key of keys) {
+    const attempt = record(own(dispatches, key), 'Agent specialist dispatch attempt');
+    const state = own(attempt, 'state');
+    if (!SPECIALIST_DISPATCH_STATES.has(state)) {
+      throw new Error('Agent specialist dispatch state is invalid');
+    }
+    statusCounts[state] += 1;
+    const receiptId = own(attempt, 'providerReceiptId');
+    if (typeof receiptId === 'string' && receiptId.length > 0 && receiptId.length <= 240) {
+      receiptIdsRecorded += 1;
+    }
+    const referencesPresent = safeHasOwn(attempt, 'resultArtifactRefs');
+    if (!referencesPresent) continue;
+    const refs = own(attempt, 'resultArtifactRefs');
+    if (!plainArray(refs)) throw new Error('Agent specialist artifact references must be a bounded dense array');
+    const length = own(refs, 'length');
+    if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
+      throw new Error('Agent specialist artifact reference count is invalid');
+    }
+    for (let index = 0; index < length; index += 1) {
+      record(own(refs, String(index)), 'Agent specialist artifact reference');
+      artifactReferencesRecorded += 1;
+    }
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_DISPATCH_METADATA_ONLY',
+    recordPresent: true,
+    inspectedAttempts: keys.length,
+    statusCounts,
+    receiptIdsRecorded,
+    artifactReferencesRecorded,
+    externalEffectVerified: false,
+    artifactProvenanceVerified: false,
+  });
+}
+
 export function buildAgentRunTimelineV1(job, options = {}) {
   record(job, 'Agent timeline job');
   record(options, 'Agent timeline options');
@@ -287,6 +350,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     ],
     externalEffectVerified: false,
     recordedOutcome,
+    specialistProviderDispatch: recordedSpecialistDispatchEvidence(runtime),
   };
   // Preserve a single observation of this persisted accounting field. A
   // hostile storage Proxy may return a new descriptor on each inspection:
