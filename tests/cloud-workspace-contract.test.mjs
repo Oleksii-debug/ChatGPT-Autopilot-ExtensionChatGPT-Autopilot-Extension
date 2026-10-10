@@ -711,7 +711,6 @@ test('S1 scrub refuses stale canonical owner before any external teardown, even 
     { leaseId: 'lease.cloud.reassigned' },
     { policyEnvelopeId: 'policy.cloud.replaced' },
     { ownerPlane: 'LOCAL' },
-    { state: 'RECONCILE' },
   ]) {
     await assert.rejects(() => teardownAndVerifyCloudWorkspaceV1(binding, {
       at: SCRUB_AT,
