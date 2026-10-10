@@ -1080,3 +1080,51 @@ test('Plan-1 S1: exact-effect chronology and negative-zero attempt survive cold 
   assert.equal(initial.phase, ExactEffectPhase.PREPARED,
     'failed and positive normalization never mutate the input ledger');
 });
+
+test('exact-effect optional identity presence survives JSON cold restart without laundering undefined', () => {
+  const original = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const durable = JSON.parse(JSON.stringify(original));
+  assert.deepEqual(normalizeExactEffectStateV1(durable), original);
+
+  // A present-but-undefined durable identity is lost by JSON.stringify and
+  // could otherwise be reinterpreted as a genuinely omitted legacy field.
+  for (const key of ['executionId', 'commitId']) {
+    const corrupt = { ...durable, [key]: undefined };
+    assert.throws(() => normalizeExactEffectStateV1(corrupt), new RegExp(key));
+  }
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...durable,
+      ambiguity: { ...durable.ambiguity, reasonCode: undefined },
+    }),
+    /ambiguity.reasonCode/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...durable,
+      reconciliation: { ...durable.reconciliation, reasonCode: undefined },
+    }),
+    /reconciliation.reasonCode/,
+  );
+
+  const invalidBegin = event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'begin-undefined-execution-id',
+    '2026-09-19T12:00:01Z',
+    { executionId: undefined },
+  );
+  assert.throws(() => reduceExactEffectV1(durable, invalidBegin), /event.executionId/);
+
+  // Truly absent legacy executionId remains valid for BEGIN_EXECUTION, and
+  // does not mutate the snapshot that was previously read from durable storage.
+  const validBegin = { ...invalidBegin };
+  delete validBegin.executionId;
+  const admitted = reduceExactEffectV1(durable, validBegin);
+  assert.equal(admitted.accepted, true);
+  assert.equal(admitted.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(admitted.state.attempt, 1);
+  assert.equal(exactEffectCanExecuteV1(admitted.state), false);
+  assert.equal(durable.phase, ExactEffectPhase.PREPARED);
+  assert.equal(durable.attempt, 0);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(admitted.state))), admitted.state);
+});
