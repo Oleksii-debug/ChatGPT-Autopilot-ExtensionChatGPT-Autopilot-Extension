@@ -958,3 +958,5 @@ GitHub exact-head `2b8e9041e2b7be2bdf67efe3a59cca3d569a35cb`: Plan1 dual-OS #380
 
 ## PLAN7_S1_CORE_FINAL_SUCCESS_38047768302_20261010
 - Exact head `94ae462ab496f0cb8810d4b295ea28961516825a`: Core deterministic #38047768302 **SUCCESS** at live readback; Plan7 dual-OS #38047768289 **SUCCESS** (80/80 each); Release #38047768291 **FAILURE** due to package deterministic Node qualification. Section 1 remains ACTIONABLE / IN_PROGRESS / NOT DONE; Section 2 ACTIONABLE / IN_PROGRESS / NOT DONE, unchanged. No terminal DONE or source merge claimed.
+
+Plan 4 post-CI correction (2026-10-10): exact head `4ee652bfdf1bad150895c1aaa7f6aa2c13c0224d`: Core #38047709256 **COMPLETED SUCCESS** (Ubuntu+Windows 76/76 scoped, 111/111 related each); Chrome #38047709255 **SUCCESS**; Release #38047709340 **FAILURE** (Linux 3180/3305 pass; Windows release gate succeeded). PR #700 OPEN/DRAFT/UNMERGED. S1+S2 both ACTIONABLE / NOT TERMINAL DONE, pending full profile/account/credential dispatch provenance, crash/reconcile accounting, 11.x main merge/postintegration readback. Other plans untouched.
