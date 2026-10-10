@@ -231,6 +231,9 @@ export class AiGatewayClient {
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
     // Only existing gateway operations are admissible. This client is not
     // an arbitrary loopback HTTP proxy, credential injector or model authority.
+    // Validate the path's primitive type before RegExp.test, which otherwise
+    // invokes a hostile caller object's toString() before admission.
+    if (typeof path !== 'string') throw new Error('AI Gateway request path is not an approved model endpoint');
     const allowedDiscoveryPath = /^\/models\?provider=[^&?#]+(?:&endpointId=[^&?#]+)?$/u.test(path);
     const readOnly = path === '/health' || path === '/status' || allowedDiscoveryPath;
     const completion = path === '/complete';
