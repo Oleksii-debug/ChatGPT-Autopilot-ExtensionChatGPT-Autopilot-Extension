@@ -173,7 +173,7 @@ function snapshotOwnDataRequest(value, label) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
+      throw new Error(`${label} fields must be an enumerable data property`);
     }
     snapshot[key] = descriptor.value;
   }
