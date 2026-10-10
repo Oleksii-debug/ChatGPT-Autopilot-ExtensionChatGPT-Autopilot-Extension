@@ -77,6 +77,15 @@ function timestamp(value, label) {
   if (canonical !== value) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
   return value;
 }
+function legacyPlanFallback(source, key, fallback, label) {
+  // Only genuinely omitted V1 metadata is eligible for a legacy default.
+  // Own undefined disappears during JSON persistence, erasing exact
+  // dependencies, acceptance evidence, states or the owner's budget.
+  if (!Object.hasOwn(source, key)) return fallback;
+  if (source[key] === undefined) throw new Error(`${label} cannot be explicit undefined`);
+  return source[key];
+}
+
 function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
       || value < min || value > max) {
@@ -130,9 +139,9 @@ function normalizeBudget(raw = {}) {
   const source = object(raw, 'AgentPlan budget');
   exact(source, new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']), 'AgentPlan budget');
   return {
-    maxModelCalls: strictInteger(source.maxModelCalls === undefined ? 0 : source.maxModelCalls, 'AgentPlan budget maxModelCalls', { max: 1_000_000 }),
-    maxRuntimeSeconds: strictInteger(source.maxRuntimeSeconds === undefined ? 0 : source.maxRuntimeSeconds, 'AgentPlan budget maxRuntimeSeconds', { max: 31_536_000 }),
-    maxCostUsdMicros: strictInteger(source.maxCostUsdMicros === undefined ? 0 : source.maxCostUsdMicros, 'AgentPlan budget maxCostUsdMicros'),
+    maxModelCalls: strictInteger(legacyPlanFallback(source, 'maxModelCalls', 0, 'AgentPlan budget maxModelCalls'), 'AgentPlan budget maxModelCalls', { max: 1_000_000 }),
+    maxRuntimeSeconds: strictInteger(legacyPlanFallback(source, 'maxRuntimeSeconds', 0, 'AgentPlan budget maxRuntimeSeconds'), 'AgentPlan budget maxRuntimeSeconds', { max: 31_536_000 }),
+    maxCostUsdMicros: strictInteger(legacyPlanFallback(source, 'maxCostUsdMicros', 0, 'AgentPlan budget maxCostUsdMicros'), 'AgentPlan budget maxCostUsdMicros'),
   };
 }
 
@@ -150,29 +159,29 @@ function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
 function normalizeNode(raw) {
   const source = object(raw, 'AgentPlan node');
   exact(source, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'requiredCapabilityIds', 'requiredToolIds', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
-  const state = source.state === undefined ? AgentPlanNodeState.PENDING : source.state;
+  const state = legacyPlanFallback(source, 'state', AgentPlanNodeState.PENDING, 'AgentPlan node state');
   if (typeof state !== 'string' || !NODE_STATES.has(state)) throw new Error('AgentPlan node state is invalid');
   return {
     nodeId: id(source.nodeId, 'AgentPlan nodeId'),
     title: text(source.title, 'AgentPlan node title', { max: 240 }),
     objective: text(source.objective, 'AgentPlan node objective', { max: 4000 }),
-    dependsOn: uniqueIds(source.dependsOn === undefined ? [] : source.dependsOn, 'AgentPlan node dependsOn'),
-    conflictKeys: uniqueIds(source.conflictKeys === undefined ? [] : source.conflictKeys, 'AgentPlan node conflictKeys'),
-    ownerId: source.ownerId == null || source.ownerId === '' ? '' : id(source.ownerId, 'AgentPlan node ownerId'),
+    dependsOn: uniqueIds(legacyPlanFallback(source, 'dependsOn', [], 'AgentPlan node dependsOn'), 'AgentPlan node dependsOn'),
+    conflictKeys: uniqueIds(legacyPlanFallback(source, 'conflictKeys', [], 'AgentPlan node conflictKeys'), 'AgentPlan node conflictKeys'),
+    ownerId: legacyPlanFallback(source, 'ownerId', null, 'AgentPlan node ownerId') == null || source.ownerId === '' ? '' : id(source.ownerId, 'AgentPlan node ownerId'),
     executionPlane: typeof source.executionPlane === 'string' && PLANES.has(source.executionPlane) ? source.executionPlane : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
-    requiredCapabilityIds: uniqueIds(source.requiredCapabilityIds === undefined ? [] : source.requiredCapabilityIds, 'AgentPlan node requiredCapabilityIds', 64),
-    requiredToolIds: uniqueIds(source.requiredToolIds === undefined ? [] : source.requiredToolIds, 'AgentPlan node requiredToolIds', 128),
-    acceptanceCriteria: uniqueText(source.acceptanceCriteria === undefined ? [] : source.acceptanceCriteria, 'AgentPlan node acceptanceCriteria'),
-    budget: normalizeBudget(source.budget === undefined ? {} : source.budget),
+    requiredCapabilityIds: uniqueIds(legacyPlanFallback(source, 'requiredCapabilityIds', [], 'AgentPlan node requiredCapabilityIds'), 'AgentPlan node requiredCapabilityIds', 64),
+    requiredToolIds: uniqueIds(legacyPlanFallback(source, 'requiredToolIds', [], 'AgentPlan node requiredToolIds'), 'AgentPlan node requiredToolIds', 128),
+    acceptanceCriteria: uniqueText(legacyPlanFallback(source, 'acceptanceCriteria', [], 'AgentPlan node acceptanceCriteria'), 'AgentPlan node acceptanceCriteria'),
+    budget: normalizeBudget(legacyPlanFallback(source, 'budget', {}, 'AgentPlan node budget')),
     state,
-    evidence: source.evidence == null || source.evidence === '' ? '' : text(source.evidence, 'AgentPlan node evidence', { max: 8000 }),
+    evidence: legacyPlanFallback(source, 'evidence', null, 'AgentPlan node evidence') == null || source.evidence === '' ? '' : text(source.evidence, 'AgentPlan node evidence', { max: 8000 }),
     updatedAt: timestamp(source.updatedAt, 'AgentPlan node updatedAt'),
   };
 }
 
 function assertAcyclic(nodes) {
   const byId = new Map(nodes.map(node => [node.nodeId, node]));
-  for (const node of nodes) for (const dependency of node.dependsOn) if (!byId.has(dependency)) throw new Error(`AgentPlan node ${node.nodeId} depends on unknown node ${dependency}`);
+  for (const node of nodes) for (const dependency of node.dependsOn) if (!byId.has(dependency)) throw new Error('AgentPlan node depends on unknown node');
   const visiting = new Set(); const visited = new Set();
   const walk = (nodeId) => {
     if (visited.has(nodeId)) return;
@@ -197,7 +206,7 @@ export function normalizeAgentPlanV1(raw) {
     planId: id(source.planId, 'AgentPlan planId'),
     jobId: id(source.jobId, 'AgentPlan jobId'),
     objective: text(source.objective, 'AgentPlan objective', { max: 8000 }),
-    successCriteria: uniqueText(source.successCriteria === undefined ? [] : source.successCriteria, 'AgentPlan successCriteria'),
+    successCriteria: uniqueText(legacyPlanFallback(source, 'successCriteria', [], 'AgentPlan successCriteria'), 'AgentPlan successCriteria'),
     nodes,
     createdAt: timestamp(source.createdAt, 'AgentPlan createdAt'),
     updatedAt: timestamp(source.updatedAt, 'AgentPlan updatedAt'),
