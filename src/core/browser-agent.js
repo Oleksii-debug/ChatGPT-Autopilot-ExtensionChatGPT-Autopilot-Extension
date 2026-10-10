@@ -704,7 +704,14 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       const usernameProof = uniqueObservedBrowserTarget(snapshot, usernameFrameId, usernameRef);
       usernameElement = usernameProof?.element || null;
       const usernameType = String(usernameElement?.type || '').toLowerCase();
-      if (!usernameElement || usernameElement.sensitive === true || usernameType === 'password' || usernameType === 'file') {
+      const usernameTag = String(usernameElement?.tag || '').toLowerCase();
+      // Only real text input types may receive an owner broker username.
+      // A checkbox, button, radio, date, number or other input can emit a
+      // consequential change event even when its value setter accepts text.
+      const textInput = ['text', 'email', 'search', 'tel', 'url'].includes(usernameType);
+      if (!usernameElement || usernameElement.sensitive === true
+        || (usernameTag === 'input' && !textInput)
+        || usernameType === 'password' || usernameType === 'file') {
         throw new Error('Browser Agent credential username target is not a non-sensitive editable field');
       }
     }
@@ -1462,7 +1469,10 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
       || location.href !== action.expectedFrameUrl) throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
     const inputType = String(element.getAttribute('type') || 'text').toLowerCase();
     if ((kind === 'password' && inputType !== 'password')
-      || (kind === 'username' && ['password', 'file', 'hidden'].includes(inputType))) {
+      || (kind === 'username' && element instanceof HTMLInputElement
+        && !['text', 'email', 'search', 'tel', 'url'].includes(inputType))) {
+      // Recovered/approved actions do not inherit permission to write into a
+      // non-text input, even with a forged or stale semantic proof envelope.
       throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
     }
     const form = element.form instanceof HTMLFormElement ? element.form : null;
