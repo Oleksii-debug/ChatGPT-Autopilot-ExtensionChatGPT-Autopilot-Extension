@@ -928,3 +928,40 @@ test('Plan-1 S1: exact effect and artifact numeric identity rejects JSON-lossy n
     'sizeBytes -0 must not be normalized into zero across restart',
   );
 });
+
+
+test('Plan-1 S1: extended ISO year preserves exact UTC chronology across cold serialization', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-year-10000',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: '+010000-01-01T00:00:00.001Z',
+  };
+  const normalized = normalizeToolInvocationV1(invocation);
+  assert.equal(normalized.createdAt, '+010000-01-01T00:00:00.001Z');
+  assert.equal(
+    normalizeToolInvocationV1({ ...invocation, createdAt: '9999-12-31T23:59:59.999Z' }).createdAt,
+    '9999-12-31T23:59:59.999Z',
+  );
+  assert.equal(
+    normalizeToolInvocationV1({ ...invocation, createdAt: '+010000-01-01T01:00:00+01:00' }).createdAt,
+    '+010000-01-01T00:00:00.000Z',
+  );
+  assert.equal(
+    normalizeToolInvocationV1(JSON.parse(JSON.stringify(normalized))).createdAt,
+    normalized.createdAt,
+  );
+  for (const invalid of [
+    '10000-01-01T00:00:00Z',
+    '+010000-02-30T00:00:00Z',
+    '+010000-01-01T24:00:00Z',
+    '+010000-01-01T00:00:00+25:00',
+  ]) {
+    assert.throws(() => normalizeToolInvocationV1({ ...invocation, createdAt: invalid }),
+      /timestamp|calendar date/i);
+  }
+});
