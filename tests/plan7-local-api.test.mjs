@@ -143,7 +143,7 @@ test('duplicate Host or Authorization headers fail closed before token lookup or
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
     const client = createAutopilotLocalClientV1({ token: TOKEN, port });
     assert.equal((await client.control(request('clean-header-recovery'))).status, 'RECEIVED');
-    assert.equal(tokenLookups, 2);
+    assert.equal(tokenLookups, 3);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
@@ -253,7 +253,7 @@ test('Expect 100-continue is rejected before pre-auth body upload, token and Cor
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
     const client = createAutopilotLocalClientV1({ token: TOKEN, port });
     assert.equal((await client.control(request('continue-fence-recovery'))).status, 'RECEIVED');
-    assert.equal(tokenLookups, 2);
+    assert.equal(tokenLookups, 3);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
@@ -556,7 +556,7 @@ test('owner token revoked while HTTP body is pending cannot reach canonical Core
       'a revoked but initially valid bearer cannot enter canonical scope or effects');
     const freshClient = createAutopilotLocalClientV1({ token: newToken, port });
     assert.equal((await freshClient.control(request('revocation-recovery'))).status, 'RECEIVED');
-    assert.equal(lookups, 4);
+    assert.equal(lookups, 5);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
@@ -590,7 +590,7 @@ test('owner-injected token rotation revokes the old credential without Core disp
     assert.equal(missing.status, 'UNKNOWN_NETWORK_RESULT');
     assert.equal(missing.httpStatus, 401);
     assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
-    assert.equal(lookups, 6);
+    assert.equal(lookups, 8);
   } finally {
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
   }
@@ -639,7 +639,7 @@ test('malformed bearer credentials never invoke the trusted owner token resolver
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
     const valid = createAutopilotLocalClientV1({ token: TOKEN, port });
     assert.equal((await valid.control(request('after-invalid-token'))).status, 'RECEIVED');
-    assert.equal(tokenLookups, 2);
+    assert.equal(tokenLookups, 3);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
@@ -749,4 +749,55 @@ test('Local API refuses accessor, inherited, symbol and Proxy dependency injecti
   server.close();
   assert.equal(getterCalls, 0, 'malicious getter must not execute');
   assert.equal(proxyGets, 0, 'admission must pin descriptor values without property reads');
+});
+
+
+test('owner bearer revoked during async Core scope lookup is denied before dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const freshToken = 'scope-rotation-new-token-test-only-'.repeat(3);
+  let activeToken = TOKEN;
+  let notifyScope, releaseScope;
+  const scopeEntered = new Promise(resolve => { notifyScope = resolve; });
+  const scopeReleased = new Promise(resolve => { releaseScope = resolve; });
+  const deps = dependencies(counters);
+  const canonicalResolve = deps.resolveTrustedScope;
+  let heldOnce = false;
+  deps.resolveTrustedScope = async lookup => {
+    const proof = canonicalResolve(lookup);
+    if (!heldOnce) {
+      heldOnce = true;
+      notifyScope();
+      await scopeReleased;
+    }
+    return proof;
+  };
+  let lookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { lookups += 1; return activeToken; },
+    dependencies: deps,
+  });
+  try {
+    const port = server.address().port;
+    const oldClient = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const pending = oldClient.control(request('owner-revoked-during-scope'));
+    await scopeEntered;
+    assert.deepEqual(counters, { scopes: 1, dispatches: 0 });
+    activeToken = freshToken;
+    releaseScope();
+    const refused = await pending;
+    assert.equal(refused.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(refused.httpStatus, 401);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 0 },
+      'scope verified under a retired bearer must not reach canonical dispatch');
+    assert.equal(lookups, 3, 'authorization is checked before body, after body and after scope');
+    const newClient = createAutopilotLocalClientV1({ token: freshToken, port });
+    const recovered = await newClient.control(request('after-scope-token-rotation'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.deepEqual(counters, { scopes: 2, dispatches: 1 });
+    assert.equal(lookups, 6);
+  } finally {
+    releaseScope?.();
+    await new Promise((resolve, reject) => server.close(
+      error => error ? reject(error) : resolve()));
+  }
 });
