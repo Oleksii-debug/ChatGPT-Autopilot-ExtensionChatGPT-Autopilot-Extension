@@ -2545,7 +2545,10 @@ function syncAgentDefinitionModelRoutePolicyControls() {
     'agent-definition-model-route-free-only',
     'agent-definition-model-route-locality',
     'agent-definition-model-route-max-input-price',
-    'agent-definition-model-route-max-output-price'
+    'agent-definition-model-route-max-output-price',
+    'agent-definition-model-route-backoff-seconds',
+    'agent-definition-model-route-circuit-failures',
+    'agent-definition-model-route-circuit-seconds'
   ]) {
     $(id).disabled = !configured;
   }
@@ -2583,6 +2586,9 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-model-route-locality').value = modelRoutePolicy?.locality || 'any';
   $('agent-definition-model-route-max-input-price').value = modelRoutePolicy?.maxInputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxInputPricePerMillionUsd);
   $('agent-definition-model-route-max-output-price').value = modelRoutePolicy?.maxOutputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxOutputPricePerMillionUsd);
+  $('agent-definition-model-route-backoff-seconds').value = String(modelRoutePolicy?.retryBackoffSeconds ?? 60);
+  $('agent-definition-model-route-circuit-failures').value = String(modelRoutePolicy?.circuitBreakerFailures ?? 2);
+  $('agent-definition-model-route-circuit-seconds').value = String(modelRoutePolicy?.circuitBreakerSeconds ?? 300);
   syncAgentDefinitionModelRoutePolicyControls();
   const specialistDelegationProfile = definition && Object.hasOwn(definition, 'specialistDelegationProfile')
     ? definition.specialistDelegationProfile : undefined;
@@ -2876,6 +2882,9 @@ function agentDefinitionFormValue() {
     modelRouteLocality: $('agent-definition-model-route-locality').value,
     modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
     modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
+    modelRouteRetryBackoffSeconds: $('agent-definition-model-route-backoff-seconds').value,
+    modelRouteCircuitBreakerFailures: $('agent-definition-model-route-circuit-failures').value,
+    modelRouteCircuitBreakerSeconds: $('agent-definition-model-route-circuit-seconds').value,
   };
 }
 
