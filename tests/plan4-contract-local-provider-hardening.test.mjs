@@ -1415,3 +1415,43 @@ test('Plan4 S2: forged local response readers are redacted and never authorize b
   assert.equal(recovered.usage.totalTokens,3);
   assert.equal(effects,3);
 });
+
+test('Plan4 S1: explicitly undefined owner locality and route cost class fail closed before routing', () => {
+  const base = {routeId:'owner.local',provider:'ollama',model:'fixture'};
+  for (const invalid of [
+    {...base,locality:undefined},
+    {...base,costClass:undefined},
+    {...base,locality:'remote',costClass:undefined},
+  ]) {
+    assert.throws(() => normalizeAiRoutePool([invalid]),/locality|costClass.*undefined/);
+    assert.throws(() => selectAiRouteCandidates({
+      routes:[invalid],policy:{locality:'local'},now:1,
+    }),/locality|costClass.*undefined/);
+  }
+  assert.throws(
+    () => normalizeAiRoutePolicy({locality:undefined}),
+    /AI route policy locality cannot be undefined/,
+  );
+  assert.throws(
+    () => selectAiRouteCandidates({routes:[base],policy:{locality:undefined},now:1}),
+    /AI route policy locality cannot be undefined/,
+  );
+  // JSON null is not a safe substitute for lost owner locality or route class.
+  for (const field of ['locality','costClass']) {
+    const corrupt = JSON.parse(JSON.stringify({...base,[field]:null}));
+    assert.throws(() => normalizeAiRoutePool([corrupt]),/locality|costClass/);
+  }
+  assert.throws(() => normalizeAiRoutePolicy(
+    JSON.parse(JSON.stringify({locality:null}))),/locality/);
+  // Genuine omission preserves legacy defaults and valid, explicitly pinned
+  // local routing survives a persisted JSON round trip.
+  const legacy = normalizeAiRoutePool([base])[0];
+  assert.equal(legacy.locality,'local');
+  assert.equal(legacy.costClass,'free');
+  const persisted=JSON.parse(JSON.stringify({
+    routes:[{...base,locality:'local',costClass:'free'}],
+    policy:{locality:'local',pinnedRouteId:'owner.local'},
+  }));
+  assert.deepEqual(selectAiRouteCandidates({...persisted,now:1})
+    .candidates.map(candidate=>candidate.routeId),['owner.local']);
+});
