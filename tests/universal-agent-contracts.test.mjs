@@ -1024,3 +1024,88 @@ test('Plan-1 S1: nested contract JSON diagnostics never expose attacker-owned me
     'valid durable argument identity must survive cold JSON restart',
   );
 });
+
+
+test('Plan-1 S1: tool policy authorization envelope rejects accessor, alias and inherited authority before effects', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-envelope-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-envelope-1',
+    arguments: { fileRef: 'workspace:README.md' },
+    createdAt: AT,
+  };
+  const policyDecision = {
+    schemaVersion: 1,
+    decisionId: 'decision-envelope-1',
+    invocationId: 'invoke-envelope-1',
+    decision: 'ALLOW',
+    reasonCode: 'OWNER_APPROVED',
+    decidedAt: AT,
+  };
+  const toolDescriptor = {
+    schemaVersion: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    label: 'Read file',
+    capabilityIds: ['filesystem.read'],
+    readOnly: true,
+  };
+  const authorized = { invocation, policyDecision, toolDescriptor, grantedCapabilityIds: ['filesystem.read'] };
+  let reads = 0;
+  for (const name of ['invocation', 'policyDecision', 'toolDescriptor', 'grantedCapabilityIds']) {
+    const hostile = { ...authorized };
+    Object.defineProperty(hostile, name, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error('PRIVATE-OWNER-SECRET-GETTER');
+      },
+    });
+    assert.throws(
+      () => assertToolInvocationAuthorizedV1(hostile),
+      error => {
+        assert.match(error.message, /data properties/);
+        assert.doesNotMatch(error.message, /PRIVATE-OWNER-SECRET-GETTER/);
+        return true;
+      },
+      name,
+    );
+  }
+  assert.equal(reads, 0, 'never evaluate untrusted authority wrapper accessors');
+
+  const secret = 'PRIVATE-OWNER-SECRET-ALIAS';
+  const unknownAuthority = { ...authorized, [secret]: { permission: 'ALLOW' } };
+  assert.throws(
+    () => assertToolInvocationAuthorizedV1(unknownAuthority),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.doesNotMatch(error.message, /PRIVATE-OWNER-SECRET/);
+      return true;
+    },
+  );
+  const symbolAuthority = { ...authorized, [Symbol(secret)]: 'ALLOW' };
+  assert.throws(() => assertToolInvocationAuthorizedV1(symbolAuthority), /unknown field/);
+  const inheritedAuthority = Object.assign(Object.create({ policyDecision }), {
+    invocation, toolDescriptor, grantedCapabilityIds: ['filesystem.read'],
+  });
+  assert.throws(() => assertToolInvocationAuthorizedV1(inheritedAuthority), /plain object/);
+  const nonEnumerable = { ...authorized };
+  Object.defineProperty(nonEnumerable, 'policyDecision', { value: policyDecision, enumerable: false });
+  assert.throws(() => assertToolInvocationAuthorizedV1(nonEnumerable), /data properties/);
+
+  const verified = assertToolInvocationAuthorizedV1(authorized);
+  assert.equal(verified.policyDecision.decision, PolicyDecisionKind.ALLOW);
+  assert.deepEqual(verified.grantedCapabilityIds, ['filesystem.read']);
+  assert.equal(Object.isFrozen(verified), true);
+  const cold = assertToolInvocationAuthorizedV1(JSON.parse(JSON.stringify(authorized)));
+  assert.deepEqual(cold, verified, 'valid authorization identity survives JSON cold restart');
+
+  assert.throws(
+    () => assertToolInvocationAuthorizedV1({ ...authorized, policyDecision: { ...policyDecision, decision: 'DENY' } }),
+    /not authorized/,
+    'hardened intake must not relax the canonical owner policy',
+  );
+});
