@@ -1,4 +1,5 @@
 import test from 'node:test';
+import http from 'node:http';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -381,5 +382,70 @@ test('Plan4 S1 explicit empty compatible endpoint registry stays disabled across
     }), []);
   } finally {
     fs.rmSync(dir, { recursive:true, force:true });
+  }
+});
+
+
+test('Plan4 S1 provider redirect cannot cross endpoint with credential, model or prompt', async () => {
+  // Physical loopback HTTP exercises native Node fetch redirect handling, not
+  // just an option-spy. A response from another origin must never be fetched.
+  let redirectedHits = 0;
+  const authorizedHits = [];
+  const destination = http.createServer((_req, res) => {
+    redirectedHits += 1;
+    res.writeHead(200, { 'content-type':'application/json' });
+    res.end(JSON.stringify({
+      data:[{id:'model-v1'}],
+      choices:[{message:{content:'unapproved destination replied'}}],
+    }));
+  });
+  const listen = server => new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve(server.address().port));
+  });
+  const close = server => new Promise(resolve => {
+    server.closeAllConnections?.();
+    server.close(() => resolve());
+  });
+  let origin;
+  try {
+    const destinationPort = await listen(destination);
+    origin = http.createServer((req, res) => {
+      authorizedHits.push({ path:req.url, authorization:req.headers.authorization });
+      res.writeHead(307, {
+        location:'http://127.0.0.1:' + destinationPort + '/unapproved-account',
+      });
+      res.end();
+    });
+    const originPort = await listen(origin);
+    const endpoints = normalizeCompatibleEndpointRegistry([
+      { endpointId:'bound-account', baseUrl:'http://127.0.0.1:' + originPort + '/v1', apiKeyEnv:'FIXTURE_CREDENTIAL' },
+    ]);
+    const options = {
+      compatibleEndpoints:endpoints,
+      endpointId:'bound-account',
+      env:{ FIXTURE_CREDENTIAL:'local-fixture-token' },
+      fetchFn:fetch,
+    };
+    await assert.rejects(
+      listProviderModels('openai-compatible', options),
+      error => error.code === 'AI_PROVIDER_UNAVAILABLE',
+    );
+    await assert.rejects(
+      completeProvider({
+        provider:'openai-compatible', endpointId:'bound-account',
+        model:'model-v1', prompt:'private fixture prompt',
+      }, options),
+      error => error.code === 'AI_PROVIDER_UNAVAILABLE',
+    );
+    assert.equal(authorizedHits.length, 2, 'only two owner-authorized upstream requests are allowed');
+    assert.equal(authorizedHits[0].path, '/v1/models');
+    assert.equal(authorizedHits[1].path, '/v1/chat/completions');
+    assert.deepEqual(authorizedHits.map(hit => hit.authorization),
+      ['Bearer local-fixture-token', 'Bearer local-fixture-token']);
+    assert.equal(redirectedHits, 0, 'a second origin must not receive tokens, model or prompts');
+  } finally {
+    if (origin?.listening) await close(origin);
+    if (destination.listening) await close(destination);
   }
 });

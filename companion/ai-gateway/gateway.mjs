@@ -401,7 +401,11 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
   let response;
   let text;
   try {
-    response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
+    // Pin every provider request to its approved origin: native fetch follows
+    // cross-origin 30x redirects by default, which can leak tokens, prompts or
+    // model/account identity and bypass an exact endpoint profile binding.
+    // The caller cannot re-enable redirects through init.
+    response = await fetchFn(url, { ...init, redirect: 'error', signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
     text = await readBoundedUpstreamText(response, controller);
   } catch (error) {
     if (error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE' || error?.code === 'AI_PROVIDER_INVALID_RESPONSE') throw error;
