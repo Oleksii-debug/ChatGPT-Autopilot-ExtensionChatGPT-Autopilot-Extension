@@ -318,6 +318,39 @@ test('untrusted registry Proxy reflection and secret-shaped keys fail closed wit
   assert.equal(Object.isFrozen(recovered), true);
 });
 
+test('signed-zero Proxy length is rejected without accepting fabricated empty specialist scope; JSON restart remains valid', () => {
+  // A Proxy over a mutable empty Array can legally forge its length data
+  // descriptor as negative zero. Never normalize that non-canonical authority
+  // boundary into an ordinary empty list.
+  const forgedEmpty = () => new Proxy([], {
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+      return key === 'length' ? { ...descriptor, value: -0 } : descriptor;
+    },
+  });
+  assert.equal(Object.is(Object.getOwnPropertyDescriptor(forgedEmpty(), 'length').value, -0), true);
+  assert.throws(() => normalizeSpecialistDefinitionV1(definition({
+    toolIds: forgedEmpty(),
+  })), /toolIds has invalid length/);
+  assert.throws(() => normalizeSpecialistRegistryV1(registry({
+    definitions: forgedEmpty(),
+  })), /definitions has invalid length/);
+  assert.throws(() => discoverSpecialistsV1(discovery({
+    requiredToolIds: forgedEmpty(),
+  })), /requiredToolIds has invalid length/);
+
+  const safeDefinition = normalizeSpecialistDefinitionV1(JSON.parse(JSON.stringify(definition({
+    toolIds: [],
+  }))));
+  assert.deepEqual(safeDefinition.toolIds, []);
+  assert.equal(safeDefinition.enabled, true);
+  const safeRegistry = normalizeSpecialistRegistryV1(JSON.parse(JSON.stringify(registry({
+    definitions: [],
+  }))));
+  assert.deepEqual(safeRegistry.definitions, []);
+  assert.equal(Object.isFrozen(safeRegistry), true);
+});
+
 test('null-prototype records are accepted and caller-owned registry inputs remain unchanged', () => {
   const coding = Object.assign(Object.create(null), definition());
   const portable = Object.assign(Object.create(null), registry({ definitions: [coding] }));

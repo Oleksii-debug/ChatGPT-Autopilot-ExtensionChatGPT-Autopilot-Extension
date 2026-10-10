@@ -62,7 +62,7 @@ function denseArray(value, label, max, min = 0) {
   }
   if (!isArray || proto !== Array.prototype) throw new Error(label + ' must be a canonical array');
   const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < min || length > max) throw new Error(label + ' has invalid length');
+  if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < min || length > max) throw new Error(label + ' has invalid length');
   const expected = new Set(['length', ...Array.from({length}, (_, index) => String(index))]);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !expected.has(key)) throw new Error(label + ' contains non-canonical array fields');
