@@ -106,6 +106,50 @@ test('SDK authenticated loopback request dispatches only through canonical resol
   assert.deepEqual(counters,{scopes:1,dispatches:1});
 });
 
+
+test('duplicate Host or Authorization headers fail closed before token lookup or Core dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const validHost = '127.0.0.1:' + port;
+    const validAuth = 'Bearer ' + TOKEN;
+    const invalidAuth = 'Bearer ' + 'x'.repeat(64);
+    const cases = [
+      ['Host', validHost, 'Authorization', validAuth, 'Authorization', invalidAuth],
+      ['Host', validHost, 'Authorization', invalidAuth, 'Authorization', validAuth],
+      ['Host', validHost, 'Host', 'attacker.invalid', 'Authorization', validAuth],
+      ['Host', 'attacker.invalid', 'Host', validHost, 'Authorization', validAuth],
+    ];
+    for (const headerFields of cases) {
+      const status = await new Promise((resolve, reject) => {
+        const raw = httpRequest({
+          hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+          headers: [...headerFields, 'Content-Type', 'application/json'],
+        }, res => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode));
+        });
+        raw.once('error', reject);
+        raw.end(JSON.stringify(request('duplicated-security-header')));
+      });
+      assert.equal(status, 403);
+    }
+    assert.equal(tokenLookups, 0, 'ambiguous requests may not consult the owner secret provider');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    assert.equal((await client.control(request('clean-header-recovery'))).status, 'RECEIVED');
+    assert.equal(tokenLookups, 1);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
+
 test('unauthenticated, wrong-host, origin and preflight requests do not reach Core', async () => {
   const counters={scopes:0, dispatches:0};
   await withServer(async port => {

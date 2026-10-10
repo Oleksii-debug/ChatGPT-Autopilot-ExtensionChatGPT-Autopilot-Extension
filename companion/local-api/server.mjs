@@ -57,6 +57,20 @@ function headerString(raw) {
   return typeof raw === 'string' ? raw : '';
 }
 
+/**
+ * Node accepts duplicated Authorization and Host fields in raw HTTP/1 headers,
+ * but req.headers hides that ambiguity by retaining one value. Reject the
+ * entire request before token resolution or canonical Core dispatch: different
+ * intermediaries can select different duplicates.
+ */
+function hasUnambiguousRawHeader(req, name, required = true) {
+  let count = 0;
+  for (let i = 0; i < req.rawHeaders.length; i += 2) {
+    if (req.rawHeaders[i].toLowerCase() === name && ++count > 1) return false;
+  }
+  return required ? count === 1 : count <= 1;
+}
+
 function exactToken(input, label) {
   if (typeof input !== 'string' || input.length < 32 || input.length > 512 || /[^\x21-\x7e]/u.test(input)) {
     throw new Error(label + ' must be an explicit high-entropy ASCII secret (32–512 characters)');
@@ -126,6 +140,10 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
     try {
       // Remote peers are rejected even if a caller improperly rebinds the server.
       if (req.socket.remoteAddress !== '127.0.0.1') return reject(res);
+      // HTTP/1 duplicate sensitive headers are ambiguous even if Node exposes
+      // a seemingly valid normalized first value.
+      if (!hasUnambiguousRawHeader(req, 'host')
+        || !hasUnambiguousRawHeader(req, 'authorization', false)) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
       // Cross-origin and browser-driven requests are always denied, including
