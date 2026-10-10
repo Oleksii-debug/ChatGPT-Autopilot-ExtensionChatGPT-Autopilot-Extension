@@ -537,3 +537,69 @@ test('Section 1: blocked provider execution cannot become success after restart 
   assert.equal(recovered.errorCode, 'OPENHANDS_CONFIGURATION_BLOCKED');
   assert.equal(recovered.updatedAt, T1);
 });
+
+
+test('Section 1: explicit null or undefined provider chronology cannot erase durable effect provenance', () => {
+  const current = prepared();
+  const legitimateOutcome = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_PROVIDER_TERMINAL_RECEIPT',
+    errorCode: '',
+    providerUpdatedAt: T0,
+    providerObservedAt: T1,
+    at: T1,
+  };
+  const accepted = recordSpecialistProviderExecutionOutcomeV1(current, legitimateOutcome);
+  assert.equal(accepted.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.deepEqual(
+    normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(accepted))),
+    accepted,
+  );
+
+  for (const field of ['providerUpdatedAt', 'providerObservedAt']) {
+    for (const invalid of [null, undefined]) {
+      assert.throws(
+        () => recordSpecialistProviderExecutionOutcomeV1(current, {
+          ...legitimateOutcome,
+          [field]: invalid,
+        }),
+        /must use canonical UTC/,
+        field + ' must fail before outcome admission',
+      );
+      assert.throws(
+        () => normalizeSpecialistProviderExecutionV1({
+          ...accepted,
+          [field]: invalid,
+        }),
+        /must use canonical UTC/,
+        field + ' must fail when a caller corrupts a durable record',
+      );
+      // null persists across JSON cold restart; undefined must be rejected
+      // before serialization can silently remove its field.
+      if (invalid === null) {
+        assert.throws(
+          () => normalizeSpecialistProviderExecutionV1(
+            JSON.parse(JSON.stringify({ ...accepted, [field]: invalid })),
+          ),
+          /must use canonical UTC/,
+          field + ' must remain invalid after JSON cold restart',
+        );
+      }
+    }
+  }
+  assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(current.updatedAt, T0);
+
+  // Legitimate legacy omission still carries exactly the historical
+  // no-chronology semantics; do not require provider accounts for it.
+  const { providerUpdatedAt: _updated, providerObservedAt: _observed, ...legacy } = accepted;
+  const restoredLegacy = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(legacy)),
+  );
+  assert.equal(restoredLegacy.providerUpdatedAt, '');
+  assert.equal(restoredLegacy.providerObservedAt, '');
+});
