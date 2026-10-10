@@ -32,6 +32,7 @@ import {
   createOpenHandsSpecialistReadinessBindingV1,
   probeOpenHandsSpecialistProviderConfigV1,
 } from '../core/openhands-specialist-readiness.js';
+import { normalizeSpecialistSelectionV1 } from '../core/specialist-registry.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { SpecialistProviderDispatcherV1 } from '../core/specialist-provider-dispatcher.js';
 import {
@@ -246,8 +247,12 @@ const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({
 });
 const specialistReadinessConfigProvenance = new WeakMap();
 const specialistProviderReadinessResolver = Object.freeze({
-  async resolve(selection) {
-    const providerId = selection?.providerId || '';
+  async resolve(selectionInput) {
+    // Normalize before reading any caller-owned selection property. A hostile
+    // accessor or Proxy may otherwise execute before the trusted registry
+    // rejects its noncanonical capability/identity envelope.
+    const selection = normalizeSpecialistSelectionV1(selectionInput);
+    const providerId = selection.providerId;
     if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
       return mistralSpecialistReadinessResolver.resolve(selection);
     }
