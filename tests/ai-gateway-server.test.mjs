@@ -97,6 +97,52 @@ test('gateway selects bounded compatible endpoints by ID and resolves secrets on
   );
 });
 
+test('Plan4 S1 custom account is never selected without its exact endpointId, including after cold restart', async () => {
+  // An unbound legacy call may only select the literal default endpoint,
+  // even when the user configured exactly one non-default account.
+  const custom = { endpointId:'account-b', baseUrl:'https://account-b.example.test/v1', apiKeyEnv:'ACCOUNT_B_KEY' };
+  const fixtures = [normalizeCompatibleEndpointRegistry([custom]),
+    normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([custom])))];
+  let outbound = 0;
+  const fetchFn = async (url, init = {}) => {
+    outbound++;
+    assert.equal(url.startsWith('https://account-b.example.test/v1/'), true);
+    assert.equal(init.headers.authorization, 'Bearer fixture-only-key');
+    if (url.endsWith('/models')) return response({ data:[{ id:'approved-model' }] });
+    return response({ choices:[{ message:{ content:'approved text' } }] });
+  };
+  for (const compatibleEndpoints of fixtures) {
+    const options = { fetchFn, compatibleEndpoints, env:{ ACCOUNT_B_KEY:'fixture-only-key' } };
+    await assert.rejects(
+      listProviderModels('openai-compatible', options),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND' && error.statusCode === 404,
+    );
+    await assert.rejects(
+      completeProvider({ provider:'openai-compatible', model:'approved-model', prompt:'test' }, options),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND' && error.statusCode === 404,
+    );
+    assert.equal(outbound, fixtures.indexOf(compatibleEndpoints) * 2, 'no provider request for unbound identity');
+    assert.deepEqual(await listProviderModels('openai-compatible', { ...options, endpointId:'account-b' }), ['approved-model']);
+    const receipt = await completeProvider({
+      provider:'openai-compatible', endpointId:'account-b', model:'approved-model', prompt:'test',
+    }, options);
+    assert.equal(receipt.endpointId, 'account-b');
+    assert.equal(receipt.model, 'approved-model');
+    assert.equal(receipt.text, 'approved text');
+  }
+  assert.equal(outbound, 4);
+
+  const legacy = normalizeCompatibleEndpointRegistry([{ endpointId:'default',
+    baseUrl:'http://127.0.0.1:1234/v1', apiKeyEnv:'' }]);
+  const calls = [];
+  assert.deepEqual(await listProviderModels('openai-compatible', {
+    compatibleEndpoints:legacy,
+    fetchFn:async (url, init) => { calls.push([url, init]); return response({ data:[{ id:'local' }] }); },
+  }), ['local']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'http://127.0.0.1:1234/v1/models');
+});
+
 test('compatible endpoint registry rejects duplicate IDs, inline secrets and insecure remote HTTP', () => {
   assert.throws(() => normalizeCompatibleEndpointRegistry([
     { endpointId:'same', baseUrl:'https://one.example/v1' },
