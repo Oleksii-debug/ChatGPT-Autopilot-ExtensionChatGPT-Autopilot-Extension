@@ -1119,7 +1119,13 @@ export function snapshotBrowserPage(snapshotId) {
         || String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
       )).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
     }
-    if (inputType === 'checkbox' || inputType === 'radio' || element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'radio') item.checked = Boolean(element.checked || element.getAttribute('aria-checked') === 'true');
+    if (inputType === 'checkbox' || inputType === 'radio' || element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'radio') {
+      // A mixed or malformed ARIA checked value is not proof of false. Keep
+      // the ambiguity visible to the planner after snapshot/restart.
+      const ariaChecked = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
+      item.checked = 'checked' in element ? Boolean(element.checked)
+        : (!ariaChecked || ariaChecked === 'false' ? false : ariaChecked === 'true' ? true : null);
+    }
     if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
       item.sensitive = sensitive;
       item.filled = sensitive ? undefined : Boolean(normalize(element.value ?? element.textContent ?? '', 2));
@@ -1338,7 +1344,15 @@ export function executeBrowserPageAction(snapshotId, action) {
     const element = ensureTarget();
     const desired = action.checked;
     const role = element.getAttribute('role');
-    const current = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
+    const readCheckedState = () => {
+      if ('checked' in element) return Boolean(element.checked);
+      const state = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
+      // aria-checked="mixed"/"undefined"/invalid cannot be silently
+      // converted into the false state and reported as a verified effect.
+      if (state && state !== 'true' && state !== 'false') throw new Error('AGENT_CHECK_STATE_INDETERMINATE');
+      return state === 'true';
+    };
+    const current = readCheckedState();
     if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
     if (current !== desired) {
       // A focus handler may change a checkbox/radio/switch after the initial
@@ -1347,14 +1361,13 @@ export function executeBrowserPageAction(snapshotId, action) {
       element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       element.focus?.({ preventScroll: true });
       ensureUnoccluded(element);
-      const afterFocus = 'checked' in element
-        ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
+      const afterFocus = readCheckedState();
       if (afterFocus !== desired) {
         ensureUnoccluded(element);
         element.click();
       }
     }
-    const observed = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
+    const observed = readCheckedState();
     if (observed !== desired) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     return { ok: true, kind: 'check', effectVerified: true, checked: observed, url: location.href };
   }
