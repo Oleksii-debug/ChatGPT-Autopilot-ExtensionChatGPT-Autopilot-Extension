@@ -434,3 +434,41 @@ test('Plan4 S1 named loopback account never silently drops an explicitly require
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('Plan4 S1 direct HTTP provider output ceiling is exact and never coerced to unlimited', async () => {
+  const upstreamCalls = [];
+  const server = createGatewayServer({
+    fetchFn:async (url, init) => {
+      upstreamCalls.push([url, init]);
+      return response({ message:{ content:'bounded fixture' } });
+    },
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const root = `http://127.0.0.1:${server.address().port}`;
+  const request = async maxOutputTokens => fetch(`${root}/complete`, {
+    method:'POST', headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({ provider:'ollama', model:'local-fixture', prompt:'bounded task', maxOutputTokens }),
+  });
+  try {
+    const invalid = [-1, null, '12', 1.25, true, [], {}, Number.MAX_SAFE_INTEGER + 1];
+    for (const raw of invalid) {
+      const restored = JSON.parse(JSON.stringify(raw));
+      const result = await request(restored);
+      assert.equal(result.status, 400, `reject malformed ceiling ${JSON.stringify(raw)}`);
+      assert.equal((await result.json()).code, 'AI_PROVIDER_OUTPUT_LIMIT_INVALID');
+      assert.equal(upstreamCalls.length, 0, 'invalid owner ceiling must not reach a model provider');
+    }
+    const positive = await request(12);
+    assert.equal(positive.status, 200);
+    assert.equal((await positive.json()).text, 'bounded fixture');
+    assert.equal(upstreamCalls.length, 1);
+    assert.deepEqual(JSON.parse(upstreamCalls[0][1].body).options, { num_predict:12 });
+    const legacyZero = await request(0);
+    assert.equal(legacyZero.status, 200);
+    assert.equal(upstreamCalls.length, 2);
+    assert.equal(JSON.parse(upstreamCalls[1][1].body).options, undefined,
+      'explicit numeric zero keeps the documented legacy unlimited setting');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
