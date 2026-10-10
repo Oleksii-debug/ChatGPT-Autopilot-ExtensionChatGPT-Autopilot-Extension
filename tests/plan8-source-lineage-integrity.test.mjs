@@ -97,3 +97,24 @@ test('invalid source ancestor version fails despite current 11.x head', () => wi
   assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: priorVersion }),
     /source ancestor manifest.json version/u);
 }));
+
+test('an untracked replacement cannot impersonate a source blob deleted from candidate HEAD', () => withFixture(f => {
+  const path = 'src/core/browser-agent-manager.js';
+  f.git('rm', path);
+  f.git('commit', '-m', 'Remove canonical source blob');
+  f.put(path, '/* untracked file impersonating canonical source */\n');
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }),
+    /candidate HEAD missing regular tracked 11\.x source path/u);
+}));
+
+test('candidate recovery cannot retroactively invent a missing source-ancestor blob', () => withFixture(f => {
+  const path = 'src/core/orchestration-v2-manager.js';
+  f.git('rm', path);
+  f.git('commit', '-m', 'Remove source ancestor blob');
+  const incompleteAncestor = f.git('rev-parse', 'HEAD');
+  f.put(path, '/* candidate restored path without original source lineage */\n');
+  f.git('add', path);
+  f.git('commit', '-m', 'Restore candidate path');
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: incompleteAncestor }),
+    /source ancestor missing regular tracked 11\.x source path/u);
+}));
