@@ -451,6 +451,10 @@ function teardownCompletion(overrides = {}) {
     schemaVersion: 1,
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
+    workspaceRevision: 'rev.10',
+    environmentSha256: ENV_SHA,
+    checkpointArtifactId: 'artifact.checkpoint.10',
+    checkpointSha256: CHECKPOINT_SHA,
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     completedAt: '2026-09-25T06:08:30.000Z',
@@ -1269,4 +1273,50 @@ test('S1 hostile teardown receipt trap fails closed without secret leakage or sc
     },
   );
   assert.equal(scrubCalls, 0, 'a rejected provider receipt cannot trigger scrub verification');
+});
+
+test('S1 teardown completion is bound to exact workspace state across JSON restart', async () => {
+  const { binding } = bindingAndOwnership();
+  const alterations = [
+    { workspaceRevision: 'rev.9' },
+    { workspaceRevision: undefined },
+    { environmentSha256: 'c'.repeat(64) },
+    { environmentSha256: undefined },
+    { checkpointArtifactId: 'artifact.checkpoint.9' },
+    { checkpointArtifactId: undefined },
+    { checkpointSha256: 'd'.repeat(64) },
+    { checkpointSha256: undefined },
+  ];
+  for (const altered of alterations) {
+    let scrubVerifications = 0;
+    const durable = JSON.parse(JSON.stringify(binding));
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(durable, {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+        teardown: async target => {
+          assert.equal(target.workspaceRevision, binding.workspaceRevision);
+          assert.equal(target.checkpointSha256, binding.checkpointSha256);
+          return JSON.parse(JSON.stringify(teardownCompletion(altered)));
+        },
+        verifyScrub: async () => { scrubVerifications++; return scrubProof(); },
+      }),
+      /teardown completion workspace state mismatch/u,
+    );
+    assert.equal(scrubVerifications, 0, 'old environment teardown cannot produce clean scrub evidence');
+  }
+
+  let scrubVerifications = 0;
+  const verified = await teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+    at: SCRUB_AT,
+    loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+    loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(cloudOwnership())),
+    teardown: async () => JSON.parse(JSON.stringify(teardownCompletion())),
+    verifyScrub: async () => { scrubVerifications++; return scrubProof(); },
+  });
+  assert.equal(scrubVerifications, 1);
+  assert.equal(verified.scrubVerified, true);
+  assert.equal(verified.leaseReleaseAuthorized, false);
+  assert.equal(verified.reuseAuthorized, false);
 });
