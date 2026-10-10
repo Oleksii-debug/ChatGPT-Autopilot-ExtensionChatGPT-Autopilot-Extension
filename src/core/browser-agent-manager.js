@@ -89,7 +89,7 @@ const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
@@ -100,7 +100,7 @@ const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
 const AUTOMATIC_SPECIALIST_DELEGATION_KEYS = new Set([
@@ -1021,6 +1021,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent definition registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent definition registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let committed = null;
     await this.update(store => {
@@ -1035,6 +1038,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
@@ -1111,6 +1115,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent Specialist registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent Specialist registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalSpecialistRegistryId(request.registryId);
     if (Object.hasOwn(request, 'definition')) {
       request.definition = normalizeSpecialistDefinitionV1(request.definition);
@@ -1128,6 +1135,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
