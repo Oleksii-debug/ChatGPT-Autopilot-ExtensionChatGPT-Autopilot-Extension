@@ -2969,3 +2969,46 @@ test('Plan2 S1 native text normalization cannot dispatch wrong form effects befo
     else globalThis.HTMLInputElement = priorInput;
   }
 });
+
+
+test('Plan2 S1 select cannot notify listeners before a rejected option value is observed', () => {
+  setup();
+  const priorSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.multiple = false;
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'allow', textContent: 'Allow', label: 'Allow' },
+    ];
+    const events = [];
+    element.dispatchEvent = event => { events.push(event.type); return true; };
+    let selected = 'keep';
+    let rejectWrites = true;
+    Object.defineProperty(element, 'value', {
+      configurable: true,
+      get() { return selected; },
+      set(value) { if (!rejectWrites) selected = value; },
+    });
+    const snapshotId = 'select-postcondition-before-event';
+    const page = snapshotBrowserPage(snapshotId);
+    const current = { frames: [{ frameId: 0, ...page }], url: page.url };
+    const intended = { type: 'select', frameId: 0, ref: 'r1', value: 'allow' };
+    const resumed = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify(intended), current)));
+    assert.throws(() => executeBrowserPageAction(snapshotId, resumed),
+      /AGENT_EFFECT_NOT_OBSERVED/, 'a rejected native select mutation must fail');
+    assert.equal(selected, 'keep');
+    assert.deepEqual(events, [], 'no input/change on unaccepted option');
+    assert.equal(element.clicked, 0, 'rejected select never uses a click fallback');
+
+    rejectWrites = false;
+    assert.equal(executeBrowserPageAction(snapshotId, resumed).effectVerified, true,
+      'valid exact value remains a supported selection after JSON recovery');
+    assert.equal(selected, 'allow');
+    assert.deepEqual(events, ['input', 'change']);
+  } finally {
+    if (priorSelect === undefined) delete globalThis.HTMLSelectElement;
+    else globalThis.HTMLSelectElement = priorSelect;
+  }
+});
