@@ -1,3 +1,9 @@
+### PLAN7_S1_EXACT_CI_83_83_BASELINE_MATCH_20261010 — NONTERMINAL RELEASE READBACK
+
+- Only canonical Plan 7 S1, PR #712 exact head `9b5245cfaa128c7e9ba2af223c0b754f952d1a65`, comment #6097119276. Plan7 dual-OS Actions #38049115804 **SUCCESS**: Ubuntu **83/83** and Windows **83/83**, failures 0; Core Actions #38049115910 **SUCCESS**. Release Actions #38049115782 **FAILURE**: Windows packaging SUCCESS but Linux aggregate 3302/3173 pass/118 fail/11 cancelled. Baseline original 11.0.13 #37715274509 = 3228/3099 pass/118 fail/11 cancelled; both detailed job logs compared, all **129/129 failing-or-cancelled test names identical**, no newly failing names. Full Release is not waived.
+- Actual Companion/Core runtime binding, owner-issued credential lifecycle and durable request/effect reconciliation, canonical product merge/restart and postintegration readback remain unverified. **S1 NOT DONE, S2 NOT DONE**. Section 2 and all other plans untouched; do not proceed S3.
+
+
 ### PLAN7_S1_BOUNDED_OWNER_TOKEN_9B5245CF_20261010 — NONTERMINAL
 
 - Scope ONLY Drive `7. Сьомий план` (doc `1hMDxTh8AtFgGR_6z_f9DwvdC3ybWtbaCSSou4UxjGpU`), first ACTIONABLE Section 1. Section 2 remains ACTIONABLE / IN_PROGRESS / NOT DONE; other plans unchanged.
