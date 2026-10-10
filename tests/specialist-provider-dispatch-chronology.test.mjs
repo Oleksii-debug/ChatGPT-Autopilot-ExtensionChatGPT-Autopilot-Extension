@@ -495,3 +495,59 @@ test('Section 1 pre-effect clock failure still prevents provider dispatch', asyn
   await assert.rejects(dispatcher.execute(f.request(readiness)), /trusted clock unavailable/u);
   assert.equal(calls, 0, 'no effect exists before the dispatch boundary');
 });
+
+
+test('Section 1 request and binding Proxy reflection traps are redacted before any effect', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  const poison = () => { throw new Error('SECRET_PROXY_REFLECTION_743'); };
+  let effects = 0;
+  const requestProxy = new Proxy(f.request(readiness), { getPrototypeOf: poison });
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0,
+    bindings: [{ providerId: 'provider.local', execute: async () => { effects += 1; } }],
+  });
+  await assert.rejects(dispatcher.execute(requestProxy), error =>
+    /cannot be inspected safely/u.test(error.message)
+    && !error.message.includes('SECRET_PROXY_REFLECTION_743'));
+  const bindingArray = new Proxy([], { ownKeys: poison });
+  assert.throws(() => new SpecialistProviderDispatcherV1({ bindings: bindingArray }), error =>
+    /cannot be inspected safely/u.test(error.message)
+    && !error.message.includes('SECRET_PROXY_REFLECTION_743'));
+  assert.equal(effects, 0);
+});
+
+test('Section 1 nested readiness Proxy trap never reaches provider and never exposes secret text', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  const poison = () => { throw new Error('SECRET_NESTED_READINESS_813'); };
+  const nested = new Proxy(readiness.inspection, { ownKeys: poison });
+  const forged = { ...readiness, inspection: nested };
+  await assert.rejects(f.newDispatcher().execute(f.request(forged)), error =>
+    /cannot be inspected safely/u.test(error.message)
+    && !error.message.includes('SECRET_NESTED_READINESS_813'));
+  assert.equal(f.providerCalls, 0);
+});
+
+test('Section 1 post-effect Proxy receipt reflection becomes opaque UNKNOWN without resending', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  let effects = 0;
+  const poison = () => { throw new Error('SECRET_PROVIDER_RECEIPT_921'); };
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => {
+        effects += 1;
+        return new Proxy({}, { ownKeys: poison });
+      },
+    }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(readiness)), error =>
+    error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+    && /reconcile the canonical effect/u.test(error.message)
+    && !error.message.includes('SECRET_PROVIDER_RECEIPT_921')
+    && !Object.hasOwn(error, 'cause'));
+  assert.equal(effects, 1);
+});
