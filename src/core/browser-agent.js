@@ -1067,7 +1067,10 @@ export function snapshotBrowserPage(snapshotId) {
     if (!options || options.length > 500) return '';
     const entries = Array.from(options).map(option => [
       String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
-      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
+      option.getAttribute?.('aria-disabled') === 'true', option.getAttribute?.('aria-hidden') === 'true',
+      option.parentElement?.getAttribute?.('aria-disabled') === 'true',
+      option.parentElement?.getAttribute?.('aria-hidden') === 'true',
     ]);
     const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
     if (source.length > 100000) return '';
@@ -1108,7 +1111,13 @@ export function snapshotBrowserPage(snapshotId) {
     if (tag === 'select') {
       item.optionFingerprint = optionFingerprint(element);
       item.selected = normalize(element.options?.[element.selectedIndex]?.textContent || '', 500);
-      item.options = Array.from(element.options || []).filter(option => !option.disabled).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
+      item.options = Array.from(element.options || []).filter(option => !(
+        option.disabled || option.hidden || option.parentElement?.disabled || option.parentElement?.hidden
+        || option.getAttribute?.('aria-disabled') === 'true'
+        || option.getAttribute?.('aria-hidden') === 'true'
+        || option.parentElement?.getAttribute?.('aria-disabled') === 'true'
+        || option.parentElement?.getAttribute?.('aria-hidden') === 'true'
+      )).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
     }
     if (inputType === 'checkbox' || inputType === 'radio' || element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'radio') item.checked = Boolean(element.checked || element.getAttribute('aria-checked') === 'true');
     if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
@@ -1157,7 +1166,10 @@ export function executeBrowserPageAction(snapshotId, action) {
     if (!options || options.length > 500) return '';
     const entries = Array.from(options).map(option => [
       String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
-      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
+      option.getAttribute?.('aria-disabled') === 'true', option.getAttribute?.('aria-hidden') === 'true',
+      option.parentElement?.getAttribute?.('aria-disabled') === 'true',
+      option.parentElement?.getAttribute?.('aria-hidden') === 'true',
     ]);
     const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
     if (source.length > 100000) return '';
