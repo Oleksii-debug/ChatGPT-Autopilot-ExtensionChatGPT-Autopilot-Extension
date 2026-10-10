@@ -143,6 +143,42 @@ test('Plan4 S1 loopback HTTP never infers a custom provider account from a singl
   }
 });
 
+test('Plan4 S1 explicitly empty endpoint registry remains disabled after restart with a healthy local gateway', async () => {
+  // Persisted [] is intentional authorization of zero compatible accounts.
+  // /health must not crash, invent an implicit default, or perform provider I/O.
+  const compatibleEndpoints=normalizeCompatibleEndpointRegistry(JSON.stringify([]));
+  let providerCalls=0;
+  const server=createGatewayServer({
+    compatibleEndpoints,
+    fetchFn:async ()=>{ providerCalls++; throw new Error('provider must not be contacted'); },
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const root=`http://127.0.0.1:${server.address().port}`;
+  try {
+    const health=await fetch(`${root}/health`);
+    assert.equal(health.status,200);
+    const state=await health.json();
+    assert.equal(state.ok,true);
+    assert.deepEqual(state.compatibleEndpoints,[]);
+    assert.equal(state.compatibleBaseUrl,'');
+    assert.equal(state.compatibleTransport,'');
+    for (const req of [
+      () => fetch(`${root}/models?provider=openai-compatible`),
+      () => fetch(`${root}/complete`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({provider:'openai-compatible',model:'model-x',prompt:'never send'}),
+      }),
+    ]) {
+      const result=await req();
+      assert.equal(result.status,404);
+      assert.equal((await result.json()).code,'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
+    }
+    assert.equal(providerCalls,0);
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+  }
+});
+
 test('gateway rejects web origins and binds exactly one Chrome extension during an explicit pairing window', async () => {
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-gateway-e2e-pair-'));
   const pairingStore = createExtensionPairingStore({ configDir });
