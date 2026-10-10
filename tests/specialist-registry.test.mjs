@@ -8,6 +8,7 @@ import {
   discoverSpecialistsV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
   proposeSpecialistRegistryMutationV1,
   SpecialistRegistryMutationKind,
 } from '../src/core/specialist-registry.js';
@@ -120,6 +121,37 @@ test('portable registry normalizes deterministically and interoperates with the 
   assert.equal(coding.resultContractId, 'result.coding.workspace.v1');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(coding.capabilityIds));
+});
+
+test('legacy unbound selection stays read-only across JSON recovery, with no handoff authority', () => {
+  const request = discovery();
+  const selected = discoverSpecialistsV1(request).specialists[0];
+  const { registryBindingKey, ...legacyData } = selected;
+  assert.equal(registryBindingKey, request.registry.bindingKey);
+  const legacy = normalizeSpecialistSelectionV1(JSON.parse(JSON.stringify(legacyData)));
+  assert.equal(Object.hasOwn(legacy, 'registryBindingKey'), false);
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    expectedRegistryBindingKey: request.registry.bindingKey,
+    selection: legacy,
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  }), /registry identity, revision or bindingKey drifted/u);
+  assert.throws(
+    () => normalizeSpecialistSelectionV1({ ...legacyData, registryBindingKey: undefined }),
+    /registryBindingKey is invalid/u,
+  );
+  const bound = bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    expectedRegistryBindingKey: request.registry.bindingKey,
+    selection: selected,
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  });
+  assert.equal(bound.authority.executionAuthorized, false);
+  assert.equal(bound.authority.credentialAuthorized, false);
 });
 
 test('discovery grants only requested parent capabilities and explicitly requested tools', () => {
