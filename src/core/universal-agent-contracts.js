@@ -466,9 +466,15 @@ export function normalizeSpecialistHandoffV1(input) {
     requestedCapabilityIds,
     artifactRefs,
     credentialRefs,
-    maxModelCalls: integer(raw.maxModelCalls, 'maxModelCalls', 0, 1_000_000, { optional: true, fallback: 0 }),
-    maxRuntimeSeconds: integer(raw.maxRuntimeSeconds, 'maxRuntimeSeconds', 0, 31_536_000, { optional: true, fallback: 0 }),
-    maxCostUsdMicros: integer(raw.maxCostUsdMicros, 'maxCostUsdMicros', 0, Number.MAX_SAFE_INTEGER, { optional: true, fallback: 0 }),
+    maxModelCalls: integer(raw.maxModelCalls, 'maxModelCalls', 0, 1_000_000, {
+      optional: true, fallback: 0, present: Object.hasOwn(raw, 'maxModelCalls'),
+    }),
+    maxRuntimeSeconds: integer(raw.maxRuntimeSeconds, 'maxRuntimeSeconds', 0, 31_536_000, {
+      optional: true, fallback: 0, present: Object.hasOwn(raw, 'maxRuntimeSeconds'),
+    }),
+    maxCostUsdMicros: integer(raw.maxCostUsdMicros, 'maxCostUsdMicros', 0, Number.MAX_SAFE_INTEGER, {
+      optional: true, fallback: 0, present: Object.hasOwn(raw, 'maxCostUsdMicros'),
+    }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     parentInvocationId: id(raw.parentInvocationId, 'parentInvocationId', { optional: true }),
   });
