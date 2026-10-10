@@ -1193,3 +1193,34 @@ test('Plan-1 S1: canonical registry adapters reject hostile options without exec
     validCapability,
   );
 });
+
+
+test('Plan-1 S1: explicit unknown privacy and read-only flags cannot downgrade at restart', () => {
+  const descriptor = {
+    schemaVersion: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    label: 'Read file',
+    capabilityIds: ['filesystem.read'],
+  };
+  const report = artifact({ sensitive: true });
+  for (const invalid of [null, undefined, 'false', 0]) {
+    assert.throws(
+      () => normalizeToolDescriptorV1({ ...descriptor, readOnly: invalid }),
+      /readOnly must be boolean/,
+      'explicitly unknown readOnly permission cannot turn into false',
+    );
+    assert.throws(
+      () => normalizeArtifactRefV1({ ...report, sensitive: invalid }),
+      /sensitive must be boolean/,
+      'explicitly unknown artifact sensitivity cannot turn into public metadata',
+    );
+  }
+  assert.equal(normalizeToolDescriptorV1(descriptor).readOnly, false, 'omitted legacy flag retains default');
+  assert.equal(normalizeArtifactRefV1(artifact({ sensitive: false })).sensitive, false);
+  assert.equal(normalizeArtifactRefV1(report).sensitive, true);
+  const durableTool = normalizeToolDescriptorV1({ ...descriptor, readOnly: true });
+  const durableArtifact = normalizeArtifactRefV1(report);
+  assert.deepEqual(normalizeToolDescriptorV1(JSON.parse(JSON.stringify(durableTool))), durableTool);
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(durableArtifact))), durableArtifact);
+});
