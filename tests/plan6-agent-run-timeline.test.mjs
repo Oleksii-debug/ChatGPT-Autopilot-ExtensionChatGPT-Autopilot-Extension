@@ -11,7 +11,7 @@ function job() {
       estimatedCostUsd: 0.016,
       currentUrl: 'https://secret.invalid/?token=PRIVATE_999',
       lastError: 'CREDENTIAL_SECRET_999',
-      verifiedOutcome: { checks: [{ detail: 'PRIVATE_CHECK_999' }] },
+      verifiedOutcome: { checks: [{ criterion: 1, text: 'PRIVATE_CRITERION_999', detail: 'PRIVATE_CHECK_999' }] },
       plan: { revision: 4, nodes: [{ state: 'READY', prompt: 'PRIVATE_NODE_999' }, { state: 'VERIFIED' }] },
       history: [
         { at: 10, type: 'owner-instruction', message: 'PRIVATE_INSTRUCTION_999' },
