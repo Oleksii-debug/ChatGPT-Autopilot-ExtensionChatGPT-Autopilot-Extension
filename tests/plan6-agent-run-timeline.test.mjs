@@ -1701,3 +1701,46 @@ test('S1 specialist provider receipt identity cannot hide invisible format contr
       /receipt identity is invalid/u);
   }
 });
+
+test('S1 repeated Specialist artifact references are not independent identities after cold restart', () => {
+  const marker = 'PRIVATE_REUSED_ARTIFACT_123';
+  const input = job();
+  input.runtime.specialistDispatchByAgentId = {
+    'specialist:plan:one': {
+      state: 'PROVIDER_SUCCEEDED', providerReceiptId: 'receipt-one',
+      resultArtifactRefs: [{ artifactId: marker }, { artifactId: marker },
+        { artifactId: 'artifact-distinct', privateNote: 'PRIVATE_NOTE_456' }],
+    },
+    'specialist:plan:two': {
+      state: 'PROVIDER_SUCCEEDED', providerReceiptId: 'receipt-two',
+      resultArtifactRefs: [{ artifactId: marker }],
+    },
+  };
+  const before = structuredClone(input);
+  const result = buildAgentRunTimelineV1(input);
+  const evidence = result.evidenceMap.specialistProviderDispatch;
+  assert.equal(evidence.artifactReferencesRecorded, 4);
+  assert.equal(evidence.distinctArtifactIdsRecorded, 2);
+  assert.equal(evidence.reusedArtifactReferencesRecorded, 2);
+  assert.equal(evidence.receiptIdsRecorded, 2);
+  assert.equal(evidence.artifactProvenanceVerified, false);
+  assert.equal(evidence.externalEffectVerified, false);
+  assert.equal(result.mayReplayExternalEffect, false);
+  assert.equal(Object.isFrozen(evidence), true);
+  assert.deepEqual(input, before);
+  assert.deepEqual(result, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))));
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE_|artifact-distinct|receipt-one|receipt-two/u);
+  const legacy = buildAgentRunTimelineV1(job()).evidenceMap.specialistProviderDispatch;
+  assert.equal(legacy.distinctArtifactIdsRecorded, 0);
+  assert.equal(legacy.reusedArtifactReferencesRecorded, 0);
+});
+
+test('S1 repeated artifact identities have a native semantic text equivalent', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const ui = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const section = ui.slice(ui.indexOf('function renderAgentRunTimeline(job)'), ui.indexOf('function renderBrowserAgentList()'));
+  assert.match(section, /distinctArtifactIdsRecorded/u);
+  assert.match(section, /reusedArtifactReferencesRecorded/u);
+  assert.match(section, /Це лише збережені метадані/u);
+  assert.doesNotMatch(section, /innerHTML|outerHTML|insertAdjacentHTML/u);
+});
