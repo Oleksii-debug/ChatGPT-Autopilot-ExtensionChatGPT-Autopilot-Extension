@@ -693,6 +693,27 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       }
     }
 
+    // Broker origin is not sufficient after delayed approvals or navigation.
+    // Bind the password and optional username to exact observed DOM identities.
+    if (!clean(passwordFrame?.url, 4096) || !clean(passwordElement?.semanticIdentity, 80)) {
+      throw new Error('Browser Agent credential semantic target identity is missing');
+    }
+    action.expectedFrameUrl = clean(passwordFrame.url, 4096);
+    action.expectedPasswordSemanticIdentity = passwordElement.semanticIdentity;
+    action.expectedPasswordName = String(passwordElement.name ?? '');
+    action.expectedPasswordFormAction = String(passwordElement.formAction ?? '');
+    action.expectedPasswordFormMethod = String(passwordElement.formMethod ?? '');
+    if (usernameRef) {
+      const usernameElement = (snapshot?.frames || []).find(frame => frame.frameId === usernameFrameId)
+        ?.elements?.find(item => item.ref === usernameRef);
+      if (!clean(usernameElement?.semanticIdentity, 80)) {
+        throw new Error('Browser Agent credential semantic target identity is missing');
+      }
+      action.expectedUsernameSemanticIdentity = usernameElement.semanticIdentity;
+      action.expectedUsernameName = String(usernameElement.name ?? '');
+      action.expectedUsernameFormAction = String(usernameElement.formAction ?? '');
+      action.expectedUsernameFormMethod = String(usernameElement.formMethod ?? '');
+    }
     action.credentialRef = credentialRef;
     action.credentialId = clean(credential.credentialId, 128);
     action.frameId = passwordFrameId;
@@ -1306,26 +1327,71 @@ export function executeBrowserPageAction(snapshotId, action) {
 }
 
 export function executeBrowserCredentialFill(snapshotId, action, username, secret) {
+  // Serialized Chrome script. Page content is untrusted and cannot provide
+  // policy authority or choose another field after a delayed approval.
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const find = ref => Array.from(document.querySelectorAll(`[${marker}]`)).find(element =>
-    element.getAttribute(marker) === String(ref || '')
-    && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
-
+  const find = ref => {
+    if (typeof ref !== 'string' || !ref || typeof snapshotId !== 'string' || !snapshotId) return null;
+    const matches = Array.from(document.querySelectorAll('[' + marker + ']')).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId);
+    return matches.length === 1 ? matches[0] : null;
+  };
+  const normalize = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const semanticIdentity = element => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const proof = (element, kind) => {
+    const label = kind === 'password' ? 'PASSWORD' : 'USERNAME';
+    if (!element || !element.isConnected || !(element instanceof HTMLInputElement)
+      || !action || typeof action.expectedFrameUrl !== 'string' || !action.expectedFrameUrl
+      || location.href !== action.expectedFrameUrl) throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    const inputType = String(element.getAttribute('type') || 'text').toLowerCase();
+    if ((kind === 'password' && inputType !== 'password')
+      || (kind === 'username' && ['password', 'file', 'hidden'].includes(inputType))) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    }
+    const form = element.form instanceof HTMLFormElement ? element.form : null;
+    const formAction = form ? form.action || '' : '';
+    const formMethod = form ? String(form.method || 'get').toLowerCase() : '';
+    const labelIds = String(element.getAttribute('aria-labelledby') || '').split(/\s+/);
+    const labelledBy = labelIds.map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = element.labels ? Array.from(element.labels).map(item => item.textContent || '').join(' ') : '';
+    const currentName = normalize(element.getAttribute('aria-label') || labelledBy || labels
+      || element.getAttribute('alt') || element.getAttribute('title') || element.textContent
+      || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '', 800);
+    const prefix = kind === 'password' ? 'expectedPassword' : 'expectedUsername';
+    if (typeof action[prefix + 'SemanticIdentity'] !== 'string'
+      || !action[prefix + 'SemanticIdentity']
+      || semanticIdentity(element) !== action[prefix + 'SemanticIdentity']
+      || currentName !== action[prefix + 'Name']
+      || normalize(formAction, 1200) !== action[prefix + 'FormAction']
+      || normalize(formMethod, 20) !== action[prefix + 'FormMethod']) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    }
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled || node.getAttribute?.('aria-hidden') === 'true'
+        || node.getAttribute?.('aria-disabled') === 'true') throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') {
+        throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+      }
+    }
+    return element;
+  };
+  if (typeof secret !== 'string' || !secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
   const password = find(action?.passwordRef);
-  if (!(password instanceof HTMLInputElement)
-    || String(password.type || '').toLowerCase() !== 'password'
-    || password.disabled
-    || password.hidden
-    || password.inert
-    || password.getAttribute('aria-hidden') === 'true'
-    || password.getAttribute('aria-disabled') === 'true') {
-    throw new Error('AGENT_CREDENTIAL_PASSWORD_TARGET_STALE');
-  }
-
-  const passwordValue = String(secret ?? '');
-  if (!passwordValue) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
-
+  const user = action?.usernameRef ? find(action.usernameRef) : null;
+  proof(password, 'password');
+  if (action?.usernameRef) proof(user, 'username');
   const dispatch = element => {
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
@@ -1335,37 +1401,23 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     if (setter) setter.call(element, value); else element.value = value;
     dispatch(element);
   };
-
   let usernameFilled = false;
-  if (action?.usernameRef) {
-    const user = find(action.usernameRef);
-    if (!user || !user.isConnected || user.disabled || user.hidden || user.inert
-      || user.getAttribute('aria-hidden') === 'true' || user.getAttribute('aria-disabled') === 'true') {
-      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_STALE');
-    }
-    const value = String(username ?? '');
-    const tag = String(user.tagName || '').toLowerCase();
-    const inputType = tag === 'input' ? String(user.type || 'text').toLowerCase() : '';
-    if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
+  if (user) {
+    user.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
     user.focus?.({ preventScroll: true });
-    if (tag === 'input') {
-      setInputValue(user, value);
-    } else if (tag === 'textarea') {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      if (setter) setter.call(user, value); else user.value = value;
-      dispatch(user);
-    } else if (user.isContentEditable) {
-      user.textContent = value;
-      dispatch(user);
-    } else {
-      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
-    }
+    proof(user, 'username');
+    proof(password, 'password');
+    setInputValue(user, typeof username === 'string' ? username : '');
     usernameFilled = true;
   }
-
+  // Username handlers may alter the password target. No secret is written
+  // until both the post-username and post-focus proofs still match.
+  password.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
+  proof(password, 'password');
   password.focus?.({ preventScroll: true });
-  setInputValue(password, passwordValue);
-  if (String(password.value || '') !== passwordValue) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+  proof(password, 'password');
+  setInputValue(password, secret);
+  if (String(password.value || '') !== secret) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
   return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
 }
 
