@@ -1063,6 +1063,9 @@ test('hybrid strong review cannot downgrade an UNKNOWN settlement to a successfu
         error.status=503;
         throw error;
       }
+      // Primary settlement must be positively acknowledged before the
+      // second (strong-model) attempt may execute at all.
+      return {settled:true};
     },
   };
   const orchestrator=new AiOrchestrator({
