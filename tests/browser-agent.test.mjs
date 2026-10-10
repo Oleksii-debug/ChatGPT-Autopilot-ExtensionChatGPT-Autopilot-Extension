@@ -3338,6 +3338,10 @@ test('Plan4 S1: corrupted persisted numeric budget receipts quarantine instead o
     ['totalTokens', 1],
     ['estimatedCostUsd', '0'],
     ['createdAt', 1.25],
+    ['reservationId', 'reservation\nforged'],
+    ['reservationId', 'reservation\u007fforged'],
+    ['callNumber', '1'],
+    ['controlEpoch', -1],
   ];
   for (let i = 0; i < corruptions.length; i += 1) {
     const id = `job-numeric-quarantine-${i}`;
