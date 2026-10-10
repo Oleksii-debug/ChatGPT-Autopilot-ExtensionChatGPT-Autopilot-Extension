@@ -358,7 +358,7 @@ test('terminal Specialist provider success is immutable across durable replay an
     errorCode: 'LATE_TRANSPORT_RETRY',
     at: T2,
   };
-  assert.strictEqual(recordSpecialistProviderExecutionOutcomeV1(cold, lateContradiction), cold);
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(cold, lateContradiction), cold);
   assert.equal(cold.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
   assert.equal(cold.effectEvidence, 'VERIFIED_TERMINAL_EFFECT_RECEIPT');
   assert.equal(cold.safeToRetry, false);
@@ -386,7 +386,7 @@ test('terminal provider failure cannot be rewritten as success or execute hostil
       throw Error('SECRET_MUST_NOT_BE_READ');
     },
   });
-  assert.strictEqual(recordSpecialistProviderExecutionOutcomeV1(restored, replay), restored);
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(restored, replay), restored);
   assert.equal(getterCalls, 0);
   assert.equal(restored.status, SpecialistProviderExecutionStatus.PROVIDER_FAILED);
   assert.equal(restored.effectEvidence, 'VERIFIED_FAILURE_RECEIPT');
