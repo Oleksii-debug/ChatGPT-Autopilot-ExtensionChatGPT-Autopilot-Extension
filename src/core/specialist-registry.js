@@ -105,7 +105,22 @@ function subset(requested, allowed, label) {
 function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
 function exactBindingKey(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) throw new Error(label + ' is invalid');
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) {
+    throw new Error(label + ' is invalid');
+  }
+  // Durable registry keys are JSON.stringify arrays (which may contain spaces
+  // inside human-readable definition fields). Legacy read-only selections can
+  // carry opaque identity tokens, but must not accept arbitrary whitespace,
+  // control characters or noncanonical representations as authority.
+  if (value.startsWith('[')) {
+    let parsed;
+    try { parsed = JSON.parse(value); } catch { throw new Error(label + ' is invalid'); }
+    if (!Array.isArray(parsed) || JSON.stringify(parsed) !== value) {
+      throw new Error(label + ' is invalid');
+    }
+  } else if (!ID.test(value)) {
+    throw new Error(label + ' is invalid');
+  }
   return value;
 }
 function definitionProjection(definition) {
