@@ -116,7 +116,8 @@ function planes(value) {
 function subset(requested, allowed, label) {
   const set = new Set(allowed);
   const missing = requested.filter(item => !set.has(item));
-  if (missing.length) throw new Error(label + ' exceeds parent or specialist authority: ' + missing.join(', '));
+  // Capability/tool identities are lower-trust input. Deny without echoing caller-supplied IDs.
+  if (missing.length) throw new Error(label + ' exceeds parent or specialist authority');
 }
 function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
