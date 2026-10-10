@@ -586,7 +586,7 @@ test('cloud teardown never reports clean on incomplete/hostile proof or failed t
       loadCanonicalBinding: async () => binding,
       teardown: async () => { throw new Error('teardown failed'); },
       verifyScrub: async () => { verified = true; return scrubProof(); },
-    }), /teardown failed/u,
+    }), /cloud workspace provider teardown failed; canonical reconciliation required/u,
   );
   assert.equal(verified, false);
 });
@@ -1319,4 +1319,64 @@ test('S1 teardown completion is bound to exact workspace state across JSON resta
   assert.equal(verified.scrubVerified, true);
   assert.equal(verified.leaseReleaseAuthorized, false);
   assert.equal(verified.reuseAuthorized, false);
+});
+
+test('S1 provider callback errors redact secrets and never synthesize cloud lifecycle authority', async () => {
+  const secret = 'CLOUD_PROVIDER_CREDENTIAL_DO_NOT_DISCLOSE';
+  const { binding, ownership } = bindingAndOwnership();
+  const restartedBinding = JSON.parse(JSON.stringify(binding));
+  const restartedOwner = JSON.parse(JSON.stringify(ownership));
+  const exception = () => { throw new Error(secret); };
+
+  // A rejected isolation callback cannot reach the atomic canonical binding commit.
+  let commits = 0;
+  await assert.rejects(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), restartedOwner, {
+      at: '2026-09-25T06:06:00.000Z',
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(restartedOwner)),
+      verifyIsolation: async () => exception(),
+      atomicCommitCanonicalBinding: async () => { commits++; },
+      loadCanonicalBinding: async () => restartedBinding,
+    }),
+    error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /provider isolation attestation failed; canonical reconciliation required/u);
+      return true;
+    },
+  );
+  assert.equal(commits, 0);
+
+  // Once teardown has an ambiguous outcome, never run a second destructive
+  // operation or accept any scrub receipt as proof of lease release.
+  let scrubCalls = 0;
+  for (const phase of ['teardown', 'scrub']) {
+    let teardownCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(restartedBinding)), {
+        at: SCRUB_AT,
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(restartedOwner)),
+        loadCanonicalBinding: async () => JSON.parse(JSON.stringify(restartedBinding)),
+        teardown: async () => {
+          teardownCalls++;
+          if (phase === 'teardown') exception();
+          return teardownCompletion();
+        },
+        verifyScrub: async () => {
+          scrubCalls++;
+          if (phase === 'scrub') exception();
+          return scrubProof();
+        },
+      }),
+      error => {
+        assert.equal(error.message.includes(secret), false);
+        assert.match(error.message, new RegExp(
+          'provider ' + (phase === 'scrub' ? 'scrub verification' : 'teardown') +
+          ' failed; canonical reconciliation required',
+        ));
+        return true;
+      },
+    );
+    assert.equal(teardownCalls, 1, 'a failed provider effect is never blindly retried');
+  }
+  assert.equal(scrubCalls, 1, 'scrub must not run after failed teardown');
 });
