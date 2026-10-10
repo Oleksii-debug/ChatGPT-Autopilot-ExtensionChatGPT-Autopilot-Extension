@@ -70,17 +70,28 @@ const MAX_DATA_BYTES = 65_536;
 const MAX_DATA_DEPTH = 16;
 const MAX_DATA_NODES = 8_192;
 
+// Untrusted Proxy reflection traps may throw credential-bearing errors.
+// Contract rejection must never forward attacker-controlled error messages.
+function safeAgentReflection(label, inspect) {
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function requirePlainObject(value, label, allowed = null) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)
-      || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+  if (!value || typeof value !== 'object'
+      || safeAgentReflection(label, () => Array.isArray(value))) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = safeAgentReflection(label, () => Object.getPrototypeOf(value));
+  if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
   const result = {};
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeAgentReflection(label, () => Reflect.ownKeys(value))) {
     if (typeof key !== 'string' || (allowed && !allowed.has(key))) {
       throw new Error(`${label} contains unknown field`);
     }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = safeAgentReflection(label, () => Object.getOwnPropertyDescriptor(value, key));
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} fields must be enumerable own data properties`);
     }
@@ -134,22 +145,22 @@ function cloneData(value, label) {
     if (!item || typeof item !== 'object' || seen.has(item)) throw new Error(`${label} must be an acyclic JSON data value`);
     seen.add(item);
     let output;
-    if (Array.isArray(item)) {
-      if (Object.getPrototypeOf(item) !== Array.prototype) throw new Error(`${label} must be a bounded plain array`);
+    if (safeAgentReflection(label, () => Array.isArray(item))) {
+      if (safeAgentReflection(label, () => Object.getPrototypeOf(item)) !== Array.prototype) throw new Error(`${label} must be a bounded plain array`);
       // Untrusted Proxy arrays may implement a hostile get('length') trap.
       // Read the own data descriptor once instead; a forged, missing or
       // nonnumeric length is never coerced into an effect/event payload.
-      const lengthDescriptor = Object.getOwnPropertyDescriptor(item, 'length');
+      const lengthDescriptor = safeAgentReflection(label, () => Object.getOwnPropertyDescriptor(item, 'length'));
       const length = lengthDescriptor?.value;
       if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
           || !Number.isSafeInteger(length) || length < 0 || length > MAX_DATA_NODES) {
         throw new Error(`${label} must be a bounded plain array`);
       }
-      const keys = Reflect.ownKeys(item);
+      const keys = safeAgentReflection(label, () => Reflect.ownKeys(item));
       if (keys.length !== length + 1) throw new Error(`${label} contains non-canonical array fields`);
       output = [];
       for (let i = 0; i < length; i += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(item, String(i));
+        const descriptor = safeAgentReflection(label, () => Object.getOwnPropertyDescriptor(item, String(i)));
         if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) throw new Error(`${label} contains sparse/accessor array entries`);
         output.push(copy(descriptor.value, depth + 1));
       }
