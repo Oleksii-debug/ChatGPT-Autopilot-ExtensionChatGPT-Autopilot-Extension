@@ -412,7 +412,7 @@ const CANONICAL_BINDING_COMMIT_OPTIONS = new Set([
   'at', 'loadCanonicalOwnership', 'verifyIsolation',
   'atomicCommitCanonicalBinding', 'loadCanonicalBinding',
 ]);
-const CANONICAL_BINDING_RECOVERY_OPTIONS = new Set(['loadCanonicalBinding']);
+const CANONICAL_BINDING_RECOVERY_OPTIONS = new Set(['at', 'loadCanonicalBinding', 'loadCanonicalOwnership']);
 
 function cloudBindingLookupKey(binding) {
   return Object.freeze({
@@ -508,19 +508,53 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
   const trusted = dataRecord(
     options, CANONICAL_BINDING_RECOVERY_OPTIONS, 'Canonical cloud binding recovery options',
   );
-  if (typeof trusted.loadCanonicalBinding !== 'function') {
-    throw new Error('canonical cloud binding recovery requires trusted loadCanonicalBinding');
+  for (const name of ['loadCanonicalBinding', 'loadCanonicalOwnership']) {
+    if (typeof trusted[name] !== 'function') {
+      throw new Error('canonical cloud binding recovery requires trusted ' + name);
+    }
   }
+  const at = exactTimestamp(trusted.at, 'Canonical cloud binding recovery at');
+  const bindingKey = cloudBindingLookupKey(binding);
+  const ownershipKey = Object.freeze({
+    taskId: binding.taskId, planId: binding.planId,
+    nodeId: binding.nodeId, effectId: binding.effectId,
+  });
+  // A stored binding alone is not a valid post-crash recovery result: its
+  // owner may have lost the lease or changed while the first read was in flight.
+  // This is read-only and must never issue another atomic commit or provider call.
   const persisted = cloudBindingReadback(
-    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+    binding, await trusted.loadCanonicalBinding(bindingKey),
   );
+  let current = Boolean(persisted);
+  if (current) {
+    const ownerBefore = normalizeExactExecutionOwnershipV1(
+      await trusted.loadCanonicalOwnership(ownershipKey),
+    );
+    current = ownerBefore.state === ExecutionOwnershipState.OWNED
+      && ownerBefore.ownerPlane === 'CLOUD'
+      && sameExecutionIdentity(binding, ownerBefore)
+      && Date.parse(at) >= Date.parse(binding.boundAt)
+      && Date.parse(at) >= Date.parse(ownerBefore.updatedAt)
+      && Boolean(ownerBefore.leaseUntil)
+      && Date.parse(at) < Date.parse(ownerBefore.leaseUntil);
+    if (current) {
+      const afterBinding = cloudBindingReadback(
+        binding, await trusted.loadCanonicalBinding(bindingKey),
+      );
+      const ownerAfter = normalizeExactExecutionOwnershipV1(
+        await trusted.loadCanonicalOwnership(ownershipKey),
+      );
+      current = Boolean(afterBinding)
+        && JSON.stringify(ownerAfter) === JSON.stringify(ownerBefore);
+    }
+  }
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
-    status: persisted
+    status: current
       ? 'CANONICAL_BINDING_DURABLE_READBACK'
       : 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION',
-    binding: persisted,
-    durableBindingVerified: Boolean(persisted),
+    binding: current ? persisted : null,
+    durableBindingVerified: current,
     safeRetryAuthorized: false,
     executionAuthorized: false,
     resumeAuthorized: false,
