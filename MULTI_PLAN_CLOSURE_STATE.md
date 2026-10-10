@@ -1,5 +1,14 @@
 # ChatGPT Autopilot — Multi-Plan Closure State
 
+### PLAN4_S1_EXACT_ROUTER_VERSION_ID_FENCES_8C054F49_20261010 — NOT TERMINAL DONE
+
+- Owner scope: ONLY Drive `4. Четвертий план`, canonical doc `1fx4sR_jCfIoKlFHPed7chAr5zy2eJKwWRQq_mjuALh4`; preserve other plans unchanged. First ACTIONABLE Section 1 remains priority; Section 2 remains ACTIONABLE / IN_PROGRESS without new mutation or DONE.
+- Reused existing 11.0.13 High PR #700, branch `plan4/s1-s2-authority-timeout-fences-20261008`; exact head `8c054f4944775b919796bffdbc24dd07fac78500` (OPEN / DRAFT / UNMERGED as at first readback), not stale `main` 0.9.19.
+- S1 production source: `src/core/ai-orchestrator.js` validates explicitly declared router schemaVersion=1 and denies unknown persisted owner-routing fields, rather than ignoring future/misspelled restrictions. Commit `c53203bd6d13abcdc51b3acbd48e42e8e6894fda`, blob `f113c965b9281d11926cae162e85bed446e72849`. `src/core/ai-route-pool.js` requires exact, untrimmed routeId/profileId/endpointId/credentialRef; no silent identity alias across JSON restart. Commit `24ce283d3a1ccc72b476ad116a71f5f5407a7b71`, blob `5ba64bef47887851c15a66150d49d08d2bf90592`.
+- Existing `tests/plan4-contract-local-provider-hardening.test.mjs` extended with negative unknown-version/unknown-field/no-provider-effect and whitespace identity alias guards, JSON-cold-restart and exact positive endpoint binding. Test commits `0d5fc3106550ba0bac98ee25779afd977126f26b`, `8c054f4944775b919796bffdbc24dd07fac78500`; exact test blob `17717cb11ba8050e33365ab72c8ed8d1cccaaa77`. Exact GitHub code/test blobs READ BACK; no fabricated local Node pass.
+- At checkpoint exact-head Chrome #38048822474 SUCCESS; Core #38048822479 PENDING, Release #38048822472 IN_PROGRESS. Their later results must be re-read against same SHA; no terminal qualification yet. Previous exact head `80d03e38` Core + Chrome SUCCESS / Linux release FAILURE.
+- **S1 ACTIONABLE / IN_PROGRESS / NOT DONE. S2 ACTIONABLE / IN_PROGRESS / NOT DONE.** Missing: end-to-end provider/model/profile/account/credential-to-dispatch binding, production durable reserve/settle/UNKNOWN restart+failover verification, exact-head Core+full Release, canonical 11.x main integration/postmerge readback. No Plan4 Section 3 activation; no real provider credentials or physical NVDA claimed. Continue S1 before S2; do not turn this checkpoint into DONE.
+
 ### PLAN1_S1S2_EXACT_HEAD_ACTIONS_B2F43FD9_READBACK_20261010 — still NOT DONE
 
 - Only Plan 1 Sections 1 and 2. Existing PR #692 exact HEAD `b2f43fd90285ee9ef1be86347eb6a360924334c2`, code and test file blobs read back. Existing PR comment #6097056913 summarizes four engineering commits, failure boundaries and remaining gates.
