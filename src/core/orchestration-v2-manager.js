@@ -15,7 +15,11 @@ import {
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
-import { createOrchestrationProjectAuthorityV1 } from './browser-agent-orchestration-binding.js';
+import {
+  createOrchestrationProjectAuthorityV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -208,6 +212,85 @@ export class OrchestrationV2Manager {
     return this.runProjectAuthorityExclusive(async () => {
       const authority = await this.resolveProjectHierarchyAuthority(projectId);
       return operation(authority);
+    });
+  }
+
+  /**
+   * Plan-1 S1: short-lived, Project-fenced lifecycle capability for an already
+   * bound Browser Agent. Structural/effect authority remains in the existing
+   * Orchestration controller. A caller never receives a raw controller.
+   */
+  withBrowserAgentBoundLifecycleAuthority(input, operation) {
+    if (typeof operation !== 'function') {
+      throw new Error('Bound Browser Agent lifecycle callback is required');
+    }
+    const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(input);
+    return this.withProjectHierarchyAuthority(binding.projectId, async authority => {
+      const inspected = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding, authority,
+      });
+      if (!inspected.current) {
+        throw new Error('Browser Agent orchestration binding is stale: ' + inspected.status);
+      }
+      let active = true;
+      const controller = this.controllerFor(binding.orchestraId);
+      const applyBoundLifecycle = async (action, rawOptions) => {
+        if (!active) throw new Error('Browser Agent bound lifecycle authority callback has expired');
+        if (!['PAUSE', 'RESUME', 'STOP'].includes(action)) {
+          throw new Error('Unknown bound Browser Agent lifecycle command');
+        }
+        if (!rawOptions || typeof rawOptions !== 'object'
+            || Array.isArray(rawOptions)
+            || ![Object.prototype, null].includes(Object.getPrototypeOf(rawOptions))) {
+          throw new Error('Bound lifecycle options must be a plain object');
+        }
+        const options = Object.create(null);
+        for (const key of Reflect.ownKeys(rawOptions)) {
+          if (typeof key !== 'string' || !['browserControlEpoch', 'nowMs'].includes(key)) {
+            throw new Error('Bound lifecycle options contains unknown field');
+          }
+          const descriptor = Object.getOwnPropertyDescriptor(rawOptions, key);
+          if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+            throw new Error('Bound lifecycle options fields must be enumerable own data properties');
+          }
+          options[key] = descriptor.value;
+        }
+        if (!Number.isSafeInteger(options.browserControlEpoch)
+            || Object.is(options.browserControlEpoch, -0)
+            || options.browserControlEpoch < 0
+            || !Number.isSafeInteger(options.nowMs)
+            || Object.is(options.nowMs, -0)
+            || options.nowMs < 0) {
+          throw new Error('Bound lifecycle clock/epoch must be exact non-negative integers');
+        }
+        const expectedScope = {
+          PAUSE: 'PAUSED', RESUME: 'RUNNING', STOP: 'STOPPED',
+        }[action];
+        const event = {
+          type: action + '_SCOPE',
+          eventId: compactOrchestrationEventId(
+            'browser-owner-scope', binding.orchestraId, binding.graphId,
+            binding.nodeId, binding.jobId, action, options.browserControlEpoch,
+          ),
+          controlEpoch: binding.controlEpoch,
+          nodeId: binding.nodeId,
+        };
+        const result = await controller.dispatchHierarchyScopeEvent(
+          event, { nowMs: options.nowMs },
+        );
+        const runtime = await controller.runtimeRepository.load();
+        const targetScopeState = runtime?.hierarchy?.state?.nodesById?.[binding.nodeId]?.scopeState;
+        if (targetScopeState !== expectedScope) {
+          throw new Error('Bound lifecycle target did not enter requested lifecycle scope: '
+            + String(targetScopeState || 'MISSING'));
+        }
+        return Object.freeze({ result, targetScopeState });
+      };
+      try {
+        return await operation(applyBoundLifecycle);
+      } finally {
+        active = false;
+      }
     });
   }
 
