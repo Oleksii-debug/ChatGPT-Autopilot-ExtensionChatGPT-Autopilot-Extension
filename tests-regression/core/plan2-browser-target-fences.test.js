@@ -2504,3 +2504,88 @@ test('Plan2 S1 checkbox and radio missing ARIA state never verify unchecked', ()
     assert.equal(element.clicked, 0);
   }
 });
+
+// Section 1: semantic CHECK is not a shortcut around owner approval for
+// native button form submission/reset or link navigation.
+test('Plan2 S1 CHECK denies ARIA form and link side effects after JSON recovery', () => {
+  for (const variant of [
+    { tag: 'BUTTON', type: 'submit' },
+    { tag: 'BUTTON', type: 'reset' },
+    { tag: 'A', href: 'https://example.test/unapproved-effect' },
+  ]) {
+    setup();
+    element.tagName = variant.tag;
+    if (variant.type) element.setAttribute('type', variant.type);
+    if (variant.href) element.setAttribute('href', variant.href);
+    element.setAttribute('role', 'switch');
+    element.setAttribute('aria-checked', 'false');
+    element.click = () => { element.clicked++; element.setAttribute('aria-checked', 'true'); };
+    const id = 'check-unsafe-' + (variant.type || 'link');
+    const observed = snapshotBrowserPage(id);
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+      { frames: [{ frameId: 0, ...observed }], url: observed.url },
+    )));
+    assert.throws(() => executeBrowserPageAction(id, action), /AGENT_CHECK_CONTROL_EFFECT_UNSAFE/);
+    assert.equal(element.clicked, 0, 'unapproved form/link side effect must not dispatch click');
+    assert.equal(element.getAttribute('aria-checked'), 'false');
+  }
+
+  // Explicit button semantics remain actionable; do not disable genuine
+  // ARIA controls while closing the implicit submit/navigation bypass.
+  setup();
+  element.setAttribute('role', 'switch');
+  element.setAttribute('aria-checked', 'false');
+  element.click = () => { element.clicked++; element.setAttribute('aria-checked', 'true'); };
+  const valid = snapshotBrowserPage('check-safe-button');
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...valid }], url: valid.url },
+  )));
+  assert.equal(executeBrowserPageAction('check-safe-button', action).checked, true);
+  assert.equal(element.clicked, 1);
+});
+
+// A checked radio cannot become unchecked by activating itself. In particular,
+// a click on an already selected radio could run app handlers without a valid
+// false postcondition; fail closed before any click, including after restart.
+test('Plan2 S1 radio uncheck is effect-free while valid radio selection recovers', () => {
+  for (const kind of ['native', 'aria']) {
+    setup();
+    if (kind === 'native') {
+      element.tagName = 'INPUT';
+      element.type = 'radio';
+      element.checked = true;
+      element.setAttribute('type', 'radio');
+    } else {
+      element.setAttribute('role', 'radio');
+      element.setAttribute('aria-checked', 'true');
+    }
+    element.click = () => { element.clicked++; };
+    const id = 'radio-no-uncheck-' + kind;
+    const observed = snapshotBrowserPage(id);
+    const refused = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+      { frames: [{ frameId: 0, ...observed }], url: observed.url },
+    )));
+    assert.throws(() => executeBrowserPageAction(id, refused), /AGENT_RADIO_UNCHECK_UNSUPPORTED/);
+    assert.equal(element.clicked, 0, 'an impossible uncheck must not emit a click');
+  }
+
+  setup();
+  element.tagName = 'INPUT';
+  element.type = 'radio';
+  element.checked = false;
+  element.setAttribute('type', 'radio');
+  element.click = () => { element.clicked++; element.checked = true; };
+  const id = 'radio-select-restart';
+  const observed = snapshotBrowserPage(id);
+  const selected = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url },
+  )));
+  assert.equal(executeBrowserPageAction(id, selected).checked, true);
+  assert.equal(element.clicked, 1);
+  assert.equal(executeBrowserPageAction(id, selected).checked, true);
+  assert.equal(element.clicked, 1, 'already selected radio must not click again');
+});
