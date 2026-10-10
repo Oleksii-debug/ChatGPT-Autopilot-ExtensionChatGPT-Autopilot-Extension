@@ -320,6 +320,7 @@ function recordedExecutionOwnershipEvidence(runtime) {
   }
   const stateCounts = { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 };
   const seenNodes = new Set();
+  const seenEffects = new Set();
   for (let i = 0; i < count; i += 1) {
     const item = record(own(records, String(i)), 'Agent execution ownership record');
     const state = own(item, 'state');
@@ -328,10 +329,11 @@ function recordedExecutionOwnershipEvidence(runtime) {
     if (!RECORDED_OWNERSHIP_STATES.has(state) ||
         typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId) ||
         typeof effectId !== 'string' || !RECORDED_OWNERSHIP_ID.test(effectId) ||
-        seenNodes.has(nodeId)) {
+        seenNodes.has(nodeId) || seenEffects.has(effectId)) {
       throw new Error('Agent execution ownership record has invalid or duplicate identity/state');
     }
     seenNodes.add(nodeId);
+    seenEffects.add(effectId);
     stateCounts[state] += 1;
   }
   return freeze({
