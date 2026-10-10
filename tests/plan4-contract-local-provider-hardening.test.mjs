@@ -48,6 +48,46 @@ test('Plan4 S1 owner router rejects unsupported versions and unknown policy fiel
   assert.equal(declared.fallbackToStrongOnPrimaryError,false);
 });
 
+test('Plan4 S1 locality and cost enums cannot be whitespace-aliased after JSON cold restart', async () => {
+  let providerEffects = 0;
+  const router = new AiOrchestrator({gatewayClient:{
+    async complete() { providerEffects += 1; throw new Error('unauthorized model dispatch'); },
+  }});
+  for (const locality of [' local', 'local ', '\tlocal', 'remote ', '\nremote']) {
+    const candidate = {...route, locality};
+    for (const persisted of [candidate, JSON.parse(JSON.stringify(candidate))]) {
+      assert.throws(() => normalizeAiRoutePool([persisted]), /AI route locality/);
+      await assert.rejects(router.run({enabled:true, mode:'primary', routes:[persisted]}, {}, 'fixture'),
+        /AI route locality/);
+    }
+  }
+  for (const costClass of [' free', 'free ', '\tpaid', 'unknown\n']) {
+    const candidate = {...route, costClass};
+    for (const persisted of [candidate, JSON.parse(JSON.stringify(candidate))]) {
+      assert.throws(() => normalizeAiRoutePool([persisted]), /AI route costClass/);
+      await assert.rejects(router.run({enabled:true, mode:'primary', routes:[persisted]}, {}, 'fixture'),
+        /AI route costClass/);
+    }
+  }
+  for (const locality of [' any', 'any ', '\tlocal', 'remote\n']) {
+    const owner = {enabled:true, mode:'primary', routePolicy:{locality}, routes:[route]};
+    for (const persisted of [owner, JSON.parse(JSON.stringify(owner))]) {
+      assert.throws(() => normalizeAiRoutePolicy(persisted.routePolicy), /AI route policy locality/);
+      assert.throws(() => normalizeAiRouterSettings(persisted), /AI route policy locality/);
+      await assert.rejects(router.run(persisted, {}, 'fixture'), /AI route policy locality/);
+    }
+  }
+  assert.equal(providerEffects, 0);
+  // Valid exact values and truly omitted legacy fields stay usable.
+  assert.equal(normalizeAiRoutePool([route])[0].locality, 'local');
+  assert.equal(normalizeAiRoutePool([{...route,costClass:'free'}])[0].costClass, 'free');
+  assert.equal(normalizeAiRoutePolicy({locality:'local'}).locality, 'local');
+  const admitted = normalizeAiRouterSettings(JSON.parse(JSON.stringify({
+    enabled:true, mode:'primary', routePolicy:{locality:'local'}, routes:[route],
+  })));
+  assert.equal(admitted.routePolicy.locality,'local');
+});
+
 test('Plan4 S1 persisted route and endpoint identity is exact, not a whitespace alias', async () => {
   for (const changed of [
     {...route,routeId:' primary '},
