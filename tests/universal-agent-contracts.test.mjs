@@ -76,6 +76,24 @@ test('Plan-1 S1: empty optional effect and approval references cannot be erased 
 });
 
 
+test('Plan-1 S1: credential expiry cannot be erased by empty timestamp on recovery', () => {
+  const legacy = credential();
+  delete legacy.expiresAt;
+  const absent = normalizeCredentialRefV1(legacy);
+  assert.equal(absent.expiresAt, null);
+  assert.deepEqual(normalizeCredentialRefV1(JSON.parse(JSON.stringify(absent))), absent);
+  for (const expiresAt of ['', ' ', 0, false]) {
+    const corrupt = { ...legacy, expiresAt };
+    assert.throws(() => normalizeCredentialRefV1(corrupt), /expiresAt must be an ISO timestamp/);
+    assert.deepEqual(corrupt, { ...legacy, expiresAt },
+      'rejected expiration must not mutate durable credential references');
+  }
+  const active = normalizeCredentialRefV1({ ...legacy, expiresAt: '2026-09-19T04:00:00Z' });
+  assert.ok(Object.isFrozen(active));
+  assert.equal(active.expiresAt, '2026-09-19T04:00:00.000Z');
+  assert.deepEqual(normalizeCredentialRefV1(JSON.parse(JSON.stringify(active))), active);
+});
+
 test('Plan-1 S1: observation data presence is exact across cold restart and corruption', () => {
   const base = {
     schemaVersion: 1, observationId: 'obs-data-presence',
