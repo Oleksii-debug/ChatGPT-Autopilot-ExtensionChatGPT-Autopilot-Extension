@@ -182,11 +182,18 @@ test('Local API bounds concurrent authenticated slow uploads before owner broker
       held.push(req);
       req.flushHeaders();
     }
-    await Promise.race([
-      allHeld,
-      new Promise((_, reject) => setTimeout(
-        () => reject(new Error('Local API admission fixtures did not enter')), 10_000)),
-    ]);
+    let readinessTimer;
+    try {
+      await Promise.race([
+        allHeld,
+        new Promise((_, reject) => {
+          readinessTimer = setTimeout(
+            () => reject(new Error('Local API admission fixtures did not enter')), 10_000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(readinessTimer);
+    }
     const overload = await fetch('http://127.0.0.1:' + port + '/v1/control', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
