@@ -30,6 +30,7 @@ const COMMAND_KEYS = new Set([
   'planId',
   'expectedJobRevision',
   'expectedPlanRevision',
+  'expectedControlEpoch',
   'policyEnvelopeId',
   'sourcePrincipalId',
   'sourceDeviceId',
@@ -44,6 +45,7 @@ const SNAPSHOT_KEYS = new Set([
   'planId',
   'jobRevision',
   'planRevision',
+  'controlEpoch',
   'policyEnvelopeId',
   'observedAt',
 ]);
@@ -157,6 +159,9 @@ function normalizeCommand(value) {
       raw.expectedPlanRevision,
       'RemoteSteeringCommandV1 expectedPlanRevision',
     ),
+    expectedControlEpoch: raw.expectedControlEpoch === undefined
+      ? null
+      : requireRevision(raw.expectedControlEpoch, 'RemoteSteeringCommandV1 expectedControlEpoch'),
     policyEnvelopeId: requireId(
       raw.policyEnvelopeId,
       'RemoteSteeringCommandV1 policyEnvelopeId',
@@ -194,6 +199,9 @@ function normalizeCurrentSnapshot(value) {
       raw.planRevision,
       'RemoteSteeringCurrentSnapshotV1 planRevision',
     ),
+    controlEpoch: raw.controlEpoch === undefined
+      ? null
+      : requireRevision(raw.controlEpoch, 'RemoteSteeringCurrentSnapshotV1 controlEpoch'),
     policyEnvelopeId: requireId(
       raw.policyEnvelopeId,
       'RemoteSteeringCurrentSnapshotV1 policyEnvelopeId',
@@ -238,6 +246,11 @@ function assertExactCurrentBinding(command, snapshot) {
   if (command.policyEnvelopeId !== snapshot.policyEnvelopeId) {
     throw new Error('remote steering policy envelope is stale or mismatched');
   }
+  // Legacy V1 remains non-authorizing; an epoch-bearing runtime must never
+  // accept commands that omit or mismatch its current control epoch.
+  if (command.expectedControlEpoch !== snapshot.controlEpoch) {
+    throw new Error('remote steering control epoch is missing, stale or mismatched');
+  }
 }
 
 function assertChronology(command, snapshot, assessmentAt) {
@@ -280,6 +293,8 @@ function canonicalFingerprintInput(command) {
     command.expiresAt,
     command.redirectTarget?.kind ?? '',
     command.redirectTarget?.targetId ?? '',
+    // Retain historical fingerprints for epoch-less advisory clients.
+    ...(command.expectedControlEpoch === null ? [] : [command.expectedControlEpoch]),
   ]);
 }
 
@@ -319,6 +334,8 @@ export async function assessRemoteSteeringCommandV1(input, options = undefined) 
     planId: command.planId,
     jobRevision: currentSnapshot.jobRevision,
     planRevision: currentSnapshot.planRevision,
+    controlEpoch: currentSnapshot.controlEpoch,
+    controlEpochBound: currentSnapshot.controlEpoch !== null,
     policyEnvelopeId: command.policyEnvelopeId,
     sourcePrincipalId: command.sourcePrincipalId,
     sourceDeviceId: command.sourceDeviceId,
@@ -340,5 +357,6 @@ export async function assessRemoteSteeringCommandV1(input, options = undefined) 
     requiresCanonicalCommandDeduplication: true,
     requiresFreshPolicy: true,
     requiresFreshStateRecheck: true,
+    requiresCanonicalControlEpochRecheck: true,
   });
 }
