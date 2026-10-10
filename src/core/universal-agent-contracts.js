@@ -104,7 +104,9 @@ function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
 }
 
 function timestamp(value, label, { optional = false } = {}) {
-  if ((value == null || value === '') && optional) return null;
+  // An empty persisted expiry is not absence: accepting it as null could
+  // silently remove the credential's expiration bound on cold recovery.
+  if (value == null && optional) return null;
   // All durable authority/evidence clocks must be explicit, zone-bound ISO
   // instants. Date.parse accepts shorthand and rolls impossible calendar dates.
   // Year 10000+ requires the ISO 8601 signed six-digit extended-year form.
