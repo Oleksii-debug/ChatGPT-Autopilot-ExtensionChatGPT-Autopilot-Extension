@@ -240,6 +240,10 @@ const specialistVerificationResolver = new AiRouteSpecialistVerificationResolver
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   artifactStore: specialistArtifactStore,
 });
+const browserAgentOrchestrationLifecycleDependencies = Object.freeze({
+  withBrowserAgentBoundLifecycleAuthority: (binding, operation) =>
+    orchestrationV2.withBrowserAgentBoundLifecycleAuthority(binding, operation),
+});
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
@@ -803,11 +807,11 @@ export async function dispatchUiMessage(message, sender = null) {
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
-    result = await browserAgent.pause(message.payload?.id || '');
+    result = await browserAgent.pause(message.payload?.id || '', browserAgentOrchestrationLifecycleDependencies);
   } else if (message.command === 'RESUME_BROWSER_AGENT_JOB') {
-    result = await browserAgent.resume(message.payload?.id || '');
+    result = await browserAgent.resume(message.payload?.id || '', { runInitial: true }, browserAgentOrchestrationLifecycleDependencies);
   } else if (message.command === 'STOP_BROWSER_AGENT_JOB') {
-    result = await browserAgent.stop(message.payload?.id || '');
+    result = await browserAgent.stop(message.payload?.id || '', browserAgentOrchestrationLifecycleDependencies);
   } else if (message.command === 'STEP_BROWSER_AGENT_JOB') {
     result = await browserAgent.step(message.payload?.id || '');
   } else if (message.command === 'ADD_BROWSER_AGENT_INSTRUCTION') {
