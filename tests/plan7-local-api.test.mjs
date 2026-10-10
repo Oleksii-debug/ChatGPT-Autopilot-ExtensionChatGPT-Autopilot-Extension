@@ -801,3 +801,73 @@ test('owner bearer revoked during async Core scope lookup is denied before dispa
       error => error ? reject(error) : resolve()));
   }
 });
+
+
+test('disconnect during async scope cannot dispatch a new Core effect; clean owner request recovers', async () => {
+  for (const ownerTokenProvider of [false, true]) {
+    const counters = { scopes: 0, dispatches: 0 };
+    let enterScope, releaseScope;
+    const scopeEntered = new Promise(resolve => { enterScope = resolve; });
+    const scopeReleased = new Promise(resolve => { releaseScope = resolve; });
+    const deps = dependencies(counters);
+    const trustedScope = deps.resolveTrustedScope;
+    let first = true;
+    deps.resolveTrustedScope = async lookup => {
+      const proof = trustedScope(lookup);
+      if (first) {
+        first = false;
+        enterScope();
+        await scopeReleased;
+      }
+      return proof;
+    };
+    let tokenLookups = 0;
+    const auth = ownerTokenProvider
+      ? { tokenProvider: async () => { tokenLookups += 1; return TOKEN; } }
+      : { token: TOKEN };
+    const server = await startAutopilotLocalApiLoopbackV1({
+      ...auth, dependencies: deps,
+    });
+    let abandoned;
+    try {
+      const port = server.address().port;
+      const body = JSON.stringify({
+        ...request('disconnected-during-scope-' + ownerTokenProvider),
+        operation: 'AGENT_STOP',
+      });
+      abandoned = httpRequest({
+        hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + TOKEN,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, response => response.resume());
+      abandoned.on('error', () => {});
+      abandoned.end(body);
+      await scopeEntered;
+      assert.deepEqual(counters, { scopes: 1, dispatches: 0 });
+      const socketClosed = new Promise(resolve => abandoned.once('close', resolve));
+      abandoned.destroy();
+      await socketClosed;
+      // Give the server a turn to observe the TCP disconnect before releasing
+      // the held trusted Core scope operation.
+      await new Promise(resolve => setTimeout(resolve, 30));
+      releaseScope();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(counters, { scopes: 1, dispatches: 0 },
+        'an abandoned connection cannot initiate a consequential Core dispatch');
+      const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+      const recovery = await client.control(request('scope-disconnect-recovery-' + ownerTokenProvider));
+      assert.equal(recovery.status, 'RECEIVED');
+      assert.deepEqual(counters, { scopes: 2, dispatches: 1 });
+      assert.equal(tokenLookups, ownerTokenProvider ? 5 : 0,
+        'only a surviving owner request completes the final token check');
+    } finally {
+      releaseScope?.();
+      abandoned?.destroy();
+      await new Promise((resolve, reject) =>
+        server.close(error => error ? reject(error) : resolve()));
+    }
+  }
+});
