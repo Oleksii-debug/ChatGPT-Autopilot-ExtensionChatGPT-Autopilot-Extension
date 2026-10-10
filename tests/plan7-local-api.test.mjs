@@ -72,17 +72,17 @@ test('declared and undeclared HTTP trailers never enter owner broker or Core; cl
         'Transfer-Encoding: chunked',
         ...(advertise ? ['Trailer: X-Injected-Authority'] : []),
         'Connection: close', '', '',
-      ].join('\\r\\n')
-        + Buffer.byteLength(body).toString(16) + '\\r\\n'
-        + body + '\\r\\n0\\r\\nX-Injected-Authority: false\\r\\n\\r\\n';
+      ].join('\r\n')
+        + Buffer.byteLength(body).toString(16) + '\r\n'
+        + body + '\r\n0\r\nX-Injected-Authority: false\r\n\r\n';
       socket.once('connect', () => socket.end(requestWire));
       const chunks = [];
       for await (const chunk of socket) chunks.push(chunk);
       return Buffer.concat(chunks).toString('utf8');
     }
-    assert.match(await chunkedWithTrailer(true), /^HTTP\\/1\\.1 403\\b/u,
+    assert.match(await chunkedWithTrailer(true), /^HTTP\/1\.1 403\b/u,
       'declared trailer must fail pre-auth');
-    assert.match(await chunkedWithTrailer(false), /^HTTP\\/1\\.1 403\\b/u,
+    assert.match(await chunkedWithTrailer(false), /^HTTP\/1\.1 403\b/u,
       'undeclared trailing fields must fail after streaming and before Core');
     assert.equal(tokenLookups, 1,
       'only the unadvertised trailer reaches the initial credential lookup');
