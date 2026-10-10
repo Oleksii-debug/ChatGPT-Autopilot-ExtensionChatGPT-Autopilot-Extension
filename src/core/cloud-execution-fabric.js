@@ -121,7 +121,8 @@ function snapshotRecord(value, label, allowed) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+    // Untrusted property names may embed secrets or page content. Never echo them.
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
     const descriptor = descriptors[key];
     if (!descriptor
         || descriptor.enumerable !== true
