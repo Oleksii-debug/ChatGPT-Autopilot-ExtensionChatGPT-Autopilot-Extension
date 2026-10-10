@@ -1503,3 +1503,40 @@ test('corrupt provider execution provenance is quarantined across restart and bl
     /provenance is quarantined as corrupt/u,
   );
 });
+
+
+test('Plan8 11.x convergence: paused durable parent cannot create an automatic Specialist handoff', async () => {
+  const { chrome, manager } = await fixture();
+  await manager.update(store => {
+    store.byId['job.auto'].runtime.runState = 'PAUSED';
+    store.byId['job.auto'].runtime.controlEpoch = 2;
+    return store;
+  });
+  const before = await manager.get('job.auto');
+  const safeRequest = {
+    registryId: 'specialists:project-1',
+    expectedRegistryRevision: 4,
+    expectedPlanRevision: 7,
+    nodeId: 'local-analysis',
+    policyEnvelopeId: 'policy:job.auto',
+    deadlineAt: T1,
+    priority: 5,
+  };
+  await assert.rejects(
+    () => manager.prepareAutomaticSpecialistDelegation('job.auto', safeRequest),
+    /parent must be RUNNING/u,
+  );
+  const after = await manager.get('job.auto');
+  assert.deepEqual(after.job.runtime, before.job.runtime,
+    'rejected delegation must preserve the exact paused runtime and not grant a child lease');
+  assert.deepEqual(after.job.runtime.specialistHandoffs, []);
+  assert.deepEqual(after.job.runtime.specialistExecutionOwnerships, []);
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+  });
+  const recovered = await restarted.get('job.auto');
+  assert.deepEqual(recovered.job.runtime, before.job.runtime,
+    'cold reload must not resurrect a handoff rejected under the paused parent');
+});
