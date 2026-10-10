@@ -450,3 +450,51 @@ test('S1 Specialist projection fails closed on hostile or corrupted persisted di
     /dispatch state is invalid/,
   );
 });
+
+test('S1 corrupt recorded checks fail closed rather than becoming zero after restart', () => {
+  for (const corruptChecks of [null, undefined, '', {}, 7]) {
+    const input = job();
+    input.runtime.verifiedOutcome.checks = corruptChecks;
+    assert.throws(() => buildAgentRunTimelineV1(input), /checks must be a bounded dense array/);
+    const clone = structuredClone(input);
+    assert.throws(() => buildAgentRunTimelineV1(clone), /checks must be a bounded dense array/);
+    if (corruptChecks !== undefined) {
+      assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))), /checks must be a bounded dense array/);
+    }
+  }
+  const legacy = job();
+  delete legacy.runtime.verifiedOutcome.checks;
+  const output = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy)));
+  assert.equal(output.evidenceMap.recordedOutcome.criteriaRecorded, 0);
+  assert.equal(output.evidenceMap.recordedOutcome.externalEffectVerified, false);
+  assert.equal(output.mayReplayExternalEffect, false);
+  assert.equal(Object.isFrozen(output.evidenceMap.recordedOutcome), true);
+});
+
+test('S1 recorded outcome time rejects forged persisted values without getter execution', () => {
+  const marker = 'PRIVATE_VERIFICATION_TIME_GETTER';
+  for (const corruptAt of [undefined, null, '42', -1, -0, 0.5, NaN, Infinity, 8_640_000_000_000_001]) {
+    const input = job();
+    input.runtime.verifiedOutcome.verifiedAt = corruptAt;
+    assert.throws(() => buildAgentRunTimelineV1(input), /verifiedAt is invalid/);
+    assert.throws(() => buildAgentRunTimelineV1(structuredClone(input)), /verifiedAt is invalid/);
+  }
+  const input = job();
+  let calls = 0;
+  Object.defineProperty(input.runtime.verifiedOutcome, 'verifiedAt', {
+    enumerable: true,
+    get() { calls += 1; throw Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(input), /accessor-backed verifiedAt/u);
+  assert.equal(calls, 0);
+  const valid = job();
+  valid.runtime.verifiedOutcome.verifiedAt = 123;
+  const recorded = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid)));
+  assert.equal(recorded.evidenceMap.recordedOutcome.recordedAt, 123);
+  assert.equal(recorded.evidenceMap.externalEffectVerified, false);
+  valid.runtime.verifiedOutcome.verifiedAt = 0;
+  assert.equal(buildAgentRunTimelineV1(valid).evidenceMap.recordedOutcome.recordedAt, null);
+  delete valid.runtime.verifiedOutcome.verifiedAt;
+  assert.equal(buildAgentRunTimelineV1(valid).evidenceMap.recordedOutcome.recordedAt, null);
+  assert.doesNotMatch(JSON.stringify(recorded), /PRIVATE_|NEVER_EXPORT|SECRET_999|CREDENTIAL_SECRET/u);
+});
