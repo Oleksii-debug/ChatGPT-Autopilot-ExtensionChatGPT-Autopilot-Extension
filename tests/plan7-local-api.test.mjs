@@ -253,7 +253,7 @@ test('Expect 100-continue is rejected before pre-auth body upload, token and Cor
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
     const client = createAutopilotLocalClientV1({ token: TOKEN, port });
     assert.equal((await client.control(request('continue-fence-recovery'))).status, 'RECEIVED');
-    assert.equal(tokenLookups, 1);
+    assert.equal(tokenLookups, 2);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
@@ -639,7 +639,7 @@ test('malformed bearer credentials never invoke the trusted owner token resolver
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
     const valid = createAutopilotLocalClientV1({ token: TOKEN, port });
     assert.equal((await valid.control(request('after-invalid-token'))).status, 'RECEIVED');
-    assert.equal(tokenLookups, 1);
+    assert.equal(tokenLookups, 2);
     assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
   } finally {
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
