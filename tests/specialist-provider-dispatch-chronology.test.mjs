@@ -162,7 +162,7 @@ test('untrusted nested readiness accessor cannot execute getter or dispatch prov
     get() { getterCalls++; throw new Error('SECRET_LEAK_CANARY'); },
   });
   const forged = { ...valid, inspection: { ...valid.inspection, checks: [forgedCheck] } };
-  await assert.rejects(f.newDispatcher().execute(f.request(forged)), /own data property/u);
+  await assert.rejects(f.newDispatcher().execute(f.request(forged)), /own data propert/u);
   assert.equal(getterCalls, 0);
   assert.equal(f.providerCalls, 0);
 });
