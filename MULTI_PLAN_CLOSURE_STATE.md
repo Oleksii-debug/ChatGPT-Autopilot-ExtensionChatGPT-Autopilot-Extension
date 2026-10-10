@@ -1,3 +1,10 @@
+### PLAN6_S1_ACTION_PAYLOAD_IDENTITY_PR815_48089E04_20261010 — NONTERMINAL 0/2
+- Exclusively canonical Drive Plan6 doc `1fr5Pm7ZbX7IxF-2CZ9nqWSE7vREMEGDCN2r0uHyr_Tk`. FIRST ACTIONABLE S1 IN_PROGRESS/NOT DONE. S2 NOT ADVANCED/NOT DONE, terminal two-sections DONE=0/2. Other Drive plans untouched.
+- REUSE existing 11.0.13 High Plan6 feature #709 at `335c1b0563aa3436a99e6ace03460d4502b0643d` (not stale main). Child draft #815 https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/815 exact HEAD `48089e048fc1e574f2a12d47c7c794750fc9e870`, OPEN/UNMERGED.
+- Existing read-only Agent timeline now rejects present malformed recorded action payloads and padded/whitespace-only durable Agent IDs, preserving legacy missing/null action, Cyrillic valid ID, no replay/policy/provider/effect authority. Added focused tests for negative, JSON restart, redaction and recovery; isolated V8 before/after expected checks PASS, not full CI.
+- Exact source/test file blob readback MATCH `34d8da7cfe17842f92cf38075b5402e8a6491a0e` / `7871b7a0edb8a33a4f1dc295e49862a8b6484075`. New child CI Plan6 #38074411334, Core #38074411318, Chrome #38074411358, Release #38074411359 initially QUEUED, no PASS assumed.
+- S1 incomplete: independent trusted tool/effect/before-after/artifact/Agent-tree receipts, chaos/endurance, green aggregate Release, safe 11.x->main Plan8 integration and postmain exact-SHA acceptance. S2 prod injection boundary not advanced before S1 terminal. NVDA_VERIFIED=false, HUMAN_TESTED=false, no credentials/authenticated effects. Do not promote on PR or green component test alone.
+
 ### PLAN5_S1_CANONICAL_STORE_READBACK_REDACTION_PR814_3B841D96_20261010 — ENGINEERING PATCH / CI QUEUED / TERMINAL 0/2
 - Scope ONLY canonical Drive 5. П’ятий план doc 1uSdYSarW52E9H7RkekA_wQ_7EgYR-xgiVdn51w5unQQ and FIRST ACTIONABLE unfinished Section 1. Section 2 NOT ADVANCED; other Drive plans untouched.
 - Reuse existing 11.0.13 High Plan5 PR #714 at exact parent 4dca23d2f27417c513ca3be4d1d13ba0a037f055. Child DRAFT PR #814 at exact head 3b841d96f00edb67ae11d79efa064ef8251c3add, NOT merged into #714/main.
