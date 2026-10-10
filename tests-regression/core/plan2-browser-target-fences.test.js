@@ -2918,3 +2918,54 @@ test('Plan2 S1 multi-select cannot silently clear existing values during parse o
     globalThis.HTMLSelectElement = priorSelect;
   }
 });
+
+
+test('Plan2 S1 native text normalization cannot dispatch wrong form effects before postcondition', () => {
+  setup();
+  const priorInput = globalThis.HTMLInputElement;
+  const changes = [];
+  try {
+    globalThis.HTMLInputElement = class SanitizingInput {};
+    Object.defineProperty(globalThis.HTMLInputElement.prototype, 'value', {
+      set(value) {
+        // Model a native typed input rejecting a value without throwing.
+        // This is the browser behavior for an invalid number/date value.
+        const valid = this.type === 'number'
+          ? /^-?\\d+(?:\\.\\d+)?$/.test(value)
+          : /^\\d{4}-\\d{2}-\\d{2}$/.test(value);
+        this.value = valid ? value : '';
+      },
+    });
+    element.tagName = 'INPUT';
+    element.dispatchEvent = event => { changes.push(event.type); return true; };
+    for (const [kind, accepted] of [['number', '42'], ['date', '2026-10-10']]) {
+      element.type = kind;
+      element.setAttribute('type', kind);
+      element.value = '';
+      changes.length = 0;
+      const snapshotId = 'typed-fill-' + kind;
+      const page = snapshotBrowserPage(snapshotId);
+      const current = { frames: [{ frameId: 0, ...page }], url: page.url };
+      const proposed = { type: 'fill', frameId: 0, ref: 'r1', text: 'not-a-' + kind };
+      const invalid = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify(proposed), current)));
+      assert.throws(() => executeBrowserPageAction(snapshotId, invalid),
+        /AGENT_EFFECT_NOT_OBSERVED/, kind + ' native setter rejected malformed text');
+      assert.equal(element.value, '', 'invalid typed value cannot be accepted');
+      assert.deepEqual(changes, [], 'no input/change reaches persistence listeners before value proof');
+      assert.equal(element.clicked, 0);
+
+      // Restart through JSON and retry with a genuinely accepted native value.
+      const resumed = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+        ...proposed, text: accepted,
+      }), current)));
+      const result = executeBrowserPageAction(snapshotId, resumed);
+      assert.equal(result.ok, true);
+      assert.equal(result.effectVerified, true);
+      assert.equal(element.value, accepted);
+      assert.deepEqual(changes, ['input', 'change']);
+    }
+  } finally {
+    if (priorInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = priorInput;
+  }
+});
