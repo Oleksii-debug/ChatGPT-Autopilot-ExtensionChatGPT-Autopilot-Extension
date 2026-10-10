@@ -721,6 +721,13 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
     ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
     'Cloud workspace scrub proof', completedAt,
   );
+  // Equal timestamps do not prove causal ordering. An attestation captured
+  // before teardown could be replayed with the teardown completion timestamp.
+  // Require strictly later, independently attested scrub evidence. This is
+  // non-authorizing and never releases or reuses the canonical execution lease.
+  if (Date.parse(verifiedAt) <= Date.parse(completedAt)) {
+    throw new Error('Cloud workspace scrub proof must follow teardown completion');
+  }
   // Teardown and attestation cross asynchronous boundaries. A proof about an
   // earlier lease/workspace must never be accepted after the canonical binding
   // has changed (including same lease with a different checkpoint revision).
