@@ -867,3 +867,109 @@ test('null-prototype durable state and event records remain supported', () => {
   const result = reduceExactEffectV1(normalized, rawEvent);
   assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
 });
+
+
+test('Plan-1 S1: persisted exact-effect phase cannot forge verification, safe retry or commit', () => {
+  const prepared = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const bogusVerified = { ...prepared, phase: ExactEffectPhase.VERIFIED };
+  const bogusRetry = { ...prepared, phase: ExactEffectPhase.SAFE_RETRY };
+  for (const candidate of [bogusVerified, bogusRetry]) {
+    const before = JSON.stringify(candidate);
+    const re = candidate.phase === ExactEffectPhase.VERIFIED
+      ? /requires bound positive verification/ : /requires bound failed verification and reconciliation/;
+    assert.throws(() => normalizeExactEffectStateV1(candidate), re);
+    assert.throws(() => normalizeExactEffectStateV1(JSON.parse(before)), re);
+    assert.equal(JSON.stringify(candidate), before, 'failed recovery cannot mutate evidence');
+  }
+  assert.throws(
+    () => exactEffectCanExecuteV1(bogusRetry),
+    /requires bound failed verification and reconciliation/,
+    'forged SAFE_RETRY cannot authorize another physical execution',
+  );
+  assert.throws(
+    () => reduceExactEffectV1(bogusVerified, event(
+      ExactEffectEventType.COMMIT, 'bogus-commit', '2026-09-19T12:00:05Z',
+      { commitId: 'fake-commit' },
+    )),
+    /requires bound positive verification/,
+    'forged VERIFIED cannot generate a commit event',
+  );
+
+  let state = reduceExactEffectV1(prepared, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'start-integrity-1', '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION, 'observed-integrity-1',
+    '2026-09-19T12:00:03Z', { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION, 'verified-integrity-1',
+    '2026-09-19T12:00:04Z', { verification: verification() },
+  )).state;
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(state))), state);
+  const committed = reduceExactEffectV1(state, event(
+    ExactEffectEventType.COMMIT, 'commit-integrity-1', '2026-09-19T12:00:05Z',
+    { commitId: 'real-commit-1' },
+  )).state;
+  assert.equal(committed.phase, ExactEffectPhase.COMMITTED);
+  assert.equal(committed.commitId, 'real-commit-1');
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(committed))), committed);
+  for (const commitId of ['', null, undefined]) {
+    const corrupted = { ...committed, commitId };
+    assert.throws(() => normalizeExactEffectStateV1(corrupted),
+      /COMMITTED exact-effect state requires an exact commitId receipt/,
+      'persisted committed phase without exact receipt must not count as complete');
+    assert.equal(corrupted.commitId, commitId);
+  }
+  const fabricated = { ...prepared, phase: ExactEffectPhase.COMMITTED };
+  assert.throws(() => normalizeExactEffectStateV1(fabricated),
+    /requires bound positive verification/,
+    'a fake COMMITTED label alone cannot mark an external effect as done');
+});
+
+test('Plan-1 S1: authenticated SAFE_RETRY survives cold restart without permission amplification', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'safe-start-1', '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY, 'safe-ambiguity-1',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT', summary: 'Read after write required.' },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RESOLVE_RECONCILIATION, 'safe-reconcile-1',
+    '2026-09-19T12:00:04Z', {
+      outcome: ReconciliationOutcome.SAFE_RETRY,
+      reasonCode: 'POSTCONDITION_PROVES_NO_EFFECT',
+      observation: observation({ observationId: 'safe-obs-1', status: 'ERROR' }),
+      verification: verification({
+        verificationId: 'safe-verify-1', observationId: 'safe-obs-1',
+        status: 'FAILED', reasonCode: 'POSTCONDITION_ABSENT',
+      }),
+    },
+  )).state;
+  assert.equal(state.phase, ExactEffectPhase.SAFE_RETRY);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(state))), state);
+  assert.equal(exactEffectCanExecuteV1(state), true);
+
+  for (const malformed of [
+    { ...state, verification: null },
+    { ...state, observation: null },
+    { ...state, reconciliation: { ...state.reconciliation, outcome: ReconciliationOutcome.MANUAL_REVIEW } },
+    { ...state, verification: { ...state.verification, status: 'VERIFIED' } },
+  ]) {
+    assert.throws(() => normalizeExactEffectStateV1(malformed),
+      /requires bound failed verification and reconciliation/,
+      'tampered replay authority must fail closed');
+    assert.throws(() => exactEffectCanExecuteV1(malformed),
+      /requires bound failed verification and reconciliation/);
+  }
+  const continued = reduceExactEffectV1(
+    JSON.parse(JSON.stringify(state)),
+    event(ExactEffectEventType.BEGIN_EXECUTION, 'safe-start-2', '2026-09-19T12:00:05Z'),
+  );
+  assert.equal(continued.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(continued.state.attempt, 2);
+  assert.equal(continued.action, 'EXECUTE');
+});
