@@ -52,6 +52,14 @@ function makeChrome({ permission = true } = {}) {
     scripting: {
       async executeScript(details) {
         const name = details.func?.name || '';
+        if (name === 'func' || !name) {
+          const tab = tabs.get(details.target.tabId);
+          return [{ frameId: 0, result: {
+            url: tab?.url || '',
+            documentEpoch: 1700000000000 + pageVersion,
+            width: 1280, height: 720, scrollX: 0, scrollY: 0,
+          } }];
+        }
         if (name === 'snapshotBrowserPage') {
           const snapshotId = details.args[0];
           const tab = tabs.get(details.target.tabId);
@@ -61,7 +69,7 @@ function makeChrome({ permission = true } = {}) {
             title: 'AIS',
             text: `page version ${pageVersion}`,
             elements: [{ ref: 'r1', tag: 'button', role: '', type: '', name: 'Add course', semanticIdentity: 'fixture-button-add-course-v1', checked: false, selected: false }],
-            viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 1600 },
+            viewport: { width: 1280, height: 720, scrollX: 0, scrollY: 0, documentEpoch: 1700000000000 + pageVersion, documentHeight: 1600 },
           } }];
         }
         if (name === 'executeBrowserPageAction') {
