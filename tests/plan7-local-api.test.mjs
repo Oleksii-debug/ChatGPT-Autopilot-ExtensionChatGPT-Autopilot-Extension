@@ -67,11 +67,11 @@ test('legacy HTTP/1.0 downgrade is denied before owner-token lookup or Core and 
       'Content-Type: application/json',
       'Content-Length: ' + Buffer.byteLength(body),
       'Connection: close', '', '', 
-    ].join('\\r\\n') + body));
+    ].join('\r\n') + body));
     const chunks = [];
     for await (const chunk of socket) chunks.push(chunk);
     const response = Buffer.concat(chunks).toString('utf8');
-    assert.match(response, /^HTTP\\/1\\.1 403\\b/u);
+    assert.match(response, /^HTTP\/1\.1 403\b/u);
     assert.equal(tokenLookups, 0,
       'HTTP downgrade must not invoke trusted credential resolution');
     assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
