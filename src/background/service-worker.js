@@ -113,7 +113,7 @@ const aiOrchestrator = new AiOrchestrator({
     },
     afterProviderCall: async ({ context, reservation, ok, result }) => {
       if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current || !reservation?.reservationId) return;
-      await browserAgentLifecycle.current.settleProviderModelBudget({
+      return await browserAgentLifecycle.current.settleProviderModelBudget({
         jobId: context.jobId,
         reservationId: reservation.reservationId,
         ok,
