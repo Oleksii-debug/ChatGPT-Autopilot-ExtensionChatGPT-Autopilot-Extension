@@ -521,6 +521,17 @@ export function validateTrustedScriptSource(code) {
   return source;
 }
 
+// Ref ordinals belong to exactly one observed frame and one element.
+// A duplicated persisted target cannot authorize a policy or credential effect.
+function uniqueObservedBrowserTarget(snapshot, frameId, ref) {
+  if (!Number.isInteger(frameId) || frameId < 0 || typeof ref !== 'string' || !ref
+    || !Array.isArray(snapshot?.frames)) return null;
+  const frames = snapshot.frames.filter(frame => frame && frame.frameId === frameId);
+  if (frames.length !== 1 || !Array.isArray(frames[0].elements)) return null;
+  const matching = frames[0].elements.filter(element => element && element.ref === ref);
+  return matching.length === 1 ? { frame: frames[0], element: matching[0] } : null;
+}
+
 function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   const type = clean(raw?.type, 40).toLowerCase();
   if (!ACTION_TYPES.has(type) || (!allowBatch && type === BrowserAgentActionType.BATCH)) {
@@ -644,9 +655,10 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     // ref alone. Bind its file-input meaning to the same snapshot/URL/label
     // evidence used for clicks before Chrome DOM.setFileInputFiles.
     if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
-      const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
-      const target = (frame?.elements || []).find(item => item.ref === action.ref);
-      if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing');
+      const proof = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref);
+      const frame = proof?.frame;
+      const target = proof?.element;
+      if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing or ambiguous');
       action.expectedSemanticIdentity = target.semanticIdentity;
       action.expectedFrameUrl = clean(frame.url, 4096);
       // Bind live accessible labels, link destinations, and form endpoints, too.
@@ -660,16 +672,19 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   }
   if (type === BrowserAgentActionType.FILL_CREDENTIAL) {
     const credentialRef = clean(raw.credentialRef, 80);
-    const credential = (snapshot?.credentials || []).find(item => item?.ref === credentialRef);
-    if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action references a credential outside the current snapshot');
+    const credentialMatches = Array.isArray(snapshot?.credentials)
+      ? snapshot.credentials.filter(item => item && item.ref === credentialRef) : [];
+    const credential = credentialMatches.length === 1 ? credentialMatches[0] : null;
+    if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action requires one exact current credential reference');
 
     const passwordFrameId = raw.passwordFrameId;
     const passwordRef = clean(raw.passwordRef, 120);
     if (!Number.isInteger(passwordFrameId) || !passwordRef || !refs.has(`${passwordFrameId}:${passwordRef}`)) {
       throw new Error('Browser Agent credential action requires an exact current password field');
     }
-    const passwordFrame = (snapshot?.frames || []).find(frame => frame.frameId === passwordFrameId);
-    const passwordElement = (passwordFrame?.elements || []).find(item => item.ref === passwordRef);
+    const passwordProof = uniqueObservedBrowserTarget(snapshot, passwordFrameId, passwordRef);
+    const passwordFrame = passwordProof?.frame;
+    const passwordElement = passwordProof?.element;
     if (String(passwordElement?.tag || '').toLowerCase() !== 'input'
       || String(passwordElement?.type || '').toLowerCase() !== 'password'
       || passwordElement?.sensitive !== true) {
@@ -678,6 +693,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
 
     let usernameFrameId = null;
     let usernameRef = '';
+    let usernameElement = null;
     if (raw.usernameRef != null || raw.usernameFrameId != null) {
       usernameFrameId = raw.usernameFrameId;
       usernameRef = clean(raw.usernameRef, 120);
@@ -685,8 +701,8 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
         throw new Error('Browser Agent credential username target is outside the current snapshot');
       }
       if (usernameFrameId !== passwordFrameId) throw new Error('Browser Agent credential username/password fields must be in the same frame in V1');
-      const usernameFrame = (snapshot?.frames || []).find(frame => frame.frameId === usernameFrameId);
-      const usernameElement = (usernameFrame?.elements || []).find(item => item.ref === usernameRef);
+      const usernameProof = uniqueObservedBrowserTarget(snapshot, usernameFrameId, usernameRef);
+      usernameElement = usernameProof?.element || null;
       const usernameType = String(usernameElement?.type || '').toLowerCase();
       if (!usernameElement || usernameElement.sensitive === true || usernameType === 'password' || usernameType === 'file') {
         throw new Error('Browser Agent credential username target is not a non-sensitive editable field');
@@ -704,8 +720,6 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.expectedPasswordFormAction = String(passwordElement.formAction ?? '');
     action.expectedPasswordFormMethod = String(passwordElement.formMethod ?? '');
     if (usernameRef) {
-      const usernameElement = (snapshot?.frames || []).find(frame => frame.frameId === usernameFrameId)
-        ?.elements?.find(item => item.ref === usernameRef);
       if (!clean(usernameElement?.semanticIdentity, 80)) {
         throw new Error('Browser Agent credential semantic target identity is missing');
       }
@@ -738,8 +752,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       throw new Error('Browser Agent select requires an exact bounded option value');
     }
     action.value = raw.value;
-    const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
-    const observed = (frame?.elements || []).find(item => item.ref === action.ref);
+    const observed = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref)?.element;
     if (typeof observed?.optionFingerprint !== 'string' || !observed.optionFingerprint) {
       throw new Error('Browser Agent select options require observed target identity');
     }
@@ -764,8 +777,9 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       }
       // Keys can submit forms and activate controls. They need the same
       // observed semantic identity as a pointer click, never a bare ordinal ref.
-      const frame = (snapshot?.frames || []).find(item => item.frameId === action.frameId);
-      const observed = (frame?.elements || []).find(item => item.ref === action.ref);
+      const proof = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref);
+      const frame = proof?.frame;
+      const observed = proof?.element;
       if (!observed?.semanticIdentity || !clean(frame?.url, 4096)) {
         throw new Error('Browser Agent key target identity is missing');
       }
