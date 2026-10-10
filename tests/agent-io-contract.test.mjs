@@ -242,6 +242,42 @@ test('Plan-1 S1: agent action/event diagnostics redact unknown keys and do not i
 });
 
 
+test('Plan-1 S1: explicit corrupt action/event payload cannot silently erase evidence on recovery', () => {
+  const legacyAction = action(); delete legacyAction.data;
+  const legacyEvent = event(); delete legacyEvent.data;
+  const restoredAction = normalizeAgentAction(legacyAction);
+  const restoredEvent = normalizeAgentEvent(legacyEvent);
+  assert.deepEqual(restoredAction.data, {});
+  assert.deepEqual(restoredEvent.data, {});
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(restoredAction))), restoredAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(restoredEvent))), restoredEvent);
+
+  for (const corruptData of [null, undefined]) {
+    const untrustedAction = action({ data: corruptData });
+    const untrustedEvent = event({ data: corruptData });
+    assert.throws(
+      () => normalizeAgentAction(untrustedAction),
+      /action data contains corrupt explicitly present data/,
+    );
+    assert.throws(
+      () => normalizeAgentEvent(untrustedEvent),
+      /event data contains corrupt explicitly present data/,
+    );
+    assert.equal(untrustedAction.data, corruptData);
+    assert.equal(untrustedEvent.data, corruptData);
+  }
+  const validAction = normalizeAgentAction(action({
+    data: { effect: { effectId: 'effect-reserved', phase: 'PREPARED' } },
+  }));
+  const validEvent = normalizeAgentEvent(event({
+    data: { observed: { artifactId: 'artifact-verified', result: 'OK' } },
+  }));
+  assert.equal(Object.isFrozen(validAction.data.effect), true);
+  assert.equal(Object.isFrozen(validEvent.data.observed), true);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(validAction))), validAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(validEvent))), validEvent);
+});
+
 test('Plan-1 S1: hostile Proxy reflection never leaks errors or publishes false action/effect evidence', async () => {
   const secret = 'PRIVATE-OWNER-CREDENTIAL-IN-REFLECTION-TRAP';
   let traps = 0;
