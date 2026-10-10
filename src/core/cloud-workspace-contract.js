@@ -305,8 +305,8 @@ function assessment(status, reasonCode, binding, ownership, at) {
 // Provider-neutral isolation and scrub verification hooks. These are invoked
 // ONLY by a trusted canonical runtime adapter. A provider's unverified JSON
 // observation must never self-grant executable authority.
-const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation']);
-const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub']);
+const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation', 'loadCanonicalOwnership']);
+const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding']);
 const ISOLATION_PROOF_KEYS = new Set([
   'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
   'filesystemIsolated', 'browserIsolated', 'processIsolated',
@@ -353,12 +353,25 @@ export async function verifyCloudWorkspaceIsolationV1(
   observationInput, executionOwnershipInput, options,
 ) {
   const trusted = trustedLifecycleOptions(
-    options, ISOLATION_OPTIONS, ['verifyIsolation'], 'Cloud workspace isolation options',
+    options, ISOLATION_OPTIONS, ['verifyIsolation', 'loadCanonicalOwnership'], 'Cloud workspace isolation options',
   );
-  // Bind before invoking external adapter. Rejected ownership / expired lease
-  // must never trigger provider-side work or an isolation authority claim.
+  // Resolve the current ownership from the canonical store before *any*
+  // provider work. Caller-provided ownership is never itself authoritative.
+  const callerOwnership = normalizeExactExecutionOwnershipV1(executionOwnershipInput);
+  const identity = Object.freeze({
+    taskId: callerOwnership.taskId,
+    planId: callerOwnership.planId,
+    nodeId: callerOwnership.nodeId,
+    effectId: callerOwnership.effectId,
+  });
+  const persistedOwner = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(identity),
+  );
+  if (JSON.stringify(persistedOwner) !== JSON.stringify(callerOwnership)) {
+    throw new Error('cloud workspace ownership drifted from canonical store');
+  }
   const binding = createCloudWorkspaceBindingV1(
-    observationInput, executionOwnershipInput, { at: trusted.at },
+    observationInput, persistedOwner, { at: trusted.at },
   );
   const proof = await trusted.verifyIsolation(Object.freeze({
     workspaceId: binding.workspaceId,
@@ -366,6 +379,14 @@ export async function verifyCloudWorkspaceIsolationV1(
     executionLeaseId: binding.executionLeaseId,
     executionOwnershipRevision: binding.executionOwnershipRevision,
   }));
+  // Fail closed if the lease changed while asynchronous provider attestation
+  // was in flight. This remains non-authorizing evidence, not a new lease.
+  const ownerAfter = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(identity),
+  );
+  if (JSON.stringify(ownerAfter) !== JSON.stringify(persistedOwner)) {
+    throw new Error('cloud workspace ownership changed during isolation attestation');
+  }
   const verifiedAt = verifyExactLifecycleProof(
     proof, ISOLATION_PROOF_KEYS, binding, trusted.at,
     ['filesystemIsolated', 'browserIsolated', 'processIsolated'],
@@ -390,9 +411,19 @@ export async function verifyCloudWorkspaceIsolationV1(
  */
 export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   const trusted = trustedLifecycleOptions(
-    options, SCRUB_OPTIONS, ['teardown', 'verifyScrub'], 'Cloud workspace scrub options',
+    options, SCRUB_OPTIONS, ['teardown', 'verifyScrub', 'loadCanonicalBinding'], 'Cloud workspace scrub options',
   );
   const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
+  const persistedBinding = normalizeCloudWorkspaceBindingV1(
+    await trusted.loadCanonicalBinding(Object.freeze({
+      workspaceId: binding.workspaceId,
+      providerId: binding.providerId,
+      executionLeaseId: binding.executionLeaseId,
+    })),
+  );
+  if (JSON.stringify(persistedBinding) !== JSON.stringify(binding)) {
+    throw new Error('cloud workspace scrub target does not match canonical binding');
+  }
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
