@@ -252,13 +252,23 @@ function frozen(value) {
   return Object.freeze(value);
 }
 
-function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST, present = false } = {}) {
+function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST, present = false, identityKey = null } = {}) {
   if (value == null && !present) return [];
   const items = dataArray(value, label, max);
-  return items.map((item, index) => {
+  const normalized = items.map((item, index) => {
     try { return normalizeItem(item); }
     catch (error) { throw new Error(`${label}[${index}]: ${error.message}`); }
   });
+  // A restarted evidence/handoff list cannot contain two records with the same
+  // durable identity. Validate normalized data only; never read caller objects.
+  if (identityKey) {
+    const seen = new Set();
+    for (const item of normalized) {
+      if (seen.has(item[identityKey])) throw new Error(`${label} contains duplicate durable identities`);
+      seen.add(item[identityKey]);
+    }
+  }
+  return normalized;
 }
 
 const CAPABILITY_KEYS = new Set(['schemaVersion', 'capabilityId', 'description', 'riskClass', 'attributes']);
@@ -387,7 +397,7 @@ export function normalizeObservationV1(input) {
   // Persisted evidence status must retain exact canonical identity across restarts.
   const status = raw.status;
   if (!OBSERVATION_STATUSES.has(status)) throw new Error('status is invalid');
-  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1, { present: Object.hasOwn(raw, 'artifactRefs') });
+  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1, { present: Object.hasOwn(raw, 'artifactRefs'), identityKey: 'artifactId' });
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ObservationV1'),
     observationId: id(raw.observationId, 'observationId'),
@@ -456,8 +466,8 @@ const HANDOFF_KEYS = new Set([
 export function normalizeSpecialistHandoffV1(input) {
   const raw = plain(input, 'SpecialistHandoffV1');
   exactKeys(raw, HANDOFF_KEYS, 'SpecialistHandoffV1');
-  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1, { present: Object.hasOwn(raw, 'artifactRefs') });
-  const credentialRefs = normalizedObjectList(raw.credentialRefs, 'credentialRefs', normalizeCredentialRefV1, { max: 64, present: Object.hasOwn(raw, 'credentialRefs') });
+  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1, { present: Object.hasOwn(raw, 'artifactRefs'), identityKey: 'artifactId' });
+  const credentialRefs = normalizedObjectList(raw.credentialRefs, 'credentialRefs', normalizeCredentialRefV1, { max: 64, present: Object.hasOwn(raw, 'credentialRefs'), identityKey: 'credentialId' });
   const requestedCapabilityIds = idList(raw.requestedCapabilityIds, 'requestedCapabilityIds', { optional: false });
   if (!requestedCapabilityIds.length) throw new Error('requestedCapabilityIds must not be empty');
   return frozen({
