@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { AgentExecutionPlane } from '../src/core/agent-plan.js';
 import {
   bindSpecialistHandoffToRegistryV1,
+  createSpecialistRegistryV1,
   discoverSpecialistsV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
@@ -49,14 +50,35 @@ function researchDefinition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return {
+  const input = {
     schemaVersion: 1,
     registryId: 'specialists:project-1',
     revision: 3,
     definitions: [researchDefinition(), definition()],
     ...overrides,
   };
+  // Canonical registry fixtures carry the exact content/revision binding.
+  // Deliberately invalid fixtures remain invalid for rejection assertions.
+  try {
+    return { ...input, bindingKey: createSpecialistRegistryV1(input).bindingKey };
+  } catch {
+    return input;
+  }
 }
+
+test('specialist registry JSON recovery pins the binding and rejects missing or forged keys', () => {
+  const reg = registry();
+  const recovered = JSON.parse(JSON.stringify(reg));
+  assert.equal(normalizeSpecialistRegistryV1(recovered).bindingKey, reg.bindingKey);
+  assert.throws(
+    () => normalizeSpecialistRegistryV1({ ...recovered, bindingKey: undefined }),
+    /bindingKey is invalid/u,
+  );
+  assert.throws(
+    () => normalizeSpecialistRegistryV1({ ...recovered, bindingKey: recovered.bindingKey + 'forged' }),
+    /bindingKey is inconsistent/u,
+  );
+});
 
 function discovery(overrides = {}) {
   return {
@@ -127,6 +149,7 @@ test('binding preserves exact selection provenance and never mints execution or 
   const selected = discoverSpecialistsV1(request).specialists[0];
   const bound = bindSpecialistHandoffToRegistryV1({
     registry: request.registry,
+    expectedRegistryBindingKey: request.registry.bindingKey,
     selection: selected,
     handoff: handoff(),
     parentCapabilityIds: request.parentCapabilityIds,
@@ -160,6 +183,7 @@ test('disabled, removed or revision-drifted specialist definitions fail closed a
   const selected = discoverSpecialistsV1(request).specialists[0];
   const bind = nextRegistry => bindSpecialistHandoffToRegistryV1({
     registry: nextRegistry,
+    expectedRegistryBindingKey: nextRegistry.bindingKey,
     selection: selected,
     handoff: handoff(),
     parentCapabilityIds: request.parentCapabilityIds,
@@ -183,6 +207,7 @@ test('parent capability or tool-scope drift requires rediscovery instead of wide
   const selected = discoverSpecialistsV1(request).specialists[0];
   const base = {
     registry: request.registry,
+    expectedRegistryBindingKey: request.registry.bindingKey,
     selection: selected,
     handoff: handoff(),
   };
@@ -253,7 +278,7 @@ test('null-prototype records are accepted and caller-owned registry inputs remai
 
 
 test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions without persistence authority', () => {
-  const empty = normalizeSpecialistRegistryV1({
+  const empty = createSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:mutations',
     revision: 1,
@@ -261,6 +286,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
   });
   const created = proposeSpecialistRegistryMutationV1({
     registry: empty,
+    expectedRegistryBindingKey: empty.bindingKey,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 1,
     kind: SpecialistRegistryMutationKind.CREATE,
@@ -274,6 +300,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
 
   const updated = proposeSpecialistRegistryMutationV1({
     registry: created.nextRegistry,
+    expectedRegistryBindingKey: created.nextRegistry.bindingKey,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 2,
     kind: SpecialistRegistryMutationKind.UPDATE,
@@ -289,6 +316,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
 
   const removed = proposeSpecialistRegistryMutationV1({
     registry: updated.nextRegistry,
+    expectedRegistryBindingKey: updated.nextRegistry.bindingKey,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 3,
     kind: SpecialistRegistryMutationKind.DELETE,
@@ -301,7 +329,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
 });
 
 test('registry mutation proposals fail closed on stale or non-monotonic revisions', () => {
-  const current = normalizeSpecialistRegistryV1({
+  const current = createSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:cas',
     revision: 9,
@@ -309,6 +337,7 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
   });
   assert.throws(() => proposeSpecialistRegistryMutationV1({
     registry: current,
+    expectedRegistryBindingKey: current.bindingKey,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 8,
     kind: SpecialistRegistryMutationKind.DELETE,
@@ -318,6 +347,7 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
 
   assert.throws(() => proposeSpecialistRegistryMutationV1({
     registry: current,
+    expectedRegistryBindingKey: current.bindingKey,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 9,
     kind: SpecialistRegistryMutationKind.UPDATE,
@@ -328,6 +358,7 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
 
   assert.throws(() => proposeSpecialistRegistryMutationV1({
     registry: current,
+    expectedRegistryBindingKey: current.bindingKey,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 9,
     kind: SpecialistRegistryMutationKind.UPDATE,
@@ -348,7 +379,7 @@ test('registry mutation snapshots nested definitions without executing accessors
       return ['filesystem.read'];
     },
   });
-  const current = normalizeSpecialistRegistryV1({
+  const current = createSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:hostile',
     revision: 1,
@@ -356,6 +387,7 @@ test('registry mutation snapshots nested definitions without executing accessors
   });
   assert.throws(() => proposeSpecialistRegistryMutationV1({
     registry: current,
+    expectedRegistryBindingKey: current.bindingKey,
     registryId: 'specialists:hostile',
     expectedRegistryRevision: 1,
     kind: SpecialistRegistryMutationKind.CREATE,
