@@ -145,6 +145,7 @@ function validateResolvedStates(rawStates, selection) {
 export class SpecialistProviderReadinessResolverV1 {
   #bindings;
   #now;
+  #selectionByReadiness = new WeakMap();
 
   constructor(input = {}) {
     const raw = record(input, RESOLVER_KEYS, 'Specialist provider readiness resolver options');
@@ -196,7 +197,7 @@ export class SpecialistProviderReadinessResolverV1 {
     const providerStates = validateResolvedStates(result.providerStates, selection);
     const inspection = inspectSpecialistProviderReadinessV1({ selection, providerStates });
 
-    return freeze({
+    const canonicalReadiness = freeze({
       schemaVersion: SPECIALIST_PROVIDER_READINESS_RESOLVER_VERSION,
       registryId: selection.registryId,
       registryRevision: selection.registryRevision,
@@ -225,6 +226,30 @@ export class SpecialistProviderReadinessResolverV1 {
         capacityReserved: false,
       },
     });
+    this.#selectionByReadiness.set(canonicalReadiness, selection);
+    return canonicalReadiness;
+  }
+
+  /**
+   * Re-probe the very same trusted selection to exclude provider-readiness
+   * drift at the serialized durable admission boundary. Opaque caller
+   * readiness objects cannot impersonate an owner-issued observation.
+   */
+  async assertCurrent(readiness) {
+    if (!readiness || typeof readiness !== 'object') {
+      throw new Error('Trusted readiness observation is required');
+    }
+    const selection = this.#selectionByReadiness.get(readiness);
+    if (!selection) throw new Error('Readiness observation lacks trusted resolver provenance');
+    const current = await this.resolve(selection);
+    if (!current.executable || current.readiness !== readiness.readiness
+        || current.providerId !== readiness.providerId
+        || current.registryRevision !== readiness.registryRevision
+        || current.definitionRevision !== readiness.definitionRevision
+        || JSON.stringify(current.inspection) !== JSON.stringify(readiness.inspection)) {
+      throw new Error('Provider readiness changed since its trusted observation');
+    }
+    return true;
   }
 }
 
