@@ -1356,3 +1356,39 @@ test('Plan-1 S1: denied capability diagnostics never disclose untrusted identifi
     assertSpecialistHandoffScopedV1(handoff, ['filesystem.read', secret]),
   );
 });
+
+
+test('Plan-1 S1: artifact digest identity is exact through persisted observation and specialist handoff', () => {
+  const digest = 'a'.repeat(64);
+  const valid = normalizeArtifactRefV1(artifact({ sha256: digest }));
+  assert.equal(valid.sha256, digest);
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(valid))), valid);
+  assert.ok(Object.isFrozen(valid), 'persisted artifact metadata remains immutable');
+
+  // Previously both uppercase and padded hashes were silently normalized into
+  // a different identity, letting noncanonical evidence pass after restart.
+  for (const candidate of [digest.toUpperCase(), ' ' + digest, digest + ' ', '\\n' + digest, 'A' + digest.slice(1)]) {
+    const hostile = artifact({ sha256: candidate });
+    for (const restarted of [hostile, JSON.parse(JSON.stringify(hostile))]) {
+      assert.throws(() => normalizeArtifactRefV1(restarted), /sha256 is invalid/);
+      assert.throws(() => normalizeObservationV1({
+        schemaVersion: 1,
+        observationId: 'obs-digest-identity',
+        invocationId: 'invoke-1',
+        status: ObservationStatus.OK,
+        artifactRefs: [restarted],
+        observedAt: AT,
+      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+      assert.throws(() => normalizeSpecialistHandoffV1({
+        schemaVersion: 1,
+        handoffId: 'handoff-digest-identity',
+        specialistId: 'specialist-1',
+        goal: 'Read verified evidence',
+        requestedCapabilityIds: ['filesystem.read'],
+        artifactRefs: [restarted],
+        createdAt: AT,
+      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+    }
+  }
+  assert.deepEqual(normalizeArtifactRefV1(artifact({ sha256: '' })).sha256, '');
+});
