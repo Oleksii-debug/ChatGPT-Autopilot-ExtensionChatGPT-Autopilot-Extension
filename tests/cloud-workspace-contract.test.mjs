@@ -723,6 +723,29 @@ test('S1 scrub refuses stale canonical owner before any external teardown, even 
   assert.equal(teardownCalls, 0, 'no stale owner may trigger provider teardown');
 });
 
+test('S1 teardown refuses expired owner lease and rolled-back clocks before provider I/O', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let teardownCalls = 0;
+  let scrubCalls = 0;
+  const scenarios = [
+    { at: '2026-09-25T07:00:00.000Z', owner: ownership },
+    { at: '2026-09-25T07:00:01.000Z', owner: ownership },
+    { at: '2026-09-25T06:05:59.000Z', owner: ownership },
+    { at: SCRUB_AT, owner: { ...ownership, updatedAt: '2026-09-25T06:11:00.000Z' } },
+  ];
+  for (const { at, owner } of scenarios) {
+    await assert.rejects(() => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at,
+      loadCanonicalBinding: async () => binding,
+      loadCanonicalOwnership: async () => owner,
+      teardown: async () => { teardownCalls++; return teardownCompletion(); },
+      verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+    }), /live canonical owner lease/u);
+  }
+  assert.equal(teardownCalls, 0, 'stale ownership cannot delete cloud resources');
+  assert.equal(scrubCalls, 0, 'invalid teardown cannot be attested as clean');
+});
+
 test('S1 scrub refuses owner changes across teardown or attestation with unchanged binding', async () => {
   const { binding, ownership } = bindingAndOwnership();
   for (const driftOn of ['teardown', 'attestation']) {
