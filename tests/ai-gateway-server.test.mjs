@@ -345,3 +345,41 @@ test('Plan4 S1 standalone gateway preserves exact multilingual model identity af
   assert.equal(result.model,model);
   assert.equal(result.text,'verified');
 });
+
+
+test('Plan4 S1 explicit empty compatible endpoint registry stays disabled across JSON restart', async () => {
+  // A missing legacy registry retains the local discovery default.
+  assert.equal(normalizeCompatibleEndpointRegistry('')[0].endpointId, 'default');
+  for (const configured of [[], JSON.parse(JSON.stringify([])), '[]']) {
+    const endpoints = normalizeCompatibleEndpointRegistry(configured);
+    assert.deepEqual(endpoints, []);
+    assert.equal(Object.isFrozen(endpoints), true);
+    let effects = 0;
+    const fetchFn = async () => {
+      effects += 1;
+      throw new Error('unapproved provider network effect');
+    };
+    await assert.rejects(
+      listProviderModels('openai-compatible', { compatibleEndpoints:endpoints, fetchFn }),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND',
+    );
+    await assert.rejects(
+      completeProvider({ provider:'openai-compatible', model:'fixture', prompt:'approved' },
+        { compatibleEndpoints:endpoints, fetchFn }),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND',
+    );
+    assert.equal(effects, 0);
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-empty-endpoints-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:[] }), 'utf8');
+    assert.deepEqual(loadCompatibleEndpointRegistry({ env:{}, configFile }), []);
+    // Environment override [] must not silently revive the local fallback.
+    assert.deepEqual(loadCompatibleEndpointRegistry({
+      env:{ AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:'[]' }, configFile,
+    }), []);
+  } finally {
+    fs.rmSync(dir, { recursive:true, force:true });
+  }
+});
