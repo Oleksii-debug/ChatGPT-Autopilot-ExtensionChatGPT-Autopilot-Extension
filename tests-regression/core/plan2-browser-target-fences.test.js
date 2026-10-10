@@ -2931,8 +2931,8 @@ test('Plan2 S1 native text normalization cannot dispatch wrong form effects befo
         // Model a native typed input rejecting a value without throwing.
         // This is the browser behavior for an invalid number/date value.
         const valid = this.type === 'number'
-          ? /^-?\\d+(?:\\.\\d+)?$/.test(value)
-          : /^\\d{4}-\\d{2}-\\d{2}$/.test(value);
+          ? /^-?\d+(?:\.\d+)?$/.test(value)
+          : /^\d{4}-\d{2}-\d{2}$/.test(value);
         this.value = valid ? value : '';
       },
     });
