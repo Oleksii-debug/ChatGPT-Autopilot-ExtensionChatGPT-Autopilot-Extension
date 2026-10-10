@@ -47,8 +47,10 @@ export function listAgentProviders() {
 
 export function getAgentProvider(providerId) {
   const id = requireExactProviderId(providerId);
+  // Provider IDs are an exact authority allowlist, not inherited object keys.
+  // Do not disclose attacker-supplied identifiers in diagnostic errors.
+  if (!Object.hasOwn(DESCRIPTORS, id)) throw new Error('Unsupported agent provider');
   const descriptor = DESCRIPTORS[id];
-  if (!descriptor) throw new Error(`Unsupported agent provider: ${id}`);
   return { ...descriptor, capabilities: [...descriptor.capabilities] };
 }
 
