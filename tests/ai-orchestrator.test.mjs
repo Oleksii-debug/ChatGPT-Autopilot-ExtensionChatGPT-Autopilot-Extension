@@ -543,6 +543,46 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   ]);
 });
 
+test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any model', async () => {
+  const configured = settings({
+    routes:[{ routeId:'sole-local', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1 }],
+  });
+  let getterReads = 0;
+  const forgedReceipts = [
+    { reservationId:'reservation-1', routeId:'other-route' },
+    { reservationId:'reservation-1', provider:'openai' },
+    { reservationId:'reservation-1', model:'other-model' },
+    { reservationId:'reservation-1', endpointId:'forged-account' },
+    Object.defineProperty({ reservationId:'reservation-1' }, 'provider', {
+      enumerable:true, get() { getterReads += 1; throw new Error('secret-provider-getter'); },
+    }),
+  ];
+  for (const receipt of forgedReceipts) {
+    let gatewayCalls = 0;
+    let settlementCalls = 0;
+    const router = new AiOrchestrator({
+      now:() => 82_000,
+      gatewayClient:{ async complete() { gatewayCalls += 1; throw new Error('forbidden'); } },
+      providerCallLifecycle:{
+        async beforeProviderCall() { return receipt; },
+        async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'budget-bound', controlEpoch:0 },
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH'
+        && !String(error.message).includes('secret-provider-getter'),
+    );
+    assert.equal(gatewayCalls, 0, 'mismatched receipt is rejected before provider I/O');
+    assert.equal(settlementCalls, 0, 'no model effect exists to settle');
+  }
+  assert.equal(getterReads, 0, 'an untrusted receipt getter must never execute');
+});
+
 test('selected model profile adds only its own prompts to the gateway request', async () => {
   const gateway = new FakeGateway(['coded']);
   const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 1000 });
