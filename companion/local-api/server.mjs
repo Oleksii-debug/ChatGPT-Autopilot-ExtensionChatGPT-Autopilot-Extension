@@ -174,10 +174,15 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
         // A valid-looking first header must never hide ambiguous body framing,
         // media type or browser provenance before owner-token resolution.
         || !hasUnambiguousRawHeader(req, 'content-type', false)
+        || !hasUnambiguousRawHeader(req, 'content-encoding', false)
         || !hasUnambiguousRawHeader(req, 'content-length', false)
         || !hasUnambiguousRawHeader(req, 'transfer-encoding', false)
         || !hasUnambiguousRawHeader(req, 'origin', false)
         || !hasUnambiguousRawHeader(req, 'access-control-request-method', false)) return reject(res);
+      // This v1 endpoint accepts only literal strict UTF-8 JSON bytes. Reject
+      // Content-Encoding at admission, before consulting the owner token
+      // provider or canonical Core; decompression is not an API feature.
+      if (req.headers['content-encoding'] !== undefined) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
       // Cross-origin and browser-driven requests are always denied, including
