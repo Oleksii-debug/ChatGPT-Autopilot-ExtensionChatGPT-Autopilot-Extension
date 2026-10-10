@@ -1798,3 +1798,51 @@ test('S1 canonical readback wrapper preserves trusted adapter method receiver', 
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.resumeAuthorized, false);
 });
+
+test('S1 provider lifecycle keeps trusted callback receivers across JSON restart', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let isolationCalls = 0;
+  const isolation = await verifyCloudWorkspaceIsolationV1(
+    observation(), JSON.parse(JSON.stringify(ownership)), {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(ownership)),
+      verifyIsolation: async function (target) {
+        isolationCalls++;
+        assert.equal(this.at, ISOLATION_AT);
+        assert.equal(this.verifyIsolation instanceof Function, true);
+        assert.equal(target.executionLeaseId, ownership.leaseId);
+        return JSON.parse(JSON.stringify(isolationProof()));
+      },
+    },
+  );
+  assert.equal(isolationCalls, 1);
+  assert.equal(isolation.isolationVerified, true);
+  assert.equal(isolation.executionAuthorized, false);
+
+  const stages = [];
+  const scrub = await teardownAndVerifyCloudWorkspaceV1(
+    JSON.parse(JSON.stringify(binding)), {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(ownership)),
+      teardown: async function (target) {
+        stages.push('teardown');
+        assert.equal(this.at, SCRUB_AT);
+        assert.equal(typeof this.verifyScrub, 'function');
+        assert.equal(target.executionOwnershipRevision, ownership.revision);
+        return JSON.parse(JSON.stringify(teardownCompletion()));
+      },
+      verifyScrub: async function (target) {
+        stages.push('scrub');
+        assert.equal(this.at, SCRUB_AT);
+        assert.equal(typeof this.teardown, 'function');
+        assert.equal(target.workspaceId, binding.workspaceId);
+        return JSON.parse(JSON.stringify(scrubProof()));
+      },
+    },
+  );
+  assert.deepEqual(stages, ['teardown', 'scrub']);
+  assert.equal(scrub.scrubVerified, true);
+  assert.equal(scrub.leaseReleaseAuthorized, false);
+  assert.equal(scrub.reuseAuthorized, false);
+});
