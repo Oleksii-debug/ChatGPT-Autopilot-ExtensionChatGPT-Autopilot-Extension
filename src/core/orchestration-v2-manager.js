@@ -263,6 +263,28 @@ export class OrchestrationV2Manager {
             || options.nowMs < 0) {
           throw new Error('Bound lifecycle clock/epoch must be exact non-negative integers');
         }
+        if (action === 'RESUME') {
+          const meta = await this.loadMeta({ migrate: false });
+          if (meta.byId[binding.orchestraId]?.ownerPaused) {
+            throw new Error('Bound Browser Agent cannot resume while canonical orchestra owner pause is active');
+          }
+          const currentRuntime = await controller.runtimeRepository.load();
+          const graphNodes = currentRuntime?.hierarchy?.graph?.nodesById || {};
+          const stateNodes = currentRuntime?.hierarchy?.state?.nodesById || {};
+          let parent = graphNodes[binding.nodeId]?.parentId || null;
+          const visited = new Set();
+          while (parent) {
+            if (visited.has(parent)) throw new Error('Bound hierarchy ancestor cycle');
+            visited.add(parent);
+            if (stateNodes[parent]?.scopeState === 'PAUSED') {
+              throw new Error('Bound Browser Agent cannot resume below PAUSED ancestor ' + parent);
+            }
+            if (stateNodes[parent]?.scopeState === 'STOPPED') {
+              throw new Error('Bound Browser Agent cannot resume below STOPPED ancestor ' + parent);
+            }
+            parent = graphNodes[parent]?.parentId || null;
+          }
+        }
         const expectedScope = {
           PAUSE: 'PAUSED', RESUME: 'RUNNING', STOP: 'STOPPED',
         }[action];
