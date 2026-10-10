@@ -3478,6 +3478,15 @@ export class BrowserAgentManager {
       || (isCoordinateDrag && (!pending.dragStartFingerprint || !pending.dragEndFingerprint))) {
       return pauseStaleApproval('Approved action is missing the persisted target evidence; nothing was executed.', pending.action);
     }
+    // Credential approvals remain bound to the same observed frame/URL; no
+    // persisted string alias may be coerced into frame zero during replay.
+    if (pending.action?.type === BrowserAgentActionType.FILL_CREDENTIAL
+      && (!Number.isSafeInteger(pending.action.frameId) || pending.action.frameId < 0
+        || pending.action.frameId !== pending.action.passwordFrameId
+        || pending.action.expectedFrameUrl !== pending.url)) {
+      return pauseStaleApproval('Approved credential action has an invalid frame or URL proof; nothing was executed.', pending.action);
+    }
+    let approvedCredentialProof = false;
     if (pending.action?.ref && pending.targetFingerprint) {
       let proof = null;
       try {
@@ -3491,6 +3500,7 @@ export class BrowserAgentManager {
       if (!proof?.ok) {
         return pauseStaleApproval('Approved action became stale because the target control changed; nothing was executed.', pending.action);
       }
+      approvedCredentialProof = pending.action?.type === BrowserAgentActionType.FILL_CREDENTIAL;
     } else if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(pending.action?.type) && pending.targetFingerprint) {
       let proof = null;
       try {
@@ -3549,7 +3559,17 @@ export class BrowserAgentManager {
     const live = await this.get(id);
     if (!live.job || !epoch) return this.get(id);
     try {
-      const executed = await this.executeAction(live.job, { snapshotId: pending.snapshotId, url: pending.url }, pending.action, epoch);
+      // Approved credential targets were just re-proved in the exact Chrome
+      // frame. Preserve that verified identity for the existing execution
+      // boundary, which otherwise receives only a shortened approval snapshot.
+      const approvedSnapshot = {
+        snapshotId: pending.snapshotId,
+        url: pending.url,
+        ...(approvedCredentialProof ? {
+          frames: [{ frameId: pending.action.passwordFrameId, url: pending.url }],
+        } : {}),
+      };
+      const executed = await this.executeAction(live.job, approvedSnapshot, pending.action, epoch);
       if (executed.kind === 'CANCELLED_BY_OWNER' || executed.kind === 'WAITING_PERMISSION' || executed.kind === 'WAITING_CAPABILITY') return this.get(id);
       await this.update(store => {
         const job = store.byId[id];
