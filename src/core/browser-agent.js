@@ -184,7 +184,9 @@ function browserAgentObservedActivationDestination(snapshot, action) {
     && action.key === 'Enter' && observed.formAssociated === true
     && observed.tag === 'input'
     && ['text', 'search', 'email', 'url', 'tel', 'number', 'password'].includes(observed.type);
-  if (observed.submitLike === true || inputEnterSubmit) {
+  const observedSubmitLike = observed.submitLike === true
+    || (observed.tag === 'input' && observed.type === 'image');
+  if (observedSubmitLike || inputEnterSubmit) {
     if (observed.formAssociated !== true) return null;
     // A missing or corrupt persisted form destination must fail closed.
     return { href: observed.formAction, kind: 'form' };
@@ -1174,7 +1176,8 @@ export function snapshotBrowserPage(snapshotId) {
     const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
     const sensitive = inputType === 'password' || inputType === 'file';
     const form = element.form instanceof HTMLFormElement ? element.form : null;
-    const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
+    const submitLike = (tag === 'button' && controlType === 'submit')
+      || (tag === 'input' && ['submit', 'image'].includes(controlType));
     const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
     const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
     const item = {
@@ -1295,7 +1298,8 @@ export function executeBrowserPageAction(snapshotId, action) {
     const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
       : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
     const form = target.form instanceof HTMLFormElement ? target.form : null;
-    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const submitLike = (tag === 'button' && type === 'submit')
+      || (tag === 'input' && ['submit', 'image'].includes(type));
     const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
     const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
     const normalizeObserved = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -1830,7 +1834,8 @@ export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
   const inputType = tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
   const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase() : inputType;
   const form = target.form instanceof HTMLFormElement ? target.form : null;
-  const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+  const submitLike = (tag === 'button' && type === 'submit')
+      || (tag === 'input' && ['submit', 'image'].includes(type));
   const effectiveFormAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
   const effectiveFormMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
   const live = {
@@ -1957,7 +1962,8 @@ export function proveBrowserNativeClick(snapshotId, ref, expected) {
     const tag = String(target.tagName || '').toLowerCase();
     const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
       : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
-    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const submitLike = (tag === 'button' && type === 'submit')
+      || (tag === 'input' && ['submit', 'image'].includes(type));
     const form = target.form instanceof HTMLFormElement ? target.form : null;
     const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
     const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
@@ -2040,7 +2046,8 @@ export function probeBrowserCoordinateTarget(x, y, fingerprint, requireTextFocus
       || (tag === 'input' && !nonTextInputTypes.has(inputType || 'text'))
     );
     const form = element.form instanceof HTMLFormElement ? element.form : null;
-    const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
+    const submitLike = (tag === 'button' && controlType === 'submit')
+      || (tag === 'input' && ['submit', 'image'].includes(controlType));
     const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
     const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
     const rect = element.getBoundingClientRect();
@@ -2198,7 +2205,8 @@ export function classifyBrowserAgentActionRisk(snapshot, action) {
   }
   const targetName = clean(element.name || element.href || 'consequential control', 800) || 'consequential control';
   const evidence = normalizeActionRiskText(`${element.name || ''} ${element.href || ''}`);
-  const submitLike = element.submitLike === true || action.submitLike === true;
+  const submitLike = element.submitLike === true
+    || (element.tag === 'input' && element.type === 'image') || action.submitLike === true;
   if (action.type === BrowserAgentActionType.CLICK_AT && element.visualOnly === true) {
     return { requiresApproval: true, targetName: targetName || 'visual-only target', reason: `Owner approval required before visual-only coordinate action: ${targetName || 'visual-only target'}` };
   }
