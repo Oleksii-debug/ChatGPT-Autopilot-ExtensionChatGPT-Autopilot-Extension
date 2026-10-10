@@ -541,3 +541,58 @@ test('Plan-1 S1: plan schema reflection stays data-only and budget signed zero n
   assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(canonical))), canonical,
     'denied hostile and lossy inputs never poison original durable plan');
 });
+
+
+test('Plan-1 S1: explicit undefined owner budgets, dependencies and evidence fail before cold restart', () => {
+  const fields = [
+    'state', 'ownerId', 'evidence', 'dependsOn', 'conflictKeys',
+    'requiredCapabilityIds', 'requiredToolIds', 'acceptanceCriteria', 'budget',
+  ];
+  for (const field of fields) {
+    const base = node('intake');
+    const corrupted = { ...base, [field]: undefined };
+    assert.equal(Object.hasOwn(corrupted, field), true);
+    assert.throws(() => normalizeAgentPlanV1(plan([corrupted])),
+      /cannot be explicit undefined/,
+      'persisted node ' + field + ' cannot disappear after JSON recovery');
+    assert.equal(corrupted[field], undefined, 'normalization must not change source');
+    const omitted = { ...base };
+    delete omitted[field];
+    const legacy = normalizeAgentPlanV1(plan([omitted]));
+    assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(legacy))), legacy,
+      'truly absent V1 field retains canonical legacy default');
+  }
+
+  for (const field of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    const corruptBudget = { [field]: undefined };
+    assert.throws(() => normalizeAgentPlanV1(plan([
+      node('intake', [], [], corruptBudget),
+    ])), /cannot be explicit undefined/,
+    'explicitly corrupted persisted ceiling must not become zero');
+    const accepted = normalizeAgentPlanV1(plan([
+      node('intake', [], [], { [field]: 3 }),
+    ]));
+    assert.equal(accepted.nodes[0].budget[field], 3);
+    assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(accepted))), accepted);
+  }
+  const original = plan([node('intake')]);
+  const malformedCriteria = { ...original, successCriteria: undefined };
+  assert.throws(() => normalizeAgentPlanV1(malformedCriteria),
+    /cannot be explicit undefined/,
+    'plan-wide successCriteria may not be erased before recovery');
+  const legacy = { ...original };
+  delete legacy.successCriteria;
+  const normalized = normalizeAgentPlanV1(legacy);
+  assert.deepEqual(normalized.successCriteria, []);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(normalized))), normalized);
+
+  // Unknown dependencies may encode private owner keys: diagnostics must not
+  // disclose these attacker-controlled IDs even when the plan is denied.
+  const privateReference = 'OWNER_PRIVATE_PLAN_DEPENDENCY';
+  const denied = plan([node('intake', [privateReference])]);
+  assert.throws(() => normalizeAgentPlanV1(denied), error => {
+    assert.equal(error.message.includes(privateReference), false);
+    assert.equal(error.message.includes('depends on unknown node'), true);
+    return true;
+  });
+});
