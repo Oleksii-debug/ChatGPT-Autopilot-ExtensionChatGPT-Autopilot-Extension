@@ -827,7 +827,7 @@ test('S1 scrub refuses owner changes across teardown or attestation with unchang
         return scrubProof();
       },
     }), /canonical ownership changed during teardown\/scrub/u);
-    assert.equal(ownerLoads, 2, 'owner must be reloaded after scrub');
+    assert.equal(ownerLoads, 3, 'owner must be reloaded immediately before teardown and after scrub');
     assert.equal(providerTeardowns, 1);
   }
 });
@@ -1219,7 +1219,7 @@ test('S1 scrub rejects canonical binding deleted or replaced during the final ow
           return persisted;
         },
         loadCanonicalOwnership: async () => {
-          if (++ownerReads === 2) {
+          if (++ownerReads === 3) {
             persisted = drift === 'deleted' ? null
               : { ...persisted, checkpointSha256: 'f'.repeat(64) };
           }
@@ -1230,7 +1230,7 @@ test('S1 scrub rejects canonical binding deleted or replaced during the final ow
       }),
       /plain data object|canonical binding changed after final owner readback/u,
     );
-    assert.equal(ownerReads, 2);
+    assert.equal(ownerReads, 3);
     assert.equal(bindingReads, 4, 'pre-teardown and final post-owner readbacks are mandatory');
     assert.equal(teardownCalls, 1, 'uncertain teardown must not be blindly repeated');
     assert.equal(scrubCalls, 1, 'a stale prior scrub proof cannot authorize lease reuse');
@@ -1260,7 +1260,7 @@ test('S1 scrub performs final canonical binding readback on clean JSON cold-rest
   assert.equal(receipt.reuseAuthorized, false);
   assert.equal(receipt.requiresCanonicalRuntime, true);
   assert.equal(bindingReads, 4);
-  assert.equal(ownerReads, 2);
+  assert.equal(ownerReads, 3);
   assert.equal(providerTeardowns, 1);
 });
 
@@ -1411,4 +1411,41 @@ test('S1 provider callback errors redact secrets and never synthesize cloud life
     assert.equal(teardownCalls, 1, 'a failed provider effect is never blindly retried');
   }
   assert.equal(scrubCalls, 1, 'scrub must not run after failed teardown');
+});
+
+test('S1 owner revocation during async binding read fences destructive cloud teardown', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  for (const drift of ['revision', 'lease']) {
+    let persistedOwner = JSON.parse(JSON.stringify(ownership));
+    const savedBinding = JSON.parse(JSON.stringify(binding));
+    let bindingReads = 0;
+    let ownerReads = 0;
+    let teardowns = 0;
+    let scrubCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => {
+          bindingReads += 1;
+          if (bindingReads === 2) {
+            persistedOwner = drift === 'revision'
+              ? { ...persistedOwner, revision: persistedOwner.revision + 1 }
+              : { ...persistedOwner, leaseId: 'lease.cloud.new' };
+          }
+          return JSON.parse(JSON.stringify(savedBinding));
+        },
+        loadCanonicalOwnership: async () => {
+          ownerReads += 1;
+          return JSON.parse(JSON.stringify(persistedOwner));
+        },
+        teardown: async () => { teardowns += 1; return teardownCompletion(); },
+        verifyScrub: async () => { scrubCalls += 1; return scrubProof(); },
+      }),
+      /canonical owner changed before provider teardown/u,
+    );
+    assert.equal(bindingReads, 2, 'the drift happened after first owner read');
+    assert.equal(ownerReads, 2, 'rechecked canonical ownership immediately before provider I/O');
+    assert.equal(teardowns, 0, 'never send destructive provider I/O with revoked lease');
+    assert.equal(scrubCalls, 0, 'never attest scrub if teardown did not start');
+  }
 });
