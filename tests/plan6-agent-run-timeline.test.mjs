@@ -727,3 +727,49 @@ test('S1 actual fresh canonical BrowserAgentRuntime projects an inspectable time
   assert.equal(first.mayReplayExternalEffect, false);
   assert.deepEqual(first, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(fresh))));
 });
+
+
+test('S1 dispatch-map identities are canonical before evidence counts, including cold restart', () => {
+  const valid = job();
+  valid.runtime.specialistDispatchByAgentId = {
+    'agent:0/worker-1': { state: 'PROVIDER_SUCCEEDED', providerReceiptId: 'receipt-1' },
+  };
+  const observed = buildAgentRunTimelineV1(valid).evidenceMap.specialistProviderDispatch;
+  assert.equal(observed.inspectedAttempts, 1);
+  assert.equal(observed.receiptIdsRecorded, 1);
+  assert.equal(observed.externalEffectVerified, false);
+  assert.deepEqual(
+    observed,
+    buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))).evidenceMap.specialistProviderDispatch,
+  );
+
+  for (const hostileIdentity of [
+    '', ' secret-agent', '_proto', 'agent one', 'agent\u202eoverride',
+    'agent\u2067override', 'agent\nnewline', 'agent\u0000null', 'x'.repeat(181),
+  ]) {
+    const corrupted = job();
+    const map = Object.create(null);
+    Object.defineProperty(map, hostileIdentity, {
+      configurable: true, enumerable: true, writable: true,
+      value: { state: 'PROVIDER_SUCCEEDED', providerReceiptId: 'PRIVATE_RECEIPT_NO_EXPORT' },
+    });
+    corrupted.runtime.specialistDispatchByAgentId = map;
+    for (const candidate of [corrupted, JSON.parse(JSON.stringify(corrupted))]) {
+      assert.throws(() => buildAgentRunTimelineV1(candidate), error =>
+        error instanceof Error &&
+        /dispatch map exceeds the bounded record schema/u.test(error.message) &&
+        !error.message.includes(hostileIdentity) &&
+        !error.message.includes('PRIVATE_RECEIPT_NO_EXPORT'),
+      );
+    }
+  }
+  let getterInvocations = 0;
+  const corrupted = job();
+  const map = Object.create(null);
+  Object.defineProperty(map, 'bad\nkey', {
+    enumerable: true, get() { getterInvocations += 1; throw Error('PRIVATE_TRAP'); },
+  });
+  corrupted.runtime.specialistDispatchByAgentId = map;
+  assert.throws(() => buildAgentRunTimelineV1(corrupted), /dispatch map exceeds the bounded record schema/u);
+  assert.equal(getterInvocations, 0);
+});
