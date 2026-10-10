@@ -52,7 +52,7 @@ function array(value, label, max) {
   // Inspect descriptors before reading any element, including 'length'.
   // A Proxy or getter must not cause an effect or expose its exception text.
   const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+  if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < 0 || length > max) {
     throw new Error(`${label} must be a bounded canonical array`);
   }
   const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
@@ -83,7 +83,14 @@ function timestamp(value, label) {
 }
 
 function clock(now) {
-  const value = now();
+  // A callback is not trusted to supply public error messages or causes.
+  // Fail closed before any provider effect if it cannot be observed safely.
+  let value;
+  try {
+    value = now();
+  } catch {
+    throw new Error('Specialist dispatcher clock could not be observed safely');
+  }
   if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0 || value > 8_640_000_000_000_000) throw new Error('Specialist dispatcher clock returned an invalid time');
   return value;
 }
