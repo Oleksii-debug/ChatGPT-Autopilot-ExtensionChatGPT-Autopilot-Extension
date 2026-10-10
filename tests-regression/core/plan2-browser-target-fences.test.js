@@ -2404,3 +2404,54 @@ test('Plan-2 S1: case-insensitive ARIA option state is fail-closed across focus'
     globalThis.HTMLSelectElement = previous;
   }
 });
+
+
+// Section 1: tri-state ARIA controls cannot be reported as already unchecked
+// when their real accessible state is MIXED or otherwise indeterminate.
+test('Plan2 S1 ARIA checked evidence rejects indeterminate states after JSON recovery', () => {
+  setup();
+  element.setAttribute('role', 'checkbox');
+  element.setAttribute('aria-checked', 'MIXED');
+  const page = snapshotBrowserPage('aria-mixed');
+  assert.equal(page.elements[0].checked, null);
+  const snapshot = { frames: [{ frameId: 0, ...page }], url: page.url };
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":false}', snapshot)));
+  for (const ariaValue of ['MIXED', 'undefined', 'unexpected']) {
+    element.setAttribute('aria-checked', ariaValue);
+    assert.throws(() => executeBrowserPageAction('aria-mixed', action), /AGENT_CHECK_STATE_INDETERMINATE/);
+    assert.equal(element.clicked, 0);
+  }
+  // An explicitly observed false remains a valid non-mutating success.
+  element.setAttribute('aria-checked', 'FALSE');
+  const result = executeBrowserPageAction('aria-mixed', action);
+  assert.equal(result.ok, true);
+  assert.equal(result.checked, false);
+  assert.equal(element.clicked, 0);
+});
+
+test('Plan2 S1 focus-time ARIA state is reobserved without duplicate click', () => {
+  setup();
+  element.setAttribute('role', 'checkbox');
+  element.setAttribute('aria-checked', 'false');
+  const page = snapshotBrowserPage('aria-focus');
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":true}',
+    { frames: [{ frameId: 0, ...page }], url: page.url })));
+  element.focus = () => { element.setAttribute('aria-checked', 'TRUE'); };
+  const noDuplicate = executeBrowserPageAction('aria-focus', action);
+  assert.equal(noDuplicate.ok, true);
+  assert.equal(noDuplicate.checked, true);
+  assert.equal(element.clicked, 0);
+  element.setAttribute('aria-checked', 'false');
+  element.focus = () => { element.setAttribute('aria-checked', 'mixed'); };
+  assert.throws(() => executeBrowserPageAction('aria-focus', action), /AGENT_CHECK_STATE_INDETERMINATE/);
+  assert.equal(element.clicked, 0);
+  element.focus = () => {};
+  element.setAttribute('aria-checked', 'FALSE');
+  element.click = () => { element.clicked++; element.setAttribute('aria-checked', 'TRUE'); };
+  const recovered = executeBrowserPageAction('aria-focus', action);
+  assert.equal(recovered.ok, true);
+  assert.equal(recovered.checked, true);
+  assert.equal(element.clicked, 1);
+});
