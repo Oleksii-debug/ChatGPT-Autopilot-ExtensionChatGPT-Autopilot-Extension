@@ -85,7 +85,10 @@ function id(value, label) {
 // Labels/descriptions cross both persisted JSON and accessible owner-facing UI.
 // Bidi controls, hidden separators and unpaired UTF-16 code units can change
 // their appearance or identity after serialization; never publish them.
-const UNSAFE_SPECIALIST_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u061C\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/u;
+// Additional visually empty Unicode characters can spoof specialist identity
+// without appearing as an ASCII control or a bidi formatting character.
+// Preserve legitimate Arabic/Hangul script, ordinary spaces and emoji.
+const UNSAFE_SPECIALIST_TEXT = /[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u00AD\\u034F\\u061C\\u115F-\\u1160\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\u3164\\uFEFF\\uFFA0]/u;
 function hasUnpairedSurrogate(value) {
   for (let index = 0; index < value.length; index += 1) {
     const unit = value.charCodeAt(index);
