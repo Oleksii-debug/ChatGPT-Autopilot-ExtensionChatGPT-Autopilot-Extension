@@ -834,3 +834,48 @@ test('Section 1 chronological provider receipt at/after the effect edge survives
   assert.equal(effects, 1);
   assert.equal(clockReads, 3);
 });
+
+
+test('Section 1 expired in-flight provider lease is UNKNOWN even with an otherwise valid receipt', async () => {
+  // A callback may finish after the canonical owner's lease has elapsed;
+  // neither a valid-looking receipt nor a stale caller snapshot extends it.
+  for (const elapsedMs of [600_000, 600_001]) {
+    const f = fixture();
+    const durableReadiness = JSON.parse(JSON.stringify(await f.trustedResolver.resolve(f.selection)));
+    let providerEffects = 0;
+    let clockReads = 0;
+    const sampled = [T0, T0 + 1_000, T0 + elapsedMs];
+    const dispatcher = new SpecialistProviderDispatcherV1({
+      now: () => sampled[Math.min(clockReads++, 2)],
+      bindings: [{
+        providerId: 'provider.local',
+        execute: async () => {
+          providerEffects += 1;
+          return {
+            providerReceiptId: 'receipt.local',
+            observedAt: ts(T0 + 1_500),
+            resultArtifactRefs: [{
+              schemaVersion: 1, artifactId: 'artifact.local', kind: 'report',
+              uri: 'artifact://local/report', mediaType: 'application/json',
+              sha256: 'a'.repeat(64), sizeBytes: 123,
+              createdAt: ts(T0 + 1_000), producerInvocationId: 'lease.read',
+              sensitive: false,
+            }],
+          };
+        },
+      }],
+    });
+    await assert.rejects(
+      dispatcher.execute(f.request(durableReadiness)),
+      error => error instanceof Error
+        && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+        && /reconcile the canonical effect/u.test(error.message)
+        && !Object.hasOwn(error, 'cause'),
+      'expired result must reconcile instead of certifying an out-of-lease effect',
+    );
+    assert.equal(providerEffects, 1, 'provider must be invoked once, never retried');
+    assert.equal(clockReads, 3, 'late completion must check an actual post-effect clock');
+  }
+  // The adjacent positive JSON cold-restart receipt test proves that a
+  // genuinely in-lease completion still succeeds without new authority.
+});
