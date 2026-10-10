@@ -594,3 +594,29 @@ test('untrusted cloud capacity property names stay out of diagnostics; recovery 
   assert.equal(recovered.dispatchAuthorized, false);
   assert.equal(recovered.executionAuthorized, false);
 });
+
+
+test('AVAILABLE execution ownership clock rollback is fenced before any new claim', () => {
+  const rollback = assessCloudExecutionFabricV1(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  }));
+  assert.equal(rollback.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+  assert.equal(rollback.reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+  assert.equal(rollback.selectedSlotId, '');
+  assert.equal(rollback.dispatchAuthorized, false);
+  assert.equal(rollback.executionAuthorized, false);
+  const afterRestart = JSON.parse(JSON.stringify(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  })));
+  assert.equal(assessCloudExecutionFabricV1(afterRestart).reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+
+  const forwardClock = assessCloudExecutionFabricV1(request({
+    executionOwnership: availableOwnership('2026-09-25T10:06:00.000Z'),
+    assessedAt: '2026-09-25T10:06:00.000Z',
+  }));
+  assert.equal(forwardClock.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(forwardClock.dispatchAuthorized, false);
+  assert.equal(forwardClock.executionAuthorized, false);
+});
