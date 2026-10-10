@@ -9,7 +9,7 @@ class FakeGateway {
   async complete(args) {
     this.calls.push(structuredClone(args));
     const text = this.responses.shift() ?? `${args.provider}/${args.model}:${args.prompt}`;
-    return { ok: true, provider: args.provider, model: args.model, text };
+    return { ok: true, provider: args.provider, model: args.model, ...(args.endpointId ? { endpointId:args.endpointId } : {}), text };
   }
 }
 
@@ -481,6 +481,7 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
     },
     async afterProviderCall({ context, reservation, route, ok, result }) {
       events.push(['after', context.jobId, reservation.reservationId, route.model, ok, result.usage.totalTokens]);
+      return {settled:true};
     },
   };
   const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 80_000 });
@@ -516,6 +517,7 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
     },
     async afterProviderCall({ reservation, route, ok, error }) {
       events.push(['after', reservation.reservationId, route.model, ok, error.message]);
+      return {settled:true};
     },
   };
   const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 81_000 });

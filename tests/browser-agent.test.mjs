@@ -3127,7 +3127,7 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
     prompt:'bounded prompt',
     systemPrompt:'bounded system',
     maxOutputTokens:128,
-    route:{ routeId:'primary', provider:'ollama', model:'qwen:8b' },
+    route:{ routeId:'primary', provider:'openai-compatible', model:'fixture-model', endpointId:'owner.endpoint' },
     callNumber:1,
   });
   const beforeRestart = await manager.get('job-budget-restart');
@@ -3135,6 +3135,11 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.reservationId, reservation.reservationId);
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.modelCalls, 1);
   assert.equal(beforeRestart.job.runtime.modelBudgetReservation.outputTokens, 128);
+  assert.equal(reservation.endpointId, 'owner.endpoint', 'reservation exposes exact account endpoint');
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.endpointId, 'owner.endpoint',
+    'the canonical durable store preserves endpoint attribution before dispatch');
+  assert.equal(JSON.parse(JSON.stringify(beforeRestart.job.runtime.modelBudgetReservation)).endpointId,
+    'owner.endpoint', 'JSON persistence must not erase endpoint identity');
 
   await assert.rejects(
     () => manager.reserveProviderModelBudget({
@@ -3151,6 +3156,9 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
   );
 
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 51_000 });
+  const cold = await restarted.get('job-budget-restart');
+  assert.equal(cold.job.runtime.modelBudgetReservation.endpointId, 'owner.endpoint',
+    'cold restart must retain the endpoint of the consumed provider attempt');
   assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-budget-restart'), true);
   const recovered = await restarted.get('job-budget-restart');
   assert.equal(recovered.job.runtime.modelBudgetReservation, null);
@@ -3224,6 +3232,59 @@ test('Browser Agent successful provider settlement uses exact usage once and cle
     { settled:false },
   );
   assert.equal((await manager.get('job-budget-success')).job.runtime.modelCalls, 1);
+});
+
+test('Browser Agent rejects forged provider usage without clearing the durable budget reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi:chrome, routePrompt:async()=>({text:'{}'}), now:()=>80_000 });
+  await manager.create({
+    id:'job-budget-forged-usage',
+    goal:'Account model usage without trusting provider payload',
+    maxModelCalls:1,
+    maxOutputTokensPerCall:128,
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:2,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-forged-usage'].runtime.runState='RUNNING';
+    return store;
+  });
+  const reservation=await manager.reserveProviderModelBudget({
+    jobId:'job-budget-forged-usage',controlEpoch:0,
+    prompt:'bounded input',systemPrompt:'bounded system',maxOutputTokens:128,
+  });
+  const badResults=[
+    {text:'done',usage:{inputTokens:Infinity}},
+    {text:'done',usage:{outputTokens:'100'}},
+    {text:'done',usage:{totalTokens:-1}},
+    {text:'done',usage:{inputTokens:1.5}},
+    {text:'done',usage:{outputTokens:Number.MAX_SAFE_INTEGER+1}},
+    {text:'done',usage:null},
+    {text:'done',usage:Object.defineProperty({},'inputTokens',{get(){throw new Error('sk-private-usage');},enumerable:true})},
+    Object.defineProperty({},'usage',{get(){throw new Error('sk-private-response');},enumerable:true}),
+  ];
+  for(const result of badResults) {
+    await assert.rejects(
+      () => manager.settleProviderModelBudget({
+        jobId:'job-budget-forged-usage',reservationId:reservation.reservationId,
+        ok:true,result,
+      }),
+      error=>error.code==='AI_MODEL_BUDGET_USAGE_INVALID'
+        && !String(error.message).includes('sk-private'),
+    );
+    const pending=(await manager.get('job-budget-forged-usage')).job.runtime;
+    assert.equal(pending.modelBudgetReservation.reservationId,reservation.reservationId);
+    assert.equal(pending.modelCalls,0,'untrusted usage may not falsely settle the account');
+  }
+  const restarted=new BrowserAgentManager({
+    chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>81_000,
+  });
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-budget-forged-usage'),true);
+  const recovered=(await restarted.get('job-budget-forged-usage')).job.runtime;
+  assert.equal(recovered.modelBudgetReservation,null);
+  assert.equal(recovered.modelCalls,1);
+  assert.equal(recovered.outputTokens,128);
+  assert.equal(recovered.history.at(-1).type,'model-budget-recovered-after-restart');
 });
 
 test('Browser Agent conservatively consumes the bounded reservation after an admitted provider failure', async () => {

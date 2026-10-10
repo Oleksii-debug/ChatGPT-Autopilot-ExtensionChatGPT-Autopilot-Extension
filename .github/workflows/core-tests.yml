@@ -48,7 +48,11 @@ jobs:
       - run: node --check src/core/ai-route-pool.js
       - run: node --check src/core/local-ai-provider.js
       - run: node --check src/core/ai-gateway-client.js
+      - run: node --check companion/ai-gateway/gateway.mjs
       - run: node --test tests/plan4-contract-local-provider-hardening.test.mjs
+      # Exact endpoint/credential identity reaches the actual HTTP gateway,
+      # including read-only discovery and provider POST without external creds.
+      - run: node --test tests/ai-gateway-server.test.mjs tests/ai-gateway-e2e.test.mjs
       # Reuse canonical integrated coverage: route dispatch/failover, provider transport,
       # credential broker and budget-admission/recovery, on both OS runners.
       - run: node --test tests/ai-route-pool.test.mjs tests/ai-orchestrator.test.mjs tests/ai-gateway-client.test.mjs tests/local-ai-provider.test.mjs tests/credential-broker.test.mjs tests/agent-budget-admission.test.mjs tests/resource-budget-governor.test.mjs

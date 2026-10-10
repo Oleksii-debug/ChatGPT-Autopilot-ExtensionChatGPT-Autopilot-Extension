@@ -1,3 +1,4 @@
+import { hasUnsafeAiDispatchUnicode } from './ai-route-pool.js';
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:17621';
 const MIN_TIMEOUT_SECONDS = 5;
@@ -5,6 +6,14 @@ const MAX_TIMEOUT_SECONDS = 900;
 const MAX_REQUEST_BYTES = 4_000_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_RESPONSE_CHUNKS = 8_192;
+
+// Only errors created by this module may cross the provider boundary as-is.
+// Untrusted fetch/body readers can forge diagnostic prefixes or error codes.
+const trustedGatewayFailures = new WeakSet();
+function trustedGatewayFailure(error) {
+  trustedGatewayFailures.add(error);
+  return error;
+}
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -78,6 +87,17 @@ function optionalText(value, label) {
   return value;
 }
 
+// Bound endpoint identity cannot be silently erased at the dispatch boundary.
+// Omitted identity retains legacy behavior without pretending a profile match.
+function endpointIdFromRequest(record) {
+  if (!Object.hasOwn(record, 'endpointId')) return '';
+  const value = record.endpointId;
+  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(value)) {
+    throw new Error('AI Gateway endpointId must be an exact bounded identity when supplied');
+  }
+  return value;
+}
+
 function invalidRequestBodyError() {
   const error = new Error('AI Gateway request body must be JSON text');
   error.code = 'AI_GATEWAY_INVALID_REQUEST_BODY';
@@ -93,13 +113,13 @@ function requestTooLargeError() {
 function responseTooLargeError() {
   const error = new Error('AI Gateway response is too large');
   error.code = 'AI_GATEWAY_RESPONSE_TOO_LARGE';
-  return error;
+  return trustedGatewayFailure(error);
 }
 
 function invalidResponseStreamError() {
   const error = new Error('AI Gateway returned an invalid response body stream');
   error.code = 'AI_GATEWAY_INVALID_RESPONSE';
-  return error;
+  return trustedGatewayFailure(error);
 }
 
 async function cancelResponse(response, reader, controller) {
@@ -188,21 +208,33 @@ async function parseJson(response, controller) {
       : status >= 500 ? 'UNAVAILABLE'
       : 'INVALID_REQUEST';
     error.retryable = ['RATE_LIMIT', 'TIMEOUT', 'UNAVAILABLE'].includes(error.category);
-    return Promise.reject(error);
+    return Promise.reject(trustedGatewayFailure(error));
   }
   try { return text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
+  catch { throw trustedGatewayFailure(new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`)); }
 }
 
 export class AiGatewayClient {
-  constructor({ fetchFn = globalThis.fetch } = {}) {
+  constructor({
+    fetchFn = globalThis.fetch,
+    setTimeoutFn = globalThis.setTimeout,
+    clearTimeoutFn = globalThis.clearTimeout,
+  } = {}) {
     if (typeof fetchFn !== 'function') throw new Error('AI Gateway fetch is unavailable');
+    if (typeof setTimeoutFn !== 'function' || typeof clearTimeoutFn !== 'function') {
+      throw new Error('AI Gateway deadline clock is unavailable');
+    }
     this.fetchFn = fetchFn;
+    this.setTimeoutFn = setTimeoutFn;
+    this.clearTimeoutFn = clearTimeoutFn;
   }
 
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
     // Only existing gateway operations are admissible. This client is not
     // an arbitrary loopback HTTP proxy, credential injector or model authority.
+    // Validate the path's primitive type before RegExp.test, which otherwise
+    // invokes a hostile caller object's toString() before admission.
+    if (typeof path !== 'string') throw new Error('AI Gateway request path is not an approved model endpoint');
     const allowedDiscoveryPath = /^\/models\?provider=[^&?#]+(?:&endpointId=[^&?#]+)?$/u.test(path);
     const readOnly = path === '/health' || path === '/status' || allowedDiscoveryPath;
     const completion = path === '/complete';
@@ -217,9 +249,11 @@ export class AiGatewayClient {
       (safeInit.method !== undefined && safeInit.method !== 'GET')
       || safeInit.body !== undefined
     )) throw new Error('AI Gateway read-only endpoint requires GET without a request body');
-    if (completion && (safeInit.method !== 'POST' || typeof safeInit.body !== 'string')) {
+    if (completion && safeInit.method !== 'POST') {
       throw new Error('AI Gateway completion requires explicit POST JSON');
     }
+    // Keep invalid completion bodies machine-readable without performing I/O.
+    if (completion && typeof safeInit.body !== 'string') throw invalidRequestBodyError();
     if (completion) {
       let payload;
       try { payload = JSON.parse(safeInit.body); } catch { throw invalidRequestBodyError(); }
@@ -239,7 +273,14 @@ export class AiGatewayClient {
       throw requestTooLargeError();
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout * 1000);
+    // Only the deadline callback marks timeout. A bounded-body rejection can
+    // abort the response separately and must keep its own typed failure.
+    let timedOut = false;
+    let responseReceived = false;
+    const timer = this.setTimeoutFn(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeout * 1000);
     try {
       const response = await this.fetchFn(requestUrl, {
         ...safeInit,
@@ -251,24 +292,70 @@ export class AiGatewayClient {
           ...(safeInit.body ? { 'Content-Type': 'application/json' } : {}),
         },
       });
-      return await parseJson(response, controller);
+      responseReceived = true;
+      // Fetch and body readers may ignore AbortSignal, but their late bytes
+      // must never be published as a successful model completion.
+      if (timedOut) {
+        const late = new Error('AI Gateway response arrived after the deadline');
+        late.name = 'AbortError';
+        throw late;
+      }
+      const parsed = await parseJson(response, controller);
+      if (timedOut) {
+        const late = new Error('AI Gateway response body finished after the deadline');
+        late.name = 'AbortError';
+        throw late;
+      }
+      return parsed;
     } catch (error) {
-      if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
-      if (error?.name === 'AbortError') {
+      // Once a POST response has been observed, body-reader failure or late
+      // expiry is an ambiguous provider effect. Do not convert a forged
+      // AbortError into a retryable timeout or dispatch a second provider call.
+      // Genuine HTTP classification below still carries its trusted status.
+      if (completion && responseReceived && timedOut) {
+        const unknown = new Error('AI Gateway completion result is unverified; reconcile before retry');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
+      // A completion POST can reach the gateway even when fetch rejects before
+      // receiving headers (socket close, deadline, or upstream/proxy failure).
+      // Without a verified HTTP response there is no evidence that the model
+      // effect did not execute. Fail closed instead of authorizing blind
+      // cross-provider retries or recording the request as a safe timeout.
+      // Read-only health/status/catalog probes retain retryable semantics.
+      if (completion && !responseReceived) {
+        const unknown = new Error('AI Gateway completion dispatch outcome is UNKNOWN; reconcile before retry');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
+      if (timedOut || (!responseReceived && error?.name === 'AbortError')) {
         const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
         timeoutError.code = 'AI_GATEWAY_TIMEOUT';
         timeoutError.category = 'TIMEOUT';
         timeoutError.retryable = true;
         throw timeoutError;
       }
-      if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
+      // Do not trust a transport error's message, code, or prototype. Only
+      // locally constructed failures have an authenticated diagnostic origin.
+      if (error && typeof error === 'object' && trustedGatewayFailures.has(error)) throw error;
+      if (completion && responseReceived) {
+        const unknown = new Error('AI Gateway completion response could not be verified');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
       const unavailable = new Error('Could not reach AI Gateway');
       unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
       unavailable.category = 'UNAVAILABLE';
       unavailable.retryable = true;
       throw unavailable;
     } finally {
-      clearTimeout(timer);
+      this.clearTimeoutFn(timer);
     }
   }
 
@@ -291,9 +378,14 @@ export class AiGatewayClient {
     const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
     const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     const provider = request.provider;
-    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
-    const p = encodeURIComponent(clean(provider));
-    if (!p) throw new Error('AI provider is required');
+    const endpointId = endpointIdFromRequest(request);
+    // Provider identity is an exact dispatch key, not whitespace-normalized
+    // display text. A caller outside the orchestrator must not bypass the
+    // canonical route/account binding by silently aliasing a persisted ID.
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80 || hasUnsafeAiDispatchUnicode(provider)) {
+      throw new Error('AI provider must be an exact bounded identity');
+    }
+    const p = encodeURIComponent(provider);
     const endpoint = clean(endpointId);
     return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}${endpoint ? `&endpointId=${encodeURIComponent(endpoint)}` : ''}`);
   }
@@ -304,7 +396,7 @@ export class AiGatewayClient {
     const timeoutSeconds = request.timeoutSeconds === undefined ? 180 : request.timeoutSeconds;
     const provider = request.provider;
     const model = request.model;
-    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
+    const endpointId = endpointIdFromRequest(request);
     const prompt = request.prompt;
     const systemPrompt = optionalText(request.systemPrompt, 'AI Gateway systemPrompt');
     const maxOutputTokens = request.maxOutputTokens === undefined ? 0 : request.maxOutputTokens;
@@ -317,13 +409,19 @@ export class AiGatewayClient {
     }
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
-    if (!clean(provider)) throw new Error('AI provider is required');
-    if (!clean(model)) throw new Error('AI model is required');
+    // Preserve the exact authorized provider/model identity through the
+    // final outbound effect. Never trim aliases at this API boundary.
+    if (typeof provider !== 'string' || !provider || provider !== provider.trim() || provider.length > 80 || hasUnsafeAiDispatchUnicode(provider)) {
+      throw new Error('AI provider must be an exact bounded identity');
+    }
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300 || hasUnsafeAiDispatchUnicode(model)) {
+      throw new Error('AI model must be an exact bounded identity');
+    }
     return this.request(gatewayUrl, timeoutSeconds, '/complete', {
       method: 'POST',
       body: JSON.stringify({
-        provider: clean(provider),
-        model: clean(model),
+        provider,
+        model,
         ...(clean(endpointId) ? { endpointId: clean(endpointId) } : {}),
         prompt: normalizedPrompt,
         systemPrompt: clean(systemPrompt),

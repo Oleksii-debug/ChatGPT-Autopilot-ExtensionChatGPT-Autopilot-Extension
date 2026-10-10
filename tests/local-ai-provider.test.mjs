@@ -260,7 +260,9 @@ test('transport forces redirect error so a local endpoint cannot redirect prompt
   await client.request(
     settings,
     'http://127.0.0.1:11434/api/chat',
-    { redirect: 'follow' },
+    { redirect: 'follow', method: 'POST', body: JSON.stringify({
+      model:'qwen3:8b', messages:[{role:'user',content:'redirect safety fixture'}], stream:false,
+    }) },
   );
   assert.equal(observedUrl, 'http://127.0.0.1:11434/api/chat');
   assert.equal(observedRedirect, 'error');
