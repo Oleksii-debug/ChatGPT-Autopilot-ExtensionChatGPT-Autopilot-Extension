@@ -687,3 +687,28 @@ test('malformed persisted counters fail closed instead of silently reporting zer
   assert.equal(buildAgentRunTimelineV1(invalidRevision).plan.revision, 0);
   assert.doesNotMatch(JSON.stringify(buildAgentRunTimelineV1(job())), /PRIVATE_COUNTER_GETTER/);
 });
+
+
+test('S1 persisted explicit null/undefined verified outcome fails closed; missing legacy outcome remains distinguishable', () => {
+  for (const invalid of [null, undefined]) {
+    const input = job();
+    input.runtime.verifiedOutcome = invalid;
+    assert.throws(() => buildAgentRunTimelineV1(input), /Agent persisted outcome is invalid/u);
+    if (invalid === null) {
+      assert.throws(
+        () => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))),
+        /Agent persisted outcome is invalid/u,
+      );
+    }
+  }
+  const missing = job();
+  delete missing.runtime.verifiedOutcome;
+  const projection = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(missing)));
+  assert.equal(projection.evidenceMap.recordedOutcome.recordPresent, false);
+  assert.equal(projection.evidenceMap.recordedOutcome.criteriaRecorded, 0);
+  assert.equal(projection.evidenceMap.recordedOutcome.externalEffectVerified, false);
+  assert.equal(projection.evidenceOnly, true);
+  assert.equal(projection.mayReplayExternalEffect, false);
+  assert.doesNotMatch(JSON.stringify(projection), /PRIVATE_|NEVER_EXPORT/u);
+  assert.deepEqual(projection, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(missing))));
+});
