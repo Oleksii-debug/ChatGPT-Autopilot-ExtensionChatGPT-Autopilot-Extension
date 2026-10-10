@@ -959,11 +959,11 @@ test('Plan-1 S1: authenticated SAFE_RETRY survives cold restart without permissi
     { ...state, reconciliation: { ...state.reconciliation, outcome: ReconciliationOutcome.MANUAL_REVIEW } },
     { ...state, verification: { ...state.verification, status: 'VERIFIED' } },
   ]) {
-    assert.throws(() => normalizeExactEffectStateV1(malformed),
-      /requires bound failed verification and reconciliation/,
+    // The lower-level verifier-to-observation binding may reject first.
+    const denial = /requires bound failed verification and reconciliation|Verification requires observation/;
+    assert.throws(() => normalizeExactEffectStateV1(malformed), denial,
       'tampered replay authority must fail closed');
-    assert.throws(() => exactEffectCanExecuteV1(malformed),
-      /requires bound failed verification and reconciliation/);
+    assert.throws(() => exactEffectCanExecuteV1(malformed), denial);
   }
   const continued = reduceExactEffectV1(
     JSON.parse(JSON.stringify(state)),
