@@ -1500,6 +1500,11 @@ export class BrowserAgentManager {
     const resolveSelection = (store) => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to admit');
+      // Revalidate in both the readiness preflight and serialized commit.
+      // A pause/revocation during an async readiness probe must not claim a child lease.
+      if (job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+        throw new Error('Automatic specialist admission parent must be RUNNING');
+      }
       if (!job.definitionScope) throw new Error('Automatic specialist admission requires a reusable Agent definition scope');
       const registry = store.specialistRegistriesById?.[registryId] || null;
       if (!registry) throw new Error('Specialist registry not found');
