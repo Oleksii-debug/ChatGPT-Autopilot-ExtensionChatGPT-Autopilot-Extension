@@ -965,3 +965,62 @@ test('Plan-1 S1: extended ISO year preserves exact UTC chronology across cold se
       /timestamp|calendar date/i);
   }
 });
+
+
+test('Plan-1 S1: nested contract JSON diagnostics never expose attacker-owned member names', () => {
+  const secret = 'PRIVATE-PROVIDER-TOKEN-NEVER-LOG';
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-nested-redaction',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  };
+
+  // Both undefined and negative zero are invalid durable effect arguments.
+  // The rejection must identify the contract field, not an attacker key.
+  for (const invalidValue of [undefined, -0, Infinity]) {
+    const nested = { [secret]: invalidValue };
+    assert.throws(
+      () => normalizeToolInvocationV1({
+        ...invocation, arguments: { request: { nested } },
+      }),
+      error => {
+        assert.match(error.message, /arguments/);
+        assert.doesNotMatch(error.message, /PRIVATE-PROVIDER|TOKEN-NEVER-LOG/);
+        return true;
+      },
+    );
+  }
+
+  let getterReads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, secret, {
+    enumerable: true,
+    get() { getterReads += 1; throw new Error('private getter payload'); },
+  });
+  assert.throws(
+    () => normalizeToolInvocationV1({
+      ...invocation, arguments: { request: { hostile } },
+    }),
+    error => {
+      assert.match(error.message, /enumerable own data properties/);
+      assert.doesNotMatch(error.message, /PRIVATE-PROVIDER|private getter payload/);
+      return true;
+    },
+  );
+  assert.equal(getterReads, 0, 'validation must not execute an untrusted getter');
+
+  const valid = normalizeToolInvocationV1({
+    ...invocation, arguments: { request: { [secret]: 'opaque-data' } },
+  });
+  assert.equal(valid.arguments.request[secret], 'opaque-data');
+  assert.equal(
+    normalizeToolInvocationV1(JSON.parse(JSON.stringify(valid))).arguments.request[secret],
+    'opaque-data',
+    'valid durable argument identity must survive cold JSON restart',
+  );
+});
