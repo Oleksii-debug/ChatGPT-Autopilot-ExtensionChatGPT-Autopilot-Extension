@@ -1193,3 +1193,57 @@ test('S1 mutable storage descriptors are observed once without running getters o
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_SECOND_DESCRIPTOR_|PRIVATE_GET_TRAP_/);
   }
 });
+
+test('Plan 6 S1: plan nodes and recorded outcome checks are single durable descriptor observations', () => {
+  const source = job();
+  let nodesReads = 0;
+  let checksReads = 0;
+  const goodNodes = source.runtime.plan.nodes;
+  const goodChecks = source.runtime.verifiedOutcome.checks;
+  source.runtime.plan = new Proxy(source.runtime.plan, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'nodes') {
+        nodesReads += 1;
+        return { configurable: true, enumerable: true, writable: true,
+          value: nodesReads === 1 ? goodNodes : [{ state: 'FAILED' }] };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  source.runtime.verifiedOutcome = new Proxy(source.runtime.verifiedOutcome, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'checks') {
+        checksReads += 1;
+        return { configurable: true, enumerable: true, writable: true,
+          value: checksReads === 1 ? goodChecks : [] };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const projected = buildAgentRunTimelineV1(source);
+  assert.equal(nodesReads, 1, 'plan nodes must not be read twice');
+  assert.equal(checksReads, 1, 'recorded checks must not be read twice');
+  assert.equal(projected.plan.nodeCount, 2);
+  assert.equal(projected.evidenceMap.recordedOutcome.criteriaRecorded, 1);
+  assert.equal(projected.mayReplayExternalEffect, false);
+  assert.equal(projected.evidenceMap.externalEffectVerified, false);
+  assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_CHECK_999|PRIVATE_NODE_999/u);
+});
+
+test('Plan 6 S1: hidden nodes/checks refuse non-durable evidence; JSON restart stays consistent', () => {
+  for (const slot of ['nodes', 'checks']) {
+    const raw = job();
+    const parent = slot === 'nodes' ? raw.runtime.plan : raw.runtime.verifiedOutcome;
+    const retained = parent[slot];
+    Object.defineProperty(parent, slot, {
+      configurable: true, enumerable: false, writable: true, value: retained,
+    });
+    assert.throws(() => buildAgentRunTimelineV1(raw), /enumerable data field/u);
+  }
+  const original = job();
+  const before = buildAgentRunTimelineV1(original);
+  const after = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(original)));
+  assert.deepEqual(before, after);
+  assert.equal(after.evidenceOnly, true);
+  assert.equal(after.mayReplayExternalEffect, false);
+});
