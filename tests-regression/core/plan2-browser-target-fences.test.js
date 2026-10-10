@@ -17,7 +17,8 @@ import {
   browserAgentSnapshotElement,
   BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
-import { BrowserAgentManager } from '../../src/core/browser-agent-manager.js';
+import { BrowserAgentManager, buildUniqueBrowserFileInputExpression } from '../../src/core/browser-agent-manager.js';
+import { runInNewContext } from 'node:vm';
 
 class FakeElement {
   constructor(text = 'Save') {
@@ -2038,4 +2039,54 @@ test('Plan-2 S1: resumed focus refuses ancestor concealment and scroll-time drif
     delete element.parentElement;
     delete document.activeElement;
   }
+});
+
+test('Plan-2 S1: CDP upload input resolver fails closed on cloned refs, stale input and hostile selectors', () => {
+  class BrowserInput {}
+  const make = (ref, snapshotId, type = 'file') => {
+    const node = new BrowserInput();
+    node.attrs = { 'data-autopilot-agent-ref': ref, 'data-autopilot-agent-snapshot': snapshotId };
+    node.getAttribute = name => node.attrs[name] ?? null;
+    node.type = type;
+    node.isConnected = true;
+    return node;
+  };
+  const resolve = (ref, snapshotId, nodes) => {
+    const expression = buildUniqueBrowserFileInputExpression(ref, snapshotId);
+    return runInNewContext(expression, {
+      document: { querySelectorAll(selector) {
+        assert.equal(selector, '[data-autopilot-agent-ref]');
+        return nodes;
+      } },
+      HTMLInputElement: BrowserInput,
+    }, { timeout: 1000 });
+  };
+  const observed = JSON.parse(JSON.stringify({ ref: 'r1', snapshotId: 's1' }));
+  const selected = make(observed.ref, observed.snapshotId);
+  assert.equal(resolve(observed.ref, observed.snapshotId, [selected]), selected);
+  assert.equal(resolve('r1', 's1', [selected, make('r1', 's1')]), null,
+    'a page-authored clone must not become a file upload target');
+  assert.equal(resolve('r1', 's1', [make('r1', 'stale')]), null);
+  const disconnected = make('r1', 's1');
+  disconnected.isConnected = false;
+  assert.equal(resolve('r1', 's1', [disconnected]), null);
+  assert.equal(resolve('r1', 's1', [make('r1', 's1', 'text')]), null);
+  const hostileRef = `r1"][data-autopilot-agent-snapshot="s1`;
+  assert.equal(resolve(hostileRef, 's1', [selected]), null,
+    'untrusted ref text cannot alter the query selector or select a different input');
+  assert.throws(() => buildUniqueBrowserFileInputExpression('', 's1'), /AGENT_FILE_INPUT_STALE/);
+  assert.throws(() => buildUniqueBrowserFileInputExpression('r1', null), /AGENT_FILE_INPUT_STALE/);
+});
+
+test('Plan-2 S1: CDP upload uses unique typed resolver before file effect', () => {
+  const source = readFileSync(new URL('../../src/core/browser-agent-manager.js', import.meta.url), 'utf8');
+  const start = source.indexOf('if (action.type === BrowserAgentActionType.UPLOAD_DOWNLOAD)');
+  const end = source.indexOf('if (action.type === BrowserAgentActionType.NAVIGATE)', start);
+  assert.ok(start >= 0 && end > start);
+  const upload = source.slice(start, end);
+  assert.match(upload, /buildUniqueBrowserFileInputExpression\(action\.ref, snapshot\.snapshotId\)/);
+  assert.doesNotMatch(upload, /document\.querySelector\('/);
+  assert.ok(upload.indexOf('buildUniqueBrowserFileInputExpression(') < upload.indexOf('DOM.setFileInputFiles'));
+  assert.equal((upload.match(/await proveInput\(\)/g) || []).length, 3,
+    'semantic owner preflight remains in place');
 });
