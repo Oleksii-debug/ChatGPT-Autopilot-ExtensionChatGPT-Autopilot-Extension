@@ -3272,3 +3272,186 @@ test('Plan2 S1 select rechecks option identity and visibility between input and 
     globalThis.document.elementFromPoint = originalHit;
   }
 });
+
+
+test('Plan2 S1 readonly semantic FILL rejects observation, focus and event-time retargeting', () => {
+  setup();
+  const previousInput = globalThis.HTMLInputElement;
+  const originalFocus = element.focus;
+  try {
+    globalThis.HTMLInputElement = FakeElement;
+    element.tagName = 'INPUT';
+    element.type = 'text';
+    element.setAttribute('type', 'text');
+    element.value = '';
+    const events = [];
+    let onInput = () => {};
+    element.dispatchEvent = event => {
+      events.push(event.type);
+      if (event.type === 'input') onInput();
+      return true;
+    };
+    const makeSnapshot = () => {
+      const snap = snapshotBrowserPage('readonly-form-proof');
+      return { url: snap.url, frames: [{ frameId: 0, ...snap }] };
+    };
+    const proposed = { type: 'fill', frameId: 0, ref: 'r1', text: 'owner-approved' };
+
+    element.readOnly = true;
+    assert.equal(makeSnapshot().frames[0].elements[0].readonly, true);
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify(proposed), makeSnapshot()), /readonly/);
+    element.readOnly = false;
+
+    element.setAttribute('readonly', '');
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify(proposed), makeSnapshot()), /readonly/);
+    element.removeAttribute('readonly');
+
+    element.setAttribute('aria-readonly', ' TrUe ');
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify(proposed), makeSnapshot()), /readonly/);
+    element.removeAttribute('aria-readonly');
+
+    const observed = makeSnapshot();
+    assert.equal(observed.frames[0].elements[0].readonly, false);
+    const restored = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify(proposed), observed)));
+    const run = () => executeBrowserPageAction(observed.frames[0].snapshotId, restored);
+
+    element.readOnly = true;
+    assert.throws(run, /AGENT_TARGET_READONLY/);
+    assert.equal(element.value, '');
+    assert.deepEqual(events, []);
+    element.readOnly = false;
+
+    element.focus = () => { element.setAttribute('readonly', ''); };
+    assert.throws(run, /AGENT_TARGET_READONLY/);
+    assert.equal(element.value, '');
+    assert.deepEqual(events, []);
+    element.focus = originalFocus;
+    element.removeAttribute('readonly');
+
+    onInput = () => { element.setAttribute('aria-readonly', 'true'); };
+    assert.throws(run, /AGENT_TARGET_READONLY/);
+    assert.deepEqual(events, ['input'], 'event-time readonly transition prevents change');
+    element.removeAttribute('aria-readonly');
+    events.length = 0;
+    onInput = () => {};
+    assert.equal(run().effectVerified, true);
+    assert.equal(element.value, 'owner-approved');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(element.clicked, 0);
+  } finally {
+    element.focus = originalFocus;
+    if (previousInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = previousInput;
+  }
+});
+
+test('Plan2 S1 credential broker never writes into readonly password or username fields', () => {
+  const previousInput = globalThis.HTMLInputElement;
+  const previousTextarea = globalThis.HTMLTextAreaElement;
+  const previousDocument = globalThis.document;
+  const previousLocation = globalThis.location;
+  const events = [];
+  class FormField extends FakeElement {
+    constructor(type, name, left) {
+      super('');
+      this.tagName = 'INPUT';
+      this.attrs = new Map([['type', type], ['aria-label', name]]);
+      this.type = type;
+      this.value = '';
+      this.id = '';
+      this.form = null;
+      this.labels = null;
+      this.rect = { left, top: 10, width: 90, height: 30 };
+    }
+    dispatchEvent(event) {
+      events.push(this.type + ':' + event.type);
+      this.onDispatch?.(event);
+      return true;
+    }
+  }
+  globalThis.HTMLInputElement = FormField;
+  globalThis.HTMLTextAreaElement = class extends FakeElement {};
+  try {
+    const user = new FormField('text', 'Username', 10);
+    const password = new FormField('password', 'Password', 210);
+    const fields = [user, password];
+    globalThis.location = { href: 'https://example.test/login' };
+    globalThis.document = {
+      title: 'Login', body: { innerText: 'Login' },
+      documentElement: { scrollHeight: 500 }, getElementById: () => null,
+      querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
+        ? fields.filter(field => field.getAttribute('data-autopilot-agent-ref')) : fields,
+      elementFromPoint: x => x < 150 ? user : password,
+    };
+    const proposed = {
+      type: 'fill_credential', credentialRef: 'c1',
+      usernameFrameId: 0, usernameRef: 'r1', passwordFrameId: 0, passwordRef: 'r2',
+    };
+    const snapshot = () => {
+      const snap = snapshotBrowserPage('readonly-credential-proof');
+      return {
+        snap, observed: {
+          url: snap.url, frames: [{ frameId: 0, ...snap }],
+          credentials: [{ ref: 'c1', credentialId: 'fixture-opaque-credential' }],
+        },
+      };
+    };
+
+    password.readOnly = true;
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify(proposed), snapshot().observed),
+      /editable password input/);
+    password.readOnly = false;
+    user.setAttribute('aria-readonly', 'true');
+    assert.throws(() => parseBrowserAgentAction(JSON.stringify(proposed), snapshot().observed),
+      /not a non-sensitive editable field/);
+    user.removeAttribute('aria-readonly');
+
+    const { snap, observed } = snapshot();
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify(proposed), observed)));
+    const run = () => executeBrowserCredentialFill(snap.snapshotId, action, 'alice', 'fixture-secret');
+    password.setAttribute('readonly', '');
+    assert.throws(run, /AGENT_CREDENTIAL_PASSWORD_TARGET_READONLY/);
+    assert.deepEqual(events, []);
+    assert.equal(password.value, '');
+    password.removeAttribute('readonly');
+
+    user.readOnly = true;
+    assert.throws(run, /AGENT_CREDENTIAL_USERNAME_TARGET_READONLY/);
+    assert.deepEqual(events, []);
+    assert.equal(password.value, '');
+    user.readOnly = false;
+
+    password.focus = () => { password.readOnly = true; };
+    assert.throws(run, /AGENT_CREDENTIAL_PASSWORD_TARGET_READONLY/);
+    assert.equal(password.value, '', 'password focus-time readonly denies any secret write');
+    password.readOnly = false;
+    password.focus = () => {};
+    events.length = 0;
+    user.value = ''; password.value = '';
+
+    password.onDispatch = event => {
+      if (event.type === 'input') password.setAttribute('aria-readonly', 'true');
+    };
+    assert.throws(run, /AGENT_CREDENTIAL_PASSWORD_TARGET_READONLY/);
+    assert.deepEqual(events, ['text:input', 'text:change', 'password:input'],
+      'a readonly input handler must not invoke the password change listener');
+    password.onDispatch = null;
+    password.removeAttribute('aria-readonly');
+    events.length = 0;
+    user.value = ''; password.value = '';
+
+    assert.equal(run().passwordFilled, true);
+    assert.equal(user.value, 'alice');
+    assert.equal(password.value, 'fixture-secret');
+    assert.deepEqual(events, ['text:input', 'text:change', 'password:input', 'password:change']);
+  } finally {
+    if (previousInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = previousInput;
+    if (previousTextarea === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = previousTextarea;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
+});
