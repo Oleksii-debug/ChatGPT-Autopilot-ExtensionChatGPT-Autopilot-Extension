@@ -598,8 +598,13 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
     if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
     seen.add(profileId);
-    const provider = clean(own(item, 'provider'), 40);
-    if (!PROVIDERS.has(provider)) throw new Error('AI endpoint provider is invalid');
+    // Provider is part of the persisted endpoint/account binding. Never
+    // trim an invalid identity into a different authorized provider on reload.
+    const provider = own(item, 'provider');
+    if (typeof provider !== 'string' || provider.length > 40
+        || provider !== provider.trim() || !PROVIDERS.has(provider)) {
+      throw new Error('AI endpoint provider must be an exact supported identity');
+    }
     const endpointId = optionalIdentity(item, 'endpointId', 'AI endpoint endpointId');
     const locality = own(item, 'locality');
     if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
