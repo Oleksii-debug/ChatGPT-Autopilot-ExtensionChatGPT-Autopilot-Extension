@@ -59,10 +59,54 @@ export function providerHasCapability(providerId, capabilityId) {
   return descriptor.capabilities.includes(capabilityId);
 }
 
+// Source-of-truth remains DESCRIPTORS. This is an admission fence, not a new
+// registry: never iterate caller-owned capability data or expose its contents
+// in a diagnostic before authorizing provider operations.
+function snapshotRequiredCapabilities(required) {
+  const label = 'Agent provider required capabilities';
+  let descriptors;
+  try {
+    if (!Array.isArray(required) || Object.getPrototypeOf(required) !== Array.prototype) {
+      throw new Error('noncanonical array');
+    }
+    descriptors = Object.getOwnPropertyDescriptors(required);
+  } catch {
+    // A Proxy trap can throw an arbitrary secret-bearing Error. Do not log it.
+    throw new Error(`${label} must be a bounded plain data array`);
+  }
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
+    throw new Error(`${label} must be a bounded plain data array`);
+  }
+  // Reject own symbols, hidden members and non-index properties. In particular,
+  // never execute a custom iterator, an accessor or an inherited authority list.
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)
+        || !Number.isSafeInteger(Number(key)) || Number(key) >= length) {
+      throw new Error(`${label} contains noncanonical fields`);
+    }
+  }
+  const ids = [];
+  for (let index = 0; index < length; index += 1) {
+    const entry = descriptors[String(index)];
+    if (!entry || entry.enumerable !== true || !Object.hasOwn(entry, 'value')
+        || typeof entry.value !== 'string' || entry.value.length === 0
+        || entry.value.length > 180 || entry.value !== entry.value.trim()) {
+      throw new Error(`${label} must contain exact data-only capability IDs`);
+    }
+    ids.push(entry.value);
+  }
+  return [...new Set(ids)];
+}
+
 export function requireAgentProviderCapabilities(providerId, required = []) {
   const descriptor = getAgentProvider(providerId);
-  const missing = [...new Set(required)].filter(capability => !descriptor.capabilities.includes(capability));
-  if (missing.length) throw new Error(`Agent provider ${providerId} lacks capabilities: ${missing.join(', ')}`);
+  const exact = snapshotRequiredCapabilities(required);
+  // Never interpolate caller-controlled provider/capability values in logs.
+  if (exact.some(capability => !descriptor.capabilities.includes(capability))) {
+    throw new Error('Agent provider lacks required capabilities');
+  }
   return descriptor;
 }
 

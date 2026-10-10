@@ -11,6 +11,7 @@ on:
       - src/core/outcome-verification-bridge.js
       - src/core/agent-definition-registry.js
       - src/core/agent-io-contract.js
+      - src/core/capability-registry.js
       - src/core/universal-agent-contracts.js
       - src/core/browser-agent-manager.js
       - src/core/browser-agent-orchestration-binding.js
