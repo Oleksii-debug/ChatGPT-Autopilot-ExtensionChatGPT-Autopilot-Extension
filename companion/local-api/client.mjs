@@ -8,6 +8,92 @@ import { normalizeAutopilotProgrammaticRequestV1, isAutopilotProgrammaticOperati
  */
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
+const MAX_RESPONSE_BYTES = 262_144;
+
+/**
+ * A remote/compromised loopback peer must not force the SDK to buffer an
+ * unbounded HTTP 200 body before the canonical Core proof is validated.
+ * The timeout promise belongs to the entire SDK control call, including
+ * every streamed chunk. No response parsing failure grants retry authority.
+ *
+ * Small test doubles without a Fetch ReadableStream retain the older json()
+ * fixture interface; real HTTP Response bodies always use the bounded path.
+ */
+async function readBoundedControlResponseJson(res, deadline) {
+  const type = res?.headers?.get?.('content-type');
+  // A real HTTP Response with a body stream must carry the Companion's
+  // JSON media type. Missing Content-Type is not an authenticated Core proof;
+  // internal pre-stream json() fixtures retain their existing compatibility.
+  if ((res?.body != null && type == null)
+    || (type != null && !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(type))) {
+    throw new Error('Local API response media type is invalid');
+  }
+  const declared = res?.headers?.get?.('content-length');
+  if (declared != null
+    && (!/^\d+$/u.test(declared)
+      || !Number.isSafeInteger(Number(declared))
+      || Number(declared) > MAX_RESPONSE_BYTES)) {
+    throw new Error('Local API response content length is invalid');
+  }
+  if (res?.body === undefined && typeof res?.json === 'function') {
+    // Compatibility for internal in-process fetch stubs only.
+    return Promise.race([res.json(), deadline]);
+  }
+  if (!res?.body || typeof res.body.getReader !== 'function') {
+    throw new Error('Local API response stream is missing');
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await Promise.race([reader.read(), deadline]);
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) {
+        throw new Error('Local API response chunk is invalid');
+      }
+      size += chunk.value.byteLength;
+      if (size > MAX_RESPONSE_BYTES) {
+        // A stream can omit or forge Content-Length. Do not retain its data
+        // or wait for the peer to finish sending it.
+        void reader.cancel().catch(() => {});
+        throw new Error('Local API response is too large');
+      }
+      // Snapshot bytes at the reader boundary: a custom stream can recycle
+      // its backing buffer after read() resolves. Never validate a different
+      // receipt from the bytes observed at read time.
+      chunks.push(chunk.value.slice());
+    }
+    // Even a bounded stream must agree with declared framing. A fabricated
+    // Content-Length is not evidence that a truncated/extended Core receipt
+    // was delivered, so the SDK reports ambiguity without any retry.
+    if (declared != null && size !== Number(declared)) {
+      throw new Error('Local API response content length mismatch');
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    // Fatal decoding rejects replacements; preserve a BOM so JSON.parse
+    // rejects it exactly as the shared CLI/HTTP control JSON parser does.
+    const json = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    return JSON.parse(json);
+  } finally {
+    try { reader.releaseLock(); } catch { /* no peer diagnostics */ }
+  }
+}
+
+
+// The trusted Companion/owner may rotate its bearer between SDK requests.
+// The SDK reads the current token per call, never stores an old fallback.
+function validLocalApiToken(candidate) {
+  return typeof candidate === 'string'
+    && candidate.length >= 32 && candidate.length <= 512
+    && !/[^\x21-\x7e]/u.test(candidate);
+}
+
 function canonicalUtcTimestamp(value) {
   if (typeof value !== 'string') return false;
   const millis = Date.parse(value);
@@ -161,9 +247,12 @@ function validBoundScopeAndChronology(result, sentRequest) {
     && observed <= completed && dispatched <= validThrough;
 }
 
-export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
-  if (typeof token !== 'string' || token.length < 32 || token.length > 512
-    || /[^\x21-\x7e]/u.test(token)) {
+export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
+  if (tokenProvider !== undefined
+    && (typeof tokenProvider !== 'function' || token !== undefined)) {
+    throw new Error('Use either a trusted token or owner tokenProvider, never both');
+  }
+  if (tokenProvider === undefined && !validLocalApiToken(token)) {
     throw new Error('A trusted local API token is required');
   }
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Valid loopback port required');
@@ -174,6 +263,12 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
   // This instance-local concurrency fence does not replace Core's durable
   // request/effect deduplication or authorize retry after ambiguity.
   const inFlightRequests = new Set();
+  // A completed SDK promise does not prove its transport finished without an
+  // effect. Retain only unresolved transmitted identities after a timeout,
+  // dropped response or untrusted receipt. This is a client-side no-resend
+  // fence, NOT Core's durable deduplication/reconciliation authority.
+  const ambiguousRequests = new Set();
+  const MAX_AMBIGUOUS_REQUESTS = 4096;
   return Object.freeze({
     async control(request) {
       // Canonical Core preflight snapshots own data descriptors before any
@@ -189,6 +284,20 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       const requestKey = JSON.stringify([
         sentRequest.principalId, sentRequest.projectId, sentRequest.requestId,
       ]);
+      if (ambiguousRequests.has(requestKey)) {
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'This requestId has an unresolved prior transmission; reconcile canonical job state before retrying.',
+        });
+      }
+      // Fail closed rather than evicting unresolved identities and silently
+      // permitting a duplicate consequential dispatch after quota pressure.
+      if (ambiguousRequests.size >= MAX_AMBIGUOUS_REQUESTS) {
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'Local unresolved-request capacity exhausted; reconcile canonical job state before further transmission.',
+        });
+      }
       if (inFlightRequests.has(requestKey)) {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
@@ -196,8 +305,46 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         });
       }
       inFlightRequests.add(requestKey);
+      // Use one monotonic budget for trusted token resolution, HTTP and
+      // receipt parsing. Token lookup may not extend a caller's effect deadline.
+      const controlStartedAt = performance.now();
       let timeoutHandle;
       try {
+      // An owner-issued token is a credential read, not a second authorization
+      // authority. Resolve it AFTER canonical preflight and BEFORE transmission.
+      // A failed, late or invalid resolver never opens a socket, never falls
+      // back to a retired secret and never triggers an automatic effect retry.
+      let requestToken = token;
+      if (tokenProvider !== undefined) {
+        let credentialTimer;
+        try {
+          requestToken = await Promise.race([
+            Promise.resolve().then(() => tokenProvider()),
+            new Promise((_, reject) => {
+              credentialTimer = setTimeout(
+                () => reject(new Error('Owner token resolution deadline')),
+                Math.min(timeoutMs, 2_000),
+              );
+            }),
+          ]);
+        } catch {
+          throw new Error('Trusted local API owner token unavailable before transmission');
+        } finally {
+          clearTimeout(credentialTimer);
+        }
+        if (!validLocalApiToken(requestToken)) {
+          throw new Error('Trusted local API owner token unavailable before transmission');
+        }
+      }
+      const transportBudgetMs = timeoutMs - (performance.now() - controlStartedAt);
+      if (transportBudgetMs <= 0) {
+        // Even a successfully resolved owner token cannot authorize a fresh
+        // transmission after this SDK call's original deadline elapsed.
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'Reconcile the exact requestId with canonical job state before retrying.',
+        });
+      }
       // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
       // Enforce one wall-clock deadline across transport AND body parsing.
       // Timeout is always ambiguous, not evidence of zero external effects.
@@ -206,14 +353,17 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         timeoutHandle = setTimeout(() => {
           abortController.abort();
           reject(new Error('Local API deadline expired'));
-        }, timeoutMs);
+        }, transportBudgetMs);
       });
       let res;
+      // Mark as unresolved before invoking the transport: a custom fetch
+      // can synchronously transmit and throw before returning its Promise.
+      ambiguousRequests.add(requestKey);
       try {
         res = await Promise.race([fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
           method: 'POST',
           headers: {
-            Authorization: 'Bearer ' + token,
+            Authorization: 'Bearer ' + requestToken,
             'Content-Type': 'application/json',
           },
           body,
@@ -232,11 +382,13 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       // evidence that no effect occurred; never expose upstream error text.
       let responseOk, responseStatus = null;
       try {
-        responseOk = res?.ok === true;
-        if (!responseOk) {
-          const observedStatus = res?.status;
-          responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
-        }
+        // The canonical Companion V1 endpoint acknowledges only with HTTP 200.
+        // Custom transports may supply an inconsistent { ok: true, status: 401 }
+        // alongside a plausible JSON receipt. Treat the entire response as
+        // ambiguous, never as a verified Core acknowledgement or retry signal.
+        const observedStatus = res?.status;
+        responseStatus = Number.isInteger(observedStatus) ? observedStatus : null;
+        responseOk = res?.ok === true && responseStatus === 200;
       } catch {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
@@ -253,7 +405,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       }
       try {
         // Validate and return only immutable snapshots, never original Proxies.
-        const body = await Promise.race([res.json(), deadline]);
+        const body = await readBoundedControlResponseJson(res, deadline);
         if (abortController.signal.aborted) throw new Error('Late Local API response');
         const envelope = snapshotTransportRecord(body, RESPONSE_FIELDS);
         const outer = snapshotTransportRecord(envelope.result, RESULT_FIELDS);
@@ -310,6 +462,8 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
           throw new Error('Unbound response');
         }
         if (abortController.signal.aborted) throw new Error('Late Local API receipt');
+        // Only an exactly-bound authenticated Core receipt clears uncertainty.
+        ambiguousRequests.delete(requestKey);
         return value;
       } catch {
         return Object.freeze({

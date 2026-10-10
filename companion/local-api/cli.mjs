@@ -6,6 +6,7 @@
  * NEVER place a token on the command line or in a checked-in file.
  */
 import { createAutopilotLocalClientV1 } from './client.mjs';
+import { parseStrictControlJsonV1 } from './control-json.mjs';
 
 const help = `ChatGPT Автопілот — локальний CLI, API v1
   node companion/local-api/cli.mjs < request.json
@@ -14,6 +15,8 @@ const help = `ChatGPT Автопілот — локальний CLI, API v1
   Дані запиту: JSON із schemaVersion, requestId, principalId, projectId,
   operation, targetId, payloadArtifactRef, requestedAt.
   Операції проходять звичайні перевірки політик і дозволів Core.
+  RECEIVED не означає, що задачу завершено; перевіряйте Core receipt.status.
+  Код 0: Core ACCEPTED (ще виконується) або COMPLETED; код 2: REJECTED/UNKNOWN.
   UNKNOWN_NETWORK_RESULT: перевірте стан за requestId, не повторюйте ефект сліпо.
 `;
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
@@ -32,11 +35,18 @@ async function main() {
     if (length > 65_536) throw new Error('Вхідний JSON завеликий.');
     chunks.push(chunk);
   }
-  const raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  // Same strict UTF-8 / duplicate-identity fence as the authenticated HTTP endpoint.
+  // A CLI must not silently choose the last duplicate requestId or projectId.
+  const raw = parseStrictControlJsonV1(Buffer.concat(chunks));
   const result = await client.control(raw);
   // Output is structured text, accessible to NVDA and shell scripts.
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  if (result.status !== 'RECEIVED') process.exitCode = 2;
+  // RECEIVED is an authenticated transport acknowledgement, not a successful
+  // Core outcome. A canonical REJECTED receipt must never exit zero and mislead
+  // shell automation into treating a denied control operation as successful.
+  if (result.status !== 'RECEIVED' || result.result?.receipt?.status === 'REJECTED') {
+    process.exitCode = 2;
+  }
 }
 main().catch(() => {
   // No stack traces or secrets in diagnostics.
