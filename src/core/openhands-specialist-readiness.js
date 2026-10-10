@@ -165,6 +165,32 @@ function ownErrorCode(error) {
   return ID.test(descriptor.value) ? descriptor.value : '';
 }
 
+function checkedProbeMethod(client) {
+  if (!client || (typeof client !== 'object' && typeof client !== 'function')) {
+    throw new Error('OpenHands specialist readiness requires a client with probe()');
+  }
+  // Inspect data descriptors only; never execute an untrusted accessor while
+  // deciding whether the provider is admissible. Real class prototype methods
+  // and fixture clients with own data methods are both supported.
+  let cursor = client;
+  try {
+    for (let depth = 0; depth < 8 && cursor
+        && cursor !== Object.prototype && cursor !== Function.prototype; depth += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, 'probe');
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error('unsafe probe descriptor');
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
+    }
+  } catch {
+    throw new Error('OpenHands specialist readiness client cannot be inspected safely');
+  }
+  throw new Error('OpenHands specialist readiness requires a client with probe()');
+}
+
 function classifyProbeFailure(error) {
   const code = ownErrorCode(error);
   if (code === 'OPENHANDS_TRANSPORT_FAILURE'
@@ -205,10 +231,7 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
   const raw = record(input, PROBE_KEYS, 'OpenHands specialist provider probe options');
   const config = normalizeOpenHandsCodingSpecialistConfigV1(raw.config);
   const client = raw.client;
-  if (!client || (typeof client !== 'object' && typeof client !== 'function')
-      || typeof client.probe !== 'function') {
-    throw new Error('OpenHands specialist readiness requires a client with probe()');
-  }
+  const probe = checkedProbeMethod(client);
   const now = raw.now === undefined ? () => Date.now() : raw.now;
   if (typeof now !== 'function') throw new Error('now must be a function');
 
@@ -219,7 +242,7 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
     installed: true,
   });
   try {
-    await client.probe(Object.freeze({ config, conversationId: '' }));
+    await probe.call(client, Object.freeze({ config, conversationId: '' }));
   } catch (error) {
     classification = classifyProbeFailure(error);
   }
@@ -264,10 +287,7 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
   const raw = record(input, FACTORY_KEYS, 'OpenHands specialist readiness binding options');
   const config = normalizeOpenHandsCodingSpecialistConfigV1(raw.config);
   const client = raw.client;
-  if (!client || (typeof client !== 'object' && typeof client !== 'function')
-      || typeof client.probe !== 'function') {
-    throw new Error('OpenHands specialist readiness requires a client with probe()');
-  }
+  const probe = checkedProbeMethod(client);
   const maxAgeMs = raw.maxAgeMs === undefined
     ? DEFAULT_MAX_AGE_MS
     : integer(raw.maxAgeMs, 'maxAgeMs', 1, MAX_MAX_AGE_MS);
@@ -305,7 +325,7 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
       installed: true,
     });
     try {
-      await client.probe(Object.freeze({
+      await probe.call(client, Object.freeze({
         config,
         conversationId: '',
       }));
