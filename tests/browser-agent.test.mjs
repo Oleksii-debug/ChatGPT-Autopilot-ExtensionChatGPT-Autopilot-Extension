@@ -2553,8 +2553,10 @@ test('coordinate click revalidates the exact target after debugger attach before
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') return [{ frameId: 0, result: {
       x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
       target: { tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', editable: false, sensitive: false, visualOnly: false },
@@ -2563,7 +2565,7 @@ test('coordinate click revalidates the exact target after debugger attach before
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2577,6 +2579,7 @@ test('coordinate click revalidates the exact target after debugger attach before
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.dispatchMouseEvent'), false, 'stale post-attach coordinate must never dispatch native mouse input');
 });
 
@@ -2586,6 +2589,7 @@ test('visual-only coordinate click waits for approval and stale coordinate appro
   let verifyOk = true;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: verifyOk } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
@@ -2690,8 +2694,10 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       return [{ frameId: 0, result: { x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720, target: {
@@ -2702,7 +2708,7 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2716,6 +2722,7 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.dispatchMouseEvent'), false, 'stale post-attach drag endpoint must stop before native mouse events');
 });
 
@@ -2725,6 +2732,7 @@ test('coordinate drag approval is TOCTOU-safe and stale source/destination dispa
   let verifyCalls = 0;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: ++verifyCalls === 1 } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       return [{ frameId: 0, result: {
@@ -2813,8 +2821,10 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') return [{ frameId: 0, result: {
       x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
       target: { tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
@@ -2823,7 +2833,7 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2837,6 +2847,7 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.insertText'), false, 'stale post-attach text target must block native text insertion');
 });
 
