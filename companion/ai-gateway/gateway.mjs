@@ -600,12 +600,24 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
       }
       if (req.method === 'GET' && url.pathname === '/models') {
         const provider = clean(url.searchParams.get('provider'));
-        const endpointId = clean(url.searchParams.get('endpointId'));
+        // Preserve exact account binding across the HTTP boundary. Do not
+        // trim malicious endpointId query values or pick one of duplicates.
+        const endpointIds = url.searchParams.getAll('endpointId');
+        if (endpointIds.length > 1 || (endpointIds.length === 1 && !endpointIds[0])) {
+          throw gatewayError('Gateway endpointId query must be a unique exact value', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+        }
+        const endpointId = endpointIds[0] ?? '';
         const models = await listProviderModels(provider, { fetchFn, endpointId, compatibleEndpoints, env });
         return json(res, 200, { ok: true, provider, ...(provider === 'openai-compatible' ? { endpointId:resolveCompatibleEndpoint(endpointId, compatibleEndpoints).endpointId } : {}), models }, { corsOrigin });
       }
       if (req.method === 'POST' && url.pathname === '/complete') {
         const body = await readBody(req);
+        // A declared-but-erased endpoint binding is not the legacy omission.
+        // It must never select a default account after JSON migration.
+        if (body && typeof body === 'object' && !Array.isArray(body)
+            && Object.hasOwn(body, 'endpointId') && body.endpointId === '') {
+          throw gatewayError('Explicitly empty gateway endpointId is not allowed', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+        }
         const result = await inferenceQueue.run(() => completeProvider(body, { fetchFn, compatibleEndpoints, env }));
         return json(res, 200, { ok: true, ...result }, { corsOrigin });
       }
