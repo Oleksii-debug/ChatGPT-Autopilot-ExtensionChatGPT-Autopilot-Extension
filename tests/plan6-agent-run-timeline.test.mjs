@@ -602,3 +602,46 @@ test('S1 durable ownership refuses one effect assigned to multiple nodes after J
   assert.deepEqual(clean, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(source))));
   assert.doesNotMatch(JSON.stringify(clean), /PRIVATE_OWNER_A|PRIVATE_OWNER_B|effect-shared|effect-distinct/);
 });
+
+test('S1 recorded Specialist dispatch receipt identities must be unique and structurally safe across restart', () => {
+  const input = job();
+  input.runtime.specialistDispatchByAgentId = {
+    first: { state: 'PROVIDER_SUCCEEDED', providerReceiptId: 'receipt-1' },
+    second: { state: 'AMBIGUOUS', providerReceiptId: 'receipt-1' },
+  };
+  for (const candidate of [input, JSON.parse(JSON.stringify(input))]) {
+    assert.throws(() => buildAgentRunTimelineV1(candidate), /receipt identity is invalid or duplicated/u);
+  }
+  input.runtime.specialistDispatchByAgentId.second.providerReceiptId = 'receipt-2';
+  const good = buildAgentRunTimelineV1(input);
+  assert.equal(good.evidenceMap.specialistProviderDispatch.receiptIdsRecorded, 2);
+  assert.equal(good.evidenceMap.specialistProviderDispatch.externalEffectVerified, false);
+  assert.equal(good.mayReplayExternalEffect, false);
+  assert.deepEqual(good, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))));
+  assert.doesNotMatch(JSON.stringify(good), /receipt-1|receipt-2/u);
+});
+
+test('S1 refuses non-string, control and accessor Specialist receipt identities without disclosure or replay', () => {
+  const marker = 'PRIVATE_RECEIPT_TRAP_DO_NOT_LEAK';
+  for (const value of [7, {}, true, 'receipt-\\u202e-hidden', 'receipt-\\n-wrong', 'a'.repeat(241)]) {
+    const input = job();
+    input.runtime.specialistDispatchByAgentId = {
+      first: { state: 'PROVIDER_SUCCEEDED', providerReceiptId: value },
+    };
+    assert.throws(() => buildAgentRunTimelineV1(input), error =>
+      error instanceof Error && /receipt identity is invalid or duplicated/u.test(error.message) &&
+      !error.message.includes(marker));
+  }
+  let called = 0;
+  const input = job();
+  const attempt = { state: 'PROVIDER_SUCCEEDED' };
+  Object.defineProperty(attempt, 'providerReceiptId', {
+    enumerable: true,
+    get() { called += 1; throw Error(marker); },
+  });
+  input.runtime.specialistDispatchByAgentId = { first: attempt };
+  assert.throws(() => buildAgentRunTimelineV1(input), error =>
+    error instanceof Error && !error.message.includes(marker));
+  assert.equal(called, 0);
+  assert.equal(buildAgentRunTimelineV1(job()).mayReplayExternalEffect, false);
+});
