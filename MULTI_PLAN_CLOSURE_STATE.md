@@ -1,3 +1,11 @@
+### PLAN6_S1_OWNERSHIP_EVIDENCE_A5F3D58A_20261010 — NONTERMINAL
+- Scope STRICTLY canonical Google Drive `6. Шостий план` doc `1fr5Pm7ZbX7IxF-2CZ9nqWSE7vREMEGDCN2r0uHyr_Tk`, first ACTIONABLE Section 1 only. Section 2 is ACTIONABLE / NOT DONE, was not modified; Section 3+ and all other Drive plans untouched.
+- Reused 11.0.13 High Plan6 source PR #709; scoped child PR [#721](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/721), exact candidate head `54d9ea50a020853e2b9eeff4f5c46fd695ade0ce`, merged into Plan6 feature branch ONLY as `a5f3d58a5e21d52b7a819180d7a3ad3f70c4a62e`, NOT into stale main 0.9.19. Verified merged source blobs: timeline `26d424e61416ac6a3e1f2185f9297b69829209d6`; UI `53f63c7492074085a06e61bcb95592f6f4b024e1`; tests `4d50fc56b126d74df26b1cbedb1521801f5a3673`.
+- S1 engineering: reusable read-only canonical `specialistExecutionOwnerships` projection, bounded 128, validated states and nonduplicate structural node/effect ID presence, no exposed IDs/secrets/authority or replay, `agentTreeEdgesVerified=false`, `externalEffectVerified=false`. Keyboard semantic Ukrainian status reports recorded counts. Added 3 test cases covering positive/JSON restart/privacy, negative corrupt/sparse/oversize/duplicate/Proxy/accessor and UI semantics. No external effect, production provider credential or physical NVDA claim.
+- Exact candidate CI: Plan6 dual-OS [#38049898912](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/38049898912) SUCCESS, Ubuntu 67/67 PASS, Windows 67/67 PASS; UI accessibility #38049898937 SUCCESS; Chrome #38049899001 SUCCESS; Core #38049898995 SUCCESS. Full Release #38049898915 FAILURE; no release readiness waiver. Post-merge source readback verified against the three hashes; post-merge fresh CI not yet claimed.
+- **S1 ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. S2 ACTIONABLE / NOT DONE.** Missing full verified tool/external-effect/before-after/artifact/Agent-tree provenance, actual product integration/recovery/endurance and canonical 11.x-main convergence/release qualification/post-main readback. HUMAN_TESTED=false; NVDA_VERIFIED=false. Never promote PR/merge/scoped CI to terminal DONE.
+
+
 
 ### PLAN7_S1_SDK_TOKEN_GRAMMAR_PARITY_PR722_20261010 — NONTERMINAL
 
