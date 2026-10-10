@@ -415,7 +415,15 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   // These are presence counts within the bounded canonical history, not proof
   // that an external operation committed or that missing evidence never existed.
   // Do not infer receipts, artifacts or before/after snapshots from free text.
-  const recordedOutcome = recordedOutcomeSummary(own(runtime, 'verifiedOutcome'));
+  // A genuinely missing legacy outcome means "not recorded". A persisted
+  // explicit null/undefined instead signals corrupt evidence and must never
+  // be projected as an apparently clean empty verification after restart.
+  const outcomePresent = safeHasOwn(runtime, 'verifiedOutcome');
+  const rawOutcome = own(runtime, 'verifiedOutcome');
+  if (outcomePresent && rawOutcome == null) {
+    throw new Error('Agent persisted outcome is invalid');
+  }
+  const recordedOutcome = recordedOutcomeSummary(rawOutcome);
   const evidenceMap = {
     scope: 'INSPECTED_CANONICAL_HISTORY_ONLY',
     // BrowserAgentManager also caps its persisted history. Even reading all
