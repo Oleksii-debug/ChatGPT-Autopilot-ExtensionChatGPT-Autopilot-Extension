@@ -288,6 +288,63 @@ function recordedSpecialistDispatchEvidence(runtime) {
   });
 }
 
+// Read-only projection of the EXISTING durable ExecutionOwnershipV1 records.
+// State and structural link counts are NOT Agent-tree ancestry, execution
+// receipts, independent verification or permission to resume/replay effects.
+const RECORDED_OWNERSHIP_STATES = new Set([
+  'AVAILABLE', 'OWNED', 'HANDOFF_PENDING', 'RECONCILE', 'VERIFIED', 'MANUAL_REVIEW',
+]);
+const RECORDED_OWNERSHIP_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+function recordedExecutionOwnershipEvidence(runtime) {
+  const empty = () => freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_OWNERSHIP_METADATA_ONLY',
+    recordPresent: false,
+    inspectedRecords: 0,
+    stateCounts: { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 },
+    structurallyBoundNodeRecords: 0,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+  if (!safeHasOwn(runtime, 'specialistExecutionOwnerships')) return empty();
+  const records = own(runtime, 'specialistExecutionOwnerships');
+  if (!plainArray(records)) throw new Error('Agent execution ownership records must be a bounded dense array');
+  const count = own(records, 'length');
+  if (!Number.isSafeInteger(count) || count < 0 || count > 128) {
+    throw new Error('Agent execution ownership length is invalid');
+  }
+  const keys = safeOwnKeys(records);
+  if (keys.length !== count + 1 || keys.some(key =>
+    typeof key !== 'string' || (key !== 'length' &&
+      (!/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= count)))) {
+    throw new Error('Agent execution ownership records must be a bounded dense array');
+  }
+  const stateCounts = { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 };
+  const seenNodes = new Set();
+  for (let i = 0; i < count; i += 1) {
+    const item = record(own(records, String(i)), 'Agent execution ownership record');
+    const state = own(item, 'state');
+    const nodeId = own(item, 'nodeId');
+    const effectId = own(item, 'effectId');
+    if (!RECORDED_OWNERSHIP_STATES.has(state) ||
+        typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId) ||
+        typeof effectId !== 'string' || !RECORDED_OWNERSHIP_ID.test(effectId) ||
+        seenNodes.has(nodeId)) {
+      throw new Error('Agent execution ownership record has invalid or duplicate identity/state');
+    }
+    seenNodes.add(nodeId);
+    stateCounts[state] += 1;
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_OWNERSHIP_METADATA_ONLY',
+    recordPresent: true,
+    inspectedRecords: count,
+    stateCounts,
+    structurallyBoundNodeRecords: seenNodes.size,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+}
+
 export function buildAgentRunTimelineV1(job, options = {}) {
   record(job, 'Agent timeline job');
   record(options, 'Agent timeline options');
@@ -359,6 +416,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     externalEffectVerified: false,
     recordedOutcome,
     specialistProviderDispatch: recordedSpecialistDispatchEvidence(runtime),
+    specialistExecutionOwnership: recordedExecutionOwnershipEvidence(runtime),
   };
   // Preserve a single observation of this persisted accounting field. A
   // hostile storage Proxy may return a new descriptor on each inspection:

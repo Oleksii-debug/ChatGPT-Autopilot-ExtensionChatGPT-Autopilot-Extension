@@ -3537,6 +3537,11 @@ function renderAgentRunTimeline(job) {
       ', записаних посилань на артефакти ' + timeline.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded +
       ', неоднозначних станів ' + timeline.evidenceMap.specialistProviderDispatch.statusCounts.AMBIGUOUS +
       '. Це лише збережені метадані, не доказ зовнішнього виконання чи походження артефактів.' +
+      ' Збережені ExecutionOwnership records: ' + timeline.evidenceMap.specialistExecutionOwnership.inspectedRecords +
+      ', вузлів зі структурними ідентифікаторами ' + timeline.evidenceMap.specialistExecutionOwnership.structurallyBoundNodeRecords +
+      ', станів звірки ' + timeline.evidenceMap.specialistExecutionOwnership.stateCounts.RECONCILE +
+      ', ручної перевірки ' + timeline.evidenceMap.specialistExecutionOwnership.stateCounts.MANUAL_REVIEW +
+      '. Це лише збережені стани, а не підтверджені зв’язки Agent tree чи квитанції ефектів.' +
       ' Підтвердження зовнішніх ефектів, знімки до/після, квитанції інструментів, походження артефактів та зв’язки Agent tree цією хронологією не встановлені.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями; підрахунки неповні.' : '') +
       ' Порядкові номери записів належать лише поточному збереженому зрізу і можуть змінюватися після обрізання історії.' +

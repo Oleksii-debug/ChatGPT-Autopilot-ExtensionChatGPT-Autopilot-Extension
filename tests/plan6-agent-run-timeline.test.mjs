@@ -498,3 +498,83 @@ test('S1 recorded outcome time rejects forged persisted values without getter ex
   assert.equal(buildAgentRunTimelineV1(valid).evidenceMap.recordedOutcome.recordedAt, null);
   assert.doesNotMatch(JSON.stringify(recorded), /PRIVATE_|NEVER_EXPORT|SECRET_999|CREDENTIAL_SECRET/u);
 });
+
+test('S1 durable execution ownership metadata projection is bounded, redacted and read-only after restart', () => {
+  const input = job();
+  input.runtime.specialistExecutionOwnerships = [
+    { state: 'AVAILABLE', nodeId: 'private-node-1', effectId: 'private-effect-1', policyEnvelopeId: 'PRIVATE_POLICY_MARKER' },
+    { state: 'OWNED', nodeId: 'private-node-2', effectId: 'private-effect-2', ownerId: 'PRIVATE_OWNER_MARKER' },
+    { state: 'RECONCILE', nodeId: 'private-node-3', effectId: 'private-effect-3', ambiguityReason: 'PRIVATE_FAILURE_MARKER' },
+  ];
+  const before = structuredClone(input);
+  const snapshot = buildAgentRunTimelineV1(input);
+  const result = snapshot.evidenceMap.specialistExecutionOwnership;
+  assert.equal(result.source, 'CANONICAL_AGENT_RUNTIME_OWNERSHIP_METADATA_ONLY');
+  assert.equal(result.recordPresent, true);
+  assert.equal(result.inspectedRecords, 3);
+  assert.deepEqual(result.stateCounts, {
+    AVAILABLE: 1, OWNED: 1, HANDOFF_PENDING: 0, RECONCILE: 1, VERIFIED: 0, MANUAL_REVIEW: 0,
+  });
+  assert.equal(result.structurallyBoundNodeRecords, 3);
+  assert.equal(result.agentTreeEdgesVerified, false);
+  assert.equal(result.externalEffectVerified, false);
+  assert.equal(snapshot.evidenceMap.externalEffectVerified, false);
+  assert.equal(snapshot.mayReplayExternalEffect, false);
+  assert.deepEqual(input, before);
+  assert.deepEqual(snapshot, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))));
+  assert.equal(Object.isFrozen(result.stateCounts), true);
+  assert.doesNotMatch(JSON.stringify(snapshot), /PRIVATE_|private-node|private-effect/u);
+  const legacy = job();
+  delete legacy.runtime.specialistExecutionOwnerships;
+  const missing = buildAgentRunTimelineV1(legacy).evidenceMap.specialistExecutionOwnership;
+  assert.equal(missing.recordPresent, false);
+  assert.equal(missing.inspectedRecords, 0);
+  assert.equal(missing.agentTreeEdgesVerified, false);
+});
+
+test('S1 malformed or spoofed durable execution ownership never becomes zero or verified evidence', () => {
+  const marker = 'PRIVATE_OWNERSHIP_TRAP_DO_NOT_EXPORT';
+  const record = { state: 'OWNED', nodeId: 'node-1', effectId: 'effect-1' };
+  const cases = [
+    null, undefined, {}, new Array(2), [null], [3], [record, record],
+    [{ ...record, state: 'OWNER_APPROVED' }],
+    [{ ...record, nodeId: '' }],
+    [{ ...record, effectId: ' PRIVATE_ALIAS' }],
+    Array.from({ length: 129 }, (_, i) => ({ ...record, nodeId: 'node-' + i })),
+  ];
+  const extra = [record];
+  extra.extra = marker;
+  cases.push(extra);
+  for (const value of cases) {
+    const input = job();
+    input.runtime.specialistExecutionOwnerships = value;
+    assert.throws(
+      () => buildAgentRunTimelineV1(input),
+      error => error instanceof Error && !error.message.includes(marker),
+    );
+  }
+  const accessor = [record];
+  let invoked = 0;
+  Object.defineProperty(accessor, '0', { get() { invoked += 1; throw Error(marker); }, enumerable: true });
+  const input = job();
+  input.runtime.specialistExecutionOwnerships = accessor;
+  assert.throws(() => buildAgentRunTimelineV1(input), error => !error.message.includes(marker));
+  assert.equal(invoked, 0);
+  input.runtime.specialistExecutionOwnerships = new Proxy([record], {
+    ownKeys() { throw Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(input), error => !error.message.includes(marker));
+  input.runtime.specialistExecutionOwnerships = [{ ...record, state: 'WRONG' }];
+  assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))), /identity\/state/u);
+  assert.equal(buildAgentRunTimelineV1(job()).mayReplayExternalEffect, false);
+});
+
+test('S1 execution ownership summary is exposed by native text, never user-content HTML', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const script = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const section = script.slice(script.indexOf('function renderAgentRunTimeline(job)'), script.indexOf('function renderBrowserAgentList()'));
+  assert.match(section, /specialistExecutionOwnership\.inspectedRecords/u);
+  assert.match(section, /specialistExecutionOwnership\.stateCounts\.RECONCILE/u);
+  assert.match(section, /зв’язки Agent tree/u);
+  assert.doesNotMatch(section, /innerHTML|outerHTML|insertAdjacentHTML/u);
+});
