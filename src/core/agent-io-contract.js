@@ -40,13 +40,13 @@ const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
 
 export function getAgentActionRequiredCapability(actionType) {
   const type = typeof actionType === 'string' ? actionType : '';
-  if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
+  if (!ACTION_TYPES.has(type)) throw new Error('Unsupported agent action type');
   return ACTION_CAPABILITY_REQUIREMENTS[type] || null;
 }
 
 export function getAgentEventRequiredCapability(eventType) {
   const type = typeof eventType === 'string' ? eventType : '';
-  if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
+  if (!EVENT_TYPES.has(type)) throw new Error('Unsupported agent event type');
   return EVENT_CAPABILITY_REQUIREMENTS[type] || null;
 }
 
@@ -201,7 +201,7 @@ export function normalizeAgentAction(input) {
   const action = requirePlainObject(input, 'Agent action', ACTION_FIELDS);
   if (action.schemaVersion !== 1) throw new Error('Unsupported agent action schemaVersion');
   const type = typeof action.type === 'string' ? action.type : '';
-  if (!ACTION_TYPES.has(type)) throw new Error(`Unsupported agent action type: ${type || '(empty)'}`);
+  if (!ACTION_TYPES.has(type)) throw new Error('Unsupported agent action type');
   const providerId = requireId(action.providerId, 'providerId');
   requireProviderCapabilityForAction(providerId, type);
   const normalized = {
@@ -221,7 +221,7 @@ export function normalizeAgentEvent(input) {
   const event = requirePlainObject(input, 'Agent event', EVENT_FIELDS);
   if (event.schemaVersion !== 1) throw new Error('Unsupported agent event schemaVersion');
   const type = typeof event.type === 'string' ? event.type : '';
-  if (!EVENT_TYPES.has(type)) throw new Error(`Unsupported agent event type: ${type || '(empty)'}`);
+  if (!EVENT_TYPES.has(type)) throw new Error('Unsupported agent event type');
   const providerId = requireId(event.providerId, 'providerId');
   requireProviderCapabilityForEvent(providerId, type);
   const normalized = {
