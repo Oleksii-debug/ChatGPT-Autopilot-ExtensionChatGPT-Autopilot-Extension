@@ -181,6 +181,13 @@ export function loadCompatibleEndpointRegistry({ env = process.env, configFile =
   }
   const config = readJsonFile(configFile);
   if (config.error) throw gatewayError('Could not parse Gateway endpoint settings', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  // Only a genuinely missing settings file may use the historical default.
+  // A present JSON null, scalar or array is corrupt config, not permission
+  // to replace the former account registry with an implicit local endpoint.
+  if (config.exists && (!config.value || typeof config.value !== 'object'
+      || Array.isArray(config.value))) {
+    throw gatewayError('Gateway endpoint settings must be a JSON object', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  }
   if (config.value?.compatibleEndpoints !== undefined) return normalizeCompatibleEndpointRegistry(config.value.compatibleEndpoints);
   return normalizeCompatibleEndpointRegistry('');
 }
