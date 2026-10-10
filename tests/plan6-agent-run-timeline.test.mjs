@@ -578,3 +578,27 @@ test('S1 execution ownership summary is exposed by native text, never user-conte
   assert.match(section, /зв’язки Agent tree/u);
   assert.doesNotMatch(section, /innerHTML|outerHTML|insertAdjacentHTML/u);
 });
+
+test('S1 durable ownership refuses one effect assigned to multiple nodes after JSON restart', () => {
+  const source = job();
+  source.runtime.specialistExecutionOwnerships = [
+    { state: 'OWNED', nodeId: 'node-A', effectId: 'effect-shared', ownerId: 'PRIVATE_OWNER_A' },
+    { state: 'RECONCILE', nodeId: 'node-B', effectId: 'effect-shared', ownerId: 'PRIVATE_OWNER_B' },
+  ];
+  for (const candidate of [source, JSON.parse(JSON.stringify(source))]) {
+    assert.throws(() => buildAgentRunTimelineV1(candidate),
+      /execution ownership record has invalid or duplicate identity\/state/);
+  }
+  // Different canonical effect identities retain the original read-only
+  // projection without exposing owner IDs or implying external completion.
+  source.runtime.specialistExecutionOwnerships[1].effectId = 'effect-distinct';
+  const clean = buildAgentRunTimelineV1(source);
+  assert.equal(clean.evidenceMap.specialistExecutionOwnership.inspectedRecords, 2);
+  assert.equal(clean.evidenceMap.specialistExecutionOwnership.structurallyBoundNodeRecords, 2);
+  assert.equal(clean.evidenceMap.specialistExecutionOwnership.externalEffectVerified, false);
+  assert.equal(clean.evidenceMap.specialistExecutionOwnership.agentTreeEdgesVerified, false);
+  assert.equal(clean.mayReplayExternalEffect, false);
+  assert.equal(clean.evidenceOnly, true);
+  assert.deepEqual(clean, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(source))));
+  assert.doesNotMatch(JSON.stringify(clean), /PRIVATE_OWNER_A|PRIVATE_OWNER_B|effect-shared|effect-distinct/);
+});
