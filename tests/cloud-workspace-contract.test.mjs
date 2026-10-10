@@ -365,3 +365,42 @@ test('assessment option timestamp is data-only and cannot execute an accessor', 
   ), /own data properties/);
   assert.equal(reads, 0);
 });
+
+test('lease deadline is exclusive for creation and persisted cloud continuity', () => {
+  const ownership = cloudOwnership();
+  assert.throws(() => createCloudWorkspaceBindingV1(
+    observation({ observedAt: '2026-09-25T06:50:00.000Z', expiresAt: '2026-09-25T07:30:00.000Z' }),
+    ownership,
+    { at: ownership.leaseUntil },
+  ), /live execution lease/u);
+  const { binding } = bindingAndOwnership();
+  const result = assessCloudWorkspaceContinuityV1(
+    binding,
+    observation({ observedAt: '2026-09-25T06:50:00.000Z', expiresAt: '2026-09-25T07:30:00.000Z' }),
+    ownership,
+    { at: ownership.leaseUntil },
+  );
+  assert.equal(result.status, CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED);
+  assert.equal(result.reasonCode, 'EXECUTION_LEASE_EXPIRED');
+  assert.equal(result.resumeAuthorized, false);
+});
+
+test('rollback of assessment clock cannot make a future cloud binding ready', () => {
+  const { binding, ownership } = bindingAndOwnership();
+  const result = assessCloudWorkspaceContinuityV1(
+    binding, observation(), ownership,
+    { at: '2026-09-25T06:05:30.000Z' },
+  );
+  assert.equal(result.status, CloudWorkspaceContinuityStatus.BLOCKED);
+  assert.equal(result.reasonCode, 'BINDING_FROM_FUTURE');
+  assert.equal(result.executionAuthorized, false);
+});
+
+test('observation from before a later canonical ownership revision cannot bind a cloud lease', () => {
+  const ownership = cloudOwnership();
+  const revised = Object.freeze({ ...ownership, updatedAt: '2026-09-25T06:05:30.000Z' });
+  assert.throws(
+    () => createCloudWorkspaceBindingV1(observation(), revised, { at: '2026-09-25T06:06:00.000Z' }),
+    /predates canonical ownership revision/u,
+  );
+});
