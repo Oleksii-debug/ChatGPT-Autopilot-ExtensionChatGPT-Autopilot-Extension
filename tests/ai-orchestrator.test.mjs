@@ -543,6 +543,74 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   ]);
 });
 
+test('Plan4 S1: a stale or forged call ordinal never authorizes provider I/O', async () => {
+  const configured = settings({
+    routes:[{routeId:'one-local', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1}],
+  });
+  let getterReads = 0;
+  const rejected = [
+    {reservationId:'durable-ordinal', callNumber:0},
+    {reservationId:'durable-ordinal', callNumber:2},
+    {reservationId:'durable-ordinal', callNumber:'1'},
+    {reservationId:'durable-ordinal', callNumber:undefined},
+    {reservationId:'durable-ordinal', callNumber:NaN},
+    {reservationId:'durable-ordinal', callNumber:-0},
+    Object.defineProperty({reservationId:'durable-ordinal'}, 'callNumber', {
+      get() { getterReads += 1; throw new Error('secret-ordinal-getter'); },
+    }),
+    new Proxy({reservationId:'durable-ordinal', callNumber:1}, {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === 'callNumber') throw new Error('secret-ordinal-proxy');
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    }),
+  ];
+  for (const reservation of rejected) {
+    let providerCalls = 0;
+    let settlements = 0;
+    const router = new AiOrchestrator({
+      now:() => 84_000,
+      gatewayClient:{async complete() {providerCalls++; throw new Error('unexpected I/O');}},
+      providerCallLifecycle:{
+        async beforeProviderCall() {return reservation;},
+        async afterProviderCall() {settlements++; return {settled:true};},
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'ordinal-bound task', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{kind:'browser-agent', jobId:'ordinal-bound', controlEpoch:0},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_CALL_NUMBER_MISMATCH'
+        && !String(error.message).includes('secret-ordinal'),
+    );
+    assert.equal(providerCalls, 0, 'stale ordinal must deny provider I/O');
+    assert.equal(settlements, 0, 'stale ordinal must not fabricate settlement');
+  }
+  assert.equal(getterReads, 0, 'receipt ordinal getter is never invoked');
+  let providerCalls = 0;
+  let settlements = 0;
+  const router = new AiOrchestrator({
+    now:() => 84_100,
+    gatewayClient:{async complete() {
+      providerCalls++;
+      return {text:'ordinal verified', usage:{inputTokens:1, outputTokens:1, totalTokens:2}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall() {return {reservationId:'durable-ordinal', callNumber:1};},
+      async afterProviderCall() {settlements++; return {settled:true};},
+    },
+  });
+  const good = await router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'ordinal-bound task', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'ordinal-valid', controlEpoch:0},
+  });
+  assert.equal(good.text, 'ordinal verified');
+  assert.equal(providerCalls, 1);
+  assert.equal(settlements, 1);
+});
+
 test('Plan4 S1: invalid durable reservation IDs never reach the provider', async () => {
   const configured = settings({
     routes:[{routeId:'one-local', provider:'ollama', model:'fixture',
