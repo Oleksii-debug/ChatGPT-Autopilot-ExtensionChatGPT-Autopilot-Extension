@@ -459,3 +459,26 @@ test('Plan8 convergence dispatch identity is stable after canonical JSON restart
     ...structuredClone(canonical), executionAuthority: true,
   }), /cannot grant executionAuthority/u);
 });
+
+test('Plan8 exact optional parent authority identity survives JSON recovery and rejects forged identities', () => {
+  const identity = 'subagent-authority:' + 'a'.repeat(64);
+  const canonical = createSubagentTaskEnvelopeV1(request({ authorityEnvelopeIdentity: identity }));
+  assert.equal(canonical.authorityEnvelopeIdentity, identity);
+  assert.equal(normalizeSubagentTaskEnvelopeV1(JSON.parse(JSON.stringify(canonical))).authorityEnvelopeIdentity, identity);
+  assert.notEqual(deriveSubagentTaskDispatchIdentityV1(canonical),
+    deriveSubagentTaskDispatchIdentityV1(createSubagentTaskEnvelopeV1(request())),
+    'changing parent authority identity must produce a different replay fence');
+  assert.throws(() => createSubagentTaskEnvelopeV1(request({
+    authorityEnvelopeIdentity: 'subagent-authority:' + 'A'.repeat(64),
+  })), /exact subagent authority-envelope identity/u);
+  assert.throws(() => createSubagentTaskEnvelopeV1(request({
+    authorityEnvelopeIdentity: 'authority-escalated',
+  })), /exact subagent authority-envelope identity/u);
+  let getterReads = 0;
+  const forged = request();
+  Object.defineProperty(forged, 'authorityEnvelopeIdentity', {
+    enumerable: true, get() { getterReads++; return identity; },
+  });
+  assert.throws(() => createSubagentTaskEnvelopeV1(forged), /enumerable own data property/u);
+  assert.equal(getterReads, 0);
+});
