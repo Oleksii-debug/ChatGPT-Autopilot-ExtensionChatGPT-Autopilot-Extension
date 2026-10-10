@@ -925,7 +925,9 @@ test('Plan2 S1 unsafe persisted direct URLs cannot inherit source ALLOW after JS
   const snapshot = JSON.parse(JSON.stringify({ url: 'https://source.test/current', frames: [] }));
   const unsafe = [undefined, null, 14, {}, [], '', '/relative', '//blocked.test/path',
     'javascript:alert(1)', 'data:text/html,unsafe', 'file:///tmp/proof',
-    'chrome-extension://opaque/path', 'not a URL'];
+    'chrome-extension://opaque/path', 'not a URL',
+    'https://alice:secret@source.test/private', 'https://bob@source.test/private',
+    'http://user:%70ass@source.test/'];
   for (const type of ['navigate', 'new_tab', 'download']) {
     for (const url of unsafe) {
       // Exercise the owner policy on durable replay, not only parseSingleAction.
