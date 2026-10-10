@@ -166,3 +166,74 @@ test('persisted orchestra metadata cannot select inherited identities or malform
   }));
   assert.equal((await manager.loadMeta()).selectedId, 'orch-1');
 });
+
+
+test('metadata cold restart isolates corrupt owner policies and rejects accessor records without evaluating them', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  let getterCalls = 0;
+  const healthy = {
+    id: 'healthy',
+    name: 'Healthy',
+    subagentPolicy: {
+      schemaVersion: 1,
+      allowAgentCreatedChildren: false,
+      maxDepth: 2,
+      maxChildrenPerAgent: 1,
+    },
+  };
+  let stored = {
+    schemaVersion: 1,
+    selectedId: 'bad-policy',
+    order: ['bad-policy', 'getter-record', 'getter-policy', 'hidden-record', 'healthy'],
+    byId: {
+      'bad-policy': { id: 'bad-policy', subagentPolicy: { allowAgentCreatedChildren: 'true' } },
+      'getter-policy': { id: 'getter-policy' },
+      healthy,
+    },
+  };
+  Object.defineProperty(stored.byId, 'getter-record', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('untrusted entry getter should not run');
+    },
+  });
+  Object.defineProperty(stored.byId['getter-policy'], 'subagentPolicy', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('untrusted owner policy getter should not run');
+    },
+  });
+  Object.defineProperty(stored.byId, 'hidden-record', {
+    enumerable: false,
+    value: { id: 'hidden-record', subagentPolicy: {} },
+  });
+  manager.chrome = { storage: { local: {
+    get: async () => ({ autopilotOrchestrationV2Manager: stored }),
+  } } };
+
+  const recovered = await manager.loadMeta();
+  assert.equal(getterCalls, 0);
+  assert.deepEqual(recovered.order, ['healthy']);
+  assert.equal(recovered.selectedId, 'healthy');
+  assert.equal(Object.hasOwn(recovered.byId, 'bad-policy'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'getter-record'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'getter-policy'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'hidden-record'), false);
+  assert.equal(recovered.byId.healthy.subagentPolicy.allowAgentCreatedChildren, false);
+
+  // Cold JSON recovery still selects the same owned, valid policy. The
+  // unavailable corrupt entries cannot be treated as runnable authorities.
+  stored = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    selectedId: 'healthy',
+    order: ['healthy'],
+    byId: { healthy },
+  }));
+  const clean = await manager.loadMeta();
+  assert.deepEqual(clean.order, ['healthy']);
+  assert.equal(clean.selectedId, 'healthy');
+  assert.deepEqual(clean.byId.healthy.subagentPolicy, recovered.byId.healthy.subagentPolicy);
+});
