@@ -481,10 +481,28 @@ export async function listProviderModels(provider, { fetchFn = globalThis.fetch,
   return (body.data || body.models || []).map(item => clean(item?.id || item?.name || item?.model)).filter(Boolean).sort();
 }
 
+
+function exactProviderModelId(model) {
+  // The HTTP gateway is an independently callable transport boundary. An
+  // untrusted request must never alias to a different charged model by
+  // trimming or accepting malformed Unicode, even if extension validation
+  // was bypassed. Keep the companion standalone (no dependency on src/).
+  if (!clean(model)) throw new Error('Model is required');
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300
+      || /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(model)
+      || Array.from(model).some(char => {
+        const point = char.codePointAt(0);
+        return point >= 0xd800 && point <= 0xdfff;
+      })) {
+    throw gatewayError('AI provider model identity must be exact bounded Unicode', 400, 'AI_MODEL_ID_INVALID');
+  }
+  return model;
+}
+
 export async function completeProvider({ provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch, compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   requireBuiltinEndpointUnbound(provider, endpointId);
-  if (!clean(model)) throw new Error('Model is required');
+  const dispatchModel = exactProviderModelId(model);
   if (!clean(prompt)) throw new Error('Prompt is required');
   const visionImage = normalizeImageDataUrl(imageDataUrl);
   if (provider === 'ollama') {
@@ -494,17 +512,17 @@ export async function completeProvider({ provider, model, endpointId = '', promp
     const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
-      body: JSON.stringify({ model: clean(model), messages, stream: false, ...(tokenLimit ? { options: { num_predict: tokenLimit } } : {}) }),
+      body: JSON.stringify({ model: dispatchModel, messages, stream: false, ...(tokenLimit ? { options: { num_predict: tokenLimit } } : {}) }),
     });
     const text = clean(body?.message?.content) || clean(body?.response);
     if (!text) throw new Error('Ollama returned no assistant text');
     const inputTokens = Math.max(0, Number(body?.prompt_eval_count || 0));
     const outputTokens = Math.max(0, Number(body?.eval_count || 0));
-    return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, modelCalls: 1 } };
+    return { provider, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, modelCalls: 1 } };
   }
 
   if (provider === 'openai') {
-    const payload = { model: clean(model), input: visionImage ? [{ role: 'user', content: [{ type: 'input_text', text: clean(prompt) }, { type: 'input_image', image_url: visionImage }] }] : clean(prompt) };
+    const payload = { model: dispatchModel, input: visionImage ? [{ role: 'user', content: [{ type: 'input_text', text: clean(prompt) }, { type: 'input_image', image_url: visionImage }] }] : clean(prompt) };
     if (clean(systemPrompt)) payload.instructions = clean(systemPrompt);
     const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
     if (tokenLimit) payload.max_output_tokens = tokenLimit;
@@ -518,7 +536,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
     const inputTokens = Math.max(0, Number(body?.usage?.input_tokens || 0));
     const outputTokens = Math.max(0, Number(body?.usage?.output_tokens || 0));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(body?.usage?.total_tokens || 0));
-    return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
+    return { provider, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
   }
 
   const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
@@ -529,14 +547,14 @@ export async function completeProvider({ provider, model, endpointId = '', promp
   const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: compatibleHeaders(endpoint, env),
-    body: JSON.stringify({ model: clean(model), messages, stream: false, ...(tokenLimit ? { max_tokens: tokenLimit } : {}) }),
+    body: JSON.stringify({ model: dispatchModel, messages, stream: false, ...(tokenLimit ? { max_tokens: tokenLimit } : {}) }),
   });
   const text = clean(body?.choices?.[0]?.message?.content) || clean(body?.choices?.[0]?.text);
   if (!text) throw new Error('OpenAI-compatible server returned no assistant text');
   const inputTokens = Math.max(0, Number(body?.usage?.prompt_tokens || 0));
   const outputTokens = Math.max(0, Number(body?.usage?.completion_tokens || 0));
   const totalTokens = Math.max(inputTokens + outputTokens, Number(body?.usage?.total_tokens || 0));
-  return { provider, endpointId: endpoint.endpointId, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
+  return { provider, endpointId: endpoint.endpointId, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
 }
 
 
