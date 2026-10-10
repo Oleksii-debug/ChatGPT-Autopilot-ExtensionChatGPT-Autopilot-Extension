@@ -74,19 +74,29 @@ const agentJobsReadGate = createAgentJobsReadGateV1(() => core('LIST_BROWSER_AGE
 let agentOwnerOperationSequence = 0;
 let agentListProjection = '';
 function selectBrowserAgentView(id) {
-  ui.selectedBrowserAgentId = id || '';
-  return agentViewFence.select(ui.selectedBrowserAgentId);
+  const nextId = id || '';
+  // Cached timeline evidence belongs to one selected Agent. A different
+  // selection must not inherit the previous Agent's successful Core-read gate.
+  if (nextId !== ui.selectedBrowserAgentId) ui.agentTimelineStale = true;
+  ui.selectedBrowserAgentId = nextId;
+  return agentViewFence.select(nextId);
 }
 function beginAgentOwnerOperation(command, id = ui.selectedBrowserAgentId) {
   const key = `${command}:${id || ''}`;
   if (agentOwnerOperations.has(key)) return null;
   agentOwnerOperations.add(key);
   agentJobsReadGate.invalidate();
+  // A command may change durable history without changing selected identity.
+  // Refuse an export of pre-command evidence until a fresh Core read succeeds.
+  ui.agentTimelineStale = true;
   return { key, ticket: selectBrowserAgentView(ui.selectedBrowserAgentId), sequence: ++agentOwnerOperationSequence };
 }
 function finishAgentOwnerOperation(operation) {
   agentOwnerOperations.delete(operation.key);
   agentJobsReadGate.invalidate();
+  // Completion changes the durable state *after* any concurrent Core read.
+  // Only a subsequent accepted read may reauthorize read-only export.
+  ui.agentTimelineStale = true;
 }
 function agentOwnerResult(operation, message) {
   if (operation.sequence === agentOwnerOperationSequence) $('agent-command-result').textContent = message;
@@ -3532,10 +3542,21 @@ function renderAgentRunTimeline(job) {
       ', дій власника серед переглянутих ' + counters.ownerEvents + '.' +
       ' Карта доказів: подій редакції плану ' + timeline.evidenceMap.observed.planRevisionEvents +
       ', контрольних точок ' + timeline.evidenceMap.observed.checkpointRecordedEvents + '.' +
+      ' Збережені метадані Specialist: спроб ' + timeline.evidenceMap.specialistProviderDispatch.inspectedAttempts +
+      ', записаних ідентифікаторів квитанцій ' + timeline.evidenceMap.specialistProviderDispatch.receiptIdsRecorded +
+      ', записаних посилань на артефакти ' + timeline.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded +
+      ', неоднозначних станів ' + timeline.evidenceMap.specialistProviderDispatch.statusCounts.AMBIGUOUS +
+      '. Це лише збережені метадані, не доказ зовнішнього виконання чи походження артефактів.' +
+      ' Збережені ExecutionOwnership records: ' + timeline.evidenceMap.specialistExecutionOwnership.inspectedRecords +
+      ', вузлів зі структурними ідентифікаторами ' + timeline.evidenceMap.specialistExecutionOwnership.structurallyBoundNodeRecords +
+      ', станів звірки ' + timeline.evidenceMap.specialistExecutionOwnership.stateCounts.RECONCILE +
+      ', ручної перевірки ' + timeline.evidenceMap.specialistExecutionOwnership.stateCounts.MANUAL_REVIEW +
+      '. Це лише збережені стани, а не підтверджені зв’язки Agent tree чи квитанції ефектів.' +
       ' Підтвердження зовнішніх ефектів, знімки до/після, квитанції інструментів, походження артефактів та зв’язки Agent tree цією хронологією не встановлені.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями; підрахунки неповні.' : '') +
       ' Порядкові номери записів належать лише поточному збереженому зрізу і можуть змінюватися після обрізання історії.' +
-      ' Це перегляд, а не повторне виконання.';
+      ' Це перегляд, а не повторне виконання.' +
+      (ui.agentTimelineStale ? ' Увага: останнє оновлення з Core не підтверджене; експорт заблоковано до успішного оновлення.' : '');
   } catch {
     list.replaceChildren();
     status.textContent = 'Безпечна хронологія недоступна: перевірте збережений стан Agent.';
@@ -3544,15 +3565,23 @@ function renderAgentRunTimeline(job) {
 async function refreshAgentRunTimeline() {
   const button = $('agent-run-timeline-refresh-button');
   if (button.disabled) return;
+  // A failed or overtaken Core refresh must not leave an exportable old
+  // snapshot masquerading as current evidence. Keep viewing read-only.
+  ui.agentTimelineStale = true;
   const restoreFocusOnUnownedBlur = document.activeElement === button;
   button.disabled = true;
   try {
     const result = await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
-    if (result.applied) {
+    // An accepted read is not sufficient while an owner operation is live,
+    // or after a selection switch. Never override the shared freshness gate.
+    if (result.applied && !ui.agentTimelineStale &&
+        (!result.job || result.job.id === ui.selectedBrowserAgentId)) {
+      renderAgentRunTimeline(result.job || null);
       announce('Хронологію Agent оновлено з Core.');
     } else {
-      $('agent-run-timeline-status').textContent = 'Не вдалося оновити. Перевірте Core і повторіть.';
-      announce('Хронологію Agent не оновлено. Перевірте Core.');
+      ui.agentTimelineStale = true;
+      $('agent-run-timeline-status').textContent = 'Хронологію не підтверджено: перевірте Core, завершення команди власника та вибране завдання. Оновіть ще раз.';
+      announce('Актуальність хронології Agent не підтверджена. Експорт заблоковано.');
     }
   } catch {
     // A failed Core read must not leave a disabled keyboard control or an unhandled UI rejection.
@@ -3567,9 +3596,22 @@ async function refreshAgentRunTimeline() {
   }
 }
 function exportAgentRunTimeline() {
+  if (ui.agentTimelineStale) {
+    $('agent-run-timeline-status').textContent = 'Експорт заблоковано: актуальність даних не підтверджено Core. Натисніть «Оновити з Core». ';
+    announce('Експорт хронології заблоковано до успішного оновлення з Core.');
+    return;
+  }
   const job = ui.agentTimelineJob;
   if (!job) {
     $('agent-run-timeline-status').textContent = 'Спочатку виберіть завдання Agent.';
+    return;
+  }
+  // Never export evidence read for Agent A after selection switched to B.
+  // Compare exact identities without coercion; no persisted effects are run.
+  if (job.id !== ui.selectedBrowserAgentId) {
+    ui.agentTimelineStale = true;
+    $('agent-run-timeline-status').textContent = 'Експорт заблоковано: вибране завдання Agent не відповідає хронології. Оновіть дані з Core.';
+    announce('Експорт заблоковано: хронологія належить іншому Agent.');
     return;
   }
   try {
@@ -3650,6 +3692,12 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
     }
     renderBrowserAgentList();
     const job = ui.browserAgentJobs.find(item => item.id === nextId) || null;
+    // The ticket/read-gate checks above have accepted this exact Core read.
+    // Only this path (or a successful per-Agent Core selection) refreshes
+    // export authority; local selection and cached rendering never do.
+    // A Core snapshot accepted during an in-flight owner command may predate
+    // the command's durable effect; it must not make export available.
+    ui.agentTimelineStale = agentOwnerOperations.size > 0;
     renderBrowserAgentJob(job);
     return { applied: true, job };
   } catch (error) {
@@ -3671,6 +3719,7 @@ async function selectBrowserAgentJob() {
     const data = await core('SELECT_BROWSER_AGENT_JOB', { id });
     if (!agentViewFence.current(ticket)) return;
     if (data?.job && data.job.id !== id) throw new Error('Core повернув інше завдання Agent.');
+    if (data?.job && agentOwnerOperations.size === 0) ui.agentTimelineStale = false;
     renderBrowserAgentJob(data?.job || null);
     renderBrowserAgentList();
   } catch (error) {
