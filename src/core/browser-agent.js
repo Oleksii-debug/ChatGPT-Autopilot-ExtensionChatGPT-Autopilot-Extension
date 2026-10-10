@@ -781,7 +781,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       const frame = proof?.frame;
       const observed = proof?.element;
       if (!observed?.semanticIdentity || !clean(frame?.url, 4096)) {
-        throw new Error('Browser Agent key target identity is missing');
+        throw new Error('Browser Agent key target identity is missing or ambiguous');
       }
       action.expectedSemanticIdentity = observed.semanticIdentity;
       action.expectedFrameUrl = clean(frame.url, 4096);
