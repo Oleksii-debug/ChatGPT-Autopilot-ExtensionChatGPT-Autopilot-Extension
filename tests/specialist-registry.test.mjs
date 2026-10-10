@@ -213,7 +213,7 @@ test('registry rejects duplicate identities, numeric aliases, secret-shaped unkn
   })), /duplicate specialistId/);
   assert.throws(() => normalizeSpecialistRegistryV1(registry({ revision: -0 })), /registry revision is invalid/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ definitionRevision: -0 })), /definitionRevision is invalid/);
-  assert.throws(() => normalizeSpecialistDefinitionV1({ ...definition(), apiKey: 'must-never-enter-registry' }), /unknown field: apiKey/);
+  assert.throws(() => normalizeSpecialistDefinitionV1({ ...definition(), apiKey: 'must-never-enter-registry' }), /contains unknown field/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ specialistId: ' openhands-coding' })), /exact canonical identity/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ label: ' OpenHands Coding' })), /exact bounded text/);
 });
@@ -239,6 +239,48 @@ test('authority records reject accessors and hidden/symbol fields without execut
   const symbolic = definition();
   symbolic[Symbol('authority')] = true;
   assert.throws(() => normalizeSpecialistDefinitionV1(symbolic), /unknown field/);
+});
+
+test('untrusted registry Proxy reflection and secret-shaped keys fail closed with normal recovery', () => {
+  const secret = 'SECRET_REGISTRY_PROXY_TRAP_PRIVATE';
+  let getterReads = 0;
+  const denied = operation => {
+    assert.throws(operation, error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /cannot be inspected safely|contains unknown field/);
+      return true;
+    });
+  };
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const handler = {
+      [trap]() {
+        throw new Error(secret);
+      },
+    };
+    denied(() => normalizeSpecialistDefinitionV1(new Proxy(definition(), handler)));
+    denied(() => normalizeSpecialistDefinitionV1(definition({
+      capabilityIds: new Proxy(['coding.workspace'], handler),
+    })));
+  }
+
+  const unknown = { ...definition(), [secret]: 'must-not-be-echoed' };
+  denied(() => normalizeSpecialistDefinitionV1(unknown));
+  const accessor = definition();
+  Object.defineProperty(accessor, 'specialistId', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      throw new Error(secret);
+    },
+  });
+  assert.throws(() => normalizeSpecialistDefinitionV1(accessor), /enumerable own data property/);
+  assert.equal(getterReads, 0, 'no hostile accessor may execute');
+
+  const restart = JSON.parse(JSON.stringify(definition()));
+  const recovered = normalizeSpecialistDefinitionV1(restart);
+  assert.equal(recovered.specialistId, OPENHANDS_CODING_SPECIALIST_ID);
+  assert.equal(recovered.enabled, true);
+  assert.equal(Object.isFrozen(recovered), true);
 });
 
 test('null-prototype records are accepted and caller-owned registry inputs remain unchanged', () => {

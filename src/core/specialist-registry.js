@@ -27,12 +27,19 @@ const MUTATION_KINDS = new Set(Object.values(SpecialistRegistryMutationKind));
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' must be a plain data object');
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Lower-trust Proxy reflection errors may contain account data or secrets.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) throw new Error(label + ' must be a plain data object');
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(label + ' contains unknown field: ' + String(key));
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(label + ' contains unknown field');
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' must be an enumerable own data property');
@@ -43,8 +50,17 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max, min = 0) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error(label + ' must be a canonical array');
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) throw new Error(label + ' must be a canonical array');
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || length < min || length > max) throw new Error(label + ' has invalid length');
   const expected = new Set(['length', ...Array.from({length}, (_, index) => String(index))]);
