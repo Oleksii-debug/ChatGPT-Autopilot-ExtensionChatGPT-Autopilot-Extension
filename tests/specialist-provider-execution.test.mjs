@@ -232,3 +232,50 @@ test('execution record rejects identity drift, malformed outcome and accessor fi
   );
   assert.equal(reads, 0);
 });
+
+test('Section 1: hostile provider execution records never leak Proxy errors or caller field names, while JSON restart survives', () => {
+  const secret = 'PRIVATE_PROVIDER_TOKEN_CANARY_7e2a';
+  const legitimate = JSON.parse(JSON.stringify(prepared()));
+  for (const trapName of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const input = new Proxy({ ...legitimate }, {
+      [trapName]() { throw new Error(secret); },
+    });
+    assert.throws(
+      () => normalizeSpecialistProviderExecutionV1(input),
+      error => error instanceof Error
+        && /cannot be inspected safely/u.test(error.message)
+        && !error.message.includes(secret)
+        && !('cause' in error),
+      trapName + ' must be redacted',
+    );
+  }
+
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1({ ...legitimate, [secret]: 'ignored' }),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  let accessorCalls = 0;
+  const accessorRecord = { ...legitimate };
+  Object.defineProperty(accessorRecord, 'status', {
+    enumerable: true,
+    get() { accessorCalls += 1; throw new Error(secret); },
+  });
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(accessorRecord),
+    error => error instanceof Error
+      && /data property/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  assert.equal(accessorCalls, 0);
+
+  // The rejected input must not corrupt the durable good execution snapshot.
+  const restarted = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(legitimate)),
+  );
+  assert.equal(restarted.leaseId, legitimate.leaseId);
+  assert.equal(restarted.providerId, legitimate.providerId);
+  assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.deepEqual(JSON.parse(JSON.stringify(restarted)), legitimate);
+});
