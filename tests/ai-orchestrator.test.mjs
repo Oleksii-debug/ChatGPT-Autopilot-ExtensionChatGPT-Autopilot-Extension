@@ -550,8 +550,8 @@ test('Plan4 S1: invalid durable reservation IDs never reach the provider', async
   });
   let getterCalls = 0;
   const corrupt = [
-    '', ' padded', 'padded ', 'multi\\nline', 'control\\u0000byte',
-    'delete\\u007fchar', 'x'.repeat(241), null, 42,
+    '', ' padded', 'padded ', 'multi\nline', 'control\u0000byte',
+    'delete\u007fchar', 'x'.repeat(241), null, 42,
     Object.defineProperty({}, 'reservationId', {
       enumerable:true,
       get() { getterCalls += 1; throw new Error('secret-do-not-read'); },
