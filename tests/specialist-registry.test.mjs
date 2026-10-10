@@ -207,6 +207,41 @@ test('parent capability or tool-scope drift requires rediscovery instead of wide
   }), /capability scope changed after selection/);
 });
 
+test('authority subset denial redacts caller-controlled capability and tool IDs without widening grants', () => {
+  const secret = 'SECRET_SCOPE_DIAGNOSTIC_PRIVATE_20261010';
+  const request = discovery();
+  const selected = discoverSpecialistsV1(request).specialists[0];
+  const denied = action => {
+    assert.throws(action, error => {
+      assert.match(error.message, /exceeds parent or specialist authority/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  };
+  denied(() => discoverSpecialistsV1(discovery({
+    requiredCapabilityIds: [secret],
+  })));
+  denied(() => discoverSpecialistsV1(discovery({
+    requiredToolIds: [secret],
+  })));
+  denied(() => bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    selection: {...selected, grantedToolIds: [secret]},
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  }));
+  const allowed = bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    selection: selected,
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  });
+  assert.deepEqual(allowed.childScope.toolIds, ['filesystem.read', 'workspace.patch']);
+  assert.equal(allowed.authority.executionAuthorized, false);
+});
+
 test('registry rejects duplicate identities, numeric aliases, secret-shaped unknown fields and text aliases', () => {
   assert.throws(() => normalizeSpecialistRegistryV1(registry({
     definitions: [definition(), definition()],
