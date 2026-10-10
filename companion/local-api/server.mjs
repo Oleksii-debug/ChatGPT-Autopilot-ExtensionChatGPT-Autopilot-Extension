@@ -168,6 +168,11 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   // authentication fence only; Core remains the single policy/effect authority.
   const revokedBeforeDispatch = Symbol('local-api-owner-token-revoked');
   const disconnectedBeforeDispatch = Symbol('local-api-client-disconnected');
+  const shuttingDownBeforeDispatch = Symbol('local-api-companion-shutting-down');
+  // Graceful Native Companion stop is an admission barrier, not an effect
+  // cancellation. In-flight scope/token awaits must not launch NEW Core work
+  // after the trusted owner has begun closing this listener.
+  let shuttingDown = false;
   // Transport-only admission fence. Core must still own durable request/effect
   // deduplication and reconciliation across processes and restarts.
   // Keep the transport's overlapping request population strictly bounded.
@@ -184,6 +189,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
     }
     activeHttpRequests += 1;
     try {
+      if (shuttingDown) return send(res, 503, FAILURE);
       // Remote peers are rejected even if a caller improperly rebinds the server.
       if (req.socket.remoteAddress !== '127.0.0.1') return reject(res);
       // HTTP/1 duplicate sensitive headers are ambiguous even if Node exposes
@@ -289,6 +295,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
           resolveTrustedScope: trustedDependencies.resolveTrustedScope,
           now: trustedDependencies.now,
           async dispatchCanonicalControl(envelope) {
+            if (shuttingDown) throw shuttingDownBeforeDispatch;
             if (res.destroyed) throw disconnectedBeforeDispatch;
             if (tokenProvider !== undefined) {
               let currentExpected;
@@ -319,6 +326,9 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
                 || atUse > Date.parse(envelope.scopeProof.validThrough)) {
               throw new Error('Canonical scope elapsed before dispatch');
             }
+            // A Companion close may have begun while the trusted owner token
+            // or scope was pending. Never initiate a NEW Core dispatch then.
+            if (shuttingDown) throw shuttingDownBeforeDispatch;
             // Retain the pinned Core function and its original call semantics.
             return trustedDependencies.dispatchCanonicalControl(envelope);
           },
@@ -332,6 +342,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // Revocation after async scope lookup is still an authentication denial,
       // never evidence that Core dispatched or that retry is safe.
       if (error === revokedBeforeDispatch) return reject(res, 401);
+      if (error === shuttingDownBeforeDispatch) return send(res, 503, FAILURE);
       // No response can be delivered to a disconnected client; most
       // importantly, this path has *not* entered canonical dispatch.
       if (error === disconnectedBeforeDispatch) return;
@@ -354,6 +365,17 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 1_000;
   server.maxRequestsPerSocket = 1;
+  // Freeze new dispatch admission at the BEGINNING of trusted Companion
+  // shutdown, not at Node's later 'close' event (which waits for active work).
+  // Never claim already-started Core effects were cancelled by HTTP shutdown.
+  const nodeClose = server.close.bind(server);
+  Object.defineProperty(server, 'close', {
+    configurable: false, enumerable: false, writable: false,
+    value: (...args) => {
+      shuttingDown = true;
+      return nodeClose(...args);
+    },
+  });
   // This factory intentionally exposes the Node server for Companion lifecycle
   // control. Restrict even that exposed listen() entry point: relying on a
   // remoteAddress check *after* a TCP listener binds 0.0.0.0/:: is not the
