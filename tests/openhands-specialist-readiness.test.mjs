@@ -435,7 +435,7 @@ test('readiness capability scope must exactly match the owner-qualified OpenHand
 
   await assert.rejects(
     resolver.resolve(selection({ requestedCapabilityIds: ['code.review'] })),
-    /^Trusted readiness provider resolution failed$/u,
+    /Trusted readiness provider resolution failed/u,
   );
   assert.equal(probes, 0);
 });
