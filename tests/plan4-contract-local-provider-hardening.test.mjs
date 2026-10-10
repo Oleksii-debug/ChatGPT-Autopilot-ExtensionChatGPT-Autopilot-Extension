@@ -1853,3 +1853,32 @@ test('Plan4 S1: endpoint model catalog remains exact and immutable across JSON r
   assert.equal(Object.hasOwn(legacyBound.endpointProfiles[0],'modelIds'),false);
   assert.notEqual(admitted.configSha256,legacyBound.configSha256);
 });
+
+
+test('Plan4 S1 model identity rejects controls, bidi and invalid Unicode before network and after JSON restart', async () => {
+  let effects = 0;
+  const router = new AiOrchestrator({ gatewayClient: { async complete() {
+    effects++;
+    throw new Error('unexpected provider effect');
+  } } });
+  const dangerous = [0, 10, 13, 127, 0x80, 0x61c, 0x200e, 0x202e, 0x2028, 0x2066, 0xd800, 0xdc00];
+  for (const codePoint of dangerous) {
+    const corrupted = [{...route, model:'fixture' + String.fromCharCode(codePoint) + 'injected'}];
+    for (const persisted of [corrupted, JSON.parse(JSON.stringify(corrupted))]) {
+      assert.throws(() => normalizeAiRoutePool(persisted), /exact bounded identity/);
+      assert.throws(() => normalizeAiRouterSettings({enabled:true, mode:'primary', routes:persisted}),
+        /exact bounded identity/);
+      await assert.rejects(router.run({enabled:true, mode:'primary', routes:persisted}, {}, 'approved prompt'),
+        /exact bounded identity/);
+      await assert.rejects(createAiRouteRegistryEvidenceV1({...snapshot, routes:persisted}),
+        /exact bounded identity/);
+    }
+  }
+  assert.equal(effects, 0);
+  // Preserve actual Unicode model IDs, including valid surrogate pairs, unchanged.
+  const accepted = {...route, model:'family/модель-测试-🤖'};
+  assert.equal(normalizeAiRoutePool(JSON.parse(JSON.stringify([accepted])))[0].model, accepted.model);
+  const first = await createAiRouteRegistryEvidenceV1({...snapshot, routes:[accepted]});
+  const restarted = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({...snapshot, routes:[accepted]})));
+  assert.equal(first.configSha256, restarted.configSha256);
+});
