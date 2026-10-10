@@ -222,7 +222,8 @@ export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requi
     if (typeof action.url === 'string' && action.url.trim()) {
       try {
         const destination = new URL(action.url);
-        safeDirectDestination = destination.protocol === 'https:' || destination.protocol === 'http:';
+        safeDirectDestination = (destination.protocol === 'https:' || destination.protocol === 'http:')
+          && !destination.username && !destination.password;
       } catch { /* missing, malformed, or relative persisted URL is not authoritative */ }
     }
     if (!safeDirectDestination) {
