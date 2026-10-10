@@ -880,7 +880,7 @@ test('S1 ambiguous canonical binding write recovers by read-only lookup without 
   );
   assert.equal(commits, 1);
   const recovered = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
-    at: '2026-09-25T06:07:00.000Z',
+    at: '2026-09-25T06:09:00.000Z',
     loadCanonicalBinding: async () => persisted,
     loadCanonicalOwnership: async () => owner,
   });
@@ -890,7 +890,7 @@ test('S1 ambiguous canonical binding write recovers by read-only lookup without 
   assert.equal(recovered.executionAuthorized, false);
   assert.equal(commits, 1);
   const absent = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
-    at: '2026-09-25T06:07:00.000Z',
+    at: '2026-09-25T06:09:00.000Z',
     loadCanonicalBinding: async () => null,
     loadCanonicalOwnership: async () => owner,
   });
