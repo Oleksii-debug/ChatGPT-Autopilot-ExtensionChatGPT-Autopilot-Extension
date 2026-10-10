@@ -30,7 +30,10 @@ function assertNoDuplicateJsonMembers(source) {
 
 export function parseStrictControlJsonV1(bytes) {
   if (!(bytes instanceof Uint8Array)) throw new Error('Expected bounded JSON bytes');
-  const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  // The default TextDecoder silently strips a leading UTF-8 BOM before
+  // JSON.parse. Preserve it so non-canonical BOM-prefixed control JSON is
+  // rejected identically by the Native Companion HTTP ingress and CLI.
+  const source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   const parsed = JSON.parse(source);
   assertNoDuplicateJsonMembers(source);
   return parsed;
