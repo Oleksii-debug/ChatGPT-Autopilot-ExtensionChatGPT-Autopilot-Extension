@@ -275,6 +275,7 @@ export class AiGatewayClient {
     // Only the deadline callback marks timeout. A bounded-body rejection can
     // abort the response separately and must keep its own typed failure.
     let timedOut = false;
+    let responseReceived = false;
     const timer = this.setTimeoutFn(() => {
       timedOut = true;
       controller.abort();
@@ -290,6 +291,7 @@ export class AiGatewayClient {
           ...(safeInit.body ? { 'Content-Type': 'application/json' } : {}),
         },
       });
+      responseReceived = true;
       // Fetch and body readers may ignore AbortSignal, but their late bytes
       // must never be published as a successful model completion.
       if (timedOut) {
@@ -305,7 +307,18 @@ export class AiGatewayClient {
       }
       return parsed;
     } catch (error) {
-      if (timedOut || error?.name === 'AbortError') {
+      // Once a POST response has been observed, body-reader failure or late
+      // expiry is an ambiguous provider effect. Do not convert a forged
+      // AbortError into a retryable timeout or dispatch a second provider call.
+      // Genuine HTTP classification below still carries its trusted status.
+      if (completion && responseReceived && timedOut) {
+        const unknown = new Error('AI Gateway completion result is unverified; reconcile before retry');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
+      if (timedOut || (!responseReceived && error?.name === 'AbortError')) {
         const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
         timeoutError.code = 'AI_GATEWAY_TIMEOUT';
         timeoutError.category = 'TIMEOUT';
@@ -315,6 +328,13 @@ export class AiGatewayClient {
       // Do not trust a transport error's message, code, or prototype. Only
       // locally constructed failures have an authenticated diagnostic origin.
       if (error && typeof error === 'object' && trustedGatewayFailures.has(error)) throw error;
+      if (completion && responseReceived) {
+        const unknown = new Error('AI Gateway completion response could not be verified');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
       const unavailable = new Error('Could not reach AI Gateway');
       unavailable.code = 'AI_GATEWAY_UNAVAILABLE';
       unavailable.category = 'UNAVAILABLE';
