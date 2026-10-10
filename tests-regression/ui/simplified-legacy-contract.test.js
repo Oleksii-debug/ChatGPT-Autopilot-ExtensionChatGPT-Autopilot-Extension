@@ -124,7 +124,21 @@ test('UI removes tutorial prose globally while keeping runtime and safety status
   assert.doesNotMatch(html, /Один рядок — один напрям/u);
   assert.doesNotMatch(html, /\splaceholder="/u);
   const described = [...html.matchAll(/aria-describedby="([^"]+)"/gu)].flatMap(match => match[1].split(/\s+/u));
-  assert.deepEqual([...new Set(described)].sort(), ['delete-dialog-description', 'uncertain-help']);
+  assert.deepEqual(
+    [...new Set(described)].sort(),
+    ['agent-owner-max-concurrent-help', 'delete-dialog-description', 'uncertain-help'],
+    'only safety-critical and capacity field descriptions should be present'
+  );
+  assert.match(
+    html,
+    /<p id="agent-owner-max-concurrent-help" class="field-help">[^<]*owner-authoritative maxConcurrentAgents[^<]*0 означає:[^<]*<\/p>/u,
+    'capacity help must truthfully explain the durable owner-wide zero-leases policy'
+  );
+  assert.match(
+    html,
+    /<input id="agent-owner-max-concurrent"[^>]*aria-describedby="agent-owner-max-concurrent-help"/u,
+    'capacity input must have an accessible reference to its operative safety explanation'
+  );
   assert.match(html, /id="uncertain-help"/u, 'duplicate-send safety warning must remain');
   assert.match(html, /id="delete-dialog-description"/u, 'destructive delete description must remain');
 });

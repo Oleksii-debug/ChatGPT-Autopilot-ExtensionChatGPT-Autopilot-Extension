@@ -85,6 +85,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
+  'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
   'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
@@ -756,6 +757,10 @@ export async function dispatchUiMessage(message, sender = null) {
     result = await browserAgent.createSpecialistRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
+  } else if (message.command === 'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.getOwnerResourceBudget();
+  } else if (message.command === 'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.setOwnerResourceBudget(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION') {

@@ -314,6 +314,15 @@
         </fieldset>
       </details>
 
+      <fieldset class="settings-group" id="agent-owner-resource-budget-group">
+        <legend>Глобальна capacity Specialist</legend>
+        <p id="agent-owner-max-concurrent-help" class="field-help">Це owner-authoritative maxConcurrentAgents із ResourceBudgetV1 для product-wide Specialist admission. 0 означає: не видавати нові Specialist leases. Інші виміри ResourceBudgetV1 під час цього збереження не змінюються.</p>
+        <label for="agent-owner-max-concurrent">Максимум одночасних Specialist leases</label>
+        <input id="agent-owner-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric" value="0" aria-describedby="agent-owner-max-concurrent-help">
+        <button id="agent-owner-resource-budget-save-button" type="button">Зберегти глобальну capacity</button>
+        <p id="agent-owner-resource-budget-status" role="status" tabindex="0">Глобальний ResourceBudgetV1 ще не завантажено.</p>
+      </fieldset>
+
       <details id="agent-specialist-details">
         <summary>Субагенти та specialist providers</summary>
         <fieldset class="settings-group" id="agent-specialist-registry-group">
