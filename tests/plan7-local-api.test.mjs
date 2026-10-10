@@ -361,3 +361,57 @@ test('token rotation provider exceptions and conflicting static fallback fail cl
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
   }
 });
+
+
+test('malformed bearer credentials never invoke the trusted owner token resolver', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups += 1; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    for (const credential of ['', 'short', 'x'.repeat(513)]) {
+      const res = await fetch('http://127.0.0.1:' + port + '/v1/control', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + credential, 'Content-Type': 'application/json' },
+        body: JSON.stringify(request('bad-token-' + credential.length)),
+      });
+      assert.equal(res.status, 401);
+    }
+    assert.equal(tokenLookups, 0, 'bad bearer syntax must not touch the owner credential broker');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+    const valid = createAutopilotLocalClientV1({ token: TOKEN, port });
+    assert.equal((await valid.control(request('after-invalid-token'))).status, 'RECEIVED');
+    assert.equal(tokenLookups, 1);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test('owner token resolver timeout fails closed and a late resolution cannot dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let unlock, activeProvider = () => new Promise(resolve => { unlock = resolve; });
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: () => activeProvider(),
+    dependencies: dependencies(counters),
+  });
+  try {
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port: server.address().port });
+    const ambiguous = await client.control(request('hung-provider-no-dispatch'));
+    assert.equal(ambiguous.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(ambiguous.httpStatus, 401);
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+    unlock(TOKEN);
+    await Promise.resolve();
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'late token cannot authorize the already denied HTTP request');
+    activeProvider = async () => TOKEN;
+    assert.equal((await client.control(request('provider-recovers-next-request'))).status, 'RECEIVED');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
