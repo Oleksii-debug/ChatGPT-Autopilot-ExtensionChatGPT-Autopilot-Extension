@@ -833,7 +833,7 @@ test('scrub fails closed when final canonical binding readback fails', async () 
       teardown: async () => teardownCompletion(),
       verifyScrub: async () => scrubProof(),
     }),
-    /canonical store readback unavailable/u,
+    /canonical cloud binding readback failed; reconciliation required/u,
   );
   assert.equal(loads, 3);
 });
@@ -927,7 +927,7 @@ test('S1 scrub requires trusted canonical owner resolver and fails closed on fin
     },
     teardown: async () => teardownCompletion(),
     verifyScrub: async () => scrubProof(),
-  }), /canonical owner store unavailable/u);
+  }), /canonical cloud ownership readback failed; reconciliation required/u);
   assert.equal(loads, 2);
 });
 
