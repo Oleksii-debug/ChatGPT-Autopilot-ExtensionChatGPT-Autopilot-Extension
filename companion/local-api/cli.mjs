@@ -39,7 +39,12 @@ async function main() {
   const result = await client.control(raw);
   // Output is structured text, accessible to NVDA and shell scripts.
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-  if (result.status !== 'RECEIVED') process.exitCode = 2;
+  // RECEIVED is an authenticated transport acknowledgement, not a successful
+  // Core outcome. A canonical REJECTED receipt must never exit zero and mislead
+  // shell automation into treating a denied control operation as successful.
+  if (result.status !== 'RECEIVED' || result.result?.receipt?.status === 'REJECTED') {
+    process.exitCode = 2;
+  }
 }
 main().catch(() => {
   // No stack traces or secrets in diagnostics.
