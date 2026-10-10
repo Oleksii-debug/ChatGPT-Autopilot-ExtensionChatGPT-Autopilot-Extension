@@ -1025,3 +1025,68 @@ test('S1 canonical enumerable dispatch records survive cold restart without fabr
   assert.equal(after.evidenceOnly, true);
   assert.doesNotMatch(JSON.stringify(after), /PRIVATE_RECEIPT|PRIVATE_ARTIFACT/u);
 });
+
+test('S1 durable scalar evidence rejects non-enumerable fields lost on JSON restart', () => {
+  const variations = [
+    ['counter', input => Object.defineProperty(input.runtime, 'stepCount', {
+      value: 31, enumerable: false, configurable: true,
+    })],
+    ['plan revision', input => Object.defineProperty(input.runtime.plan, 'revision', {
+      value: 73, enumerable: false, configurable: true,
+    })],
+    ['plan node state', input => Object.defineProperty(input.runtime.plan.nodes[0], 'state', {
+      value: 'VERIFIED', enumerable: false, configurable: true,
+    })],
+    ['recorded outcome time', input => Object.defineProperty(input.runtime.verifiedOutcome, 'verifiedAt', {
+      value: 1234, enumerable: false, configurable: true,
+    })],
+  ];
+  for (const [name, modify] of variations) {
+    const input = job();
+    modify(input);
+    assert.throws(() => buildAgentRunTimelineV1(input),
+      /persisted field must be an enumerable data field/u, name);
+    // The input's hidden value vanishes after JSON restart. It must never
+    // have been exported as durable evidence in the pre-restart projection.
+    const restored = JSON.parse(JSON.stringify(input));
+    const projection = buildAgentRunTimelineV1(restored);
+    assert.equal(projection.mayReplayExternalEffect, false, name);
+    assert.equal(projection.evidenceMap.externalEffectVerified, false, name);
+  }
+  const ordinary = job();
+  ordinary.runtime.verifiedOutcome.verifiedAt = 1234;
+  const before = buildAgentRunTimelineV1(ordinary);
+  const after = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(ordinary)));
+  assert.deepEqual(after, before);
+  assert.equal(after.evidenceMap.recordedOutcome.recordedAt, 1234);
+  assert.equal(after.counters.steps, 9);
+  assert.equal(after.plan.stateCounts.READY, 1);
+});
+
+test('S1 persisted scalar descriptor traps fail closed without leaking or running getters', () => {
+  const marker = 'PRIVATE_TIMELINE_FIELD_TRAP_NEVER_EXPORT';
+  let invoked = 0;
+  const accessor = job();
+  Object.defineProperty(accessor.runtime.plan.nodes[0], 'state', {
+    configurable: true, enumerable: true,
+    get() { invoked += 1; throw new Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor),
+    error => error instanceof Error && /enumerable data field/u.test(error.message) &&
+      !error.message.includes(marker));
+  assert.equal(invoked, 0);
+
+  const trapped = job();
+  trapped.runtime.plan = new Proxy(trapped.runtime.plan, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'revision') throw Error(marker);
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(trapped),
+    error => error instanceof Error && /cannot be safely inspected/u.test(error.message) &&
+      !error.message.includes(marker));
+  const recovered = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(job())));
+  assert.equal(recovered.mayReplayExternalEffect, false);
+  assert.equal(recovered.evidenceOnly, true);
+});
