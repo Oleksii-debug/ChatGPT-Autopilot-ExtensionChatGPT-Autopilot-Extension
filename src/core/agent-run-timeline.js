@@ -136,6 +136,7 @@ function boundedJobId(value) {
   // A persisted Agent must have a real identity; never export an orphan
   // timeline under an empty identifier after corrupted storage or restart.
   if (typeof value !== 'string' || value.length < 1 || value.length > 128 ||
+      value !== value.trim() ||
       /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(value)) {
     throw new Error('Agent timeline job identity is invalid');
   }
@@ -594,9 +595,14 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
     const { present: hasRecordedTime, value: recordedTime } = persistedField(entry, 'at');
-    const rawAction = persistedField(entry, 'action').value;
+    const { present: actionPresent, value: rawAction } = persistedField(entry, 'action');
     let actionType = '';
-    if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
+    if (known && ACTION_DETAIL_EVENTS.has(rawType) && actionPresent && rawAction !== null) {
+      // A stored action payload may be genuinely absent in legacy history,
+      // or null when Core recorded no detail. An explicitly stored malformed
+      // payload (array/scalar/exotic/undefined) is corrupt durable evidence,
+      // not a harmless omission. Reuse the existing descriptor-only guard.
+      record(rawAction, 'Agent history recorded action');
       // An explicitly persisted malformed action kind must not be laundered
       // into an innocuous missing kind in a read-only exported timeline.
       // Unknown well-formed future kinds remain non-authorizing/undisclosed.
