@@ -3,6 +3,7 @@ on:
   push:
     branches: ["plan8/11-0-13-source-convergence-20261010"]
     paths:
+      - "PLAN8_11_0_13_SOURCE_CONVERGENCE.md"
       - "src/**"
       - "tests/**"
       - "tests-regression/**"
