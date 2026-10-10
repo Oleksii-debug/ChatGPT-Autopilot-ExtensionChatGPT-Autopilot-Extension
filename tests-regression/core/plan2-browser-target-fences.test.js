@@ -3566,3 +3566,47 @@ test('Plan2 S1 unsafe link protocol cannot inherit global allow before or after 
   assert.equal(judge({ ...click, href: 'javascript:alert(1)', policy: 'DENY' }).decision, 'ALLOW',
     'action/model fields cannot forge observed link authority');
 });
+
+test('Plan2 S1 Enter/Space inherit observed link DESTINATION owner rule, not source-site ALLOW', () => {
+  const config = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'source.test', defaultDecision: 'ALLOW', actionDecisions: {} },
+      { pattern: 'blocked.test', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.test', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  };
+  const snapshot = {
+    url: 'https://source.test/page',
+    frames: [{
+      frameId: 0,
+      url: 'https://source.test/page',
+      elements: [{
+        ref: 'r1', tag: 'a', name: 'External', href: 'https://blocked.test/checkout',
+        semanticIdentity: 'observed-link', submitLike: false,
+      }],
+    }],
+  };
+  const verdict = (key, href) => {
+    snapshot.frames[0].elements[0].href = href;
+    // Persist and recover both action and semantic observation; neither a
+    // model-supplied href nor the source-site ALLOW may override the link.
+    const action = JSON.parse(JSON.stringify({
+      type: 'key', key, frameId: 0, ref: 'r1', href: 'https://source.test/forged',
+    }));
+    return resolveBrowserAgentOwnerPolicy(config,
+      JSON.parse(JSON.stringify(snapshot)), action);
+  };
+  for (const key of ['Enter', ' ', 'Space']) {
+    const denied = verdict(key, 'https://blocked.test/checkout');
+    assert.equal(denied.decision, 'DENY', `${key} must not bypass blocked destination`);
+    assert.equal(denied.policyUrl, 'https://blocked.test/checkout');
+    assert.equal(denied.source, 'site:blocked.test');
+    const asked = verdict(key, 'https://ask.test/confirm');
+    assert.equal(asked.decision, 'ASK', `${key} must preserve destination confirmation`);
+    assert.equal(asked.source, 'site:ask.test');
+    const allowed = verdict(key, '#same-page');
+    assert.equal(allowed.decision, 'ALLOW');
+    assert.equal(allowed.policyUrl, 'https://source.test/page#same-page');
+  }
+});

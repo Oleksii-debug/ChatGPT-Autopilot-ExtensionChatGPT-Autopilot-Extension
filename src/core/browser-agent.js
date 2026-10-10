@@ -162,12 +162,20 @@ function bestMatchingSiteRule(siteRules, url) {
   return matches[0] || null;
 }
 
+// An observed link has one destination policy whether activated by pointer
+// or keyboard. Otherwise an owner DENY rule for an external host would apply
+// to CLICK but silently inherit the current page's ALLOW rule on Enter/Space.
+function browserAgentActivatesObservedLink(action) {
+  return action?.type === BrowserAgentActionType.CLICK
+    || (action?.type === BrowserAgentActionType.KEY && ['Enter', ' ', 'Space'].includes(action?.key));
+}
+
 function browserAgentPolicyTargetUrl(snapshot, action) {
   const current = clean(snapshot?.url, 4096);
   if ([BrowserAgentActionType.NAVIGATE, BrowserAgentActionType.NEW_TAB, BrowserAgentActionType.DOWNLOAD].includes(action?.type)) {
     return clean(action?.url, 4096) || current;
   }
-  if (action?.type === BrowserAgentActionType.CLICK) {
+  if (browserAgentActivatesObservedLink(action)) {
     const element = browserAgentSnapshotElement(snapshot, action);
     const href = clean(element?.href, 4096);
     if (href) {
@@ -188,9 +196,7 @@ export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requi
   // particular javascript:/data:/file:/mailto: cannot fall through an
   // unmatched site rule into a global ALLOW decision for semantic activation.
   // Read only the uniquely observed target, never action/model-supplied href.
-  const activatesLink = action?.type === BrowserAgentActionType.CLICK
-    || (action?.type === BrowserAgentActionType.KEY && ['Enter', ' ', 'Space'].includes(action?.key));
-  if (activatesLink) {
+  if (browserAgentActivatesObservedLink(action)) {
     const observed = browserAgentSnapshotElement(snapshot, action);
     if (typeof observed?.href === 'string' && observed.href.trim()) {
       let httpLink = false;
