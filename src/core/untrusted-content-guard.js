@@ -238,7 +238,7 @@ function normalizeArtifact(value) {
   // A foreign digest must already be canonical. Never silently convert case,
   // whitespace or other encodings before binding source to the proposal.
   if (typeof snapshot.sha256 !== 'string' || !SHA256.test(snapshot.sha256)) {
-    throw new Error('UntrustedContentSourceV1 artifactRef requires sha256 in canonical lowercase form');
+    throw new Error('UntrustedContentSourceV1 artifactRef requires sha256 (canonical lowercase sha256)');
   }
   const artifact = normalizeArtifactRefV1(snapshot);
   if (!artifact.sha256) throw new Error('UntrustedContentSourceV1 artifactRef requires sha256');
