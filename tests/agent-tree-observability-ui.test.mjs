@@ -237,3 +237,55 @@ test('metadata cold restart isolates corrupt owner policies and rejects accessor
   assert.equal(clean.selectedId, 'healthy');
   assert.deepEqual(clean.byId.healthy.subagentPolicy, recovered.byId.healthy.subagentPolicy);
 });
+
+
+test('accessor-backed orchestra envelope and metadata fail closed without getter execution and recover from JSON', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  const healthy = { id: 'healthy', name: 'Recovered', createdAt: 7, updatedAt: 9 };
+  let stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+  manager.chrome = { storage: { local: {
+    get: async () => ({ autopilotOrchestrationV2Manager: stored }),
+  } } };
+  let getterCalls = 0;
+  const poison = () => {
+    getterCalls += 1;
+    throw new Error('persisted accessor executed');
+  };
+  for (const key of ['schemaVersion', 'order', 'byId']) {
+    stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+    Object.defineProperty(stored, key, { enumerable: true, get: poison });
+    const result = await manager.loadMeta();
+    assert.deepEqual(result.order, [], `accessor-backed envelope ${key} must fail closed`);
+  }
+  stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+  Object.defineProperty(stored, 'selectedId', { enumerable: true, get: poison });
+  assert.equal((await manager.loadMeta()).selectedId, 'healthy', 'selectedId getter must not run');
+
+  for (const key of ['id', 'name', 'ownerPaused', 'pausedSessionIds', 'createdAt', 'updatedAt', 'subagentPolicy']) {
+    const forged = { id: 'forged', name: 'Forged' };
+    Object.defineProperty(forged, key, { enumerable: true, get: poison });
+    stored = {
+      schemaVersion: 1,
+      order: ['forged', 'healthy'],
+      selectedId: 'forged',
+      byId: { forged, healthy },
+    };
+    const result = await manager.loadMeta();
+    assert.deepEqual(result.order, ['healthy'], `accessor-backed entry ${key} must be isolated`);
+    assert.equal(result.selectedId, 'healthy');
+  }
+  assert.equal(getterCalls, 0, 'no untrusted getters may be executed during metadata recovery');
+
+  stored = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    order: ['healthy'],
+    selectedId: 'healthy',
+    byId: { healthy },
+  }));
+  const recovered = await manager.loadMeta();
+  assert.deepEqual(recovered.order, ['healthy']);
+  assert.equal(recovered.byId.healthy.name, 'Recovered');
+  assert.equal(recovered.byId.healthy.createdAt, 7);
+  assert.equal(recovered.byId.healthy.updatedAt, 9);
+});
