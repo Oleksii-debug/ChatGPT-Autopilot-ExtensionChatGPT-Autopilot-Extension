@@ -118,43 +118,64 @@ function identityChanged(a, b) {
 }
 function freshMeta() { return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function normalizeMeta(raw) {
-  if (!raw || raw.schemaVersion !== MANAGER_SCHEMA_VERSION || !Array.isArray(raw.order)
-      || !raw.byId || typeof raw.byId !== 'object' || Array.isArray(raw.byId)) return freshMeta();
+  // Chrome storage normally returns JSON, but tests and recovery boundaries may
+  // supply accessor-backed objects. Inspect own descriptors before reading data.
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return freshMeta();
+  const header = Object.getOwnPropertyDescriptors(raw);
+  for (const key of ['schemaVersion', 'order', 'byId']) {
+    const field = header[key];
+    if (!field?.enumerable || !Object.hasOwn(field, 'value')) return freshMeta();
+  }
+  const rawOrder = header.order.value;
+  const rawById = header.byId.value;
+  if (header.schemaVersion.value !== MANAGER_SCHEMA_VERSION || !Array.isArray(rawOrder)
+      || !rawById || typeof rawById !== 'object' || Array.isArray(rawById)) return freshMeta();
   const byId = {};
   const order = [];
-  for (const id of raw.order) {
+  for (const id of rawOrder) {
     // Persisted JSON may name inherited Object.prototype keys. They are not
     // orchestra records and must never become a controller/storage identity.
     if (typeof id !== 'string' || !id || id === '__proto__'
-        || !Object.hasOwn(raw.byId, id) || Object.hasOwn(byId, id)) continue;
+        || !Object.hasOwn(rawById, id) || Object.hasOwn(byId, id)) continue;
     // A forged accessor or hidden entry is not persisted JSON authority.
     // Never evaluate a user-supplied getter during cold-start recovery.
-    const entry = Object.getOwnPropertyDescriptor(raw.byId, id);
+    const entry = Object.getOwnPropertyDescriptor(rawById, id);
     if (!entry?.enumerable || !Object.hasOwn(entry, 'value')) continue;
     const item = entry.value;
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-    const policyField = Object.getOwnPropertyDescriptor(item, 'subagentPolicy');
-    if (policyField && (!policyField.enumerable || !Object.hasOwn(policyField, 'value'))) continue;
+    const fields = Object.getOwnPropertyDescriptors(item);
+    if (['id', 'name', 'ownerPaused', 'pausedSessionIds', 'createdAt', 'updatedAt', 'subagentPolicy']
+        .some(key => fields[key] && (!fields[key].enumerable || !Object.hasOwn(fields[key], 'value')))) continue;
     let subagentPolicy;
     try {
       // Do not let one malformed owner policy make all healthy orchestras
       // unrecoverable, and do not restore that corrupted orchestra as runnable.
-      subagentPolicy = storedSubagentPolicy(policyField?.value);
+      subagentPolicy = storedSubagentPolicy(fields.subagentPolicy?.value);
     } catch {
       continue;
     }
+    const ownerName = fields.name?.value;
+    const pausedIds = fields.pausedSessionIds?.value;
+    const safeStoredTime = key => {
+      const value = fields[key]?.value;
+      if (typeof value !== 'number' && typeof value !== 'string') return 0;
+      const numeric = Number(value || 0);
+      return Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
+    };
     byId[id] = {
       id,
-      name: safeName(item.name, 'Оркестр'),
-      ownerPaused: item.ownerPaused === true,
-      pausedSessionIds: Array.isArray(item.pausedSessionIds) ? [...new Set(item.pausedSessionIds.filter(v => typeof v === 'string'))] : [],
+      name: safeName(typeof ownerName === 'string' ? ownerName : '', 'Оркестр'),
+      ownerPaused: fields.ownerPaused?.value === true,
+      pausedSessionIds: Array.isArray(pausedIds) ? [...new Set(pausedIds.filter(v => typeof v === 'string'))] : [],
       subagentPolicy,
-      createdAt: Math.max(0, Number(item.createdAt || 0)),
-      updatedAt: Math.max(0, Number(item.updatedAt || 0)),
+      createdAt: safeStoredTime('createdAt'),
+      updatedAt: safeStoredTime('updatedAt'),
     };
     order.push(id);
   }
-  return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: typeof raw.selectedId === 'string' && Object.hasOwn(byId, raw.selectedId) ? raw.selectedId : (order[0] || ''), order, byId };
+  const selected = header.selectedId?.enumerable && Object.hasOwn(header.selectedId, 'value')
+    ? header.selectedId.value : '';
+  return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: typeof selected === 'string' && Object.hasOwn(byId, selected) ? selected : (order[0] || ''), order, byId };
 }
 
 export class OrchestrationV2Manager {
