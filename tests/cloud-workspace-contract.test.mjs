@@ -9,6 +9,8 @@ import {
   createCloudWorkspaceBindingV1,
   normalizeCloudWorkspaceBindingV1,
   normalizeCloudWorkspaceObservationV1,
+  verifyCloudWorkspaceIsolationV1,
+  teardownAndVerifyCloudWorkspaceV1,
 } from '../src/core/cloud-workspace-contract.js';
 import {
   claimExecutionOwnershipV1,
@@ -403,4 +405,140 @@ test('observation from before a later canonical ownership revision cannot bind a
     () => createCloudWorkspaceBindingV1(observation(), revised, { at: '2026-09-25T06:06:00.000Z' }),
     /predates canonical ownership revision/u,
   );
+});
+
+const ISOLATION_AT = '2026-09-25T06:08:00.000Z';
+const SCRUB_AT = '2026-09-25T06:10:00.000Z';
+function isolationProof(overrides = {}) {
+  return {
+    workspaceId: 'workspace.cloud.1',
+    providerId: 'cloud.provider.1',
+    executionLeaseId: 'lease.cloud.1',
+    verifiedAt: '2026-09-25T06:07:00.000Z',
+    filesystemIsolated: true,
+    browserIsolated: true,
+    processIsolated: true,
+    ...overrides,
+  };
+}
+function scrubProof(overrides = {}) {
+  return {
+    workspaceId: 'workspace.cloud.1',
+    providerId: 'cloud.provider.1',
+    executionLeaseId: 'lease.cloud.1',
+    verifiedAt: '2026-09-25T06:09:00.000Z',
+    filesystemScrubbed: true,
+    browserScrubbed: true,
+    processesTerminated: true,
+    secretsPurged: true,
+    ...overrides,
+  };
+}
+test('trusted cloud isolation adapter binds canonical owner and cannot authorize execution', async () => {
+  let called = 0;
+  const result = await verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
+    at: ISOLATION_AT,
+    verifyIsolation: async target => {
+      called++;
+      assert.deepEqual(target, {
+        workspaceId: 'workspace.cloud.1',
+        providerId: 'cloud.provider.1',
+        executionLeaseId: 'lease.cloud.1',
+        executionOwnershipRevision: 2,
+      });
+      assert.equal(Object.isFrozen(target), true);
+      return isolationProof();
+    },
+  });
+  assert.equal(called, 1);
+  assert.equal(result.isolationVerified, true);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.resumeAuthorized, false);
+  assert.equal(Object.isFrozen(result.binding), true);
+});
+test('cloud isolation proof rejects mismatched, incomplete, stale, future and forged adapter receipts', async () => {
+  for (const mutation of [
+    { workspaceId: 'workspace.other' },
+    { providerId: 'provider.other' },
+    { executionLeaseId: 'lease.old' },
+    { filesystemIsolated: false },
+    { browserIsolated: false },
+    { processIsolated: false },
+    { verifiedAt: '2026-09-25T06:04:00.000Z' },
+    { verifiedAt: '2026-09-25T06:09:00.000Z' },
+    { processIsolated: 'true' },
+    { unknown: true },
+  ]) {
+    await assert.rejects(
+      () => verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
+        at: ISOLATION_AT,
+        verifyIsolation: async () => isolationProof(mutation),
+      }), /proof|unknown field/u,
+    );
+  }
+  let getterReads = 0;
+  const hostile = isolationProof();
+  Object.defineProperty(hostile, 'processIsolated', {
+    enumerable: true,
+    get() { getterReads++; return true; },
+  });
+  await assert.rejects(() => verifyCloudWorkspaceIsolationV1(
+    observation(), cloudOwnership(),
+    { at: ISOLATION_AT, verifyIsolation: async () => hostile },
+  ), /data properties/u);
+  assert.equal(getterReads, 0);
+});
+test('cloud isolation rejects expired canonical ownership before trusted adapter invocation', async () => {
+  let calls = 0;
+  await assert.rejects(
+    () => verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
+      at: '2026-09-25T07:00:00.000Z',
+      verifyIsolation: async () => { calls++; return isolationProof(); },
+    }), /live execution lease/u,
+  );
+  assert.equal(calls, 0);
+});
+test('trusted cloud teardown must verify filesystem/browser/process/secret scrub and remains non-authorizing', async () => {
+  const { binding } = bindingAndOwnership();
+  const calls = [];
+  const receipt = await teardownAndVerifyCloudWorkspaceV1(
+    JSON.parse(JSON.stringify(binding)), {
+      at: SCRUB_AT,
+      teardown: async target => { calls.push('teardown'); assert.equal(target.workspaceId, binding.workspaceId); },
+      verifyScrub: async () => { calls.push('verify'); return scrubProof(); },
+    },
+  );
+  assert.deepEqual(calls, ['teardown', 'verify']);
+  assert.equal(receipt.scrubVerified, true);
+  assert.equal(receipt.leaseReleaseAuthorized, false);
+  assert.equal(receipt.reuseAuthorized, false);
+});
+test('cloud teardown never reports clean on incomplete/hostile proof or failed teardown', async () => {
+  const { binding } = bindingAndOwnership();
+  for (const mutation of [
+    { filesystemScrubbed: false },
+    { browserScrubbed: false },
+    { processesTerminated: false },
+    { secretsPurged: false },
+    { executionLeaseId: 'lease.wrong' },
+    { verifiedAt: '2026-09-25T06:05:00.000Z' },
+    { verifiedAt: '2026-09-25T06:11:00.000Z' },
+    { filesystemScrubbed: 1 },
+  ]) {
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(binding, {
+        at: SCRUB_AT, teardown: async () => {},
+        verifyScrub: async () => scrubProof(mutation),
+      }), /proof/u,
+    );
+  }
+  let verified = false;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at: SCRUB_AT,
+      teardown: async () => { throw new Error('teardown failed'); },
+      verifyScrub: async () => { verified = true; return scrubProof(); },
+    }), /teardown failed/u,
+  );
+  assert.equal(verified, false);
 });
