@@ -20,6 +20,17 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_ROUTES = 32;
 const MAX_PARALLEL_WORKERS = 200;
 
+// Shared, pure check for exact provider/model dispatch identities across
+// the registry, legacy model slots and the final outbound gateway boundary.
+// A legitimate Unicode model name is not normalized into a different model.
+export function hasUnsafeAiDispatchUnicode(value) {
+  return /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(value)
+    || Array.from(value).some(char => {
+      const point = char.codePointAt(0);
+      return point >= 0xd800 && point <= 0xdfff;
+    });
+}
+
 export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
   autoSwitch: true,
   pinnedRouteId: '',
@@ -228,11 +239,7 @@ export function normalizeAiRoutePool(raw = []) {
     // Exact provider dispatch IDs must never contain terminal control characters,
     // bidi overrides or malformed Unicode. Do not normalize valid Unicode IDs.
     if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300
-        || /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(model)
-        || Array.from(model).some(char => {
-          const point = char.codePointAt(0);
-          return point >= 0xd800 && point <= 0xdfff;
-        })) {
+        || hasUnsafeAiDispatchUnicode(model)) {
       throw new Error('AI route model must be an exact bounded identity');
     }
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
