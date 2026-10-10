@@ -107,7 +107,7 @@ test('invalid source ancestor version fails despite current 11.x head', () => wi
   f.put('manifest.json', JSON.stringify({ version: PLAN8_SOURCE_VERSION }));
   f.git('add', '.');
   f.git('commit', '-m', 'Restore current version');
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: priorVersion }),
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: priorVersion, mainAncestorCommit: f.mainAncestor }),
     /source ancestor manifest.json version/u);
 }));
 
@@ -128,7 +128,7 @@ test('candidate recovery cannot retroactively invent a missing source-ancestor b
   f.put(path, '/* candidate restored path without original source lineage */\n');
   f.git('add', path);
   f.git('commit', '-m', 'Restore candidate path');
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: incompleteAncestor }),
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: incompleteAncestor, mainAncestorCommit: f.mainAncestor }),
     /source ancestor missing regular tracked 11\.x source path/u);
 }));
 
