@@ -162,7 +162,8 @@ function validBoundScopeAndChronology(result, sentRequest) {
 }
 
 export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
-  if (typeof token !== 'string' || token.length < 32 || token.length > 512) {
+  if (typeof token !== 'string' || token.length < 32 || token.length > 512
+    || /[^\x21-\x7e]/u.test(token)) {
     throw new Error('A trusted local API token is required');
   }
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Valid loopback port required');
