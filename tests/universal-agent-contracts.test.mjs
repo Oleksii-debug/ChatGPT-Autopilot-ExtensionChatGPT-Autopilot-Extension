@@ -768,7 +768,7 @@ test('universal-agent contract boundary rejects accessor-backed and hidden field
   });
   assert.throws(
     () => normalizeCapabilityV1(hiddenAuthority),
-    /enumerable own data properties|unknown field: hiddenAuthority/,
+    /enumerable own data properties|unknown field/,
   );
 });
 
@@ -874,4 +874,94 @@ test('Plan-1: universal authority, artifact and credential chronology rejects sh
     normalizeArtifactRefV1(artifact({ createdAt: '2026-09-18T22:00:00-05:00' })).createdAt,
     '2026-09-19T03:00:00.000Z',
   );
+});
+
+
+test('Plan-1 S1: universal agent contracts redact untrusted property names without invoking accessors', () => {
+  const secret = 'OWNER-CREDENTIAL-SECRET-MUST-NOT-BE-LOGGED';
+  let reads = 0;
+  const unknownField = artifact();
+  Object.defineProperty(unknownField, secret, {
+    enumerable: true,
+    get() { reads += 1; throw new Error('unsafe getter invoked'); },
+  });
+  assert.throws(() => normalizeArtifactRefV1(unknownField), error => {
+    assert.match(error.message, /unknown field|enumerable own data properties/);
+    assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT|unsafe getter invoked/);
+    return true;
+  });
+
+  const symbolic = artifact();
+  Object.defineProperty(symbolic, Symbol(secret), { enumerable: true, value: 'ALLOW' });
+  assert.throws(() => normalizeArtifactRefV1(symbolic), error => {
+    assert.match(error.message, /unknown field|enumerable own data properties/);
+    assert.doesNotMatch(error.message, /OWNER-CREDENTIAL|SECRET-MUST-NOT/);
+    return true;
+  });
+  assert.equal(reads, 0);
+});
+
+
+test('Plan-1 S1: exact effect and artifact numeric identity rejects JSON-lossy negative zero', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-numeric-canonical',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { offset: 0 },
+    createdAt: AT,
+  };
+  assert.deepEqual(normalizeToolInvocationV1(invocation).arguments, { offset: 0 });
+  for (const argumentsValue of [{ offset: -0 }, { nested: [{ offset: -0 }] }]) {
+    assert.throws(
+      () => normalizeToolInvocationV1({ ...invocation, arguments: argumentsValue }),
+      /non-canonical negative zero/,
+      'effect arguments must not change identity after JSON persistence',
+    );
+  }
+  assert.equal(normalizeArtifactRefV1(artifact({ sizeBytes: 0 })).sizeBytes, 0);
+  assert.throws(
+    () => normalizeArtifactRefV1(artifact({ sizeBytes: -0 })),
+    /sizeBytes.*invalid/,
+    'sizeBytes -0 must not be normalized into zero across restart',
+  );
+});
+
+
+test('Plan-1 S1: extended ISO year preserves exact UTC chronology across cold serialization', () => {
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-year-10000',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: '+010000-01-01T00:00:00.001Z',
+  };
+  const normalized = normalizeToolInvocationV1(invocation);
+  assert.equal(normalized.createdAt, '+010000-01-01T00:00:00.001Z');
+  assert.equal(
+    normalizeToolInvocationV1({ ...invocation, createdAt: '9999-12-31T23:59:59.999Z' }).createdAt,
+    '9999-12-31T23:59:59.999Z',
+  );
+  assert.equal(
+    normalizeToolInvocationV1({ ...invocation, createdAt: '+010000-01-01T01:00:00+01:00' }).createdAt,
+    '+010000-01-01T00:00:00.000Z',
+  );
+  assert.equal(
+    normalizeToolInvocationV1(JSON.parse(JSON.stringify(normalized))).createdAt,
+    normalized.createdAt,
+  );
+  for (const invalid of [
+    '10000-01-01T00:00:00Z',
+    '+010000-02-30T00:00:00Z',
+    '+010000-01-01T24:00:00Z',
+    '+010000-01-01T00:00:00+25:00',
+  ]) {
+    assert.throws(() => normalizeToolInvocationV1({ ...invocation, createdAt: invalid }),
+      /timestamp|calendar date/i);
+  }
 });

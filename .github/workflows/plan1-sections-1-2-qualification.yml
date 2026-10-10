@@ -7,12 +7,14 @@ on:
   pull_request:
     paths:
       - src/core/outcome-contract.js
+      - src/core/outcome-verification-bridge.js
       - src/core/agent-definition-registry.js
       - src/core/agent-io-contract.js
       - src/core/universal-agent-contracts.js
       - src/core/browser-agent-manager.js
       - src/core/browser-agent.js
       - tests/outcome-contract.test.mjs
+      - tests/outcome-verification-bridge.test.mjs
       - tests/agent-definition-registry.test.mjs
       - tests/agent-io-contract.test.mjs
       - tests/universal-agent-contracts.test.mjs
@@ -40,26 +42,32 @@ jobs:
       - name: Exact-source JavaScript parse checks
         run: |
           node --check src/core/outcome-contract.js
+          node --check src/core/outcome-verification-bridge.js
           node --check src/core/agent-definition-registry.js
           node --check src/core/agent-io-contract.js
           node --check src/core/universal-agent-contracts.js
           node --check src/core/browser-agent-manager.js
           node --check src/core/browser-agent.js
           node --check tests/outcome-contract.test.mjs
+          node --check tests/outcome-verification-bridge.test.mjs
           node --check tests/agent-definition-registry.test.mjs
           node --check tests/agent-io-contract.test.mjs
           node --check tests/universal-agent-contracts.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
           node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
-      - name: Outcome Contract canonical goal/evidence and intake non-disclosure
-        run: node --test tests/outcome-contract.test.mjs
-      - name: Agent Definition canonical route policy and diagnostic non-disclosure
-        run: node --test tests/agent-definition-registry.test.mjs
+      # Run the S1 contract regression gates before the independent S2
+      # evidence-verifier gate, so an S2 failure cannot hide S1 results.
       - name: Agent I/O negative and schema contract tests
         run: node --test tests/agent-io-contract.test.mjs
       - name: Universal agent authority and evidence contracts
         run: node --test tests/universal-agent-contracts.test.mjs
+      - name: Outcome Contract canonical goal/evidence and intake non-disclosure
+        run: node --test tests/outcome-contract.test.mjs
+      - name: Trusted Outcome verification boundary and non-disclosure
+        run: node --test tests/outcome-verification-bridge.test.mjs
+      - name: Agent Definition canonical route policy and diagnostic non-disclosure
+        run: node --test tests/agent-definition-registry.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
         run: node --test tests/browser-agent-definition-launch.test.mjs
       - name: Adjacent persisted Agent definition regression tests

@@ -78,7 +78,7 @@ function requirePlainObject(value, label, allowed = null) {
   const result = {};
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || (allowed && !allowed.has(key))) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
@@ -126,7 +126,11 @@ function cloneData(value, label) {
   function copy(item, depth) {
     if (++visited > MAX_DATA_NODES || depth > MAX_DATA_DEPTH) throw new Error(`${label} exceeds structural bounds`);
     if (item == null || typeof item === 'string' || typeof item === 'boolean') return item;
-    if (typeof item === 'number' && Number.isFinite(item)) return item;
+    if (typeof item === 'number' && Number.isFinite(item)) {
+      // JSON persists -0 as 0; reject exact effect/event value identity drift.
+      if (Object.is(item, -0)) throw new Error(`${label} contains non-canonical negative zero`);
+      return item;
+    }
     if (!item || typeof item !== 'object' || seen.has(item)) throw new Error(`${label} must be an acyclic JSON data value`);
     seen.add(item);
     let output;

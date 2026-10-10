@@ -407,7 +407,7 @@ test('caller-forged verifier, authority and VERIFIED status cannot enter the tru
 
   await assert.rejects(
     () => adjudicate(fixture),
-    /contains unknown field: verification/,
+    /contains unknown field/,
   );
 });
 
@@ -792,4 +792,31 @@ test('hostile trusted resolver records reject without accessor execution', async
     /enumerable own data properties/,
   );
   assert.equal(getterCalls, 0);
+});
+
+
+test('Plan-1 S2: trusted Outcome verification errors redact attacker-defined field keys and never invoke getters', async () => {
+  const secret = 'PRIVATE-OUTCOME-PROOF-SECRET-DO-NOT-LOG';
+  let reads = 0;
+
+  const requestFixture = happyFixture();
+  Object.defineProperty(requestFixture.input, secret, {
+    enumerable: true,
+    get() { reads += 1; throw new Error('forbidden getter'); },
+  });
+  await assert.rejects(() => adjudicate(requestFixture), error => {
+    assert.match(error.message, /unknown field|enumerable own data properties/);
+    assert.doesNotMatch(error.message, /PRIVATE-OUTCOME|SECRET-DO-NOT-LOG|forbidden getter/);
+    return true;
+  });
+
+  const recordFixture = happyFixture();
+  const trusted = recordFixture.records.get('verification-tests');
+  Object.defineProperty(trusted, Symbol(secret), { enumerable: true, value: 'ALLOW' });
+  await assert.rejects(() => adjudicate(recordFixture), error => {
+    assert.match(error.message, /unknown field|enumerable own data properties/);
+    assert.doesNotMatch(error.message, /PRIVATE-OUTCOME|SECRET-DO-NOT-LOG/);
+    return true;
+  });
+  assert.equal(reads, 0);
 });

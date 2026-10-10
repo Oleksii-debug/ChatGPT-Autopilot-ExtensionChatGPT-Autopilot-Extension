@@ -43,7 +43,7 @@ function plain(value, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor
@@ -59,7 +59,7 @@ function plain(value, label) {
 function exactKeys(value, allowed, label) {
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
   }
   for (const key of allowed) {
@@ -98,13 +98,16 @@ function timestamp(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
   // All durable authority/evidence clocks must be explicit, zone-bound ISO
   // instants. Date.parse accepts shorthand and rolls impossible calendar dates.
-  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  // Year 10000+ requires the ISO 8601 signed six-digit extended-year form.
+  // The calendar round-trip must compare the full wall-clock width; fixed
+  // slicing at 19 characters rejects valid extended years or hides rollover.
+  const format = /^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (typeof value !== 'string' || !format.test(value)) {
     throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
   }
-  const wallClock = value.slice(0, 19);
+  const wallClock = value.match(/^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u)[0];
   const calendar = new Date(wallClock + 'Z');
-  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 19) !== wallClock) {
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, wallClock.length) !== wallClock) {
     throw new Error(`${label} contains an invalid calendar date`);
   }
   const instant = new Date(value);
@@ -117,6 +120,7 @@ function integer(value, label, min, max, { optional = false, fallback = 0 } = {}
   if (typeof value !== 'number'
       || !Number.isInteger(value)
       || !Number.isFinite(value)
+      || Object.is(value, -0)
       || value < min
       || value > max) {
     throw new Error(`${label} is invalid`);
@@ -192,6 +196,8 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    // JSON.stringify(-0) is 0; reject rather than mutate exact effect identity on restart.
+    if (Object.is(value, -0)) throw new Error(`${label} contains non-canonical negative zero`);
     return value;
   }
   if (!value || typeof value !== 'object') {
