@@ -115,8 +115,10 @@ function timestamp(value, label, { optional = false } = {}) {
   return instant.toISOString();
 }
 
-function integer(value, label, min, max, { optional = false, fallback = 0 } = {}) {
-  if (value == null && optional) return fallback;
+function integer(value, label, min, max, { optional = false, fallback = 0, present = false } = {}) {
+  // Only an absent legacy field may receive a default. Explicit null or
+  // undefined is corrupted persisted evidence, not an absent size.
+  if (value == null && optional && !present) return fallback;
   if (typeof value !== 'number'
       || !Number.isInteger(value)
       || !Number.isFinite(value)
@@ -363,7 +365,9 @@ export function normalizeArtifactRefV1(input) {
     uri: text(raw.uri, 'uri', { max: 4096 }),
     mediaType: text(raw.mediaType, 'mediaType', { optional: true, max: 300 }),
     sha256: digest,
-    sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, { optional: true, fallback: 0 }),
+    sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, {
+      optional: true, fallback: 0, present: Object.hasOwn(raw, 'sizeBytes'),
+    }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     producerInvocationId: id(raw.producerInvocationId, 'producerInvocationId', { optional: true }),
     sensitive: bool(raw.sensitive, 'sensitive', false, { present: Object.hasOwn(raw, 'sensitive') }),
