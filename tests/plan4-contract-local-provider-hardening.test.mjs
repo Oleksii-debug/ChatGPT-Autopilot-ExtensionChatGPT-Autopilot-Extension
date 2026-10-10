@@ -1820,3 +1820,36 @@ test('Plan4 S1: direct gateway dispatch never aliases provider/model identities 
   assert.equal(JSON.parse(sent[0].body).model,restarted.model);
   assert.match(sent[1].url,/provider=ollama/);
 });
+
+test('Plan4 S1: endpoint model catalog remains exact and immutable across JSON restart', async () => {
+  const bound = {
+    schemaVersion:1, registryRevision:9,
+    routes:[{...route, endpointId:'local-model-1'}],
+    endpointProfiles:[{...endpoint, endpointId:'local-model-1', modelIds:['llama3']}],
+  };
+  const admitted = await createAiRouteRegistryEvidenceV1(bound);
+  const restored = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(bound)));
+  assert.equal(admitted.configSha256, restored.configSha256);
+  assert.equal(admitted.routeIdentities[0].endpointBinding,'MATCHED');
+  assert.deepEqual(admitted.endpointProfiles[0].modelIds,['llama3']);
+  assert.equal(Object.isFrozen(admitted.endpointProfiles[0].modelIds),true);
+  for (const invalid of [
+    [], ['other-model'], [' llama3'], ['llama3 '], ['llama3','llama3'],
+    null, false, 0, 'llama3',
+  ]) {
+    const mismatch = {...bound,endpointProfiles:[{...bound.endpointProfiles[0],modelIds:invalid}]};
+    for (const value of [mismatch,JSON.parse(JSON.stringify(mismatch))]) {
+      await assert.rejects(createAiRouteRegistryEvidenceV1(value),
+        /modelIds|model is absent|bounded array|exact bounded identifier|duplicates/);
+    }
+  }
+  const legacy = {...bound,endpointProfiles:[endpoint]};
+  // No endpoint model claim is invented in a legacy unbound profile.
+  assert.equal((await createAiRouteRegistryEvidenceV1(legacy)).routeIdentities[0].endpointBinding,
+    'UNRESOLVED_LEGACY');
+  const withoutCatalog = {...bound,endpointProfiles:[{...endpoint,endpointId:'local-model-1'}]};
+  const legacyBound = await createAiRouteRegistryEvidenceV1(withoutCatalog);
+  assert.equal(legacyBound.routeIdentities[0].endpointBinding,'MATCHED');
+  assert.equal(Object.hasOwn(legacyBound.endpointProfiles[0],'modelIds'),false);
+  assert.notEqual(admitted.configSha256,legacyBound.configSha256);
+});
