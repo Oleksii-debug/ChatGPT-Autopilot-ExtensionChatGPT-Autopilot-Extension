@@ -139,6 +139,43 @@ test('encoded and duplicate Content-Encoding requests are rejected before owner 
   }
 });
 
+test('unknown method/route rejects before owner token resolver and Core; valid route recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const endpoint = 'http://127.0.0.1:' + port;
+    const headers = {
+      Authorization: 'Bearer ' + TOKEN,
+      'Content-Type': 'application/json',
+    };
+    const unknownPath = await fetch(endpoint + '/v2/control', {
+      method: 'POST', headers, body: JSON.stringify(request('route-denied')),
+    });
+    assert.equal(unknownPath.status, 404);
+    const unknownMethod = await fetch(endpoint + '/v1/control', {
+      method: 'GET', headers,
+    });
+    assert.equal(unknownMethod.status, 404);
+    assert.equal(tokenLookups, 0, 'unknown endpoints must not resolve owner bearer');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'unknown endpoints must not reach canonical Core');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const positive = await client.control(request('route-valid-recovery'));
+    assert.equal(positive.status, 'RECEIVED');
+    assert.equal(positive.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3, 'valid Core dispatch still rechecks current owner token');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('Local API is opt-in and rejects missing runtime or short secrets', () => {
   assert.throws(() => createAutopilotLocalApiServerV1(), /high-entropy/u);
   assert.throws(() => createAutopilotLocalApiServerV1({token: TOKEN}), /Trusted canonical/u);
