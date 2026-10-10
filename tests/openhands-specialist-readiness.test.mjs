@@ -555,3 +555,73 @@ test('hostile readiness capability-array reflection fails before the OpenHands p
   );
   assert.equal(calls, 0);
 });
+
+test('hostile client probe accessor and Proxy reflection traps cannot authorize readiness or leak diagnostics', async () => {
+  let getterCalls = 0;
+  let providerEffects = 0;
+  const accessorClient = {};
+  Object.defineProperty(accessorClient, 'probe', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('SECRET_CLIENT_GETTER');
+    },
+  });
+  const trapClient = new Proxy({
+    async probe() { providerEffects += 1; },
+  }, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'probe') throw new Error('SECRET_CLIENT_DESCRIPTOR_TRAP');
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  for (const client of [accessorClient, trapClient]) {
+    await assert.rejects(
+      () => probeOpenHandsSpecialistProviderConfigV1({
+        config: config(), client, now: monotonicNow([T0, T1]),
+      }),
+      error => error.message.includes('cannot be inspected safely')
+        && !error.message.includes('SECRET'),
+    );
+    assert.throws(
+      () => createOpenHandsSpecialistReadinessBindingV1({
+        config: config(), client, now: monotonicNow([T0, T1]),
+      }),
+      error => error.message.includes('cannot be inspected safely')
+        && !error.message.includes('SECRET'),
+    );
+  }
+  assert.equal(getterCalls, 0, 'probe getters must not execute at admission');
+  assert.equal(providerEffects, 0, 'hostile clients must not perform provider I/O');
+});
+
+test('binding holds admitted OpenHands probe identity across later client method replacement', async () => {
+  let originalCalls = 0;
+  let replacementCalls = 0;
+  const client = {
+    async probe() { originalCalls += 1; },
+  };
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(), client, now: monotonicNow([T0, T1]),
+  });
+  client.probe = async () => {
+    replacementCalls += 1;
+    throw new Error('SECRET_REPLACED_PROVIDER');
+  };
+  const observation = await binding.resolveReadiness({
+    schemaVersion: 1,
+    registryId: 'registry:openhands',
+    registryRevision: 4,
+    specialistId: 'openhands-coding',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    definitionRevision: 2,
+    executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
+    requestedToolIds: [],
+    asOf: new Date(T0).toISOString(),
+  });
+  assert.equal(originalCalls, 1);
+  assert.equal(replacementCalls, 0);
+  assert.equal(observation.providerStates[0].health, 'READY');
+  assert.equal(JSON.stringify(observation).includes('SECRET'), false);
+});
