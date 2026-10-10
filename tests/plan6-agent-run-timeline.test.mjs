@@ -596,7 +596,7 @@ test('S1 durable ownership refuses one effect assigned to multiple nodes after J
   assert.equal(clean.evidenceMap.specialistExecutionOwnership.inspectedRecords, 2);
   assert.equal(clean.evidenceMap.specialistExecutionOwnership.structurallyBoundNodeRecords, 2);
   assert.equal(clean.evidenceMap.specialistExecutionOwnership.externalEffectVerified, false);
-  assert.equal(clean.evidenceMap.agentTreeEdgesVerified, false);
+  assert.equal(clean.evidenceMap.specialistExecutionOwnership.agentTreeEdgesVerified, false);
   assert.equal(clean.mayReplayExternalEffect, false);
   assert.equal(clean.evidenceOnly, true);
   assert.deepEqual(clean, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(source))));
