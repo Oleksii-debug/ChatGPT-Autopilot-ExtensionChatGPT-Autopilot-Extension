@@ -263,6 +263,12 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
   // This instance-local concurrency fence does not replace Core's durable
   // request/effect deduplication or authorize retry after ambiguity.
   const inFlightRequests = new Set();
+  // A completed SDK promise does not prove its transport finished without an
+  // effect. Retain only unresolved transmitted identities after a timeout,
+  // dropped response or untrusted receipt. This is a client-side no-resend
+  // fence, NOT Core's durable deduplication/reconciliation authority.
+  const ambiguousRequests = new Set();
+  const MAX_AMBIGUOUS_REQUESTS = 4096;
   return Object.freeze({
     async control(request) {
       // Canonical Core preflight snapshots own data descriptors before any
@@ -278,6 +284,20 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
       const requestKey = JSON.stringify([
         sentRequest.principalId, sentRequest.projectId, sentRequest.requestId,
       ]);
+      if (ambiguousRequests.has(requestKey)) {
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'This requestId has an unresolved prior transmission; reconcile canonical job state before retrying.',
+        });
+      }
+      // Fail closed rather than evicting unresolved identities and silently
+      // permitting a duplicate consequential dispatch after quota pressure.
+      if (ambiguousRequests.size >= MAX_AMBIGUOUS_REQUESTS) {
+        return Object.freeze({
+          schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
+          instruction: 'Local unresolved-request capacity exhausted; reconcile canonical job state before further transmission.',
+        });
+      }
       if (inFlightRequests.has(requestKey)) {
         return Object.freeze({
           schemaVersion: 1, status: 'UNKNOWN_NETWORK_RESULT',
@@ -336,6 +356,9 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
         }, transportBudgetMs);
       });
       let res;
+      // Mark as unresolved before invoking the transport: a custom fetch
+      // can synchronously transmit and throw before returning its Promise.
+      ambiguousRequests.add(requestKey);
       try {
         res = await Promise.race([fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
           method: 'POST',
@@ -439,6 +462,8 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
           throw new Error('Unbound response');
         }
         if (abortController.signal.aborted) throw new Error('Late Local API receipt');
+        // Only an exactly-bound authenticated Core receipt clears uncertainty.
+        ambiguousRequests.delete(requestKey);
         return value;
       } catch {
         return Object.freeze({
