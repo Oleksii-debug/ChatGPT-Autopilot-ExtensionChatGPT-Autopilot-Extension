@@ -43,7 +43,7 @@ function strictRecord(value, allowed, label) {
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
+      throw new Error(`${label} field must be an enumerable own data property`);
     }
     out[key] = descriptor.value;
   }
