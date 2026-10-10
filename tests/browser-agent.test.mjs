@@ -792,6 +792,79 @@ test('credential resolve is discarded if page origin changes before secret inser
   assert.match(live.job.runtime.lastError, /AGENT_CREDENTIAL_ORIGIN_STALE/);
   assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
 });
+test('owner Stop during credential broker resolution prevents any secret insertion', async () => {
+  const chrome = makeChrome();
+  let credentialExecutions = 0;
+  let manager;
+  const nativeCompanionClient = {
+    async listCredentials() {
+      return { credentialRefs: [{
+        schemaVersion: 1,
+        credentialId: 'ais-main',
+        brokerId: 'native-companion',
+        kind: 'username-password',
+        scope: ['https://ais.example.edu'],
+        expiresAt: null,
+      }] };
+    },
+    async resolveCredential(input) {
+      await manager.stop('job-1');
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: 'must-not-be-inserted',
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [{ frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/app',
+        title: 'AIS',
+        text: 'Login',
+        elements: [
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
+        ],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      credentialExecutions += 1;
+      return [{ frameId: 0, result: { ok: true, passwordFilled: true } }];
+    }
+    return original(details);
+  };
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({
+      text: JSON.stringify({
+        type: 'fill_credential',
+        credentialRef: 'c1',
+        usernameFrameId: 0,
+        usernameRef: 'r1',
+        passwordFrameId: 0,
+        passwordRef: 'r2',
+      }),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+    }),
+    now: (() => { let n = 160_000; return () => ++n; })(),
+  });
+  await manager.create({ id: 'job-1', goal: 'Login only to AIS', credentialDecision: 'ALLOW', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
+  await manager.start('job-1', { runInitial: false });
+  const result = await manager.cycleOne('job-1');
+  assert.equal(result.kind, 'CANCELLED_BY_OWNER');
+  assert.equal(credentialExecutions, 0, 'owner Stop must revoke the credential execution epoch');
+  const live = await manager.get('job-1');
+  assert.equal(live.job.runtime.runState, 'STOPPED');
+  assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
+});
 
 test('owner site policy overrides global autonomy and supports credentials independently', () => {
   const value = config({
