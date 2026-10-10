@@ -2198,3 +2198,49 @@ test('Plan-1 S1: unsupported capability risk classes fail closed before durable 
   });
   assert.equal(getterCalls, 0, 'untrusted accessor must not execute during admission');
 });
+
+
+test('Plan-1 S1: explicitly corrupt provider capabilities never disappear on cold recovery', () => {
+  const options = Object.freeze({ toolId: 'file.read', label: 'Read file' });
+  const provider = Object.freeze({
+    id: 'provider.fixture', label: 'Fixture', capabilities: Object.freeze(['filesystem.read']),
+  });
+  const valid = toolDescriptorV1FromAgentProvider(provider, options);
+  assert.deepEqual(valid.capabilityIds, ['filesystem.read']);
+  assert.ok(Object.isFrozen(valid));
+  assert.deepEqual(normalizeToolDescriptorV1(JSON.parse(JSON.stringify(valid))), valid);
+
+  // A missing legacy field retains the old no-grants behavior. A present
+  // invalid field, unlike absence, must not become [] after a process restart.
+  const legacy = toolDescriptorV1FromAgentProvider(
+    Object.freeze({ id: 'provider.fixture', label: 'Fixture' }), options,
+  );
+  assert.deepEqual(legacy.capabilityIds, []);
+  assert.deepEqual(normalizeToolDescriptorV1(JSON.parse(JSON.stringify(legacy))), legacy);
+
+  for (const capabilities of [null, undefined, false, '', 0]) {
+    const corrupt = Object.freeze({ ...provider, capabilities });
+    assert.throws(() => toolDescriptorV1FromAgentProvider(corrupt, options),
+      /capabilityIds must be a bounded plain array/,
+      'explicit corrupt provider metadata must not silently erase declared capabilities');
+    assert.equal(Object.hasOwn(corrupt, 'capabilities'), true);
+    if (capabilities === null) {
+      assert.throws(() => toolDescriptorV1FromAgentProvider(JSON.parse(JSON.stringify(corrupt)), options),
+        /capabilityIds must be a bounded plain array/,
+        'persisted null metadata must remain fail-closed after cold JSON restart');
+    }
+  }
+
+  let reads = 0;
+  const secret = 'PRIVATE_PROVIDER_CAPABILITY_GETTER_MUST_NOT_RUN';
+  const hostile = { id: 'provider.fixture', label: 'Fixture' };
+  Object.defineProperty(hostile, 'capabilities', {
+    enumerable: true, get() { reads += 1; throw new Error(secret); },
+  });
+  assert.throws(() => toolDescriptorV1FromAgentProvider(hostile, options), error => {
+    assert.match(error.message, /data properties/);
+    assert.doesNotMatch(error.message, /PRIVATE_PROVIDER_CAPABILITY_GETTER_MUST_NOT_RUN/);
+    return true;
+  });
+  assert.equal(reads, 0, 'provider capability getter must never execute');
+});
