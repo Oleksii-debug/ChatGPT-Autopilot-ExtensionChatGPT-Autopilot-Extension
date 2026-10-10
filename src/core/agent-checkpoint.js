@@ -62,23 +62,31 @@ const ARTIFACT_KEYS = new Set([
 const ASSESSMENT_KEYS = new Set(['checkpoint', 'current', 'snapshotUtf8']);
 const CRYPTO_OPTION_KEYS = new Set(['cryptoApi']);
 
+// Checkpoint material and recovery heads can originate from untrusted persisted
+// state. Proxy reflection traps must never leak attacker-controlled errors.
+function safeCheckpointReflection(label, inspect) {
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function strictRecord(value, label, allowedKeys) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object'
+      || safeCheckpointReflection(label, () => Array.isArray(value))) {
     throw new Error(`${label} must be a plain object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = safeCheckpointReflection(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const descriptors = safeCheckpointReflection(label, () => Object.getOwnPropertyDescriptors(value));
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowedKeys.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
+      throw new Error(`${label} contains unknown field`);
     }
     const descriptor = descriptors[key];
     if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      throw new Error(`${label} field ${key} must be an enumerable own data property`);
+      throw new Error(`${label} fields must be enumerable own data properties`);
     }
     out[key] = descriptor.value;
   }
@@ -93,10 +101,11 @@ function checkpointCryptoApi(options) {
 }
 
 function strictArray(value, label, { max }) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!safeCheckpointReflection(label, () => Array.isArray(value)
+      && Object.getPrototypeOf(value) === Array.prototype)) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const descriptors = safeCheckpointReflection(label, () => Object.getOwnPropertyDescriptors(value));
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
@@ -142,7 +151,7 @@ function positiveInteger(value, label) {
 }
 
 function nonNegativeInteger(value, label) {
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer`);
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0) throw new Error(`${label} must be a non-negative integer`);
   return value;
 }
 
@@ -169,7 +178,9 @@ function digest(value, label) {
 }
 
 function idList(value, label, { max }) {
-  const raw = strictArray(value ?? [], label, { max });
+  // A stored null/undefined cannot silently erase unresolved external effects.
+  // Callers provide [] only when the legacy field is genuinely absent.
+  const raw = strictArray(value, label, { max });
   const out = raw.map((item, index) => exactId(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
@@ -218,7 +229,8 @@ function normalizeCheckpointMaterial(raw, allowedKeys) {
     exactEffectLedgerRevision: nonNegativeInteger(input.exactEffectLedgerRevision, 'AgentCheckpointV1 exactEffectLedgerRevision'),
     policyRevisionId: exactId(input.policyRevisionId, 'AgentCheckpointV1 policyRevisionId'),
     snapshotArtifact: artifact,
-    evidenceArtifactIds: idList(input.evidenceArtifactIds ?? [], 'AgentCheckpointV1 evidenceArtifactIds', { max: MAX_EVIDENCE_IDS }),
+    evidenceArtifactIds: idList(Object.hasOwn(input, 'evidenceArtifactIds') ? input.evidenceArtifactIds : [],
+      'AgentCheckpointV1 evidenceArtifactIds', { max: MAX_EVIDENCE_IDS }),
     createdAt,
   };
 }
@@ -314,7 +326,8 @@ export function normalizeAgentCheckpointHeadV1(raw) {
     internalStateRevision: positiveInteger(input.internalStateRevision, 'AgentCheckpointHeadV1 internalStateRevision'),
     exactEffectLedgerRevision: nonNegativeInteger(input.exactEffectLedgerRevision, 'AgentCheckpointHeadV1 exactEffectLedgerRevision'),
     policyRevisionId: exactId(input.policyRevisionId, 'AgentCheckpointHeadV1 policyRevisionId'),
-    unresolvedEffectIds: idList(input.unresolvedEffectIds ?? [], 'AgentCheckpointHeadV1 unresolvedEffectIds', { max: MAX_UNRESOLVED_EFFECTS }),
+    unresolvedEffectIds: idList(Object.hasOwn(input, 'unresolvedEffectIds') ? input.unresolvedEffectIds : [],
+      'AgentCheckpointHeadV1 unresolvedEffectIds', { max: MAX_UNRESOLVED_EFFECTS }),
     observedAt: timestamp(input.observedAt, 'AgentCheckpointHeadV1 observedAt'),
   });
 }

@@ -168,7 +168,7 @@ test('rewind rejects cross-identity, wrong snapshot bytes and regressed current 
       snapshotUtf8: '{"state":"checkpoinu"}',
       snapshotSha256: SNAPSHOT_SHA,
     }),
-    /unknown field: snapshotSha256/,
+    /contains unknown field/,
   );
   await assert.rejects(
     () => assessAgentCheckpointRewindV1({
@@ -192,7 +192,7 @@ test('checkpoint boundaries reject accessors, hidden aliases and array accessors
   });
   await assert.rejects(
     () => createAgentCheckpointV1(accessorCheckpoint),
-    /enumerable own data property/,
+    /enumerable own data propert/,
   );
   assert.equal(reads, 0);
 
@@ -203,7 +203,7 @@ test('checkpoint boundaries reject accessors, hidden aliases and array accessors
   });
   await assert.rejects(
     () => createAgentCheckpointV1(hiddenCheckpoint),
-    /unknown field: shadowAuthority/,
+    /contains unknown field/,
   );
 
   const evidence = ['evidence-1'];
@@ -217,7 +217,7 @@ test('checkpoint boundaries reject accessors, hidden aliases and array accessors
   });
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput({ evidenceArtifactIds: evidence })),
-    /enumerable own data property/,
+    /enumerable own data propert/,
   );
   assert.equal(reads, 0);
 });
@@ -371,7 +371,7 @@ test('checkpoint crypto options reject hostile caller representations before dep
   const createCounter = { reads: 0 };
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput(), accessorOptions(createCounter)),
-    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+    /AgentCheckpoint crypto options fields must be enumerable own data properties/u,
   );
   assert.equal(createCounter.reads, 0);
 
@@ -380,7 +380,7 @@ test('checkpoint crypto options reject hostile caller representations before dep
   const verifyCounter = { reads: 0 };
   await assert.rejects(
     () => verifyAgentCheckpointV1(checkpoint, accessorOptions(verifyCounter)),
-    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+    /AgentCheckpoint crypto options fields must be enumerable own data properties/u,
   );
   assert.equal(verifyCounter.reads, 0);
 
@@ -391,7 +391,7 @@ test('checkpoint crypto options reject hostile caller representations before dep
       current: head(),
       snapshotUtf8: SNAPSHOT_UTF8,
     }, accessorOptions(assessCounter)),
-    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+    /AgentCheckpoint crypto options fields must be enumerable own data properties/u,
   );
   assert.equal(assessCounter.reads, 0);
 });
@@ -399,7 +399,7 @@ test('checkpoint crypto options reject hostile caller representations before dep
 test('checkpoint crypto options are exact and preserve null-prototype compatibility', async () => {
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput(), { cryptoApi: globalThis.crypto, extra: true }),
-    /AgentCheckpoint crypto options contains unknown field: extra/u,
+    /AgentCheckpoint crypto options contains unknown field/u,
   );
 
   const symbolic = { cryptoApi: globalThis.crypto };
@@ -413,7 +413,7 @@ test('checkpoint crypto options are exact and preserve null-prototype compatibil
   Object.defineProperty(hidden, 'cryptoApi', { value: globalThis.crypto, enumerable: false });
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput(), hidden),
-    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+    /AgentCheckpoint crypto options fields must be enumerable own data properties/u,
   );
 
   const exotic = Object.assign(Object.create({ inherited: true }), { cryptoApi: globalThis.crypto });
@@ -434,3 +434,83 @@ test('checkpoint crypto options are exact and preserve null-prototype compatibil
   assert.equal(result.status, AgentCheckpointRewindStatus.READY_FOR_RECONCILIATION);
 });
 
+
+
+test('Plan-1 S1: persisted null/undefined effect and evidence lists cannot erase recovery authority', async () => {
+  const checkpoint = await createAgentCheckpointV1(checkpointInput());
+  const previous = JSON.parse(JSON.stringify(checkpoint));
+  for (const corruptValue of [null, undefined]) {
+    const corrupt = checkpointInput({ evidenceArtifactIds: corruptValue });
+    await assert.rejects(() => createAgentCheckpointV1(corrupt), /bounded plain array/);
+    assert.equal(corrupt.evidenceArtifactIds, corruptValue, 'failed admission must not change persisted evidence');
+
+    const stale = head({ unresolvedEffectIds: corruptValue });
+    assert.throws(() => normalizeAgentCheckpointHeadV1(stale), /bounded plain array/,
+      'an explicitly corrupted list of unresolved effects must not become zero effects');
+    await assert.rejects(() => assessAgentCheckpointRewindV1({
+      checkpoint, current: stale, snapshotUtf8: SNAPSHOT_UTF8,
+    }), /bounded plain array/, 'rewind must fail before it can falsely report safe recovery');
+    assert.equal(stale.unresolvedEffectIds, corruptValue);
+  }
+
+  const oldCheckpoint = checkpointInput();
+  delete oldCheckpoint.evidenceArtifactIds;
+  const compatible = await createAgentCheckpointV1(oldCheckpoint);
+  assert.deepEqual(compatible.evidenceArtifactIds, []);
+  assert.deepEqual(await verifyAgentCheckpointV1(JSON.parse(JSON.stringify(compatible))), compatible);
+  const oldHead = head();
+  delete oldHead.unresolvedEffectIds;
+  assert.deepEqual(normalizeAgentCheckpointHeadV1(oldHead).unresolvedEffectIds, []);
+  assert.deepEqual(await verifyAgentCheckpointV1(JSON.parse(JSON.stringify(checkpoint))), checkpoint);
+  assert.deepEqual(JSON.parse(JSON.stringify(checkpoint)), previous,
+    'failed read-only recovery checks must not mutate the valid checkpoint');
+});
+
+test('Plan-1 S1: hostile checkpoint reflection never leaks private persisted data', async () => {
+  const secret = 'CHECKPOINT_PRIVATE_CANARY_20261010';
+  const base = checkpointInput();
+  const persistedHead = head();
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const hostile = new Proxy(base, { [trap]() { throw new Error(secret); } });
+    await assert.rejects(() => createAgentCheckpointV1(hostile), error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.doesNotMatch(error.message, new RegExp(secret));
+      return true;
+    });
+    const hostileHead = new Proxy(persistedHead, { [trap]() { throw new Error(secret); } });
+    assert.throws(() => normalizeAgentCheckpointHeadV1(hostileHead), error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.doesNotMatch(error.message, new RegExp(secret));
+      return true;
+    });
+  }
+
+  const secretKey = 'SECRET_CHECKPOINT_FIELD_MUST_NOT_LEAK';
+  const injected = checkpointInput({ [secretKey]: true });
+  await assert.rejects(() => createAgentCheckpointV1(injected), error => {
+    assert.match(error.message, /contains unknown field/);
+    assert.doesNotMatch(error.message, /SECRET_CHECKPOINT_FIELD_MUST_NOT_LEAK/);
+    return true;
+  });
+  const symbol = Symbol(secret);
+  const injectedHead = head();
+  injectedHead[symbol] = true;
+  assert.throws(() => normalizeAgentCheckpointHeadV1(injectedHead), error => {
+    assert.match(error.message, /contains unknown field/);
+    assert.doesNotMatch(error.message, new RegExp(secret));
+    return true;
+  });
+
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const list = new Proxy(['effect-unknown'], { [trap]() { throw new Error(secret); } });
+    const current = head({ unresolvedEffectIds: list });
+    assert.throws(() => normalizeAgentCheckpointHeadV1(current), error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.doesNotMatch(error.message, new RegExp(secret));
+      return true;
+    });
+  }
+  const checkpoint = await createAgentCheckpointV1(base);
+  assert.deepEqual(await verifyAgentCheckpointV1(JSON.parse(JSON.stringify(checkpoint))), checkpoint);
+  assert.deepEqual(normalizeAgentCheckpointHeadV1(JSON.parse(JSON.stringify(persistedHead))).unresolvedEffectIds, []);
+});
