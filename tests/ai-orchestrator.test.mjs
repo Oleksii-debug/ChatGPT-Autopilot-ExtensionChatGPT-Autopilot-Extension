@@ -543,6 +543,34 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   ]);
 });
 
+test('Plan4 S1: negative-zero owner call and token ceilings cannot disable bounded dispatch', async () => {
+  const configured = settings({
+    routes:[{routeId:'local-ceiling',provider:'ollama',model:'fixture',
+      roles:['planner'],priority:1}],
+  });
+  let gatewayCalls = 0;
+  const router = new AiOrchestrator({
+    now:()=>83_900,
+    gatewayClient:{async complete() {
+      gatewayCalls++;
+      return {text:'valid legacy zero ceiling',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+    }},
+  });
+  for (const field of ['maxOutputTokens','maxModelCallsForRequest']) {
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {[field]:-0}),
+      error => /non-negative safe integer/.test(error.message),
+      field,
+    );
+    assert.equal(gatewayCalls,0,field+' may never disable owner budget and reach provider');
+  }
+  const result = await router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'allowed legacy unbounded', {
+    maxOutputTokens:0,maxModelCallsForRequest:0,
+  });
+  assert.equal(result.text,'valid legacy zero ceiling');
+  assert.equal(gatewayCalls,1,'genuinely positive legacy zero remains backward compatible');
+});
+
 test('Plan4 S1: a stale or forged call ordinal never authorizes provider I/O', async () => {
   const configured = settings({
     routes:[{routeId:'one-local', provider:'ollama', model:'fixture',
