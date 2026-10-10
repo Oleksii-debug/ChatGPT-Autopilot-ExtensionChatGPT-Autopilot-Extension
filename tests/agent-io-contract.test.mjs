@@ -443,3 +443,44 @@ test('Plan-1 S1: signed extended ISO years agree across Agent contracts and cold
       /timestamp|calendar date/i, 'invalid event date must fail closed: ' + invalid);
   }
 });
+
+
+test('Plan-1 S1: durable action and event type enums reject whitespace aliases', async () => {
+  // An incoming record must never acquire a different action/evidence identity
+  // merely because the runtime trimmed untrusted input before authorization.
+  const sinkObservations = [];
+  const sink = new AgentEventSink({ onEvent: item => sinkObservations.push(item) });
+  const registry = new AgentActionHandlerRegistry();
+  registry.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT, () => 'executed');
+  let executions = 0;
+  const guarded = new AgentActionHandlerRegistry();
+  guarded.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT,
+    () => { executions += 1; return 'executed'; });
+
+  for (const alias of [' submit-prompt', 'submit-prompt ', '\\tsubmit-prompt']) {
+    const invalid = action({ type: alias });
+    assert.throws(() => normalizeAgentAction(invalid), /Unsupported agent action type/);
+    await assert.rejects(() => guarded.execute(invalid), /Unsupported agent action type/);
+    assert.equal(executions, 0, 'invalid durable action must not dispatch');
+    assert.throws(() => getAgentActionRequiredCapability(alias), /Unsupported agent action type/);
+    assert.equal(invalid.type, alias, 'rejection must not mutate persisted caller data');
+    assert.throws(() => registry.register(AgentProviderId.CHATGPT_BROWSER, alias, () => {}), /Unsupported agent action type/);
+  }
+  for (const alias of [' action-succeeded', 'action-succeeded ', '\\taction-succeeded']) {
+    const invalid = event({ type: alias });
+    assert.throws(() => normalizeAgentEvent(invalid), /Unsupported agent event type/);
+    await assert.rejects(() => sink.emit(invalid), /Unsupported agent event type/);
+    assert.throws(() => getAgentEventRequiredCapability(alias), /Unsupported agent event type/);
+    assert.equal(invalid.type, alias);
+  }
+  assert.equal(sinkObservations.length, 0, 'invalid event must not reach observer');
+  assert.equal(executions, 0);
+
+  const acceptedAction = normalizeAgentAction(action());
+  const acceptedEvent = await sink.emit(event());
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(acceptedAction))), acceptedAction);
+  assert.deepEqual(normalizeAgentEvent(JSON.parse(JSON.stringify(acceptedEvent))), acceptedEvent);
+  assert.equal(sinkObservations.length, 1, 'canonical event remains publishable');
+  assert.equal(await guarded.execute(action()), 'executed');
+  assert.equal(executions, 1, 'canonical action remains dispatchable');
+});
