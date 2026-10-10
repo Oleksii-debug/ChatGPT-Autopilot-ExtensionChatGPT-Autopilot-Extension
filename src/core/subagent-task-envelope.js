@@ -52,7 +52,7 @@ const ENVELOPE_KEYS = new Set([
   'completionAuthority',
 ]);
 const BUDGET_KEYS = new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']);
-const SOURCE_REF_KEYS = new Set(['sourceId', 'location', 'revisionId']);
+const SOURCE_REF_KEYS = new Set(['sourceId', 'location', 'revisionId', 'contentSha256']);
 const OUTCOME_KEYS = new Set([
   'contractId',
   'contractRevision',
@@ -179,12 +179,26 @@ function compareCodeUnit(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function exactSourceSha256(value) {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/u.test(value)) {
+    throw new Error('inputSourceRef.contentSha256 must be canonical lowercase SHA-256');
+  }
+  return value;
+}
+
 function normalizeSourceRef(value) {
   const raw = record(value, SOURCE_REF_KEYS, 'SubagentTaskSourceRefV1');
   return {
     sourceId: id(own(raw, 'sourceId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.sourceId'),
     location: text(own(raw, 'location', 'SubagentTaskSourceRefV1'), 'inputSourceRef.location', 8_000),
     revisionId: id(own(raw, 'revisionId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.revisionId'),
+    // Cross-feature Project Context may bind immutable source bytes. Preserve the
+    // hash when present; legacy OutcomeContract references remain un-hashed.
+    // Explicitly present invalid/undefined values must not silently downgrade
+    // the source identity fence after a JSON restart.
+    ...(Object.hasOwn(raw, 'contentSha256')
+      ? { contentSha256: exactSourceSha256(raw.contentSha256) }
+      : {}),
   };
 }
 
