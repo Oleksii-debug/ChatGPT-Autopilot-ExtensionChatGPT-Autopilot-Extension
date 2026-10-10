@@ -135,7 +135,8 @@ function cloneReadinessEvidence(value, label, depth = 0, budget = { count: 0 }, 
         // A caller-controlled field name may carry secrets: never echo it.
         throw new Error(`${label} must have enumerable own data properties`);
       }
-      result[key] = cloneReadinessEvidence(descriptor.value, `${label}.${key}`, depth + 1, budget, ancestors);
+      // Do not put caller-supplied field names into nested failure diagnostics.
+      result[key] = cloneReadinessEvidence(descriptor.value, `${label}.field`, depth + 1, budget, ancestors);
     }
   }
   ancestors.delete(value);
