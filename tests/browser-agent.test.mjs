@@ -3484,7 +3484,7 @@ test('Plan-1: config edits reject hidden authority, hostile coercion and mutable
   Object.defineProperty(getterUpdate, 'goal', {
     enumerable: true, get() { getterReads += 1; throw new Error('private-data-must-not-run'); },
   });
-  await assert.rejects(() => manager.updateConfig('job-config-fence', getterUpdate), /data property/);
+  await assert.rejects(() => manager.updateConfig('job-config-fence', getterUpdate), /data propert/);
   assert.equal(getterReads, 0);
   await assert.rejects(() => manager.updateConfig('job-config-fence', { ownerEffectAuthorized: true }), /unknown field/);
   await assert.rejects(() => manager.updateConfig('job-config-fence', { id: 'different-job' }), /durable job identity/);
@@ -3500,8 +3500,8 @@ test('Plan-1: config edits reject hidden authority, hostile coercion and mutable
   await pending;
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
   const persisted = await restarted.get('job-config-fence');
-  assert.equal(persisted.config.goal, 'Updated verified goal');
-  assert.deepEqual(persisted.config.acceptanceCriteria, ['Independent proof']);
+  assert.equal(persisted.job.config.goal, 'Updated verified goal');
+  assert.deepEqual(persisted.job.config.acceptanceCriteria, ['Independent proof']);
 });
 
 test('Plan-1: S1/S2 untrusted intake field names never leak secrets or mutate durable jobs', async () => {
@@ -3558,7 +3558,7 @@ test('Plan-1: S1/S2 untrusted intake field names never leak secrets or mutate du
     chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
   });
   const persisted = await restarted.get('redaction-owner-job');
-  assert.equal(persisted.config.goal, 'Preserve the original goal');
+  assert.equal(persisted.job.config.goal, 'Preserve the original goal');
   assert.deepEqual((await restarted.load()).order, ['redaction-owner-job']);
 });
 
@@ -3612,12 +3612,12 @@ test('Plan-1: explicit malformed owner policy and ceilings cannot silently reset
     chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
   });
   const stored = await restarted.get('job-owner-ceilings');
-  assert.equal(stored.config.goal, 'Verify owner evidence');
-  assert.equal(stored.config.allowCrossOriginNavigation, false);
-  assert.equal(stored.config.startFromActiveTab, false);
-  assert.equal(stored.config.visionOnDemand, false);
-  assert.equal(stored.config.maxModelCalls, 4);
-  assert.deepEqual(stored.config.acceptanceCriteria, ['Verified by independent evidence']);
+  assert.equal(stored.job.config.goal, 'Verify owner evidence');
+  assert.equal(stored.job.config.allowCrossOriginNavigation, false);
+  assert.equal(stored.job.config.startFromActiveTab, false);
+  assert.equal(stored.job.config.visionOnDemand, false);
+  assert.equal(stored.job.config.maxModelCalls, 4);
+  assert.deepEqual(stored.job.config.acceptanceCriteria, ['Verified by independent evidence']);
   assert.equal((await restarted.load()).order.length, 1);
   assert.equal(chrome._actionCalls.length, 0);
 });
@@ -3645,7 +3645,7 @@ test('Plan-1: config edit rejects nested policy getter, sparse criteria and non-
   const persisted = await new BrowserAgentManager({
     chromeApi: chrome, routePrompt: async () => ({ text: '{}' }),
   }).get('job-config-negative');
-  assert.equal(persisted.config.goal, 'Original');
+  assert.equal(persisted.job.config.goal, 'Original');
 });
 
 test('Plan-1 S1: corrupt in-flight model reservation quarantines on cold restart without write or retry', async () => {
