@@ -17,6 +17,8 @@ test('keyboard-first CLI help is Ukrainian, deterministic and usable without aut
   assert.match(r.stdout,/Автопілот — локальний CLI/);
   assert.match(r.stdout,/requestId/);
   assert.match(r.stdout,/UNKNOWN_NETWORK_RESULT/);
+  assert.match(r.stdout,/REJECTED/);
+  assert.match(r.stdout,/ACCEPTED/);
   assert.equal(r.stderr,'');
 });
 
