@@ -110,6 +110,58 @@ test('compatible endpoint registry rejects duplicate IDs, inline secrets and ins
   assert.throws(() => normalizeCompatibleEndpointRegistry('{bad json'), /must be valid JSON/);
 });
 
+test('Plan4 S1 real gateway registry preserves exact account endpoint and credential-ref identity after JSON restart', () => {
+  const endpoint={endpointId:'team',baseUrl:'https://models.example.test/v1',apiKeyEnv:'TEAM_KEY'};
+  const valid=normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([endpoint])));
+  assert.deepEqual(valid[0],endpoint);
+  for(const bad of [
+    {...endpoint,endpointId:' team '},
+    {...endpoint,endpointId:'team '},
+    {...endpoint,endpointId:'\\tteam'},
+    {...endpoint,endpointId:null},
+    {...endpoint,endpointId:undefined},
+    {...endpoint,apiKeyEnv:' TEAM_KEY '},
+    {...endpoint,apiKeyEnv:'TEAM_KEY\\n'},
+    {...endpoint,apiKeyEnv:null},
+  ]) {
+    assert.throws(
+      ()=>normalizeCompatibleEndpointRegistry([bad]),
+      error=>error.code==='INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+    );
+    assert.throws(
+      ()=>normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([bad]))),
+      error=>error.code==='INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+    );
+  }
+});
+
+test('Plan4 S1 real gateway denies malformed endpoint IDs before account credential/network effect', async () => {
+  const compatibleEndpoints=normalizeCompatibleEndpointRegistry([
+    {endpointId:'local',baseUrl:'http://127.0.0.1:1234/v1',apiKeyEnv:''},
+    {endpointId:'team',baseUrl:'https://models.example.test/v1',apiKeyEnv:'TEAM_KEY'},
+  ]);
+  let fetchCalls=0;
+  const fetchFn=async ()=>{fetchCalls++;return response({data:[{id:'model'}]});};
+  const env={TEAM_KEY:'test-fixture-opaque-credential'};
+  for(const endpointId of [' team ','team ', '\\tteam',null,{},42]) {
+    await assert.rejects(
+      listProviderModels('openai-compatible',{endpointId,compatibleEndpoints,env,fetchFn}),
+      error=>error.code==='AI_COMPATIBLE_ENDPOINT_ID_INVALID',
+    );
+    await assert.rejects(
+      completeProvider({provider:'openai-compatible',endpointId,model:'model',prompt:'test'},
+        {compatibleEndpoints,env,fetchFn}),
+      error=>error.code==='AI_COMPATIBLE_ENDPOINT_ID_INVALID',
+    );
+  }
+  assert.equal(fetchCalls,0);
+  const ok=await listProviderModels('openai-compatible',{
+    endpointId:'team',compatibleEndpoints,env,fetchFn,
+  });
+  assert.deepEqual(ok,['model']);
+  assert.equal(fetchCalls,1);
+});
+
 test('compatible endpoint registry loads local non-secret settings unless an explicit env registry overrides them', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-endpoints-'));
   const configFile = path.join(dir, 'gateway-settings.json');
