@@ -478,7 +478,11 @@ function compatibleHeaders(endpoint, env = process.env) {
     let loopback = false;
     try { loopback = isLoopbackHostname(new URL(clean(endpoint?.baseUrl)).hostname); }
     catch (_) {}
-    if (loopback) return {};
+    // Only the historical implicit default endpoint may retain optional
+    // COMPATIBLE_API_KEY for backwards compatibility. A named endpoint with
+    // an explicit apiKeyEnv is an account credential binding even on
+    // loopback; losing that key must never downgrade to credentialless I/O.
+    if (loopback && endpoint?.endpointId === 'default' && apiKeyEnv === 'COMPATIBLE_API_KEY') return {};
     throw gatewayError(
       `Credential ${apiKeyEnv} is not configured for OpenAI-compatible endpoint ${clean(endpoint?.endpointId) || 'unknown'}`,
       428,
