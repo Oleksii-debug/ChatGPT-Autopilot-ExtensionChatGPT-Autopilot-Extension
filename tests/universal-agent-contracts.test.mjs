@@ -1978,3 +1978,59 @@ test('Plan-1 S1: corrupt persisted artifact digest cannot erase evidence across 
   assert.ok(Object.isFrozen(verified));
   assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(verified))), verified);
 });
+
+
+test('Plan-1 S1: nested prototype keys fail closed across invocation, observation and capability contracts', () => {
+  const secret = 'PRIVATE_NESTED_JSON_VALUE_MUST_NOT_LEAK';
+  const contracts = [
+    value => normalizeToolInvocationV1({
+      schemaVersion: 1, invocationId: 'invoke-nested-safe', toolId: 'fs.read',
+      providerId: 'native-companion', requestedCapabilityIds: ['filesystem.read'],
+      policyDecisionId: 'decision-nested-safe', arguments: value, createdAt: AT,
+    }),
+    value => normalizeObservationV1({
+      schemaVersion: 1, observationId: 'obs-nested-safe',
+      invocationId: 'invoke-nested-safe', status: ObservationStatus.OK,
+      data: value, observedAt: AT,
+    }),
+    value => normalizeCapabilityV1({
+      schemaVersion: 1, capabilityId: 'filesystem.read',
+      riskClass: 'R0', attributes: value,
+    }),
+  ];
+
+  for (const makeContract of contracts) {
+    const good = makeContract(Object.freeze({ scope: Object.freeze({ granted: false }) }));
+    const normalizedJson = JSON.parse(JSON.stringify(good));
+    assert.equal(Object.isFrozen(good), true);
+    assert.deepEqual(makeContract({ scope: { granted: false } }), good);
+    assert.deepEqual(JSON.parse(JSON.stringify(good)), normalizedJson,
+      'validated JSON remains deterministic and serializable for cold recovery');
+
+    // The existing V1 contract deliberately preserves __proto__ strictly
+    // as an own data member; retaining that behavior is a migration requirement.
+    const legacy = JSON.parse('{"nested":{"__proto__":{"marker":"own-data"}}}');
+    const legacyContract = makeContract(legacy);
+    const legacyData = legacyContract.arguments ?? legacyContract.data ?? legacyContract.attributes;
+    assert.equal(Object.getPrototypeOf(legacyData.nested), Object.prototype);
+    assert.equal(Object.hasOwn(legacyData.nested, '__proto__'), true);
+    assert.deepEqual(legacyData.nested.__proto__, { marker: 'own-data' });
+
+    for (const unsafeKey of ['constructor', 'prototype']) {
+      const hostile = JSON.parse(JSON.stringify({ nested: {} }));
+      Object.defineProperty(hostile.nested, unsafeKey, {
+        value: { authorized: true, secret }, enumerable: true, configurable: true,
+      });
+      const before = JSON.stringify(hostile);
+      for (const candidate of [hostile, JSON.parse(before)]) {
+        assert.throws(() => makeContract(candidate), error => {
+          assert.match(error.message, /contains unsafe property key/);
+          assert.doesNotMatch(error.message, /PRIVATE_NESTED_JSON_VALUE_MUST_NOT_LEAK/);
+          return true;
+        }, 'prototype-identity keys must not enter durable effect/evidence data');
+        assert.equal(JSON.stringify(candidate), before,
+          'rejected caller-owned data must remain unchanged');
+      }
+    }
+  }
+});

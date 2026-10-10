@@ -244,6 +244,16 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
     const raw = plain(value, label);
     const out = {};
     for (const key of Object.keys(raw)) {
+      // Align with the existing Agent I/O JSON boundary: these keys can
+      // become inherited authority/effect properties after a later merge,
+      // spread or legacy object hydration. Reject at the shared contract
+      // boundary rather than accepting non-portable durable evidence.
+      // The untrusted key is intentionally absent from diagnostics.
+      // Existing V1 deliberately preserves a data-only __proto__ member via
+      // Object.defineProperty; do not break that cold-restart contract.
+      if (key === 'constructor' || key === 'prototype') {
+        throw new Error(`${label} contains unsafe property key`);
+      }
       Object.defineProperty(out, key, {
         // Never interpolate attacker-owned JSON member names into errors:
         // key names can carry credentials and are not diagnostic authority.
