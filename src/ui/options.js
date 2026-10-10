@@ -2967,7 +2967,7 @@ async function saveAgentDefinition() {
     const payload = current
       ? {
           registryId: registry.registryId,
-          expectedRegistryRevision: registry.revision,
+          expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey,
           kind: 'UPDATE',
           agentDefinitionId: current.agentDefinitionId,
           expectedDefinitionRevision: current.definitionRevision,
@@ -2975,7 +2975,7 @@ async function saveAgentDefinition() {
         }
       : {
           registryId: registry.registryId,
-          expectedRegistryRevision: registry.revision,
+          expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey,
           kind: 'CREATE',
           definition,
         };
@@ -3004,7 +3004,7 @@ async function toggleAgentDefinitionEnabled() {
     };
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
-      expectedRegistryRevision: registry.revision,
+      expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey,
       kind: 'UPDATE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
@@ -3030,7 +3030,7 @@ async function deleteAgentDefinition() {
   try {
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
-      expectedRegistryRevision: registry.revision,
+      expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey,
       kind: 'DELETE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
@@ -3229,8 +3229,8 @@ async function saveSpecialist() {
   try {
     const definition = specialistDefinitionFromForm(current ? current.definitionRevision + 1 : 1);
     const payload = current
-      ? { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition }
-      : { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'CREATE', definition };
+      ? { registryId: registry.registryId, expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition }
+      : { registryId: registry.registryId, expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey, kind: 'CREATE', definition };
     await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', payload);
     await loadSpecialistRegistries({ selectRegistryId: registry.registryId, selectSpecialistId: definition.specialistId });
     $('agent-specialist-status').textContent = current ? 'Specialist definition оновлено.' : 'Specialist definition створено.';
@@ -3247,7 +3247,7 @@ async function toggleSpecialistEnabled() {
   if (!registry || !current) return;
   try {
     const definition = { ...current, enabled: !current.enabled, definitionRevision: current.definitionRevision + 1 };
-    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition });
+    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey, kind: 'UPDATE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision, definition });
     await loadSpecialistRegistries({ selectRegistryId: registry.registryId, selectSpecialistId: current.specialistId });
     $('agent-specialist-status').textContent = definition.enabled ? 'Specialist увімкнено.' : 'Specialist вимкнено.';
     announce(definition.enabled ? 'Specialist увімкнено.' : 'Specialist вимкнено.');
@@ -3263,7 +3263,7 @@ async function deleteSpecialist() {
   if (!registry || !current) return;
   if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Видалити specialist “${current.label}”?`)) return;
   try {
-    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, kind: 'DELETE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision });
+    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId: registry.registryId, expectedRegistryRevision: registry.revision, expectedRegistryBindingKey: registry.bindingKey, kind: 'DELETE', specialistId: current.specialistId, expectedDefinitionRevision: current.definitionRevision });
     ui.selectedSpecialistId = '';
     await loadSpecialistRegistries({ selectRegistryId: registry.registryId });
     $('agent-specialist-status').textContent = 'Specialist definition видалено.';
