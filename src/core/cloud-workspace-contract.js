@@ -308,15 +308,15 @@ function assessment(status, reasonCode, binding, ownership, at) {
 const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation', 'loadCanonicalOwnership']);
 const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding', 'loadCanonicalOwnership']);
 const ISOLATION_PROOF_KEYS = new Set([
-  'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
+  'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemIsolated', 'browserIsolated', 'processIsolated',
 ]);
 const SCRUB_PROOF_KEYS = new Set([
-  'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
+  'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
 ]);
 const TEARDOWN_RECEIPT_KEYS = new Set([
-  'schemaVersion', 'workspaceId', 'providerId', 'executionLeaseId', 'completedAt',
+  'schemaVersion', 'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'completedAt',
 ]);
 
 function trustedLifecycleOptions(input, keys, required, label) {
@@ -334,7 +334,8 @@ function verifyExactLifecycleProof(input, keys, binding, at, properties, label, 
   const raw = dataRecord(input, keys, label);
   if (raw.workspaceId !== binding.workspaceId
     || raw.providerId !== binding.providerId
-    || raw.executionLeaseId !== binding.executionLeaseId) {
+    || raw.executionLeaseId !== binding.executionLeaseId
+    || raw.executionOwnershipRevision !== binding.executionOwnershipRevision) {
     throw new Error(`${label} does not match exact cloud workspace/lease identity`);
   }
   const verifiedAt = exactTimestamp(raw.verifiedAt, `${label}.verifiedAt`);
@@ -592,7 +593,8 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   if (completed.schemaVersion !== CLOUD_WORKSPACE_VERSION
       || completed.workspaceId !== binding.workspaceId
       || completed.providerId !== binding.providerId
-      || completed.executionLeaseId !== binding.executionLeaseId) {
+      || completed.executionLeaseId !== binding.executionLeaseId
+      || completed.executionOwnershipRevision !== binding.executionOwnershipRevision) {
     throw new Error('Cloud workspace teardown completion identity mismatch');
   }
   const completedAt = exactTimestamp(completed.completedAt, 'Cloud workspace teardown completedAt');
