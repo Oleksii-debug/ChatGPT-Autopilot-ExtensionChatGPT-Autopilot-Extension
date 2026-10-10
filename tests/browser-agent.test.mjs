@@ -2006,9 +2006,11 @@ test('unchanged page after DOM and native click is surfaced as effect-not-observ
   await manager.create({ id: 'job-1', goal: 'Use control only if it really changes the page', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'NATIVE_CLICK_FALLBACK');
+  // An unchanged DOM never proves an AJAX/server click had no effect.
+  // Replan once without automatically emitting a second physical click.
   const final = await manager.cycleOne('job-1');
   assert.equal(final.kind, 'COMPLETED');
+  assert.equal(chrome._actionCalls.length, 1, 'unchanged DOM must not trigger blind click resend');
   const live = await manager.get('job-1');
   const evidence = live.job.runtime.history.find(item => item.type === 'effect-not-observed');
   assert.ok(evidence, 'the reasoning model must receive durable evidence that both click paths produced no observable effect');
