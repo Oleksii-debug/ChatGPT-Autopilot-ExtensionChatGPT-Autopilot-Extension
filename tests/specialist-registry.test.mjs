@@ -501,3 +501,29 @@ test('specialist owner-facing metadata fails closed on bidi, hidden control and 
   assert.equal(accepted.enabled, true);
   assert.equal(accepted.definitionRevision, restored.definitionRevision);
 });
+
+
+test('specialist metadata rejects Arabic Letter Mark and Unicode line separator spoofing', () => {
+  // U+061C is the Arabic Letter Mark (an invisible bidi control). U+2028 and
+  // U+2029 render as line breaks without being literal permitted newlines.
+  for (const field of ['label', 'description']) {
+    for (const invisible of ['\u061C', '\u2028', '\u2029']) {
+      const forged = 'Qualified' + invisible + 'Untrusted';
+      assert.throws(
+        () => normalizeSpecialistDefinitionV1(definition({ [field]: forged })),
+        /must be exact bounded text/,
+        field + ' must reject owner-facing spoofing controls',
+      );
+    }
+  }
+
+  // Ordinary Arabic script and explicit description line breaks are valid.
+  const persisted = JSON.parse(JSON.stringify(definition({
+    label: 'QA — العربية Україна',
+    description: 'First line\nSecond line — العربية',
+  })));
+  const recovered = normalizeSpecialistDefinitionV1(persisted);
+  assert.equal(recovered.label, persisted.label);
+  assert.equal(recovered.description, persisted.description);
+  assert.equal(recovered.enabled, true);
+});
