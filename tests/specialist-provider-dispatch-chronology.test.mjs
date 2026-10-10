@@ -172,20 +172,22 @@ test('Section 1 hostile nested readiness field identity stays opaque before prov
   const valid = await f.trustedResolver.resolve(f.selection);
   const privateField = 'PRIVATE_READINESS_FIELD_7CC';
   let getterCalls = 0;
-  for (const shape of ['accessor', 'hidden']) {
+  for (const shape of ['accessor', 'hidden', 'malformed']) {
     const check = { ...valid.inspection.checks[0] };
     if (shape === 'accessor') {
       Object.defineProperty(check, privateField, {
         enumerable: true,
         get() { getterCalls += 1; throw new Error('PRIVATE_GETTER_MESSAGE_7CC'); },
       });
-    } else {
+    } else if (shape === 'hidden') {
       Object.defineProperty(check, privateField, { enumerable: false, value: 'private' });
+    } else {
+      Object.defineProperty(check, privateField, { enumerable: true, value: Symbol('private') });
     }
     const forged = { ...valid, inspection: { ...valid.inspection, checks: [check] } };
     await assert.rejects(f.newDispatcher().execute(f.request(forged)), error =>
       error instanceof Error
-      && /enumerable own data properties/u.test(error.message)
+      && /(?:enumerable own data properties|not canonical data)/u.test(error.message)
       && !error.message.includes(privateField)
       && !error.message.includes('PRIVATE_GETTER_MESSAGE_7CC'));
   }
