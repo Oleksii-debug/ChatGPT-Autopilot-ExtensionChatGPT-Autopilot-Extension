@@ -2123,3 +2123,44 @@ test('Plan4 S1 endpoint evidence round-trips canonical origin through JSON cold 
     }
   }
 });
+
+test('Plan4 S1 owner no-auto-switch never selects an alternative during durable backoff; restart and recovery', async () => {
+  const primary = {...route, priority:100};
+  const secondary = {...route, routeId:'secondary', model:'llama-alternative', priority:1};
+  const routes = [primary, secondary];
+  const routeStates = {primary:{backoffUntil:10_000}};
+  const policy = {autoSwitch:false};
+  const selected = selectAiRouteCandidates({routes, policy, routeStates, now:100});
+  assert.deepEqual(selected.eligibleRouteIds, ['primary','secondary']);
+  assert.deepEqual(selected.candidates, []);
+  assert.equal(selected.retryAt,10_000);
+
+  const cold = JSON.parse(JSON.stringify({routes,policy,routeStates}));
+  const restored = selectAiRouteCandidates({...cold,now:100});
+  assert.deepEqual(restored.candidates, []);
+  assert.equal(restored.retryAt,10_000);
+  assert.deepEqual(selectAiRouteCandidates({routes,policy:{autoSwitch:true},routeStates,now:100})
+    .candidates.map(item => item.routeId),['secondary']);
+
+  let providerCalls=0;
+  const gatewayClient = {async complete(request) {
+    providerCalls += 1;
+    return {text:'fixture result', provider:request.provider, model:request.model,
+      usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+  }};
+  const guarded = new AiOrchestrator({gatewayClient,now:()=>100});
+  const routerSettings = {enabled:true,mode:'primary',routes,
+    routePolicy:policy,fallbackToStrongOnPrimaryError:false};
+  await assert.rejects(
+    guarded.run(routerSettings,{routeStates:cold.routeStates},'approved fixture prompt'),
+    error => error.code === 'AI_ROUTE_POOL_EXHAUSTED' && error.retryAt === 10_000,
+  );
+  assert.equal(providerCalls,0,'no provider or alternate model may be called during owner-pinned backoff');
+
+  const recovered = new AiOrchestrator({gatewayClient,now:()=>10_000});
+  const result = await recovered.run(JSON.parse(JSON.stringify(routerSettings)),
+    {routeStates:JSON.parse(JSON.stringify(routeStates))},'approved fixture prompt');
+  assert.equal(providerCalls,1);
+  assert.equal(result.routing.selectedRouteId,'primary');
+  assert.equal(result.routing.selectedModel,'llama3');
+});
