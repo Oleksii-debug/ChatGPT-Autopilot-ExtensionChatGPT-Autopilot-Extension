@@ -645,3 +645,45 @@ test('S1 refuses non-string, control and accessor Specialist receipt identities 
   assert.equal(called, 0);
   assert.equal(buildAgentRunTimelineV1(job()).mayReplayExternalEffect, false);
 });
+
+
+test('malformed persisted counters fail closed instead of silently reporting zero, including JSON restart', () => {
+  const fields = ['stepCount', 'completedCycles', 'modelCalls', 'totalTokens'];
+  for (const field of fields) {
+    for (const invalid of [-1, 0.5, '9', null, NaN, Infinity, -0]) {
+      const input = job();
+      input.runtime[field] = invalid;
+      assert.throws(() => buildAgentRunTimelineV1(input), /persisted counter is invalid/);
+      // JSON storage changes NaN/Infinity to null and -0 to 0; only a
+      // storage-preserving malformed case supports a cold-restart assertion.
+      if (invalid === -1 || invalid === 0.5 || invalid === '9' || invalid === null) {
+        const restarted = JSON.parse(JSON.stringify(input));
+        assert.throws(() => buildAgentRunTimelineV1(restarted), /persisted counter is invalid/);
+      }
+    }
+    const legacy = job();
+    delete legacy.runtime[field];
+    const result = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy)));
+    const displayed = { stepCount: 'steps', completedCycles: 'cycles', modelCalls: 'modelCalls', totalTokens: 'totalTokens' }[field];
+    assert.equal(result.counters[displayed], 0);
+    assert.equal(result.evidenceOnly, true);
+    assert.equal(result.mayReplayExternalEffect, false);
+  }
+
+  let privateGetterCalls = 0;
+  const accessor = job();
+  Object.defineProperty(accessor.runtime, 'stepCount', {
+    enumerable: true,
+    get() { privateGetterCalls++; throw new Error('PRIVATE_COUNTER_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), /accessor-backed stepCount/);
+  assert.equal(privateGetterCalls, 0);
+
+  const invalidRevision = job();
+  invalidRevision.runtime.plan.revision = -1;
+  assert.throws(() => buildAgentRunTimelineV1(invalidRevision), /persisted counter is invalid/);
+  assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(invalidRevision))), /persisted counter is invalid/);
+  delete invalidRevision.runtime.plan.revision;
+  assert.equal(buildAgentRunTimelineV1(invalidRevision).plan.revision, 0);
+  assert.doesNotMatch(JSON.stringify(buildAgentRunTimelineV1(job())), /PRIVATE_COUNTER_GETTER/);
+});
