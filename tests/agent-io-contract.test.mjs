@@ -10,7 +10,7 @@ import {
   normalizeAgentAction,
   normalizeAgentEvent,
 } from '../src/core/agent-io-contract.js';
-import { AgentProviderId, CapabilityId } from '../src/core/capability-registry.js';
+import { AgentProviderId, CapabilityId, getAgentProvider } from '../src/core/capability-registry.js';
 
 function action(overrides = {}) {
   return {
@@ -537,4 +537,40 @@ test('Plan-1 S1: unknown action/event types never disclose untrusted input in di
   assert.equal(await registry.execute(action()), 'handled');
   assert.equal(effects, 1);
   assert.equal(published.length, 1);
+});
+
+
+test('Plan-1 S1: provider allowlist never admits inherited names or discloses untrusted IDs', async () => {
+  const marker = 'PRIVATE-PROVIDER-IDENTITY-CANARY';
+  let calls = 0;
+  const registry = new AgentActionHandlerRegistry();
+  registry.register(AgentProviderId.CHATGPT_BROWSER, AgentActionType.SUBMIT_PROMPT,
+    () => { calls += 1; return true; });
+  const sinkMessages = [];
+  const sink = new AgentEventSink({ onEvent: value => sinkMessages.push(value) });
+
+  for (const invalidId of ['__proto__', 'constructor', 'toString', 'hasOwnProperty',
+    `unknown-${marker}`]) {
+    const reject = fn => assert.throws(fn, error => {
+      assert.match(error.message, /Unsupported agent provider/);
+      assert.doesNotMatch(error.message, /PRIVATE-PROVIDER-IDENTITY-CANARY|__proto__|constructor|toString|hasOwnProperty/);
+      return true;
+    }, 'only own registered provider descriptors can supply authority');
+    reject(() => getAgentProvider(invalidId));
+    reject(() => normalizeAgentAction(action({ providerId: invalidId })));
+    reject(() => normalizeAgentEvent(event({ providerId: invalidId })));
+    reject(() => registry.register(invalidId, AgentActionType.SUBMIT_PROMPT, () => {}));
+    await assert.rejects(() => registry.execute(action({ providerId: invalidId })),
+      /Unsupported agent provider/);
+    await assert.rejects(() => sink.emit(event({ providerId: invalidId })),
+      /Unsupported agent provider/);
+  }
+  assert.equal(calls, 0, 'unknown providers cannot dispatch canonical action handlers');
+  assert.equal(sinkMessages.length, 0, 'unknown providers cannot publish trusted observations');
+
+  const valid = normalizeAgentAction(action());
+  assert.equal(valid.providerId, AgentProviderId.CHATGPT_BROWSER);
+  assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(valid))), valid);
+  assert.equal(await registry.execute(action()), true);
+  assert.equal(calls, 1);
 });
