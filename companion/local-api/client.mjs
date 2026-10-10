@@ -21,8 +21,11 @@ const MAX_RESPONSE_BYTES = 262_144;
  */
 async function readBoundedControlResponseJson(res, deadline) {
   const type = res?.headers?.get?.('content-type');
-  if (type != null
-    && !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(type)) {
+  // A real HTTP Response with a body stream must carry the Companion's
+  // JSON media type. Missing Content-Type is not an authenticated Core proof;
+  // internal pre-stream json() fixtures retain their existing compatibility.
+  if ((res?.body != null && type == null)
+    || (type != null && !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(type))) {
     throw new Error('Local API response media type is invalid');
   }
   const declared = res?.headers?.get?.('content-length');
