@@ -1030,3 +1030,65 @@ test('S1 teardown refuses revision-replayed completion or scrub, including cold 
     }
   }
 });
+
+
+test('S1 commit refuses a binding replaced during final async owner readback', async () => {
+  const owner = cloudOwnership();
+  let persisted = null;
+  let ownerReads = 0;
+  let commits = 0;
+  let bindingReads = 0;
+  await assert.rejects(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+      at: ISOLATION_AT,
+      verifyIsolation: async () => isolationProof(),
+      loadCanonicalOwnership: async () => {
+        ownerReads++;
+        // Third owner lookup is the post-commit one; its await boundary
+        // races a canonical binding deletion with an unchanged owner.
+        if (ownerReads === 3) persisted = null;
+        return owner;
+      },
+      atomicCommitCanonicalBinding: async tx => {
+        commits++;
+        persisted = JSON.parse(JSON.stringify(tx.binding));
+      },
+      loadCanonicalBinding: async () => {
+        bindingReads++;
+        return persisted;
+      },
+    }),
+    /binding disappeared after owner readback/u,
+  );
+  assert.equal(commits, 1);
+  assert.equal(ownerReads, 3);
+  assert.equal(bindingReads, 2);
+});
+
+test('S1 cold recovery checks binding again after final owner await; never resends', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let persisted = JSON.parse(JSON.stringify(binding));
+  let ownerReads = 0;
+  let bindingReads = 0;
+  let commits = 0;
+  const result = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
+    at: '2026-09-25T06:07:00.000Z',
+    loadCanonicalBinding: async () => {
+      bindingReads++;
+      return persisted;
+    },
+    loadCanonicalOwnership: async () => {
+      ownerReads++;
+      if (ownerReads === 2) persisted = null;
+      return ownership;
+    },
+  });
+  assert.equal(result.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+  assert.equal(result.durableBindingVerified, false);
+  assert.equal(result.binding, null);
+  assert.equal(result.safeRetryAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(ownerReads, 2);
+  assert.equal(bindingReads, 3);
+  assert.equal(commits, 0);
+});
