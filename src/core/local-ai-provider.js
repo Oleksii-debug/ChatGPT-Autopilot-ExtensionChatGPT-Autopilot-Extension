@@ -453,7 +453,9 @@ export class LocalAiClient {
       }
       return consumed;
     } catch (error) {
-      if (controller.signal.aborted || error?.name === 'AbortError') {
+      // A forged AbortError from an already-returned response must not be
+      // reclassified as retryable timeout after a provider POST may commit.
+      if (controller.signal.aborted || (!responseReceived && error?.name === 'AbortError')) {
         const timeout = new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
         timeout.code = 'LOCAL_AI_TIMEOUT';
         timeout.category = 'TIMEOUT';
