@@ -1983,3 +1983,58 @@ test('Plan4 S1: pre-header errors stay UNKNOWN for POST; read-only probes remain
     error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT'
     && error.retryable===true && !error.message.includes('sk-private'));
 });
+
+
+test('Plan4 S1: legacy slots and direct gateway reject hostile Unicode identities without network or fallback', async () => {
+  let outbound = 0;
+  const gateway = new AiGatewayClient({fetchFn:async () => {
+    outbound += 1;
+    return {ok:true,status:200,headers:{get:()=>null},text:async()=>JSON.stringify({text:'verified'})};
+  }});
+  const owner = {enabled:true,mode:'primary',
+    primary:{provider:'ollama',model:'fixture'},fallbackToStrongOnPrimaryError:true};
+  const dangerous = [0,10,127,0x80,0x61c,0x200e,0x202e,0x2028,0x2066,0xd800,0xdc00];
+  for (const point of dangerous) {
+    const hostile = 'model-' + String.fromCharCode(point) + '-identity';
+    for (const model of [hostile,JSON.parse(JSON.stringify(hostile))]) {
+      assert.throws(()=>normalizeAiRouterSettings({...owner,primary:{provider:'ollama',model}}),
+        /AI model slot name must be exact trimmed text/);
+      assert.throws(()=>normalizeAiRouterSettings({...owner,strong:{provider:'openai',model}}),
+        /AI model slot name must be exact trimmed text/);
+      await assert.rejects(gateway.complete({provider:'ollama',model,prompt:'approved'}),
+        /AI model must be an exact bounded identity/);
+    }
+    for (const provider of [hostile,JSON.parse(JSON.stringify(hostile))]) {
+      await assert.rejects(gateway.complete({provider,model:'fixture',prompt:'approved'}),
+        /AI provider must be an exact bounded identity/);
+      await assert.rejects(gateway.listModels({provider}),
+        /AI provider must be an exact bounded identity/);
+    }
+  }
+  assert.equal(outbound,0,'malformed identity must be rejected before model/health transport');
+});
+
+test('Plan4 S1: verified Unicode model identity remains unchanged in legacy-slot and gateway dispatch', async () => {
+  const good = 'Київ/模型:v2';
+  const owner = JSON.parse(JSON.stringify({enabled:true,mode:'primary',
+    primary:{provider:'ollama',model:good},fallbackToStrongOnPrimaryError:false}));
+  assert.equal(normalizeAiRouterSettings(owner).primary.model,good);
+  const sent = [];
+  const gateway = new AiGatewayClient({fetchFn:async (url,init) => {
+    sent.push({url,body:JSON.parse(init.body)});
+    return {ok:true,status:200,headers:{get:()=>null},text:async()=>JSON.stringify({text:'verified'})};
+  }});
+  const completed = await gateway.complete({provider:'ollama',model:good,prompt:'approved'});
+  assert.equal(completed.text,'verified');
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].body.model,good);
+  let modelCalls=0;
+  const router = new AiOrchestrator({gatewayClient:{async complete(request) {
+    modelCalls += 1;
+    assert.equal(request.model,good);
+    return {text:'verified',provider:'ollama',model:good};
+  }}});
+  const routed=await router.run(owner,{},'approved');
+  assert.equal(routed.text,'verified');
+  assert.equal(modelCalls,1);
+});
