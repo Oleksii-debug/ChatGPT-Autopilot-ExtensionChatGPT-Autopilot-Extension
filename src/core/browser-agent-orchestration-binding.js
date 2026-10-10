@@ -27,15 +27,24 @@ const CREATE_BINDING_KEYS = new Set([
 ]);
 const INSPECT_BINDING_KEYS = new Set(['binding', 'authority']);
 
+function inspectUntrustedRecord(label, operation) {
+  // Revoked/hostile Proxies can throw credential-bearing errors from
+  // Array.isArray, getPrototypeOf, ownKeys, or getOwnPropertyDescriptor.
+  // Fail closed without promoting untrusted trap text into diagnostics.
+  try { return operation(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function strictRecord(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object'
+      || inspectUntrustedRecord(label, () => Array.isArray(value))) {
     throw new Error(`${label} must be a plain object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = inspectUntrustedRecord(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const descriptors = inspectUntrustedRecord(label, () => Object.getOwnPropertyDescriptors(value));
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
