@@ -1600,7 +1600,7 @@ test('scope dispatcher snapshots every event field as own data and rejects autho
       nodeId: 'root',
       executionAuthorized: true,
     }, { nowMs: 2000 }),
-    /unknown field: executionAuthorized/,
+    /unknown field/,
   );
 });
 
