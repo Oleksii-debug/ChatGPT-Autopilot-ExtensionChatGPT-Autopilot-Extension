@@ -532,15 +532,26 @@ test('hostile readiness capability-array reflection fails before the OpenHands p
     client: { async probe() { calls += 1; } },
     now: monotonicNow([T0, T1]),
   });
-  const resolver = new SpecialistProviderReadinessResolverV1({
-    bindings: [binding], now: () => T1,
-  });
+  // Call the provider binding directly to isolate its own hostile-array boundary.
+  // The canonical resolver has a separate selection-normalization contract.
   const caps = new Proxy(['code.write'], {
     ownKeys() { throw new Error('SECRET_ARRAY_TRAP'); },
   });
   await assert.rejects(
-    () => resolver.resolve(selection({ requestedCapabilityIds: caps })),
-    error => !error.message.includes('SECRET_ARRAY_TRAP'),
+    () => binding.resolveReadiness({
+      schemaVersion: 1,
+      registryId: 'registry:openhands',
+      registryRevision: 4,
+      specialistId: 'openhands-coding',
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      definitionRevision: 2,
+      executionPlane: 'LOCAL',
+      requestedCapabilityIds: caps,
+      requestedToolIds: [],
+      asOf: new Date(T0).toISOString(),
+    }),
+    error => error.message.includes('cannot be inspected safely')
+      && !error.message.includes('SECRET_ARRAY_TRAP'),
   );
   assert.equal(calls, 0);
 });
