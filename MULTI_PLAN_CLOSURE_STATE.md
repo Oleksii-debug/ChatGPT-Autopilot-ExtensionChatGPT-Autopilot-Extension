@@ -1,3 +1,7 @@
+### PLAN8_S1_CI_FINAL_READBACK_2047B80_20261010 — NONTERMINAL
+- Exact PR #716 head `2047b80aae57c10fa515552c861161c8c4ed2ad2`: Core #38050844049 SUCCESS, UI #38050844032 SUCCESS, Interaction #38050844121 SUCCESS, Chrome #38050844094 SUCCESS; Release #38050844050 FAILURE (Ubuntu 3587/3294 pass/282 fail/11 cancelled, Windows package SUCCESS). Exact source + new negative/restart tests in checkpoint below. [Evidence PR comment](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/716#issuecomment-6097348373).
+- S1 ACTIONABLE / NOT TERMINAL DONE; S2 WAITING_UPSTREAM / NOT DONE. No main integration/postmerge readback or whole-product pass.
+
 ### PLAN8_S1_SPECIALIST_REGISTRY_BINDING_CONVERGENCE_20261010_2047B80 — NONTERMINAL
 
 - Scope ONLY canonical Google Drive `8. Восьмий план`, document `1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM`. FIRST ACTIONABLE Section 1 IN_PROGRESS / NOT TERMINAL DONE. Section 2 WAITING_UPSTREAM / NOT DONE; Plans 1–7 and owner-deferred Plan 5 are not magically terminal. No other Drive plan mutated by this work.
