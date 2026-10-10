@@ -2,10 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
-import {
-  AgentDefinitionRegistryMutationKind,
-  createAgentDefinitionRegistryV1,
-} from '../src/core/agent-definition-registry.js';
+import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 
 function makeChromeStorage() {
   const data = Object.create(null);
@@ -87,30 +84,19 @@ function ownerBudget() {
 }
 
 async function seed(manager, def = definition()) {
-  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   return manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
-}
-
-function bindingKey(def = definition()) {
-  return createAgentDefinitionRegistryV1({
-    schemaVersion: 1,
-    registryId: 'agents:project-1',
-    revision: 2,
-    definitions: [def],
-  }).bindingKey;
 }
 
 function launch(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
-    expectedRegistryBindingKey: bindingKey(),
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
     jobId: 'job.research-binding',
@@ -124,6 +110,26 @@ function launch(overrides = {}) {
     ...overrides,
   };
 }
+
+
+test('11.x registry admission rejects obsolete binding-key aliases before durable mutation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await assert.rejects(
+    () => manager.mutateAgentDefinitionRegistry({
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 1,
+      expectedRegistryBindingKey: 'forged-stale-binding-key',
+      kind: AgentDefinitionRegistryMutationKind.CREATE,
+      definition: definition(),
+    }),
+    /unknown field/,
+  );
+  const after = await manager.getAgentDefinitionRegistry('agents:project-1');
+  assert.equal(after.registry.revision, 1);
+  assert.deepEqual(after.registry.definitions, []);
+});
 
 test('definition launch persists the exact non-authorizing specialist delegation binding across restart', async () => {
   const { chrome } = makeChromeStorage();
@@ -199,7 +205,6 @@ test('definition without delegation profile and manual jobs persist no specialis
   delete noProfile.specialistDelegationProfile;
   await seed(manager, noProfile);
   const created = await manager.createFromAgentDefinition(launch({
-    expectedRegistryBindingKey: bindingKey(noProfile),
   }));
   assert.equal(created.job.specialistDelegationBinding, null);
 
