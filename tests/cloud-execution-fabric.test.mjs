@@ -73,7 +73,7 @@ function slot(slotId = 'slot-a', overrides = {}) {
     artifactSyncSupported: true,
     secureScrubSupported: true,
     evidenceRetentionSupported: true,
-    observedAt: '2026-09-25T10:00:01.000Z',
+    observedAt: '2026-09-25T10:00:04.000Z',
     expiresAt: '2026-09-25T10:20:00.000Z',
     ...overrides,
   };
@@ -834,4 +834,47 @@ test('S1 unbound warm workspace cannot be reused without a canonical owner bindi
   assert.equal(authorizedBinding.disposition, CloudFabricDisposition.CLOUD);
   assert.equal(authorizedBinding.selectedWorkspaceId, 'workspace-a');
   assert.equal(authorizedBinding.executionAuthorized, false);
+});
+
+test('S1 bound workspace requires slot evidence at or after canonical binding across JSON restart', () => {
+  const owner = ownedCloud();
+  const binding = workspaceBinding(owner);
+  const stale = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('stale-after-owner-before-binding', {
+      workspaceId: 'workspace-a',
+      observedAt: '2026-09-25T10:00:02.000Z',
+    })],
+    workspaceBindings: [binding],
+  });
+  for (const input of [stale, JSON.parse(JSON.stringify(stale))]) {
+    const outcome = assessCloudExecutionFabricV1(input);
+    assert.equal(outcome.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(outcome.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(outcome.candidateAssessments[0].reasonCode,
+      'SLOT_OBSERVATION_PREDATES_BINDING');
+    assert.equal(outcome.selectedWorkspaceId, '');
+    assert.equal(outcome.requiredExecutionTransition, '');
+    assert.equal(outcome.dispatchAuthorized, false);
+    assert.equal(outcome.executionAuthorized, false);
+    assert.equal(outcome.resumeAuthorized, false);
+  }
+  // A new, independently observed slot after the durable binding may be
+  // recommended, but even then execution authority remains in canonical Core.
+  const fresh = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('fresh-bound', {
+      workspaceId: 'workspace-a',
+      observedAt: binding.boundAt,
+    })],
+    workspaceBindings: [binding],
+  }))));
+  assert.equal(fresh.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(fresh.selectedWorkspaceId, 'workspace-a');
+  assert.equal(fresh.workspaceProvisioningRequired, false);
+  assert.equal(fresh.requiredExecutionTransition, 'NONE');
+  assert.equal(fresh.dispatchAuthorized, false);
+  assert.equal(fresh.executionAuthorized, false);
 });
