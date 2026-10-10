@@ -1072,7 +1072,7 @@ test('S1 persisted scalar descriptor traps fail closed without leaking or runnin
     get() { invoked += 1; throw new Error(marker); },
   });
   assert.throws(() => buildAgentRunTimelineV1(accessor),
-    error => error instanceof Error && /enumerable data field/u.test(error.message) &&
+    error => error instanceof Error && /accessor-backed state/u.test(error.message) &&
       !error.message.includes(marker));
   assert.equal(invoked, 0);
 
