@@ -1,5 +1,9 @@
 # ChatGPT Autopilot — Multi-Plan Closure State
 
+## Worker status precedence — 2026-10-10
+
+Historical nonterminal checkpoints are audit-only. Select work from the newest independently evidenced canonical per-Plan terminal/status record and assigned Drive plan, not older PR/CI snapshots. Never reopen terminal DONE without a new named proven regression/invalid evidence/contract change/broken integration; never mark earlier work DONE solely from a PR, a queued/failed old SHA, or a fixture-only PASS. The 11.0.13 exact Drive source import requirement below remains binding before further source closure; Plan 5 stays owner-deferred and Plan 8 requires upstream final gates. Preserve unique existing work by REUSE -> REPAIR -> CONVERGE.
+
 ## Live coordination rules
 - PROJECT_PLAN_INDEX.md + MULTI_PLAN_PARALLELISM_CONTRACT.md + this file + assigned Drive plan are the coordination authority.
 - **SOURCE_IMPORT_REQUIRED / ACTIONABLE:** exact Drive archive `ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip` has been located and inspected as a full 11.0.13 source tree. Current GitHub main 0.9.19 is stale. Import/synchronize the exact archive (or a proven newer direct successor) into canonical Git, preserve provenance/hash, run current qualification, then continue normal product-code closure. Do not rebuild from 0.9.19.
