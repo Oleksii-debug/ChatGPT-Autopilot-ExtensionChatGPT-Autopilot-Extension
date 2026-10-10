@@ -31,11 +31,19 @@ function dataRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    // Even a data-only read can invoke hostile Proxy reflection traps.
+    // Never forward an untrusted trap's exception into canonical diagnostics.
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    throw new Error(`${label} has invalid own-data descriptors`);
+  }
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
@@ -43,8 +51,8 @@ function dataRecord(value, allowed, label) {
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} fields must be own data properties`);
     }
-    if (!descriptor.enumerable) throw new Error(`${label} contains non-enumerable field: ${key}`);
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+    if (!descriptor.enumerable) throw new Error(`${label} contains non-enumerable field`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
     Object.defineProperty(out, key, {
       value: descriptor.value,
       enumerable: true,
