@@ -74,14 +74,21 @@ const agentJobsReadGate = createAgentJobsReadGateV1(() => core('LIST_BROWSER_AGE
 let agentOwnerOperationSequence = 0;
 let agentListProjection = '';
 function selectBrowserAgentView(id) {
-  ui.selectedBrowserAgentId = id || '';
-  return agentViewFence.select(ui.selectedBrowserAgentId);
+  const nextId = id || '';
+  // Cached timeline evidence belongs to one selected Agent. A different
+  // selection must not inherit the previous Agent's successful Core-read gate.
+  if (nextId !== ui.selectedBrowserAgentId) ui.agentTimelineStale = true;
+  ui.selectedBrowserAgentId = nextId;
+  return agentViewFence.select(nextId);
 }
 function beginAgentOwnerOperation(command, id = ui.selectedBrowserAgentId) {
   const key = `${command}:${id || ''}`;
   if (agentOwnerOperations.has(key)) return null;
   agentOwnerOperations.add(key);
   agentJobsReadGate.invalidate();
+  // A command may change durable history without changing selected identity.
+  // Refuse an export of pre-command evidence until a fresh Core read succeeds.
+  ui.agentTimelineStale = true;
   return { key, ticket: selectBrowserAgentView(ui.selectedBrowserAgentId), sequence: ++agentOwnerOperationSequence };
 }
 function finishAgentOwnerOperation(operation) {
@@ -3595,6 +3602,14 @@ function exportAgentRunTimeline() {
     $('agent-run-timeline-status').textContent = 'Спочатку виберіть завдання Agent.';
     return;
   }
+  // Never export evidence read for Agent A after selection switched to B.
+  // Compare exact identities without coercion; no persisted effects are run.
+  if (job.id !== ui.selectedBrowserAgentId) {
+    ui.agentTimelineStale = true;
+    $('agent-run-timeline-status').textContent = 'Експорт заблоковано: вибране завдання Agent не відповідає хронології. Оновіть дані з Core.';
+    announce('Експорт заблоковано: хронологія належить іншому Agent.');
+    return;
+  }
   try {
     const timeline = buildAgentRunTimelineV1(job, { filter: $('agent-run-timeline-filter').value || 'ALL' });
     downloadJson(timeline, 'ChatGPT-Autopilot-Agent-run-timeline-redacted.json');
@@ -3673,6 +3688,10 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
     }
     renderBrowserAgentList();
     const job = ui.browserAgentJobs.find(item => item.id === nextId) || null;
+    // The ticket/read-gate checks above have accepted this exact Core read.
+    // Only this path (or a successful per-Agent Core selection) refreshes
+    // export authority; local selection and cached rendering never do.
+    ui.agentTimelineStale = false;
     renderBrowserAgentJob(job);
     return { applied: true, job };
   } catch (error) {
@@ -3694,6 +3713,7 @@ async function selectBrowserAgentJob() {
     const data = await core('SELECT_BROWSER_AGENT_JOB', { id });
     if (!agentViewFence.current(ticket)) return;
     if (data?.job && data.job.id !== id) throw new Error('Core повернув інше завдання Agent.');
+    if (data?.job) ui.agentTimelineStale = false;
     renderBrowserAgentJob(data?.job || null);
     renderBrowserAgentList();
   } catch (error) {
