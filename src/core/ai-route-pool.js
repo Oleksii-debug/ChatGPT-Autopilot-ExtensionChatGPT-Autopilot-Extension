@@ -593,7 +593,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   const profiles = denseDataArray(suppliedProfiles === undefined ? [] : suppliedProfiles, 'AI endpoint profiles', 32);
   const seen = new Set();
   const normalizedProfiles = profiles.map((entry, index) => {
-    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless', 'accountId', 'capabilityIds']), `AI endpoint profile ${index + 1}`);
+    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless', 'accountId', 'capabilityIds', 'modelIds']), `AI endpoint profile ${index + 1}`);
     if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
     const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
     if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
@@ -630,11 +630,17 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
       ? id(own(item, 'accountId'), 'AI endpoint accountId') : '';
     const declaredCapabilities = Object.hasOwn(item, 'capabilityIds')
       ? Object.freeze(optionalIds(item, 'capabilityIds', 'AI endpoint capabilityIds', 64)) : null;
+    // Advisory model-catalog scope for an endpoint; omitted legacy profiles
+    // remain unrestricted evidence, not a fabricated positive model match.
+    // Exact model IDs are checked before hashing and after JSON restart.
+    const declaredModels = Object.hasOwn(item, 'modelIds')
+      ? Object.freeze(optionalIds(item, 'modelIds', 'AI endpoint modelIds', 64)) : null;
     return Object.freeze({
       schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin,
       locality, credentialRef, credentialless,
       ...(accountId ? { accountId } : {}),
       ...(declaredCapabilities !== null ? { capabilityIds: declaredCapabilities } : {}),
+      ...(declaredModels !== null ? { modelIds: declaredModels } : {}),
     });
   });
   // Endpoint identity is advisory evidence, never a second source of dispatch authority.
@@ -655,6 +661,9 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (profile && Object.hasOwn(profile, 'capabilityIds')
         && route.capabilityIds.some(capability => !profile.capabilityIds.includes(capability))) {
       throw new Error('AI route claims a capability absent from its bound endpoint profile');
+    }
+    if (profile && Object.hasOwn(profile, 'modelIds') && !profile.modelIds.includes(route.model)) {
+      throw new Error('AI route model is absent from its bound endpoint profile');
     }
     return Object.freeze({
       routeId: route.routeId, provider: route.provider, model: route.model,
