@@ -567,6 +567,15 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
       || ownerBefore.policyEnvelopeId !== binding.policyEnvelopeId) {
     throw new Error('cloud workspace teardown canonical ownership mismatch');
   }
+  // Never send provider teardown against an expired owner lease or a
+  // rolled-back assessment clock. Cleanup after expiry must be reconciled by
+  // the canonical job runtime; a stale worker cannot destroy reused resources.
+  if (!ownerBefore.leaseUntil
+      || Date.parse(trusted.at) < Date.parse(binding.boundAt)
+      || Date.parse(trusted.at) < Date.parse(ownerBefore.updatedAt)
+      || Date.parse(trusted.at) >= Date.parse(ownerBefore.leaseUntil)) {
+    throw new Error('cloud workspace teardown requires a live canonical owner lease');
+  }
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
