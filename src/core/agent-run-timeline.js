@@ -242,7 +242,15 @@ function planSummary(plan) {
     }
     for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent plan nodes')) {
       record(node, 'Agent plan node');
-      const state = persistedField(node, 'state').value;
+      const { present: statePresent, value: state } = persistedField(node, 'state');
+      // A missing field in a legacy plan is UNKNOWN, never VERIFIED. Explicitly
+      // malformed persisted states must not become credible UNKNOWN evidence.
+      // A valid future string remains forward-compatible but non-authorizing.
+      if (statePresent && (typeof state !== 'string' || state.length < 1 ||
+          state.length > 64 || state !== state.trim() ||
+          /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(state))) {
+        throw new Error('Agent plan node recorded state is invalid');
+      }
       const safeState = PLAN_STATES.has(state) ? state : 'UNKNOWN';
       stateCounts[safeState] = (stateCounts[safeState] || 0) + 1;
       nodeCount += 1;

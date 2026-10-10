@@ -1508,3 +1508,45 @@ test('S1 persisted event types refuse forged data and Unicode spoofing across JS
   }
   assert.equal(buildAgentRunTimelineV1(job()).entries[1].event, 'action');
 });
+
+
+test('S1 persisted plan-node state integrity rejects corrupted evidence without executing accessors', () => {
+  const clean = job();
+  clean.runtime.plan.nodes[0].state = 'FUTURE_PHASE';
+  const future = buildAgentRunTimelineV1(clean);
+  assert.deepEqual(future.plan.stateCounts, { UNKNOWN: 1, VERIFIED: 1 });
+  assert.deepEqual(future, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(clean))));
+  const legacy = job();
+  delete legacy.runtime.plan.nodes[0].state;
+  assert.equal(buildAgentRunTimelineV1(legacy).plan.stateCounts.UNKNOWN, 1);
+  assert.deepEqual(buildAgentRunTimelineV1(legacy),
+    buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
+  for (const state of [undefined, null, false, 1, '', ' READY ', 'PRIVATE\u202eVERIFIED', 'x'.repeat(65)]) {
+    const corrupt = job();
+    corrupt.runtime.plan.nodes[0].state = state;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt), /recorded state is invalid/u);
+    // undefined cannot survive JSON serialization; it must be rejected
+    // before it can silently disappear from the durable record.
+    if (state !== undefined) {
+      assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corrupt))),
+        /recorded state is invalid/u);
+    }
+  }
+  let getters = 0;
+  const hostile = job();
+  Object.defineProperty(hostile.runtime.plan.nodes[0], 'state', {
+    enumerable: true, get() { getters += 1; throw Error('PRIVATE_STATE_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(hostile),
+    error => !error.message.includes('PRIVATE_STATE_GETTER'));
+  assert.equal(getters, 0);
+  const hidden = job();
+  Object.defineProperty(hidden.runtime.plan.nodes[0], 'state', {
+    value: 'VERIFIED', enumerable: false,
+  });
+  assert.throws(() => buildAgentRunTimelineV1(hidden), /enumerable data field/u);
+  assert.equal(future.evidenceOnly, true);
+  assert.equal(future.mayReplayExternalEffect, false);
+  assert.equal(future.evidenceMap.externalEffectVerified, false);
+  assert.equal(future.evidenceMap.specialistPlanLinks.agentTreeEdgesVerified, false);
+});
