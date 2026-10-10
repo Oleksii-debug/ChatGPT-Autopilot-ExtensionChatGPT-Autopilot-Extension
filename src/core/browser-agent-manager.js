@@ -3681,6 +3681,15 @@ export class BrowserAgentManager {
     try { priorTabs = (await this.chrome.tabs.query({})).map(tab => tab.id).filter(Number.isInteger); } catch {}
 
     if (action.type === BrowserAgentActionType.FILL_CREDENTIAL) {
+      // Durable approval/restart envelopes must not coerce an untrusted frame
+      // identifier or broker field into the active Chrome target.
+      if (!Number.isSafeInteger(action.passwordFrameId) || action.passwordFrameId < 0
+        || action.frameId !== action.passwordFrameId || action.ref !== action.passwordRef
+        || (action.usernameRef && action.usernameFrameId !== action.passwordFrameId)
+        || typeof action.expectedFrameUrl !== 'string' || !isHttpUrl(action.expectedFrameUrl)
+        || !Array.isArray(snapshot?.frames)
+        || !snapshot.frames.some(frame => frame.frameId === action.passwordFrameId
+          && frame.url === action.expectedFrameUrl)) throw new Error('AGENT_CREDENTIAL_FRAME_PROOF_STALE');
       if (!this.nativeCompanion) throw new Error('AGENT_CREDENTIAL_BROKER_UNAVAILABLE');
       const liveBefore = await this.chrome.tabs.get(tabId);
       const liveBeforeUrl = clean(liveBefore?.pendingUrl || liveBefore?.url, 4096);
