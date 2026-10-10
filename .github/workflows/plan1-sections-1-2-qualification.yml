@@ -27,6 +27,7 @@ on:
       - tests/agent-checkpoint.test.mjs
       - tests/agent-plan.test.mjs
       - tests/universal-agent-exact-effect.test.mjs
+      - tests/plan1-cross-contract-restart.test.mjs
       - tests/browser-agent-definition-launch.test.mjs
       - tests/browser-agent.test.mjs
       - tests/browser-agent-orchestration-binding.test.mjs
@@ -69,6 +70,7 @@ jobs:
           node --check tests/agent-checkpoint.test.mjs
           node --check tests/agent-plan.test.mjs
           node --check tests/universal-agent-exact-effect.test.mjs
+          node --check tests/plan1-cross-contract-restart.test.mjs
           node --check tests/browser-agent-definition-launch.test.mjs
           node --check tests/browser-agent.test.mjs
           node --check tests/browser-agent-orchestration-binding.test.mjs
@@ -86,6 +88,8 @@ jobs:
         run: node --test tests/agent-plan.test.mjs
       - name: Exact-effect ledger reconciliation and replay resistance
         run: node --test tests/universal-agent-exact-effect.test.mjs
+      - name: Plan1 cross-contract cold-restart and effect replay boundary
+        run: node --test tests/plan1-cross-contract-restart.test.mjs
       - name: Agent Definition canonical route policy and diagnostic non-disclosure
         run: node --test tests/agent-definition-registry.test.mjs
       - name: Browser Agent Definition/direct durable intake and restart tests
