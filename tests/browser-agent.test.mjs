@@ -2500,6 +2500,8 @@ test('vision can drive a bounded native coordinate click without a DOM ref under
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
@@ -2626,6 +2628,8 @@ test('vision can drive a bounded native coordinate drag under explicit ALLOW_ALL
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       const isSource = x < 400;
@@ -2766,6 +2770,8 @@ test('vision can focus a coordinate text target and insert text through native C
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
