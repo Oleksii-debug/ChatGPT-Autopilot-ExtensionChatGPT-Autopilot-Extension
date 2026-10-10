@@ -438,6 +438,7 @@ test('trusted cloud isolation adapter binds canonical owner and cannot authorize
   let called = 0;
   const result = await verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
     at: ISOLATION_AT,
+    loadCanonicalOwnership: async () => cloudOwnership(),
     verifyIsolation: async target => {
       called++;
       assert.deepEqual(target, {
@@ -472,7 +473,8 @@ test('cloud isolation proof rejects mismatched, incomplete, stale, future and fo
     await assert.rejects(
       () => verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
         at: ISOLATION_AT,
-        verifyIsolation: async () => isolationProof(mutation),
+        loadCanonicalOwnership: async () => cloudOwnership(),
+    verifyIsolation: async () => isolationProof(mutation),
       }), /proof|unknown field/u,
     );
   }
@@ -484,7 +486,8 @@ test('cloud isolation proof rejects mismatched, incomplete, stale, future and fo
   });
   await assert.rejects(() => verifyCloudWorkspaceIsolationV1(
     observation(), cloudOwnership(),
-    { at: ISOLATION_AT, verifyIsolation: async () => hostile },
+    { at: ISOLATION_AT, loadCanonicalOwnership: async () => cloudOwnership(),
+    verifyIsolation: async () => hostile },
   ), /data properties/u);
   assert.equal(getterReads, 0);
 });
@@ -493,7 +496,8 @@ test('cloud isolation rejects expired canonical ownership before trusted adapter
   await assert.rejects(
     () => verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
       at: '2026-09-25T07:00:00.000Z',
-      verifyIsolation: async () => { calls++; return isolationProof(); },
+      loadCanonicalOwnership: async () => cloudOwnership(),
+    verifyIsolation: async () => { calls++; return isolationProof(); },
     }), /live execution lease/u,
   );
   assert.equal(calls, 0);
@@ -504,6 +508,7 @@ test('trusted cloud teardown must verify filesystem/browser/process/secret scrub
   const receipt = await teardownAndVerifyCloudWorkspaceV1(
     JSON.parse(JSON.stringify(binding)), {
       at: SCRUB_AT,
+      loadCanonicalBinding: async () => binding,
       teardown: async target => { calls.push('teardown'); assert.equal(target.workspaceId, binding.workspaceId); },
       verifyScrub: async () => { calls.push('verify'); return scrubProof(); },
     },
@@ -527,7 +532,8 @@ test('cloud teardown never reports clean on incomplete/hostile proof or failed t
   ]) {
     await assert.rejects(
       () => teardownAndVerifyCloudWorkspaceV1(binding, {
-        at: SCRUB_AT, teardown: async () => {},
+        at: SCRUB_AT, loadCanonicalBinding: async () => binding,
+      teardown: async () => {},
         verifyScrub: async () => scrubProof(mutation),
       }), /proof/u,
     );
@@ -536,9 +542,38 @@ test('cloud teardown never reports clean on incomplete/hostile proof or failed t
   await assert.rejects(
     () => teardownAndVerifyCloudWorkspaceV1(binding, {
       at: SCRUB_AT,
+      loadCanonicalBinding: async () => binding,
       teardown: async () => { throw new Error('teardown failed'); },
       verifyScrub: async () => { verified = true; return scrubProof(); },
     }), /teardown failed/u,
   );
   assert.equal(verified, false);
+});
+
+test('isolation refuses canonical ownership drift during asynchronous proof', async () => {
+  let loads = 0;
+  const validOwner = cloudOwnership();
+  const newerOwner = { ...validOwner, revision: validOwner.revision + 1 };
+  await assert.rejects(
+    () => verifyCloudWorkspaceIsolationV1(observation(), validOwner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => (++loads === 1 ? validOwner : newerOwner),
+      verifyIsolation: async () => isolationProof(),
+    }), /changed during isolation attestation/u,
+  );
+  assert.equal(loads, 2);
+});
+test('scrub rejects forged caller binding before any provider teardown', async () => {
+  const { binding } = bindingAndOwnership();
+  const forged = { ...binding, workspaceRevision: 'workspace.forged' };
+  let teardowns = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(forged, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => binding,
+      teardown: async () => { teardowns++; },
+      verifyScrub: async () => scrubProof(),
+    }), /does not match canonical binding/u,
+  );
+  assert.equal(teardowns, 0);
 });
