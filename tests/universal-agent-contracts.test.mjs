@@ -94,6 +94,31 @@ test('Plan-1 S1: credential expiry cannot be erased by empty timestamp on recove
   assert.deepEqual(normalizeCredentialRefV1(JSON.parse(JSON.stringify(active))), active);
 });
 
+test('Plan-1 S1: corrupt capability risk metadata cannot downgrade on restart', () => {
+  const legacy = { schemaVersion: 1, capabilityId: 'fs.read' };
+  const absent = normalizeCapabilityV1(legacy);
+  assert.equal(absent.riskClass, 'R0');
+  assert.deepEqual(absent.attributes, {});
+  assert.deepEqual(normalizeCapabilityV1(JSON.parse(JSON.stringify(absent))), absent);
+  for (const [key, value] of [
+    ['riskClass', null], ['riskClass', undefined],
+    ['attributes', null], ['attributes', undefined],
+  ]) {
+    const corrupt = { ...legacy, [key]: value };
+    assert.throws(() => normalizeCapabilityV1(corrupt), error => {
+      assert.match(error.message, /riskClass must be text|attributes contains corrupt explicitly present data/);
+      return true;
+    }, 'corrupt explicit capability authority must not be normalized to a default');
+    assert.deepEqual(corrupt, { ...legacy, [key]: value });
+  }
+  const explicit = normalizeCapabilityV1({
+    ...legacy, riskClass: 'R2', attributes: { userApproved: false, scope: ['workspace.read'] },
+  });
+  assert.equal(explicit.riskClass, 'R2');
+  assert.equal(Object.isFrozen(explicit.attributes.scope), true);
+  assert.deepEqual(normalizeCapabilityV1(JSON.parse(JSON.stringify(explicit))), explicit);
+});
+
 test('Plan-1 S1: observation data presence is exact across cold restart and corruption', () => {
   const base = {
     schemaVersion: 1, observationId: 'obs-data-presence',
