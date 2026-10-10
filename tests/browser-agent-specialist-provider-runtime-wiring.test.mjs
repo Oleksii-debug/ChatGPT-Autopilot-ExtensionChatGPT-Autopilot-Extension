@@ -63,9 +63,17 @@ test('service worker composes one trusted durable Specialist readiness path', as
     source,
     /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]*?probeOpenHandsSpecialistProviderConfigV1\([\s\S]*?browserAgent\.getSpecialistProviderConfig\(providerId\)[\s\S]*?config changed during readiness probe/iu,
   );
+  // Scope the negative-effect check to the actual probe branch. A fixed
+  // character window can incorrectly match subsequent independent command
+  // branches as new provider integrations are inserted nearby.
+  const probeProviderCommand = source.match(
+    /} else if \(message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'\) \{([\s\S]*?)\n  } else if \(message\.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'\) \{/,
+  );
+  assert.ok(probeProviderCommand, 'readiness probe command must remain structurally identifiable');
   assert.doesNotMatch(
-    source,
-    /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]{0,3000}(?:claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff)/u,
+    probeProviderCommand[1],
+    /claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff/u,
+    'readiness probe must not dispatch a provider effect or grant claim/completion authority',
   );
   assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
