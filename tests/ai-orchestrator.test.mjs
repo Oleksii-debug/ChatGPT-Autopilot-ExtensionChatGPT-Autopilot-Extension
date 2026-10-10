@@ -556,6 +556,12 @@ test('Plan4 S1: invalid durable reservation IDs never reach the provider', async
       enumerable:true,
       get() { getterCalls += 1; throw new Error('secret-do-not-read'); },
     }),
+    new Proxy({reservationId:'valid-unverified'}, {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'reservationId') throw new Error('secret-reflection-message');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    }),
   ];
   for (const candidate of corrupt) {
     const receipt = candidate && typeof candidate === 'object'
@@ -619,6 +625,12 @@ test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any mo
     { reservationId:'reservation-1', endpointId:'forged-account' },
     Object.defineProperty({ reservationId:'reservation-1' }, 'provider', {
       enumerable:true, get() { getterReads += 1; throw new Error('secret-provider-getter'); },
+    }),
+    new Proxy({reservationId:'reservation-1', provider:'ollama'}, {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'provider') throw new Error('secret-provider-reflection');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
     }),
   ];
   for (const receipt of forgedReceipts) {
