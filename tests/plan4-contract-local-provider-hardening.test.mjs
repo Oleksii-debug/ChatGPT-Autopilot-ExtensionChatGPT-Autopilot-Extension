@@ -48,6 +48,39 @@ test('Plan4 S1 owner router rejects unsupported versions and unknown policy fiel
   assert.equal(declared.fallbackToStrongOnPrimaryError,false);
 });
 
+test('Plan4 S1 persisted route and endpoint identity is exact, not a whitespace alias', async () => {
+  for (const changed of [
+    {...route,routeId:' primary '},
+    {...route,routeId:'primary '},
+    {...route,routeId:'\\tprimary'},
+    {...route,endpointId:' endpoint.local '},
+    {...route,endpointId:'endpoint.local\\n'},
+  ]) {
+    assert.throws(()=>normalizeAiRoutePool([changed]),/exact bounded identifier/);
+    assert.throws(()=>normalizeAiRoutePool(JSON.parse(JSON.stringify([changed]))),/exact bounded identifier/);
+  }
+  for (const changed of [
+    {...endpoint,profileId:' local.ollama '},
+    {...endpoint,endpointId:' endpoint.local '},
+    {...endpoint,credentialRef:' ref.local ' ,credentialless:false},
+  ]) {
+    await assert.rejects(
+      createAiRouteRegistryEvidenceV1({...snapshot,endpointProfiles:[changed]}),
+      /exact bounded identifier/,
+    );
+    await assert.rejects(
+      createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({...snapshot,endpointProfiles:[changed]}))),
+      /exact bounded identifier/,
+    );
+  }
+  const legitimate = {...snapshot,routes:[{...route,endpointId:'endpoint.local'}],
+    endpointProfiles:[{...endpoint,endpointId:'endpoint.local'}]};
+  const evidence=await createAiRouteRegistryEvidenceV1(legitimate);
+  const cold=await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(legitimate)));
+  assert.equal(evidence.configSha256,cold.configSha256);
+  assert.equal(evidence.routeIdentities[0].endpointBinding,'MATCHED');
+});
+
 test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
   const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
     locality:'local', costClass:'free' };
