@@ -338,7 +338,7 @@ function normalizeProviderStates(value) {
       throw new Error('CloudFabricRequestV1 provider readiness must be provider-level');
     }
     if (seen.has(state.providerId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate provider readiness: ${state.providerId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate provider readiness');
     }
     seen.add(state.providerId);
   }
@@ -357,7 +357,7 @@ function normalizeWorkspaceBindings(value) {
   const seen = new Set();
   for (const binding of bindings) {
     if (seen.has(binding.workspaceId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate workspace binding: ${binding.workspaceId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate workspace binding');
     }
     seen.add(binding.workspaceId);
   }
@@ -555,7 +555,7 @@ export function assessCloudExecutionFabricV1(input) {
   const slotIds = new Set();
   for (const slot of slots) {
     if (slotIds.has(slot.slotId)) {
-      throw new Error(`CloudFabricRequestV1 contains duplicate slot: ${slot.slotId}`);
+      throw new Error('CloudFabricRequestV1 contains duplicate slot');
     }
     slotIds.add(slot.slotId);
   }
