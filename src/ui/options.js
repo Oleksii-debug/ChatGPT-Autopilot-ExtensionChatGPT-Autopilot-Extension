@@ -8,6 +8,7 @@ import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
+import { buildSpecialistDefinitionFromFormV1 } from './specialist-definition-form.js';
 import {
   OPENHANDS_AGENT_SERVER_VERSION,
   OPENHANDS_CODING_PROVIDER_ID,
@@ -2946,7 +2947,7 @@ function fillSpecialistForm(definition = null, { create = false } = {}) {
   $('agent-specialist-provider-id').value = definition?.providerId || '';
   $('agent-specialist-label').value = definition?.label || '';
   $('agent-specialist-description').value = definition?.description || '';
-  $('agent-specialist-plane').value = ['LOCAL', 'CLOUD', 'REMOTE'].includes(definition?.executionPlane)
+  $('agent-specialist-plane').value = ['BROWSER', 'LOCAL', 'CLOUD', 'REMOTE'].includes(definition?.executionPlane)
     ? definition.executionPlane
     : 'LOCAL';
   $('agent-specialist-capabilities').value = agentDefinitionLines(definition?.capabilityIds);
@@ -3046,22 +3047,19 @@ function newSpecialist() {
 }
 
 function specialistDefinitionFromForm(definitionRevision) {
-  const label = $('agent-specialist-label').value.trim();
-  const description = $('agent-specialist-description').value.trim();
-  if (!label) throw new Error('Назва specialist обов’язкова.');
-  return {
-    schemaVersion: 1,
-    specialistId: parseCanonicalAgentIdentity($('agent-specialist-id').value, 'Specialist ID'),
-    providerId: parseCanonicalAgentIdentity($('agent-specialist-provider-id').value, 'Provider ID'),
-    label,
-    description,
+  // The canonical Specialist form contract owns validation, identity,
+  // capability deduplication, execution-plane admission and revision shape.
+  return buildSpecialistDefinitionFromFormV1({
+    specialistId: $('agent-specialist-id').value,
+    providerId: $('agent-specialist-provider-id').value,
+    label: $('agent-specialist-label').value.trim(),
+    description: $('agent-specialist-description').value.trim(),
     executionPlane: $('agent-specialist-plane').value,
-    capabilityIds: specialistIdsFromText($('agent-specialist-capabilities').value, 'Capability ID', { required: true }),
-    toolIds: specialistIdsFromText($('agent-specialist-tools').value, 'Tool ID'),
-    resultContractId: parseCanonicalAgentIdentity($('agent-specialist-result-contract').value, 'Result contract ID'),
+    capabilityIdsText: $('agent-specialist-capabilities').value,
+    toolIdsText: $('agent-specialist-tools').value,
+    resultContractId: $('agent-specialist-result-contract').value,
     enabled: $('agent-specialist-enabled').checked,
-    definitionRevision,
-  };
+  }, { definitionRevision });
 }
 
 async function reloadAfterSpecialistDrift(error, { specialistId = '' } = {}) {
