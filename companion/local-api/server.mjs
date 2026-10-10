@@ -157,7 +157,15 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // HTTP/1 duplicate sensitive headers are ambiguous even if Node exposes
       // a seemingly valid normalized first value.
       if (!hasUnambiguousRawHeader(req, 'host')
-        || !hasUnambiguousRawHeader(req, 'authorization', false)) return reject(res);
+        || !hasUnambiguousRawHeader(req, 'authorization', false)
+        // Node normally discards duplicate Content-Type/Content-Length values.
+        // A valid-looking first header must never hide ambiguous body framing,
+        // media type or browser provenance before owner-token resolution.
+        || !hasUnambiguousRawHeader(req, 'content-type', false)
+        || !hasUnambiguousRawHeader(req, 'content-length', false)
+        || !hasUnambiguousRawHeader(req, 'transfer-encoding', false)
+        || !hasUnambiguousRawHeader(req, 'origin', false)
+        || !hasUnambiguousRawHeader(req, 'access-control-request-method', false)) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
       // Cross-origin and browser-driven requests are always denied, including

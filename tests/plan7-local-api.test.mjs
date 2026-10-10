@@ -151,6 +151,51 @@ test('duplicate Host or Authorization headers fail closed before token lookup or
 });
 
 
+test('duplicate Content-Type is denied before owner token lookup or canonical Core dispatch', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups += 1; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const duplicateTypes = [
+      ['application/json', 'application/json'],
+      ['application/json', 'text/plain'],
+      ['text/plain', 'application/json'],
+    ];
+    for (const [first, second] of duplicateTypes) {
+      const status = await new Promise((resolve, reject) => {
+        const raw = httpRequest({
+          hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+          headers: [
+            'Host', '127.0.0.1:' + port,
+            'Authorization', 'Bearer ' + TOKEN,
+            'Content-Type', first, 'Content-Type', second,
+          ],
+        }, res => {
+          res.resume();
+          res.once('end', () => resolve(res.statusCode));
+        });
+        raw.once('error', reject);
+        raw.end(JSON.stringify(request('duplicate-body-header-' + first + '-' + second)));
+      });
+      assert.equal(status, 403, 'no intermediary-dependent choice of JSON media type');
+    }
+    assert.equal(tokenLookups, 0, 'ambiguous body framing must not invoke Companion credentials');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 });
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const clean = await client.control(request('duplicate-body-header-clean-recovery'));
+    assert.equal(clean.status, 'RECEIVED');
+    assert.equal(clean.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3, 'clean request is authenticated at admission, body, and dispatch');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('Local API bounds concurrent authenticated slow uploads before owner broker or Core', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   let ownerLookups = 0, notifyFull;
