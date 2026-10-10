@@ -129,9 +129,10 @@ export function resolveAgentProviderLaunchUrl(providerId, requestedUrl = '') {
   if (requestedUrl != null && typeof requestedUrl !== 'string') {
     throw new Error('Agent provider launch URL must be text');
   }
-  const launchUrl = (requestedUrl == null || requestedUrl === '')
-    ? descriptor.defaultLaunchUrl
-    : requestedUrl.trim();
+  // Keep legacy blank/whitespace text as a default request, but never
+  // reinterpret an object, number or boolean as a valid launch decision.
+  const requestedText = typeof requestedUrl === 'string' ? requestedUrl.trim() : '';
+  const launchUrl = requestedText || descriptor.defaultLaunchUrl;
   if (typeof launchUrl !== 'string' || !launchUrl) {
     throw new Error('Agent provider has no valid launch URL');
   }
