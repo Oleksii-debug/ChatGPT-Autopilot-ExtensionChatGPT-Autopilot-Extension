@@ -82,9 +82,30 @@ function id(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(label + ' must use exact canonical identity representation');
   return value;
 }
+// Labels/descriptions cross both persisted JSON and accessible owner-facing UI.
+// Bidi controls, hidden separators and unpaired UTF-16 code units can change
+// their appearance or identity after serialization; never publish them.
+const UNSAFE_SPECIALIST_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/u;
+function hasUnpairedSurrogate(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xD800 && unit <= 0xDBFF) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xDC00 && next <= 0xDFFF)) return true;
+      index += 1;
+    } else if (unit >= 0xDC00 && unit <= 0xDFFF) {
+      return true;
+    }
+  }
+  return false;
+}
 function text(value, label, max, optional = false) {
   if ((value === undefined || value === '') && optional) return '';
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max || value.includes('\0')) throw new Error(label + ' must be exact bounded text');
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max
+      || UNSAFE_SPECIALIST_TEXT.test(value) || hasUnpairedSurrogate(value)
+      || (label === 'label' && /[\t\n]/u.test(value))) {
+    throw new Error(label + ' must be exact bounded text');
+  }
   return value;
 }
 function integer(value, label) {
