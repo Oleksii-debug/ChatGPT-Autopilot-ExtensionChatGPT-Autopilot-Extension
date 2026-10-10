@@ -285,6 +285,15 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
   return `You are the stronger escalation/review model in a persistent hybrid AI workflow.\n\nTRIGGER: ${trigger}\n\nORIGINAL TASK:\n${clean(prompt)}\n\nPRIMARY/LOCAL WORKER REPORT OR DRAFT:\n${report || '(no primary report)'}${previous}\n\nContinue the task from this handoff. Correct errors, resolve uncertainty, and return the best usable result. Do not merely comment on the handoff.`.slice(0, settings.handoffMaxChars + clean(prompt).length + 2000);
 }
 
+// The durable budget broker must explicitly acknowledge settlement. An absent,
+// false, accessor-backed or forged receipt cannot authorize publishing output or
+// another provider effect after the first attempt may have been charged.
+function isCommittedProviderSettlement(receipt) {
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return false;
+  const settled = Object.getOwnPropertyDescriptor(receipt, 'settled');
+  return Boolean(settled && Object.hasOwn(settled, 'value') && settled.value === true);
+}
+
 export class AiOrchestrator {
   constructor({
     gatewayClient, now = () => Date.now(), providerCallLifecycle = null,
@@ -436,13 +445,14 @@ export class AiOrchestrator {
       } catch (error) {
         if (lifecycle) {
           try {
-            await lifecycle.afterProviderCall({
+            const settlement = await lifecycle.afterProviderCall({
               context: providerCallBudgetContext,
               reservation,
               route: routeIdentity,
               ok: false,
               error,
             });
+            if (!isCommittedProviderSettlement(settlement)) throw new Error('Unverified model budget settlement');
           } catch (settlementError) {
             // A provider may already have incurred a charge or produced an output.
             // Do not retry another model while its settlement is uncertain.
@@ -459,13 +469,14 @@ export class AiOrchestrator {
       }
       if (lifecycle) {
         try {
-          await lifecycle.afterProviderCall({
+          const settlement = await lifecycle.afterProviderCall({
             context: providerCallBudgetContext,
             reservation,
             route: routeIdentity,
             ok: true,
             result: value,
           });
+          if (!isCommittedProviderSettlement(settlement)) throw new Error('Unverified model budget settlement');
         } catch (settlementError) {
           // A provider may already have incurred a charge or produced an output.
           // Do not retry another model while its settlement is uncertain.
