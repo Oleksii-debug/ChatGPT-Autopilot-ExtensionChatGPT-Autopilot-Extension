@@ -296,7 +296,7 @@ test('binding request and trusted resolver dependency boundaries are exact-shape
   });
   await assert.rejects(
     () => manager.bindOrchestrationNode('job-1', hostileRequest, dependencies),
-    /enumerable own data properties/,
+    /enumerable own data property/,
   );
   assert.equal(requestReads, 0);
 
@@ -1290,7 +1290,7 @@ test('lifecycle adapter options are exact descriptor-safe data and private Brows
       bound.binding,
       applyBoundLifecycle => applyBoundLifecycle('PAUSE', hostileOptions),
     ),
-    /enumerable own data property/,
+    /enumerable own data properties/,
   );
   assert.equal(reads, 0);
 
