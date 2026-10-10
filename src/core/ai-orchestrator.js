@@ -126,6 +126,20 @@ function ownerRouterNumber(source, key, fallback) {
 
 export function normalizeAiRouterSettings(raw = {}) {
   const source = snapshotRouterOwnerData(raw, 'AI router settings');
+  // Versionless stored settings are the supported legacy v1 shape. Reject a
+  // future/invalid declared version instead of silently routing it as v1.
+  if (Object.hasOwn(source, 'schemaVersion') && source.schemaVersion !== 1) {
+    throw new Error('Unsupported AI router settings schemaVersion');
+  }
+  // Owner settings control endpoint selection, provider and fallback policy.
+  // Unknown persisted fields must not be silently ignored (including typos
+  // in restrictions), and their untrusted names must not leak to diagnostics.
+  const admitted = new Set(Object.keys(DEFAULT_AI_ROUTER_SETTINGS));
+  for (const key of Object.keys(source)) {
+    if (key !== 'schemaVersion' && !admitted.has(key)) {
+      throw new Error('AI router settings contain an unknown owner-controlled field');
+    }
+  }
   const timeoutSeconds = ownerRouterNumber(source, 'timeoutSeconds', DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
   const strongEveryNRequests = ownerRouterNumber(source, 'strongEveryNRequests', DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
   const strongEveryMinutes = ownerRouterNumber(source, 'strongEveryMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
