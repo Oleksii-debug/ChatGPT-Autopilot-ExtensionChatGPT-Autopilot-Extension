@@ -51,7 +51,7 @@ import {
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
-import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
+import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1, normalizeResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
   normalizeAgentDefinitionRegistryV1,
@@ -118,6 +118,7 @@ const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
   'resolveProjectHierarchyAuthority',
   'withProjectHierarchyAuthority',
 ]);
+const OWNER_RESOURCE_BUDGET_SET_KEYS = new Set(['expectedRevision', 'budget']);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -481,6 +482,37 @@ function normalizeBrowserAgentExecutionPolicy(raw = {}) {
   }
   return Object.freeze({ maxConcurrentAgents: value });
 }
+function normalizePersistedOwnerResourceBudgetState(rawBudget, rawRevision, rawQuarantined) {
+  const hasBudget = rawBudget !== undefined;
+  const hasRevision = rawRevision !== undefined;
+  let quarantined = rawQuarantined === true;
+  if (rawQuarantined !== undefined && typeof rawQuarantined !== 'boolean') {
+    quarantined = true;
+  }
+  // The budget and its CAS revision are one durable authority record.  Legacy
+  // stores may omit both, but a partially persisted pair must never mint
+  // revision-zero capacity after corruption or manual storage substitution.
+  if (hasBudget !== hasRevision) {
+    quarantined = true;
+  }
+  let revision = 0;
+  if (hasRevision) {
+    try {
+      revision = nonNegativeSafeInteger(rawRevision, 'Stored owner resource budget revision');
+    } catch {
+      quarantined = true;
+    }
+  }
+  let budget;
+  try {
+    budget = normalizeResourceBudgetV1(hasBudget ? rawBudget : {});
+  } catch {
+    budget = normalizeResourceBudgetV1({});
+    quarantined = true;
+  }
+  return { budget, revision, quarantined };
+}
+
 function freshStore() {
   return {
     schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
@@ -492,6 +524,9 @@ function freshStore() {
     definitionRegistryQuarantineById: Object.create(null),
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
+    ownerResourceBudget: normalizeResourceBudgetV1({}),
+    ownerResourceBudgetRevision: 0,
+    ownerResourceBudgetQuarantined: false,
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -792,6 +827,14 @@ function normalizeStore(raw, now) {
   );
   out.specialistRegistriesById = specialistState.registries;
   out.specialistRegistryQuarantineById = specialistState.quarantine;
+  const ownerState = normalizePersistedOwnerResourceBudgetState(
+    raw.ownerResourceBudget,
+    raw.ownerResourceBudgetRevision,
+    raw.ownerResourceBudgetQuarantined,
+  );
+  out.ownerResourceBudget = ownerState.budget;
+  out.ownerResourceBudgetRevision = ownerState.revision;
+  out.ownerResourceBudgetQuarantined = ownerState.quarantined;
   return out;
 }
 
@@ -1054,6 +1097,59 @@ export class BrowserAgentManager {
       .map(registryId => clone(store.specialistRegistriesById[registryId]));
     const quarantinedRegistryIds = Object.keys(store.specialistRegistryQuarantineById || {}).sort();
     return { registries, quarantinedRegistryIds };
+  }
+
+  async getOwnerResourceBudget() {
+    const store = await this.load();
+    return {
+      budget: clone(store.ownerResourceBudget),
+      revision: store.ownerResourceBudgetRevision,
+      quarantined: store.ownerResourceBudgetQuarantined === true,
+    };
+  }
+
+  async setOwnerResourceBudget(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      OWNER_RESOURCE_BUDGET_SET_KEYS,
+      'Browser Agent owner resource budget set request',
+    );
+    for (const key of OWNER_RESOURCE_BUDGET_SET_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent owner resource budget set request requires ${key}`);
+      }
+    }
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Owner resource budget expectedRevision',
+    );
+    const prepared = normalizeResourceBudgetV1(request.budget);
+    let committed = null;
+    await this.update(store => {
+      if (store.ownerResourceBudgetQuarantined === true) {
+        throw new Error('Owner resource budget is quarantined as corrupt and cannot authorize mutation');
+      }
+      const currentRevision = nonNegativeSafeInteger(
+        store.ownerResourceBudgetRevision,
+        'Owner resource budget current revision',
+      );
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Owner resource budget revision drifted before update');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Owner resource budget revision cannot advance');
+      }
+      store.ownerResourceBudget = prepared;
+      store.ownerResourceBudgetRevision = currentRevision + 1;
+      store.ownerResourceBudgetQuarantined = false;
+      committed = {
+        budget: clone(prepared),
+        revision: store.ownerResourceBudgetRevision,
+        quarantined: false,
+      };
+      return store;
+    });
+    return committed;
   }
 
   async getSpecialistRegistry(registryId) {
@@ -1793,9 +1889,12 @@ export class BrowserAgentManager {
    */
   async claimSpecialistHandoffsAcrossJobs(payload = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
-    const limit = request.maxConcurrentHandoffs;
-    if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
-      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    const requestedLimit = Object.hasOwn(request, 'maxConcurrentHandoffs')
+      ? request.maxConcurrentHandoffs
+      : 256;
+    if (typeof requestedLimit !== 'number' || !Number.isSafeInteger(requestedLimit)
+        || Object.is(requestedLimit, -0) || requestedLimit < 0 || requestedLimit > 256) {
+      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256 when supplied');
     }
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
@@ -1806,6 +1905,14 @@ export class BrowserAgentManager {
     claimRequest.at = at;
     let result = null;
     await this.update(store => {
+      const ownerBudget = normalizeResourceBudgetV1(store.ownerResourceBudget || {});
+      const ownerBudgetRevision = nonNegativeSafeInteger(
+        store.ownerResourceBudgetRevision,
+        'Owner resource budget current revision',
+      );
+      const ownerLimit = store.ownerResourceBudgetQuarantined === true
+        ? 0 : Math.min(256, ownerBudget.maxConcurrentAgents);
+      const limit = Math.min(requestedLimit, ownerLimit);
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
       const specialistOwnerships = store.order
@@ -1847,6 +1954,10 @@ export class BrowserAgentManager {
       }
       result = {
         maxConcurrentHandoffs: limit,
+        requestedMaxConcurrentHandoffs: requestedLimit,
+        ownerMaxConcurrentAgents: ownerLimit,
+        ownerResourceBudgetRevision: ownerBudgetRevision,
+        ownerResourceBudgetQuarantined: store.ownerResourceBudgetQuarantined === true,
         activeLeases: liveLeases.length,
         capacityObligations: capacityOwnerships.length,
         remainingSlots: remaining,
