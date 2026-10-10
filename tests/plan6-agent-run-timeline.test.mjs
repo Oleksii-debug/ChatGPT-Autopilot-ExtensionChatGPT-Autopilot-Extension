@@ -773,3 +773,75 @@ test('S1 dispatch-map identities are canonical before evidence counts, including
   assert.throws(() => buildAgentRunTimelineV1(corrupted), /dispatch map exceeds the bounded record schema/u);
   assert.equal(getterInvocations, 0);
 });
+
+
+test('S1 canonical evidence arrays reject forged properties and concealed descriptors without fake counts', () => {
+  const cases = [
+    input => { input.runtime.plan.nodes.extra = { state: 'VERIFIED' }; },
+    input => { Object.defineProperty(input.runtime.plan.nodes, '0', { enumerable: false }); },
+    input => { input.runtime.verifiedOutcome.checks.extra = { private: 'PRIVATE_INJECTED' }; },
+    input => { Object.defineProperty(input.runtime.verifiedOutcome.checks, '0', { enumerable: false }); },
+    input => {
+      const refs = [{ artifactId: 'PRIVATE_ARTIFACT' }];
+      refs.extra = 'PRIVATE_UNVERIFIED_PROOF';
+      input.runtime.specialistDispatchByAgentId = {
+        'agent-a': { state: 'PROVIDER_SUCCEEDED', resultArtifactRefs: refs },
+      };
+    },
+  ];
+  for (const corrupt of cases) {
+    const input = job();
+    corrupt(input);
+    assert.throws(() => buildAgentRunTimelineV1(input), error =>
+      error instanceof Error && /canonical dense array/u.test(error.message) &&
+      !/PRIVATE_|NEVER_EXPORT/u.test(error.message));
+  }
+  const valid = job();
+  valid.runtime.specialistDispatchByAgentId = {
+    'agent-a': { state: 'PROVIDER_SUCCEEDED', resultArtifactRefs: [{ artifactId: 'PRIVATE_ARTIFACT' }] },
+  };
+  const projection = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid)));
+  assert.equal(projection.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded, 1);
+  assert.equal(projection.evidenceMap.specialistProviderDispatch.artifactProvenanceVerified, false);
+  assert.equal(projection.evidenceMap.externalEffectVerified, false);
+  assert.equal(projection.mayReplayExternalEffect, false);
+  assert.doesNotMatch(JSON.stringify(projection), /PRIVATE_|NEVER_EXPORT/u);
+  assert.deepEqual(projection, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+});
+
+test('S1 hostile evidence array traps never execute getters or expose private diagnostics', () => {
+  const marker = 'PRIVATE_EVIDENCE_TRAP_NEVER_LEAK';
+  let reads = 0;
+  const checked = [ { state: 'READY' } ];
+  const maliciousNodes = new Proxy(checked, {
+    get(_target, key, receiver) {
+      if (key === '0') { reads += 1; throw Error(marker); }
+      return Reflect.get(_target, key, receiver);
+    },
+  });
+  const valid = job();
+  valid.runtime.plan.nodes = maliciousNodes;
+  const success = buildAgentRunTimelineV1(valid);
+  assert.equal(success.plan.nodeCount, 1);
+  assert.equal(reads, 0);
+  assert.equal(success.evidenceOnly, true);
+  const unsafe = job();
+  unsafe.runtime.verifiedOutcome.checks = new Proxy([{}], {
+    ownKeys() { throw Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(unsafe), error =>
+    error instanceof Error && !error.message.includes(marker));
+  assert.equal(reads, 0);
+  unsafe.runtime.verifiedOutcome.checks = [ {} ];
+  unsafe.runtime.specialistDispatchByAgentId = {
+    'agent-a': { state: 'PROVIDER_SUCCEEDED', resultArtifactRefs: new Proxy([{}], {
+      getOwnPropertyDescriptor(_target, key) {
+        if (key === '0') throw Error(marker);
+        return Reflect.getOwnPropertyDescriptor(_target, key);
+      },
+    }) },
+  };
+  assert.throws(() => buildAgentRunTimelineV1(unsafe), error =>
+    error instanceof Error && !error.message.includes(marker));
+  assert.equal(reads, 0);
+});
