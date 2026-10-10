@@ -606,6 +606,38 @@ test('S1 refuses stale pre-teardown scrub proof and never reports a clean lease'
   assert.equal(readbacks, 2, 'pre-teardown binding fence is checked but invalid proof never produces a clean receipt');
 });
 
+test('S1 rejects equal-time scrub receipt replay after JSON cold restart', async () => {
+  const { binding } = bindingAndOwnership();
+  const restarted = JSON.parse(JSON.stringify(binding));
+  let teardownCalls = 0;
+  let scrubCalls = 0;
+  let canonicalReads = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(restarted, {
+      at: SCRUB_AT,
+      loadCanonicalOwnership: async () => cloudOwnership(),
+      loadCanonicalBinding: async () => {
+        canonicalReads++;
+        return JSON.parse(JSON.stringify(binding));
+      },
+      teardown: async () => {
+        teardownCalls++;
+        return teardownCompletion();
+      },
+      verifyScrub: async () => {
+        scrubCalls++;
+        // An attestation with the SAME timestamp is not proof that
+        // filesystem/browser/process/secret scrub occurred after teardown.
+        return scrubProof({ verifiedAt: '2026-09-25T06:08:30.000Z' });
+      },
+    }),
+    /scrub proof must follow teardown completion/u,
+  );
+  assert.equal(teardownCalls, 1, 'destructive teardown must never be retried');
+  assert.equal(scrubCalls, 1);
+  assert.equal(canonicalReads, 2, 'no clean/lease-release readback on rejected proof');
+});
+
 test('S1 requires versioned exact teardown completion before scrub verification', async () => {
   const { binding } = bindingAndOwnership();
   const invalid = [
