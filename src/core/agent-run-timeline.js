@@ -340,6 +340,8 @@ function recordedSpecialistDispatchEvidence(runtime) {
     statusCounts: { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 },
     receiptIdsRecorded: 0,
     artifactReferencesRecorded: 0,
+    distinctArtifactIdsRecorded: 0,
+    reusedArtifactReferencesRecorded: 0,
     externalEffectVerified: false,
     artifactProvenanceVerified: false,
   });
@@ -354,6 +356,11 @@ function recordedSpecialistDispatchEvidence(runtime) {
   const statusCounts = { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 };
   let receiptIdsRecorded = 0;
   let artifactReferencesRecorded = 0;
+  // Multiple references to one persisted artifact ID are not independent
+  // provenance. Keep both the total count and a distinct-ID count; no ID is
+  // exported and neither count verifies an external artifact or effect.
+  const seenArtifactIds = new Set();
+  let reusedArtifactReferencesRecorded = 0;
   // One receipt identity cannot prove multiple independently recorded
   // provider attempts. This remains metadata, not trusted external proof.
   const seenReceiptIds = new Set();
@@ -408,6 +415,8 @@ function recordedSpecialistDispatchEvidence(runtime) {
         throw new Error('Agent specialist artifact reference identity is invalid');
       }
       artifactReferencesRecorded += 1;
+      if (seenArtifactIds.has(artifactId)) reusedArtifactReferencesRecorded += 1;
+      else seenArtifactIds.add(artifactId);
     }
   }
   return freeze({
@@ -417,6 +426,8 @@ function recordedSpecialistDispatchEvidence(runtime) {
     statusCounts,
     receiptIdsRecorded,
     artifactReferencesRecorded,
+    distinctArtifactIdsRecorded: seenArtifactIds.size,
+    reusedArtifactReferencesRecorded,
     externalEffectVerified: false,
     artifactProvenanceVerified: false,
   });
