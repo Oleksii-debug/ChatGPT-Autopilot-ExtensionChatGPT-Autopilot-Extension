@@ -565,10 +565,13 @@ export class AiOrchestrator {
         }
         if (value && typeof value === 'object' && !Array.isArray(value)) {
           const fields = Object.getOwnPropertyDescriptors(value);
-          for (const field of ['provider', 'model', 'endpointId']) {
+          // A gateway may omit routeId (provider protocols do not require it),
+          // but an explicitly declared routeId must match the authorized route.
+          // Never permit provider output to rewrite persisted route provenance.
+          for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
             if (field === 'endpointId' && !requiresBoundReceipt) continue;
             if (!Object.hasOwn(fields, field)) {
-              if (requiresBoundReceipt) receiptIdentityMismatch = true;
+              if (requiresBoundReceipt && field !== 'routeId') receiptIdentityMismatch = true;
               continue;
             }
             if (!Object.hasOwn(fields[field], 'value')
