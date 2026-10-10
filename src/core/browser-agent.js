@@ -1118,8 +1118,15 @@ export function snapshotBrowserPage(snapshotId) {
 export function executeBrowserPageAction(snapshotId, action) {
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const ref = String(action?.ref || '');
-  const target = ref ? Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId) : null;
+  const ref = typeof action?.ref === 'string' ? action.ref : '';
+  // A page can duplicate our observation marker after the snapshot (including
+  // after an approval/restart). The first matching node is not authoritative:
+  // reject ambiguous refs before ANY click, fill, select, or check effect.
+  const matches = ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll(`[${marker}]`)).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
   const semanticIdentity = (element) => {
     const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
     const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
