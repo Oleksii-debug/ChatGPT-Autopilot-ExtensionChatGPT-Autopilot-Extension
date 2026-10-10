@@ -224,6 +224,22 @@ function optionalIds(record, key, label, max = MAX_ROUTES) {
   return ids(own(record, key), label, max);
 }
 
+// A model catalog names dispatch identities, not ASCII route/profile keys.
+// Share the route's exact Unicode safety boundary (no silent normalization),
+// while preserving dense-array, duplicate and size checks.
+function endpointModelIds(value, label) {
+  const source = denseDataArray(value, label, 64);
+  const models = source.map((model, index) => {
+    if (typeof model !== 'string' || !model || model !== model.trim()
+        || model.length > 300 || hasUnsafeAiDispatchUnicode(model)) {
+      throw new Error(`${label}[${index}] must be an exact bounded model identity`);
+    }
+    return model;
+  });
+  if (new Set(models).size !== models.length) throw new Error(`${label} contains duplicates`);
+  return models;
+}
+
 export function normalizeAiRoutePool(raw = []) {
   if (raw === null) throw new Error('AI route pool must be a bounded array');
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
@@ -648,7 +664,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     // remain unrestricted evidence, not a fabricated positive model match.
     // Exact model IDs are checked before hashing and after JSON restart.
     const declaredModels = Object.hasOwn(item, 'modelIds')
-      ? Object.freeze(optionalIds(item, 'modelIds', 'AI endpoint modelIds', 64)) : null;
+      ? Object.freeze(endpointModelIds(own(item, 'modelIds'), 'AI endpoint modelIds')) : null;
     return Object.freeze({
       schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin,
       locality, credentialRef, credentialless,
