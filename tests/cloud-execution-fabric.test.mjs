@@ -478,3 +478,76 @@ test('S1 cloud fabric rejects revoked provider-array Proxy on JSON cold restart'
   assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
   assert.equal(recovered.executionAuthorized, false);
 });
+
+test('S1 refuses a warm workspace belonging to another canonical execution after JSON restart', () => {
+  const foreignOwner = ownedCloud();
+  const foreignBinding = workspaceBinding(foreignOwner, {
+    taskId: 'task-foreign',
+    planId: 'plan-foreign',
+    nodeId: 'node-foreign',
+    effectId: 'effect-foreign',
+    policyEnvelopeId: 'policy-foreign',
+  });
+  const current = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('occupied', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [foreignBinding],
+  });
+  for (const input of [current, JSON.parse(JSON.stringify(current))]) {
+    const blocked = assessCloudExecutionFabricV1(input);
+    assert.equal(blocked.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(blocked.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
+    assert.equal(blocked.candidateAssessments[0].reasonCode, 'WORKSPACE_BOUND_TO_OTHER_EXECUTION');
+    assert.equal(blocked.selectedWorkspaceId, '');
+    assert.equal(blocked.dispatchAuthorized, false);
+    assert.equal(blocked.executionAuthorized, false);
+  }
+
+  // Unbound capacity remains selectable without reusing another job's state.
+  const recovered = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('occupied', { workspaceId: 'workspace-a' }),
+      slot('clean-cold', {
+        workspaceId: '',
+        temperature: 'COLD',
+        estimatedStartupMs: 2500,
+      }),
+    ],
+    workspaceBindings: [foreignBinding],
+  }))));
+  assert.equal(recovered.selectedSlotId, 'clean-cold');
+  assert.equal(recovered.workspaceProvisioningRequired, true);
+  assert.equal(recovered.executionAuthorized, false);
+});
+
+test('S1 fails closed when two cloud slots advertise the same workspace identity', () => {
+  const duplicate = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [
+      slot('warm-one', { workspaceId: 'workspace-a' }),
+      slot('warm-two', { workspaceId: 'workspace-a' }),
+    ],
+  });
+  for (const input of [duplicate, JSON.parse(JSON.stringify(duplicate))]) {
+    const result = assessCloudExecutionFabricV1(input);
+    assert.equal(result.disposition, CloudFabricDisposition.BLOCKED);
+    assert.equal(result.selectedSlotId, '');
+    assert.equal(result.candidateAssessments.length, 2);
+    assert.ok(result.candidateAssessments.every(
+      candidate => candidate.reasonCode === 'AMBIGUOUS_WORKSPACE_SLOT',
+    ));
+    assert.equal(result.executionAuthorized, false);
+  }
+  // Existing canonical binding remains eligible when the slot is unique.
+  const owner = ownedCloud();
+  const unique = assessCloudExecutionFabricV1(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('current', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }));
+  assert.equal(unique.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(unique.requiredExecutionTransition, 'NONE');
+  assert.equal(unique.executionAuthorized, false);
+});
