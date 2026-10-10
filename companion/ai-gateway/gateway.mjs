@@ -635,8 +635,12 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
           providers: [...PROVIDERS],
           openaiConfigured: Boolean(clean(process.env.OPENAI_API_KEY)),
           compatibleApiKeyConfigured: compatibleEndpoints.some(item => item.apiKeyEnv && clean(env[item.apiKeyEnv])),
-          compatibleBaseUrl: compatibleEndpoints[0].baseUrl,
-          compatibleTransport: new URL(compatibleEndpoints[0].baseUrl).protocol.replace(':', ''),
+          // [] is a valid explicitly disabled account registry. Health must
+          // stay readable without conjuring an implicit default endpoint.
+          compatibleBaseUrl: compatibleEndpoints[0]?.baseUrl || '',
+          compatibleTransport: compatibleEndpoints[0]
+            ? new URL(compatibleEndpoints[0].baseUrl).protocol.replace(':', '')
+            : '',
           compatibleEndpoints: compatibleEndpoints.map(item => ({ endpointId:item.endpointId, baseUrl:item.baseUrl, transport:new URL(item.baseUrl).protocol.replace(':', ''), apiKeyConfigured:Boolean(item.apiKeyEnv && clean(env[item.apiKeyEnv])) })),
           ollamaBaseUrl: OLLAMA_BASE_URL,
           nodeVersion: process.version,
