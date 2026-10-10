@@ -27,6 +27,52 @@ import {
 
 const AT = '2026-09-19T03:00:00Z';
 
+test('Plan-1 S1: artifact location identity survives JSON restart without whitespace or control-byte aliases', () => {
+  const canonical = artifact({ artifactId: 'artifact-uri-stable', uri: 'artifact://job-1/report.txt' });
+  const normalized = normalizeArtifactRefV1(canonical);
+  assert.equal(normalized.uri, canonical.uri);
+  assert.equal(Object.isFrozen(normalized), true);
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(normalized))), normalized);
+
+  const hostile = [
+    ' ' + canonical.uri,
+    canonical.uri + ' ',
+    '\t' + canonical.uri,
+    canonical.uri + '\n',
+    canonical.uri + '\u0000',
+    canonical.uri + '\u007f',
+    '',
+    null,
+    undefined,
+    42,
+    'x'.repeat(4097),
+  ];
+  for (const value of hostile) {
+    const bad = { ...canonical, uri: value };
+    assert.throws(() => normalizeArtifactRefV1(bad), error => {
+      assert.match(error.message, /uri must be an exact canonical artifact location/);
+      assert.doesNotMatch(error.message, /job-1\/report/);
+      return true;
+    }, 'corrupt artifact locations must fail closed rather than change on restart');
+    assert.throws(() => normalizeObservationV1({
+      schemaVersion: 1, observationId: 'obs-uri', invocationId: 'invoke-uri',
+      status: ObservationStatus.OK, artifactRefs: [bad], observedAt: AT,
+    }), /uri must be an exact canonical artifact location/);
+    assert.throws(() => normalizeSpecialistHandoffV1({
+      schemaVersion: 1, handoffId: 'handoff-uri', specialistId: 'specialist-uri',
+      goal: 'Read independently evidenced artifact', requestedCapabilityIds: ['filesystem.read'],
+      artifactRefs: [bad], credentialRefs: [], createdAt: AT,
+    }), /uri must be an exact canonical artifact location/);
+  }
+
+  const observation = normalizeObservationV1({
+    schemaVersion: 1, observationId: 'obs-uri-valid', invocationId: 'invoke-uri',
+    status: ObservationStatus.OK, artifactRefs: [canonical], observedAt: AT,
+  });
+  assert.equal(observation.artifactRefs[0].uri, canonical.uri);
+  assert.deepEqual(normalizeObservationV1(JSON.parse(JSON.stringify(observation))), observation);
+});
+
 test('Plan-1 S1: hostile Proxy reflection traps never disclose secret error text or authorize evidence', () => {
   const secret = 'PRIVATE-AGENT-CONTRACT-PROXY-DIAGNOSTIC-SECRET';
   let trapInvocations = 0;
