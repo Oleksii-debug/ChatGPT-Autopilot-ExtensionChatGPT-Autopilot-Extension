@@ -104,6 +104,23 @@ function timestamp(value, label) {
   return Object.freeze({ value, ms });
 }
 
+// Clock dependencies are lower-trust callbacks. They must not leak error text,
+// error causes or property-access side effects into readiness diagnostics.
+// Keep identical bounds at both observation points, before and after probing.
+function trustedClockMs(now) {
+  let value;
+  try {
+    value = now();
+  } catch {
+    throw new Error('Trusted readiness resolver clock could not be observed safely');
+  }
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)
+      || Object.is(value, -0) || value < 0 || value > MAX_DATE_MS) {
+    throw new Error('Trusted readiness resolver clock returned an invalid time');
+  }
+  return value;
+}
+
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freeze(child);
@@ -192,11 +209,7 @@ export class SpecialistProviderReadinessResolverV1 {
     const bound = this.#bindings.get(selection.providerId);
     if (!bound) throw new Error('No trusted readiness resolver is bound for selected provider');
 
-    const startedAtMs = this.#now();
-    if (typeof startedAtMs !== 'number' || !Number.isSafeInteger(startedAtMs)
-        || Object.is(startedAtMs, -0) || startedAtMs < 0 || startedAtMs > MAX_DATE_MS) {
-      throw new Error('Trusted readiness resolver clock returned an invalid time');
-    }
+    const startedAtMs = trustedClockMs(this.#now);
     const asOf = new Date(startedAtMs).toISOString();
     const request = resolutionRequest(selection, asOf);
     let rawResult;
@@ -207,11 +220,7 @@ export class SpecialistProviderReadinessResolverV1 {
       throw new Error('Trusted readiness provider resolution failed');
     }
 
-    const resolvedAtMs = this.#now();
-    if (typeof resolvedAtMs !== 'number' || !Number.isSafeInteger(resolvedAtMs)
-        || Object.is(resolvedAtMs, -0) || resolvedAtMs < 0 || resolvedAtMs > MAX_DATE_MS) {
-      throw new Error('Trusted readiness resolver clock returned an invalid time');
-    }
+    const resolvedAtMs = trustedClockMs(this.#now);
     if (resolvedAtMs < startedAtMs) {
       throw new Error('Trusted readiness resolver clock moved backwards');
     }
