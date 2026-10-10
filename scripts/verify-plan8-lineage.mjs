@@ -100,6 +100,17 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
       throw new Error('PLAN8_LINEAGE_INVALID: source ancestor lacks ' + path);
     }
     parseVersion(baselineText, 'source ancestor ' + path);
+    // Verify committed candidate bytes separately from the working tree. An
+    // unstaged 11.x manifest must not conceal a committed 0.9.x downgrade.
+    assertTrackedRegularSource(root, 'HEAD', path, 'candidate HEAD');
+    let headText;
+    try {
+      headText = execFileSync('git', ['-C', root, 'show', 'HEAD:' + path],
+        { encoding: 'utf8', stdio: 'pipe' });
+    } catch {
+      throw new Error('PLAN8_LINEAGE_INVALID: candidate HEAD lacks ' + path);
+    }
+    parseVersion(headText, 'candidate HEAD ' + path);
   }
   return Object.freeze({
     version: PLAN8_SOURCE_VERSION, sourceCommit, mainAncestorCommit,
