@@ -288,6 +288,15 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     externalEffectVerified: false,
     recordedOutcome,
   };
+  // Preserve a single observation of this persisted accounting field. A
+  // hostile storage Proxy may return a new descriptor on each inspection:
+  // repeated reads could mix evidence from distinct snapshots or coerce
+  // attacker-controlled objects while preparing an accessible export.
+  const rawEstimatedCostUsd = own(runtime, 'estimatedCostUsd');
+  const estimatedCostUsd = typeof rawEstimatedCostUsd === 'number' &&
+    Number.isFinite(rawEstimatedCostUsd) &&
+    rawEstimatedCostUsd >= 0 && rawEstimatedCostUsd <= 1000000
+      ? Math.round(rawEstimatedCostUsd * 1000000) / 1000000 : null;
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
     jobId: boundedJobId(own(job, 'id')),
@@ -308,11 +317,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       cycles: integer(own(runtime, 'completedCycles')),
       modelCalls: integer(own(runtime, 'modelCalls')),
       totalTokens: integer(own(runtime, 'totalTokens')),
-      estimatedCostUsd: typeof own(runtime, 'estimatedCostUsd') === 'number' &&
-        Number.isFinite(own(runtime, 'estimatedCostUsd')) &&
-        own(runtime, 'estimatedCostUsd') >= 0 &&
-        own(runtime, 'estimatedCostUsd') <= 1000000
-          ? Math.round(own(runtime, 'estimatedCostUsd') * 1000000) / 1000000 : null,
+      estimatedCostUsd,
       verifiedChecks: recordedOutcome.criteriaRecorded,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
     },
