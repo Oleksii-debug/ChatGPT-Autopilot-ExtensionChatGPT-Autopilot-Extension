@@ -569,6 +569,60 @@ test('S1 malformed or spoofed durable execution ownership never becomes zero or 
   assert.equal(buildAgentRunTimelineV1(job()).mayReplayExternalEffect, false);
 });
 
+test('S1 hidden ownership entries cannot masquerade as durable evidence across cold restart', () => {
+  const marker = 'PRIVATE_HIDDEN_OWNERSHIP_NEVER_EXPORT';
+  const ownership = { state: 'OWNED', nodeId: 'node-visible', effectId: 'effect-visible', note: marker };
+  const hidden = job();
+  const records = [ownership];
+  Object.defineProperty(records, '0', { value: ownership, enumerable: false, configurable: true, writable: true });
+  hidden.runtime.specialistExecutionOwnerships = records;
+  assert.throws(() => buildAgentRunTimelineV1(hidden), error =>
+    error instanceof Error &&
+    /canonical dense array/u.test(error.message) &&
+    !error.message.includes(marker),
+    'a hidden record would be counted before JSON storage but lost after restart');
+
+  const valid = job();
+  valid.runtime.specialistExecutionOwnerships = [ownership];
+  const before = buildAgentRunTimelineV1(valid);
+  const restarted = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid)));
+  assert.deepEqual(before, restarted);
+  assert.equal(before.evidenceMap.specialistExecutionOwnership.inspectedRecords, 1);
+  assert.equal(before.evidenceMap.specialistExecutionOwnership.externalEffectVerified, false);
+  assert.equal(before.evidenceMap.specialistExecutionOwnership.agentTreeEdgesVerified, false);
+  assert.equal(before.mayReplayExternalEffect, false);
+  assert.doesNotMatch(JSON.stringify(before), /PRIVATE_HIDDEN|node-visible|effect-visible/u);
+});
+
+test('S1 ownership descriptor guards fail closed without getter, Proxy trap or replay', () => {
+  const marker = 'PRIVATE_OWNERSHIP_TRAP_NEVER_EXPORT';
+  let getterCalls = 0;
+  const array = [{ state: 'OWNED', nodeId: 'node-1', effectId: 'effect-1' }];
+  Object.defineProperty(array, '0', {
+    enumerable: false, configurable: true,
+    get() { getterCalls += 1; throw Error(marker); },
+  });
+  const input = job();
+  input.runtime.specialistExecutionOwnerships = array;
+  assert.throws(() => buildAgentRunTimelineV1(input), error =>
+    error instanceof Error && /canonical dense array/u.test(error.message) &&
+    !error.message.includes(marker));
+  assert.equal(getterCalls, 0);
+  input.runtime.specialistExecutionOwnerships = new Proxy([
+    { state: 'OWNED', nodeId: 'node-1', effectId: 'effect-1' },
+  ], {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === '0') throw Error(marker);
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(input), error =>
+    error instanceof Error && /cannot be safely inspected/u.test(error.message) &&
+    !error.message.includes(marker));
+  assert.equal(getterCalls, 0);
+  assert.equal(buildAgentRunTimelineV1(job()).mayReplayExternalEffect, false);
+});
+
 test('S1 execution ownership summary is exposed by native text, never user-content HTML', async () => {
   const { readFile } = await import('node:fs/promises');
   const script = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
