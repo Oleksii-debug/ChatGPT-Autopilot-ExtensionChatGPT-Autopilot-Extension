@@ -135,6 +135,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   // Recheck immediately before the effect-capable Core dispatch. This is an
   // authentication fence only; Core remains the single policy/effect authority.
   const revokedBeforeDispatch = Symbol('local-api-owner-token-revoked');
+  const disconnectedBeforeDispatch = Symbol('local-api-client-disconnected');
   // Transport-only admission fence. Core must still own durable request/effect
   // deduplication and reconciliation across processes and restarts.
   // Keep the transport's overlapping request population strictly bounded.
@@ -236,12 +237,16 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       try {
         // Input carries only request identities, not credentials or policy.
         // Canonical control rechecks trusted scope and downstream authority.
-        const scopedDependencies = tokenProvider === undefined
-          ? trustedDependencies
-          : Object.freeze({
-            resolveTrustedScope: trustedDependencies.resolveTrustedScope,
-            now: trustedDependencies.now,
-            async dispatchCanonicalControl(envelope) {
+        // An HTTP client disappearing during an asynchronous trusted scope
+        // check cannot launch a *new* Core operation after disconnect. Once
+        // Core dispatch has begun its own durable effect ledger still owns the
+        // ambiguous outcome; transport abort is not a cancellation receipt.
+        const scopedDependencies = Object.freeze({
+          resolveTrustedScope: trustedDependencies.resolveTrustedScope,
+          now: trustedDependencies.now,
+          async dispatchCanonicalControl(envelope) {
+            if (res.destroyed) throw disconnectedBeforeDispatch;
+            if (tokenProvider !== undefined) {
               let currentExpected;
               try {
                 currentExpected = digest(exactToken(
@@ -253,11 +258,15 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
               if (!timingSafeEqual(candidateDigest, currentExpected)) {
                 throw revokedBeforeDispatch;
               }
-              // Retain the pinned Core function and its original call semantics.
-              const canonicalDispatch = trustedDependencies.dispatchCanonicalControl;
-              return canonicalDispatch(envelope);
-            },
-          });
+            }
+            // The owner resolver above can await a remote/store lookup while
+            // the socket closes. Recheck at the last synchronous dispatch
+            // boundary, including static-token callers.
+            if (res.destroyed) throw disconnectedBeforeDispatch;
+            // Retain the pinned Core function and its original call semantics.
+            return trustedDependencies.dispatchCanonicalControl(envelope);
+          },
+        });
         const result = await executeAutopilotProgrammaticControlV1(normalized, scopedDependencies);
         return send(res, 200, { schemaVersion: 1, status: 'RECEIVED', result });
       } finally {
@@ -267,6 +276,9 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // Revocation after async scope lookup is still an authentication denial,
       // never evidence that Core dispatched or that retry is safe.
       if (error === revokedBeforeDispatch) return reject(res, 401);
+      // No response can be delivered to a disconnected client; most
+      // importantly, this path has *not* entered canonical dispatch.
+      if (error === disconnectedBeforeDispatch) return;
       // Do not echo payloads, caller credentials, provider errors, or stack traces.
       return send(res, 422, FAILURE);
     } finally {
