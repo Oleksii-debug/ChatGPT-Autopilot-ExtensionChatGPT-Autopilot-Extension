@@ -95,6 +95,23 @@ function request(overrides = {}) {
   };
 }
 
+test('automatic proposal preserves exact Specialist CAS on JSON restart without granting execution', () => {
+  const input = request();
+  const proposal = prepareAutomaticAgentSpecialistDelegationV1(input);
+  assert.equal(proposal.binding.registryBindingKey, input.registry.bindingKey);
+  assert.equal(proposal.selection.registryBindingKey, input.registry.bindingKey);
+  assert.equal(JSON.parse(JSON.stringify(proposal.binding)).registryBindingKey, input.registry.bindingKey);
+  assert.equal(proposal.binding.authority.executionAuthorized, false);
+  assert.equal(proposal.authority.executionAuthorized, false);
+
+  const forged = JSON.parse(JSON.stringify(input));
+  forged.registry.bindingKey += ':forged';
+  assert.throws(
+    () => prepareAutomaticAgentSpecialistDelegationV1(forged),
+    /bindingKey is inconsistent/u,
+  );
+});
+
 test('automatic delegation selects least-authority eligible specialist with deterministic identity tie-break', () => {
   const result = prepareAutomaticAgentSpecialistDelegationV1(request());
   assert.equal(result.selection.specialistId, 'narrow-a');
