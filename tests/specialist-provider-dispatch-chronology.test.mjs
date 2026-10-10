@@ -277,7 +277,8 @@ test('untrusted Specialist result artifact metadata never invokes a provider-sup
   await assert.rejects(
     dispatcher.execute(f.request(readiness)),
     error => error instanceof Error
-      && /enumerable own data property/u.test(error.message)
+      && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+      && /reconcile the canonical effect/u.test(error.message)
       && !error.message.includes('SECRET_RESULT_GETTER_CANARY'),
   );
   assert.equal(dispatches, 1, 'this is a post-provider receipt validation fence');
@@ -431,4 +432,66 @@ test('Section 1 provider exception after effect is opaque UNKNOWN and must be re
   f.nowMs = T0 + 301_000;
   await assert.rejects(restarted.execute(f.request(saved)), /stale/u);
   assert.equal(f.providerCalls, 0, 'stale durable readiness must not dispatch after restart');
+});
+
+test('Section 1 post-effect malformed receipt is UNKNOWN, never retry-safe or provider completion', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  let effects = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => T0,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => {
+        effects += 1;
+        return {
+          providerReceiptId: 'receipt.local',
+          observedAt: ts(T0),
+          resultArtifactRefs: [],
+        };
+      },
+    }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(readiness)), error =>
+    error instanceof Error
+    && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+    && /reconcile the canonical effect/u.test(error.message)
+    && !Object.hasOwn(error, 'cause'));
+  assert.equal(effects, 1, 'ambiguous effect must never be resent');
+});
+
+test('Section 1 post-effect clock exception redacts its text and retains UNKNOWN', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  let clockReads = 0;
+  let effects = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => {
+      clockReads += 1;
+      if (clockReads === 3) throw new Error('PRIVATE_CLOCK_CREDENTIAL_731');
+      return T0;
+    },
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => { effects += 1; return {}; },
+    }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(readiness)), error =>
+    error instanceof Error
+    && error.code === 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN'
+    && !error.message.includes('PRIVATE_CLOCK_CREDENTIAL_731'));
+  assert.equal(clockReads, 3);
+  assert.equal(effects, 1, 'post-effect clock failure is not a no-effect signal');
+});
+
+test('Section 1 pre-effect clock failure still prevents provider dispatch', async () => {
+  const f = fixture();
+  const readiness = await f.trustedResolver.resolve(f.selection);
+  let calls = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => { throw new Error('trusted clock unavailable'); },
+    bindings: [{ providerId: 'provider.local', execute: async () => { calls += 1; } }],
+  });
+  await assert.rejects(dispatcher.execute(f.request(readiness)), /trusted clock unavailable/u);
+  assert.equal(calls, 0, 'no effect exists before the dispatch boundary');
 });
