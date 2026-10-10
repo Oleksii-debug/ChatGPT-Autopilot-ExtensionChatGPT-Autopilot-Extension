@@ -413,6 +413,37 @@ test('oversize, unknown protocol and malformed JSON fail closed without Core eff
   assert.deepEqual(counters,{scopes:0,dispatches:0});
 });
 
+
+test('SDK rejects mismatched HTTP status even with forged ok=true and a real receipt; fresh request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  await withServer(async port => {
+    for (const [index, forgedStatus] of [401, 204, '200', undefined].entries()) {
+      let transfers = 0;
+      const fetchImpl = async (...args) => {
+        transfers += 1;
+        const actual = await fetch(...args);
+        assert.equal(actual.status, 200, 'the trusted server did dispatch');
+        // A buggy or hostile custom adapter misreports success. Even though
+        // a genuine receipt was available, this cannot become SDK RECEIVED.
+        return { ok: true, status: forgedStatus, json: () => actual.json() };
+      };
+      const client = createAutopilotLocalClientV1({ token: TOKEN, port, fetchImpl });
+      const result = await client.control(request('forged-http-ok-' + index));
+      assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT');
+      assert.equal(result.httpStatus, Number.isInteger(forgedStatus) ? forgedStatus : null);
+      assert.equal(transfers, 1, 'no blind replay of an ambiguous effect');
+      assert.equal(counters.dispatches, index + 1,
+        'each intentionally sent test request dispatches exactly once');
+    }
+    const canonicalClient = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await canonicalClient.control(request('strict-http-status-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.deepEqual(counters, { scopes: 5, dispatches: 5 });
+  }, dependencies(counters));
+});
+
+
 test('network uncertainty cannot cause an automatic replay', async () => {
   let dispatches=0;
   const client=createAutopilotLocalClientV1({token:TOKEN,port:12345,fetchImpl:async()=>{
