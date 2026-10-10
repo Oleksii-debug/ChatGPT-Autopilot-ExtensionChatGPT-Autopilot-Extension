@@ -259,6 +259,17 @@ function frozen(value) {
   return Object.freeze(value);
 }
 
+function artifactUri(value) {
+  // A durable artifact location is evidence identity, never display text.
+  // Trimming or admitting literal control bytes silently changes a reference
+  // across persisted readback or downstream transport encoding.
+  if (typeof value !== 'string' || !value || value.length > 4096
+      || value !== value.trim() || /[\u0000-\u001F\u007F]/u.test(value)) {
+    throw new Error('uri must be an exact canonical artifact location');
+  }
+  return value;
+}
+
 function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST, present = false, identityKey = null } = {}) {
   if (value == null && !present) return [];
   const items = dataArray(value, label, max);
@@ -381,7 +392,7 @@ export function normalizeArtifactRefV1(input) {
     schemaVersion: version(raw.schemaVersion, 'ArtifactRefV1'),
     artifactId: id(raw.artifactId, 'artifactId'),
     kind: id(raw.kind, 'kind'),
-    uri: text(raw.uri, 'uri', { max: 4096 }),
+    uri: artifactUri(raw.uri),
     mediaType: text(raw.mediaType, 'mediaType', { optional: true, max: 300 }),
     sha256: digest,
     sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, {
