@@ -1156,3 +1156,46 @@ test('S1 scrub performs final canonical binding readback on clean JSON cold-rest
   assert.equal(ownerReads, 2);
   assert.equal(providerTeardowns, 1);
 });
+
+test('S1 cloud observations redact hostile fields and Proxy reflection trap text', () => {
+  const secret = 'PRIVATE_CLOUD_AUTH_SECRET_MUST_NOT_APPEAR';
+  const variants = [
+    { ...observation(), [secret]: 'injected' },
+    new Proxy(observation(), { getPrototypeOf() { throw new Error(secret); } }),
+    new Proxy(observation(), { ownKeys() { throw new Error(secret); } }),
+    new Proxy(observation(), { getOwnPropertyDescriptor() { throw new Error(secret); } }),
+  ];
+  for (const hostile of variants) {
+    assert.throws(
+      () => normalizeCloudWorkspaceObservationV1(hostile),
+      error => {
+        assert.equal(error.message.includes(secret), false, 'untrusted secret must not enter diagnostics');
+        assert.match(error.message, /unknown field|invalid own-data descriptors/u);
+        return true;
+      },
+    );
+  }
+});
+
+test('S1 hostile teardown receipt trap fails closed without secret leakage or scrub', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  const secret = 'PROVIDER_SECRET_SHOULD_STAY_PRIVATE';
+  let scrubCalls = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => JSON.parse(JSON.stringify(binding)),
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(ownership)),
+      teardown: async () => new Proxy(teardownCompletion(), {
+        getOwnPropertyDescriptor() { throw new Error(secret); },
+      }),
+      verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+    }),
+    error => {
+      assert.equal(error.message.includes(secret), false, 'hostile provider text must not leak');
+      assert.match(error.message, /invalid own-data descriptors/u);
+      return true;
+    },
+  );
+  assert.equal(scrubCalls, 0, 'a rejected provider receipt cannot trigger scrub verification');
+});
