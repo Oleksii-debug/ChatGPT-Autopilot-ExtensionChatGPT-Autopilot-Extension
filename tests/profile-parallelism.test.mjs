@@ -784,12 +784,15 @@ test('scenario ambiguous Send is verification-only while nine mixed-load peers k
   now = Number(after.sessionsById.s6.operation.verificationDeadline || 0) + 1;
   const verifyCycle = await runRuntimeCycle({ repository: repo, chromeApi, executor, executionAvailable: true, now: () => now });
   const held = verifyCycle.outcomes.find(item => item.sessionId === 's6');
-  assert.equal(held.result.kind, 'UNCERTAIN_VERIFY_HOLD');
+  assert.equal(held.result.kind, 'MANAGED_UNCERTAIN_SETTLED_NO_RESEND');
   after = await repo.load();
-  assert.equal(after.sessionsById.s6.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(after.sessionsById.s6.operation.phase, OperationPhase.FAILED_SAFE);
+  assert.equal(after.sessionsById.s6.runState, RunState.STOPPED);
+  assert.equal(after.sessionsById.s6.tasksById.t6.manualReviewReason, 'MANAGED_SEND_ACK_TIMEOUT_NO_RESEND');
   assert.equal(after.sessionsById.s6.successfulSendCount, 0);
   assert.equal(modesForScenario.filter(mode => mode === 'SUBMIT_EXISTING').length, 1, 'scenario Send must never be replayed after uncertainty');
-  assert.ok(modesForScenario.includes('VERIFY_AFTER_UNCERTAIN_SUBMIT'));
+  assert.equal(modesForScenario.includes('VERIFY_AFTER_UNCERTAIN_SUBMIT'), false,
+    'expired managed Send must settle locally before new browser I/O');
 });
 
 
