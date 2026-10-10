@@ -880,7 +880,9 @@ test('S1 ambiguous canonical binding write recovers by read-only lookup without 
   );
   assert.equal(commits, 1);
   const recovered = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
+    at: '2026-09-25T06:07:00.000Z',
     loadCanonicalBinding: async () => persisted,
+    loadCanonicalOwnership: async () => owner,
   });
   assert.equal(recovered.status, 'CANONICAL_BINDING_DURABLE_READBACK');
   assert.equal(recovered.durableBindingVerified, true);
@@ -888,7 +890,9 @@ test('S1 ambiguous canonical binding write recovers by read-only lookup without 
   assert.equal(recovered.executionAuthorized, false);
   assert.equal(commits, 1);
   const absent = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
+    at: '2026-09-25T06:07:00.000Z',
     loadCanonicalBinding: async () => null,
+    loadCanonicalOwnership: async () => owner,
   });
   assert.equal(absent.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
   assert.equal(absent.safeRetryAuthorized, false);
@@ -899,6 +903,8 @@ test('S1 recovery refuses a mismatched checkpoint without mutating canonical sta
   let lookups = 0;
   await assert.rejects(
     () => reconcileCloudWorkspaceBindingCommitV1(binding, {
+      at: '2026-09-25T06:07:00.000Z',
+      loadCanonicalOwnership: async () => cloudOwnership(),
       loadCanonicalBinding: async () => {
         lookups++;
         return { ...binding, environmentSha256: 'f'.repeat(64) };
@@ -907,6 +913,75 @@ test('S1 recovery refuses a mismatched checkpoint without mutating canonical sta
     /binding readback mismatch/u,
   );
   assert.equal(lookups, 1);
+});
+
+
+test('S1 read-only cold recovery never verifies a stolen, expired or clock-rewound cloud lease', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  const rawBinding = JSON.parse(JSON.stringify(binding));
+  for (const [owner, at] of [
+    [{ ...ownership, revision: ownership.revision + 1 }, '2026-09-25T06:07:00.000Z'],
+    [{ ...ownership, ownerId: 'other.cloud.worker' }, '2026-09-25T06:07:00.000Z'],
+    [ownership, '2026-09-25T07:00:00.000Z'],
+    [ownership, '2026-09-25T06:05:00.000Z'],
+  ]) {
+    let bindingReads = 0;
+    const result = await reconcileCloudWorkspaceBindingCommitV1(rawBinding, {
+      at,
+      loadCanonicalBinding: async () => { bindingReads++; return JSON.parse(JSON.stringify(rawBinding)); },
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(owner)),
+    });
+    assert.equal(result.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+    assert.equal(result.durableBindingVerified, false);
+    assert.equal(result.safeRetryAuthorized, false);
+    assert.equal(result.executionAuthorized, false);
+    assert.equal(result.binding, null);
+    assert.equal(bindingReads, 1);
+  }
+});
+
+test('S1 post-crash recovery rechecks owner after asynchronous binding readback', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let ownerReads = 0;
+  let bindingReads = 0;
+  const result = await reconcileCloudWorkspaceBindingCommitV1(
+    JSON.parse(JSON.stringify(binding)), {
+      at: '2026-09-25T06:07:00.000Z',
+      loadCanonicalBinding: async () => {
+        bindingReads++;
+        return JSON.parse(JSON.stringify(binding));
+      },
+      loadCanonicalOwnership: async () => {
+        ownerReads++;
+        return ownerReads === 1 ? ownership : { ...ownership, revision: ownership.revision + 1 };
+      },
+    },
+  );
+  assert.equal(ownerReads, 2);
+  assert.equal(bindingReads, 2);
+  assert.equal(result.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+  assert.equal(result.binding, null);
+  assert.equal(result.safeRetryAuthorized, false);
+  assert.equal(result.durableBindingVerified, false);
+});
+
+test('S1 binding cold-recovery requires trusted canonical ownership callback and exact timestamp', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let providerCalls = 0;
+  for (const options of [
+    { at: '2026-09-25T06:07:00.000Z', loadCanonicalBinding: async () => { providerCalls++; return binding; } },
+    {
+      at: '2026-09-25T06:07:00Z',
+      loadCanonicalBinding: async () => { providerCalls++; return binding; },
+      loadCanonicalOwnership: async () => ownership,
+    },
+  ]) {
+    await assert.rejects(
+      () => reconcileCloudWorkspaceBindingCommitV1(binding, options),
+      /trusted loadCanonicalOwnership|canonical ISO-8601 UTC/u,
+    );
+  }
+  assert.equal(providerCalls, 0);
 });
 
 test('S1 provider isolation proof refuses replay across owner revisions on same workspace and lease', async () => {
