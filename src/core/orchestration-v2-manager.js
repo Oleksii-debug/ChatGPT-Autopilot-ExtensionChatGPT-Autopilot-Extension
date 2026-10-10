@@ -275,8 +275,12 @@ export class OrchestrationV2Manager {
 
   async getAgentTreeProjection(id = '') {
     const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) {
+    // A read-only projection must never resolve inherited Object keys (such as
+    // "constructor" or "__proto__") into a controller. Treat untrusted,
+    // non-string explicit IDs as absent instead of coercing them into keys.
+    const orchestraId = typeof id === 'string' ? (id || meta.selectedId) : '';
+    if (typeof orchestraId !== 'string' || !orchestraId
+        || !Object.hasOwn(meta.byId, orchestraId)) {
       return { selectedId: '', projection: null };
     }
     const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
