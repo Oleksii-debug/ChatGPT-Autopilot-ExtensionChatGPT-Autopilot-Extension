@@ -276,11 +276,25 @@ function recordedOutcomeSummary(value) {
     if (!Number.isSafeInteger(checksLength) || checksLength < 0 || checksLength > 20) {
       throw new Error('Agent recorded outcome checks length is invalid (must be a bounded dense array)');
     }
+    const seenCriteria = new Set();
     for (const item of canonicalEvidenceElements(checks, checksLength, 'Agent recorded outcome checks')) {
       if (item === undefined) throw new Error('Agent recorded outcome checks must be dense');
-      record(item, 'Agent recorded outcome check');
+      const check = record(item, 'Agent recorded outcome check');
+      // BrowserAgentManager persists only verified criteria with canonical
+      // positive indexes and nonempty bounded text/detail. An empty check or
+      // repeated index must not inflate an accessible evidence count. Inspect
+      // descriptors, not property getters; never export private check content.
+      const criterion = persistedField(check, 'criterion').value;
+      const text = persistedField(check, 'text').value;
+      const detail = persistedField(check, 'detail').value;
+      if (!Number.isSafeInteger(criterion) || criterion <= 0 || seenCriteria.has(criterion) ||
+          typeof text !== 'string' || !text.trim() || text.length > 1000 ||
+          typeof detail !== 'string' || !detail.trim() || detail.length > 1000) {
+        throw new Error('Agent recorded outcome criterion evidence is invalid');
+      }
+      seenCriteria.add(criterion);
     }
-    count = checksLength;
+    count = seenCriteria.size;
   }
   const { present: timePresent, value: rawAt } = persistedField(value, 'verifiedAt');
   if (timePresent && (!Number.isSafeInteger(rawAt) || Object.is(rawAt, -0) ||
