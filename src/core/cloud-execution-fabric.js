@@ -595,6 +595,26 @@ export function assessCloudExecutionFabricV1(input) {
   if (ownership.state === ExecutionOwnershipState.VERIFIED) {
     return blocked(baseArgs, 'EXECUTION_ALREADY_VERIFIED');
   }
+  // A detached binding for the *same effect* is not free cloud capacity.
+  // Following a lost lease, local handoff or policy rotation the canonical
+  // execution ledger must reconcile that old workspace before a new one is
+  // proposed. Other effects' bindings remain independent.
+  const effectBindings = workspaceBindings.filter(binding =>
+    binding.taskId === ownership.taskId
+    && binding.planId === ownership.planId
+    && binding.nodeId === ownership.nodeId
+    && binding.effectId === ownership.effectId);
+  if (effectBindings.length > 1) {
+    return blocked(baseArgs, 'AMBIGUOUS_CLOUD_EFFECT_BINDINGS',
+      CloudFabricDisposition.RECONCILE_REQUIRED);
+  }
+  if (effectBindings.length === 1
+      && (ownership.state !== ExecutionOwnershipState.OWNED
+        || ownership.ownerPlane !== AgentExecutionPlane.CLOUD
+        || !ownershipMatchesBinding(ownership, effectBindings[0]))) {
+    return blocked(baseArgs, 'ORPHANED_CLOUD_EFFECT_BINDING',
+      CloudFabricDisposition.RECONCILE_REQUIRED);
+  }
   // A canonical ownership revision cannot be observed before it exists,
   // including AVAILABLE owners which have no lease yet. Clock rollback must
   // not allow a new local/cloud claim, even as an advisory recommendation.
