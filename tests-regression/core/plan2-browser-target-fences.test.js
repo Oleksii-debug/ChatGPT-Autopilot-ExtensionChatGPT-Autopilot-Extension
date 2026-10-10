@@ -3012,3 +3012,119 @@ test('Plan2 S1 select cannot notify listeners before a rejected option value is 
     else globalThis.HTMLSelectElement = priorSelect;
   }
 });
+
+
+test('Plan2 S1 credential native setter must accept and preserve value before page events', () => {
+  const previousInput = globalThis.HTMLInputElement;
+  const previousTextarea = globalThis.HTMLTextAreaElement;
+  const priorPageUrl = pageUrl;
+  const priorLocation = globalThis.location;
+  const priorDocument = globalThis.document;
+  const events = [];
+  class GuardedInput extends FakeElement {
+    constructor(type, name) {
+      super('');
+      this.tagName = 'INPUT';
+      this.attrs = new Map([['type', type], ['aria-label', name]]);
+      this.type = type;
+      this.id = '';
+      this.form = null;
+      this.labels = null;
+      this.value = '';
+    }
+    dispatchEvent(evt) {
+      events.push(this.type + ':' + evt.type);
+      this.onDispatch?.(evt);
+      return true;
+    }
+  }
+  Object.defineProperty(GuardedInput.prototype, 'value', {
+    configurable: true,
+    get() { return this._value ?? ''; },
+    set(next) {
+      this._value = this.rejectValue ? '' : next;
+      if (this.retargetOnSetter) this.setAttribute('aria-label', 'Unobserved field');
+    },
+  });
+  globalThis.HTMLInputElement = GuardedInput;
+  globalThis.HTMLTextAreaElement = class FakeTextarea extends FakeElement {};
+  try {
+    const user = new GuardedInput('text', 'Username');
+    const password = new GuardedInput('password', 'Password');
+    password.rect = { left: 210, top: 10, width: 90, height: 30 };
+    const nodes = [user, password];
+    pageUrl = 'https://example.test/login';
+    globalThis.location = { get href() { return pageUrl; } };
+    globalThis.document = {
+      title: 'Login', body: { innerText: 'Log in' }, documentElement: { scrollHeight: 500 },
+      getElementById: () => null,
+      querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
+        ? nodes.filter(input => input.getAttribute('data-autopilot-agent-ref'))
+        : nodes,
+      elementFromPoint: x => (x < 150 ? user : password),
+    };
+    const snap = snapshotBrowserPage('credential-value-fence');
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'fill_credential', credentialRef: 'c1',
+      usernameFrameId: 0, usernameRef: 'r1',
+      passwordFrameId: 0, passwordRef: 'r2',
+    }), {
+      url: snap.url, frames: [{ frameId: 0, ...snap }],
+      credentials: [{ ref: 'c1', credentialId: 'opaque-test-credential' }],
+    })));
+    const attempt = () => executeBrowserCredentialFill(snap.snapshotId, action, 'alice', 'fixture-secret');
+    const reset = () => {
+      user.value = ''; password.value = '';
+      events.length = 0;
+    };
+
+    user.rejectValue = true;
+    assert.throws(attempt, /AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(events, [], 'rejected username must not dispatch page listeners');
+    assert.equal(password.value, '', 'rejected username cannot release the secret');
+    user.rejectValue = false;
+
+    reset();
+    password.rejectValue = true;
+    assert.throws(attempt, /AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(events, ['text:input', 'text:change'],
+      'rejected password must not notify password listeners');
+    assert.equal(password.value, '');
+    password.rejectValue = false;
+
+    reset();
+    password.retargetOnSetter = true;
+    assert.throws(attempt, /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.deepEqual(events, ['text:input', 'text:change'],
+      'a native password setter that repurposes the target cannot notify listeners');
+    password.retargetOnSetter = false;
+    password.setAttribute('aria-label', 'Password');
+
+    reset();
+    password.onDispatch = event => {
+      if (event.type === 'change') password.value = 'changed-by-page';
+    };
+    assert.throws(attempt, /AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED/);
+    assert.equal(password.value, 'changed-by-page',
+      'an event-driven change must not be marked verified');
+    password.onDispatch = null;
+
+    // A cold JSON recovery restores only observed target identity, not an
+    // authorization to skip native value acceptance or post-event evidence.
+    reset();
+    const recovered = JSON.parse(JSON.stringify(action));
+    const result = executeBrowserCredentialFill(snap.snapshotId, recovered, 'alice', 'fixture-secret');
+    assert.equal(result.passwordFilled, true);
+    assert.equal(result.usernameFilled, true);
+    assert.equal(user.value, 'alice');
+    assert.equal(password.value, 'fixture-secret');
+    assert.deepEqual(events, ['text:input', 'text:change', 'password:input', 'password:change']);
+  } finally {
+    globalThis.HTMLInputElement = previousInput;
+    if (previousTextarea === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = previousTextarea;
+    globalThis.location = priorLocation;
+    globalThis.document = priorDocument;
+    pageUrl = priorPageUrl;
+  }
+});
