@@ -351,7 +351,10 @@ export function normalizeArtifactRefV1(input) {
   if (raw.sha256 != null && raw.sha256 !== '' && typeof raw.sha256 !== 'string') {
     throw new Error('sha256 must be text');
   }
-  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : raw.sha256.trim().toLowerCase();
+  // An artifact content digest is an identity, not display text: trimming or
+  // lowercasing an untrusted persisted digest silently promotes a noncanonical
+  // reference into valid verification evidence after a cold restart.
+  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : raw.sha256;
   if (digest && !SHA256.test(digest)) throw new Error('sha256 is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ArtifactRefV1'),
