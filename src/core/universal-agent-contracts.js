@@ -599,13 +599,17 @@ export function toolDescriptorV1FromAgentProvider(provider, options = {}) {
   exactKeys(config, TOOL_ADAPTER_OPTION_KEYS, 'tool adapter options');
   const { toolId, label = '', description = '', readOnly = false } = config;
   const raw = plain(provider, 'agent provider');
+  // Only genuinely missing legacy capabilities may default to no grants.
+  // An explicitly persisted null/undefined/falsy value must never erase
+  // declared provider capabilities at the adapter-to-contract boundary.
+  const capabilities = Object.hasOwn(raw, 'capabilities') ? raw.capabilities : [];
   return normalizeToolDescriptorV1({
     schemaVersion: 1,
     toolId,
     providerId: raw.id,
     label: label || raw.label || toolId,
     description,
-    capabilityIds: raw.capabilities || [],
+    capabilityIds: capabilities,
     inputSchemaRef: null,
     outputSchemaRef: null,
     readOnly,
