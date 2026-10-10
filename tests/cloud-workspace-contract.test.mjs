@@ -1032,42 +1032,57 @@ test('S1 binding bridge fails closed on missing or forged canonical persistence'
   }
 });
 
-test('S1 ambiguous canonical binding write recovers by read-only lookup without a second commit', async () => {
+test('S1 ambiguous canonical binding write redacts store errors and only reconciles read-only after restart', async () => {
   const owner = cloudOwnership();
-  let commits = 0;
-  let persisted = null;
-  await assert.rejects(
-    () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
-      at: ISOLATION_AT,
-      loadCanonicalOwnership: async () => owner,
-      verifyIsolation: async () => isolationProof(),
-      atomicCommitCanonicalBinding: async tx => {
-        commits++;
-        persisted = JSON.parse(JSON.stringify(tx.binding));
-        throw new Error('connection dropped after atomic commit');
+  for (const committedBeforeError of [true, false]) {
+    let commits = 0;
+    let persisted = null;
+    let exposedError = null;
+    try {
+      await commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+        at: ISOLATION_AT,
+        loadCanonicalOwnership: async () => owner,
+        verifyIsolation: async () => isolationProof(),
+        atomicCommitCanonicalBinding: async tx => {
+          commits++;
+          if (committedBeforeError) persisted = JSON.parse(JSON.stringify(tx.binding));
+          // Store/transport exception text is untrusted, whether the write
+          // committed before failure or never reached durable storage.
+          throw new Error('PRIVATE_BEARER_TOKEN_MUST_NOT_ESCAPE');
+        },
+        loadCanonicalBinding: async () => persisted,
+      });
+    } catch (error) {
+      exposedError = error;
+    }
+    assert.ok(exposedError instanceof Error);
+    assert.match(exposedError.message, /outcome ambiguous; read-only reconciliation required/u);
+    assert.doesNotMatch(exposedError.message, /PRIVATE_BEARER_TOKEN_MUST_NOT_ESCAPE/u);
+    assert.equal(exposedError.cause, undefined, 'secret-bearing provider error must not be chained');
+    assert.equal(commits, 1, 'never retry an uncertain canonical store write');
+
+    // Simulate a genuine process restart: no in-memory authority/receipt
+    // survives except independently persisted canonical store data.
+    const coldPersisted = persisted == null ? null : JSON.parse(JSON.stringify(persisted));
+    const recoveryBinding = coldPersisted ?? createCloudWorkspaceBindingV1(
+      observation(), owner, { at: ISOLATION_AT },
+    );
+    const recovered = await reconcileCloudWorkspaceBindingCommitV1(
+      JSON.parse(JSON.stringify(recoveryBinding)), {
+        at: '2026-09-25T06:09:00.000Z',
+        loadCanonicalBinding: async () => coldPersisted,
+        loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(owner)),
       },
-      loadCanonicalBinding: async () => persisted,
-    }),
-    /connection dropped after atomic commit/u,
-  );
-  assert.equal(commits, 1);
-  const recovered = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
-    at: '2026-09-25T06:09:00.000Z',
-    loadCanonicalBinding: async () => persisted,
-    loadCanonicalOwnership: async () => owner,
-  });
-  assert.equal(recovered.status, 'CANONICAL_BINDING_DURABLE_READBACK');
-  assert.equal(recovered.durableBindingVerified, true);
-  assert.equal(recovered.safeRetryAuthorized, false);
-  assert.equal(recovered.executionAuthorized, false);
-  assert.equal(commits, 1);
-  const absent = await reconcileCloudWorkspaceBindingCommitV1(persisted, {
-    at: '2026-09-25T06:09:00.000Z',
-    loadCanonicalBinding: async () => null,
-    loadCanonicalOwnership: async () => owner,
-  });
-  assert.equal(absent.status, 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
-  assert.equal(absent.safeRetryAuthorized, false);
+    );
+    assert.equal(recovered.status, committedBeforeError
+      ? 'CANONICAL_BINDING_DURABLE_READBACK'
+      : 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION');
+    assert.equal(recovered.durableBindingVerified, committedBeforeError);
+    assert.equal(recovered.safeRetryAuthorized, false);
+    assert.equal(recovered.executionAuthorized, false);
+    assert.equal(recovered.resumeAuthorized, false);
+    assert.equal(commits, 1);
+  }
 });
 
 test('S1 recovery refuses a mismatched checkpoint without mutating canonical state', async () => {

@@ -555,7 +555,15 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
     throw new Error('canonical cloud workspace binding already exists; use read-only reconciliation');
   }
   // A provider response cannot commit or authenticate its own binding.
-  await trusted.atomicCommitCanonicalBinding(transaction);
+  // An atomic store callback may commit durably *then* throw a transport error.
+  // Its diagnostic text can contain credentials or tenant data, and is never
+  // evidence that the write was rolled back. Redact it and require a read-only
+  // reconciliation using the original binding; no blind resubmission.
+  try {
+    await trusted.atomicCommitCanonicalBinding(transaction);
+  } catch {
+    throw new Error('canonical cloud binding commit outcome ambiguous; read-only reconciliation required');
+  }
   const persisted = cloudBindingReadback(
     binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
   );
