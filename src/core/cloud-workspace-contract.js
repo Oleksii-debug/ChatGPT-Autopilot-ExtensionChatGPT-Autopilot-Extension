@@ -306,7 +306,7 @@ function assessment(status, reasonCode, binding, ownership, at) {
 // ONLY by a trusted canonical runtime adapter. A provider's unverified JSON
 // observation must never self-grant executable authority.
 const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation', 'loadCanonicalOwnership']);
-const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding']);
+const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding', 'loadCanonicalOwnership']);
 const ISOLATION_PROOF_KEYS = new Set([
   'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
   'filesystemIsolated', 'browserIsolated', 'processIsolated',
@@ -534,7 +534,7 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
  */
 export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   const trusted = trustedLifecycleOptions(
-    options, SCRUB_OPTIONS, ['teardown', 'verifyScrub', 'loadCanonicalBinding'], 'Cloud workspace scrub options',
+    options, SCRUB_OPTIONS, ['teardown', 'verifyScrub', 'loadCanonicalBinding', 'loadCanonicalOwnership'], 'Cloud workspace scrub options',
   );
   const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
   const persistedBinding = normalizeCloudWorkspaceBindingV1(
@@ -546,6 +546,26 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   );
   if (JSON.stringify(persistedBinding) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace scrub target does not match canonical binding');
+  }
+  // The canonical binding may remain byte-for-byte identical while a different
+  // execution owner acquires the same logical job. Read the canonical ownership
+  // ledger independently before interacting with any provider resources.
+  const ownerKey = Object.freeze({
+    taskId: binding.taskId,
+    planId: binding.planId,
+    nodeId: binding.nodeId,
+    effectId: binding.effectId,
+  });
+  const ownerBefore = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(ownerKey),
+  );
+  if (ownerBefore.state !== ExecutionOwnershipState.OWNED
+      || ownerBefore.ownerPlane !== 'CLOUD'
+      || ownerBefore.ownerId !== binding.executionOwnerId
+      || ownerBefore.leaseId !== binding.executionLeaseId
+      || ownerBefore.revision !== binding.executionOwnershipRevision
+      || ownerBefore.policyEnvelopeId !== binding.policyEnvelopeId) {
+    throw new Error('cloud workspace teardown canonical ownership mismatch');
   }
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
@@ -590,6 +610,12 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   );
   if (JSON.stringify(finalPersistedBinding) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace canonical binding changed during teardown/scrub');
+  }
+  const ownerAfter = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(ownerKey),
+  );
+  if (JSON.stringify(ownerAfter) !== JSON.stringify(ownerBefore)) {
+    throw new Error('cloud workspace canonical ownership changed during teardown/scrub');
   }
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
