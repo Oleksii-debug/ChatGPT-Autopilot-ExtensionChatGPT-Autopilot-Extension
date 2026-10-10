@@ -313,6 +313,17 @@ export function normalizeCloudExecutionSlotV1(input) {
 // Provider readiness is an untrusted discovery payload. Snapshot and allowlist
 // descriptors before entering the shared capability normalizer, so hostile
 // Proxy traps and getter text can never become cloud diagnostics.
+// The canonical execution owner is supplied to this advisory capacity boundary
+// by a caller or a recovered JSON job.  Do not let proxy reflection, getters
+// or attacker-controlled field names escape into diagnostics from the shared
+// ownership normalizer.  It remains the sole semantic ownership authority.
+const FABRIC_OWNERSHIP_KEYS = new Set([
+  'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId',
+  'policyEnvelopeId', 'state', 'ownerPlane', 'ownerId', 'leaseId',
+  'leaseUntil', 'handoffToPlane', 'handoffId', 'ambiguityReason',
+  'updatedAt', 'revision',
+]);
+
 const PROVIDER_STATE_KEYS = new Set([
   'schemaVersion', 'providerId', 'toolId', 'health',
   'installationRequired', 'installed', 'authenticationRequired',
@@ -543,7 +554,9 @@ export function assessCloudExecutionFabricV1(input) {
     throw new Error('CloudFabricRequestV1 checkpoint identity must be complete');
   }
 
-  const ownership = normalizeExecutionOwnershipV1(raw.executionOwnership);
+  const ownership = normalizeExecutionOwnershipV1(snapshotRecord(
+    raw.executionOwnership, 'CloudFabricRequestV1.executionOwnership', FABRIC_OWNERSHIP_KEYS,
+  ));
   const slots = dataArray(raw.cloudSlots, 'CloudFabricRequestV1.cloudSlots', MAX_SLOTS)
     .map((item, index) => {
       try {
