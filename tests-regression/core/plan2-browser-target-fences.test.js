@@ -2292,3 +2292,52 @@ test('Plan-2 S1: focus-time state mutation does not bypass a new overlay', () =>
   assert.throws(() => executeBrowserPageAction('focus-check-overlay', action), /AGENT_TARGET_OCCLUDED/);
   assert.equal(element.clicked, 0, 'an overlay must prevent synthetic click after focus');
 });
+
+
+test('semantic select omits ARIA-ineligible options and rejects focus-time ARIA drift after JSON restart', () => {
+  setup();
+  const priorSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    const attrs = {};
+    const option = (value, parentElement = null, getAttribute = () => null) => ({
+      value, textContent: value, label: value, disabled: false, hidden: false,
+      parentElement, getAttribute,
+    });
+    const keep = option('Keep');
+    const allowed = option('Allow', null, name => attrs[name] || null);
+    const ariaHidden = option('Hidden', null, name => name === 'aria-hidden' ? 'true' : null);
+    const ariaGroupDisabled = option('Group disabled', {
+      getAttribute: name => name === 'aria-disabled' ? 'true' : null,
+    });
+    element.options = [keep, allowed, ariaHidden, ariaGroupDisabled];
+    element.selectedIndex = 0;
+    element.value = 'Keep';
+    let dispatched = 0;
+    element.dispatchEvent = () => { dispatched += 1; return true; };
+
+    const snapshot = snapshotBrowserPage('aria-option-eligibility');
+    assert.deepEqual(snapshot.elements[0].options, ['Keep', 'Allow']);
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'Allow',
+    }), { frames: [{ frameId: 0, ...snapshot }], url: snapshot.url });
+    const resumed = JSON.parse(JSON.stringify(action));
+    element.focus = () => { attrs['aria-hidden'] = 'true'; };
+    assert.throws(
+      () => executeBrowserPageAction('aria-option-eligibility', resumed),
+      /AGENT_SELECT_OPTIONS_STALE/,
+    );
+    assert.equal(element.value, 'Keep');
+    assert.equal(dispatched, 0);
+
+    delete attrs['aria-hidden'];
+    element.focus = () => {};
+    const result = executeBrowserPageAction('aria-option-eligibility', resumed);
+    assert.equal(result.ok, true);
+    assert.equal(element.value, 'Allow');
+    assert.equal(dispatched, 2);
+  } finally {
+    globalThis.HTMLSelectElement = priorSelect;
+  }
+});
