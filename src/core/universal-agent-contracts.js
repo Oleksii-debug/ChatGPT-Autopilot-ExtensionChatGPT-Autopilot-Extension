@@ -88,10 +88,14 @@ function version(value, label) {
   return UniversalAgentContractVersion;
 }
 
-function id(value, label, { optional = false } = {}) {
-  // Null is canonical for an absent optional reference, but an explicit empty
-  // string cannot erase an effect, approval or parent identity on restart.
-  if (value == null && optional) return null;
+function id(value, label, { optional = false, present = false } = {}) {
+  // Null is canonical for an absent optional reference. Explicit undefined,
+  // unlike an absent property, disappears during JSON persistence and could
+  // silently erase an effect, approval or parent binding on cold recovery.
+  if (value == null && optional) {
+    if (value === undefined && present) throw new Error(`${label} must be a canonical null or exact ID`);
+    return null;
+  }
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   if (value !== value.trim()) throw new Error(`${label} is invalid: must be an exact canonical ID; exact canonical identity required`);
   if (!ID.test(value)) throw new Error(`${label} is invalid`);
@@ -361,8 +365,8 @@ export function normalizeToolDescriptorV1(input) {
     label: text(raw.label, 'label', { max: 300 }),
     description: text(raw.description, 'description', { optional: true, max: 4000 }),
     capabilityIds: idList(raw.capabilityIds, 'capabilityIds', { optional: false }),
-    inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true }),
-    outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true }),
+    inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'inputSchemaRef') }),
+    outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'outputSchemaRef') }),
     readOnly: bool(raw.readOnly, 'readOnly', false, { present: Object.hasOwn(raw, 'readOnly') }),
   });
 }
@@ -379,7 +383,7 @@ export function normalizePolicyDecisionV1(input) {
   // Never turn malformed input into ALLOW during an authorization readback.
   const decision = raw.decision;
   if (!POLICY_KINDS.has(decision)) throw new Error('decision is invalid');
-  const approvalId = id(raw.approvalId, 'approvalId', { optional: true });
+  const approvalId = id(raw.approvalId, 'approvalId', { optional: true, present: Object.hasOwn(raw, 'approvalId') });
   if (decision === PolicyDecisionKind.REQUIRE_APPROVAL && !approvalId) {
     throw new Error('REQUIRE_APPROVAL requires approvalId');
   }
@@ -414,7 +418,7 @@ export function normalizeToolInvocationV1(input) {
     policyDecisionId: id(raw.policyDecisionId, 'policyDecisionId'),
     arguments: jsonData(raw.arguments, 'arguments', { optional: false }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
-    parentInvocationId: id(raw.parentInvocationId, 'parentInvocationId', { optional: true }),
+    parentInvocationId: id(raw.parentInvocationId, 'parentInvocationId', { optional: true, present: Object.hasOwn(raw, 'parentInvocationId') }),
   });
 }
 
@@ -447,7 +451,7 @@ export function normalizeArtifactRefV1(input) {
       optional: true, fallback: 0, present: Object.hasOwn(raw, 'sizeBytes'),
     }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
-    producerInvocationId: id(raw.producerInvocationId, 'producerInvocationId', { optional: true }),
+    producerInvocationId: id(raw.producerInvocationId, 'producerInvocationId', { optional: true, present: Object.hasOwn(raw, 'producerInvocationId') }),
     sensitive: bool(raw.sensitive, 'sensitive', false, { present: Object.hasOwn(raw, 'sensitive') }),
   });
 }
@@ -492,16 +496,16 @@ export function normalizeVerificationV1(input) {
     schemaVersion: version(raw.schemaVersion, 'VerificationV1'),
     verificationId: id(raw.verificationId, 'verificationId'),
     invocationId: id(raw.invocationId, 'invocationId'),
-    observationId: id(raw.observationId, 'observationId', { optional: status === VerificationStatus.NOT_APPLICABLE }),
+    observationId: id(raw.observationId, 'observationId', { optional: status === VerificationStatus.NOT_APPLICABLE, present: Object.hasOwn(raw, 'observationId') }),
     status,
     reasonCode: id(raw.reasonCode, 'reasonCode'),
     summary: text(raw.summary, 'summary', { optional: true, max: 8000 }),
     evidenceArtifactIds: idList(raw.evidenceArtifactIds, 'evidenceArtifactIds', { present: Object.hasOwn(raw, 'evidenceArtifactIds') }),
     verifiedAt: timestamp(raw.verifiedAt, 'verifiedAt'),
-    verifierId: id(raw.verifierId, 'verifierId', { optional: true }),
-    verificationAuthorityId: id(raw.verificationAuthorityId, 'verificationAuthorityId', { optional: true }),
-    effectId: id(raw.effectId, 'effectId', { optional: true }),
-    executionId: id(raw.executionId, 'executionId', { optional: true }),
+    verifierId: id(raw.verifierId, 'verifierId', { optional: true, present: Object.hasOwn(raw, 'verifierId') }),
+    verificationAuthorityId: id(raw.verificationAuthorityId, 'verificationAuthorityId', { optional: true, present: Object.hasOwn(raw, 'verificationAuthorityId') }),
+    effectId: id(raw.effectId, 'effectId', { optional: true, present: Object.hasOwn(raw, 'effectId') }),
+    executionId: id(raw.executionId, 'executionId', { optional: true, present: Object.hasOwn(raw, 'executionId') }),
     attempt: integer(raw.attempt, 'attempt', 0, 64, {
       optional: true, fallback: 0, present: Object.hasOwn(raw, 'attempt'),
     }),
@@ -556,7 +560,7 @@ export function normalizeSpecialistHandoffV1(input) {
       optional: true, fallback: 0, present: Object.hasOwn(raw, 'maxCostUsdMicros'),
     }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
-    parentInvocationId: id(raw.parentInvocationId, 'parentInvocationId', { optional: true }),
+    parentInvocationId: id(raw.parentInvocationId, 'parentInvocationId', { optional: true, present: Object.hasOwn(raw, 'parentInvocationId') }),
   });
 }
 
