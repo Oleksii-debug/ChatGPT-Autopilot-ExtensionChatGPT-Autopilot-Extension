@@ -514,3 +514,76 @@ test('Plan-1 S1: hostile checkpoint reflection never leaks private persisted dat
   assert.deepEqual(await verifyAgentCheckpointV1(JSON.parse(JSON.stringify(checkpoint))), checkpoint);
   assert.deepEqual(normalizeAgentCheckpointHeadV1(JSON.parse(JSON.stringify(persistedHead))).unresolvedEffectIds, []);
 });
+
+
+test('Plan-1 S1: checkpoint schema migration cannot erase exact effects or authorize rewind', async () => {
+  const checkpoint = await createAgentCheckpointV1(checkpointInput());
+  const persisted = JSON.parse(JSON.stringify(checkpoint));
+  assert.deepEqual(await verifyAgentCheckpointV1(persisted), checkpoint,
+    'canonical V1 checkpoint persists with the same digest');
+  const liveHead = head({ unresolvedEffectIds: ['effect-unreconciled-1'] });
+  assert.equal(liveHead.exactEffectLedgerRevision, 7);
+
+  // A future, omitted or JSON-lossy schema must not be normalized into V1.
+  // Rejected rewind requests never mutate the unreconciled effect ledger.
+  for (const schemaVersion of [0, 2, null, undefined, '1']) {
+    const createCandidate = checkpointInput({ schemaVersion });
+    await assert.rejects(() => createAgentCheckpointV1(createCandidate), /schemaVersion/);
+    const storedCandidate = { ...persisted, schemaVersion };
+    assert.throws(() => normalizeAgentCheckpointV1(storedCandidate), /schemaVersion/);
+    await assert.rejects(
+      () => assessAgentCheckpointRewindV1({
+        checkpoint: storedCandidate, current: liveHead, snapshotUtf8: SNAPSHOT_UTF8,
+      }),
+      /schemaVersion/,
+      'malformed checkpoint may not issue a rewind recommendation',
+    );
+    const unknownHead = { ...liveHead, schemaVersion };
+    assert.throws(() => normalizeAgentCheckpointHeadV1(unknownHead), /schemaVersion/);
+    await assert.rejects(
+      () => assessAgentCheckpointRewindV1({
+        checkpoint, current: unknownHead, snapshotUtf8: SNAPSHOT_UTF8,
+      }),
+      /schemaVersion/,
+      'malformed live head may not erase ambiguous external effects',
+    );
+    assert.deepEqual(liveHead.unresolvedEffectIds, ['effect-unreconciled-1']);
+    assert.equal(liveHead.exactEffectLedgerRevision, 7);
+  }
+
+  const createNoVersion = checkpointInput();
+  const noVersionHead = { ...liveHead };
+  delete createNoVersion.schemaVersion;
+  delete noVersionHead.schemaVersion;
+  await assert.rejects(() => createAgentCheckpointV1(createNoVersion), /schemaVersion/);
+  assert.throws(() => normalizeAgentCheckpointHeadV1(noVersionHead), /schemaVersion/);
+
+  let getterInvocations = 0;
+  for (const candidate of [checkpointInput(), { ...liveHead }]) {
+    Object.defineProperty(candidate, 'schemaVersion', {
+      enumerable: true, configurable: true,
+      get() { getterInvocations += 1; throw new Error('OWNER_PRIVATE_SCHEMA_SECRET'); },
+    });
+    if (Object.hasOwn(candidate, 'checkpointId')) {
+      await assert.rejects(() => createAgentCheckpointV1(candidate), error => {
+        assert.match(error.message, /own data properties/);
+        assert.doesNotMatch(error.message, /OWNER_PRIVATE_SCHEMA_SECRET/);
+        return true;
+      });
+    } else {
+      assert.throws(() => normalizeAgentCheckpointHeadV1(candidate), error => {
+        assert.match(error.message, /own data properties/);
+        assert.doesNotMatch(error.message, /OWNER_PRIVATE_SCHEMA_SECRET/);
+        return true;
+      });
+    }
+  }
+  assert.equal(getterInvocations, 0, 'unknown-version accessors never run');
+  const blocked = await assessAgentCheckpointRewindV1({
+    checkpoint, current: liveHead, snapshotUtf8: SNAPSHOT_UTF8,
+  });
+  assert.equal(blocked.status, AgentCheckpointRewindStatus.BLOCKED);
+  assert.equal(blocked.reasonCode, 'UNRESOLVED_EXTERNAL_EFFECTS');
+  assert.equal(blocked.restoreAuthorized, false);
+  assert.equal(blocked.preserveExactEffectLedgerRevision, 7);
+});
