@@ -296,6 +296,45 @@ function isCommittedProviderSettlement(receipt) {
   return Boolean(settled && Object.hasOwn(settled, 'value') && settled.value === true);
 }
 
+// Model/provider replies are untrusted even after a trusted transport and
+// durable budget settlement. Spreading a reply or reading nested usage getters
+// after settlement can throw a forged transient error and dispatch another
+// provider for an effect that has already incurred usage.
+function snapshotAiProviderCompletion(value) {
+  const data = (record, label) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new Error(label + ' must be an own-data record');
+    }
+    const prototype = Object.getPrototypeOf(record);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(label + ' must be a plain own-data record');
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(record);
+    const copy = Object.create(null);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key];
+      if (typeof key !== 'string' || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(label + ' contains an unsupported or computed property');
+      }
+      Object.defineProperty(copy, key, {
+        value: descriptor.value, enumerable: true, configurable: false, writable: false,
+      });
+    }
+    return copy;
+  };
+  const result = data(value, 'AI provider response');
+  if (typeof result.text !== 'string') {
+    throw new Error('AI provider response text must be data text');
+  }
+  if (Object.hasOwn(result, 'usage') && result.usage != null) {
+    const usage = Object.freeze(data(result.usage, 'AI provider usage'));
+    // Preserve the response shape while replacing only its untrusted nested
+    // usage reference; the rest remains advisory and never gains authority.
+    return Object.freeze(Object.assign(Object.create(null), result, { usage }));
+  }
+  return Object.freeze(result);
+}
+
 export class AiOrchestrator {
   constructor({
     gatewayClient, now = () => Date.now(), providerCallLifecycle = null,
@@ -522,6 +561,19 @@ export class AiOrchestrator {
       if (receiptIdentityMismatch) {
         const unverified = new Error('Model provider identity receipt does not match the authorized route');
         unverified.code = 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED';
+        unverified.category = 'UNAVAILABLE';
+        unverified.retryable = false;
+        routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:unverified.code, category:unverified.category });
+        throw attachFailureRuntime(unverified);
+      }
+      // Verify the complete provider payload before reporting a SUCCESS or
+      // exposing nested usage to later arithmetic. The provider call is
+      // already settled: a malformed payload is UNKNOWN, never retryable.
+      try {
+        value = snapshotAiProviderCompletion(value);
+      } catch {
+        const unverified = new Error('AI provider completion payload is unverified after dispatch');
+        unverified.code = 'AI_PROVIDER_RESPONSE_UNVERIFIED';
         unverified.category = 'UNAVAILABLE';
         unverified.retryable = false;
         routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:unverified.code, category:unverified.category });
