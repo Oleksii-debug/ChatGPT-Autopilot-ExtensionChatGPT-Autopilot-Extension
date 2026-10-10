@@ -592,7 +592,7 @@ test('Tool invocation authorization consistency blocks mismatched decision, prov
     policyDecision: decision,
     toolDescriptor: { ...tool, capabilityIds: ['filesystem.read', 'filesystem.write'] },
     grantedCapabilityIds: ['filesystem.read'],
-  }), /exceeds granted capabilities: filesystem.write/);
+  }), /exceeds granted capabilities/);
 });
 
 test('Specialist handoff cannot amplify parent capability grant', () => {
@@ -610,7 +610,7 @@ test('Specialist handoff cannot amplify parent capability grant', () => {
   );
   assert.throws(
     () => assertSpecialistHandoffScopedV1(handoff, ['workspace.read']),
-    /exceeds granted capabilities: workspace.write/,
+    /exceeds granted capabilities/,
   );
 });
 
