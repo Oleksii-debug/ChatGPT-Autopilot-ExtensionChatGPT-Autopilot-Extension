@@ -120,6 +120,55 @@ test('Plan4 S1 provider/model route identity never aliases by trimming before di
   assert.equal(first.routeIdentities[0].model,exact.model);
 });
 
+test('Plan4 S1 exact endpoint account and capability provenance is versioned, immutable, and advisory', async () => {
+  const routed = {...route,endpointId:'loopback-1',capabilityIds:['tools.read']};
+  const profile = {...endpoint,endpointId:'loopback-1',accountId:'owner.local-1',
+    capabilityIds:['tools.read','vision.inspect']};
+  const linked = {...snapshot,routes:[routed],endpointProfiles:[profile]};
+  const accepted = await createAiRouteRegistryEvidenceV1(linked);
+  const cold = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(linked)));
+  assert.equal(accepted.configSha256,cold.configSha256);
+  assert.deepEqual(accepted.endpointProfiles[0].capabilityIds,['tools.read','vision.inspect']);
+  assert.equal(accepted.endpointProfiles[0].accountId,'owner.local-1');
+  assert.ok(Object.isFrozen(accepted.endpointProfiles[0].capabilityIds));
+  assert.equal(accepted.routeIdentities[0].endpointBinding,'MATCHED');
+  assert.equal(accepted.authority.canGrantPermission,false);
+  assert.equal(accepted.authority.canReadCredentials,false);
+  const older = await createAiRouteRegistryEvidenceV1({...linked,endpointProfiles:[{...endpoint,endpointId:'loopback-1'}]});
+  const olderRestarted = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({
+    ...linked,endpointProfiles:[{...endpoint,endpointId:'loopback-1'}],
+  })));
+  assert.equal(older.configSha256,olderRestarted.configSha256);
+  assert.notEqual(older.configSha256,accepted.configSha256);
+  for (const bad of [
+    {...profile, accountId:' owner.local-1'},
+    {...profile, accountId:''},
+    {...profile, accountId:null},
+    {...profile, capabilityIds:null},
+    {...profile, capabilityIds:'tools.read'},
+    {...profile, capabilityIds:['tools.read','tools.read']},
+    {...profile, capabilityIds:['tools.read',false]},
+    {...profile, capabilityIds:[]},
+  ]) {
+    await assert.rejects(createAiRouteRegistryEvidenceV1({...linked,endpointProfiles:[bad]}),
+      /AI endpoint accountId|AI endpoint capabilityIds|claims a capability/);
+    await assert.rejects(createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({
+      ...linked,endpointProfiles:[bad],
+    }))), /AI endpoint accountId|AI endpoint capabilityIds|claims a capability/);
+  }
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...linked,routes:[{...routed,capabilityIds:['vision.inspect','unsupported.scope']}],
+  }), /claims a capability/);
+  await assert.rejects(createAiRouteRegistryEvidenceV1({
+    ...linked,endpointProfiles:[{...profile,accountId:'owner.other'}],
+    routes:[{...routed,capabilityIds:['unsupported.scope']}],
+  }), /claims a capability/);
+  const changedAccount = await createAiRouteRegistryEvidenceV1({
+    ...linked,endpointProfiles:[{...profile,accountId:'owner.other'}],
+  });
+  assert.notEqual(changedAccount.configSha256,accepted.configSha256);
+});
+
 test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
   const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
     locality:'local', costClass:'free' };
