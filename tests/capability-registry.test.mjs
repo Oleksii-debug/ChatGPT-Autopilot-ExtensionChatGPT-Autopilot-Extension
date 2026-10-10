@@ -95,6 +95,7 @@ test('Plan-1 S1: provider launch admission is data-only and redacts rejected URL
   // preserve the same existing site adapter authority without mutation.
   assert.equal(resolveAgentProviderLaunchUrl(providerId), 'https://chatgpt.com/');
   assert.equal(resolveAgentProviderLaunchUrl(providerId, null), 'https://chatgpt.com/');
+  assert.equal(resolveAgentProviderLaunchUrl(providerId, '   '), 'https://chatgpt.com/');
   const input = { providerId, requestedUrl: 'https://chatgpt.com/c/legitimate' };
   const persisted = JSON.parse(JSON.stringify(input));
   assert.equal(
