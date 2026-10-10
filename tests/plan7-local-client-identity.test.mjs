@@ -612,10 +612,12 @@ test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors a
   const replies = [
     streamReply(canonical, { 'Content-Type': 'text/html' }),
     streamReply(canonical, { 'Content-Length': '999999999' }),
+    streamReply(canonical, { 'Content-Length': '1' }),
+    streamReply(canonical, { 'Content-Length': String(canonical.byteLength + 1) }),
     streamReply(new Uint8Array(262_145)),
     streamReply(new Uint8Array([0xc3, 0x28])),
     streamReply(encode('\uFEFF' + JSON.stringify(transportResponse()))),
-    streamReply(canonical),
+    streamReply(canonical, { 'Content-Length': String(canonical.byteLength) }),
   ];
   let transmissions = 0;
   const client = createAutopilotLocalClientV1({
@@ -633,6 +635,53 @@ test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors a
     'fresh valid bounded JSON request must recover without cached denial');
   assert.equal(valid.result.receipt.status, 'COMPLETED');
   assert.equal(transmissions, replies.length, 'SDK must never blindly resend');
+});
+
+
+test('SDK snapshots recycled response-stream buffers before validating Core receipt', async () => {
+  const canonical = new TextEncoder().encode(JSON.stringify(transportResponse()));
+  const reusable = new Uint8Array(canonical.byteLength);
+  const chunkSize = Math.max(1, Math.floor(canonical.byteLength / 2));
+  let offset = 0;
+  let reads = 0;
+  let transmissions = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => {
+      transmissions++;
+      return {
+        ok: true, status: 200,
+        headers: {
+          get(name) {
+            if (name === 'content-type') return 'application/json';
+            if (name === 'content-length') return String(canonical.byteLength);
+            return null;
+          },
+        },
+        body: {
+          getReader() {
+            return {
+              async read() {
+                if (offset >= canonical.byteLength) return { done: true };
+                const end = Math.min(offset + chunkSize, canonical.byteLength);
+                const chunk = canonical.subarray(offset, end);
+                reusable.set(chunk, 0);
+                offset = end;
+                reads++;
+                return { done: false, value: reusable.subarray(0, chunk.byteLength) };
+              },
+              releaseLock() {},
+            };
+          },
+        },
+      };
+    },
+  });
+  const reply = await client.control(BASE);
+  assert.equal(reply.status, 'RECEIVED',
+    'recycled stream backing arrays must not corrupt the captured receipt');
+  assert.ok(reads >= 2);
+  assert.equal(transmissions, 1, 'receipt handling must not retry an effect');
 });
 
 test('SDK total deadline covers a stalled streamed HTTP 200 body with clean recovery', async () => {
