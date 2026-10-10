@@ -283,7 +283,15 @@ const specialistProviderReadinessResolver = Object.freeze({
     // A stable owner config does not prove live provider health. Re-probe
     // through the SAME trusted resolver/selection before durable admission;
     // latency drift alone is not permission drift or a second authority.
-    return provenance.resolver.assertCurrent(readiness);
+    await provenance.resolver.assertCurrent(readiness);
+    // Owner settings can change while the harmless network probe is in
+    // flight. Close this TOCTOU window before the existing admission lease.
+    const afterProbe = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
+    if (afterProbe.quarantined || !afterProbe.config
+        || JSON.stringify(afterProbe.config) !== provenance.configSnapshot) {
+      throw new Error('Specialist provider config changed during readiness revalidation');
+    }
+    return true;
   },
 });
 const specialistReadinessResolver = specialistProviderReadinessResolver;
