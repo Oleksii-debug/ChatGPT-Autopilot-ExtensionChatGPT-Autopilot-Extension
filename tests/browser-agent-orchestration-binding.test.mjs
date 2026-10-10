@@ -1703,3 +1703,42 @@ test('Plan-1: S1 orchestration binding contract redacts hostile keys and symbols
     'root',
   );
 });
+
+
+test('Plan-1 S1: revoked and hostile Proxy reflection failures stay redacted', () => {
+  const secret = 'DO-NOT-LEAK-ORCHESTRATION-OWNER-TOKEN';
+  const target = { nodeId: 'root' };
+  const attacks = [
+    new Proxy(target, {
+      getPrototypeOf() { throw new Error(secret + '-prototype'); },
+    }),
+    new Proxy(target, {
+      ownKeys() { throw new Error(secret + '-keys'); },
+    }),
+    new Proxy(target, {
+      getOwnPropertyDescriptor() { throw new Error(secret + '-descriptor'); },
+    }),
+  ];
+  const { proxy: revoked, revoke } = Proxy.revocable(target, {});
+  revoke();
+  attacks.push(revoked);
+  for (const attack of attacks) {
+    assert.throws(
+      () => normalizeBrowserAgentOrchestrationBindingRequestV1(attack),
+      error => {
+        assert.match(error.message, /cannot be safely inspected/);
+        assert.equal(error.message.includes(secret), false,
+          'Proxy reflection diagnostics may never include owner/provider secrets');
+        return true;
+      },
+    );
+  }
+  // A rejected hostile record must never change the source or the existing
+  // canonical authority. A legitimate record remains stable across cold JSON
+  // serialization / normalization, without introducing a new store.
+  assert.deepEqual(target, { nodeId: 'root' });
+  const valid = normalizeBrowserAgentOrchestrationBindingRequestV1(target);
+  const persisted = JSON.parse(JSON.stringify(valid));
+  assert.deepEqual(normalizeBrowserAgentOrchestrationBindingRequestV1(persisted), valid);
+  assert.equal(Object.isFrozen(valid), true);
+});
