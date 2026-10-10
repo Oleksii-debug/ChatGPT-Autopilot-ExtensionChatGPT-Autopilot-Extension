@@ -11,6 +11,15 @@ test('service worker composes one trusted durable Specialist readiness path', as
   assert.match(source, /OpenHandsCodingSpecialistClient/);
   assert.match(source, /browserAgent\.getSpecialistProviderConfig\(providerId\)/);
   assert.match(source, /specialistProviderReadinessResolver/);
+  // Owner config equality is not live OpenHands readiness: the exact
+  // resolver that issued the observation must repeat a harmless provider
+  // health/identity probe before the existing durable admission boundary.
+  assert.match(source, /specialistReadinessConfigProvenance\\.set\\(readiness,[\\s\\S]*?configSnapshot:[\\s\\S]*?resolver,/);
+  assert.match(source, /return provenance\\.resolver\\.assertCurrent\\(readiness\\)/);
+  assert.doesNotMatch(
+    source,
+    /Specialist provider config changed after readiness probe'[\\s\\S]{0,120}return true;/,
+  );
   assert.match(source, /automaticSpecialistDelegationDependencies/);
 
   assert.match(source, /'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS'/);
