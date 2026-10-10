@@ -23,6 +23,9 @@ export const VerificationStatus = Object.freeze({
 const POLICY_KINDS = new Set(Object.values(PolicyDecisionKind));
 const OBSERVATION_STATUSES = new Set(Object.values(ObservationStatus));
 const VERIFICATION_STATUSES = new Set(Object.values(VerificationStatus));
+// V1 owner policy understands only R0–R4; unknown future classes cannot
+// silently enter durable grants as arbitrary canonical-looking IDs.
+const RISK_CLASSES = new Set(['R0', 'R1', 'R2', 'R3', 'R4']);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_TEXT = 16_000;
@@ -100,6 +103,15 @@ function id(value, label, { optional = false, present = false } = {}) {
   if (value !== value.trim()) throw new Error(`${label} is invalid: must be an exact canonical ID; exact canonical identity required`);
   if (!ID.test(value)) throw new Error(`${label} is invalid`);
   return value;
+}
+
+function capabilityRiskClass(value, present) {
+  // Missing legacy metadata retains the established R0 default. An explicit
+  // unsupported class must not be accepted and later downgraded by a policy
+  // consumer that only recognizes R0–R4, especially after cold restart.
+  const normalized = present ? id(value, 'riskClass') : 'R0';
+  if (!RISK_CLASSES.has(normalized)) throw new Error('riskClass must be a supported R0-R4 class');
+  return normalized;
 }
 
 function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
@@ -346,7 +358,7 @@ export function normalizeCapabilityV1(input) {
     description: text(raw.description, 'description', { optional: true, max: 2000 }),
     // Absent legacy metadata has documented defaults; explicitly persisted
     // null/undefined is corruption and must never downgrade the risk class.
-    riskClass: Object.hasOwn(raw, 'riskClass') ? id(raw.riskClass, 'riskClass') : 'R0',
+    riskClass: capabilityRiskClass(raw.riskClass, Object.hasOwn(raw, 'riskClass')),
     attributes: jsonData(raw.attributes, 'attributes', { present: Object.hasOwn(raw, 'attributes') }),
   });
 }
