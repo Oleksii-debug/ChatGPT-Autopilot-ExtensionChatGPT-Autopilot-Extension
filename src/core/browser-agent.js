@@ -1390,6 +1390,26 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     }
     return element;
   };
+  // A credential field must remain physically reachable after focus/scroll.
+  // The semantic identity alone does not prevent an overlay from obscuring it.
+  // This is a self-contained Chrome scripting function: no module helpers.
+  const ensureUnoccluded = (element, kind) => {
+    const label = kind === 'password' ? 'PASSWORD' : 'USERNAME';
+    proof(element, kind);
+    const rect = element.getBoundingClientRect?.();
+    const x = rect && rect.left + rect.width / 2;
+    const y = rect && rect.top + rect.height / 2;
+    if (!rect || !(rect.width > 0 && rect.height > 0)
+      || !Number.isFinite(x) || !Number.isFinite(y)
+      || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+    }
+    const hit = document.elementFromPoint(x, y);
+    if (hit !== element && !element.contains?.(hit)) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_OCCLUDED');
+    }
+    proof(element, kind);
+  };
   if (typeof secret !== 'string' || !secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
   const password = find(action?.passwordRef);
   const user = action?.usernameRef ? find(action.usernameRef) : null;
@@ -1413,6 +1433,7 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     user.focus?.({ preventScroll: true });
     proof(user, 'username');
     proof(password, 'password');
+    ensureUnoccluded(user, 'username');
     setInputValue(user, typeof username === 'string' ? username : '');
     usernameFilled = true;
   }
@@ -1422,6 +1443,7 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
   proof(password, 'password');
   password.focus?.({ preventScroll: true });
   proof(password, 'password');
+  ensureUnoccluded(password, 'password');
   setInputValue(password, secret);
   if (String(password.value || '') !== secret) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
   return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
