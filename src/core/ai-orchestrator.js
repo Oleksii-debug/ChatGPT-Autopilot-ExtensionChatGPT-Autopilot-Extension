@@ -475,6 +475,19 @@ export class AiOrchestrator {
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
         }
+        // Existing BrowserAgentManager persists route/account provenance in
+        // the reservation. A lifecycle receipt must not override the selected
+        // provider/model/endpoint after durable admission. Omitted fields are
+        // permitted only for legacy lifecycle implementations (unverified).
+        for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
+          const binding = Object.getOwnPropertyDescriptor(reservation, field);
+          if (!binding) continue;
+          if (!Object.hasOwn(binding, 'value') || binding.value !== routeIdentity[field]) {
+            const mismatch = new Error('Model-budget reservation does not match the authorized route');
+            mismatch.code = 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH';
+            throw mismatch;
+          }
+        }
       }
       callsUsed += 1;
       let value;
