@@ -45,7 +45,7 @@ async function attempt(response) {
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => {
       invocations += 1;
-      return { ok: true, json: async () => response };
+      return { ok: true, status: 200, json: async () => response };
     },
   });
   const result = await client.control(BASE);
@@ -103,7 +103,7 @@ test('payload reference needs exact size, sensitivity, provenance, and digest', 
   const client = createAutopilotLocalClientV1({
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => ({
-      ok: true, json: async () => {
+      ok: true, status: 200, json: async () => {
         const malicious = transportResponse({
           operation: request.operation, payloadArtifactRef: { ...artifact, sensitive: false },
         }, { operation: request.operation });
@@ -124,7 +124,7 @@ test('response identity is bound to serialized wire bytes despite caller TOCTOU 
       invocations += 1;
       sentProject = JSON.parse(options.body).projectId;
       request.projectId = 'foreign-project';
-      return { ok: true, json: async () => transportResponse({ projectId: 'foreign-project' },
+      return { ok: true, status: 200, json: async () => transportResponse({ projectId: 'foreign-project' },
         { projectId: 'foreign-project' }) };
     },
   });
@@ -271,7 +271,7 @@ test('SDK serializes only canonical request fields and preserves wire-bound iden
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async (_url, options) => {
       seen.push(JSON.parse(options.body));
-      return { ok: true, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponse() };
     },
   });
   const request = { ...BASE };
@@ -296,7 +296,7 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => {
       networkCalls += 1;
-      return { ok: true, json: async () => {
+      return { ok: true, status: 200, json: async () => {
         const reply = transportResponse({ operation: original.operation, targetId: original.targetId,
           payloadArtifactRef: { ...artifact } }, { operation: original.operation });
         Object.assign(reply.result.scopeProof, {
@@ -334,7 +334,7 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
     });
     const attempt = createAutopilotLocalClientV1({
       token: 'test-only-'.repeat(5), port: 12345,
-      fetchImpl: async () => ({ ok: true, json: async () => reply }),
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => reply }),
     });
     const result = await attempt.control(original);
     assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT', shape);
@@ -403,7 +403,7 @@ test('SDK deadline refuses late transport completion even when fetch ignores Abo
       calls += 1;
       signal = options.signal;
       return new Promise(resolve => setTimeout(
-        () => resolve({ ok: true, json: async () => transportResponse() }), 250,
+        () => resolve({ ok: true, status: 200, json: async () => transportResponse() }), 250,
       ));
     },
   });
@@ -420,7 +420,7 @@ test('SDK deadline covers slow JSON body after early HTTP headers', async () => 
     fetchImpl: async () => {
       calls += 1;
       return {
-        ok: true,
+        ok: true, status: 200,
         json: () => new Promise(resolve => setTimeout(() => resolve(transportResponse()), 250)),
       };
     },
@@ -508,7 +508,7 @@ test('owner-managed SDK bearer rotates per call without caching stale credential
     port: 12345,
     fetchImpl: async (_, options) => {
       sent.push(options.headers.Authorization);
-      return { ok: true, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponse() };
     },
   });
   assert.equal((await client.control(BASE)).status, 'RECEIVED');
@@ -529,7 +529,7 @@ test('owner-token resolver fails closed before networking and recovers on next c
     port: 12345,
     fetchImpl: async () => {
       sent += 1;
-      return { ok: true, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponse() };
     },
   });
   await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
@@ -555,7 +555,7 @@ test('hung SDK owner-token lookup is bounded and cannot dispatch or become stick
     timeoutMs: 100,
     fetchImpl: async () => {
       sent += 1;
-      return { ok: true, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponse() };
     },
   });
   await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
