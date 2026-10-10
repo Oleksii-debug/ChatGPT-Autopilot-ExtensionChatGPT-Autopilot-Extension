@@ -439,7 +439,8 @@ test('gateway client rejects endpoint and resource aliases before fetch', async 
   );
   assert.equal(fetchCalls, 0);
 
-  await client.complete({ ...base, maxOutputTokens: 1.9 });
+  // Only exact positive integer owner ceilings may reach the canonical gateway.
+  await client.complete({ ...base, maxOutputTokens: 1 });
   assert.equal(fetchCalls, 1);
   assert.equal(lastBody.maxOutputTokens, 1);
 });
