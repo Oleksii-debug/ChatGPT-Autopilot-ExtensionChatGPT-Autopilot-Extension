@@ -394,13 +394,16 @@ const ARTIFACT_KEYS = new Set([
 export function normalizeArtifactRefV1(input) {
   const raw = plain(input, 'ArtifactRefV1');
   exactKeys(raw, ARTIFACT_KEYS, 'ArtifactRefV1');
-  if (raw.sha256 != null && raw.sha256 !== '' && typeof raw.sha256 !== 'string') {
+  // Only a genuinely absent legacy digest may default to no hash.
+  // Explicit null/undefined means the saved artifact identity is corrupt;
+  // accepting it as '' would silently erase verification evidence on restart.
+  const hasDigest = Object.hasOwn(raw, 'sha256');
+  if (hasDigest && raw.sha256 == null) throw new Error('sha256 is invalid');
+  if (hasDigest && typeof raw.sha256 !== 'string') {
     throw new Error('sha256 must be text');
   }
-  // An artifact content digest is an identity, not display text: trimming or
-  // lowercasing an untrusted persisted digest silently promotes a noncanonical
-  // reference into valid verification evidence after a cold restart.
-  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : raw.sha256;
+  // Digest identity is exact: never trim or lowercase an untrusted hash.
+  const digest = hasDigest ? raw.sha256 : '';
   if (digest && !SHA256.test(digest)) throw new Error('sha256 is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ArtifactRefV1'),
