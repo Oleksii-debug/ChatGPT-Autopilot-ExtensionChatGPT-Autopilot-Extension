@@ -310,13 +310,26 @@ export function normalizeCloudExecutionSlotV1(input) {
   });
 }
 
+// Provider readiness is an untrusted discovery payload. Snapshot and allowlist
+// descriptors before entering the shared capability normalizer, so hostile
+// Proxy traps and getter text can never become cloud diagnostics.
+const PROVIDER_STATE_KEYS = new Set([
+  'schemaVersion', 'providerId', 'toolId', 'health',
+  'installationRequired', 'installed', 'authenticationRequired',
+  'authenticated', 'pathKind', 'latencyMs', 'reasonCode',
+]);
+
 function normalizeProviderStates(value) {
   const inputs = dataArray(value, 'CloudFabricRequestV1.providerStates', MAX_PROVIDER_STATES);
   const states = inputs.map((item, index) => {
+    const label = `CloudFabricRequestV1.providerStates[${index}]`;
+    const safeRecord = snapshotRecord(item, label, PROVIDER_STATE_KEYS);
     try {
-      return normalizeProviderReadinessV1(item);
+      // Only plain allowlisted own-data fields reach the shared normalizer.
+      return normalizeProviderReadinessV1(safeRecord);
     } catch (error) {
-      throw new Error(`CloudFabricRequestV1.providerStates[${index}]: ${error.message}`);
+      // After the snapshot, the normalizer sees no caller-controlled getters.
+      throw new Error(`${label}: ${error.message}`);
     }
   });
   const seen = new Set();
