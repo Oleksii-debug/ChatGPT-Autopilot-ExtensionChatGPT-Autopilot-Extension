@@ -108,7 +108,8 @@ function requireId(value, label) {
 }
 
 function optionalId(value, label) {
-  if (value == null || value === '') return null;
+  // Empty optional IDs are corrupt identities, not absent references.
+  if (value == null) return null;
   return requireId(value, label);
 }
 
@@ -116,13 +117,14 @@ function normalizeTimestamp(value, label) {
   // An event's chronology is evidence. Date.parse accepts ambiguous shorthand
   // and can silently roll impossible calendar days into another month; neither
   // is a trustworthy durable event timestamp.
-  const format = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  // Match UniversalAgentContractV1: signed six-digit ISO years are canonical.
+  const format = /^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
   if (typeof value !== 'string' || !format.test(value)) {
     throw new Error(`${label} must be an ISO timestamp with an explicit timezone`);
   }
-  const wallClock = value.slice(0, 19);
+  const wallClock = value.match(/^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u)[0];
   const calendar = new Date(wallClock + 'Z');
-  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 19) !== wallClock) {
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, wallClock.length) !== wallClock) {
     throw new Error(`${label} contains an invalid calendar date`);
   }
   const date = new Date(value);
