@@ -106,10 +106,17 @@ function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
   return out;
 }
 
-function timestamp(value, label, { optional = false } = {}) {
-  // An empty persisted expiry is not absence: accepting it as null could
-  // silently remove the credential's expiration bound on cold recovery.
-  if (value == null && optional) return null;
+function timestamp(value, label, { optional = false, present = false } = {}) {
+  // A genuinely absent legacy expiry and canonical null are unbounded.
+  // An explicitly present undefined is corrupt owner-controlled state:
+  // accepting it would silently erase an expiration bound before JSON
+  // persistence (where undefined properties disappear).
+  if (value == null && optional) {
+    if (value === undefined && present) {
+      throw new Error(`${label} must be an ISO timestamp or canonical null`);
+    }
+    return null;
+  }
   // All durable authority/evidence clocks must be explicit, zone-bound ISO
   // instants. Date.parse accepts shorthand and rolls impossible calendar dates.
   // Year 10000+ requires the ISO 8601 signed six-digit extended-year form.
@@ -513,7 +520,9 @@ export function normalizeCredentialRefV1(input) {
     brokerId: id(raw.brokerId, 'brokerId'),
     kind: id(raw.kind, 'kind'),
     scope: stringList(raw.scope, 'scope', { optional: false, max: 64, itemMax: 1000, exact: true, unique: true }),
-    expiresAt: timestamp(raw.expiresAt, 'expiresAt', { optional: true }),
+    expiresAt: timestamp(raw.expiresAt, 'expiresAt', {
+      optional: true, present: Object.hasOwn(raw, 'expiresAt'),
+    }),
   });
 }
 
