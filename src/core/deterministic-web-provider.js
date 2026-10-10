@@ -96,9 +96,10 @@ export function verifyDeterministicWebPostconditionV1({
   expected,
   now,
   verifierId = 'deterministic-web-postcondition-verifier',
-  verificationAuthorityId = '',
-  effectId = '',
-  executionId = '',
+  // Absent durable references are canonical null, never an empty identity.
+  verificationAuthorityId = null,
+  effectId = null,
+  executionId = null,
   attempt = 0,
 }) {
   const observed = observation.data || {};

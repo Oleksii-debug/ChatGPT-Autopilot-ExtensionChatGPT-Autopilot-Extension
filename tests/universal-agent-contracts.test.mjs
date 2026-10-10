@@ -1830,3 +1830,48 @@ test('Plan-1 S1: duplicate evidence and credential identities fail closed across
   assert.ok(Object.isFrozen(valid.artifactRefs));
   assert.ok(Object.isFrozen(valid.credentialRefs));
 });
+
+
+test('Plan-1 S1: web postcondition verifier preserves optional refs across ambiguous-effect readback', async () => {
+  const { verifyDeterministicWebPostconditionV1 } = await import('../src/core/deterministic-web-provider.js');
+  const observation = normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'web-observation-compat-1',
+    invocationId: 'web-invocation-compat-1',
+    status: ObservationStatus.OK,
+    summary: 'Independent fresh browser readback',
+    data: { url: 'https://example.test/ready' },
+    artifactRefs: [],
+    observedAt: AT,
+  });
+  const verification = verifyDeterministicWebPostconditionV1({
+    invocationId: 'web-invocation-compat-1',
+    observation,
+    expected: { url: 'https://example.test/ready' },
+    now: AT,
+  });
+  assert.equal(verification.status, VerificationStatus.VERIFIED);
+  assert.equal(verification.verificationAuthorityId, null);
+  assert.equal(verification.effectId, null);
+  assert.equal(verification.executionId, null);
+  assert.deepEqual(normalizeVerificationV1(JSON.parse(JSON.stringify(verification))), verification,
+    'fresh readback and cold recovery must agree on absent identity refs');
+
+  for (const key of ['verificationAuthorityId', 'effectId', 'executionId']) {
+    assert.throws(
+      () => normalizeVerificationV1({ ...verification, [key]: '' }),
+      /is invalid/,
+      'a corrupt explicit empty ' + key + ' must never silently erase evidence identity',
+    );
+  }
+
+  const mismatch = verifyDeterministicWebPostconditionV1({
+    invocationId: 'web-invocation-compat-1',
+    observation,
+    expected: { url: 'https://example.test/other' },
+    now: AT,
+  });
+  assert.equal(mismatch.status, VerificationStatus.FAILED,
+    'stale independent observation must not be promoted to verified or committed');
+  assert.deepEqual(normalizeVerificationV1(JSON.parse(JSON.stringify(mismatch))), mismatch);
+});
