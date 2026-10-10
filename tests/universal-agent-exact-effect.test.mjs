@@ -706,7 +706,7 @@ test('state envelope rejects hidden, symbol and inherited authority aliases', ()
   });
   assert.throws(
     () => normalizeExactEffectStateV1(hidden),
-    /unknown field: authorityGranted/,
+    /contains unknown field/,
   );
 
   const symbolic = { ...state };
