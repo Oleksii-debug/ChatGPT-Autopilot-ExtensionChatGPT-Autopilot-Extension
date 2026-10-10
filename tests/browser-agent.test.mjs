@@ -3326,6 +3326,55 @@ test('Plan4 S1: model budget route identities reject getters, coercion and persi
   assert.equal(modelEffects, 0);
 });
 
+test('Plan4 S1: corrupted persisted numeric budget receipts quarantine instead of undercounting', async () => {
+  const chrome = makeChrome();
+  let providerEffects = 0;
+  const routePrompt = async () => { providerEffects += 1; return { text:'{}' }; };
+  const manager = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 57_000 });
+  const corruptions = [
+    ['outputTokens', -1],
+    ['inputTokens', '10'],
+    ['modelCalls', 0],
+    ['totalTokens', 1],
+    ['estimatedCostUsd', '0'],
+    ['createdAt', 1.25],
+  ];
+  for (let i = 0; i < corruptions.length; i += 1) {
+    const id = `job-numeric-quarantine-${i}`;
+    await manager.create({
+      id, goal:'Reject unsafe model receipt coercion',
+      maxModelCalls:3, maxOutputTokensPerCall:64,
+    });
+    await manager.update(store => {
+      store.byId[id].runtime.runState = 'RUNNING';
+      return store;
+    });
+    await manager.reserveProviderModelBudget({
+      jobId:id, controlEpoch:0, prompt:'bounded', maxOutputTokens:64,
+      route:{ routeId:'local', provider:'ollama', model:'fixture' },
+    });
+    const [field, invalidValue] = corruptions[i];
+    await manager.update(store => {
+      store.byId[id].runtime.modelBudgetReservation[field] = invalidValue;
+      return store;
+    });
+    const cold = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 58_000 });
+    const readback = await cold.get(id);
+    assert.equal(readback.job.runtime.modelBudgetReservation, null, field);
+    assert.equal(readback.job.runtime.modelBudgetReservationQuarantined, true, field);
+    assert.equal(readback.job.runtime.runState, 'PAUSED', field);
+    assert.equal(await cold.reconcileProviderModelBudgetReservation(id), false, field);
+    await assert.rejects(
+      () => cold.reserveProviderModelBudget({
+        jobId:id, controlEpoch:0, prompt:'must never replay', maxOutputTokens:64,
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+      field,
+    );
+  }
+  assert.equal(providerEffects, 0);
+});
+
 test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 60_000 });
