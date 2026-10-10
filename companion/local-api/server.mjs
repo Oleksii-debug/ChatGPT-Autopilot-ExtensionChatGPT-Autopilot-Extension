@@ -65,6 +65,44 @@ function exactToken(input, label) {
 }
 
 /**
+ * The Companion owner supplies the three canonical Core dependencies exactly
+ * once. Pin their callable identities before a listener can accept traffic:
+ * a mutable input object or a hostile getter must never hot-swap the scope,
+ * dispatcher or trusted clock after authentication. This is NOT a new Core
+ * authority, broker, scheduler or effect store.
+ */
+const CORE_DEPENDENCY_FIELDS = Object.freeze([
+  'resolveTrustedScope', 'dispatchCanonicalControl', 'now',
+]);
+function pinCanonicalCoreDependencies(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Trusted canonical control dependencies must be provided');
+  }
+  let prototype, descriptors;
+  try {
+    prototype = Object.getPrototypeOf(input);
+    descriptors = Object.getOwnPropertyDescriptors(input);
+  } catch {
+    throw new Error('Trusted canonical control dependencies must be plain data');
+  }
+  if ((prototype !== Object.prototype && prototype !== null)
+    || Reflect.ownKeys(descriptors).length !== CORE_DEPENDENCY_FIELDS.length) {
+    throw new Error('Trusted canonical control dependencies must be exact');
+  }
+  const pinned = Object.create(null);
+  for (const field of CORE_DEPENDENCY_FIELDS) {
+    const descriptor = descriptors[field];
+    if (!descriptor?.enumerable
+      || !Object.hasOwn(descriptor, 'value')
+      || typeof descriptor.value !== 'function') {
+      throw new Error('Trusted canonical control dependencies must be callable own data');
+    }
+    pinned[field] = descriptor.value;
+  }
+  return Object.freeze(pinned);
+}
+
+/**
  * Activation must occur in a trusted Native Companion lifecycle:
  *   server.listen(port, '127.0.0.1')
  * Never pass a remote address or pass an untrusted resolver/dispatcher.
@@ -78,11 +116,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   }
   const staticExpected = tokenProvider === undefined
     ? digest(exactToken(token, 'Local API token')) : null;
-  if (!dependencies || typeof dependencies.resolveTrustedScope !== 'function'
-    || typeof dependencies.dispatchCanonicalControl !== 'function'
-    || typeof dependencies.now !== 'function') {
-    throw new Error('Trusted canonical control dependencies must be provided');
-  }
+  const trustedDependencies = pinCanonicalCoreDependencies(dependencies);
   // Transport-only admission fence. Core must still own durable request/effect
   // deduplication and reconciliation across processes and restarts.
   // Keep the transport's overlapping request population strictly bounded.
@@ -156,7 +190,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       try {
         // Input carries only request identities, not credentials or policy.
         // Canonical control rechecks trusted scope and downstream authority.
-        const result = await executeAutopilotProgrammaticControlV1(normalized, dependencies);
+        const result = await executeAutopilotProgrammaticControlV1(normalized, trustedDependencies);
         return send(res, 200, { schemaVersion: 1, status: 'RECEIVED', result });
       } finally {
         inFlight.delete(requestKey);
