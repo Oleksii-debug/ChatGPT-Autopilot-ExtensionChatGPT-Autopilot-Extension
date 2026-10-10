@@ -138,3 +138,36 @@ test('gateway rejects web origins and binds exactly one Chrome extension during 
     fs.rmSync(configDir, { recursive: true, force: true });
   }
 });
+
+test('Plan4 S1 HTTP boundary rejects foreign endpointId for built-in account before any upstream request', async () => {
+  const upstream=[];
+  const server=createGatewayServer({
+    fetchFn:async (url,init={})=>{
+      upstream.push({url,method:init.method || 'GET'});
+      return url.endsWith('/api/tags') ? response({models:[{name:'fixture-ollama'}]})
+        : response({message:{content:'fixture-response'}});
+    },
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const root=`http://127.0.0.1:${server.address().port}`;
+  try {
+    for(const provider of ['ollama','openai']) {
+      const discovered=await fetch(`${root}/models?provider=${provider}&endpointId=wrong.account`);
+      assert.equal(discovered.status,400);
+      assert.equal((await discovered.json()).code,'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+      const completion=await fetch(`${root}/complete`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({provider,endpointId:'wrong.account',model:'fixture',prompt:'approved'}),
+      });
+      assert.equal(completion.status,400);
+      assert.equal((await completion.json()).code,'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+    }
+    assert.equal(upstream.length,0,'no model discovery or provider call can cross the wrong account boundary');
+    const valid=await fetch(`${root}/models?provider=ollama`);
+    assert.equal(valid.status,200);
+    assert.deepEqual((await valid.json()).models,['fixture-ollama']);
+    assert.equal(upstream.length,1,'legacy unbound local provider still functions');
+  } finally {
+    await new Promise(resolve=>server.close(resolve));
+  }
+});
