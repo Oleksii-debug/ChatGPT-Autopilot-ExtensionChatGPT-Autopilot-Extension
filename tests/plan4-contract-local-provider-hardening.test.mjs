@@ -1881,13 +1881,13 @@ test('Plan4 S1 endpoint catalog accepts the same exact safe Unicode model identi
   // authorized model; malformed characters are rejected before any effect.
   const unsafe = [
     ' ' + multilingual, multilingual + ' ',
-    multilingual + '\\n', multilingual + '\\u202e', multilingual + '\\ud800',
+    multilingual + '\n', multilingual + '\u202e', multilingual + '\ud800',
     '', 0, {}, null,
   ];
   for (const modelId of unsafe) {
     const corrupted = {...input,endpointProfiles:[{...input.endpointProfiles[0], modelIds:[modelId]}]};
     await assert.rejects(createAiRouteRegistryEvidenceV1(corrupted),/modelIds|model identity/);
-    if (typeof modelId === 'string' && !modelId.includes('\\ud800')) {
+    if (typeof modelId === 'string' && !modelId.includes('\ud800')) {
       await assert.rejects(createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(corrupted))),/modelIds|model identity/);
     }
   }
