@@ -133,6 +133,22 @@ test('candidate recovery cannot retroactively invent a missing source-ancestor b
 }));
 
 
+test('tracked candidate HEAD downgrade cannot be concealed by unstaged 11.x files', () => withFixture(f => {
+  for (const path of ['manifest.json', 'package.json']) {
+    f.put(path, JSON.stringify({ version: '0.9.19' }));
+    f.git('add', path);
+    f.git('commit', '-m', 'Downgrade committed ' + path);
+    // The checkout looks correct, but the shipped HEAD does not.
+    f.put(path, JSON.stringify({ version: PLAN8_SOURCE_VERSION }));
+    assert.throws(() => verifyPlan8Lineage({ root: f.root,
+      sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }),
+      new RegExp('candidate HEAD ' + path.replace('.', '\\.') + ' version', 'u'));
+    // Restore clean committed 11.x lineage before trying the next file.
+    f.git('add', path);
+    f.git('commit', '-m', 'Restore committed ' + path);
+  }
+}));
+
 test('source-only candidate cannot impersonate the preserved predecessor history', () => withFixture(f => {
   f.git('checkout', '-b', 'source-only-candidate', f.baseline);
   assert.throws(() => verifyPlan8Lineage({ root: f.root,
