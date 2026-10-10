@@ -1607,7 +1607,7 @@ test('Plan4 S1 wrong provider/model/endpoint receipts settle consumption but nev
     },
   });
   const recovered=await admitted.run(JSON.parse(JSON.stringify(owner)),{},'approved',options);
-  assert.equal(recovered.routeSelection.routeId,'owner.primary');
+  assert.equal(recovered.routing.selectedRouteId,'owner.primary');
   assert.equal(recovered.text,'verified');
   assert.equal(effects,1);
 });
