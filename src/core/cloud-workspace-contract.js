@@ -316,10 +316,12 @@ function assessment(status, reasonCode, binding, ownership, at) {
 const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation', 'loadCanonicalOwnership']);
 const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub', 'loadCanonicalBinding', 'loadCanonicalOwnership']);
 const ISOLATION_PROOF_KEYS = new Set([
+  'workspaceRevision', 'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemIsolated', 'browserIsolated', 'processIsolated',
 ]);
 const SCRUB_PROOF_KEYS = new Set([
+  'workspaceRevision', 'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'verifiedAt',
   'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
 ]);
@@ -345,6 +347,14 @@ function verifyExactLifecycleProof(input, keys, binding, at, properties, label, 
     || raw.executionLeaseId !== binding.executionLeaseId
     || raw.executionOwnershipRevision !== binding.executionOwnershipRevision) {
     throw new Error(`${label} does not match exact cloud workspace/lease identity`);
+  }
+  // Reject stale lifecycle evidence for the same lease after a workspace
+  // revision, environment or checkpoint change.
+  if (raw.workspaceRevision !== binding.workspaceRevision
+      || raw.environmentSha256 !== binding.environmentSha256
+      || raw.checkpointArtifactId !== binding.checkpointArtifactId
+      || raw.checkpointSha256 !== binding.checkpointSha256) {
+    throw new Error(`${label} does not match exact workspace state/checkpoint`);
   }
   const verifiedAt = exactTimestamp(raw.verifiedAt, `${label}.verifiedAt`);
   if (Date.parse(verifiedAt) < Date.parse(minAt)
@@ -388,6 +398,10 @@ export async function verifyCloudWorkspaceIsolationV1(
   const proof = await trusted.verifyIsolation(Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
+    workspaceRevision: binding.workspaceRevision,
+    environmentSha256: binding.environmentSha256,
+    checkpointArtifactId: binding.checkpointArtifactId,
+    checkpointSha256: binding.checkpointSha256,
     executionLeaseId: binding.executionLeaseId,
     executionOwnershipRevision: binding.executionOwnershipRevision,
   }));
@@ -653,6 +667,10 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
+    workspaceRevision: binding.workspaceRevision,
+    environmentSha256: binding.environmentSha256,
+    checkpointArtifactId: binding.checkpointArtifactId,
+    checkpointSha256: binding.checkpointSha256,
     executionLeaseId: binding.executionLeaseId,
     executionOwnershipRevision: binding.executionOwnershipRevision,
   });
