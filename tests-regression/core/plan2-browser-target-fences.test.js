@@ -5,6 +5,7 @@ import {
   snapshotBrowserPage,
   parseBrowserAgentAction,
   executeBrowserPageAction,
+  executeBrowserCredentialFill,
   proveBrowserNativeClick,
   verifyBrowserApprovalTarget,
   verifyBrowserFileInput,
@@ -1763,4 +1764,116 @@ test('Plan-2 S2: screenshot point requires exact numeric main-frame viewport', (
   snapshot.visionViewport = viewport;
   assert.equal(parseBrowserAgentAction(action, snapshot).y, 20,
     'exact attached screenshot viewport remains valid without a main-frame DOM snapshot');
+});
+
+
+test('Plan-2 S1: credential fill enforces exact frame and field proof through focus/restart', () => {
+  const previousInput = globalThis.HTMLInputElement;
+  const previousTextarea = globalThis.HTMLTextAreaElement;
+  class FakeInput extends FakeElement {
+    constructor(type, name) {
+      super('');
+      this.tagName = 'INPUT';
+      this.attrs = new Map([['type', type], ['aria-label', name]]);
+      this.value = '';
+      this.id = '';
+      this.form = null;
+      this.labels = null;
+      this.type = type;
+    }
+    dispatchEvent(evt) { this.onDispatch?.(evt); return true; }
+  }
+  globalThis.HTMLInputElement = FakeInput;
+  globalThis.HTMLTextAreaElement = class FakeTextarea extends FakeElement {};
+  try {
+    const user = new FakeInput('text', 'Username');
+    const password = new FakeInput('password', 'Password');
+    const nodes = [user, password];
+    pageUrl = 'https://example.test/login';
+    globalThis.location = { get href() { return pageUrl; } };
+    globalThis.document = {
+      title: 'Login', body: { innerText: 'Log in' }, documentElement: { scrollHeight: 500 },
+      getElementById: () => null,
+      querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
+        ? nodes.filter(input => input.getAttribute('data-autopilot-agent-ref'))
+        : nodes,
+      elementFromPoint: () => password,
+    };
+    const snap = snapshotBrowserPage('credential-proof');
+    const observed = {
+      url: snap.url,
+      frames: [{ frameId: 0, ...snap }],
+      credentials: [{ ref: 'c1', credentialId: 'fixture-opaque-credential' }],
+    };
+    const action = parseBrowserAgentAction(JSON.stringify({
+      type: 'fill_credential', credentialRef: 'c1',
+      usernameFrameId: 0, usernameRef: 'r1',
+      passwordFrameId: 0, passwordRef: 'r2',
+    }), observed);
+    assert.equal(action.expectedFrameUrl, 'https://example.test/login');
+    assert.match(action.expectedPasswordSemanticIdentity, /^[0-9a-f]{8}$/);
+    const restored = JSON.parse(JSON.stringify(action));
+    const reset = () => { user.value = ''; password.value = ''; };
+    reset();
+    assert.deepEqual(executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret').passwordFilled, true);
+    assert.equal(user.value, 'alice');
+    assert.equal(password.value, 'test-secret');
+
+    reset();
+    pageUrl = 'https://example.test/evil-same-origin';
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(user.value, '');
+    assert.equal(password.value, '');
+    pageUrl = 'https://example.test/login';
+
+    reset();
+    password.setAttribute('aria-label', 'One-time-code');
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(user.value, '');
+    assert.equal(password.value, '');
+    password.setAttribute('aria-label', 'Password');
+
+    reset();
+    const missingProof = { ...restored };
+    delete missingProof.expectedPasswordSemanticIdentity;
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, missingProof, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(password.value, '');
+
+    reset();
+    password.parentElement = { hidden: true, parentElement: null, getAttribute: () => null };
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_UNAVAILABLE/);
+    assert.equal(password.value, '');
+    password.parentElement = null;
+
+    reset();
+    user.onDispatch = () => { password.setAttribute('aria-label', 'Attacker-controlled'); };
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(password.value, '', 'username handler cannot redirect the secret');
+    user.onDispatch = null;
+    password.setAttribute('aria-label', 'Password');
+
+    reset();
+    password.focus = () => { password.setAttribute('aria-label', 'Changed on focus'); };
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(password.value, '', 'password focus handler cannot redirect the secret');
+    password.focus = () => {};
+    password.setAttribute('aria-label', 'Password');
+
+    reset();
+    nodes.push(password);
+    assert.throws(() => executeBrowserCredentialFill(snap.snapshotId, restored, 'alice', 'test-secret'),
+      /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.equal(password.value, '', 'duplicated snapshot refs are ambiguous');
+  } finally {
+    if (previousInput === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = previousInput;
+    if (previousTextarea === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = previousTextarea;
+  }
 });
