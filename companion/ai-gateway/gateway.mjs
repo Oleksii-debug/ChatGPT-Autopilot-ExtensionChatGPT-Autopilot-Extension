@@ -166,9 +166,28 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
 }
 
 export function loadCompatibleEndpointRegistry({ env = process.env, configFile = path.join(CONFIG_DIR, 'gateway-settings.json') } = {}) {
-  if (clean(env.AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON)) return normalizeCompatibleEndpointRegistry(env.AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON);
+  // A present but erased environment registry is NOT an absent legacy
+  // setting. Never fall back to a different persisted account or default
+  // endpoint after a malformed override. Read only own data, not getters.
+  let override;
+  try { override = Object.getOwnPropertyDescriptor(env, 'AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON'); }
+  catch { throw gatewayError('Gateway endpoint registry override must be an own data value', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'); }
+  if (override) {
+    if (!Object.hasOwn(override, 'value') || typeof override.value !== 'string'
+        || !override.value.trim()) {
+      throw gatewayError('Explicit gateway endpoint registry override cannot be empty or computed', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
+    return normalizeCompatibleEndpointRegistry(override.value);
+  }
   const config = readJsonFile(configFile);
   if (config.error) throw gatewayError('Could not parse Gateway endpoint settings', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  // Only a genuinely missing settings file may use the historical default.
+  // A present JSON null, scalar or array is corrupt config, not permission
+  // to replace the former account registry with an implicit local endpoint.
+  if (config.exists && (!config.value || typeof config.value !== 'object'
+      || Array.isArray(config.value))) {
+    throw gatewayError('Gateway endpoint settings must be a JSON object', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  }
   if (config.value?.compatibleEndpoints !== undefined) return normalizeCompatibleEndpointRegistry(config.value.compatibleEndpoints);
   return normalizeCompatibleEndpointRegistry('');
 }

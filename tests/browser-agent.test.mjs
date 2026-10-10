@@ -3105,6 +3105,90 @@ test('Browser Agent input-token admission includes an existing durable reservati
   );
 });
 
+test('Plan4 S1: canonical router and durable manager prevent duplicate effect after unknown settlement and JSON restart', async () => {
+  const chrome=makeChrome();
+  const jobId='job-plan4-router-manager-unknown';
+  const manager=new BrowserAgentManager({
+    chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>91_000,
+  });
+  await manager.create({
+    id:jobId,goal:'Make one bounded provider call and preserve its budget on restart',
+    maxModelCalls:1,maxOutputTokensPerCall:64,
+  });
+  await manager.update(store => {
+    store.byId[jobId].runtime.runState='RUNNING';
+    return store;
+  });
+  const originalUpdate=manager.update.bind(manager);
+  let blockSettlement=false;
+  manager.update=async mutation => {
+    if (blockSettlement) throw new Error('fixture: durable settlement write failed');
+    return originalUpdate(mutation);
+  };
+  let providerEffects=0;
+  const orchestrator=new AiOrchestrator({
+    now:()=>91_000,
+    gatewayClient:{async complete(request) {
+      providerEffects+=1;
+      blockSettlement=true; // Reservation is durable, but commit now fails.
+      return {text:'effect occurred',provider:request.provider,model:request.model,
+        usage:{inputTokens:6,outputTokens:4,totalTokens:10}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall({context,route,prompt,systemPrompt,maxOutputTokens,callNumber}) {
+        return manager.reserveProviderModelBudget({
+          jobId:context.jobId,controlEpoch:context.controlEpoch,
+          route,prompt,systemPrompt,maxOutputTokens,callNumber,
+        });
+      },
+      async afterProviderCall({context,reservation,ok,result}) {
+        return manager.settleProviderModelBudget({
+          jobId:context.jobId,reservationId:reservation.reservationId,ok,result,
+        });
+      },
+    },
+  });
+  const settings={
+    enabled:true,mode:'primary',
+    primary:{provider:'ollama',model:'fixture-one'},
+    routes:[
+      {routeId:'route-one',provider:'ollama',model:'fixture-one',roles:['planner'],priority:2},
+      {routeId:'route-two',provider:'ollama',model:'fixture-two',roles:['planner'],priority:1},
+    ],
+    routePolicy:{autoSwitch:true},
+    fallbackToStrongOnPrimaryError:true,
+  };
+  await assert.rejects(
+    () => orchestrator.run(settings, {}, 'durable offline model test', {
+      maxOutputTokens:64,
+      providerCallBudgetContext:{kind:'browser-agent',jobId,controlEpoch:0},
+    }),
+    error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN',
+  );
+  assert.equal(providerEffects,1,'uncertain durable settlement prohibits backup provider effect');
+  const pending=(await manager.get(jobId)).job.runtime;
+  assert.equal(pending.modelBudgetReservation?.reservationId,jobId+':model-budget:1');
+  assert.equal(pending.modelCalls,0,'pending write must not masquerade as committed');
+  const restarted=new BrowserAgentManager({
+    chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>92_000,
+  });
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation(jobId),true);
+  const recovered=(await restarted.get(jobId)).job.runtime;
+  assert.equal(recovered.modelBudgetReservation,null);
+  assert.equal(recovered.modelCalls,1,'uncertain call remains conservatively charged');
+  assert.ok(recovered.outputTokens>=64,'reserved output ceiling is charged on recovery');
+  assert.equal(recovered.history.at(-1)?.type,'model-budget-recovered-after-restart');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId,controlEpoch:0,prompt:'forbidden replay',maxOutputTokens:64,
+      route:{routeId:'route-two',provider:'ollama',model:'fixture-two',endpointId:''},
+      callNumber:2,
+    }),
+    error => error.code==='AI_MODEL_BUDGET_EXHAUSTED',
+  );
+  assert.equal(providerEffects,1,'restart cannot create an unbudgeted second effect');
+});
+
 test('Browser Agent persists provider-call budget before I/O and restart cannot regain the reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 50_000 });
@@ -3181,6 +3265,202 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
       return true;
     },
   );
+});
+
+test('Plan4 S1: corrupt persisted pre-dispatch budget is quarantined across JSON cold restarts without replay', async () => {
+  const chrome = makeChrome();
+  let modelEffects = 0;
+  const routePrompt = async () => { modelEffects += 1; return { text:'{}' }; };
+  const manager = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 52_000 });
+  await manager.create({
+    id:'job-corrupt-model-reservation',
+    goal:'Never retry a provider effect with torn budget evidence',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    const runtime = store.byId['job-corrupt-model-reservation'].runtime;
+    runtime.runState = 'RUNNING';
+    runtime.nextWakeAt = 52_100;
+    // An interrupted write may leave an opaque reservation that cannot be
+    // accounted for safely. It must not become a missing/fresh reservation.
+    runtime.modelBudgetReservation = {
+      reservationId:'',
+      controlEpoch:0,
+      modelCalls:1,
+      inputTokens:12,
+      outputTokens:128,
+      totalTokens:140,
+      routeId:'plan4-primary',
+      endpointId:'account.endpoint',
+    };
+    return store;
+  });
+  const first = await manager.get('job-corrupt-model-reservation');
+  assert.equal(first.job.runtime.modelBudgetReservation, null);
+  assert.equal(first.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(first.job.runtime.runState, 'PAUSED');
+  assert.equal(first.job.runtime.nextWakeAt, 0);
+
+  const restarted = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 53_000 });
+  const cold = await restarted.get('job-corrupt-model-reservation');
+  assert.equal(cold.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(cold.job.runtime.runState, 'PAUSED');
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-corrupt-model-reservation'), false,
+    'an unknown reservation must never be falsely settled as a known receipt');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-corrupt-model-reservation',
+      controlEpoch:0,
+      prompt:'do not send',
+      maxOutputTokens:128,
+      route:{ routeId:'plan4-primary', endpointId:'account.endpoint' },
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+
+  // Quarantine is sticky after the damaged payload has been dropped and
+  // after an additional store serialization/restart.
+  await restarted.update(store => store);
+  const again = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 54_000 });
+  const final = await again.get('job-corrupt-model-reservation');
+  assert.equal(final.job.runtime.modelBudgetReservation, null);
+  assert.equal(final.job.runtime.modelBudgetReservationQuarantined, true);
+  await assert.rejects(
+    () => again.reserveProviderModelBudget({
+      jobId:'job-corrupt-model-reservation',
+      controlEpoch:0,
+      prompt:'still must not send',
+      maxOutputTokens:128,
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+});
+
+test('Plan4 S1: model budget route identities reject getters, coercion and persisted endpoint drift', async () => {
+  const chrome = makeChrome();
+  let modelEffects = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome, now:() => 55_000,
+    routePrompt:async () => { modelEffects += 1; return { text:'{}' }; },
+  });
+  await manager.create({
+    id:'job-route-provenance',
+    goal:'Preserve exact route identity',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    store.byId['job-route-provenance'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  let getterReads = 0;
+  const getterRoute = { routeId:'route-1', provider:'ollama', model:'fixture' };
+  Object.defineProperty(getterRoute, 'endpointId', {
+    enumerable:true,
+    get() { getterReads += 1; throw new Error('route getter must not execute'); },
+  });
+  const rejectedRoutes = [
+    getterRoute,
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:null },
+    { routeId:' route-1', provider:'ollama', model:'fixture' },
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'account\nspoof' },
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'x'.repeat(181) },
+  ];
+  for (const route of rejectedRoutes) {
+    await assert.rejects(
+      () => manager.reserveProviderModelBudget({
+        jobId:'job-route-provenance', controlEpoch:0,
+        prompt:'do not call model', maxOutputTokens:128, route,
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID',
+    );
+    assert.equal((await manager.get('job-route-provenance')).job.runtime.modelBudgetReservation, null);
+  }
+  assert.equal(getterReads, 0, 'untrusted route identity getters may not execute');
+  assert.equal(modelEffects, 0);
+
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-route-provenance', controlEpoch:0,
+    prompt:'valid route', maxOutputTokens:128,
+    route:{ routeId:'route-1', provider:'ollama', model:'fixture' },
+  });
+  assert.equal(reservation.endpointId, '', 'legacy local route without endpoint remains supported');
+  await manager.update(store => {
+    store.byId['job-route-provenance'].runtime.modelBudgetReservation.endpointId = null;
+    return store;
+  });
+  const restarted = new BrowserAgentManager({
+    chromeApi:chrome, now:() => 56_000,
+    routePrompt:async () => { modelEffects += 1; return { text:'{}' }; },
+  });
+  const cold = await restarted.get('job-route-provenance');
+  assert.equal(cold.job.runtime.modelBudgetReservation, null);
+  assert.equal(cold.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(cold.job.runtime.runState, 'PAUSED');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-route-provenance', controlEpoch:0, prompt:'never replay',
+      maxOutputTokens:128, route:{ routeId:'route-1', provider:'ollama', model:'fixture' },
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+});
+
+test('Plan4 S1: corrupted persisted numeric budget receipts quarantine instead of undercounting', async () => {
+  const chrome = makeChrome();
+  let providerEffects = 0;
+  const routePrompt = async () => { providerEffects += 1; return { text:'{}' }; };
+  const manager = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 57_000 });
+  const corruptions = [
+    ['outputTokens', -1],
+    ['inputTokens', '10'],
+    ['modelCalls', 0],
+    ['totalTokens', 1],
+    ['estimatedCostUsd', '0'],
+    ['createdAt', 1.25],
+    ['reservationId', 'reservation\nforged'],
+    ['reservationId', 'reservation\u007fforged'],
+    ['callNumber', '1'],
+    ['controlEpoch', -1],
+  ];
+  for (let i = 0; i < corruptions.length; i += 1) {
+    const id = `job-numeric-quarantine-${i}`;
+    await manager.create({
+      id, goal:'Reject unsafe model receipt coercion',
+      maxModelCalls:3, maxOutputTokensPerCall:64,
+    });
+    await manager.update(store => {
+      store.byId[id].runtime.runState = 'RUNNING';
+      return store;
+    });
+    await manager.reserveProviderModelBudget({
+      jobId:id, controlEpoch:0, prompt:'bounded', maxOutputTokens:64,
+      route:{ routeId:'local', provider:'ollama', model:'fixture' },
+    });
+    const [field, invalidValue] = corruptions[i];
+    await manager.update(store => {
+      store.byId[id].runtime.modelBudgetReservation[field] = invalidValue;
+      return store;
+    });
+    const cold = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 58_000 });
+    const readback = await cold.get(id);
+    assert.equal(readback.job.runtime.modelBudgetReservation, null, field);
+    assert.equal(readback.job.runtime.modelBudgetReservationQuarantined, true, field);
+    assert.equal(readback.job.runtime.runState, 'PAUSED', field);
+    assert.equal(await cold.reconcileProviderModelBudgetReservation(id), false, field);
+    await assert.rejects(
+      () => cold.reserveProviderModelBudget({
+        jobId:id, controlEpoch:0, prompt:'must never replay', maxOutputTokens:64,
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+      field,
+    );
+  }
+  assert.equal(providerEffects, 0);
 });
 
 test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
@@ -3434,4 +3714,61 @@ test('owner approval fence rejects a replacement pending action that races with 
   live = await manager.get('approval-race-job');
   assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
   assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new', 'stale reject must not clear the replacement approval');
+});
+
+test('Plan4 S1: model budget admission rejects coerced ceilings, call numbers and owner epochs before any reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome, routePrompt:async () => ({ text:'{}' }), now:() => 56_000,
+  });
+  const jobId = 'job-plan4-strict-budget-admission';
+  await manager.create({
+    id:jobId, goal:'Bound a local model call without external providers',
+    maxModelCalls:2, maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    store.byId[jobId].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const base = {
+    jobId, controlEpoch:0, prompt:'fixture', maxOutputTokens:128, callNumber:1,
+    route:{routeId:'local', provider:'ollama', model:'fixture'},
+  };
+  const cases = [
+    ['maxOutputTokens', '128', 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', 127.5, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', true, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', Infinity, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', NaN, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', -0, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['maxOutputTokens', 0, 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED'],
+    ['callNumber', '1', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['callNumber', 0, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['callNumber', 1.5, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', '0', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', null, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+    ['controlEpoch', -0, 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID'],
+  ];
+  for (const [field, value, errorCode] of cases) {
+    await assert.rejects(
+      () => manager.reserveProviderModelBudget({ ...base, [field]:value }),
+      error => error.code === errorCode, `${field}: malformed input must fail before store or provider effect`,
+    );
+    const readback = await manager.get(jobId);
+    assert.equal(readback.job.runtime.modelBudgetReservation, null, field);
+    assert.equal(readback.job.runtime.modelBudgetReservationSeq, 0, field);
+    assert.equal(readback.job.runtime.modelCalls, 0, field);
+  }
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({ ...base, maxOutputTokens:129 }),
+    error => error.code === 'AI_MODEL_BUDGET_EXHAUSTED'
+      && error.safeBudgetReason === 'maximum per-call output-token budget reached',
+    'a direct lifecycle caller may not bypass the owner per-call output ceiling',
+  );
+  assert.equal((await manager.get(jobId)).job.runtime.modelBudgetReservationSeq, 0);
+  const valid = await manager.reserveProviderModelBudget(base);
+  assert.equal(valid.routeId, 'local');
+  assert.equal(valid.callNumber, 1);
+  const readback = await manager.get(jobId);
+  assert.equal(readback.job.runtime.modelBudgetReservation.reservationId, valid.reservationId);
 });

@@ -554,9 +554,78 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+// Route provenance in the canonical durable budget must remain exact.
+// The router owns selection; this boundary does not add any second router.
+function exactModelBudgetRouteIdentity(route) {
+  if (!route || typeof route !== 'object' || Array.isArray(route)) {
+    const error = new Error('Model budget route identity must be a data-only object');
+    error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+    throw error;
+  }
+  const prototype = Object.getPrototypeOf(route);
+  if (prototype !== Object.prototype && prototype !== null) {
+    const error = new Error('Model budget route identity must be a plain object');
+    error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+    throw error;
+  }
+  const fields = { routeId:180, provider:80, model:300, endpointId:180 };
+  const identity = {};
+  for (const [key, max] of Object.entries(fields)) {
+    const descriptor = Object.getOwnPropertyDescriptor(route, key);
+    if (!descriptor) {
+      identity[key] = '';
+      continue; // Legacy local routes may omit endpointId.
+    }
+    const value = descriptor.value;
+    if (!Object.hasOwn(descriptor, 'value')
+      || typeof value !== 'string'
+      || value.length > max
+      || value !== value.trim()
+      || /[\u0000-\u001f\u007f]/u.test(value)) {
+      const error = new Error('Model budget route identity contains an invalid explicit field');
+      error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+      throw error;
+    }
+    identity[key] = value;
+  }
+  return Object.freeze(identity);
+}
+
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const reservationId = clean(raw.reservationId, 240);
+  // Persistent budget evidence must never be repaired by coercing an explicit
+  // negative/string/fractional token or call count into a cheaper receipt.
+  // Missing optional fields retain the legacy normalization below.
+  const integerBounds = {
+    controlEpoch:0, modelCalls:1, inputTokens:0, outputTokens:0,
+    totalTokens:0, createdAt:0, callNumber:1,
+  };
+  for (const [field, minimum] of Object.entries(integerBounds)) {
+    const descriptor = Object.getOwnPropertyDescriptor(raw, field);
+    if (!descriptor) continue;
+    if (!Object.hasOwn(descriptor, 'value')
+      || typeof descriptor.value !== 'number'
+      || !Number.isSafeInteger(descriptor.value)
+      || descriptor.value < minimum
+      || Object.is(descriptor.value, -0)) return null;
+  }
+  const costDescriptor = Object.getOwnPropertyDescriptor(raw, 'estimatedCostUsd');
+  if (costDescriptor && (!Object.hasOwn(costDescriptor, 'value')
+    || typeof costDescriptor.value !== 'number'
+    || !Number.isFinite(costDescriptor.value)
+    || costDescriptor.value < 0
+    || Object.is(costDescriptor.value, -0))) return null;
+  const idDescriptor = Object.getOwnPropertyDescriptor(raw, 'reservationId');
+  if (!idDescriptor || !Object.hasOwn(idDescriptor, 'value')
+    || typeof idDescriptor.value !== 'string'
+    || !idDescriptor.value
+    || idDescriptor.value.length > 240
+    || idDescriptor.value !== idDescriptor.value.trim()
+    || /[\u0000-\u001f\u007f]/u.test(idDescriptor.value)) return null;
+  if (typeof raw.inputTokens === 'number' && typeof raw.outputTokens === 'number'
+    && typeof raw.totalTokens === 'number'
+    && raw.totalTokens < raw.inputTokens + raw.outputTokens) return null;
+  const reservationId = idDescriptor.value;
   const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
   const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
   const inputTokens = Math.max(0, Math.floor(Number(raw.inputTokens || 0)));
@@ -565,6 +634,10 @@ function normalizeModelBudgetReservation(raw) {
   const estimatedCostUsd = Math.max(0, Number(raw.estimatedCostUsd || 0));
   const createdAt = Math.max(0, Number(raw.createdAt || 0));
   if (!reservationId || !Number.isFinite(estimatedCostUsd)) return null;
+  // Corrupt stored provenance must be quarantined, not silently trimmed or
+  // replaced with a different endpoint after cold restart.
+  let provenance;
+  try { provenance = exactModelBudgetRouteIdentity(raw); } catch { return null; }
   return {
     reservationId,
     controlEpoch,
@@ -574,10 +647,10 @@ function normalizeModelBudgetReservation(raw) {
     totalTokens,
     estimatedCostUsd,
     createdAt,
-    routeId: clean(raw.routeId, 180),
-    provider: clean(raw.provider, 80),
-    model: clean(raw.model, 300),
-    endpointId: clean(raw.endpointId, 180),
+    routeId: provenance.routeId,
+    provider: provenance.provider,
+    model: provenance.model,
+    endpointId: provenance.endpointId,
     callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
   };
 }
@@ -587,6 +660,12 @@ function normalizeRuntime(raw, now) {
   if (!raw || typeof raw !== 'object') return base;
   const allowed = new Set(Object.values(BrowserAgentRunState));
   const runState = allowed.has(raw.runState) ? raw.runState : BrowserAgentRunState.STOPPED;
+  // A torn/corrupt persisted pre-dispatch reservation is not evidence that
+  // its provider effect failed. Persist a sticky quarantine instead of
+  // restoring an empty reservation and allowing a second provider call.
+  const pendingModelReservation = normalizeModelBudgetReservation(raw.modelBudgetReservation);
+  const modelBudgetReservationQuarantined = raw.modelBudgetReservationQuarantined === true
+    || (raw.modelBudgetReservation != null && !pendingModelReservation);
   const plan = raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null;
   // Handoffs live in the already-durable Browser Agent job record.  A corrupt
   // record is ignored here and later actions fail closed against the plan.
@@ -631,12 +710,13 @@ function normalizeRuntime(raw, now) {
     specialistProviderHandoffsByAgentId,
     specialistDispatchByAgentId,
     specialistAutomationByAgentId,
-    runState,
+    runState: modelBudgetReservationQuarantined ? BrowserAgentRunState.PAUSED : runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
     modelCalls: Math.max(0, Number(raw.modelCalls || 0)),
     modelBudgetReservationSeq: Math.max(0, Math.floor(Number(raw.modelBudgetReservationSeq || 0))),
-    modelBudgetReservation: normalizeModelBudgetReservation(raw.modelBudgetReservation),
+    modelBudgetReservation: modelBudgetReservationQuarantined ? null : pendingModelReservation,
+    modelBudgetReservationQuarantined,
     aiRouterRuntime: normalizeAiRouterRuntime(raw.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
     inputTokens: Math.max(0, Number(raw.inputTokens || 0)),
     outputTokens: Math.max(0, Number(raw.outputTokens || 0)),
@@ -729,7 +809,7 @@ function normalizeRuntime(raw, now) {
         detail: clean(check?.detail, 1000),
       })).filter(check => check.criterion > 0 && check.text && check.detail),
     } : null,
-    nextWakeAt: Math.max(0, Number(raw.nextWakeAt || 0)),
+    nextWakeAt: modelBudgetReservationQuarantined ? 0 : Math.max(0, Number(raw.nextWakeAt || 0)),
     updatedAt: Math.max(0, Number(raw.updatedAt || now)),
   };
 }
@@ -2390,17 +2470,35 @@ export class BrowserAgentManager {
   }
 
   async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+    // Before any store/network effect, verify the exact route provenance
+    // without invoking getters or coercing malformed explicit identities.
+    const routeIdentity = exactModelBudgetRouteIdentity(route);
+    // Model-call admission is an accounting authority, not a convenience
+    // normalizer. Never turn strings, booleans, fractions or forged owner
+    // epochs into a valid reservation or silently round away caller limits.
+    const exactNumber = (value, minimum, field, code) => {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)
+          || Object.is(value, -0) || value < minimum) {
+        const error = new Error(`Browser Agent model budget ${field} must be an exact bounded integer`);
+        error.code = code;
+        throw error;
+      }
+      return value;
+    };
+    exactNumber(controlEpoch, 0, 'controlEpoch', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID');
+    exactNumber(callNumber, 1, 'callNumber', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID');
+    const pendingOutputTokens = exactNumber(maxOutputTokens, 1, 'maxOutputTokens',
+      'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED');
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
-    const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
-    if (pendingOutputTokens < 1) {
-      const error = new Error('Browser Agent model call requires a bounded output-token reservation');
-      error.code = 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED';
-      throw error;
-    }
     let reservation = null;
     await this.update(store => {
       const job = store.byId[jobId];
       if (!job) throw new Error('Browser Agent job not found');
+      if (job.runtime.modelBudgetReservationQuarantined === true) {
+        const error = new Error('Browser Agent provider budget reservation is quarantined after corrupt persisted evidence');
+        error.code = 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED';
+        throw error;
+      }
       if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
         const error = new Error('Browser Agent owner authority changed before model budget reservation');
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
@@ -2409,6 +2507,16 @@ export class BrowserAgentManager {
       if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
         const error = new Error('Browser Agent already has an unsettled model budget reservation');
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
+        throw error;
+      }
+      // The persisted owner per-call ceiling is also an admission fence:
+      // direct lifecycle callers must not bypass outputBudgetForCall().
+      if (Number.isSafeInteger(job.config.maxOutputTokensPerCall)
+          && job.config.maxOutputTokensPerCall > 0
+          && pendingOutputTokens > job.config.maxOutputTokensPerCall) {
+        const error = new Error('Browser Agent model call exceeds the owner per-call output ceiling');
+        error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+        error.safeBudgetReason = 'maximum per-call output-token budget reached';
         throw error;
       }
       const reason = this.budgetReason(job, {
@@ -2436,10 +2544,10 @@ export class BrowserAgentManager {
         totalTokens: pendingInputTokens + pendingOutputTokens,
         estimatedCostUsd,
         createdAt: this.now(),
-        routeId: clean(route?.routeId, 180),
-        provider: clean(route?.provider, 80),
-        model: clean(route?.model, 300),
-        endpointId: clean(route?.endpointId, 180),
+        routeId: routeIdentity.routeId,
+        provider: routeIdentity.provider,
+        model: routeIdentity.model,
+        endpointId: routeIdentity.endpointId,
         callNumber: Math.max(1, Math.floor(Number(callNumber || 1))),
       };
       job.runtime.modelBudgetReservationSeq = sequence;

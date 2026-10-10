@@ -400,7 +400,7 @@ export class AiOrchestrator {
       ['maxOutputTokens', maxOutputTokens],
       ['maxModelCallsForRequest', maxModelCallsForRequest],
     ]) {
-      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || ceiling < 0) {
+      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || Object.is(ceiling, -0) || ceiling < 0) {
         throw new Error('AI model budget ' + label + ' must be a non-negative safe integer');
       }
     }
@@ -468,12 +468,51 @@ export class AiOrchestrator {
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
         }
-        const receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId');
+        // A hostile Proxy can throw during descriptor reflection. Its message
+        // is not a trusted diagnostic and must not escape this pre-I/O fence.
+        let receipt = null;
+        try { receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId'); } catch { /* invalid receipt */ }
         if (!receipt || !Object.hasOwn(receipt, 'value')
-            || typeof receipt.value !== 'string' || receipt.value.length < 1 || receipt.value.length > 240) {
+            || typeof receipt.value !== 'string'
+            || receipt.value.length < 1 || receipt.value.length > 240
+            || receipt.value !== receipt.value.trim()
+            || /[\u0000-\u001f\u007f]/u.test(receipt.value)) {
           const unreserved = new Error('Model-budget reservation has no exact durable identity');
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
+        }
+        // A recovered/stale receipt for another model-call ordinal cannot
+        // authorize this call, even if it carries a valid reservationId.
+        // Older credentialless local lifecycle fixtures may omit callNumber.
+        let ordinal = null;
+        let ordinalReflectionFailed = false;
+        try { ordinal = Object.getOwnPropertyDescriptor(reservation, 'callNumber'); }
+        catch { ordinalReflectionFailed = true; }
+        if (ordinalReflectionFailed || (ordinal && (
+          !Object.hasOwn(ordinal, 'value') || ordinal.value !== callsUsed + 1
+        ))) {
+          const mismatch = new Error('Model-budget reservation call ordinal does not match authorized dispatch');
+          mismatch.code = 'AI_MODEL_BUDGET_RECEIPT_CALL_NUMBER_MISMATCH';
+          throw mismatch;
+        }
+        // Existing BrowserAgentManager persists route/account provenance in
+        // the reservation. A lifecycle receipt must not override the selected
+        // provider/model/endpoint after durable admission. Unbound legacy
+        // local slots may omit these fields. A specifically bound account endpoint
+        // must have every exact identity before any potentially billable I/O.
+        for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
+          let binding = null;
+          let reflectionFailed = false;
+          try { binding = Object.getOwnPropertyDescriptor(reservation, field); }
+          catch { reflectionFailed = true; }
+          // Genuine omission is legacy-compatible only on an unbound local
+          // route. A Proxy trap is *not* omission and cannot authorize I/O.
+          if (!binding && !reflectionFailed && !routeIdentity.endpointId) continue;
+          if (reflectionFailed || !binding || !Object.hasOwn(binding, 'value') || binding.value !== routeIdentity[field]) {
+            const mismatch = new Error('Model-budget reservation does not match the authorized route');
+            mismatch.code = 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH';
+            throw mismatch;
+          }
         }
       }
       callsUsed += 1;
@@ -552,10 +591,13 @@ export class AiOrchestrator {
         }
         if (value && typeof value === 'object' && !Array.isArray(value)) {
           const fields = Object.getOwnPropertyDescriptors(value);
-          for (const field of ['provider', 'model', 'endpointId']) {
+          // A gateway may omit routeId (provider protocols do not require it),
+          // but an explicitly declared routeId must match the authorized route.
+          // Never permit provider output to rewrite persisted route provenance.
+          for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
             if (field === 'endpointId' && !requiresBoundReceipt) continue;
             if (!Object.hasOwn(fields, field)) {
-              if (requiresBoundReceipt) receiptIdentityMismatch = true;
+              if (requiresBoundReceipt && field !== 'routeId') receiptIdentityMismatch = true;
               continue;
             }
             if (!Object.hasOwn(fields[field], 'value')

@@ -543,6 +543,335 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   ]);
 });
 
+test('Plan4 S1: negative-zero owner call and token ceilings cannot disable bounded dispatch', async () => {
+  const configured = settings({
+    routes:[{routeId:'local-ceiling',provider:'ollama',model:'fixture',
+      roles:['planner'],priority:1}],
+  });
+  let gatewayCalls = 0;
+  const router = new AiOrchestrator({
+    now:()=>83_900,
+    gatewayClient:{async complete() {
+      gatewayCalls++;
+      return {text:'valid legacy zero ceiling',usage:{inputTokens:1,outputTokens:1,totalTokens:2}};
+    }},
+  });
+  for (const field of ['maxOutputTokens','maxModelCallsForRequest']) {
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {[field]:-0}),
+      error => /non-negative safe integer/.test(error.message),
+      field,
+    );
+    assert.equal(gatewayCalls,0,field+' may never disable owner budget and reach provider');
+  }
+  const result = await router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'allowed legacy unbounded', {
+    maxOutputTokens:0,maxModelCallsForRequest:0,
+  });
+  assert.equal(result.text,'valid legacy zero ceiling');
+  assert.equal(gatewayCalls,1,'genuinely positive legacy zero remains backward compatible');
+});
+
+test('Plan4 S1: a stale or forged call ordinal never authorizes provider I/O', async () => {
+  const configured = settings({
+    routes:[{routeId:'one-local', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1}],
+  });
+  let getterReads = 0;
+  const rejected = [
+    {reservationId:'durable-ordinal', callNumber:0},
+    {reservationId:'durable-ordinal', callNumber:2},
+    {reservationId:'durable-ordinal', callNumber:'1'},
+    {reservationId:'durable-ordinal', callNumber:undefined},
+    {reservationId:'durable-ordinal', callNumber:NaN},
+    {reservationId:'durable-ordinal', callNumber:-0},
+    Object.defineProperty({reservationId:'durable-ordinal'}, 'callNumber', {
+      get() { getterReads += 1; throw new Error('secret-ordinal-getter'); },
+    }),
+    new Proxy({reservationId:'durable-ordinal', callNumber:1}, {
+      getOwnPropertyDescriptor(target, property) {
+        if (property === 'callNumber') throw new Error('secret-ordinal-proxy');
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    }),
+  ];
+  for (const reservation of rejected) {
+    let providerCalls = 0;
+    let settlements = 0;
+    const router = new AiOrchestrator({
+      now:() => 84_000,
+      gatewayClient:{async complete() {providerCalls++; throw new Error('unexpected I/O');}},
+      providerCallLifecycle:{
+        async beforeProviderCall() {return reservation;},
+        async afterProviderCall() {settlements++; return {settled:true};},
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'ordinal-bound task', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{kind:'browser-agent', jobId:'ordinal-bound', controlEpoch:0},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_CALL_NUMBER_MISMATCH'
+        && !String(error.message).includes('secret-ordinal'),
+    );
+    assert.equal(providerCalls, 0, 'stale ordinal must deny provider I/O');
+    assert.equal(settlements, 0, 'stale ordinal must not fabricate settlement');
+  }
+  assert.equal(getterReads, 0, 'receipt ordinal getter is never invoked');
+  let providerCalls = 0;
+  let settlements = 0;
+  const router = new AiOrchestrator({
+    now:() => 84_100,
+    gatewayClient:{async complete() {
+      providerCalls++;
+      return {text:'ordinal verified', usage:{inputTokens:1, outputTokens:1, totalTokens:2}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall() {return {reservationId:'durable-ordinal', callNumber:1};},
+      async afterProviderCall() {settlements++; return {settled:true};},
+    },
+  });
+  const good = await router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'ordinal-bound task', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'ordinal-valid', controlEpoch:0},
+  });
+  assert.equal(good.text, 'ordinal verified');
+  assert.equal(providerCalls, 1);
+  assert.equal(settlements, 1);
+});
+
+test('Plan4 S1: invalid durable reservation IDs never reach the provider', async () => {
+  const configured = settings({
+    routes:[{routeId:'one-local', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1}],
+  });
+  let getterCalls = 0;
+  const corrupt = [
+    '', ' padded', 'padded ', 'multi\nline', 'control\u0000byte',
+    'delete\u007fchar', 'x'.repeat(241), null, 42,
+    Object.defineProperty({}, 'reservationId', {
+      enumerable:true,
+      get() { getterCalls += 1; throw new Error('secret-do-not-read'); },
+    }),
+    new Proxy({reservationId:'valid-unverified'}, {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'reservationId') throw new Error('secret-reflection-message');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    }),
+  ];
+  for (const candidate of corrupt) {
+    const receipt = candidate && typeof candidate === 'object'
+      ? candidate : {reservationId:candidate};
+    let providerCalls = 0;
+    let settlementCalls = 0;
+    const router = new AiOrchestrator({
+      now:() => 83_000,
+      gatewayClient:{async complete() { providerCalls += 1; throw new Error('forbidden'); }},
+      providerCallLifecycle:{
+        async beforeProviderCall() { return receipt; },
+        async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'task', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{kind:'browser-agent', jobId:'corrupt-id', controlEpoch:0},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RESERVATION_REQUIRED'
+        && !String(error.message).includes('secret-do-not-read'),
+    );
+    assert.equal(providerCalls, 0, 'invalid ID must prevent model network I/O');
+    assert.equal(settlementCalls, 0, 'invalid ID must not produce a false settlement');
+  }
+  assert.equal(getterCalls, 0, 'accessor-backed reservation identity is never read');
+
+  let providerCalls = 0;
+  let settlementCalls = 0;
+  const validRouter = new AiOrchestrator({
+    now:() => 83_100,
+    gatewayClient:{async complete() {
+      providerCalls += 1;
+      return {text:'valid reserved response',
+        usage:{inputTokens:1, outputTokens:1, totalTokens:2}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall() { return {reservationId:'stable-id.2026/10:4'}; },
+      async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+    },
+  });
+  const result = await validRouter.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'task', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'valid-id', controlEpoch:0},
+  });
+  assert.equal(result.text, 'valid reserved response');
+  assert.equal(providerCalls, 1);
+  assert.equal(settlementCalls, 1);
+});
+
+test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any model', async () => {
+  const configured = settings({
+    routes:[{ routeId:'sole-local', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1 }],
+  });
+  let getterReads = 0;
+  const forgedReceipts = [
+    { reservationId:'reservation-1', routeId:'other-route' },
+    { reservationId:'reservation-1', provider:'openai' },
+    { reservationId:'reservation-1', model:'other-model' },
+    { reservationId:'reservation-1', endpointId:'forged-account' },
+    Object.defineProperty({ reservationId:'reservation-1' }, 'provider', {
+      enumerable:true, get() { getterReads += 1; throw new Error('secret-provider-getter'); },
+    }),
+    new Proxy({reservationId:'reservation-1', provider:'ollama'}, {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'provider') throw new Error('secret-provider-reflection');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    }),
+  ];
+  for (const receipt of forgedReceipts) {
+    let gatewayCalls = 0;
+    let settlementCalls = 0;
+    const router = new AiOrchestrator({
+      now:() => 82_000,
+      gatewayClient:{ async complete() { gatewayCalls += 1; throw new Error('forbidden'); } },
+      providerCallLifecycle:{
+        async beforeProviderCall() { return receipt; },
+        async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'budget-bound', controlEpoch:0 },
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH'
+        && !String(error.message).includes('secret-provider-getter'),
+    );
+    assert.equal(gatewayCalls, 0, 'mismatched receipt is rejected before provider I/O');
+    assert.equal(settlementCalls, 0, 'no model effect exists to settle');
+  }
+  assert.equal(getterReads, 0, 'an untrusted receipt getter must never execute');
+
+  let validatedProviderCalls = 0;
+  let validatedSettlements = 0;
+  const validRouter = new AiOrchestrator({
+    now:() => 82_000,
+    gatewayClient:{ async complete(req) {
+      validatedProviderCalls += 1;
+      return { provider:req.provider, model:req.model, text:'bound completion',
+        usage:{inputTokens:2, outputTokens:2, totalTokens:4} };
+    } },
+    providerCallLifecycle:{
+      async beforeProviderCall({route}) { return {reservationId:'reservation-verified', ...route}; },
+      async afterProviderCall() { validatedSettlements += 1; return {settled:true}; },
+    },
+  });
+  const valid = await validRouter.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'budget-valid', controlEpoch:0},
+  });
+  assert.equal(valid.text, 'bound completion');
+  assert.equal(validatedProviderCalls, 1);
+  assert.equal(validatedSettlements, 1);
+});
+
+test('Plan4 S1: bound endpoint must have complete durable provider identity before network I/O', async () => {
+  const route = {routeId:'bound-route', provider:'openai-compatible', model:'fixture',
+    endpointId:'account.endpoint'};
+  const configured = settings({
+    routes:[{...route, roles:['planner'], priority:1, costClass:'paid',
+      inputPricePerMillionUsd:1, outputPricePerMillionUsd:2}],
+  });
+  for (const missing of ['routeId', 'provider', 'model', 'endpointId']) {
+    let gatewayCalls = 0;
+    let settlementCalls = 0;
+    const incomplete = {reservationId:'durable-bound', ...route};
+    delete incomplete[missing];
+    const router = new AiOrchestrator({
+      now:() => 82_050,
+      gatewayClient:{async complete() { gatewayCalls += 1; throw new Error('unreachable'); }},
+      providerCallLifecycle:{
+        async beforeProviderCall() { return incomplete; },
+        async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{kind:'browser-agent', jobId:'bound-receipt', controlEpoch:0},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH',
+      missing,
+    );
+    assert.equal(gatewayCalls, 0, missing + ' never permits provider I/O');
+    assert.equal(settlementCalls, 0, missing + ' never creates an effect');
+  }
+  let positiveCalls = 0;
+  const validRouter = new AiOrchestrator({
+    now:() => 82_050,
+    gatewayClient:{async complete(req) {
+      positiveCalls += 1;
+      return {provider:req.provider, model:req.model, endpointId:req.endpointId,
+        text:'verified output', usage:{inputTokens:2, outputTokens:2, totalTokens:4}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall() {return {reservationId:'durable-bound', ...route};},
+      async afterProviderCall() {return {settled:true};},
+    },
+  });
+  const positive = await validRouter.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'bound-receipt-positive', controlEpoch:0},
+  });
+  assert.equal(positive.text, 'verified output');
+  assert.equal(positiveCalls, 1);
+});
+
+test('Plan4 S1: forged provider routeId remains UNKNOWN after one settled effect, including cold restart', async () => {
+  let providerCalls = 0;
+  let settled = 0;
+  const config = settings({
+    routes:[{routeId:'owner-approved', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1}],
+  });
+  const router = new AiOrchestrator({
+    now:() => 82_100,
+    gatewayClient:{async complete(req) {
+      providerCalls += 1;
+      return {text:'untrusted completion', routeId:'forged-other-route',
+        provider:req.provider, model:req.model, usage:{inputTokens:2, outputTokens:2, totalTokens:4}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall({route}) {
+        return {reservationId:'durable-receipt', ...route};
+      },
+      async afterProviderCall() {
+        settled += 1;
+        return {settled:true};
+      },
+    },
+  });
+  await assert.rejects(
+    () => router.run(config, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+      maxOutputTokens:128,
+      providerCallBudgetContext:{kind:'browser-agent', jobId:'budget-route-forgery', controlEpoch:0},
+    }),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED');
+      assert.equal(error.modelCallsUsed, 1);
+      assert.equal(error.routerRuntime.lastFailoverChain.length, 1);
+      assert.equal(error.routerRuntime.lastFailoverChain[0].outcome, 'UNKNOWN');
+      const restored = JSON.parse(JSON.stringify(error.routerRuntime));
+      assert.equal(restored.lastFailoverChain[0].outcome, 'UNKNOWN');
+      assert.equal(restored.lastFailoverChain[0].routeId, 'owner-approved');
+      return true;
+    },
+  );
+  assert.equal(providerCalls, 1, 'charged provider call must not be retried');
+  assert.equal(settled, 1, 'budget is settled once even when output identity is forged');
+});
+
 test('selected model profile adds only its own prompts to the gateway request', async () => {
   const gateway = new FakeGateway(['coded']);
   const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 1000 });

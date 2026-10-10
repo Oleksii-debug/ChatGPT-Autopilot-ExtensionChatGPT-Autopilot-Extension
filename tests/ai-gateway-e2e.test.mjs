@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createExtensionPairingStore, createGatewayServer, normalizeCompatibleEndpointRegistry } from '../companion/ai-gateway/gateway.mjs';
 import { AiGatewayClient } from '../src/core/ai-gateway-client.js';
 import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
+import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 import { createAiRouteRegistryEvidenceV1 } from '../src/core/ai-route-pool.js';
 
 function response(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }); }
@@ -45,6 +46,94 @@ test('extension client talks over real localhost HTTP to gateway which routes Ol
   }
   assert.ok(upstream.some(([url]) => url.endsWith('/api/chat')));
   assert.ok(upstream.some(([url]) => url.endsWith('/responses')));
+});
+
+test('Plan4 S1: real router-to-local-Gateway account endpoint effect is matched to durable reservation', async () => {
+  const compatibleEndpoints=normalizeCompatibleEndpointRegistry([
+    {endpointId:'owner-a',baseUrl:'https://owner-a.example.test/v1',apiKeyEnv:'OWNER_A_KEY'},
+    {endpointId:'owner-b',baseUrl:'https://owner-b.example.test/v1',apiKeyEnv:'OWNER_B_KEY'},
+  ]);
+  const effects=[];
+  const gateway=createGatewayServer({
+    compatibleEndpoints,env:{OWNER_A_KEY:'fixture-key-a',OWNER_B_KEY:'fixture-key-b'},
+    fetchFn:async (url,init={}) => {
+      effects.push({
+        url,auth:init.headers?.authorization,
+        model:JSON.parse(init.body||'{}').model,
+      });
+      assert.equal(url,'https://owner-a.example.test/v1/chat/completions',
+        'selected owner account origin must be exact');
+      assert.equal(init.headers.authorization,'Bearer fixture-key-a',
+        'selected endpoint binds exactly one credential namespace');
+      return response({
+        choices:[{message:{content:'durable account-bound result'}}],
+        usage:{prompt_tokens:5,completion_tokens:3,total_tokens:8},
+      });
+    },
+  });
+  await new Promise(resolve=>gateway.listen(0,'127.0.0.1',resolve));
+  const gatewayUrl='http://127.0.0.1:'+gateway.address().port;
+  try {
+    const id='fixture-gateway-account-bound';
+    let stored={byId:{[id]:{
+      config:{maxModelCalls:1,maxOutputTokensPerCall:48,maxInputTokens:0,
+        maxOutputTokens:0,maxTotalTokens:0,maxCostUsd:0,
+        inputPricePerMillionUsd:0,outputPricePerMillionUsd:0},
+      runtime:{runState:'RUNNING',controlEpoch:3,modelCalls:0,
+        modelBudgetReservation:null,modelBudgetReservationSeq:0,
+        inputTokens:0,outputTokens:0,totalTokens:0,
+        estimatedCostUsd:0,history:[],startedAt:50_000},
+    }}};
+    const durable=Object.create(BrowserAgentManager.prototype);
+    durable.now=()=>50_000;
+    durable.update=async mutator => { stored=await mutator(stored);return stored; };
+    const router=new AiOrchestrator({
+      now:()=>50_000,gatewayClient:new AiGatewayClient(),
+      providerCallLifecycle:{
+        async beforeProviderCall({context,route,prompt,systemPrompt,maxOutputTokens,callNumber}) {
+          return durable.reserveProviderModelBudget({
+            jobId:context.jobId,controlEpoch:context.controlEpoch,
+            route,prompt,systemPrompt,maxOutputTokens,callNumber,
+          });
+        },
+        async afterProviderCall({context,reservation,ok,result}) {
+          return durable.settleProviderModelBudget({
+            jobId:context.jobId,reservationId:reservation.reservationId,ok,result,
+          });
+        },
+      },
+    });
+    const result=await router.run({
+      enabled:true,gatewayUrl,timeoutSeconds:30,mode:'primary',
+      primary:{provider:'openai-compatible',model:'fixture-model'},
+      routes:[{routeId:'route-owner-a',provider:'openai-compatible',
+        model:'fixture-model',endpointId:'owner-a',roles:['planner'],
+        locality:'remote',costClass:'paid',inputPricePerMillionUsd:1,
+        outputPricePerMillionUsd:1,inputPriceKnown:true,outputPriceKnown:true,
+        priority:1}],
+      routePolicy:{autoSwitch:false,pinnedRouteId:'route-owner-a'},
+      fallbackToStrongOnPrimaryError:false,
+    },{},'account-bound fixture prompt',{
+      maxOutputTokens:48,
+      providerCallBudgetContext:{kind:'browser-agent',jobId:id,controlEpoch:3},
+    });
+    assert.equal(result.text,'durable account-bound result');
+    assert.equal(result.runtime.lastRouteId,'route-owner-a');
+    assert.equal(result.runtime.lastEndpointId,'owner-a');
+    assert.equal(effects.length,1,'exactly one network effect for one durable reservation');
+    assert.deepEqual(effects[0],{
+      url:'https://owner-a.example.test/v1/chat/completions',
+      auth:'Bearer fixture-key-a',model:'fixture-model',
+    });
+    assert.equal(stored.byId[id].runtime.modelCalls,1);
+    assert.equal(stored.byId[id].runtime.modelBudgetReservation,null);
+    assert.deepEqual(stored.byId[id].runtime.history.map(item=>item.type),
+      ['model-budget-reserved','model-budget-settled']);
+    assert.equal(JSON.stringify(result).includes('fixture-key-a'),false,
+      'the model response and route runtime must never expose credential values');
+  } finally {
+    await new Promise(resolve=>gateway.close(resolve));
+  }
 });
 
 test('Plan4 S1 real HTTP gateway forbids endpoint alias, duplicate ID and erased POST account before upstream I/O', async () => {
