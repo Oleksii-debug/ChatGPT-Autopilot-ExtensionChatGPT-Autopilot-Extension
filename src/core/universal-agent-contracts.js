@@ -214,7 +214,9 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
     const out = {};
     for (const key of Object.keys(raw)) {
       Object.defineProperty(out, key, {
-        value: cloneJsonData(raw[key], `${label}.${key}`, stack, depth + 1),
+        // Never interpolate attacker-owned JSON member names into errors:
+        // key names can carry credentials and are not diagnostic authority.
+        value: cloneJsonData(raw[key], label + ' nested field', stack, depth + 1),
         enumerable: true,
         writable: true,
         configurable: true,

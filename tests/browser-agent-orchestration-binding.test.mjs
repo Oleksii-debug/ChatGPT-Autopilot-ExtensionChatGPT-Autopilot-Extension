@@ -311,7 +311,7 @@ test('binding request and trusted resolver dependency boundaries are exact-shape
   });
   await assert.rejects(
     () => manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, hostileDependencies),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(dependencyReads, 0);
 
@@ -1246,7 +1246,7 @@ test('bound lifecycle dependency is descriptor-safe and cannot run a getter or a
   });
   await assert.rejects(
     () => manager.pause('job-1', hostile),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(reads, 0);
   assert.equal((await manager.get('job-1')).job.runtime.controlEpoch, before.job.runtime.controlEpoch);
@@ -1600,7 +1600,7 @@ test('scope dispatcher snapshots every event field as own data and rejects autho
       nodeId: 'root',
       executionAuthorized: true,
     }, { nowMs: 2000 }),
-    /unknown field: executionAuthorized/,
+    /unknown field/,
   );
 });
 

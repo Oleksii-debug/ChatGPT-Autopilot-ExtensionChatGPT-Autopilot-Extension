@@ -212,6 +212,58 @@ export class OrchestrationV2Controller {
     return summary;
   }
 
+  /**
+   * Plan 1 S1: input admission for canonical hierarchy scope transitions.
+   * Never delegate arbitrary owner input to the general hierarchy dispatcher.
+   * This is a narrow adapter around its existing event reducer/store, not a
+   * second scheduler or independent lifecycle authority.
+   */
+  async dispatchHierarchyScopeEvent(input, { nowMs = this.now() } = {}) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)
+        || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) {
+      throw new Error('Hierarchy scope event must be a plain object');
+    }
+    const allowed = new Set(['type', 'eventId', 'controlEpoch', 'nodeId']);
+    const snapshot = Object.create(null);
+    for (const key of Reflect.ownKeys(input)) {
+      if (typeof key !== 'string' || !allowed.has(key)) {
+        throw new Error('Hierarchy scope event contains unknown field');
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(input, key);
+      if (!descriptor || descriptor.enumerable !== true
+          || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(key === 'type'
+          ? 'Hierarchy scope event type must be an enumerable own data property'
+          : 'Hierarchy scope event ' + key + ' must be an enumerable own data property');
+      }
+      snapshot[key] = descriptor.value;
+    }
+    if (![
+      OrchestrationHierarchyEventType.PAUSE_SCOPE,
+      OrchestrationHierarchyEventType.RESUME_SCOPE,
+      OrchestrationHierarchyEventType.STOP_SCOPE,
+    ].includes(snapshot.type)) {
+      throw new Error('Hierarchy scope dispatcher accepts only PAUSE_SCOPE, RESUME_SCOPE or STOP_SCOPE');
+    }
+    if (typeof snapshot.eventId !== 'string' || !snapshot.eventId
+        || typeof snapshot.nodeId !== 'string' || !snapshot.nodeId
+        || !Number.isSafeInteger(snapshot.controlEpoch) || snapshot.controlEpoch < 0) {
+      throw new Error('Hierarchy scope event identity is invalid');
+    }
+    // Capture the canonical Core projection so failed hierarchy runtime
+    // persistence cannot leave a projected scope advanced without its proof.
+    const coreBefore = await this.coreRepository.load();
+    try {
+      return await this.dispatchHierarchyEvent(snapshot, { nowMs });
+    } catch (error) {
+      const coreAfter = await this.coreRepository.load();
+      if (coreAfter.revision !== coreBefore.revision) {
+        await this.coreRepository.save(coreBefore);
+      }
+      throw error;
+    }
+  }
+
   async startHierarchy({ rootNodeIds = null, nowMs = this.now() } = {}) {
     const runtime = await this.runtimeRepository.load();
     const hierarchy = hierarchyContainer(runtime);

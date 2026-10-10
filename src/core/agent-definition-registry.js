@@ -16,7 +16,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
   'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy', 'enabled',
-  'definitionRevision',
+  'definitionRevision', 'specialistDelegationProfile',
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
 const SELECT_REQUEST_KEYS = new Set(['registry', 'agentDefinitionId']);
@@ -284,6 +284,40 @@ function intersectDefinitionCeiling(definitionDefaults, ownerBudget, key) {
   return Math.min(requested, owner);
 }
 
+
+const SPECIALIST_PROFILE_KEYS = new Set([
+  'schemaVersion', 'registryId', 'requiredCapabilityIds', 'requiredToolIds',
+  'policyEnvelopeId', 'deadlineSeconds', 'maxConcurrentHandoffs',
+  'leaseSeconds', 'priority', 'enabled',
+]);
+
+function normalizeSpecialistDelegationProfileV1(input, capabilityIds, toolIds) {
+  if (input === undefined || input === null) return input;
+  const raw = record(input, SPECIALIST_PROFILE_KEYS, 'AgentDefinitionV1.specialistDelegationProfile');
+  if (raw.schemaVersion !== 1) throw new Error('Unsupported specialist delegation profile schemaVersion');
+  const requiredCapabilityIds = ids(raw.requiredCapabilityIds, 'specialist requiredCapabilityIds', 64);
+  const requiredToolIds = ids(raw.requiredToolIds, 'specialist requiredToolIds', 128);
+  subset(requiredCapabilityIds, capabilityIds, 'Agent specialist delegation capabilities');
+  subset(requiredToolIds, toolIds, 'Agent specialist delegation tools');
+  const priority = raw.priority;
+  if (typeof priority !== 'number' || !Number.isSafeInteger(priority)
+      || Object.is(priority, -0) || priority < 0 || priority > 1000) {
+    throw new Error('specialist delegation priority is invalid');
+  }
+  return freeze({
+    schemaVersion: 1,
+    registryId: id(raw.registryId, 'specialist registryId'),
+    requiredCapabilityIds,
+    requiredToolIds,
+    policyEnvelopeId: id(raw.policyEnvelopeId, 'specialist policyEnvelopeId'),
+    deadlineSeconds: positiveInteger(raw.deadlineSeconds, 'specialist deadlineSeconds'),
+    maxConcurrentHandoffs: positiveInteger(raw.maxConcurrentHandoffs, 'specialist maxConcurrentHandoffs'),
+    leaseSeconds: positiveInteger(raw.leaseSeconds, 'specialist leaseSeconds'),
+    priority,
+    enabled: bool(raw.enabled, 'specialist enabled'),
+  });
+}
+
 function normalizeAcceptanceCriteria(input) {
   const values = denseArray(input, 'AgentDefinitionV1.acceptanceCriteria', 20)
     .map((value, index) => textValue(value, 'acceptanceCriteria[' + index + ']', 1000));
@@ -303,20 +337,27 @@ export function normalizeAgentDefinitionV1(input) {
   if (raw.schemaVersion !== AGENT_DEFINITION_VERSION) {
     throw new Error('AgentDefinitionV1.schemaVersion must be numeric 1');
   }
+  const capabilityIds = ids(raw.capabilityIds, 'capabilityIds', 64);
+  const toolIds = ids(raw.toolIds, 'toolIds', 128);
   return freeze({
     schemaVersion: AGENT_DEFINITION_VERSION,
     agentDefinitionId: id(raw.agentDefinitionId, 'agentDefinitionId'),
     label: textValue(raw.label, 'label', 160),
     description: textValue(raw.description, 'description', 4000, { optional: true }),
     instructions: textValue(raw.instructions, 'instructions', 12000),
-    capabilityIds: ids(raw.capabilityIds, 'capabilityIds', 64),
-    toolIds: ids(raw.toolIds, 'toolIds', 128),
+    capabilityIds,
+    toolIds,
     tags: ids(raw.tags, 'tags', 32),
     acceptanceCriteria: normalizeAcceptanceCriteria(raw.acceptanceCriteria),
     configDefaults: normalizeConfigDefaults(raw.configDefaults),
     modelRoutePolicy: normalizeAgentModelRoutePolicyV1(raw.modelRoutePolicy),
     enabled: bool(raw.enabled, 'enabled'),
     definitionRevision: positiveInteger(raw.definitionRevision, 'definitionRevision'),
+    ...(raw.specialistDelegationProfile === undefined ? {} : {
+      specialistDelegationProfile: normalizeSpecialistDelegationProfileV1(
+        raw.specialistDelegationProfile, capabilityIds, toolIds,
+      ),
+    }),
   });
 }
 
@@ -474,8 +515,38 @@ export function materializeAgentDefinitionV1(input = {}) {
     throw new Error('Reusable Agent definition attempted to mint owner policy authority');
   }
 
+  const specialistProfile = current.specialistDelegationProfile;
+  if (specialistProfile?.enabled) {
+    subset(specialistProfile.requiredCapabilityIds, requestedCapabilityIds,
+      'specialist delegation capabilities for materialized job');
+    subset(specialistProfile.requiredToolIds, requestedToolIds,
+      'specialist delegation tools for materialized job');
+  }
+  const specialistDelegationBinding = specialistProfile == null ? undefined : freeze({
+    schemaVersion: 1,
+    jobId,
+    projectId,
+    registryId: registry.registryId,
+    registryRevision: registry.revision,
+    agentDefinitionId: current.agentDefinitionId,
+    definitionRevision: current.definitionRevision,
+    profile: specialistProfile,
+    authority: {
+      proposalOnly: true,
+      executionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+      capacityReserved: false,
+    },
+  });
+
   return freeze({
     schemaVersion: 1,
+    ...(specialistDelegationBinding === undefined ? {} : { specialistDelegationBinding }),
     definitionBinding: {
       registryId: registry.registryId,
       registryRevision: registry.revision,
