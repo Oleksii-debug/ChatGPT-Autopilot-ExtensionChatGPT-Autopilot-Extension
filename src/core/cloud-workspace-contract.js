@@ -376,9 +376,11 @@ function cloudProviderTarget(binding) {
   });
 }
 
-async function invokeCloudProviderEvidence(callback, target, phase) {
+async function invokeCloudProviderEvidence(callback, target, phase, receiver) {
   try {
-    return await callback(target);
+    // Trusted provider adapters may depend on their validated callback receiver.
+    // Preserve that receiver without exposing raw provider error diagnostics.
+    return await Reflect.apply(callback, receiver, [target]);
   } catch {
     throw new Error(`cloud workspace provider ${phase} failed; canonical reconciliation required`);
   }
@@ -465,7 +467,7 @@ export async function verifyCloudWorkspaceIsolationV1(
   const binding = createCloudWorkspaceBindingV1(
     observationInput, persistedOwner, { at: trusted.at },
   );
-  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, cloudProviderTarget(binding), 'isolation attestation');
+  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, cloudProviderTarget(binding), 'isolation attestation', trusted);
   // Fail closed if the lease changed while asynchronous provider attestation
   // was in flight. This remains non-authorizing evidence, not a new lease.
   const ownerAfter = normalizeExactExecutionOwnershipV1(
@@ -758,7 +760,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // finished. An attested completion timestamp must precede fresh scrub proof,
   // so a previously captured "clean" receipt cannot be replayed post-teardown.
   const completed = dataRecord(
-    await invokeCloudProviderEvidence(trusted.teardown, target, 'teardown'), TEARDOWN_RECEIPT_KEYS,
+    await invokeCloudProviderEvidence(trusted.teardown, target, 'teardown', trusted), TEARDOWN_RECEIPT_KEYS,
     'Cloud workspace teardown completion',
   );
   if (completed.schemaVersion !== CLOUD_WORKSPACE_VERSION
@@ -783,7 +785,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
       || Date.parse(completedAt) > Date.parse(trusted.at)) {
     throw new Error('Cloud workspace teardown completion chronology is invalid');
   }
-  const proof = await invokeCloudProviderEvidence(trusted.verifyScrub, target, 'scrub verification');
+  const proof = await invokeCloudProviderEvidence(trusted.verifyScrub, target, 'scrub verification', trusted);
   const verifiedAt = verifyExactLifecycleProof(
     proof, SCRUB_PROOF_KEYS, binding, trusted.at,
     ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
