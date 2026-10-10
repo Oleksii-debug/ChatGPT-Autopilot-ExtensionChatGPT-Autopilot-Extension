@@ -2250,6 +2250,13 @@ test('Plan-1 S1: present corrupt optional evidence and policy text cannot be era
   // Scope only persisted evidence/provenance/policy descriptions. Omitted V1
   // fields remain compatible; canonical empty text is explicit and stable.
   const cases = [
+    [normalizeCapabilityV1, {
+      schemaVersion: 1, capabilityId: 'filesystem.read', riskClass: 'R0',
+    }, 'description'],
+    [normalizeToolDescriptorV1, {
+      schemaVersion: 1, toolId: 'fs.read', providerId: 'native-companion',
+      label: 'Read files', capabilityIds: ['filesystem.read'],
+    }, 'description'],
     [normalizeArtifactRefV1, (() => {
       const value = artifact({ artifactId: 'artifact-optional-media' });
       delete value.mediaType;
