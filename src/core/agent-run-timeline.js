@@ -460,19 +460,25 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const history = safeHistory(own(runtime, 'history'), safeHasOwn(runtime, 'history'));
   const all = history.items.map(({ ordinal, entry }) => {
     record(entry, 'Agent history entry');
-    const rawType = own(entry, 'type');
+    // Timeline data is persisted JSON evidence: a hidden event field may be
+    // visible before restart but disappear afterward. Snapshot each fixed
+    // descriptor exactly once without invoking getters/Proxy get traps.
+    const { present: typePresent, value: rawType } = persistedField(entry, 'type');
+    if (typePresent && rawType === undefined) {
+      throw new Error('Agent history event type is invalid');
+    }
     const known = typeof rawType === 'string' && Object.hasOwn(EVENT_LABELS, rawType);
     const spec = known ? EVENT_LABELS[rawType] : ['RECOVERY', 'Подію невідомого типу зареєстровано.'];
-    const hasRecordedTime = safeHasOwn(entry, 'at');
-    const rawAction = own(entry, 'action');
+    const { present: hasRecordedTime, value: recordedTime } = persistedField(entry, 'at');
+    const rawAction = persistedField(entry, 'action').value;
     let actionType = '';
     if (known && ACTION_DETAIL_EVENTS.has(rawType) && rawAction && typeof rawAction === 'object' && !Array.isArray(rawAction)) {
-      const candidate = own(rawAction, 'type');
+      const candidate = persistedField(rawAction, 'type').value;
       if (typeof candidate === 'string' && ACTION_TYPES.has(candidate)) actionType = candidate;
     }
     return {
       entryId: 'agent-history:' + ordinal,
-      at: storedEventTime(own(entry, 'at'), hasRecordedTime),
+      at: storedEventTime(recordedTime, hasRecordedTime),
       timeEvidence: hasRecordedTime ? 'RECORDED' : 'MISSING_LEGACY',
       category: spec[0],
       event: known ? rawType : 'OTHER',
