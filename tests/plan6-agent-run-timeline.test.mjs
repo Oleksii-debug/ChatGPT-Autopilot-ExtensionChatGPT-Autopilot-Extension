@@ -1090,3 +1090,48 @@ test('S1 persisted scalar descriptor traps fail closed without leaking or runnin
   assert.equal(recovered.mayReplayExternalEffect, false);
   assert.equal(recovered.evidenceOnly, true);
 });
+
+test('S1 canonical event metadata does not disappear on JSON cold restart', () => {
+  const valid = job();
+  const before = buildAgentRunTimelineV1(valid);
+  assert.equal(before.entries[1].actionType, 'click');
+  assert.equal(before.entries[1].timeEvidence, 'RECORDED');
+  assert.deepEqual(before, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+  assert.equal(before.evidenceOnly, true);
+  assert.equal(before.mayReplayExternalEffect, false);
+
+  for (const field of ['type', 'at', 'action']) {
+    const input = job();
+    Object.defineProperty(input.runtime.history[1], field, { enumerable: false });
+    assert.throws(() => buildAgentRunTimelineV1(input), error =>
+      error instanceof Error && /persisted field must be an enumerable data field/u.test(error.message));
+  }
+  const nested = job();
+  Object.defineProperty(nested.runtime.history[1].action, 'type', { enumerable: false });
+  assert.throws(() => buildAgentRunTimelineV1(nested), /persisted field must be an enumerable data field/u);
+  const corrupt = job();
+  corrupt.runtime.history[1].type = undefined;
+  assert.throws(() => buildAgentRunTimelineV1(corrupt), /Agent history event type is invalid/u);
+
+  let getterReads = 0;
+  const accessor = job();
+  Object.defineProperty(accessor.runtime.history[1], 'at', {
+    enumerable: true,
+    get() { getterReads += 1; throw Error('PRIVATE_HISTORY_GETTER'); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), error =>
+    error instanceof Error && /accessor-backed at/u.test(error.message) &&
+    !error.message.includes('PRIVATE_HISTORY_GETTER'));
+  assert.equal(getterReads, 0);
+  const trap = job();
+  trap.runtime.history[1] = new Proxy(trap.runtime.history[1], {
+    getOwnPropertyDescriptor(target, field) {
+      if (field === 'at') throw Error('PRIVATE_PROXY_EVENT');
+      return Reflect.getOwnPropertyDescriptor(target, field);
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(trap), error =>
+    error instanceof Error && /cannot be safely inspected/u.test(error.message) &&
+    !error.message.includes('PRIVATE_PROXY_EVENT'));
+  assert.doesNotMatch(JSON.stringify(before), /PRIVATE_|NEVER_EXPORT|SENSITIVE/u);
+});
