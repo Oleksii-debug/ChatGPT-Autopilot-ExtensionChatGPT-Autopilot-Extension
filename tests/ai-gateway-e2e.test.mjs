@@ -374,3 +374,63 @@ test('Plan4 S1 built-in OpenAI uses exact injected gateway credential scope for 
     }
   }
 });
+
+test('Plan4 S1 named loopback account never silently drops an explicitly required key after JSON cold restart', async () => {
+  const source = { endpointId:'local-team', baseUrl:'http://127.0.0.1:1234/v1', apiKeyEnv:'LOCAL_TEAM_KEY' };
+  for (const persisted of [source, JSON.parse(JSON.stringify(source))]) {
+    const endpoints = normalizeCompatibleEndpointRegistry([persisted]);
+    let upstreamCalls = 0;
+    const server = createGatewayServer({
+      compatibleEndpoints:endpoints,
+      env:{},
+      fetchFn:async () => { upstreamCalls += 1; return response({ data:[] }); },
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const root = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const discovery = await fetch(`${root}/models?provider=openai-compatible&endpointId=local-team`);
+      assert.equal(discovery.status, 428);
+      assert.equal((await discovery.json()).code, 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
+      const completion = await fetch(`${root}/complete`, {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ provider:'openai-compatible', endpointId:'local-team', model:'fixture', prompt:'private fixture' }),
+      });
+      assert.equal(completion.status, 428);
+      assert.equal((await completion.json()).code, 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
+      assert.equal(upstreamCalls, 0, 'credential-bound loopback never dispatches without its named key');
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  }
+  const endpoints = normalizeCompatibleEndpointRegistry([source]);
+  const calls = [];
+  const server = createGatewayServer({
+    compatibleEndpoints:endpoints,
+    env:{ LOCAL_TEAM_KEY:'local-fixture-only' },
+    fetchFn:async (url, init) => {
+      calls.push([url, init.headers.authorization]);
+      return url.endsWith('/models')
+        ? response({ data:[{ id:'local-fixture-model' }] })
+        : response({ choices:[{ message:{ content:'local fixture result' } }] });
+    },
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const root = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const discovery = await fetch(`${root}/models?provider=openai-compatible&endpointId=local-team`);
+    assert.equal(discovery.status, 200);
+    assert.deepEqual((await discovery.json()).models, ['local-fixture-model']);
+    const completion = await fetch(`${root}/complete`, {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ provider:'openai-compatible', endpointId:'local-team', model:'local-fixture-model', prompt:'task' }),
+    });
+    assert.equal(completion.status, 200);
+    assert.equal((await completion.json()).text, 'local fixture result');
+    assert.deepEqual(calls, [
+      ['http://127.0.0.1:1234/v1/models', 'Bearer local-fixture-only'],
+      ['http://127.0.0.1:1234/v1/chat/completions', 'Bearer local-fixture-only'],
+    ]);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
