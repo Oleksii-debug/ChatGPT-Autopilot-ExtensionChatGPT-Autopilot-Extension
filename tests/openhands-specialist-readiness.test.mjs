@@ -753,3 +753,70 @@ test('executable OpenHands readiness requires verified server identity/version a
   assert.equal(verified.authority.providerExecutionAuthorized, false);
   assert.equal(verified.authority.capacityReserved, false);
 });
+
+
+test('OpenHands clock callback failures are opaque and prevent phantom readiness', async () => {
+  const receipt = {
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  };
+  const validRequest = {
+    schemaVersion: 1,
+    registryId: 'registry:openhands',
+    registryRevision: 4,
+    specialistId: 'openhands-coding',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    definitionRevision: 2,
+    executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
+    requestedToolIds: [],
+    asOf: new Date(T0).toISOString(),
+  };
+  let probes = 0;
+  const client = {
+    async probe() {
+      probes += 1;
+      return receipt;
+    },
+  };
+  const secret = 'SECRET_CLOCK_CALLBACK_DIAGNOSTIC';
+  const failsClock = (errorText, expectedProbes) => async operation => {
+    await assert.rejects(operation(), error => {
+      assert.equal(error.message, 'OpenHands readiness clock could not be observed safely');
+      assert.equal(JSON.stringify({ message: error.message, cause: error.cause }).includes(secret), false);
+      return true;
+    });
+    assert.equal(probes, expectedProbes);
+  };
+  await failsClock(secret, 0)(() => probeOpenHandsSpecialistProviderConfigV1({
+    config: config(),
+    client,
+    now() { throw new Error(secret); },
+  }));
+  await failsClock(secret, 1)(() => {
+    let clockCalls = 0;
+    return probeOpenHandsSpecialistProviderConfigV1({
+      config: config(),
+      client,
+      now() {
+        if (clockCalls++ === 0) return T0;
+        throw new Error(secret);
+      },
+    });
+  });
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now() { throw new Error(secret); },
+  });
+  await failsClock(secret, 1)(() => binding.resolveReadiness(validRequest));
+  const healthy = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now: monotonicNow([T0, T1]),
+  });
+  const result = await healthy.resolveReadiness(validRequest);
+  assert.equal(result.providerStates[0].health, 'READY');
+  assert.equal(JSON.parse(JSON.stringify(result)).providerStates[0].health, 'READY');
+  assert.equal(probes, 2);
+});
