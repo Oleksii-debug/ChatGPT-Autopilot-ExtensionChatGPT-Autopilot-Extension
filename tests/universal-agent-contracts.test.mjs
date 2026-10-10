@@ -1224,3 +1224,52 @@ test('Plan-1 S1: explicit unknown privacy and read-only flags cannot downgrade a
   assert.deepEqual(normalizeToolDescriptorV1(JSON.parse(JSON.stringify(durableTool))), durableTool);
   assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(durableArtifact))), durableArtifact);
 });
+
+
+test('Plan-1 S1: persisted policy and evidence enums reject alias promotion across restart', () => {
+  const permission = {
+    schemaVersion: 1,
+    decisionId: 'decision-exact-1',
+    invocationId: 'invoke-exact-1',
+    decision: PolicyDecisionKind.DENY,
+    reasonCode: 'OWNER_DENY',
+    decidedAt: AT,
+  };
+  const observation = {
+    schemaVersion: 1,
+    observationId: 'obs-exact-1',
+    invocationId: 'invoke-exact-1',
+    status: ObservationStatus.OK,
+    observedAt: AT,
+  };
+  const verification = {
+    schemaVersion: 1,
+    verificationId: 'verify-exact-1',
+    invocationId: 'invoke-exact-1',
+    observationId: 'obs-exact-1',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+  };
+  // Previously a malformed serialized/adapter status silently became an
+  // authoritative ALLOW or VERIFIED after trimming and uppercasing.
+  for (const alias of ['allow', ' ALLOW', 'ALLOW ', 'aLlOw', 'DENY ']) {
+    assert.throws(() => normalizePolicyDecisionV1({ ...permission, decision: alias }), /decision is invalid/);
+  }
+  for (const alias of ['ok', ' OK', 'OK ', 'pArTiAl']) {
+    assert.throws(() => normalizeObservationV1({ ...observation, status: alias }), /status is invalid/);
+  }
+  for (const alias of ['verified', ' VERIFIED', 'VERIFIED ', 'aMbIgUoUs']) {
+    assert.throws(() => normalizeVerificationV1({ ...verification, status: alias }), /status is invalid/);
+  }
+  for (const [normalizer, input] of [
+    [normalizePolicyDecisionV1, permission],
+    [normalizeObservationV1, observation],
+    [normalizeVerificationV1, verification],
+  ]) {
+    const original = normalizer(input);
+    const restarted = normalizer(JSON.parse(JSON.stringify(original)));
+    assert.deepEqual(restarted, original, 'cold JSON restart retains exact durable enum');
+    assert.ok(Object.isFrozen(restarted));
+  }
+});
