@@ -1652,3 +1652,26 @@ test('S1 persisted Agent identity refuses padded and invisible whitespace across
   assert.equal(baseline.evidenceOnly, true);
   assert.equal(baseline.mayReplayExternalEffect, false);
 });
+
+
+test('S1 zero-width persisted identity and event labels fail closed without leaking evidence', () => {
+  const controls = ['\u200b', '\u200e', '\u2060', '\ufeff', '\u061c', '\u180e'];
+  for (const control of controls) {
+    for (const corruptField of ['job-id', 'node-state', 'event-type', 'action-type']) {
+      const input = job();
+      if (corruptField === 'job-id') input.id += control;
+      if (corruptField === 'node-state') input.runtime.plan.nodes[0].state += control;
+      if (corruptField === 'event-type') input.runtime.history[1].type += control;
+      if (corruptField === 'action-type') input.runtime.history[1].action.type += control;
+      assert.throws(() => buildAgentRunTimelineV1(input), /invalid/u, corruptField);
+      assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input))), /invalid/u, corruptField + ' after JSON restart');
+    }
+  }
+  const valid = job();
+  valid.id = 'Агент-7';
+  const projected = buildAgentRunTimelineV1(valid);
+  assert.equal(projected.jobId, 'Агент-7');
+  assert.equal(projected.mayReplayExternalEffect, false);
+  assert.equal(projected.evidenceMap.externalEffectVerified, false);
+  assert.deepEqual(projected, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+});
