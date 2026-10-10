@@ -238,7 +238,7 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     observedAt: new Date(observedAtMs).toISOString(),
     providerState,
-    authority: {
+    authority: Object.freeze({
       providerExecutionAuthorized: false,
       toolExecutionAuthorized: false,
       policyAuthorized: false,
@@ -248,7 +248,7 @@ export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
       completionAuthorized: false,
       verificationAuthorized: false,
       capacityReserved: false,
-    },
+    }),
   });
 }
 
