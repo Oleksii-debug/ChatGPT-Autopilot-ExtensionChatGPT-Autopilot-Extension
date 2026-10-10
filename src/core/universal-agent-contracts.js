@@ -496,12 +496,17 @@ function assertSubset(requested, allowed, label) {
   if (missing.length) throw new Error(`${label} exceeds granted capabilities: ${missing.join(', ')}`);
 }
 
-export function assertToolInvocationAuthorizedV1({
-  invocation,
-  policyDecision,
-  toolDescriptor,
-  grantedCapabilityIds = [],
-} = {}) {
+const TOOL_AUTHORIZATION_ENVELOPE_KEYS = new Set([
+  'invocation', 'policyDecision', 'toolDescriptor', 'grantedCapabilityIds',
+]);
+export function assertToolInvocationAuthorizedV1(input = {}) {
+  // Treat the authorization wrapper as untrusted too. Destructuring directly
+  // from caller input invokes getters before the policy check and can conceal
+  // injected authority fields. The same descriptor-only boundary used by the
+  // canonical V1 contracts must apply before any nested normalization.
+  const request = plain(input, 'Tool authorization request');
+  exactKeys(request, TOOL_AUTHORIZATION_ENVELOPE_KEYS, 'Tool authorization request');
+  const { invocation, policyDecision, toolDescriptor, grantedCapabilityIds = [] } = request;
   const normalizedInvocation = normalizeToolInvocationV1(invocation);
   const normalizedDecision = normalizePolicyDecisionV1(policyDecision);
   const normalizedTool = normalizeToolDescriptorV1(toolDescriptor);
