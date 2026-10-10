@@ -204,6 +204,23 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 1_000;
   server.maxRequestsPerSocket = 1;
+  // This factory intentionally exposes the Node server for Companion lifecycle
+  // control. Restrict even that exposed listen() entry point: relying on a
+  // remoteAddress check *after* a TCP listener binds 0.0.0.0/:: is not the
+  // same as keeping an authenticated local control service off the network.
+  // Use the explicit (port, '127.0.0.1', callback) shape; reject ambiguous
+  // Node listen overloads instead of guessing their binding semantics.
+  const nodeListen = server.listen.bind(server);
+  Object.defineProperty(server, 'listen', {
+    configurable: false, enumerable: false, writable: false,
+    value: (port, host, ...rest) => {
+      if (!Number.isInteger(port) || port < 0 || port > 65_535
+          || host !== '127.0.0.1') {
+        throw new Error('Local API listener requires explicit 127.0.0.1 TCP binding');
+      }
+      return nodeListen(port, host, ...rest);
+    },
+  });
   return server;
 }
 
