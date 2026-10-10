@@ -63,11 +63,17 @@ test('service worker composes one trusted durable Specialist readiness path', as
     source,
     /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]*?probeOpenHandsSpecialistProviderConfigV1\([\s\S]*?browserAgent\.getSpecialistProviderConfig\(providerId\)[\s\S]*?config changed during readiness probe/iu,
   );
+  // Inspect only this command branch: sibling commands legitimately claim and
+  // execute providers, so an unbounded source-level scan is a false positive.
+  const probeStart = source.indexOf("} else if (message.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {");
+  const probeEnd = source.indexOf("} else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {", probeStart);
+  assert.ok(probeStart >= 0 && probeEnd > probeStart, 'read-only probe command must remain structurally identifiable');
+  const probeBranch = source.slice(probeStart, probeEnd);
   assert.doesNotMatch(
-    source,
-    /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]{0,3000}(?:claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff)/u,
-  );
-  assert.equal(
+    probeBranch,
+    /claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\\.execute|completeSpecialistHandoff/u,
+    'read-only probe may not claim, execute, or complete a Specialist',
+  );  assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
     0,
     'service worker must not own a second Browser Agent persistence implementation',
