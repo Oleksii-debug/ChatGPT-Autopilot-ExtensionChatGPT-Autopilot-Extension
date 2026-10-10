@@ -318,6 +318,19 @@ export class AiGatewayClient {
         unknown.retryable = false;
         throw unknown;
       }
+      // A completion POST can reach the gateway even when fetch rejects before
+      // receiving headers (socket close, deadline, or upstream/proxy failure).
+      // Without a verified HTTP response there is no evidence that the model
+      // effect did not execute. Fail closed instead of authorizing blind
+      // cross-provider retries or recording the request as a safe timeout.
+      // Read-only health/status/catalog probes retain retryable semantics.
+      if (completion && !responseReceived) {
+        const unknown = new Error('AI Gateway completion dispatch outcome is UNKNOWN; reconcile before retry');
+        unknown.code = 'AI_GATEWAY_RESPONSE_UNVERIFIED';
+        unknown.category = 'UNAVAILABLE';
+        unknown.retryable = false;
+        throw unknown;
+      }
       if (timedOut || (!responseReceived && error?.name === 'AbortError')) {
         const timeoutError = new Error(`AI Gateway request timed out after ${timeout} seconds`);
         timeoutError.code = 'AI_GATEWAY_TIMEOUT';

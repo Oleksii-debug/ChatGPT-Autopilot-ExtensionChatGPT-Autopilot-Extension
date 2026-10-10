@@ -381,8 +381,8 @@ test('gateway typed HTTP and timeout failures retain retryability without leakin
     throw Object.assign(new Error('sk-transport-secret'),{name:'AbortError'});
   }});
   await assert.rejects(aborted.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
-    error=>error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT'
-      && error.retryable===true && !error.message.includes('sk-transport-secret'));
+    error=>error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED' && error.category==='UNAVAILABLE'
+      && error.retryable===false && !error.message.includes('sk-transport-secret'));
 });
 
 test('gateway retains a safe provider code but never a secret-bearing error body or raw network exception',async()=>{
@@ -397,7 +397,7 @@ test('gateway retains a safe provider code but never a secret-bearing error body
   const network=new AiGatewayClient({fetchFn:async()=>{throw new Error('sk-private-secret endpoint');}});
   await assert.rejects(
     network.complete({provider:'openai-compatible',model:'fixture',prompt:'test'}),
-    error=>error.code==='AI_GATEWAY_UNAVAILABLE' && error.retryable===true
+    error=>error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED' && error.retryable===false
       && !error.message.includes('sk-private-secret'),
   );
 });
@@ -1441,8 +1441,9 @@ test('Plan4 S2: forged Gateway diagnostic prefixes cannot leak transport secrets
       fetchFn: async () => { throw new Error(forgedMessage); },
     });
     await assert.rejects(gateway.complete(request), error =>
-      error.code === 'AI_GATEWAY_UNAVAILABLE'
+      error.code === 'AI_GATEWAY_RESPONSE_UNVERIFIED'
       && error.category === 'UNAVAILABLE'
+      && error.retryable === false
       && !String(error.message).includes('sk-sentinel'));
   }
   const forgedBody = new AiGatewayClient({
@@ -1463,7 +1464,8 @@ test('Plan4 S2: forged Gateway diagnostic prefixes cannot leak transport secrets
     },
   });
   await assert.rejects(forgedCode.complete(request), error =>
-    error.code === 'AI_GATEWAY_UNAVAILABLE'
+    error.code === 'AI_GATEWAY_RESPONSE_UNVERIFIED'
+    && error.retryable === false
     && !String(error.message).includes('sk-sentinel'));
   // Internally generated HTTP classification is still preserved.
   const genuine = new AiGatewayClient({
@@ -1937,4 +1939,47 @@ test('Plan4 S1: durable settlement requires explicit data receipt before publica
   const response=await admitted.run(JSON.parse(JSON.stringify(owner)),{},'approved',options);
   assert.equal(response.text,'verified');
   assert.equal(sends,1);
+});
+
+
+test('Plan4 S1: ambiguous pre-header completion effects never fail over or leak transport diagnostics', async () => {
+  let effects=0;
+  const gateway=new AiGatewayClient({fetchFn:async (_url,init) => {
+    assert.equal(init.method,'POST');
+    effects++;
+    throw Object.assign(new Error('sk-private-lost-connection'),{name:'AbortError'});
+  }});
+  const candidates=[
+    {routeId:'local.main',provider:'ollama',model:'fixture-a',locality:'local',priority:2},
+    {routeId:'local.backup',provider:'ollama',model:'fixture-b',locality:'local',priority:1},
+  ];
+  const router=new AiOrchestrator({gatewayClient:gateway});
+  const owner={enabled:true,mode:'primary',routes:candidates,routePolicy:{autoSwitch:true}};
+  await assert.rejects(router.run(JSON.parse(JSON.stringify(owner)),{},'approved instruction',
+    {maxModelCallsForRequest:2}),error=>
+    error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED'
+      && error.modelCallsUsed===1
+      && error.routeAttempts?.length===1
+      && error.routeAttempts[0].routeId==='local.main'
+      && !String(error.message).includes('sk-private-lost-connection'));
+  assert.equal(effects,1,'unknown first effect cannot dispatch the backup');
+});
+
+test('Plan4 S1: pre-header errors stay UNKNOWN for POST; read-only probes remain retryable', async () => {
+  for(const failure of [new Error('sk-private-network'),Object.assign(new Error('sk-private-deadline'),{name:'AbortError'})]){
+    let requests=0;
+    const gateway=new AiGatewayClient({fetchFn:async()=>{requests++;throw failure;}});
+    const request=JSON.parse(JSON.stringify({provider:'ollama',model:'fixture',prompt:'approved'}));
+    await assert.rejects(gateway.complete(request),error=>
+      error.code==='AI_GATEWAY_RESPONSE_UNVERIFIED'
+      && error.category==='UNAVAILABLE'
+      && error.retryable===false
+      && !error.message.includes('sk-private'));
+    assert.equal(requests,1);
+  }
+  const readOnly=new AiGatewayClient({fetchFn:async()=>{throw Object.assign(
+    new Error('sk-private-probe'),{name:'AbortError'});}});
+  await assert.rejects(readOnly.health({timeoutSeconds:5}),error=>
+    error.code==='AI_GATEWAY_TIMEOUT' && error.category==='TIMEOUT'
+    && error.retryable===true && !error.message.includes('sk-private'));
 });
