@@ -48,3 +48,14 @@ CI exact **code** head `16bac9bc50d1884cd9400d4cd29c5e69d2e93dfa`:
 - Canonical shared registry `MULTI_PLAN_CLOSURE_STATE.md` updated on Plan8 PR lineage, without changing status of other plans.
 
 **S1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE; S2 WAITING_UPSTREAM / NOT DONE.** 11.x candidate remains DRAFT / UNMERGED, main manifest is still 0.9.19; outstanding 235 test failures + 11 cancelled, 11.x postmain integration/readback and full required upstream convergence. No physical Windows/NVDA/authenticated provider effects/release assertions. No real provider credentials required for these repository repairs.
+
+
+## Plan 8 S1 — registry admission fixture convergence (2026-10-10; NONTERMINAL)
+
+Scope only canonical Drive Plan 8 ID `1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM`. Reused existing draft PR #716; did not change other Drive plans or provider/effect/Agent authorities.
+
+Git commit `ef340d53b707b32fe5ea5d48d23a36852fe71b29` repairs `tests/browser-agent-definition-specialist-binding.test.mjs` (exact GitHub blob `c4ce8e6182e5a4fda952d5702f6f15d8f8f5e491`, independently read back). The previous suite could not load because it imported missing `createAgentDefinitionRegistryV1` from the existing canonical registry; its obsolete `expectedRegistryBindingKey` admission arguments also no longer matched `BrowserAgentManager`'s strict accepted shape. The fixture now uses the current revision-CAS registry and launch contracts and asserts a forged stale binding-key alias is rejected without mutating the durable registry (negative/recovery assertion). No code behavior was bypassed or tests skipped.
+
+Last complete source-code CI remains SHA `16bac9bc50d1884cd9400d4cd29c5e69d2e93dfa`: Release #38058349443 **FAILURE** Linux 3615 / 3369 PASS / 235 FAIL / 11 CANCELLED; Windows release package SUCCESS. Core #38058349406 483/483 and deterministic web 59/59 SUCCESS; UI #38058349285, Interaction #38058349395, Chrome #38058349368 SUCCESS. At new test-only commit `ef340d5`, no new exact-head workflow run was observed; its test suite is NOT yet independently qualified. These earlier results must not be attributed to the new commit.
+
+**Section 1 = FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. Section 2 = WAITING_UPSTREAM / NOT DONE / NOT ADVANCED. Terminal closures: 0/2.** Full aggregate Release and cross-feature/negative/recovery qualification, safe 11.x main merge, exact post-main Git readback, and upstream Plan1–7 terminal outputs are still missing. Main manifest remains 0.9.19; PR #716 remains draft/unmerged, mergeability not established. No real-provider account, authenticated side effect, physical NVDA test or signed go-live claim.
