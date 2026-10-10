@@ -327,7 +327,7 @@ function trustedLifecycleOptions(input, keys, required, label) {
   });
 }
 
-function verifyExactLifecycleProof(input, keys, binding, at, properties, label) {
+function verifyExactLifecycleProof(input, keys, binding, at, properties, label, minAt = binding.boundAt) {
   const raw = dataRecord(input, keys, label);
   if (raw.workspaceId !== binding.workspaceId
     || raw.providerId !== binding.providerId
@@ -335,7 +335,7 @@ function verifyExactLifecycleProof(input, keys, binding, at, properties, label) 
     throw new Error(`${label} does not match exact cloud workspace/lease identity`);
   }
   const verifiedAt = exactTimestamp(raw.verifiedAt, `${label}.verifiedAt`);
-  if (Date.parse(verifiedAt) < Date.parse(binding.boundAt)
+  if (Date.parse(verifiedAt) < Date.parse(minAt)
       || Date.parse(verifiedAt) > Date.parse(at)) {
     throw new Error(`${label} has stale or future verification chronology`);
   }
@@ -369,7 +369,7 @@ export async function verifyCloudWorkspaceIsolationV1(
   const verifiedAt = verifyExactLifecycleProof(
     proof, ISOLATION_PROOF_KEYS, binding, trusted.at,
     ['filesystemIsolated', 'browserIsolated', 'processIsolated'],
-    'Cloud workspace isolation proof',
+    'Cloud workspace isolation proof', binding.baselineObservedAt,
   );
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
