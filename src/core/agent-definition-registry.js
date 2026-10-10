@@ -1,5 +1,6 @@
 import { normalizeBrowserAgentConfig } from './browser-agent.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1, normalizeAgentSpecialistDelegationBindingV1 } from './agent-specialist-delegation-profile.js';
 
 export const AGENT_DEFINITION_VERSION = 1;
 export const AGENT_DEFINITION_REGISTRY_VERSION = 1;
@@ -15,7 +16,7 @@ export const AgentDefinitionRegistryMutationKind = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
-  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy', 'enabled',
+  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy', 'specialistDelegationProfile', 'enabled',
   'definitionRevision',
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
@@ -49,6 +50,7 @@ const DEFINITION_CEILING_KEYS = Object.freeze([
 const MODEL_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const OWNER_BUDGET_KEYS = new Set([
   ...DEFINITION_CEILING_KEYS,
@@ -214,6 +216,13 @@ export function normalizeAgentModelRoutePolicyV1(input) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
     }
   }
+  for (const key of ['retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    if (Object.hasOwn(raw, key)
+        && (typeof raw[key] !== 'number' || !Number.isSafeInteger(raw[key])
+            || Object.is(raw[key], -0) || raw[key] !== normalized[key])) {
+      throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
+    }
+  }
   for (const key of ['maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
     if (Object.hasOwn(raw, key)
         && (Object.is(raw[key], -0) || !Object.is(raw[key], normalized[key]))) {
@@ -239,6 +248,9 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
+    retryBackoffSeconds: normalized.retryBackoffSeconds,
+    circuitBreakerFailures: normalized.circuitBreakerFailures,
+    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
   });
 }
 
@@ -296,18 +308,29 @@ export function normalizeAgentDefinitionV1(input) {
   if (raw.schemaVersion !== AGENT_DEFINITION_VERSION) {
     throw new Error('AgentDefinitionV1.schemaVersion must be numeric 1');
   }
+  const specialistProfile = Object.hasOwn(raw, 'specialistDelegationProfile')
+    ? raw.specialistDelegationProfile === null ? null
+      : normalizeAgentSpecialistDelegationProfileV1(raw.specialistDelegationProfile)
+    : undefined;
+  const capabilityIds = ids(raw.capabilityIds, 'capabilityIds', 64);
+  const toolIds = ids(raw.toolIds, 'toolIds', 128);
+  if (specialistProfile) {
+    subset(specialistProfile.requiredCapabilityIds, capabilityIds, 'Agent specialist delegation capabilities');
+    subset(specialistProfile.requiredToolIds, toolIds, 'Agent specialist delegation tools');
+  }
   return freeze({
     schemaVersion: AGENT_DEFINITION_VERSION,
     agentDefinitionId: id(raw.agentDefinitionId, 'agentDefinitionId'),
     label: textValue(raw.label, 'label', 160),
     description: textValue(raw.description, 'description', 4000, { optional: true }),
     instructions: textValue(raw.instructions, 'instructions', 12000),
-    capabilityIds: ids(raw.capabilityIds, 'capabilityIds', 64),
-    toolIds: ids(raw.toolIds, 'toolIds', 128),
+    capabilityIds,
+    toolIds,
     tags: ids(raw.tags, 'tags', 32),
     acceptanceCriteria: normalizeAcceptanceCriteria(raw.acceptanceCriteria),
     configDefaults: normalizeConfigDefaults(raw.configDefaults),
     modelRoutePolicy: normalizeAgentModelRoutePolicyV1(raw.modelRoutePolicy),
+    ...(specialistProfile === undefined ? {} : { specialistDelegationProfile: specialistProfile }),
     enabled: bool(raw.enabled, 'enabled'),
     definitionRevision: positiveInteger(raw.definitionRevision, 'definitionRevision'),
   });
@@ -433,6 +456,16 @@ export function materializeAgentDefinitionV1(input = {}) {
   subset(requestedToolIds, ownerToolIds, 'Requested Agent tools');
   subset(requestedToolIds, current.toolIds, 'Requested Agent tools');
 
+  const profile = current.specialistDelegationProfile;
+  // Disabled profiles are retained for owner review but never admit execution.
+  // Enabled delegation remains a proposal scoped to the actual job, not merely
+  // the reusable definition's potentially wider advertised capabilities.
+  if (profile?.enabled) {
+    subset(profile.requiredCapabilityIds, requestedCapabilityIds,
+      'specialist delegation capabilities for materialized job');
+    subset(profile.requiredToolIds, requestedToolIds,
+      'specialist delegation tools for materialized job');
+  }
   const jobId = id(raw.jobId, 'jobId');
   const projectId = optionalId(raw.projectId, 'projectId');
   const ownerGoal = textValue(raw.goal, 'goal', 50000);
@@ -476,6 +509,27 @@ export function materializeAgentDefinitionV1(input = {}) {
       definitionRevision: current.definitionRevision,
     },
     config,
+    ...(profile ? { specialistDelegationBinding: normalizeAgentSpecialistDelegationBindingV1({
+      schemaVersion: 1,
+      jobId,
+      projectId,
+      registryId: registry.registryId,
+      registryRevision: registry.revision,
+      agentDefinitionId: current.agentDefinitionId,
+      definitionRevision: current.definitionRevision,
+      profile,
+      authority: {
+        proposalOnly: true,
+        executionAuthorized: false,
+        policyAuthorized: false,
+        schedulingAuthorized: false,
+        recoveryAuthorized: false,
+        credentialAuthorized: false,
+        completionAuthorized: false,
+        verificationAuthorized: false,
+        capacityReserved: false,
+      },
+    }) } : {}),
     routerOverride: current.modelRoutePolicy
       ? freeze({ routePolicy: current.modelRoutePolicy })
       : freeze({}),
