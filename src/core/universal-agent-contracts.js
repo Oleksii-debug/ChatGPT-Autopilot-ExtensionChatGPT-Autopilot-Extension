@@ -424,7 +424,9 @@ export function normalizeVerificationV1(input) {
     verificationAuthorityId: id(raw.verificationAuthorityId, 'verificationAuthorityId', { optional: true }),
     effectId: id(raw.effectId, 'effectId', { optional: true }),
     executionId: id(raw.executionId, 'executionId', { optional: true }),
-    attempt: integer(raw.attempt, 'attempt', 0, 64, { optional: true, fallback: 0 }),
+    attempt: integer(raw.attempt, 'attempt', 0, 64, {
+      optional: true, fallback: 0, present: Object.hasOwn(raw, 'attempt'),
+    }),
   });
 }
 
