@@ -3159,3 +3159,116 @@ test('Plan2 S1 credential native setter must accept and preserve value before pa
     pageUrl = priorPageUrl;
   }
 });
+
+
+test('Plan2 S1 regular fill blocks stale input-handler effects before change after cold restart', () => {
+  setup();
+  const oldTextarea = globalThis.HTMLTextAreaElement;
+  const originalHit = globalThis.document.elementFromPoint;
+  try {
+    globalThis.HTMLTextAreaElement = FakeElement;
+    element.tagName = 'TEXTAREA';
+    element.value = '';
+    element.setAttribute('aria-label', 'Draft');
+    const snap = snapshotBrowserPage('fill-input-fence');
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'fill', frameId: 0, ref: 'r1', text: 'approved fixture',
+    }), { url: snap.url, frames: [{ frameId: 0, ...snap }] })));
+    const events = [];
+    let onInput = () => {};
+    let occluded = false;
+    element.dispatchEvent = event => {
+      events.push(event.type);
+      if (event.type === 'input') onInput();
+      return true;
+    };
+    globalThis.document.elementFromPoint = () => occluded ? new FakeElement('Modal') : element;
+    const tryFill = () => executeBrowserPageAction(snap.snapshotId, action);
+
+    onInput = () => { element.value = 'page-overwritten'; };
+    assert.throws(tryFill, /AGENT_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(events, ['input'], 'no change for overwritten field');
+
+    events.length = 0;
+    onInput = () => { element.setAttribute('aria-label', 'Unapproved target'); };
+    assert.throws(tryFill, /AGENT_SEMANTIC_TARGET_STALE/);
+    assert.deepEqual(events, ['input'], 'a repurposed target may not receive change');
+    element.setAttribute('aria-label', 'Draft');
+
+    events.length = 0;
+    onInput = () => { occluded = true; };
+    assert.throws(tryFill, /AGENT_TARGET_OCCLUDED/);
+    assert.deepEqual(events, ['input'], 'overlay blocks the second form event');
+    occluded = false;
+
+    events.length = 0;
+    onInput = () => {};
+    const recovered = JSON.parse(JSON.stringify(action));
+    assert.equal(executeBrowserPageAction(snap.snapshotId, recovered).effectVerified, true);
+    assert.equal(element.value, 'approved fixture');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(element.clicked, 0, 'no hidden click fallback');
+  } finally {
+    if (oldTextarea === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = oldTextarea;
+    globalThis.document.elementFromPoint = originalHit;
+  }
+});
+
+test('Plan2 S1 select rechecks option identity and visibility between input and change', () => {
+  setup();
+  const oldSelect = globalThis.HTMLSelectElement;
+  const originalHit = globalThis.document.elementFromPoint;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.multiple = false;
+    element.value = 'keep';
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'allow', textContent: 'Allow', label: 'Allow' },
+    ];
+    const snap = snapshotBrowserPage('select-input-fence');
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
+      type: 'select', frameId: 0, ref: 'r1', value: 'allow',
+    }), { url: snap.url, frames: [{ frameId: 0, ...snap }] })));
+    const events = [];
+    let onInput = () => {};
+    let occluded = false;
+    element.dispatchEvent = event => {
+      events.push(event.type);
+      if (event.type === 'input') onInput();
+      return true;
+    };
+    globalThis.document.elementFromPoint = () => occluded ? new FakeElement('Modal') : element;
+    const run = () => executeBrowserPageAction(snap.snapshotId, action);
+
+    onInput = () => { element.options[1].disabled = true; };
+    assert.throws(run, /AGENT_SELECT_OPTIONS_STALE/);
+    assert.deepEqual(events, ['input'], 'an input handler cannot change approved options before change');
+    element.options[1].disabled = false;
+
+    events.length = 0;
+    onInput = () => { occluded = true; };
+    assert.throws(run, /AGENT_TARGET_OCCLUDED/);
+    assert.deepEqual(events, ['input'], 'a page overlay denies the second select event');
+    occluded = false;
+
+    events.length = 0;
+    onInput = () => { element.value = 'keep'; };
+    assert.throws(run, /AGENT_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(events, ['input'], 'value overwrite cannot be reported verified');
+
+    events.length = 0;
+    onInput = () => {};
+    const recovered = JSON.parse(JSON.stringify(action));
+    assert.equal(executeBrowserPageAction(snap.snapshotId, recovered).effectVerified, true);
+    assert.equal(element.value, 'allow');
+    assert.deepEqual(events, ['input', 'change']);
+    assert.equal(element.clicked, 0);
+  } finally {
+    if (oldSelect === undefined) delete globalThis.HTMLSelectElement;
+    else globalThis.HTMLSelectElement = oldSelect;
+    globalThis.document.elementFromPoint = originalHit;
+  }
+});
