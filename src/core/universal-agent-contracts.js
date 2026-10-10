@@ -304,8 +304,10 @@ export function normalizeCapabilityV1(input) {
     schemaVersion: version(raw.schemaVersion, 'CapabilityV1'),
     capabilityId: id(raw.capabilityId, 'capabilityId'),
     description: text(raw.description, 'description', { optional: true, max: 2000 }),
-    riskClass: id(raw.riskClass == null ? 'R0' : raw.riskClass, 'riskClass'),
-    attributes: jsonData(raw.attributes, 'attributes'),
+    // Absent legacy metadata has documented defaults; explicitly persisted
+    // null/undefined is corruption and must never downgrade the risk class.
+    riskClass: Object.hasOwn(raw, 'riskClass') ? id(raw.riskClass, 'riskClass') : 'R0',
+    attributes: jsonData(raw.attributes, 'attributes', { present: Object.hasOwn(raw, 'attributes') }),
   });
 }
 
