@@ -98,6 +98,18 @@ function plainArray(value) {
 function integer(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   return Number.isSafeInteger(value) && value >= min && value <= max ? value : 0;
 }
+// Recorded counters are evidence, not defaults. A truly absent legacy field
+// projects zero; a present corrupt value must not become a plausible zero in
+// the accessible timeline or its exported JSON after storage/restart.
+function recordedCounter(recordValue, field) {
+  if (!safeHasOwn(recordValue, field)) return 0;
+  const observed = own(recordValue, field);
+  if (!Number.isSafeInteger(observed) || Object.is(observed, -0) || observed < 0) {
+    // All field names are fixed code-owned literals. Never emit hostile values.
+    throw new Error('Agent timeline persisted counter is invalid');
+  }
+  return observed;
+}
 function boundedJobId(value) {
   // Durable BrowserAgentManager identities are bounded text, not trusted
   // display/HTML content. Never export corrupt oversized/control-char IDs.
@@ -175,7 +187,7 @@ function planSummary(plan) {
       nodeCount += 1;
     }
   }
-  return freeze({ revision: integer(own(plan, 'revision')), nodeCount, stateCounts });
+  return freeze({ revision: recordedCounter(plan, 'revision'), nodeCount, stateCounts });
 }
 function recordedOutcomeSummary(value) {
   // The persisted outcome record is observable Core state, not an external
@@ -456,10 +468,10 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     plan: planSummary(own(runtime, 'plan')),
     evidenceMap,
     counters: {
-      steps: integer(own(runtime, 'stepCount')),
-      cycles: integer(own(runtime, 'completedCycles')),
-      modelCalls: integer(own(runtime, 'modelCalls')),
-      totalTokens: integer(own(runtime, 'totalTokens')),
+      steps: recordedCounter(runtime, 'stepCount'),
+      cycles: recordedCounter(runtime, 'completedCycles'),
+      modelCalls: recordedCounter(runtime, 'modelCalls'),
+      totalTokens: recordedCounter(runtime, 'totalTokens'),
       estimatedCostUsd,
       verifiedChecks: recordedOutcome.criteriaRecorded,
       ownerEvents: all.filter(entry => entry.category === 'OWNER').length,
