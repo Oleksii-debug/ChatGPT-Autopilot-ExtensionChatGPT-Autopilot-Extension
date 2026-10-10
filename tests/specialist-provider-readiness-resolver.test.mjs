@@ -325,9 +325,12 @@ test('selection boundary and injected clock are exact and non-coercive', async (
   await assert.rejects(backwardClock.resolve(selection()), /clock moved backwards/u);
 });
 
-test('trusted resolver failures propagate and cannot be converted into READY fallback', async () => {
+test('trusted resolver failures fail closed with opaque diagnostics and cannot become READY', async () => {
   const resolver = runtime([binding(async () => {
     throw new Error('provider probe failed');
   })]);
-  await assert.rejects(resolver.resolve(selection()), /provider probe failed/u);
+  await assert.rejects(resolver.resolve(selection()), error =>
+    error.message === 'Trusted readiness provider resolution failed'
+    && !error.message.includes('provider probe failed')
+    && !Object.hasOwn(error, 'cause'));
 });
