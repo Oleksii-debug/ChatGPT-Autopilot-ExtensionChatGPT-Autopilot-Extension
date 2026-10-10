@@ -1018,10 +1018,11 @@ test('exported binding helpers reject hostile outer records before invoking acce
 
 test('definition-launched Browser Agent keeps definition provenance when bound to canonical hierarchy', async () => {
   const { manager, dependencies } = await fixture();
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const createdRegistry = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: createdRegistry.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: {
       schemaVersion: 1,
