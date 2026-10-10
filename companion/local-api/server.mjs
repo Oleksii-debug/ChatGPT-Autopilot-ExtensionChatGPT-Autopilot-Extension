@@ -13,6 +13,7 @@ import {
 } from '../../src/core/autopilot-programmatic-control.js';
 
 const MAX_BODY_BYTES = 65_536;
+const OWNER_TOKEN_RESOLVE_TIMEOUT_MS = 2_000;
 const AUTH_FAILURE = Object.freeze({ schemaVersion: 1, status: 'DENIED' });
 const FAILURE = Object.freeze({ schemaVersion: 1, status: 'UNAVAILABLE' });
 
@@ -33,6 +34,24 @@ function send(res, code, data) {
 }
 
 function reject(res, code = 403) { send(res, code, AUTH_FAILURE); }
+
+// Credential resolution is advisory to HTTP authentication, not a gate allowed
+// to stall this Companion indefinitely. A stalled or failed owner resolver
+// cannot leave a local socket waiting or use a cached old credential.
+async function boundedOwnerToken(provider) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => provider()),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Owner token unavailable')), OWNER_TOKEN_RESOLVE_TIMEOUT_MS);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function headerString(raw) {
   return typeof raw === 'string' ? raw : '';
@@ -82,6 +101,12 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       }
       const authorization = headerString(req.headers.authorization);
       const candidate = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+      // Do not invoke the credential broker on malformed anonymous requests.
+      // In particular, remote sites cannot make an Origin-denied request
+      // trigger owner credential operations.
+      if (candidate.length < 32 || candidate.length > 512 || /[^\\x21-\\x7e]/u.test(candidate)) {
+        return reject(res, 401);
+      }
       const candidateDigest = digest(candidate);
       let activeExpected = staticExpected;
       if (tokenProvider !== undefined) {
@@ -89,7 +114,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
           // Resolve afresh per request; a retired token must not authenticate.
           // Resolver errors or missing/weak tokens fail closed, no last-good
           // credential cache and no sensitive diagnostics sent to the client.
-          activeExpected = digest(exactToken(await tokenProvider(), 'Local API token'));
+          activeExpected = digest(exactToken(await boundedOwnerToken(tokenProvider), 'Local API token'));
         } catch {
           return reject(res, 401);
         }
