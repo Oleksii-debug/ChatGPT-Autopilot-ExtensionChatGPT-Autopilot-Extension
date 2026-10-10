@@ -677,6 +677,16 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   if (JSON.stringify(bindingBeforeTeardown) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace canonical binding changed before provider teardown');
   }
+  // The second binding lookup is asynchronous. An owner can be revoked or
+  // replaced while that lookup resolves even if the workspace binding itself
+  // is unchanged. Refuse destructive provider I/O on that stale ownership
+  // snapshot; the provider must independently enforce the same lease fence.
+  const ownerBeforeProvider = normalizeExactExecutionOwnershipV1(
+    await trusted.loadCanonicalOwnership(ownerKey),
+  );
+  if (JSON.stringify(ownerBeforeProvider) !== JSON.stringify(ownerBefore)) {
+    throw new Error('cloud workspace canonical owner changed before provider teardown');
+  }
   const target = Object.freeze({
     workspaceId: binding.workspaceId,
     providerId: binding.providerId,
