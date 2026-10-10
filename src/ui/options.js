@@ -3545,7 +3545,8 @@ function renderAgentRunTimeline(job) {
       ' Підтвердження зовнішніх ефектів, знімки до/після, квитанції інструментів, походження артефактів та зв’язки Agent tree цією хронологією не встановлені.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями; підрахунки неповні.' : '') +
       ' Порядкові номери записів належать лише поточному збереженому зрізу і можуть змінюватися після обрізання історії.' +
-      ' Це перегляд, а не повторне виконання.';
+      ' Це перегляд, а не повторне виконання.' +
+      (ui.agentTimelineStale ? ' Увага: останнє оновлення з Core не підтверджене; експорт заблоковано до успішного оновлення.' : '');
   } catch {
     list.replaceChildren();
     status.textContent = 'Безпечна хронологія недоступна: перевірте збережений стан Agent.';
@@ -3554,11 +3555,18 @@ function renderAgentRunTimeline(job) {
 async function refreshAgentRunTimeline() {
   const button = $('agent-run-timeline-refresh-button');
   if (button.disabled) return;
+  // A failed or overtaken Core refresh must not leave an exportable old
+  // snapshot masquerading as current evidence. Keep viewing read-only.
+  ui.agentTimelineStale = true;
   const restoreFocusOnUnownedBlur = document.activeElement === button;
   button.disabled = true;
   try {
     const result = await loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
     if (result.applied) {
+      ui.agentTimelineStale = false;
+      // loadBrowserAgentJobs may have painted while the read was pending.
+      // Clear the stale warning only after the read has been accepted.
+      renderAgentRunTimeline(result.job || null);
       announce('Хронологію Agent оновлено з Core.');
     } else {
       $('agent-run-timeline-status').textContent = 'Не вдалося оновити. Перевірте Core і повторіть.';
@@ -3577,6 +3585,11 @@ async function refreshAgentRunTimeline() {
   }
 }
 function exportAgentRunTimeline() {
+  if (ui.agentTimelineStale) {
+    $('agent-run-timeline-status').textContent = 'Експорт заблоковано: актуальність даних не підтверджено Core. Натисніть «Оновити з Core». ';
+    announce('Експорт хронології заблоковано до успішного оновлення з Core.');
+    return;
+  }
   const job = ui.agentTimelineJob;
   if (!job) {
     $('agent-run-timeline-status').textContent = 'Спочатку виберіть завдання Agent.';
