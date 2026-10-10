@@ -252,6 +252,9 @@ function recordedSpecialistDispatchEvidence(runtime) {
   const statusCounts = { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 };
   let receiptIdsRecorded = 0;
   let artifactReferencesRecorded = 0;
+  // One receipt identity cannot prove multiple independently recorded
+  // provider attempts. This remains metadata, not trusted external proof.
+  const seenReceiptIds = new Set();
   for (const key of keys) {
     const attempt = record(own(dispatches, key), 'Agent specialist dispatch attempt');
     const state = own(attempt, 'state');
@@ -260,7 +263,15 @@ function recordedSpecialistDispatchEvidence(runtime) {
     }
     statusCounts[state] += 1;
     const receiptId = own(attempt, 'providerReceiptId');
-    if (typeof receiptId === 'string' && receiptId.length > 0 && receiptId.length <= 240) {
+    if (receiptId !== undefined && receiptId !== null && receiptId !== '') {
+      // Refuse corrupt/spoofed persisted IDs instead of silently dropping
+      // them or counting the same external receipt twice after restart.
+      if (typeof receiptId !== 'string' || receiptId.length > 240 ||
+          /[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\u202a-\\u202e\\u2066-\\u2069]/u.test(receiptId) ||
+          seenReceiptIds.has(receiptId)) {
+        throw new Error('Agent specialist dispatch receipt identity is invalid or duplicated');
+      }
+      seenReceiptIds.add(receiptId);
       receiptIdsRecorded += 1;
     }
     const referencesPresent = safeHasOwn(attempt, 'resultArtifactRefs');
