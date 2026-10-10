@@ -27,6 +27,38 @@ import {
 
 const AT = '2026-09-19T03:00:00Z';
 
+test('Plan-1 S1: observation data presence is exact across cold restart and corruption', () => {
+  const base = {
+    schemaVersion: 1, observationId: 'obs-data-presence',
+    invocationId: 'invoke-data-presence', status: ObservationStatus.OK,
+    observedAt: AT,
+  };
+  const legacy = normalizeObservationV1(base);
+  assert.deepEqual(legacy.data, {}, 'only absent legacy data may be defaulted');
+  assert.deepEqual(normalizeObservationV1(JSON.parse(JSON.stringify(legacy))), legacy);
+
+  for (const bad of [null, undefined]) {
+    const corrupt = { ...base, data: bad };
+    assert.throws(() => normalizeObservationV1(corrupt), error => {
+      assert.match(error.message, /data contains corrupt explicitly present data/);
+      assert.doesNotMatch(error.message, /invocation-data-presence/);
+      return true;
+    }, 'explicit corruption must not become empty success evidence');
+    assert.deepEqual(corrupt, { ...base, data: bad }, 'input must not be mutated');
+  }
+
+  const healthy = normalizeObservationV1({
+    ...base,
+    data: { result: { evidenceId: 'effect-record-1', unchanged: true } },
+  });
+  assert.ok(Object.isFrozen(healthy));
+  assert.ok(Object.isFrozen(healthy.data.result));
+  assert.equal(healthy.data.result.evidenceId, 'effect-record-1');
+  assert.deepEqual(normalizeObservationV1(JSON.parse(JSON.stringify(healthy))), healthy,
+    'valid nested observation evidence must survive an exact JSON restart');
+});
+
+
 test('Plan-1 S1: artifact location identity survives JSON restart without whitespace or control-byte aliases', () => {
   const canonical = artifact({ artifactId: 'artifact-uri-stable', uri: 'artifact://job-1/report.txt' });
   const normalized = normalizeArtifactRefV1(canonical);
