@@ -132,7 +132,8 @@ function cloneReadinessEvidence(value, label, depth = 0, budget = { count: 0 }, 
       }
       const descriptor = descriptors[key];
       if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
-        throw new Error(`${label}.${key} must be an enumerable own data property`);
+        // A caller-controlled field name may carry secrets: never echo it.
+        throw new Error(`${label} must have enumerable own data properties`);
       }
       result[key] = cloneReadinessEvidence(descriptor.value, `${label}.${key}`, depth + 1, budget, ancestors);
     }
