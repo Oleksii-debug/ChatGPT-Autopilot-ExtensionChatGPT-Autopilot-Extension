@@ -60,6 +60,15 @@ function makeVisionChrome() {
     scripting: {
       async executeScript(details) {
         const name = details.func?.name || '';
+        // JavaScript infers the property name 'func' for an anonymous Chrome-injected arrow.
+        if (!name || name === 'func') {
+          const tab = tabs.get(details.target.tabId);
+          return [{ frameId: 0, result: {
+            url: tab?.url || '',
+            documentEpoch: 1700000000000 + pageVersion,
+            width: 1280, height: 720, scrollX: 0, scrollY: 0,
+          } }];
+        }
         if (name === 'snapshotBrowserPage') {
           const tab = tabs.get(details.target.tabId);
           return [{
@@ -70,7 +79,7 @@ function makeVisionChrome() {
               title: 'AIS',
               text: `semantic page ${pageVersion}`,
               elements: [],
-              viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 1600 },
+              viewport: { width: 1280, height: 720, scrollX: 0, scrollY: 0, documentEpoch: 1700000000000 + pageVersion, documentHeight: 1600 },
             },
           }];
         }

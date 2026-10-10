@@ -1,0 +1,42 @@
+name: Plan 2 Sections 1-2 semantic and visual safety
+
+on:
+  push:
+    branches:
+      - plan2/semantic-coordinate-fences-11-0-13-high-20261008
+  pull_request:
+    paths:
+      - "src/core/browser-agent.js"
+      - "src/core/browser-agent-manager.js"
+      - "tests-regression/core/plan2-browser-target-fences.test.js"
+      - ".github/workflows/plan2-sections-1-2-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-identity:
+    name: Plan 2 S1-S2 negative/restart proof (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify 11.x canonical lineage and source syntax
+        shell: bash
+        run: |
+          node -e "const m=require('./manifest.json');const v=m.version.split('.').map(Number);if (v[0]<11||(v[0]===11&&v[1]===0&&v[2]<13))process.exit(1)"
+          node --check src/core/browser-agent.js
+          node --check src/core/browser-agent-manager.js
+          node --check tests-regression/core/plan2-browser-target-fences.test.js
+      - name: Run semantic/visual target, injection and restart-like negative tests
+        shell: bash
+        run: |
+          node --test tests-regression/core/plan2-browser-target-fences.test.js
