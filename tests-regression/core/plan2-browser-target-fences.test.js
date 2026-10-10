@@ -683,6 +683,63 @@ test('semantic select denies focus-time overlay before changing option', () => {
   }
 });
 
+// Section 1: a select's model-visible option fingerprint is not permission
+// to activate hidden/disabled choices (including optgroup inherited state).
+test('semantic select refuses unavailable options and groups after JSON restart', () => {
+  setup();
+  const priorSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    const keep = { value: 'keep', textContent: 'Keep', label: 'Keep', disabled: false, hidden: false };
+    const archive = { value: 'archive', textContent: 'Archive', label: 'Archive', disabled: false, hidden: false };
+    element.options = [keep, archive];
+    element.value = 'keep';
+    const events = [];
+    element.dispatchEvent = event => { events.push(event.type); return true; };
+    const cases = [
+      { name: 'hidden option', option: { hidden: true } },
+      { name: 'disabled option', option: { disabled: true } },
+      { name: 'hidden optgroup', group: { hidden: true } },
+      { name: 'disabled optgroup', group: { disabled: true } },
+      { name: 'aria-disabled option', ariaOption: 'aria-disabled' },
+      { name: 'aria-hidden optgroup', ariaGroup: 'aria-hidden' },
+    ];
+    for (const scenario of cases) {
+      Object.assign(archive, { hidden: false, disabled: false, parentElement: null, getAttribute: () => null });
+      Object.assign(archive, scenario.option || {});
+      if (scenario.group) archive.parentElement = { ...scenario.group };
+      if (scenario.ariaOption) archive.getAttribute = name => name === scenario.ariaOption ? 'true' : null;
+      if (scenario.ariaGroup) archive.parentElement = { getAttribute: name => name === scenario.ariaGroup ? 'true' : null };
+      const observed = snapshotBrowserPage('select-ineligible');
+      const action = parseBrowserAgentAction(
+        '{"type":"select","frameId":0,"ref":"r1","value":"archive"}',
+        { frames: [{ frameId: 0, ...observed }], url: observed.url },
+      );
+      assert.throws(
+        () => executeBrowserPageAction('select-ineligible', JSON.parse(JSON.stringify(action))),
+        /AGENT_SELECT_OPTION_AMBIGUOUS/,
+        scenario.name,
+      );
+      assert.equal(element.value, 'keep', scenario.name);
+      assert.deepEqual(events, [], scenario.name);
+    }
+    // The same source pathway remains operational for an explicitly available
+    // exact-value option. No second selector/executor authority is introduced.
+    Object.assign(archive, { hidden: false, disabled: false, parentElement: null, getAttribute: () => null });
+    const observed = snapshotBrowserPage('select-eligible');
+    const action = parseBrowserAgentAction(
+      '{"type":"select","frameId":0,"ref":"r1","value":"archive"}',
+      { frames: [{ frameId: 0, ...observed }], url: observed.url },
+    );
+    assert.equal(executeBrowserPageAction('select-eligible', JSON.parse(JSON.stringify(action))).effectVerified, true);
+    assert.equal(element.value, 'archive');
+    assert.deepEqual(events, ['input', 'change']);
+  } finally {
+    globalThis.HTMLSelectElement = priorSelect;
+  }
+});
+
 test('visual target identity is bound to exact screenshot coordinate inside same element', () => {
   setup();
   const first = probeBrowserCoordinateTarget(20, 20);
