@@ -27,6 +27,10 @@ const OUTCOME_KEYS = new Set([
   'providerUpdatedAt', 'providerObservedAt', 'at',
 ]);
 const OPTIONAL_OUTCOME_KEYS = new Set(['providerUpdatedAt', 'providerObservedAt']);
+const PREPARE_KEYS = new Set([
+  'planId', 'nodeId', 'agentId', 'handoffId', 'providerId',
+  'leaseId', 'leaseUntil', 'conversationId', 'providerConfig', 'at',
+]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TERMINAL = new Set(['finished', 'error', 'stuck']);
@@ -256,10 +260,13 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   });
 }
 
-export function createSpecialistProviderExecutionV1({
-  planId, nodeId, agentId, handoffId, providerId, leaseId, leaseUntil,
-  conversationId, providerConfig, at,
-} = {}) {
+export function createSpecialistProviderExecutionV1(input = {}) {
+  // Do not destructure a potentially hostile preparation object: property
+  // reads could execute getters/Proxy get traps before canonical admission.
+  const {
+    planId, nodeId, agentId, handoffId, providerId, leaseId, leaseUntil,
+    conversationId, providerConfig, at,
+  } = record(input, PREPARE_KEYS, 'Specialist provider preparation request');
   return normalizeSpecialistProviderExecutionV1({
     schemaVersion: SPECIALIST_PROVIDER_EXECUTION_VERSION,
     planId,
