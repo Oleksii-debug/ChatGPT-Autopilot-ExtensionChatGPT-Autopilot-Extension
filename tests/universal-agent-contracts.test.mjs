@@ -2319,3 +2319,82 @@ test('Plan-1 S1: present corrupt optional evidence and policy text cannot be era
     createdAt: AT,
   }), /artifactRefs\[0\].*mediaType must be canonical optional text/);
 });
+
+
+test('Plan-1 S1: all persisted V1 contract families reject unknown schema versions before durable admission', () => {
+  const fixtures = [
+    [normalizeCapabilityV1, {
+      schemaVersion: 1, capabilityId: 'filesystem.read', riskClass: 'R0',
+    }],
+    [normalizeToolDescriptorV1, {
+      schemaVersion: 1, toolId: 'fs.read', providerId: 'native-companion',
+      label: 'Read file', capabilityIds: ['filesystem.read'], readOnly: true,
+    }],
+    [normalizePolicyDecisionV1, {
+      schemaVersion: 1, decisionId: 'decision-schema-1',
+      invocationId: 'invoke-schema-1', decision: PolicyDecisionKind.DENY,
+      reasonCode: 'OWNER_DENIAL', decidedAt: AT,
+    }],
+    [normalizeToolInvocationV1, {
+      schemaVersion: 1, invocationId: 'invoke-schema-1',
+      toolId: 'fs.read', providerId: 'native-companion',
+      requestedCapabilityIds: ['filesystem.read'], policyDecisionId: 'decision-schema-1',
+      arguments: { fileRef: 'workspace:safe.txt' }, createdAt: AT,
+    }],
+    [normalizeArtifactRefV1, artifact({ artifactId: 'artifact-schema-1' })],
+    [normalizeObservationV1, {
+      schemaVersion: 1, observationId: 'observation-schema-1',
+      invocationId: 'invoke-schema-1', status: ObservationStatus.OK,
+      artifactRefs: [artifact({ artifactId: 'artifact-schema-1' })],
+      observedAt: AT,
+    }],
+    [normalizeVerificationV1, {
+      schemaVersion: 1, verificationId: 'verification-schema-1',
+      invocationId: 'invoke-schema-1', observationId: 'observation-schema-1',
+      status: VerificationStatus.VERIFIED, reasonCode: 'OBSERVED',
+      evidenceArtifactIds: ['artifact-schema-1'], verifiedAt: AT,
+    }],
+    [normalizeCredentialRefV1, {
+      schemaVersion: 1, credentialId: 'credential-schema-1',
+      brokerId: 'broker-schema-1', kind: 'oauth',
+      scope: ['drive.readonly'], expiresAt: null,
+    }],
+    [normalizeSpecialistHandoffV1, {
+      schemaVersion: 1, handoffId: 'handoff-schema-1',
+      specialistId: 'specialist-schema-1', goal: 'Read approved artifact',
+      requestedCapabilityIds: ['filesystem.read'],
+      artifactRefs: [artifact({ artifactId: 'artifact-schema-1' })],
+      createdAt: AT,
+    }],
+  ];
+  for (const [normalize, input] of fixtures) {
+    const before = JSON.stringify(input);
+    const baseline = normalize(input);
+    assert.equal(baseline.schemaVersion, 1);
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(baseline))), baseline,
+      'accepted V1 contract must survive JSON cold restart');
+    for (const schemaVersion of [0, 2, null, undefined, '1']) {
+      const hostile = { ...input, schemaVersion };
+      assert.throws(() => normalize(hostile), /schemaVersion/,
+        'unknown/invalid schema must fail closed without migration alias');
+      assert.equal(hostile.schemaVersion, schemaVersion, 'denial must not mutate input');
+    }
+    const absent = { ...input };
+    delete absent.schemaVersion;
+    assert.throws(() => normalize(absent), /schemaVersion/,
+      'schema omission must not default a durable authority/evidence record to V1');
+    let getterCalls = 0;
+    const accessor = { ...input };
+    Object.defineProperty(accessor, 'schemaVersion', {
+      enumerable: true, configurable: true,
+      get() { getterCalls += 1; throw new Error('OWNER_PRIVATE_SCHEMA_SECRET'); },
+    });
+    assert.throws(() => normalize(accessor), error => {
+      assert.match(error.message, /own data properties/);
+      assert.doesNotMatch(error.message, /OWNER_PRIVATE_SCHEMA_SECRET/);
+      return true;
+    });
+    assert.equal(getterCalls, 0, 'schema accessors must never execute before validation');
+    assert.equal(JSON.stringify(input), before, 'normalizer must not change input');
+  }
+});
