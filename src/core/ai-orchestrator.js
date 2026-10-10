@@ -468,7 +468,10 @@ export class AiOrchestrator {
           unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
           throw unreserved;
         }
-        const receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId');
+        // A hostile Proxy can throw during descriptor reflection. Its message
+        // is not a trusted diagnostic and must not escape this pre-I/O fence.
+        let receipt = null;
+        try { receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId'); } catch { /* invalid receipt */ }
         if (!receipt || !Object.hasOwn(receipt, 'value')
             || typeof receipt.value !== 'string'
             || receipt.value.length < 1 || receipt.value.length > 240
@@ -484,7 +487,8 @@ export class AiOrchestrator {
         // local slots may omit these fields. A specifically bound account endpoint
         // must have every exact identity before any potentially billable I/O.
         for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
-          const binding = Object.getOwnPropertyDescriptor(reservation, field);
+          let binding = null;
+          try { binding = Object.getOwnPropertyDescriptor(reservation, field); } catch { /* invalid binding */ }
           if (!binding && !routeIdentity.endpointId) continue;
           if (!binding || !Object.hasOwn(binding, 'value') || binding.value !== routeIdentity[field]) {
             const mismatch = new Error('Model-budget reservation does not match the authorized route');
