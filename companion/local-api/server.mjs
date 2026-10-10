@@ -218,6 +218,13 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       return send(res, 422, FAILURE);
     }
   });
+  // Node's default HTTP/1 behavior automatically sends 100 Continue before
+  // the request handler can validate Host, Origin, bearer or trusted Core
+  // scope. Refuse the pre-body handshake: no unauthenticated intermediary
+  // should be invited to upload a body to this control-plane endpoint.
+  // checkContinue suppresses Node's default automatic 100 response, and
+  // does not emit the normal request event.
+  server.on('checkContinue', (_req, res) => reject(res, 417));
   server.requestTimeout = 15_000;
   server.headersTimeout = 10_000;
   server.keepAliveTimeout = 1_000;
