@@ -276,3 +276,33 @@ test('gateway preserves typed retry evidence for provider quota, timeout and ava
     error => error.statusCode === 504 && error.code === 'AI_PROVIDER_TIMEOUT',
   );
 });
+
+test('Plan4 S1 bound endpoint identity cannot silently fall through to builtin default account', async () => {
+  let providerEffects=0;
+  const fetchFn=async () => { providerEffects++; return response({models:[],data:[]}); };
+  // Builtin OpenAI and Ollama each have exactly one configured transport
+  // identity; a persisted route endpointId for a different account is not
+  // evidence that the transport can honor it.
+  for (const provider of ['ollama', 'openai']) {
+    for (const endpointId of ['team.account', ' local ', null, 13, {}]) {
+      await assert.rejects(
+        listProviderModels(provider, { endpointId, fetchFn }),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+      await assert.rejects(
+        completeProvider({provider, endpointId, model:'fixture', prompt:'approved'}, {fetchFn}),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+      await assert.rejects(
+        probeProvider(provider, { endpointId, fetchFn }),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+    }
+  }
+  assert.equal(providerEffects,0,'no discovery or completion I/O on wrong account identity');
+  const restored=JSON.parse(JSON.stringify({provider:'ollama',endpointId:'team.account',model:'fixture',prompt:'approved'}));
+  await assert.rejects(completeProvider(restored,{fetchFn}),error =>
+    error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+  assert.equal(providerEffects,0,'cold restart may not reset wrong account endpoint to default');
+  assert.deepEqual(await listProviderModels('ollama',{fetchFn:async () => response({models:[{name:'fixture'}]})}),['fixture']);
+});
