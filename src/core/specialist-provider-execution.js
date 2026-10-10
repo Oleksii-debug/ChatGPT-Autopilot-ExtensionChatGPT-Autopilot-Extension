@@ -204,10 +204,13 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   const safeToRetry = bool(raw.safeToRetry, 'safeToRetry');
   const effectEvidence = text(raw.effectEvidence, 'effectEvidence', 1000);
   const errorCode = optionalId(raw.errorCode, 'errorCode');
-  const providerUpdatedAt = raw.providerUpdatedAt == null || raw.providerUpdatedAt === ''
+  // Only a genuinely missing legacy chronology field or the canonical empty
+  // string means "not observed". An explicitly present null/undefined value
+  // must not erase persisted provider evidence during JSON cold restart.
+  const providerUpdatedAt = !Object.hasOwn(raw, 'providerUpdatedAt') || raw.providerUpdatedAt === ''
     ? ''
     : ts(raw.providerUpdatedAt, 'providerUpdatedAt');
-  const providerObservedAt = raw.providerObservedAt == null || raw.providerObservedAt === ''
+  const providerObservedAt = !Object.hasOwn(raw, 'providerObservedAt') || raw.providerObservedAt === ''
     ? ''
     : ts(raw.providerObservedAt, 'providerObservedAt');
   if (Boolean(providerUpdatedAt) !== Boolean(providerObservedAt)) {
@@ -339,8 +342,11 @@ export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcome
   const safeToRetry = bool(raw.safeToRetry, 'safeToRetry');
   const effectEvidence = text(raw.effectEvidence, 'effectEvidence', 1000);
   const errorCode = optionalId(raw.errorCode, 'errorCode');
-  const providerUpdatedAt = raw.providerUpdatedAt == null ? '' : raw.providerUpdatedAt;
-  const providerObservedAt = raw.providerObservedAt == null ? '' : raw.providerObservedAt;
+  // Do not reinterpret explicitly present null/undefined as omitted evidence.
+  // normalizeSpecialistProviderExecutionV1 validates both timestamps before
+  // admitting this outcome to the immutable durable execution record.
+  const providerUpdatedAt = Object.hasOwn(raw, 'providerUpdatedAt') ? raw.providerUpdatedAt : '';
+  const providerObservedAt = Object.hasOwn(raw, 'providerObservedAt') ? raw.providerObservedAt : '';
   const status = deriveStatus({
     providerStatus,
     providerSucceeded,
