@@ -137,7 +137,7 @@ test('definition persistence boundaries are descriptor-safe, exact-shape and zer
     enumerable: true,
     get() { reads += 1; return 'agents:project-1'; },
   });
-  await assert.rejects(() => manager.createAgentDefinitionRegistry(hostile), /enumerable data property/);
+  await assert.rejects(() => manager.createAgentDefinitionRegistry(hostile), /enumerable (?:own )?data propert(?:y|ies)/);
   assert.equal(reads, 0);
 
   await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
