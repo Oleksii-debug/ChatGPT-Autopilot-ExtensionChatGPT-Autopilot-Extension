@@ -605,6 +605,50 @@ test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any mo
   assert.equal(validatedSettlements, 1);
 });
 
+test('Plan4 S1: forged provider routeId remains UNKNOWN after one settled effect, including cold restart', async () => {
+  let providerCalls = 0;
+  let settled = 0;
+  const config = settings({
+    routes:[{routeId:'owner-approved', provider:'ollama', model:'fixture',
+      roles:['planner'], priority:1}],
+  });
+  const router = new AiOrchestrator({
+    now:() => 82_100,
+    gatewayClient:{async complete(req) {
+      providerCalls += 1;
+      return {text:'untrusted completion', routeId:'forged-other-route',
+        provider:req.provider, model:req.model, usage:{inputTokens:2, outputTokens:2, totalTokens:4}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall({route}) {
+        return {reservationId:'durable-receipt', ...route};
+      },
+      async afterProviderCall() {
+        settled += 1;
+        return {settled:true};
+      },
+    },
+  });
+  await assert.rejects(
+    () => router.run(config, DEFAULT_AI_ROUTER_RUNTIME, 'bounded task', {
+      maxOutputTokens:128,
+      providerCallBudgetContext:{kind:'browser-agent', jobId:'budget-route-forgery', controlEpoch:0},
+    }),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED');
+      assert.equal(error.modelCallsUsed, 1);
+      assert.equal(error.routerRuntime.lastFailoverChain.length, 1);
+      assert.equal(error.routerRuntime.lastFailoverChain[0].outcome, 'UNKNOWN');
+      const restored = JSON.parse(JSON.stringify(error.routerRuntime));
+      assert.equal(restored.lastFailoverChain[0].outcome, 'UNKNOWN');
+      assert.equal(restored.lastFailoverChain[0].routeId, 'owner-approved');
+      return true;
+    },
+  );
+  assert.equal(providerCalls, 1, 'charged provider call must not be retried');
+  assert.equal(settled, 1, 'budget is settled once even when output identity is forged');
+});
+
 test('selected model profile adds only its own prompts to the gateway request', async () => {
   const gateway = new FakeGateway(['coded']);
   const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 1000 });
