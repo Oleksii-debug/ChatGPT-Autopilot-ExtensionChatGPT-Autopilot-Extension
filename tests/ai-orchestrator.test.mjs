@@ -9,7 +9,7 @@ class FakeGateway {
   async complete(args) {
     this.calls.push(structuredClone(args));
     const text = this.responses.shift() ?? `${args.provider}/${args.model}:${args.prompt}`;
-    return { ok: true, provider: args.provider, model: args.model, text };
+    return { ok: true, provider: args.provider, model: args.model, ...(args.endpointId ? { endpointId:args.endpointId } : {}), text };
   }
 }
 
