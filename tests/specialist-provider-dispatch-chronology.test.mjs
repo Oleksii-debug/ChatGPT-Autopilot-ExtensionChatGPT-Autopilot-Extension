@@ -551,3 +551,32 @@ test('Section 1 post-effect Proxy receipt reflection becomes opaque UNKNOWN with
     && !Object.hasOwn(error, 'cause'));
   assert.equal(effects, 1);
 });
+
+
+test('Section 1 negative-zero readiness age cannot masquerade as a canonical zero-age observation', async () => {
+  const f = fixture();
+  const observation = await f.trustedResolver.resolve(f.selection);
+  await assert.rejects(
+    f.newDispatcher().execute(f.request({ ...observation, ageMs: -0 })),
+    /observation age is inconsistent/u,
+  );
+  assert.equal(f.providerCalls, 0, 'noncanonical readiness cannot reach the provider');
+});
+
+test('Section 1 negative-zero injected clock is denied before the provider boundary', async () => {
+  const f = fixture();
+  const observation = await f.trustedResolver.resolve(f.selection);
+  let effects = 0;
+  const dispatcher = new SpecialistProviderDispatcherV1({
+    now: () => -0,
+    bindings: [{
+      providerId: 'provider.local',
+      execute: async () => { effects += 1; },
+    }],
+  });
+  await assert.rejects(
+    dispatcher.execute(f.request(observation)),
+    /clock returned an invalid time/u,
+  );
+  assert.equal(effects, 0, 'noncanonical clock must not dispatch any provider effect');
+});
