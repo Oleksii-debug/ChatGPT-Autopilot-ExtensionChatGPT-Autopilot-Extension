@@ -29,6 +29,19 @@ function parseVersion(text, label) {
     label + ' version must be ' + PLAN8_SOURCE_VERSION + ', got ' + String(object.version));
 }
 
+function assertTrackedRegularSource(root, commit, path, label) {
+  let entry = '';
+  try {
+    entry = execFileSync('git', ['-C', root, 'ls-tree', commit, '--', path],
+      { encoding: 'utf8', stdio: 'pipe' }).trimEnd();
+  } catch {
+    throw new Error('PLAN8_LINEAGE_INVALID: ' + label + ' cannot inspect Git tree');
+  }
+  const match = /^100(?:644|755) blob [0-9a-f]{40}\t([^\n]+)$/u.exec(entry);
+  assert(match && match[1] === path,
+    label + ' missing regular tracked 11.x source path: ' + path);
+}
+
 /**
  * A fail-closed repository convergence gate. It verifies reachable Git source
  * lineage, not the original Drive ZIP bytes. The recorded archive digest is
@@ -43,6 +56,12 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
     let regular = false;
     try { regular = statSync(join(root, path)).isFile(); } catch { /* missing */ }
     assert(regular, 'required 11.x source path missing: ' + path);
+  }
+  // Directory existence alone is insufficient: untracked replacements, Git
+  // symlinks and later additions cannot establish the imported 11.x baseline.
+  for (const path of REQUIRED_PATHS) {
+    assertTrackedRegularSource(root, sourceCommit, path, 'source ancestor');
+    assertTrackedRegularSource(root, 'HEAD', path, 'candidate HEAD');
   }
   const provenance = read('PLAN8_11_0_13_SOURCE_CONVERGENCE.md');
   assert(provenance.includes(PLAN8_ARCHIVE_SHA256), 'audited archive digest missing from provenance');
