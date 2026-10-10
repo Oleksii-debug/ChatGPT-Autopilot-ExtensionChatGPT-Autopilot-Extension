@@ -1092,3 +1092,67 @@ test('S1 cold recovery checks binding again after final owner await; never resen
   assert.equal(bindingReads, 3);
   assert.equal(commits, 0);
 });
+
+
+// Plan 5 S1: final callback ordering must not turn revoked canonical state
+// into a positive scrub receipt after the provider has already been called.
+test('S1 scrub rejects canonical binding deleted or replaced during the final owner await', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  for (const drift of ['deleted', 'checkpoint-replaced']) {
+    let persisted = JSON.parse(JSON.stringify(binding));
+    let ownerReads = 0;
+    let bindingReads = 0;
+    let teardownCalls = 0;
+    let scrubCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => {
+          bindingReads++;
+          return persisted;
+        },
+        loadCanonicalOwnership: async () => {
+          if (++ownerReads === 2) {
+            persisted = drift === 'deleted' ? null
+              : { ...persisted, checkpointSha256: 'f'.repeat(64) };
+          }
+          return JSON.parse(JSON.stringify(ownership));
+        },
+        teardown: async () => { teardownCalls++; return teardownCompletion(); },
+        verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+      }),
+      /plain data object|canonical binding changed after final owner readback/u,
+    );
+    assert.equal(ownerReads, 2);
+    assert.equal(bindingReads, 3, 'the final owner await requires a new canonical binding lookup');
+    assert.equal(teardownCalls, 1, 'uncertain teardown must not be blindly repeated');
+    assert.equal(scrubCalls, 1, 'a stale prior scrub proof cannot authorize lease reuse');
+  }
+});
+
+test('S1 scrub performs final canonical binding readback on clean JSON cold-restart receipt', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let bindingReads = 0;
+  let ownerReads = 0;
+  let providerTeardowns = 0;
+  const receipt = await teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+    at: SCRUB_AT,
+    loadCanonicalBinding: async () => {
+      bindingReads++;
+      return JSON.parse(JSON.stringify(binding));
+    },
+    loadCanonicalOwnership: async () => {
+      ownerReads++;
+      return JSON.parse(JSON.stringify(ownership));
+    },
+    teardown: async () => { providerTeardowns++; return teardownCompletion(); },
+    verifyScrub: async () => scrubProof(),
+  });
+  assert.equal(receipt.scrubVerified, true);
+  assert.equal(receipt.leaseReleaseAuthorized, false);
+  assert.equal(receipt.reuseAuthorized, false);
+  assert.equal(receipt.requiresCanonicalRuntime, true);
+  assert.equal(bindingReads, 3);
+  assert.equal(ownerReads, 2);
+  assert.equal(providerTeardowns, 1);
+});
