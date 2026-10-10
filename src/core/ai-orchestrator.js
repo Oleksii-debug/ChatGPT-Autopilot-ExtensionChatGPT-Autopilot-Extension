@@ -476,6 +476,33 @@ export class AiOrchestrator {
           throw attachFailureRuntime(pending);
         }
       }
+      // Provider/account receipts are observations, not routing authority.
+      // Even after recording consumed budget, a response claiming a different
+      // provider, model or bound endpoint must never be published or retried.
+      // Missing identity fields remain legacy *unverified* (not a proof of
+      // binding); declared mismatches and accessors fail closed.
+      let receiptIdentityMismatch = false;
+      try {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const fields = Object.getOwnPropertyDescriptors(value);
+          for (const field of ['provider', 'model', 'endpointId']) {
+            if (field === 'endpointId' && !routeIdentity.endpointId) continue;
+            if (!Object.hasOwn(fields, field)) continue;
+            if (!Object.hasOwn(fields[field], 'value')
+                || fields[field].value !== routeIdentity[field]) receiptIdentityMismatch = true;
+          }
+        }
+      } catch {
+        receiptIdentityMismatch = true;
+      }
+      if (receiptIdentityMismatch) {
+        const unverified = new Error('Model provider identity receipt does not match the authorized route');
+        unverified.code = 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED';
+        unverified.category = 'UNAVAILABLE';
+        unverified.retryable = false;
+        routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:unverified.code, category:unverified.category });
+        throw attachFailureRuntime(unverified);
+      }
       routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
       selectedRouteId = routeIdentity.routeId;
       selectedRouteIdentity = Object.freeze({
