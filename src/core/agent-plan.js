@@ -27,12 +27,17 @@ const PLANES = new Set(Object.values(AgentExecutionPlane));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const TERMINAL = new Set([AgentPlanNodeState.VERIFIED, AgentPlanNodeState.FAILED, AgentPlanNodeState.CANCELLED]);
 
+function safePlanReflection(label, inspect) {
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
 function object(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  const prototype = Object.getPrototypeOf(value);
+  if (!value || typeof value !== 'object'
+      || safePlanReflection(label, () => Array.isArray(value))) throw new Error(`${label} must be an object`);
+  const prototype = safePlanReflection(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
   const snapshot = Object.create(null);
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const descriptors = safePlanReflection(label, () => Object.getOwnPropertyDescriptors(value));
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} cannot contain symbol fields`);
     const descriptor = descriptors[key];
@@ -51,7 +56,7 @@ function object(value, label) {
 }
 function exact(raw, allowed, label) {
   for (const key of Reflect.ownKeys(raw)) {
-    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field: ${String(key)}`);
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field`);
   }
 }
 function id(value, label) {
@@ -73,31 +78,33 @@ function timestamp(value, label) {
   return value;
 }
 function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < min || value > max) {
     throw new Error(`${label} is invalid`);
   }
   return value;
 }
 
 function dataArray(value, label, { min = 0, max = 128 } = {}) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!safePlanReflection(label, () => Array.isArray(value)
+      && Object.getPrototypeOf(value) === Array.prototype)) {
     throw new Error(`${label} must be a canonical array`);
   }
-  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  const lengthDescriptor = safePlanReflection(label, () => Object.getOwnPropertyDescriptor(value, 'length'));
   const length = lengthDescriptor?.value;
   if (!Number.isSafeInteger(length) || length < min || length > max) {
     throw new Error(`${label} must contain ${min}-${max} items`);
   }
   const expected = new Set(['length']);
   for (let index = 0; index < length; index += 1) expected.add(String(index));
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safePlanReflection(label, () => Reflect.ownKeys(value))) {
     if (typeof key !== 'string' || !expected.has(key)) {
       throw new Error(`${label} contains non-canonical array fields`);
     }
   }
   const out = [];
   for (let index = 0; index < length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    const descriptor = safePlanReflection(label, () => Object.getOwnPropertyDescriptor(value, String(index)));
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !descriptor.enumerable) {
       throw new Error(`${label}[${index}] must be an enumerable own data property`);
     }
