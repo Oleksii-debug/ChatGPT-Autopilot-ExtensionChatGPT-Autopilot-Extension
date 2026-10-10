@@ -933,7 +933,7 @@ test('duplicate JSON control member identities fail closed before canonical Core
     const cases = [
       original.replace(idKey, '"requestId":"forged-first","requestId":"unique-valid-identity"'),
       original.replace(idKey, '"requestId":"unique-valid-identity","requestId":"forged-last"'),
-      original.replace(idKey, '"requestId":"forged-escaped","\\\\u0072equestId":"unique-valid-identity"'),
+      original.replace(idKey, '"requestId":"forged-escaped","\\u0072equestId":"unique-valid-identity"'),
       original.replace('"principalId":"owner-1"',
         '"principalId":"other-owner","principalId":"owner-1"'),
     ];
