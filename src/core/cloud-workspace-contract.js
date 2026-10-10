@@ -326,7 +326,9 @@ const SCRUB_PROOF_KEYS = new Set([
   'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
 ]);
 const TEARDOWN_RECEIPT_KEYS = new Set([
-  'schemaVersion', 'workspaceId', 'providerId', 'executionLeaseId', 'executionOwnershipRevision', 'completedAt',
+  'schemaVersion', 'workspaceId', 'providerId', 'workspaceRevision',
+  'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
+  'executionLeaseId', 'executionOwnershipRevision', 'completedAt',
 ]);
 
 function trustedLifecycleOptions(input, keys, required, label) {
@@ -687,6 +689,15 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
       || completed.executionLeaseId !== binding.executionLeaseId
       || completed.executionOwnershipRevision !== binding.executionOwnershipRevision) {
     throw new Error('Cloud workspace teardown completion identity mismatch');
+  }
+  // A lease can be retained across workspace revision/checkpoint changes.
+  // A teardown receipt for an older incarnation is not proof of cleanup of
+  // the currently bound environment, even when the lease matches exactly.
+  if (completed.workspaceRevision !== binding.workspaceRevision
+      || completed.environmentSha256 !== binding.environmentSha256
+      || completed.checkpointArtifactId !== binding.checkpointArtifactId
+      || completed.checkpointSha256 !== binding.checkpointSha256) {
+    throw new Error('Cloud workspace teardown completion workspace state mismatch');
   }
   const completedAt = exactTimestamp(completed.completedAt, 'Cloud workspace teardown completedAt');
   if (Date.parse(completedAt) < Date.parse(binding.boundAt)
