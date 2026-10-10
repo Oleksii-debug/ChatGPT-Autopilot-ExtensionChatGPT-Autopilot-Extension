@@ -2455,3 +2455,52 @@ test('Plan2 S1 focus-time ARIA state is reobserved without duplicate click', () 
   assert.equal(recovered.checked, true);
   assert.equal(element.clicked, 1);
 });
+
+
+// Section 1: an ARIA switch is a checkable semantic control. Missing ARIA
+// state is not a proven false value, even after an action is JSON-restored.
+test('Plan2 S1 switch captures tri-state and fails closed without aria-checked', () => {
+  setup();
+  element.setAttribute('role', 'switch');
+  const page = snapshotBrowserPage('aria-switch');
+  assert.equal(page.elements[0].checked, null, 'missing switch state remains unknown');
+  const snapshot = { frames: [{ frameId: 0, ...page }], url: page.url };
+  const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":false}', snapshot)));
+  for (const value of [null, 'mixed', 'undefined', 'invalid']) {
+    if (value === null) element.removeAttribute('aria-checked');
+    else element.setAttribute('aria-checked', value);
+    assert.throws(() => executeBrowserPageAction('aria-switch', action), /AGENT_CHECK_STATE_INDETERMINATE/);
+    assert.equal(element.clicked, 0, 'uncertain switch state must not click');
+  }
+  element.setAttribute('aria-checked', 'FALSE');
+  assert.equal(executeBrowserPageAction('aria-switch', action).checked, false);
+  assert.equal(element.clicked, 0);
+  element.setAttribute('aria-checked', 'TRUE');
+  const observed = snapshotBrowserPage('switch-true');
+  assert.equal(observed.elements[0].checked, true);
+  const restored = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+    '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+    { frames: [{ frameId: 0, ...observed }], url: observed.url })));
+  element.click = () => { element.clicked++; element.setAttribute('aria-checked', 'false'); };
+  assert.equal(executeBrowserPageAction('switch-true', restored).checked, false);
+  assert.equal(element.clicked, 1, 'the explicit true-to-false transition executes once');
+});
+
+test('Plan2 S1 checkbox and radio missing ARIA state never verify unchecked', () => {
+  for (const role of ['checkbox', 'radio']) {
+    setup();
+    element.setAttribute('role', role);
+    const id = 'aria-missing-' + role;
+    const page = snapshotBrowserPage(id);
+    assert.equal(page.elements[0].checked, null);
+    const restored = JSON.parse(JSON.stringify(parseBrowserAgentAction(
+      '{"type":"check","frameId":0,"ref":"r1","checked":false}',
+      { frames: [{ frameId: 0, ...page }], url: page.url })));
+    assert.throws(() => executeBrowserPageAction(id, restored), /AGENT_CHECK_STATE_INDETERMINATE/);
+    assert.equal(element.clicked, 0);
+    element.setAttribute('aria-checked', 'false');
+    assert.equal(executeBrowserPageAction(id, restored).checked, false);
+    assert.equal(element.clicked, 0);
+  }
+});
