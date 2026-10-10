@@ -209,6 +209,39 @@ test('Plan4 S1 exact endpoint account and capability provenance is versioned, im
   assert.notEqual(changedAccount.configSha256,accepted.configSha256);
 });
 
+test('Plan4 S1 hashed route evidence does not reuse one credential reference across remote origins after JSON restart', async () => {
+  const first = {
+    ...endpoint, schemaVersion:1, profileId:'remote.first', provider:'openai-compatible',
+    endpointId:'remote-first', origin:'https://first.example.test/', locality:'remote',
+    credentialRef:'owner.remote.credential', credentialless:false, accountId:'owner-account',
+  };
+  const second = { ...first, profileId:'remote.second', endpointId:'remote-second',
+    origin:'https://second.example.test/' };
+  const unsafe = { ...snapshot, endpointProfiles:[first, second] };
+  for (const candidate of [unsafe, JSON.parse(JSON.stringify(unsafe))]) {
+    await assert.rejects(createAiRouteRegistryEvidenceV1(candidate),
+      /AI endpoint credential reference cannot bind distinct origins/);
+  }
+
+  const recovered = { ...unsafe, endpointProfiles:[first,
+    { ...second, origin:'https://first.example.test/' }] };
+  const authorized = await createAiRouteRegistryEvidenceV1(recovered);
+  assert.equal(authorized.endpointProfiles.length,2);
+  assert.equal(authorized.endpointProfiles[0].credentialRef,'owner.remote.credential');
+  assert.equal(authorized.endpointProfiles[1].origin,'https://first.example.test/');
+  const afterRestart = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({
+    ...recovered, endpointProfiles:authorized.endpointProfiles,
+  })));
+  assert.equal(afterRestart.configSha256,authorized.configSha256,
+    'canonical evidence hash must survive a JSON cold restart without credential aliasing');
+
+  const separateCredentials = await createAiRouteRegistryEvidenceV1({
+    ...unsafe, endpointProfiles:[first,
+      { ...second, credentialRef:'owner.other.credential' }],
+  });
+  assert.equal(separateCredentials.endpointProfiles[1].credentialRef,'owner.other.credential');
+});
+
 test('Plan4 S1 endpoint registry preserves exact provider/account identity after cold restart', async () => {
   const bound = {...route, endpointId:'owner.loopback'};
   const boundProfile = {...endpoint, endpointId:'owner.loopback'};
