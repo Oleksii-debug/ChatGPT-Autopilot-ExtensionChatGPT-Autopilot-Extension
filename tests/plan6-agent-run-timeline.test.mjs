@@ -1604,3 +1604,51 @@ test('S1 recorded action kinds reject corrupt durable metadata without granting 
   assert.equal(canonical.evidenceOnly, true);
   assert.equal(canonical.mayReplayExternalEffect, false);
 });
+
+
+test('S1 known event refuses malformed stored action payload while preserving missing and null legacy history', () => {
+  const base = job();
+  const recorded = buildAgentRunTimelineV1(base);
+  assert.equal(recorded.entries[1].actionType, 'click');
+  assert.deepEqual(recorded, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(base))));
+  for (const payload of ['PRIVATE_ACTION_PAYLOAD', 7, false, [], new Date(0), undefined]) {
+    const corrupt = job();
+    corrupt.runtime.history[1].action = payload;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt), error =>
+      error instanceof Error && !error.message.includes('PRIVATE_ACTION_PAYLOAD') &&
+      /plain record|must be a plain record/u.test(error.message));
+    if (payload !== undefined) {
+      assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corrupt))),
+        /plain record/u);
+    }
+  }
+  for (const mode of ['omitted', 'null']) {
+    const legacy = job();
+    if (mode === 'omitted') delete legacy.runtime.history[1].action;
+    else legacy.runtime.history[1].action = null;
+    const projected = buildAgentRunTimelineV1(legacy);
+    assert.equal(projected.entries[1].actionType, '');
+    assert.equal(projected.mayReplayExternalEffect, false);
+    assert.deepEqual(projected, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
+  }
+});
+
+test('S1 persisted Agent identity refuses padded and invisible whitespace across cold restart', () => {
+  const baseline = buildAgentRunTimelineV1(job());
+  assert.equal(baseline.jobId, 'agent-1');
+  const valid = job();
+  valid.id = 'Агент-1';
+  assert.equal(buildAgentRunTimelineV1(valid).jobId, valid.id);
+  assert.deepEqual(buildAgentRunTimelineV1(valid),
+    buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+  for (const badId of [' agent-1', 'agent-1 ', '   ', '\u00a0', 'agent-1\u00a0']) {
+    const corrupt = job();
+    corrupt.id = badId;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt),
+      /Agent timeline job identity is invalid/u);
+    assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corrupt))),
+      /Agent timeline job identity is invalid/u);
+  }
+  assert.equal(baseline.evidenceOnly, true);
+  assert.equal(baseline.mayReplayExternalEffect, false);
+});
