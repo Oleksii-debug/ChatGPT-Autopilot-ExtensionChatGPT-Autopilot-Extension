@@ -248,9 +248,14 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds: normalized.retryBackoffSeconds,
-    circuitBreakerFailures: normalized.circuitBreakerFailures,
-    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
+    // Retain absence for pre-11.x partial policies: execution merges against
+    // the parent Router authority, not a synthetic displayed default.
+    ...(Object.hasOwn(raw, 'retryBackoffSeconds')
+      ? { retryBackoffSeconds: normalized.retryBackoffSeconds } : {}),
+    ...(Object.hasOwn(raw, 'circuitBreakerFailures')
+      ? { circuitBreakerFailures: normalized.circuitBreakerFailures } : {}),
+    ...(Object.hasOwn(raw, 'circuitBreakerSeconds')
+      ? { circuitBreakerSeconds: normalized.circuitBreakerSeconds } : {}),
   });
 }
 
