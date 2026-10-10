@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 export const PLAN8_ARCHIVE_SHA256 = 'ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329';
 export const PLAN8_SOURCE_COMMIT = 'ca7062e1f8e47b26d7e024c46bb432d341621dd4';
+// Audited main-only predecessor; the source merge must preserve BOTH histories.
+export const PLAN8_MAIN_ANCESTOR_COMMIT = '2000dd3571323f7c98c6fb67c9d4aa9ff395897f';
 export const PLAN8_SOURCE_VERSION = '11.0.13';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const MAIN_ONLY_PATHS = ['src/interaction/chatgpt-live-send-recovery.js'];
 const REQUIRED_PATHS = [
   'src/core/browser-agent-manager.js',
   'src/core/orchestration-v2-manager.js',
@@ -47,8 +50,10 @@ function assertTrackedRegularSource(root, commit, path, label) {
  * lineage, not the original Drive ZIP bytes. The recorded archive digest is
  * previously audited provenance and must never be claimed as rehashed here.
  */
-export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_COMMIT } = {}) {
+export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_COMMIT,
+  mainAncestorCommit = PLAN8_MAIN_ANCESTOR_COMMIT } = {}) {
   assert(/^[0-9a-f]{40}$/u.test(sourceCommit), 'source commit must be a full lowercase Git SHA');
+  assert(/^[0-9a-f]{40}$/u.test(mainAncestorCommit), 'main ancestor must be a full lowercase Git SHA');
   const read = path => readFileSync(join(root, path), 'utf8');
   parseVersion(read('manifest.json'), 'manifest.json');
   parseVersion(read('package.json'), 'package.json');
@@ -66,10 +71,22 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
     ancestor = true;
   } catch { /* absent/shallow/divergent commit must fail closed */ }
   assert(ancestor, 'canonical 11.x source commit ' + sourceCommit + ' is not an ancestor of HEAD');
+  // The 11.x archive alone does not prove that main-only operational recovery
+  // survived convergence. Validate the independently audited main predecessor.
+  let mainAncestor = false;
+  try {
+    execFileSync('git', ['-C', root, 'merge-base', '--is-ancestor', mainAncestorCommit, 'HEAD'], { stdio: 'pipe' });
+    mainAncestor = true;
+  } catch { /* absent/shallow/divergent main predecessor */ }
+  assert(mainAncestor, 'canonical main ancestor ' + mainAncestorCommit + ' is not an ancestor of HEAD');
   // Directory existence alone is insufficient: untracked replacements, Git
   // symlinks and later additions cannot establish the imported 11.x baseline.
   for (const path of REQUIRED_PATHS) {
     assertTrackedRegularSource(root, sourceCommit, path, 'source ancestor');
+    assertTrackedRegularSource(root, 'HEAD', path, 'candidate HEAD');
+  }
+  for (const path of MAIN_ONLY_PATHS) {
+    assertTrackedRegularSource(root, mainAncestorCommit, path, 'main ancestor');
     assertTrackedRegularSource(root, 'HEAD', path, 'candidate HEAD');
   }
   const provenance = read('PLAN8_11_0_13_SOURCE_CONVERGENCE.md');
@@ -85,8 +102,9 @@ export function verifyPlan8Lineage({ root = ROOT, sourceCommit = PLAN8_SOURCE_CO
     parseVersion(baselineText, 'source ancestor ' + path);
   }
   return Object.freeze({
-    version: PLAN8_SOURCE_VERSION, sourceCommit, archivedSha256: PLAN8_ARCHIVE_SHA256,
-    sourceAncestry: 'verified', driveArchiveBytesRehashed: false,
+    version: PLAN8_SOURCE_VERSION, sourceCommit, mainAncestorCommit,
+    archivedSha256: PLAN8_ARCHIVE_SHA256,
+    sourceAncestry: 'verified', mainAncestry: 'verified', driveArchiveBytesRehashed: false,
   });
 }
 
