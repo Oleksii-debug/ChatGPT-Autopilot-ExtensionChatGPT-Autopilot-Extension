@@ -2536,7 +2536,8 @@ test('vision can drive a bounded native coordinate click without a DOM ref under
   await manager.create({ id: 'job-1', goal: 'Open the visual timetable control', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   assert.match(prompts[1].prompt, /click_at/);
   assert.equal(prompts[1].imageDataUrl, 'data:image/jpeg;base64,QUJDRA==');
   const mouse = cdp.filter(([method]) => method === 'Input.dispatchMouseEvent');
@@ -2665,7 +2666,8 @@ test('vision can drive a bounded native coordinate drag under explicit ALLOW_ALL
   await manager.create({ id: 'job-1', goal: 'Move Course A to Monday slot', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   const mouse = cdp.filter(([method]) => method === 'Input.dispatchMouseEvent');
   assert.ok(mouse.length >= 6, 'native drag must include movement, press, intermediate movement and release');
   const pressed = mouse.find(([, params]) => params.type === 'mousePressed');
@@ -2795,7 +2797,8 @@ test('vision can focus a coordinate text target and insert text through native C
   await manager.create({ id: 'job-1', goal: 'Enter schedule note visually', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   assert.ok(cdp.some(([method, params]) => method === 'Input.insertText' && params.text === 'No Friday conflict'));
   assert.equal((await manager.cycleOne('job-1')).kind, 'COMPLETED');
 });
