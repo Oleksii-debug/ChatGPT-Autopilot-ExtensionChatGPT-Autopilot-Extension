@@ -1656,3 +1656,50 @@ test('Browser Agent resume cannot bypass canonical orchestra owner pause', async
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
 });
+
+
+test('Plan-1: S1 orchestration binding contract redacts hostile keys and symbols before durable admission', () => {
+  const secret = 'private-provider-secret-must-never-appear';
+  let getterReads = 0;
+  const unknown = { nodeId: 'root', [secret]: 'attacker-supplied' };
+  assert.throws(
+    () => normalizeBrowserAgentOrchestrationBindingRequestV1(unknown),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.ok(!error.message.includes(secret));
+      return true;
+    },
+  );
+  const symbolic = { nodeId: 'root' };
+  symbolic[Symbol(secret)] = true;
+  assert.throws(
+    () => normalizeBrowserAgentOrchestrationBindingRequestV1(symbolic),
+    error => {
+      assert.match(error.message, /unknown field/);
+      assert.ok(!error.message.includes(secret));
+      return true;
+    },
+  );
+  const accessor = { nodeId: 'root' };
+  Object.defineProperty(accessor, 'expectedGraphId', {
+    enumerable: true,
+    get() {
+      getterReads++;
+      throw new Error(secret);
+    },
+  });
+  assert.throws(
+    () => normalizeBrowserAgentOrchestrationBindingRequestV1(accessor),
+    error => {
+      assert.match(error.message, /enumerable own data properties/);
+      assert.ok(!error.message.includes(secret));
+      return true;
+    },
+  );
+  assert.equal(getterReads, 0);
+  const valid = normalizeBrowserAgentOrchestrationBindingRequestV1({ nodeId: 'root' });
+  assert.equal(
+    normalizeBrowserAgentOrchestrationBindingRequestV1(JSON.parse(JSON.stringify(valid))).nodeId,
+    'root',
+  );
+});
