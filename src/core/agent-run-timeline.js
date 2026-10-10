@@ -92,7 +92,12 @@ function persistedField(value, key) {
   try { descriptor = Object.getOwnPropertyDescriptor(value, key); }
   catch { throw new Error('Agent timeline persisted field cannot be safely inspected'); }
   if (!descriptor) return { present: false, value: undefined };
-  if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+  // Preserve the existing fixed-field accessor refusal diagnostic for
+  // compatibility with prior error classification; do not echo values.
+  if (!Object.hasOwn(descriptor, 'value')) {
+    throw new Error('Agent timeline refuses accessor-backed ' + key);
+  }
+  if (!descriptor.enumerable) {
     throw new Error('Agent timeline persisted field must be an enumerable data field');
   }
   return { present: true, value: descriptor.value };
