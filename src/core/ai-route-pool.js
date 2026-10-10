@@ -593,7 +593,7 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   const profiles = denseDataArray(suppliedProfiles === undefined ? [] : suppliedProfiles, 'AI endpoint profiles', 32);
   const seen = new Set();
   const normalizedProfiles = profiles.map((entry, index) => {
-    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless']), `AI endpoint profile ${index + 1}`);
+    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless', 'accountId', 'capabilityIds']), `AI endpoint profile ${index + 1}`);
     if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
     const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
     if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
@@ -618,7 +618,19 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
     if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
     if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
-    return Object.freeze({ schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin, locality, credentialRef, credentialless });
+    // Account and capability evidence extends the existing registry; it never
+    // becomes an independent routing, authentication or permission authority.
+    // Omitted fields preserve the legacy V1 evidence hash after cold restart.
+    const accountId = Object.hasOwn(item, 'accountId')
+      ? id(own(item, 'accountId'), 'AI endpoint accountId') : '';
+    const declaredCapabilities = Object.hasOwn(item, 'capabilityIds')
+      ? Object.freeze(optionalIds(item, 'capabilityIds', 'AI endpoint capabilityIds', 64)) : null;
+    return Object.freeze({
+      schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin,
+      locality, credentialRef, credentialless,
+      ...(accountId ? { accountId } : {}),
+      ...(declaredCapabilities !== null ? { capabilityIds: declaredCapabilities } : {}),
+    });
   });
   // Endpoint identity is advisory evidence, never a second source of dispatch authority.
   // Versionless legacy routes may have no endpointId; explicitly record that gap
@@ -634,6 +646,10 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (route.endpointId && !profile) throw new Error('AI route endpoint has no registry profile');
     if (profile && (route.provider !== profile.provider || route.locality !== profile.locality)) {
       throw new Error('AI route provider/locality does not match its endpoint profile');
+    }
+    if (profile && Object.hasOwn(profile, 'capabilityIds')
+        && route.capabilityIds.some(capability => !profile.capabilityIds.includes(capability))) {
+      throw new Error('AI route claims a capability absent from its bound endpoint profile');
     }
     return Object.freeze({
       routeId: route.routeId, provider: route.provider, model: route.model,
