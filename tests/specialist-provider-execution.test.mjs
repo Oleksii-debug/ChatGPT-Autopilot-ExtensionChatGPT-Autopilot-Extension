@@ -470,3 +470,70 @@ test('Section 1: pre-preparation provider observation cannot certify the current
     /observation predates exact preparation/,
   );
 });
+
+test('Section 1: ambiguous reconciliation cannot certify a terminal effect, including cold restart', () => {
+  const current = prepared();
+  const ambiguous = {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: true,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_REQUEST_OUTCOME_UNKNOWN',
+    at: T1,
+  };
+  for (const conflicting of [
+    { providerSucceeded: true },
+    { manualReviewRequired: true },
+    { effectEvidence: 'FORGED_TERMINAL_RECEIPT' },
+    { providerStatus: 'finished' },
+  ]) {
+    assert.throws(
+      () => recordSpecialistProviderExecutionOutcomeV1(current, { ...ambiguous, ...conflicting }),
+      /Reconciliation outcome requires non-retryable, non-terminal canonical evidence/,
+    );
+    assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  }
+  const valid = recordSpecialistProviderExecutionOutcomeV1(current, ambiguous);
+  assert.equal(valid.status, SpecialistProviderExecutionStatus.RECONCILE);
+  const recovered = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(valid)));
+  assert.deepEqual(recovered, valid);
+  assert.equal(recovered.providerSucceeded, false);
+  assert.equal(recovered.effectEvidence, '');
+});
+
+test('Section 1: blocked provider execution cannot become success after restart or hostile late replay', () => {
+  const blocked = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_CONFIGURATION_BLOCKED',
+    at: T1,
+  });
+  assert.equal(blocked.status, SpecialistProviderExecutionStatus.BLOCKED_FAILURE);
+  const recovered = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(blocked)));
+  let hostileReads = 0;
+  const later = { at: T2 };
+  Object.defineProperty(later, 'providerStatus', {
+    enumerable: true,
+    get() { hostileReads += 1; throw Error('PRIVATE_PROVIDER_CANARY_NEVER_READ'); },
+  });
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(recovered, later), recovered);
+  assert.equal(hostileReads, 0);
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(recovered, {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'FORGED_LATE_SUCCESS',
+    errorCode: '',
+    at: T2,
+  }), recovered);
+  assert.equal(recovered.errorCode, 'OPENHANDS_CONFIGURATION_BLOCKED');
+  assert.equal(recovered.updatedAt, T1);
+});
