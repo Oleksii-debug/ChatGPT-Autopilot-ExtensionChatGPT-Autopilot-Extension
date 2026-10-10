@@ -554,6 +554,43 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+// Route provenance in the canonical durable budget must remain exact.
+// The router owns selection; this boundary does not add any second router.
+function exactModelBudgetRouteIdentity(route) {
+  if (!route || typeof route !== 'object' || Array.isArray(route)) {
+    const error = new Error('Model budget route identity must be a data-only object');
+    error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+    throw error;
+  }
+  const prototype = Object.getPrototypeOf(route);
+  if (prototype !== Object.prototype && prototype !== null) {
+    const error = new Error('Model budget route identity must be a plain object');
+    error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+    throw error;
+  }
+  const fields = { routeId:180, provider:80, model:300, endpointId:180 };
+  const identity = {};
+  for (const [key, max] of Object.entries(fields)) {
+    const descriptor = Object.getOwnPropertyDescriptor(route, key);
+    if (!descriptor) {
+      identity[key] = '';
+      continue; // Legacy local routes may omit endpointId.
+    }
+    const value = descriptor.value;
+    if (!Object.hasOwn(descriptor, 'value')
+      || typeof value !== 'string'
+      || value.length > max
+      || value !== value.trim()
+      || /[\\u0000-\\u001f\\u007f]/u.test(value)) {
+      const error = new Error('Model budget route identity contains an invalid explicit field');
+      error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
+      throw error;
+    }
+    identity[key] = value;
+  }
+  return Object.freeze(identity);
+}
+
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const reservationId = clean(raw.reservationId, 240);
@@ -565,6 +602,10 @@ function normalizeModelBudgetReservation(raw) {
   const estimatedCostUsd = Math.max(0, Number(raw.estimatedCostUsd || 0));
   const createdAt = Math.max(0, Number(raw.createdAt || 0));
   if (!reservationId || !Number.isFinite(estimatedCostUsd)) return null;
+  // Corrupt stored provenance must be quarantined, not silently trimmed or
+  // replaced with a different endpoint after cold restart.
+  let provenance;
+  try { provenance = exactModelBudgetRouteIdentity(raw); } catch { return null; }
   return {
     reservationId,
     controlEpoch,
@@ -574,10 +615,10 @@ function normalizeModelBudgetReservation(raw) {
     totalTokens,
     estimatedCostUsd,
     createdAt,
-    routeId: clean(raw.routeId, 180),
-    provider: clean(raw.provider, 80),
-    model: clean(raw.model, 300),
-    endpointId: clean(raw.endpointId, 180),
+    routeId: provenance.routeId,
+    provider: provenance.provider,
+    model: provenance.model,
+    endpointId: provenance.endpointId,
     callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
   };
 }
@@ -2397,6 +2438,9 @@ export class BrowserAgentManager {
   }
 
   async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+    // Before any store/network effect, verify the exact route provenance
+    // without invoking getters or coercing malformed explicit identities.
+    const routeIdentity = exactModelBudgetRouteIdentity(route);
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
     const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
     if (pendingOutputTokens < 1) {
@@ -2448,10 +2492,10 @@ export class BrowserAgentManager {
         totalTokens: pendingInputTokens + pendingOutputTokens,
         estimatedCostUsd,
         createdAt: this.now(),
-        routeId: clean(route?.routeId, 180),
-        provider: clean(route?.provider, 80),
-        model: clean(route?.model, 300),
-        endpointId: clean(route?.endpointId, 180),
+        routeId: routeIdentity.routeId,
+        provider: routeIdentity.provider,
+        model: routeIdentity.model,
+        endpointId: routeIdentity.endpointId,
         callNumber: Math.max(1, Math.floor(Number(callNumber || 1))),
       };
       job.runtime.modelBudgetReservationSeq = sequence;
