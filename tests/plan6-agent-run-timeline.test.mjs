@@ -905,3 +905,69 @@ test('S1 canonical retained history still bounds last-N evidence and survives JS
   assert.equal(projected.mayReplayExternalEffect, false);
   assert.deepEqual(projected, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input)), { limit: 2 }));
 });
+
+
+test('S1 refuses hidden and accessor-backed Specialist dispatch evidence before JSON restart can erase it', () => {
+  const marker = 'PRIVATE_DISPATCH_GETTER_NEVER_READ';
+  const hidden = job();
+  hidden.runtime.specialistDispatchByAgentId = {};
+  Object.defineProperty(hidden.runtime.specialistDispatchByAgentId, 'agent-hidden', {
+    enumerable: false, configurable: true, value: {
+      state: 'PROVIDER_SUCCEEDED', providerReceiptId: marker,
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(hidden), error =>
+    error instanceof Error &&
+    /enumerable data field/u.test(error.message) &&
+    !error.message.includes(marker));
+
+  let reads = 0;
+  const accessor = job();
+  accessor.runtime.specialistDispatchByAgentId = {};
+  Object.defineProperty(accessor.runtime.specialistDispatchByAgentId, 'agent-accessor', {
+    enumerable: true, configurable: true,
+    get() { reads += 1; throw Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), error =>
+    error instanceof Error &&
+    /enumerable data field/u.test(error.message) &&
+    !error.message.includes(marker));
+  assert.equal(reads, 0, 'an attacker getter must not run during evidence projection');
+
+  const trapped = job();
+  trapped.runtime.specialistDispatchByAgentId = new Proxy({
+    'agent-visible': { state: 'DISPATCHING' },
+  }, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'agent-visible') throw Error(marker);
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(trapped), error =>
+    error instanceof Error &&
+    /record cannot be safely inspected/u.test(error.message) &&
+    !error.message.includes(marker));
+});
+
+test('S1 canonical enumerable dispatch records survive cold restart without fabricating external receipts', () => {
+  const input = job();
+  input.runtime.specialistDispatchByAgentId = Object.create(null);
+  Object.defineProperty(input.runtime.specialistDispatchByAgentId, 'agent-visible', {
+    enumerable: true, configurable: true, writable: true,
+    value: {
+      state: 'PROVIDER_SUCCEEDED',
+      providerReceiptId: 'PRIVATE_RECEIPT_NEVER_EXPORT',
+      resultArtifactRefs: [{ artifactId: 'PRIVATE_ARTIFACT_NEVER_EXPORT' }],
+    },
+  });
+  const before = buildAgentRunTimelineV1(input);
+  const after = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(input)));
+  assert.deepEqual(before, after);
+  assert.equal(after.evidenceMap.specialistProviderDispatch.inspectedAttempts, 1);
+  assert.equal(after.evidenceMap.specialistProviderDispatch.receiptIdsRecorded, 1);
+  assert.equal(after.evidenceMap.specialistProviderDispatch.externalEffectVerified, false);
+  assert.equal(after.evidenceMap.specialistProviderDispatch.artifactProvenanceVerified, false);
+  assert.equal(after.mayReplayExternalEffect, false);
+  assert.equal(after.evidenceOnly, true);
+  assert.doesNotMatch(JSON.stringify(after), /PRIVATE_RECEIPT|PRIVATE_ARTIFACT/u);
+});
