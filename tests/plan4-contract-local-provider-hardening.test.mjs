@@ -1843,7 +1843,7 @@ test('Plan4 S1: endpoint model catalog remains exact and immutable across JSON r
         /modelIds|model is absent|bounded array|exact bounded identifier|duplicates/);
     }
   }
-  const legacy = {...bound,endpointProfiles:[endpoint]};
+  const legacy = {...bound,routes:[{...route}],endpointProfiles:[endpoint]};
   // No endpoint model claim is invented in a legacy unbound profile.
   assert.equal((await createAiRouteRegistryEvidenceV1(legacy)).routeIdentities[0].endpointBinding,
     'UNRESOLVED_LEGACY');
