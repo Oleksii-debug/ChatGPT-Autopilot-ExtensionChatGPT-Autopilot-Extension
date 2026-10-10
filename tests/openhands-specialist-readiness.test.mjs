@@ -435,7 +435,7 @@ test('readiness capability scope must exactly match the owner-qualified OpenHand
 
   await assert.rejects(
     resolver.resolve(selection({ requestedCapabilityIds: ['code.review'] })),
-    /capability scope does not match qualified profile/u,
+    /Trusted readiness provider resolution failed/u,
   );
   assert.equal(probes, 0);
 });
@@ -475,4 +475,348 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     }),
     /maxAgeMs is invalid/u,
   );
+});
+
+
+test('hostile provider failure descriptor becomes UNKNOWN without leaking remote exception text', async () => {
+  let probeCalls = 0;
+  let descriptorTraps = 0;
+  const remoteError = new Proxy(new Error('SECRET_REMOTE_DIAGNOSTIC'), {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'code') {
+        descriptorTraps += 1;
+        throw new Error('SECRET_REMOTE_DESCRIPTOR');
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const result = await probeOpenHandsSpecialistProviderConfigV1({
+    config: config(),
+    client: { async probe() { probeCalls += 1; throw remoteError; } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(probeCalls, 1);
+  assert.equal(descriptorTraps, 1);
+  assert.equal(result.providerState.health, 'UNKNOWN');
+  assert.equal(result.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(result.authority.providerExecutionAuthorized, false);
+  assert.equal(result.authority.verificationAuthorized, false);
+  assert.equal(JSON.stringify(result).includes('SECRET'), false);
+});
+
+test('hostile OpenHands probe options and unknown secret-named keys fail closed before provider I/O', async () => {
+  let calls = 0;
+  const client = { async probe() { calls += 1; } };
+  const hostile = new Proxy({ config: config(), client }, {
+    ownKeys() { throw new Error('SECRET_OPTIONS_TRAP'); },
+  });
+  await assert.rejects(
+    () => probeOpenHandsSpecialistProviderConfigV1(hostile),
+    error => error.message.includes('cannot be inspected safely')
+      && !error.message.includes('SECRET'),
+  );
+  await assert.rejects(
+    () => probeOpenHandsSpecialistProviderConfigV1({
+      config: config(), client, SECRET_OWNER_PASSWORD_CANARY: 'private',
+    }),
+    error => error.message.includes('unknown field')
+      && !error.message.includes('SECRET_OWNER_PASSWORD_CANARY'),
+  );
+  assert.equal(calls, 0);
+});
+
+test('hostile readiness capability-array reflection fails before the OpenHands provider effect', async () => {
+  let calls = 0;
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client: { async probe() { calls += 1; } },
+    now: monotonicNow([T0, T1]),
+  });
+  // Call the provider binding directly to isolate its own hostile-array boundary.
+  // The canonical resolver has a separate selection-normalization contract.
+  const caps = new Proxy(['code.write'], {
+    ownKeys() { throw new Error('SECRET_ARRAY_TRAP'); },
+  });
+  await assert.rejects(
+    () => binding.resolveReadiness({
+      schemaVersion: 1,
+      registryId: 'registry:openhands',
+      registryRevision: 4,
+      specialistId: 'openhands-coding',
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      definitionRevision: 2,
+      executionPlane: 'LOCAL',
+      requestedCapabilityIds: caps,
+      requestedToolIds: [],
+      asOf: new Date(T0).toISOString(),
+    }),
+    error => error.message.includes('cannot be inspected safely')
+      && !error.message.includes('SECRET_ARRAY_TRAP'),
+  );
+  assert.equal(calls, 0);
+});
+
+test('hostile client probe accessor and Proxy reflection traps cannot authorize readiness or leak diagnostics', async () => {
+  let getterCalls = 0;
+  let providerEffects = 0;
+  const accessorClient = {};
+  Object.defineProperty(accessorClient, 'probe', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('SECRET_CLIENT_GETTER');
+    },
+  });
+  const trapClient = new Proxy({
+    async probe() { providerEffects += 1; },
+  }, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'probe') throw new Error('SECRET_CLIENT_DESCRIPTOR_TRAP');
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  for (const client of [accessorClient, trapClient]) {
+    await assert.rejects(
+      () => probeOpenHandsSpecialistProviderConfigV1({
+        config: config(), client, now: monotonicNow([T0, T1]),
+      }),
+      error => error.message.includes('cannot be inspected safely')
+        && !error.message.includes('SECRET'),
+    );
+    assert.throws(
+      () => createOpenHandsSpecialistReadinessBindingV1({
+        config: config(), client, now: monotonicNow([T0, T1]),
+      }),
+      error => error.message.includes('cannot be inspected safely')
+        && !error.message.includes('SECRET'),
+    );
+  }
+  assert.equal(getterCalls, 0, 'probe getters must not execute at admission');
+  assert.equal(providerEffects, 0, 'hostile clients must not perform provider I/O');
+});
+
+test('binding holds admitted OpenHands probe identity across later client method replacement', async () => {
+  let originalCalls = 0;
+  let replacementCalls = 0;
+  const client = {
+    async probe() {
+      originalCalls += 1;
+      return { serverTitle: 'OpenHands Agent Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    },
+  };
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(), client, now: monotonicNow([T0, T1]),
+  });
+  client.probe = async () => {
+    replacementCalls += 1;
+    throw new Error('SECRET_REPLACED_PROVIDER');
+  };
+  const observation = await binding.resolveReadiness({
+    schemaVersion: 1,
+    registryId: 'registry:openhands',
+    registryRevision: 4,
+    specialistId: 'openhands-coding',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    definitionRevision: 2,
+    executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
+    requestedToolIds: [],
+    asOf: new Date(T0).toISOString(),
+  });
+  assert.equal(originalCalls, 1);
+  assert.equal(replacementCalls, 0);
+  assert.equal(observation.providerStates[0].health, 'READY');
+  assert.equal(JSON.stringify(observation).includes('SECRET'), false);
+});
+
+test('resolved OpenHands probe must present exact server receipt; no-op, version drift and hostile data stay non-ready', async () => {
+  const validConfig = config();
+  const noOp = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {} },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(noOp.providerState.health, 'UNKNOWN');
+  assert.equal(noOp.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(noOp.authority.providerExecutionAuthorized, false);
+
+  const wrongServer = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      return { serverTitle: 'Unrelated Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(wrongServer.providerState.health, 'UNAVAILABLE');
+  assert.equal(wrongServer.providerState.reasonCode, 'OPENHANDS_SERVER_IDENTITY_MISMATCH');
+
+  const wrongVersion = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      return { serverTitle: 'OpenHands Agent Server', serverVersion: 'mismatched-version' };
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(wrongVersion.providerState.health, 'UNAVAILABLE');
+  assert.equal(wrongVersion.providerState.reasonCode, 'OPENHANDS_SERVER_VERSION_MISMATCH');
+
+  let getterCalls = 0;
+  const malicious = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() {
+      const receipt = { serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+      Object.defineProperty(receipt, 'serverTitle', {
+        enumerable: true,
+        get() { getterCalls += 1; throw new Error('PRIVATE_PROBE_RECEIPT_SECRET'); },
+      });
+      return receipt;
+    } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(getterCalls, 0);
+  assert.equal(malicious.providerState.health, 'UNKNOWN');
+  assert.equal(malicious.providerState.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+  assert.equal(JSON.stringify(malicious).includes('PRIVATE_PROBE_RECEIPT_SECRET'), false);
+
+  const coldRestart = JSON.parse(JSON.stringify({ serverTitle: 'OpenHands Agent Server', serverVersion: OPENHANDS_AGENT_SERVER_VERSION }));
+  const valid = await probeOpenHandsSpecialistProviderConfigV1({
+    config: validConfig,
+    client: { async probe() { return coldRestart; } },
+    now: monotonicNow([T0, T1]),
+  });
+  assert.equal(valid.providerState.health, 'READY');
+  assert.equal(valid.authority.providerExecutionAuthorized, false);
+  assert.equal(valid.authority.completionAuthorized, false);
+});
+
+test('executable OpenHands readiness requires verified server identity/version after restart, never just a resolved probe', async () => {
+  const evaluate = async probe => {
+    // Treat every case as a fresh/cold-restored binding; no cached READY authority.
+    const binding = createOpenHandsSpecialistReadinessBindingV1({
+      config: JSON.parse(JSON.stringify(config())),
+      client: { probe },
+      now: monotonicNow([T0, T1]),
+    });
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [binding],
+      now: () => T1,
+    });
+    return resolver.resolve(JSON.parse(JSON.stringify(selection())));
+  };
+
+  let called = 0;
+  const noOp = await evaluate(async () => { called += 1; });
+  assert.equal(called, 1);
+  assert.equal(noOp.readiness, 'NEEDS_HEALTH_CHECK');
+  assert.equal(noOp.executable, false);
+  assert.equal(noOp.inspection.checks[0].providerReadiness.reasonCode, 'OPENHANDS_PROBE_UNKNOWN');
+
+  const wrongServer = await evaluate(async () => ({
+    serverTitle: 'Unrelated Service',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  }));
+  assert.equal(wrongServer.readiness, 'UNAVAILABLE');
+  assert.equal(wrongServer.executable, false);
+  assert.equal(wrongServer.inspection.checks[0].providerReadiness.reasonCode,
+    'OPENHANDS_SERVER_IDENTITY_MISMATCH');
+
+  const wrongVersion = await evaluate(async () => ({
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: 'forged-version',
+  }));
+  assert.equal(wrongVersion.readiness, 'UNAVAILABLE');
+  assert.equal(wrongVersion.executable, false);
+  assert.equal(wrongVersion.inspection.checks[0].providerReadiness.reasonCode,
+    'OPENHANDS_SERVER_VERSION_MISMATCH');
+
+  let getterReads = 0;
+  const hostile = await evaluate(async () => {
+    const receipt = { serverVersion: OPENHANDS_AGENT_SERVER_VERSION };
+    Object.defineProperty(receipt, 'serverTitle', {
+      enumerable: true,
+      get() { getterReads += 1; throw new Error('PRIVATE_READY_CANARY'); },
+    });
+    return receipt;
+  });
+  assert.equal(getterReads, 0);
+  assert.equal(hostile.readiness, 'NEEDS_HEALTH_CHECK');
+  assert.equal(hostile.executable, false);
+  assert.equal(JSON.stringify(hostile).includes('PRIVATE_READY_CANARY'), false);
+
+  const verified = await evaluate(async () => JSON.parse(JSON.stringify({
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  })));
+  assert.equal(verified.readiness, 'READY');
+  assert.equal(verified.executable, true);
+  assert.equal(verified.inspection.checks[0].providerReadiness.reasonCode, 'OPENHANDS_PROBE_READY');
+  assert.equal(verified.authority.providerExecutionAuthorized, false);
+  assert.equal(verified.authority.capacityReserved, false);
+});
+
+
+test('OpenHands clock callback failures are opaque and prevent phantom readiness', async () => {
+  const receipt = {
+    serverTitle: 'OpenHands Agent Server',
+    serverVersion: OPENHANDS_AGENT_SERVER_VERSION,
+  };
+  const validRequest = {
+    schemaVersion: 1,
+    registryId: 'registry:openhands',
+    registryRevision: 4,
+    specialistId: 'openhands-coding',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    definitionRevision: 2,
+    executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
+    requestedToolIds: [],
+    asOf: new Date(T0).toISOString(),
+  };
+  let probes = 0;
+  const client = {
+    async probe() {
+      probes += 1;
+      return receipt;
+    },
+  };
+  const secret = 'SECRET_CLOCK_CALLBACK_DIAGNOSTIC';
+  const failsClock = (errorText, expectedProbes) => async operation => {
+    await assert.rejects(operation(), error => {
+      assert.equal(error.message, 'OpenHands readiness clock could not be observed safely');
+      assert.equal(JSON.stringify({ message: error.message, cause: error.cause }).includes(secret), false);
+      return true;
+    });
+    assert.equal(probes, expectedProbes);
+  };
+  await failsClock(secret, 0)(() => probeOpenHandsSpecialistProviderConfigV1({
+    config: config(),
+    client,
+    now() { throw new Error(secret); },
+  }));
+  await failsClock(secret, 1)(() => {
+    let clockCalls = 0;
+    return probeOpenHandsSpecialistProviderConfigV1({
+      config: config(),
+      client,
+      now() {
+        if (clockCalls++ === 0) return T0;
+        throw new Error(secret);
+      },
+    });
+  });
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now() { throw new Error(secret); },
+  });
+  await failsClock(secret, 1)(() => binding.resolveReadiness(validRequest));
+  const healthy = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now: monotonicNow([T0, T1]),
+  });
+  const result = await healthy.resolveReadiness(validRequest);
+  assert.equal(result.providerStates[0].health, 'READY');
+  assert.equal(JSON.parse(JSON.stringify(result)).providerStates[0].health, 'READY');
+  assert.equal(probes, 2);
 });

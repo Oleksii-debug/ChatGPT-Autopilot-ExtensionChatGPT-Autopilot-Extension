@@ -23,15 +23,23 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const prototype = Object.getPrototypeOf(value);
+  let prototype;
+  let descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // A lower-trust Proxy may throw private account data from reflection traps.
+    // Fail closed without leaking its message to the owner or durable records.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {

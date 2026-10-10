@@ -12,6 +12,8 @@ import {
 export const OPENHANDS_SPECIALIST_READINESS_VERSION = 1;
 
 const FACTORY_KEYS = new Set(['config', 'client', 'maxAgeMs', 'now']);
+const PROBE_KEYS = new Set(['config', 'client', 'now']);
+const PROBE_RECEIPT_KEYS = new Set(['serverTitle', 'serverVersion']);
 const REQUEST_KEYS = new Set([
   'schemaVersion',
   'registryId',
@@ -35,15 +37,22 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Never surface a lower-trust Proxy trap's diagnostic or private data.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -55,10 +64,19 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) {
     throw new Error(label + ' must be a canonical array');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < 0 || length > max) {
     throw new Error(label + ' has invalid length');
@@ -107,7 +125,14 @@ function timestamp(value, label) {
 }
 
 function clockMs(now) {
-  const value = now();
+  // An injected clock is a dependency, not a trusted diagnostic authority.
+  // Fail closed without exposing exception messages, causes, or hostile getters.
+  let value;
+  try {
+    value = now();
+  } catch {
+    throw new Error('OpenHands readiness clock could not be observed safely');
+  }
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
       || value < 0 || value > MAX_DATE_MS) {
     throw new Error('OpenHands readiness clock returned an invalid time');
@@ -136,9 +161,42 @@ function sameIds(left, right) {
 
 function ownErrorCode(error) {
   if (!error || (typeof error !== 'object' && typeof error !== 'function')) return '';
-  const descriptor = Object.getOwnPropertyDescriptor(error, 'code');
+  let descriptor;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(error, 'code');
+  } catch {
+    // An external provider may reject with a hostile Proxy. Its diagnostics
+    // are not a source of authority and must never escape readiness probing.
+    return '';
+  }
   if (!descriptor || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string') return '';
   return ID.test(descriptor.value) ? descriptor.value : '';
+}
+
+function checkedProbeMethod(client) {
+  if (!client || (typeof client !== 'object' && typeof client !== 'function')) {
+    throw new Error('OpenHands specialist readiness requires a client with probe()');
+  }
+  // Inspect data descriptors only; never execute an untrusted accessor while
+  // deciding whether the provider is admissible. Real class prototype methods
+  // and fixture clients with own data methods are both supported.
+  let cursor = client;
+  try {
+    for (let depth = 0; depth < 8 && cursor
+        && cursor !== Object.prototype && cursor !== Function.prototype; depth += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, 'probe');
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error('unsafe probe descriptor');
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
+    }
+  } catch {
+    throw new Error('OpenHands specialist readiness client cannot be inspected safely');
+  }
+  throw new Error('OpenHands specialist readiness requires a client with probe()');
 }
 
 function classifyProbeFailure(error) {
@@ -161,6 +219,22 @@ function classifyProbeFailure(error) {
   });
 }
 
+function requireVerifiedProbeReceipt(probeResult, config) {
+  // Both owner preview and executable binding must enforce identical evidence.
+  // A fulfilled promise (including a no-op mock) never proves provider health.
+  const receipt = record(probeResult, PROBE_RECEIPT_KEYS, 'OpenHands readiness probe receipt');
+  if (receipt.serverTitle !== 'OpenHands Agent Server') {
+    const mismatch = new Error('OpenHands probe server identity mismatch');
+    mismatch.code = 'OPENHANDS_SERVER_IDENTITY_MISMATCH';
+    throw mismatch;
+  }
+  if (receipt.serverVersion !== config.agentServerVersion) {
+    const mismatch = new Error('OpenHands probe server version mismatch');
+    mismatch.code = 'OPENHANDS_SERVER_VERSION_MISMATCH';
+    throw mismatch;
+  }
+}
+
 function readinessState({ health, installed, latencyMs, reasonCode }) {
   return normalizeProviderReadinessV1({
     schemaVersion: 1,
@@ -177,6 +251,58 @@ function readinessState({ health, installed, latencyMs, reasonCode }) {
   });
 }
 
+export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
+  const raw = record(input, PROBE_KEYS, 'OpenHands specialist provider probe options');
+  const config = normalizeOpenHandsCodingSpecialistConfigV1(raw.config);
+  const client = raw.client;
+  const probe = checkedProbeMethod(client);
+  const now = raw.now === undefined ? () => Date.now() : raw.now;
+  if (typeof now !== 'function') throw new Error('now must be a function');
+
+  const startedAt = clockMs(now);
+  let classification = Object.freeze({
+    health: ProviderHealthStatus.READY,
+    reasonCode: 'OPENHANDS_PROBE_READY',
+    installed: true,
+  });
+  try {
+    // A resolved injected probe is not proof that the admitted OpenHands
+    // service was observed. Only a descriptor-safe exact server receipt may
+    // promote readiness; a no-op or forged success remains non-executable.
+    const probeResult = await probe.call(client, Object.freeze({ config, conversationId: '' }));
+    requireVerifiedProbeReceipt(probeResult, config);
+  } catch (error) {
+    classification = classifyProbeFailure(error);
+  }
+  const observedAtMs = clockMs(now);
+  if (observedAtMs < startedAt) throw new Error('OpenHands readiness clock moved backwards');
+  const latencyMs = observedAtMs - startedAt;
+  if (latencyMs > 10 * 60_000) throw new Error('OpenHands readiness probe exceeded latency bound');
+  const providerState = readinessState({
+    health: classification.health,
+    installed: classification.installed,
+    latencyMs,
+    reasonCode: classification.reasonCode,
+  });
+  return Object.freeze({
+    schemaVersion: OPENHANDS_SPECIALIST_READINESS_VERSION,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    observedAt: new Date(observedAtMs).toISOString(),
+    providerState,
+    authority: Object.freeze({
+      providerExecutionAuthorized: false,
+      toolExecutionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+      capacityReserved: false,
+    }),
+  });
+}
+
 /**
  * Builds one immutable #454-compatible binding backed by the merged OpenHands
  * provider's harmless live server identity/version probe.
@@ -189,10 +315,7 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
   const raw = record(input, FACTORY_KEYS, 'OpenHands specialist readiness binding options');
   const config = normalizeOpenHandsCodingSpecialistConfigV1(raw.config);
   const client = raw.client;
-  if (!client || (typeof client !== 'object' && typeof client !== 'function')
-      || typeof client.probe !== 'function') {
-    throw new Error('OpenHands specialist readiness requires a client with probe()');
-  }
+  const probe = checkedProbeMethod(client);
   const maxAgeMs = raw.maxAgeMs === undefined
     ? DEFAULT_MAX_AGE_MS
     : integer(raw.maxAgeMs, 'maxAgeMs', 1, MAX_MAX_AGE_MS);
@@ -230,10 +353,11 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
       installed: true,
     });
     try {
-      await client.probe(Object.freeze({
+      const probeResult = await probe.call(client, Object.freeze({
         config,
         conversationId: '',
       }));
+      requireVerifiedProbeReceipt(probeResult, config);
     } catch (error) {
       classification = classifyProbeFailure(error);
     }

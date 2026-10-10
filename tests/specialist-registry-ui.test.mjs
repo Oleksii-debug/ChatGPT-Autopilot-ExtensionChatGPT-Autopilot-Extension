@@ -18,26 +18,26 @@ function functionBody(name) {
   return options.slice(start, candidates.length ? Math.min(...candidates) : options.length);
 }
 
-test('Specialist management is keyboard-native, labeled and fail-closed before registry selection', () => {
+test('Specialist management is keyboard-native, labeled and fail-closed before registry selection in current owner UI', () => {
   for (const id of [
-    'specialist-registry-list',
-    'specialist-create-registry-id',
-    'specialist-list',
-    'specialist-id',
-    'specialist-provider-id',
-    'specialist-label',
-    'specialist-description',
-    'specialist-execution-plane',
-    'specialist-capabilities',
-    'specialist-tools',
-    'specialist-result-contract-id',
+    'agent-specialist-registry-list',
+    'agent-specialist-create-registry-id',
+    'agent-specialist-list',
+    'agent-specialist-id',
+    'agent-specialist-provider-id',
+    'agent-specialist-label',
+    'agent-specialist-description',
+    'agent-specialist-plane',
+    'agent-specialist-capabilities',
+    'agent-specialist-tools',
+    'agent-specialist-result-contract',
   ]) {
     assert.ok(html.includes(`<label for="${id}">`), `${id} needs a persistent native label`);
     assert.ok(html.includes(`id="${id}"`), `${id} control is missing`);
   }
-  assert.match(html, /<fieldset class="settings-group" id="specialist-form-group" disabled>/u);
-  assert.match(html, /<p id="specialist-status" role="status">/u);
-  assert.match(html, /id="specialist-quarantine-status" tabindex="0"/u);
+  assert.match(html, /<fieldset class="settings-group" id="agent-specialist-form-group" disabled>/u);
+  assert.match(html, /<p id="agent-specialist-status" role="status">/u);
+  assert.match(html, /id="agent-specialist-quarantine-status" tabindex="0"/u);
   assert.match(html, /Ця форма не запускає Specialist і не створює handoff/u);
 });
 
@@ -54,8 +54,10 @@ test('Specialist registry load and create use only canonical registry Core comma
 });
 
 test('Specialist save binds exact registry and definition CAS and never executes a child', () => {
-  const save = functionBody('saveSpecialistDefinition');
-  assert.match(save, /buildSpecialistDefinitionFromFormV1/u);
+  const save = functionBody('saveSpecialist');
+  const form = functionBody('specialistDefinitionFromForm');
+  assert.match(form, /buildSpecialistDefinitionFromFormV1/u);
+  assert.match(save, /specialistDefinitionFromForm/u);
   assert.match(save, /expectedRegistryRevision: registry\.revision/u);
   assert.match(save, /expectedDefinitionRevision: current\.definitionRevision/u);
   assert.match(save, /MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY/u);
@@ -63,7 +65,7 @@ test('Specialist save binds exact registry and definition CAS and never executes
 });
 
 test('Specialist toggle and delete retain exact revision guards and existing mutation authority', () => {
-  for (const name of ['toggleSpecialistEnabled', 'deleteSpecialistDefinition']) {
+  for (const name of ['toggleSpecialistEnabled', 'deleteSpecialist']) {
     const body = functionBody(name);
     assert.match(body, /expectedRegistryRevision: registry\.revision/u);
     assert.match(body, /expectedDefinitionRevision: current\.definitionRevision/u);
@@ -76,12 +78,12 @@ test('Specialist revision drift reloads durable live state instead of retrying s
   const body = functionBody('reloadAfterSpecialistDrift');
   assert.match(body, /revision drifted/iu);
   assert.match(body, /loadSpecialistRegistries/u);
-  assert.match(body, /selectRegistryId: registryId/u);
+  assert.match(body, /selectRegistryId: ui\.selectedSpecialistRegistryId/u);
   assert.match(body, /selectSpecialistId: specialistId/u);
 });
 
 test('Specialist UI exposes exactly the canonical execution-plane values', () => {
-  const start = html.indexOf('id="specialist-execution-plane"');
+  const start = html.indexOf('id="agent-specialist-plane"');
   assert.ok(start >= 0);
   const end = html.indexOf('</select>', start);
   const select = html.slice(start, end);

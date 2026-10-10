@@ -207,13 +207,48 @@ test('parent capability or tool-scope drift requires rediscovery instead of wide
   }), /capability scope changed after selection/);
 });
 
+test('authority subset denial redacts caller-controlled capability and tool IDs without widening grants', () => {
+  const secret = 'SECRET_SCOPE_DIAGNOSTIC_PRIVATE_20261010';
+  const request = discovery();
+  const selected = discoverSpecialistsV1(request).specialists[0];
+  const denied = action => {
+    assert.throws(action, error => {
+      assert.match(error.message, /exceeds parent or specialist authority/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  };
+  denied(() => discoverSpecialistsV1(discovery({
+    requiredCapabilityIds: [secret],
+  })));
+  denied(() => discoverSpecialistsV1(discovery({
+    requiredToolIds: [secret],
+  })));
+  denied(() => bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    selection: {...selected, grantedToolIds: [secret]},
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  }));
+  const allowed = bindSpecialistHandoffToRegistryV1({
+    registry: request.registry,
+    selection: selected,
+    handoff: handoff(),
+    parentCapabilityIds: request.parentCapabilityIds,
+    parentToolIds: request.parentToolIds,
+  });
+  assert.deepEqual(allowed.childScope.toolIds, ['filesystem.read', 'workspace.patch']);
+  assert.equal(allowed.authority.executionAuthorized, false);
+});
+
 test('registry rejects duplicate identities, numeric aliases, secret-shaped unknown fields and text aliases', () => {
   assert.throws(() => normalizeSpecialistRegistryV1(registry({
     definitions: [definition(), definition()],
   })), /duplicate specialistId/);
   assert.throws(() => normalizeSpecialistRegistryV1(registry({ revision: -0 })), /registry revision is invalid/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ definitionRevision: -0 })), /definitionRevision is invalid/);
-  assert.throws(() => normalizeSpecialistDefinitionV1({ ...definition(), apiKey: 'must-never-enter-registry' }), /unknown field: apiKey/);
+  assert.throws(() => normalizeSpecialistDefinitionV1({ ...definition(), apiKey: 'must-never-enter-registry' }), /contains unknown field/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ specialistId: ' openhands-coding' })), /exact canonical identity/);
   assert.throws(() => normalizeSpecialistDefinitionV1(definition({ label: ' OpenHands Coding' })), /exact bounded text/);
 });
@@ -239,6 +274,81 @@ test('authority records reject accessors and hidden/symbol fields without execut
   const symbolic = definition();
   symbolic[Symbol('authority')] = true;
   assert.throws(() => normalizeSpecialistDefinitionV1(symbolic), /unknown field/);
+});
+
+test('untrusted registry Proxy reflection and secret-shaped keys fail closed with normal recovery', () => {
+  const secret = 'SECRET_REGISTRY_PROXY_TRAP_PRIVATE';
+  let getterReads = 0;
+  const denied = operation => {
+    assert.throws(operation, error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /cannot be inspected safely|contains unknown field/);
+      return true;
+    });
+  };
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const handler = {
+      [trap]() {
+        throw new Error(secret);
+      },
+    };
+    denied(() => normalizeSpecialistDefinitionV1(new Proxy(definition(), handler)));
+    denied(() => normalizeSpecialistDefinitionV1(definition({
+      capabilityIds: new Proxy(['coding.workspace'], handler),
+    })));
+  }
+
+  const unknown = { ...definition(), [secret]: 'must-not-be-echoed' };
+  denied(() => normalizeSpecialistDefinitionV1(unknown));
+  const accessor = definition();
+  Object.defineProperty(accessor, 'specialistId', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      throw new Error(secret);
+    },
+  });
+  assert.throws(() => normalizeSpecialistDefinitionV1(accessor), /enumerable own data property/);
+  assert.equal(getterReads, 0, 'no hostile accessor may execute');
+
+  const restart = JSON.parse(JSON.stringify(definition()));
+  const recovered = normalizeSpecialistDefinitionV1(restart);
+  assert.equal(recovered.specialistId, OPENHANDS_CODING_SPECIALIST_ID);
+  assert.equal(recovered.enabled, true);
+  assert.equal(Object.isFrozen(recovered), true);
+});
+
+test('signed-zero Proxy length is rejected without accepting fabricated empty specialist scope; JSON restart remains valid', () => {
+  // A Proxy over a mutable empty Array can legally forge its length data
+  // descriptor as negative zero. Never normalize that non-canonical authority
+  // boundary into an ordinary empty list.
+  const forgedEmpty = () => new Proxy([], {
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+      return key === 'length' ? { ...descriptor, value: -0 } : descriptor;
+    },
+  });
+  assert.equal(Object.is(Object.getOwnPropertyDescriptor(forgedEmpty(), 'length').value, -0), true);
+  assert.throws(() => normalizeSpecialistDefinitionV1(definition({
+    toolIds: forgedEmpty(),
+  })), /toolIds has invalid length/);
+  assert.throws(() => normalizeSpecialistRegistryV1(registry({
+    definitions: forgedEmpty(),
+  })), /definitions has invalid length/);
+  assert.throws(() => discoverSpecialistsV1(discovery({
+    requiredToolIds: forgedEmpty(),
+  })), /requiredToolIds has invalid length/);
+
+  const safeDefinition = normalizeSpecialistDefinitionV1(JSON.parse(JSON.stringify(definition({
+    toolIds: [],
+  }))));
+  assert.deepEqual(safeDefinition.toolIds, []);
+  assert.equal(safeDefinition.enabled, true);
+  const safeRegistry = normalizeSpecialistRegistryV1(JSON.parse(JSON.stringify(registry({
+    definitions: [],
+  }))));
+  assert.deepEqual(safeRegistry.definitions, []);
+  assert.equal(Object.isFrozen(safeRegistry), true);
 });
 
 test('null-prototype records are accepted and caller-owned registry inputs remain unchanged', () => {
@@ -362,4 +472,136 @@ test('registry mutation snapshots nested definitions without executing accessors
     definition: hostile,
   }), /toolIds must be an enumerable own data property/);
   assert.equal(reads, 0);
+});
+
+
+test('specialist owner-facing metadata fails closed on bidi, hidden control and non-durable UTF-16', () => {
+  for (const [field, forged] of [
+    ['label', 'QA\u202Erelease'],
+    ['label', 'Research\nDifferent specialist'],
+    ['label', 'Coder\u200Bhidden'],
+    ['description', 'Safe description\rForged decision'],
+    ['description', 'Hidden\u2066isolate'],
+    ['description', 'Broken high surrogate \uD800'],
+    ['label', 'Broken low surrogate \uDC00'],
+  ]) {
+    assert.throws(
+      () => normalizeSpecialistDefinitionV1(definition({ [field]: forged })),
+      /must be exact bounded text/,
+      field + ' must not publish spoofable or non-durable owner-visible text',
+    );
+  }
+  const restored = JSON.parse(JSON.stringify(definition({
+    label: 'QA — valid emoji 🙂',
+    description: 'First line\nSecond line with legitimate Unicode: Україна',
+  })));
+  const accepted = normalizeSpecialistDefinitionV1(restored);
+  assert.equal(accepted.label, restored.label);
+  assert.equal(accepted.description, restored.description);
+  assert.equal(accepted.enabled, true);
+  assert.equal(accepted.definitionRevision, restored.definitionRevision);
+});
+
+
+test('specialist metadata rejects Arabic Letter Mark and Unicode line separator spoofing', () => {
+  // U+061C is the Arabic Letter Mark (an invisible bidi control). U+2028 and
+  // U+2029 render as line breaks without being literal permitted newlines.
+  for (const field of ['label', 'description']) {
+    for (const invisible of ['\u061C', '\u2028', '\u2029']) {
+      const forged = 'Qualified' + invisible + 'Untrusted';
+      assert.throws(
+        () => normalizeSpecialistDefinitionV1(definition({ [field]: forged })),
+        /must be exact bounded text/,
+        field + ' must reject owner-facing spoofing controls',
+      );
+    }
+  }
+
+  // Ordinary Arabic script and explicit description line breaks are valid.
+  const persisted = JSON.parse(JSON.stringify(definition({
+    label: 'QA — العربية Україна',
+    description: 'First line\nSecond line — العربية',
+  })));
+  const recovered = normalizeSpecialistDefinitionV1(persisted);
+  assert.equal(recovered.label, persisted.label);
+  assert.equal(recovered.description, persisted.description);
+  assert.equal(recovered.enabled, true);
+});
+
+
+test('specialist owner-facing metadata rejects Unicode soft-hyphen and invisible script fillers', () => {
+  // These code points render as absent or near-absent characters, letting two
+  // distinct specialist definitions appear indistinguishable in owner UI.
+  // Reject them at import, including after a durable JSON cold restart.
+  const invisible = ['\u00AD', '\u034F', '\u115F', '\u1160', '\u180E', '\u3164', '\uFFA0'];
+  for (const field of ['label', 'description']) {
+    for (const marker of invisible) {
+      const candidate = JSON.parse(JSON.stringify(definition({
+        [field]: 'Qualified' + marker + 'Specialist',
+      })));
+      assert.throws(
+        () => normalizeSpecialistDefinitionV1(candidate),
+        /must be exact bounded text/,
+        field + ' must not accept visually hidden specialist identity data',
+      );
+      assert.throws(
+        () => normalizeSpecialistRegistryV1({
+          schemaVersion: 1,
+          registryId: 'registry:spoofed-label',
+          revision: 1,
+          definitions: [candidate],
+        }),
+        /must be exact bounded text/,
+      );
+    }
+  }
+  const canonical = JSON.parse(JSON.stringify(definition({
+    label: 'Specialist — 한글 Україна 🙂',
+    description: 'Allowed Arabic العربية and newline\nSecond line',
+  })));
+  const restored = normalizeSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'registry:valid-unicode',
+    revision: 4,
+    definitions: [canonical],
+  });
+  assert.equal(restored.definitions[0].label, canonical.label);
+  assert.equal(restored.definitions[0].description, canonical.description);
+  assert.equal(Object.isFrozen(restored.definitions[0]), true);
+});
+
+
+test('explicitly present undefined execution plane filter cannot widen specialist placement', () => {
+  const unsafe = discovery({ executionPlanes: undefined });
+  assert.throws(
+    () => discoverSpecialistsV1(unsafe),
+    /executionPlanes must be a canonical array/,
+    'present undefined must never mean unrestricted plane selection',
+  );
+  assert.throws(
+    () => discoverSpecialistsV1(discovery({ executionPlanes: null })),
+    /executionPlanes must be a canonical array/,
+  );
+  const selected = discoverSpecialistsV1(
+    JSON.parse(JSON.stringify(discovery({ executionPlanes: [AgentExecutionPlane.LOCAL] }))),
+  );
+  assert.equal(selected.specialists.length, 1);
+  assert.equal(selected.specialists[0].executionPlane, AgentExecutionPlane.LOCAL);
+  // Legacy callers may truly omit the optional filter: only genuine absence
+  // preserves the documented fallback, including after a cold JSON restart.
+  const legacy = discovery();
+  delete legacy.executionPlanes;
+  assert.equal(discoverSpecialistsV1(JSON.parse(JSON.stringify(legacy))).specialists.length, 1);
+
+  let getterReads = 0;
+  const hostile = discovery();
+  Object.defineProperty(hostile, 'executionPlanes', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      throw new Error('SECRET_EXECUTION_PLANE_VALUE');
+    },
+  });
+  assert.throws(() => discoverSpecialistsV1(hostile), /executionPlanes must be an enumerable own data property/);
+  assert.equal(getterReads, 0, 'owner discovery must not execute untrusted accessors');
 });
