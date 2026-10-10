@@ -1,0 +1,9 @@
+11.0.12 — 2026-10-03
+
+- Scenario sending no longer waits for the browser window to become foreground-visible before an authorized form submission in its already-bound tab.
+- Work conversation `aria-busy` response status is recognized even while the composer has a draft and displays Send, preventing premature next prompts.
+- Configured post-Send dwell is preserved; activation for dwell or late observation is best effort.
+- Diagnostic export records whether Core persisted the DOM/native submit boundary.
+- Same-document adapter reinjection preserves pending acknowledgement evidence.
+
+See INCIDENT-11.0.12.md for evidence, tests, and limits.

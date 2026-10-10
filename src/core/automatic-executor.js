@@ -4,12 +4,16 @@ import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
 import { restorePendingSendTabs } from './native-input.js';
-import { resolveTaskTab } from './tabs.js';
+import { withWindowFocus, windowHasPendingSend } from './window-focus.js';
+import { assertSessionWindow } from './window-binding.js';
+import { resolveTaskTab, sameChatConversationUrl } from './tabs.js';
+import { withTabLifecycle, createRecordedOwnedTab } from './owned-tab-lifecycle.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
 import { appendLog } from './logger.js';
 import { AgentProviderId } from './capability-registry.js';
 import { promptForVerifiedSendOrdinal } from './session-prompt-cadence.js';
+import { EXECUTION_POLICY } from '../config/execution-policy.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
@@ -60,6 +64,19 @@ function resumeUnlessQuiesced(session, priorRunState) {
   session.runState = QUIESCENT_STATES.has(priorRunState) ? priorRunState : RunState.RUNNING;
 }
 
+function promptSourceForSession(session) {
+  const ordinal = Math.max(0, Number(session?.successfulSendCount || 0)) + 1;
+  const cadence = session?.promptCadence || {};
+  const p3 = cadence.prompt3 || {};
+  const p2 = cadence.prompt2 || {};
+  if (p3.enabled === true && Number.isInteger(Number(p3.everyN)) && ordinal % Number(p3.everyN) === 0) return 'PROMPT_CADENCE_3';
+  if (p2.enabled === true && Number.isInteger(Number(p2.everyN)) && ordinal % Number(p2.everyN) === 0) return 'PROMPT_CADENCE_2';
+  if (session?.scenarioWork?.managed === true) return 'SCENARIO_WORK_STEP';
+  if (session?.orchestrationWorker?.managed === true) return 'ORCHESTRATION_WORKER_PROMPT';
+  if (session?.orchestrationCoordinator?.managed === true) return 'ORCHESTRATION_COORDINATOR_PROMPT';
+  return session?.promptMode === PromptMode.UNIQUE ? 'TASK_PROMPT_OVERRIDE' : 'SHARED_SESSION_PROMPT';
+}
+
 function matchesOperation(operation, expected, phase) {
   return operation?.phase === phase
     && operation.operationId === expected.operationId
@@ -81,6 +98,15 @@ function exclusiveConversationIdentity(url) {
 function activeConversationHintConflict(state, sessionId, normalizedUrl) {
   const identity = exclusiveConversationIdentity(normalizedUrl);
   if (!identity) return null;
+  for (const owner of Object.values(state?.sessionsById || {})) {
+    if (owner.id === sessionId || owner.enabled === false) continue;
+    const managedWaiting = owner.scenarioWork?.managed && owner.operation?.phase === OperationPhase.SENT_VERIFIED;
+    if (!ACTIVE_STATES.has(owner.runState) && !managedWaiting) continue;
+    for (const task of Object.values(owner.tasksById || {})) {
+      if (Number(task.lastVerifiedSendAt || 0) > 0 && (exclusiveConversationIdentity(task.normalizedUrl) === identity
+          || (managedWaiting && exclusiveConversationIdentity(task.lastConversationUrl) === identity))) return { sessionId: owner.id };
+    }
+  }
   for (const hint of Object.values(state?.tabHintsByTaskId || {})) {
     if (!hint?.sessionId || hint.sessionId === sessionId) continue;
     const owner = state.sessionsById?.[hint.sessionId];
@@ -102,6 +128,7 @@ export class AutomaticSessionExecutor {
     now = () => Date.now(),
     cryptoApi = globalThis.crypto,
     profileGapMs = DEFAULT_PROFILE_SEND_GAP_MS,
+    forceHighEffort = EXECUTION_POLICY.forceHighEffort,
   } = {}) {
     this.repo = repository;
     this.chrome = chromeApi;
@@ -109,6 +136,51 @@ export class AutomaticSessionExecutor {
     this.now = now;
     this.coordinator = new DurableSubmissionCoordinator(repository, { now, cryptoApi, profileGapMs });
     this.tabBindQueues = new Map();
+    this.sessionRuns = new Map();
+    this.forceHighEffort = forceHighEffort === true;
+  }
+
+  async retryHiddenScenarioCheck(sessionId, task, tabId, requestId, originalResult) {
+    let tab;
+    try { tab = await this.chrome.tabs.get(tabId); } catch { return originalResult; }
+    if (tab.active || !Number.isInteger(tab.windowId)) return originalResult;
+    return withWindowFocus(this.repo, tab.windowId, async () => {
+      const state = await this.repo.load();
+      const session = state.sessionsById?.[sessionId];
+      const hintKey = session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+        ? `__session_worker__:${sessionId}` : task.id;
+      const hint = state.tabHintsByTaskId?.[hintKey];
+      if (!session?.scenarioWork?.managed || !ACTIVE_STATES.has(session.runState)
+          || state.profile?.masterPaused === true || hint?.tabId !== tabId || hint.ownedByExtension !== true
+          || windowHasPendingSend(state, tab.windowId)) return originalResult;
+      let current;
+      try { current = await this.chrome.tabs.get(tabId); } catch { return originalResult; }
+      if (current.active || current.windowId !== tab.windowId
+          || !sameChatConversationUrl(current.url, task.normalizedUrl || task.url)) return originalResult;
+      assertSessionWindow(session, current);
+      const [previous] = await this.chrome.tabs.query({ active: true, windowId: tab.windowId });
+      if (!previous?.id || previous.id === tabId) return originalResult;
+      let activated = false;
+      try {
+        await this.chrome.tabs.update(tabId, { active: true });
+        activated = true;
+        await new Promise(resolve => setTimeout(resolve, 350));
+        const stillOwned = await this.repo.load();
+        if (stillOwned.tabHintsByTaskId?.[hintKey]?.tabId !== tabId
+            || !ACTIVE_STATES.has(stillOwned.sessionsById?.[sessionId]?.runState)) return originalResult;
+        return await this.executeInteraction(sessionId, stillOwned.sessionsById[sessionId],
+          task, tabId, 'CHECK_ONLY', requestId, '');
+      } catch {
+        return originalResult;
+      } finally {
+        if (activated) {
+          try {
+            const selected = await this.chrome.tabs.get(tabId);
+            if (selected.active) await this.chrome.tabs.update(previous.id, { active: true });
+          } catch { /* owner may have closed the tab or changed the window */ }
+        }
+      }
+    });
   }
 
   async bindTaskTab(sessionId, taskId) {
@@ -119,7 +191,7 @@ export class AutomaticSessionExecutor {
     const conversationIdentity = exclusiveConversationIdentity(initialTask.normalizedUrl);
     const queueKey = conversationIdentity ? `conversation:${conversationIdentity}` : `session:${sessionId}`;
     const prior = this.tabBindQueues.get(queueKey) || Promise.resolve();
-    const operation = prior.catch(() => undefined).then(async () => {
+    const operation = prior.catch(() => undefined).then(() => withTabLifecycle(this.repo, async () => {
       try {
         // Chrome tab I/O must never run while StorageRepository.update owns its
         // serialized state-write queue. Exact /c/<id> conversation ownership is
@@ -134,16 +206,34 @@ export class AutomaticSessionExecutor {
           changed.safeDiagnosticCode = 'TAB_CONVERSATION_CHANGED_DURING_BIND';
           throw changed;
         }
+        const hintKeyForEvidence = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+          ? `__session_worker__:${sessionId}` : taskId;
+        if (Number(session.operation?.submitStartedAt || 0) > 0
+            && [OperationPhase.AMBIGUOUS, OperationPhase.SUBMITTING].includes(session.operation?.phase)
+            && !isExclusiveConversationUrl(task.normalizedUrl)) {
+          const evidence = snapshot.tabHintsByTaskId?.[hintKeyForEvidence];
+          let surviving = null;
+          try { if (evidence?.tabId != null) surviving = await this.chrome.tabs.get(evidence.tabId); } catch { /* missing */ }
+          if (!surviving) {
+            const lost = new Error('Post-submit launch tab is missing; recovery will not open a fresh composer');
+            lost.safeDiagnosticCode = 'TAB_POST_SUBMIT_BINDING_LOST';
+            throw lost;
+          }
+        }
         const conflict = activeConversationHintConflict(snapshot, sessionId, task.normalizedUrl);
         if (conflict) {
           const error = new Error('Another active Session already owns this exact ChatGPT conversation');
           error.safeDiagnosticCode = 'TAB_CONVERSATION_OWNERSHIP_CONFLICT';
           throw error;
         }
-        const tab = await resolveTaskTab(this.chrome, snapshot, sessionId, task);
         const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
-          ? `__session_worker__:${sessionId}`
-          : taskId;
+          ? `__session_worker__:${sessionId}` : taskId;
+        const owner = { hintKey, sessionId, taskId, kind: hintKey === taskId ? 'TASK' : 'SESSION_WORKER' };
+        const ownedChrome = Object.create(this.chrome);
+        ownedChrome.tabs = Object.create(this.chrome.tabs);
+        ownedChrome.tabs.create = options => createRecordedOwnedTab(this.repo, this.chrome, owner, options);
+        const tab = await resolveTaskTab(ownedChrome, snapshot, sessionId, task);
+        assertSessionWindow(session, tab);
         const resolvedHint = snapshot.tabHintsByTaskId?.[hintKey];
         if (!resolvedHint || resolvedHint.tabId !== tab.id || resolvedHint.sessionId !== sessionId) {
           throw new Error('Resolved tab ownership was not recorded in snapshot');
@@ -156,7 +246,16 @@ export class AutomaticSessionExecutor {
           if (liveTask.normalizedUrl !== task.normalizedUrl) {
             throw new Error('Task target changed during tab binding');
           }
-          draft.tabHintsByTaskId[hintKey] = structuredClone(resolvedHint);
+          const currentHint = draft.tabHintsByTaskId?.[hintKey];
+          if (currentHint && currentHint.tabId !== resolvedHint.tabId
+              && currentHint.tabId !== initial.tabHintsByTaskId?.[hintKey]?.tabId) throw new Error('TAB_BINDING_CHANGED');
+          if (!Number.isFinite(resolvedHint.readyAfterAt)) resolvedHint.readyAfterAt = this.now() + Number(live.tabReadyDelayMs || 0);
+          draft.tabHintsByTaskId[hintKey] = { ...structuredClone(resolvedHint),
+            boundAt: this.now(), boundSendCount: Number(live.successfulSendCount || 0), opening: false };
+          if (Number.isInteger(tab.windowId)) {
+            live.tabWindowId = tab.windowId;
+            if (live.scenarioWork && !Number.isInteger(live.scenarioWork.preferredWindowId)) live.scenarioWork.preferredWindowId = tab.windowId;
+          }
           appendDiagnostic(draft, {
             event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
             sessionId,
@@ -171,7 +270,7 @@ export class AutomaticSessionExecutor {
       } catch (error) {
         throw attachTaskContext(error, taskId, 'TASK_TAB_BIND_FAILED');
       }
-    });
+    }));
     this.tabBindQueues.set(queueKey, operation);
     try {
       return await operation;
@@ -189,6 +288,10 @@ export class AutomaticSessionExecutor {
       taskId: task.id,
       providerId,
       mode,
+      expectedWindowId: session?.scenarioWork?.managed ? session.scenarioWork.preferredWindowId : session?.tabWindowId,
+      requireWindowBinding: session?.scenarioWork?.windowBindingRequired === true,
+      postSendDelayMs: Math.min(60000, Math.max(0, Number(session.postSendDelayMs || 0))),
+      requireGenerationAcknowledgement: session?.scenarioWork?.managed === true,
       expectedUrl: task.normalizedUrl || task.url,
       promptText,
       recoveryLaunchUrl: mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT'
@@ -199,6 +302,7 @@ export class AutomaticSessionExecutor {
 
   async executeInteraction(sessionId, session, task, tabId, mode, requestId, promptText) {
     const request = this.request(session, task, mode, requestId, promptText);
+    const startedAt = Date.now();
     await this.repo.update(draft => {
       appendDiagnostic(draft, {
         event: 'ЗАПИТ_ДО_СТОРІНКИ',
@@ -223,7 +327,11 @@ export class AutomaticSessionExecutor {
           phase: session.operation?.phase,
           status: result.status,
           code: result.safeDiagnosticCode,
-          message: result.safeDiagnosticMessage,
+          message: [
+            result.safeDiagnosticMessage,
+            `interactionMs=${Math.max(0, Date.now() - startedAt)}`,
+            Number.isFinite(result.elapsedMs) ? `pageMs=${Math.max(0, result.elapsedMs)}` : '',
+          ].filter(Boolean).join('; '),
           observed: result.normalizedObservedUrl,
           target: request.expectedUrl,
           promptFingerprint: session.operation?.promptFingerprint,
@@ -241,7 +349,7 @@ export class AutomaticSessionExecutor {
           mode,
           phase: session.operation?.phase,
           code: error?.safeDiagnosticCode || 'INTERACTION_FAILURE',
-          message: error?.message || error,
+          message: `${error?.message || error}; interactionMs=${Math.max(0, Date.now() - startedAt)}`,
           target: request.expectedUrl,
           promptFingerprint: session.operation?.promptFingerprint,
         }, { at: this.now() });
@@ -265,7 +373,6 @@ export class AutomaticSessionExecutor {
       const operationForTask = operation?.taskId === taskId ? operation : null;
       const unattendedPreSubmitReset = session.retryPolicy !== 'manual'
         && [
-          InteractionResult.AUTH_REQUIRED,
           InteractionResult.UNKNOWN_UI,
           InteractionResult.MANUAL_REVIEW_REQUIRED,
         ].includes(result?.status)
@@ -290,7 +397,11 @@ export class AutomaticSessionExecutor {
         }, { at: this.now() });
         return draft;
       }
+      if (hint.ownedByExtension === false) return draft;
+      if (Number(operationForTask?.postSendHoldUntil || 0) > this.now()) return draft;
       tabId = hint.tabId;
+      hint.ownedByExtension = true;
+      hint.retirePending = true;
       target = task.normalizedUrl || task.url;
       appendDiagnostic(draft, {
         event: 'ЗАКРИТТЯ_ВКЛАДКИ_ЗАПЛАНОВАНО',
@@ -522,6 +633,56 @@ export class AutomaticSessionExecutor {
     return { kind: 'UNCERTAIN_SETTLED_NO_RESEND', wakeAt, result };
   }
 
+  async settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, result) {
+    const now = this.now();
+    let settled = false;
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      const liveOperation = live.operation;
+      if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
+      const liveTask = live.tasksById[expectedOperation.taskId];
+      if (!liveTask) return draft;
+
+      // A manager-owned Scenario/Orchestration operation may never poll an
+      // ambiguous Send forever. End this physical operation without replaying
+      // it; the owning manager's configured timeout/replacement policy remains
+      // the only authority allowed to start another physical chat.
+      liveOperation.phase = OperationPhase.FAILED_SAFE;
+      liveOperation.updatedAt = now;
+      liveTask.status = 'FAILED_SAFE';
+      liveTask.manualReviewReason = 'MANAGED_SEND_ACK_TIMEOUT_NO_RESEND';
+      liveTask.retryAfterAt = 0;
+      live.enabled = false;
+      live.runState = RunState.STOPPED;
+      live.lastError = `Надсилання не вдалося підтвердити у відведене вікно. Цей фізичний Send не повторюється; керівний сценарій застосує свій timeout/replacement. Код: ${result?.safeDiagnosticCode || 'SEND_ACK_TIMEOUT'}.`;
+      live.lastActionAt = now;
+      live.updatedAt = now;
+      releaseSendLease(draft, {
+        sessionId,
+        operationId: expectedOperation.operationId,
+        now,
+        profileGapMs: DEFAULT_PROFILE_SEND_GAP_MS,
+      });
+      appendDiagnostic(draft, {
+        event: 'КЕРОВАНЕ_НЕВИЗНАЧЕНЕ_НАДСИЛАННЯ_ЗАВЕРШЕНО_БЕЗ_ПОВТОРУ',
+        sessionId,
+        taskId: expectedOperation.taskId,
+        phase: liveOperation.phase,
+        code: result?.safeDiagnosticCode || 'SEND_ACK_TIMEOUT',
+        message: live.lastError,
+        promptFingerprint: expectedOperation.promptFingerprint,
+      }, { at: now });
+      settled = true;
+      return draft;
+    });
+    if (!settled) return { kind: 'OPERATION_CHANGED', result };
+    await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, {
+      ...(result || {}),
+      status: InteractionResult.TEMPORARY_ERROR,
+    });
+    return { kind: 'MANAGED_UNCERTAIN_SETTLED_NO_RESEND', result };
+  }
+
   async recoverAmbiguous(sessionId, session) {
     const operation = session.operation;
     const expectedOperation = {
@@ -555,6 +716,11 @@ export class AutomaticSessionExecutor {
       });
     }
 
+    if (beforeVerification >= deadline && session.retryPolicy !== 'manual' && managedNoResend) {
+      return this.settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, {
+        status: InteractionResult.TEMPORARY_ERROR, safeDiagnosticCode: 'RECOVERY_VERIFICATION_DEADLINE_EXPIRED',
+      });
+    }
     const retryAfterAt = task?.retryAfterAt || 0;
     if (retryAfterAt > beforeVerification) {
       return { kind: 'WAIT_RECOVERY', wakeAt: retryAfterAt };
@@ -583,46 +749,7 @@ export class AutomaticSessionExecutor {
         && result.status !== InteractionResult.SENT_VERIFIED
         && session.retryPolicy !== 'manual'
         && managedNoResend) {
-      let held = false;
-      let wakeAt = now + Math.max(5000, session.retryBackoffMs || 30000);
-      await this.repo.update(draft => {
-        const live = requireSession(draft, sessionId);
-        const liveOperation = live.operation;
-        if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
-        const liveTask = live.tasksById[expectedOperation.taskId];
-        if (!liveTask) return draft;
-        wakeAt = now + Math.max(5000, live.retryBackoffMs || 30000);
-        liveTask.status = 'SUBMISSION_UNCERTAIN';
-        liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
-        liveOperation.verificationDeadline = wakeAt + Math.max(
-          15000,
-          Math.min(45000, Math.max(1000, live.retryBackoffMs || 30000) * 2)
-        );
-        liveOperation.updatedAt = now;
-        live.runState = RunState.RECOVERING;
-        live.lastError = `Надсилання не підтверджено; повторний Send заборонено, триває перевірка тієї самої керованої операції. Код: ${result.safeDiagnosticCode || 'SEND_ACK_TIMEOUT'}.`;
-        live.lastActionAt = now;
-        live.updatedAt = now;
-        releaseSendLease(draft, {
-          sessionId,
-          operationId: expectedOperation.operationId,
-          now,
-          profileGapMs: DEFAULT_PROFILE_SEND_GAP_MS,
-        });
-        appendDiagnostic(draft, {
-          event: 'КЕРОВАНА_СЕСІЯ_УТРИМУЄ_НЕВИЗНАЧЕНЕ_НАДСИЛАННЯ_БЕЗ_ПОВТОРУ',
-          sessionId,
-          taskId: expectedOperation.taskId,
-          phase: liveOperation.phase,
-          code: result.safeDiagnosticCode || 'SEND_ACK_TIMEOUT',
-          message: live.lastError,
-          promptFingerprint: expectedOperation.promptFingerprint,
-        }, { at: now });
-        held = true;
-        return draft;
-      });
-      if (held) return { kind: 'UNCERTAIN_VERIFY_HOLD', wakeAt, result };
-      return { kind: 'OPERATION_CHANGED', result };
+      return this.settleExpiredManagedAmbiguous(sessionId, task, expectedOperation, result);
     }
 
     // After a physical Send attempt becomes ambiguous, at-most-once safety wins:
@@ -659,7 +786,10 @@ export class AutomaticSessionExecutor {
         reconciled = true;
         return draft;
       });
-      if (reconciled) await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
+      if (reconciled) {
+        await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
+        await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
+      }
       return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
@@ -732,7 +862,7 @@ export class AutomaticSessionExecutor {
       liveOperation.phase = OperationPhase.FAILED_SAFE;
       liveOperation.updatedAt = now;
       liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
-      live.lastError = 'Interrupted pre-submit operation failed safe; retry scheduled.';
+      live.lastError = 'Pre-submit operation was interrupted; automatic retry scheduled.';
       live.lastActionAt = now;
       live.updatedAt = now;
       reconciled = true;
@@ -817,6 +947,11 @@ export class AutomaticSessionExecutor {
         operation.promptText,
       ),
     });
+    // The adapter's finally runs while Core is still SUBMITTING. After the
+    // durable result has changed that phase, release the foreground focus
+    // independently of the longer physical post-Send tab dwell.
+    try { await restorePendingSendTabs(this.chrome, this.repo, { sessionId }); }
+    catch (_) { /* Cold-start reconciliation retains the durable focus lease. */ }
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
       await this.markNormalWorkResumed(sessionId, task.id);
@@ -825,18 +960,31 @@ export class AutomaticSessionExecutor {
     return { kind: result.status === InteractionResult.SENT_VERIFIED ? 'SENT' : 'SUBMISSION_UNCERTAIN', result };
   }
 
-  async runSessionOnce(sessionId) {
+  runSessionOnce(sessionId) {
+    if (this.sessionRuns.has(sessionId)) return this.sessionRuns.get(sessionId);
+    const run = this.performSessionOnce(sessionId).finally(() => {
+      if (this.sessionRuns.get(sessionId) === run) this.sessionRuns.delete(sessionId);
+    });
+    this.sessionRuns.set(sessionId, run);
+    return run;
+  }
+
+  async performSessionOnce(sessionId) {
     const state = await this.repo.load();
     const session = requireSession(state, sessionId);
     if (!ACTIVE_STATES.has(session.runState)) return { kind: 'IDLE' };
 
+    if (session.scenarioWork?.managed && session.operation?.phase === OperationPhase.FAILED_SAFE
+        && Number(session.operation.submitStartedAt || 0) > 0
+        && !session.tasksById[session.operation.taskId]?.lastVerifiedSendAt) {
+      return { kind: 'MANAGED_SEND_HELD_NO_RESEND' };
+    }
+    if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
+      return this.recoverAmbiguous(sessionId, session);
+    }
     const profileRateLimitUntil = Number(state.profile?.rateLimitUntil || 0);
     if (profileRateLimitUntil > this.now()) {
       return { kind: 'PROFILE_RATE_LIMIT_WAIT', wakeAt: profileRateLimitUntil };
-    }
-
-    if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
-      return this.recoverAmbiguous(sessionId, session);
     }
     if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
       return this.continuePreSend(sessionId, session);
@@ -848,6 +996,7 @@ export class AutomaticSessionExecutor {
       return { kind: 'OPERATION_IN_PROGRESS', phase: session.operation.phase };
     }
 
+    if (Number(session.operation?.postSendHoldUntil || 0) > this.now()) return { kind: 'POST_SEND_WAIT', wakeAt: session.operation.postSendHoldUntil };
     const selection = selectNextTask(session, this.now());
     if (selection.kind === 'IDLE' || selection.kind === 'COOLDOWN' || selection.kind === 'WAIT') return selection;
     if (selection.kind === 'COMPLETE') {
@@ -866,8 +1015,11 @@ export class AutomaticSessionExecutor {
 
     const task = selection.task;
     const tab = await this.bindTaskTab(sessionId, task.id);
+    const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? `__session_worker__:${sessionId}` : task.id;
+    const readyAfterAt = (await this.repo.load()).tabHintsByTaskId[hintKey]?.readyAfterAt || 0;
+    if (readyAfterAt > this.now()) return { kind: 'TAB_SETTLING', wakeAt: readyAfterAt };
     const checkId = `${sessionId}:${task.id}:check:${this.now()}`;
-    const check = await this.executeInteraction(
+    let check = await this.executeInteraction(
       sessionId,
       session,
       task,
@@ -876,6 +1028,13 @@ export class AutomaticSessionExecutor {
       checkId,
       '',
     );
+    // Some background ChatGPT documents postpone mounting their composer until
+    // briefly activated. Retry only a read-only CHECK_ONLY on this positively
+    // owned Scenario tab, never a second Send or an arbitrary user tab.
+    if (session.scenarioWork?.managed === true && check.status === InteractionResult.TEMPORARY_ERROR
+        && check.safeDiagnosticCode === 'COMPOSER_NOT_READY') {
+      check = await this.retryHiddenScenarioCheck(sessionId, task, tab.id, checkId, check);
+    }
 
     const postCheck = await this.repo.load();
     const postCheckSession = requireSession(postCheck, sessionId);
@@ -894,6 +1053,68 @@ export class AutomaticSessionExecutor {
       return { kind: check.status, result: check };
     }
 
+    // The standard package proceeds directly to insertion and therefore never
+    // opens or changes the model/effort menu. The separate High package sets a
+    // build-time policy and tries to select High before creating prompt state.
+    if (this.forceHighEffort) {
+      let highConfirmed = false;
+      let lastEffortCode = 'EFFORT_INTERACTION_FAILED';
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const effortState = await this.repo.load();
+        const effortSession = requireSession(effortState, sessionId);
+        if (!ACTIVE_STATES.has(effortSession.runState)) {
+          return { kind: 'QUIESCED', runState: effortSession.runState };
+        }
+        let effort;
+        try {
+          effort = await this.executeInteraction(
+            sessionId,
+            effortSession,
+            effortSession.tasksById[task.id] || task,
+            tab.id,
+            'ENSURE_HIGH_EFFORT',
+            `${sessionId}:${task.id}:effort:${this.now()}:${attempt}`,
+            '',
+          );
+        } catch (_) {
+          // A menu/transport failure is advisory. INSERT_ONLY still checks the
+          // target chat and composer before any message can be submitted.
+          lastEffortCode = 'EFFORT_INTERACTION_FAILED';
+        }
+        const postEffort = await this.repo.load();
+        const postEffortSession = requireSession(postEffort, sessionId);
+        if (!ACTIVE_STATES.has(postEffortSession.runState)) {
+          return { kind: 'QUIESCED', runState: postEffortSession.runState };
+        }
+        if (effort?.status === InteractionResult.READY) {
+          highConfirmed = true;
+          break;
+        }
+        if (effort) {
+          lastEffortCode = effort.safeDiagnosticCode || 'EFFORT_UNKNOWN_FAILURE';
+          if (!lastEffortCode.startsWith('EFFORT_')) {
+            await this.applyResult(sessionId, task.id, effort);
+            await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
+            return { kind: effort.status, result: effort };
+          }
+        }
+      }
+      if (!highConfirmed) {
+        await this.repo.update(draft => {
+          appendDiagnostic(draft, {
+            event: 'ВИСОКІ_ЗУСИЛЛЯ_НЕ_ПІДТВЕРДЖЕНО',
+            sessionId,
+            taskId: task.id,
+            tabId: tab.id,
+            mode: 'ENSURE_HIGH_EFFORT',
+            code: lastEffortCode,
+            message: 'Після трьох спроб продовжено вставлення промпта з поточним рівнем зусиль.',
+          }, { at: this.now() });
+          return draft;
+        });
+      }
+    }
+
     const fresh = await this.repo.load();
     const liveSession = requireSession(fresh, sessionId);
     if (!ACTIVE_STATES.has(liveSession.runState)) {
@@ -905,6 +1126,19 @@ export class AutomaticSessionExecutor {
     const identity = await this.coordinator.begin({ sessionId, taskId: task.id, promptText, generation });
     await this.coordinator.markReady({ sessionId, operationId: identity.operationId });
     await this.coordinator.markInserting({ sessionId, operationId: identity.operationId });
+    await this.repo.update(draft => {
+      appendDiagnostic(draft, {
+        event: 'ПРОМПТ_ПІДГОТОВЛЕНО_ДО_ВСТАВЛЕННЯ',
+        sessionId,
+        taskId: liveTask.id,
+        phase: OperationPhase.INSERTING,
+        target: liveTask.normalizedUrl || liveTask.url,
+        promptFingerprint: identity.promptFingerprint,
+        promptSource: promptSourceForSession(liveSession),
+        message: `Довжина промпта: ${promptText.length} символів. Текст промпта у діагностику не записується.`,
+      }, { at: this.now() });
+      return draft;
+    });
 
     const inserted = await this.executeInteraction(
       sessionId,
@@ -950,7 +1184,7 @@ export class AutomaticSessionExecutor {
               candidate.retryAfterAt = Math.max(candidate.retryAfterAt || 0, wakeAt);
             }
           }
-          live.lastError = `Вставлення не вдалося підтвердити; безпечний автоматичний повтор заплановано. Код: ${inserted.safeDiagnosticCode || 'INSERTION_NOT_PROVEN'}.`;
+          live.lastError = `Вставлення не вдалося підтвердити; автоматичний повтор заплановано. Код: ${inserted.safeDiagnosticCode || 'INSERTION_NOT_PROVEN'}.`;
           live.lastActionAt = now;
           live.updatedAt = now;
           appendDiagnostic(draft, {

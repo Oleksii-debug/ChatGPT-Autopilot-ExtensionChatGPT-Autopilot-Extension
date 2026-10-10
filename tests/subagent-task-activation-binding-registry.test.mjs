@@ -14,7 +14,6 @@ import {
   putSubagentTaskActivationBindingV1,
   resolveSubagentTaskActivationBindingForActivationV1,
   resolveSubagentTaskActivationBindingV1,
-  resolveSubagentTaskActivationEvidenceV1,
 } from '../src/core/subagent-task-activation-binding-registry.js';
 
 const BOUND = '2026-09-27T18:00:00.000Z';
@@ -28,7 +27,6 @@ function binding(overrides = {}) {
     childAgentId: 'child-1',
     taskId: 'task-1',
     taskEnvelopeId: 'envelope-1',
-    taskDispatchIdentity: 'subagent-task:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     planId: 'plan-1',
     planRevision: 3,
     outcomeContractId: 'outcome-1',
@@ -48,7 +46,6 @@ function binding(overrides = {}) {
     value.childAgentId,
     value.taskId,
     value.taskEnvelopeId,
-    value.taskDispatchIdentity,
     value.planId,
     String(value.planRevision),
     value.outcomeContractId,
@@ -66,51 +63,6 @@ function binding(overrides = {}) {
 function append(registry, value = binding(), registeredAt = REGISTERED) {
   return putSubagentTaskActivationBindingV1(registry, {
     binding: value,
-    registeredAt,
-  });
-}
-
-function authorityEnvelope(overrides = {}) {
-  return {
-    schemaVersion: 1,
-    decision: 'ALLOW',
-    reasonCode: 'LEAST_AUTHORITY_DERIVED',
-    projectId: 'project-1',
-    parentAgentId: 'parent-1',
-    childAgentId: 'child-1',
-    taskId: 'task-1',
-    providerId: 'provider.main',
-    capabilityIds: ['cap.read'],
-    sourceIds: ['source.allowed'],
-    artifactIds: ['artifact.allowed'],
-    toolIds: ['tool.read'],
-    toolDescriptors: [{
-      schemaVersion: 1,
-      toolId: 'tool.read',
-      providerId: 'provider.main',
-      label: 'Read',
-      description: '',
-      capabilityIds: ['cap.read'],
-      inputSchemaRef: null,
-      outputSchemaRef: null,
-      readOnly: true,
-    }],
-    executionAuthority: false,
-    credentialAuthority: false,
-    policyAuthority: false,
-    ...overrides,
-  };
-}
-
-function appendWithAuthority(
-  registry,
-  value = binding(),
-  envelope = authorityEnvelope(),
-  registeredAt = REGISTERED,
-) {
-  return putSubagentTaskActivationBindingV1(registry, {
-    binding: value,
-    authorityEnvelope: envelope,
     registeredAt,
   });
 }
@@ -170,7 +122,7 @@ test('binding ID cannot be reused with divergent boundAt even though boundAt is 
   assert.equal(divergent.bindingId, value.bindingId);
   assert.throws(
     () => append(registry, divergent, '2026-09-27T18:05:00.000Z'),
-    /Divergent subagent task activation bindingId(?: or authority provenance)? collision/u,
+    /Divergent subagent task activation bindingId collision/u,
   );
 });
 
@@ -232,85 +184,6 @@ test('same task may accumulate bounded retry generations with unique activation 
       '2026-09-27T18:40:30.000Z',
     ),
     /history limit exceeded/u,
-  );
-});
-
-test('task dispatch identity is durable binding identity', () => {
-  const first = binding();
-  const changed = binding({ taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' });
-  assert.notEqual(changed.bindingId, first.bindingId);
-  assert.throws(
-    () => normalizeSubagentTaskActivationBindingRegistryV1({
-      schemaVersion: 1,
-      revision: 1,
-      records: [{
-        binding: {
-          ...first,
-          taskDispatchIdentity: changed.taskDispatchIdentity,
-        },
-        registeredAt: REGISTERED,
-      }],
-    }),
-    /bindingId is not canonical/u,
-  );
-});
-
-test('non-WORK continuation requires an earlier durable WORK binding for the exact task dispatch identity', () => {
-  const work = binding();
-  const reconcile = binding({
-    activationId: 'activation-reconcile',
-    generation: 2,
-    invocationId: 'invocation-reconcile',
-    activationPurpose: OrchestrationActivationPurpose.RECONCILE,
-    boundAt: '2026-09-27T18:01:00.000Z',
-  });
-  assert.throws(
-    () => append(
-      createSubagentTaskActivationBindingRegistryV1(),
-      reconcile,
-      '2026-09-27T18:01:01.000Z',
-    ),
-    /requires prior durable WORK task dispatch identity/u,
-  );
-
-  let registry = append(createSubagentTaskActivationBindingRegistryV1(), work, REGISTERED);
-  registry = append(registry, reconcile, '2026-09-27T18:01:01.000Z');
-  assert.equal(registry.revision, 2);
-  assert.equal(registry.records[1].binding.activationPurpose, OrchestrationActivationPurpose.RECONCILE);
-
-  const driftedRecovery = binding({
-    taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    activationId: 'activation-recovery',
-    generation: 3,
-    invocationId: 'invocation-recovery',
-    activationPurpose: OrchestrationActivationPurpose.RECOVERY,
-    boundAt: '2026-09-27T18:02:00.000Z',
-  });
-  assert.throws(
-    () => append(registry, driftedRecovery, '2026-09-27T18:02:01.000Z'),
-    /requires prior durable WORK task dispatch identity/u,
-  );
-});
-
-test('restart normalization rejects non-WORK history that precedes its trusted WORK anchor', () => {
-  const work = binding();
-  const reconcile = binding({
-    activationId: 'activation-reconcile',
-    generation: 2,
-    invocationId: 'invocation-reconcile',
-    activationPurpose: OrchestrationActivationPurpose.RECONCILE,
-    boundAt: '2026-09-27T18:00:00.500Z',
-  });
-  assert.throws(
-    () => normalizeSubagentTaskActivationBindingRegistryV1({
-      schemaVersion: 1,
-      revision: 2,
-      records: [
-        { binding: reconcile, registeredAt: '2026-09-27T18:00:01.000Z' },
-        { binding: work, registeredAt: '2026-09-27T18:00:02.000Z' },
-      ],
-    }),
-    /requires prior durable WORK task dispatch identity/u,
   );
 });
 
@@ -474,87 +347,4 @@ test('registry is state evidence only and grants no persistence, execution, comp
     assert.equal(SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_AUTHORITY[key], false, key);
   }
   assert.equal(Object.isFrozen(SUBAGENT_TASK_ACTIVATION_BINDING_REGISTRY_AUTHORITY), true);
-});
-
-
-test('durable authority evidence preserves full tool descriptor identity across restart', () => {
-  const value = binding();
-  const registry = appendWithAuthority(
-    createSubagentTaskActivationBindingRegistryV1(),
-    value,
-  );
-  const evidence = resolveSubagentTaskActivationEvidenceV1(
-    registry,
-    { bindingId: value.bindingId },
-  );
-  assert.equal(evidence.authorityEnvelope.providerId, 'provider.main');
-  assert.equal(evidence.authorityEnvelope.toolDescriptors.length, 1);
-  assert.equal(evidence.authorityEnvelope.toolDescriptors[0].toolId, 'tool.read');
-  assert.equal(evidence.authorityEnvelope.toolDescriptors[0].providerId, 'provider.main');
-
-  const restarted = normalizeSubagentTaskActivationBindingRegistryV1(
-    structuredClone(registry),
-  );
-  const restored = resolveSubagentTaskActivationEvidenceV1(
-    restarted,
-    { bindingId: value.bindingId },
-  );
-  assert.deepEqual(restored.authorityEnvelope, evidence.authorityEnvelope);
-});
-
-test('same binding identity cannot be replayed with different authority provenance', () => {
-  const value = binding();
-  const once = appendWithAuthority(
-    createSubagentTaskActivationBindingRegistryV1(),
-    value,
-  );
-  const substituted = authorityEnvelope({
-    capabilityIds: ['cap.read', 'cap.write'],
-  });
-  assert.throws(
-    () => appendWithAuthority(
-      once,
-      structuredClone(value),
-      substituted,
-      '2026-09-27T18:05:00.000Z',
-    ),
-    /authority provenance collision/u,
-  );
-});
-
-test('non-WORK continuation requires exact durable WORK authority provenance', () => {
-  const work = binding();
-  let registry = appendWithAuthority(
-    createSubagentTaskActivationBindingRegistryV1(),
-    work,
-  );
-  const recovery = binding({
-    activationId: 'activation-recovery-authority',
-    generation: 2,
-    invocationId: 'invocation-recovery-authority',
-    activationPurpose: OrchestrationActivationPurpose.RECOVERY,
-    boundAt: '2026-09-27T18:02:00.000Z',
-  });
-
-  assert.throws(
-    () => appendWithAuthority(
-      registry,
-      recovery,
-      authorityEnvelope({ capabilityIds: ['cap.read', 'cap.write'] }),
-      '2026-09-27T18:02:01.000Z',
-    ),
-    /requires prior durable WORK task dispatch identity/u,
-  );
-
-  registry = appendWithAuthority(
-    registry,
-    recovery,
-    authorityEnvelope(),
-    '2026-09-27T18:02:01.000Z',
-  );
-  assert.equal(registry.revision, 2);
-  assert.equal(
-    registry.records[1].authorityEnvelope.providerId,
-    'provider.main',
-  );
 });

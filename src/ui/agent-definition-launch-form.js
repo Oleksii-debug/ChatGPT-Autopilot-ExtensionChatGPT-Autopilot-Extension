@@ -40,13 +40,6 @@ function exactPositiveInteger(value, label) {
   return value;
 }
 
-function exactRegistryBindingKey(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 200_000) {
-    throw new Error(`${label} is invalid`);
-  }
-  return value;
-}
-
 function boundedText(value, label, max, { optional = false } = {}) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   const text = value.trim();
@@ -72,24 +65,9 @@ function canonicalDefinitionIds(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a canonical array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < 0 || length > max) {
-    throw new Error(`${label} exceeds ${max} entries`);
-  }
-  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !expected.has(key)) {
-      throw new Error(`${label} contains non-canonical fields`);
-    }
-  }
+  if (value.length > max) throw new Error(`${label} exceeds ${max} entries`);
   const out = [];
-  for (let index = 0; index < length; index += 1) {
-    const descriptor = descriptors[String(index)];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label}[${index}] must be an enumerable own data property`);
-    }
-    const item = descriptor.value;
+  for (const item of value) {
     if (typeof item !== 'string' || !ID.test(item)) throw new Error(`${label} contains an invalid identity`);
     if (out.includes(item)) throw new Error(`${label} contains duplicate identities`);
     out.push(item);
@@ -152,11 +130,6 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     'Agent definition registry revision',
   );
 
-  const expectedRegistryBindingKey = exactRegistryBindingKey(
-    registryRaw.bindingKey,
-    'Agent definition registry bindingKey',
-  );
-
   const agentDefinitionId = boundedText(
     definitionRaw.agentDefinitionId,
     'Agent definition ID',
@@ -205,7 +178,6 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
   const request = {
     registryId,
     expectedRegistryRevision,
-    expectedRegistryBindingKey,
     agentDefinitionId,
     expectedDefinitionRevision,
     goal: boundedText(raw.goal, 'Owner task', 50000),
@@ -217,14 +189,8 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     requestedToolIds,
   };
 
-  if (request.projectId && !ID.test(request.projectId)) {
-    throw new Error('Project ID must be a canonical identity');
-  }
   const jobId = boundedText(raw.jobId || '', 'Job ID', 128, { optional: true });
-  if (jobId) {
-    if (!ID.test(jobId)) throw new Error('Job ID must be a canonical identity');
-    request.jobId = jobId;
-  }
+  if (jobId) request.jobId = jobId;
 
   return Object.freeze(request);
 }

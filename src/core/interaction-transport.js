@@ -1,24 +1,20 @@
+import { windowBindingError } from './window-binding.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { waitForTaskTabReady } from './tabs.js';
 import { SiteAdapterId, getSiteAdapter, requireSiteAdapterUrl } from './site-adapter-registry.js';
-// These phases only inspect state. They neither change the composer nor click
-// Send, so one receiver restoration and one retry are safe after an extension
-// update or a ChatGPT navigation. Effectful phases remain non-replayable.
+// These phases are replay-safe. ENSURE_HIGH_EFFORT is idempotent: a lost
+// response is retried only to prove/select the same High setting before any
+// prompt insertion. Send and prompt-mutation phases remain non-replayable.
 const SAFE_RECEIVER_RECOVERY_MODES = new Set([
   'CHECK_ONLY',
+  'ENSURE_HIGH_EFFORT',
   'PREPARE_SEND',
   'VERIFY_AFTER_UNCERTAIN_SUBMIT',
   'READ_ASSISTANT_REPORT',
-]);
-const READ_ONLY_TAB_FALLBACK_CODES = new Set([
-  'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
-  'TAB_WAKE_TIMEOUT',
-  'TAB_WAKE_FAILED',
-  'INTERACTION_SEND_FAILED',
-  'ASSISTANT_RESPONSE_TAB_MISSING',
-  'ASSISTANT_RESPONSE_TAB_FROZEN',
+  'RECOVER_CHAT_ERROR_SURFACE',
 ]);
 const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
+const DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS = 2000;
 const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
 
 function waitMs(ms) {
@@ -68,18 +64,35 @@ export class ChromeInteractionTransport {
     siteAdapterId = SiteAdapterId.CHATGPT_WEB,
     tabReadinessOptions = {},
     checkOnlyUiReadinessOptions = {},
+    requestTimeoutMs = 30000,
   } = {}) {
     this.chrome = chromeApi;
     this.siteAdapter = getSiteAdapter(siteAdapterId);
     this.tabReadinessOptions = tabReadinessOptions;
     this.checkOnlyUiReadinessOptions = checkOnlyUiReadinessOptions;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   async send(tabId, request) {
-    return this.chrome.tabs.sendMessage(tabId, {
-      channel: 'autopilot-interaction',
-      request,
-    });
+    if (request?.requireWindowBinding && !Number.isInteger(request.expectedWindowId)) throw windowBindingError();
+    if (Number.isInteger(request?.expectedWindowId)) {
+      const tab = await this.chrome.tabs.get(tabId);
+      if (tab.windowId !== request.expectedWindowId) throw windowBindingError('SCENARIO_TAB_WINDOW_MISMATCH');
+    }
+    const bounded = ['CHECK_ONLY', 'PREPARE_SEND', 'SUBMIT_EXISTING', 'VERIFY_AFTER_UNCERTAIN_SUBMIT', 'READ_ASSISTANT_REPORT'].includes(request?.mode);
+    if (!bounded) return this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction', request });
+    const timeoutMs = Math.max(1, request?.mode === 'READ_ASSISTANT_REPORT'
+      ? Math.min(5000, this.requestTimeoutMs) : this.requestTimeoutMs + (request?.mode === 'SUBMIT_EXISTING' ? Math.min(60000, Math.max(0, Number(request.postSendDelayMs || 0))) : 0));
+    let timer;
+    try {
+      return await Promise.race([
+        this.chrome.tabs.sendMessage(tabId, { channel: 'autopilot-interaction',
+          request: { ...request, executionDeadlineAt: Date.now() + timeoutMs } }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(diagnosticError(
+          'INTERACTION_REQUEST_TIMEOUT', 'Page acknowledgement timed out; physical Send will not be replayed', null, request,
+        )), timeoutMs); }),
+      ]);
+    } finally { clearTimeout(timer); }
   }
 
   async restoreMissingSafeReceiver(tabId) {
@@ -93,42 +106,16 @@ export class ChromeInteractionTransport {
   }
 
   readinessOptions(request) {
-    return {
+    const options = {
+      allowLoadingDocument: true,
       ...this.tabReadinessOptions,
       allowPostSendNavigation: request?.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
     };
-  }
-
-  canUseFreshReadTab(request, code, allowReadOnlyTabFallback) {
-    return allowReadOnlyTabFallback
-      && request?.mode === 'READ_ASSISTANT_REPORT'
-      && Boolean(request?.expectedUrl)
-      && READ_ONLY_TAB_FALLBACK_CODES.has(code)
-      && typeof this.chrome?.tabs?.create === 'function';
-  }
-
-  async executeOnFreshReadTab(request, cause = null) {
-    let replacementTabId = null;
-    try {
-      const replacement = await this.chrome.tabs.create({
-        url: request.expectedUrl,
-        active: false,
-      });
-      replacementTabId = replacement?.id ?? null;
-      if (replacementTabId == null) {
-        throw diagnosticError(
-          'ASSISTANT_RESPONSE_TAB_REPLACEMENT_FAILED',
-          'Read-only assistant report recovery could not create a replacement ChatGPT tab',
-          cause,
-          request,
-        );
-      }
-      return await this.execute(replacementTabId, request, { allowReadOnlyTabFallback: false });
-    } finally {
-      if (replacementTabId != null && typeof this.chrome?.tabs?.remove === 'function') {
-        try { await this.chrome.tabs.remove(replacementTabId); } catch (_) {}
-      }
+    if (['READ_ASSISTANT_REPORT', 'RECOVER_CHAT_ERROR_SURFACE'].includes(request?.mode)
+        && this.tabReadinessOptions.timeoutMs === undefined) {
+      options.timeoutMs = DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS;
     }
+    return options;
   }
 
   async waitForCheckOnlyUiReady(tabId, request, initialResponse) {
@@ -157,6 +144,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT' || error?.safeDiagnosticCode?.startsWith('SCENARIO_')) throw error;
         throw diagnosticError(
           isMissingReceiverError(error)
             ? 'INTERACTION_RECEIVER_LOST_DURING_UI_READINESS'
@@ -171,10 +159,12 @@ export class ChromeInteractionTransport {
     return response;
   }
 
-  async execute(tabId, request, { allowReadOnlyTabFallback = true } = {}) {
+  async execute(tabId, request) {
     if (tabId == null) throw new Error('Interaction tab id is required');
 
     try {
+      if (request?.requireWindowBinding && !Number.isInteger(request.expectedWindowId)) throw windowBindingError();
+      if (Number.isInteger(request?.expectedWindowId) && (await this.chrome.tabs.get(tabId)).windowId !== request.expectedWindowId) throw windowBindingError('SCENARIO_TAB_WINDOW_MISMATCH');
       if (request?.expectedUrl) requireSiteAdapterUrl(this.siteAdapter.id, request.expectedUrl);
       if (SAFE_RECEIVER_RECOVERY_MODES.has(request?.mode)) {
         await waitForTaskTabReady(
@@ -189,6 +179,7 @@ export class ChromeInteractionTransport {
       try {
         response = await this.send(tabId, request);
       } catch (error) {
+        if (error?.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT' || error?.safeDiagnosticCode?.startsWith('SCENARIO_')) throw error;
         // An unpacked-extension update/reload can leave an already-open ChatGPT tab
         // without the newly registered content-script receiver. Only the read-only
         // allow-list above may be restored and retried once.
@@ -264,16 +255,9 @@ export class ChromeInteractionTransport {
           request,
         );
       }
-      if (this.canUseFreshReadTab(request, response.data.safeDiagnosticCode, allowReadOnlyTabFallback)) {
-        return await this.executeOnFreshReadTab(request);
-      }
       return response.data;
     } catch (error) {
-      const contextual = attachRequestContext(error, request);
-      if (!this.canUseFreshReadTab(request, contextual.safeDiagnosticCode, allowReadOnlyTabFallback)) {
-        throw contextual;
-      }
-      return this.executeOnFreshReadTab(request, contextual);
+      throw attachRequestContext(error, request);
     }
   }
 }

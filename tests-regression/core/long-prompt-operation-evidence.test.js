@@ -40,6 +40,7 @@ test('executor accepts only explicit operation-bound accepted-representation evi
   const repo = new Repo(state());
   const transport = { async execute(_tab, request) {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     assert.equal(request.mode, 'INSERT_ONLY');
     return {
       status: InteractionResult.INSERTED_NOT_SENT,
@@ -58,6 +59,7 @@ test('attachment-like status without operation-bound evidence fails closed', asy
   const repo = new Repo(state());
   const transport = { async execute(_tab, request) {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     return {
       status: InteractionResult.INSERTED_NOT_SENT,
       composerState: 'ACCEPTED_ATTACHMENT_LIKE',
@@ -74,6 +76,7 @@ test('unproven text insertion before Send schedules automatic retry without paus
   const repo = new Repo(state());
   const transport = { async execute(_tab, request) {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     return {
       status: InteractionResult.INSERTED_NOT_SENT,
       composerState: 'VISIBLE_NONEMPTY',
@@ -108,9 +111,11 @@ test('shared-URL insertion mismatch holds every sibling cycle but keeps session 
     async get() { return { id: 7, url: 'https://chatgpt.com/' }; },
     async query() { return [{ id: 7, url: 'https://chatgpt.com/' }]; },
     async create({ url }) { return { id: 8, url }; },
+    async update(id, changes) { return { id, ...changes }; },
   } };
   const transport = { async execute(_tab, request) {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     return {
       status: InteractionResult.INSERTED_NOT_SENT,
       composerState: 'VISIBLE_NONEMPTY',

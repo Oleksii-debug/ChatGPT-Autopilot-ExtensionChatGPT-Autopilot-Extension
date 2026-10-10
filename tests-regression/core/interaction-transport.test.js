@@ -320,3 +320,12 @@ test('CHECK_ONLY classifies a Chrome network error page and reloads it for bound
   assert.equal(injections, 1);
   assert.equal(reloads, 1, 'network error page should be reloaded once before the scheduled retry');
 });
+
+test('an unresponsive post-submit page has a bounded acknowledgement wait and is never replayed', async () => {
+  let sends = 0;
+  const chrome = { tabs: { sendMessage: async () => { sends += 1; return new Promise(() => {}); } } };
+  const transport = new ChromeInteractionTransport(chrome, { requestTimeoutMs: 5 });
+  await assert.rejects(transport.execute(7, {mode:'SUBMIT_EXISTING',expectedUrl:'https://chatgpt.com/c/test'}),
+    error => error.safeDiagnosticCode === 'INTERACTION_REQUEST_TIMEOUT');
+  assert.equal(sends,1);
+});

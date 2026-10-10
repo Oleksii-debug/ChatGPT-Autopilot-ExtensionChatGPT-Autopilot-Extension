@@ -10,7 +10,6 @@ import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import {
   SUBAGENT_TASK_ENVELOPE_VERSION,
   createSubagentTaskEnvelopeV1,
-  deriveSubagentTaskDispatchIdentityV1,
   normalizeSubagentTaskEnvelopeV1,
 } from '../src/core/subagent-task-envelope.js';
 
@@ -69,7 +68,6 @@ function outcome(overrides = {}) {
       sourceId: 'source-1',
       location: 'project://source-1',
       revisionId: 'rev-1',
-      contentSha256: overrides.contentSha256 ?? '4'.repeat(64),
       purpose: 'Authoritative child input.',
     }],
     allowedAuthority: [],
@@ -156,7 +154,6 @@ test('binds exact child task, immutable input refs, budget, conflicts and outcom
     sourceId: 'source-1',
     location: 'project://source-1',
     revisionId: 'rev-1',
-    contentSha256: '4'.repeat(64),
   }]);
   assert.deepEqual(
     value.inputArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
@@ -336,7 +333,7 @@ test('envelope chronology cannot predate plan/outcome and cannot bind a future A
       }),
       createdAt: T1,
     })),
-    /AgentPlan node updatedAt is outside the plan causal window|outside plan chronology/,
+    /cannot predate AgentPlan node state/,
   );
 
   assert.throws(
@@ -438,31 +435,5 @@ test('caller-owned arrays and canonical inputs cannot mutate the frozen derived 
     sourceId: 'source-1',
     location: 'project://source-1',
     revisionId: 'rev-1',
-    contentSha256: '4'.repeat(64),
   }]);
-});
-
-
-test('source byte identity is required and participates in the durable task dispatch fingerprint', () => {
-  const first = createSubagentTaskEnvelopeV1(request());
-  const second = createSubagentTaskEnvelopeV1(request({
-    outcomeContract: outcome({ contentSha256: '5'.repeat(64) }),
-  }));
-  assert.notEqual(
-    deriveSubagentTaskDispatchIdentityV1(first),
-    deriveSubagentTaskDispatchIdentityV1(second),
-  );
-  assert.equal(first.inputSourceRefs[0].contentSha256, '4'.repeat(64));
-  assert.equal(second.inputSourceRefs[0].contentSha256, '5'.repeat(64));
-
-  const missingHash = structuredClone(outcome());
-  delete missingHash.sourceTruth[0].contentSha256;
-  assert.throws(
-    () => createSubagentTaskEnvelopeV1(request({ outcomeContract: missingHash })),
-    /must carry contentSha256 immutable identity/,
-  );
-  assert.throws(
-    () => outcome({ contentSha256: 'A'.repeat(64) }),
-    /contentSha256 must be an exact lowercase SHA-256 digest/,
-  );
 });

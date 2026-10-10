@@ -5,6 +5,7 @@ import { appendDiagnostic } from './diagnostics.js';
 import { orderedSessionIdsForFairness } from './scheduler-fairness.js';
 import { CalendarOccurrenceState, calendarAdmissionForSession, commitVerifiedCalendarOccurrence } from './calendar-runtime.js';
 import { InteractionResult } from '../shared/protocol.js';
+import { reconcileOwnedPlaceholders, reconcileCompletedOpenCloseTabs } from './owned-tab-lifecycle.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -58,7 +59,10 @@ const POST_SUBMIT_EVIDENCE_PRESERVE_CODES = new Set([
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
 
 export const DEFAULT_MAX_CONCURRENT_SESSION_OPERATIONS = 10;
-export const MAX_CONCURRENT_SESSION_OPERATIONS = 32;
+// The scheduler must not silently turn a configured 1,000-chat workload into
+// 32 operations.  Tab parking keeps Scenario work from retaining a matching
+// number of live tabs; this is the explicit user-configurable admission cap.
+export const MAX_CONCURRENT_SESSION_OPERATIONS = 1000;
 
 function runtimeConcurrency(state) {
   const raw = Number(state?.profile?.maxConcurrentSessionOperations);
@@ -161,7 +165,9 @@ async function retryPendingOwnedTabRetirements(repository, chromeApi, now) {
     .filter(([, hint]) => hint?.retirePending === true
       && hint?.ownedByExtension === true
       && Number.isInteger(hint?.tabId)
-      && Number(hint?.retireRetryAt || 0) <= now)
+      && Number(hint?.retireRetryAt || 0) <= now
+      && (snapshot.sessionsById?.[hint.sessionId]?.enabled === false
+        || Number(snapshot.sessionsById?.[hint.sessionId]?.operation?.postSendHoldUntil || 0) <= now))
     .map(([hintKey, hint]) => ({ hintKey, sessionId: hint.sessionId, tabId: hint.tabId }));
 
   for (const target of targets) {
@@ -238,6 +244,9 @@ export async function reconcileRuntimeColdStart({
   now = () => Date.now(),
 }) {
   if (!repository || !chromeApi) throw new Error('Runtime cold-start dependencies are required');
+  await reconcileOwnedPlaceholders(repository, chromeApi);
+  await reconcileCompletedOpenCloseTabs(repository);
+  await retryPendingOwnedTabRetirements(repository, chromeApi, now());
   const state = await prepareStartupState(repository, executionAvailable, now);
   const wakeAt = await reconcileAlarm(chromeApi, state, now());
   return { state, wakeAt };
@@ -479,6 +488,7 @@ export async function runRuntimeCycle({
   // may Stop the final active Session exactly when Chrome transiently refuses
   // tabs.remove. Retry those durable obligations before scheduling/executing
   // new browser work so stopped Sessions cannot strand extension-owned tabs.
+  await reconcileCompletedOpenCloseTabs(repository);
   await retryPendingOwnedTabRetirements(repository, chromeApi, now());
 
   const outcomes = [];

@@ -116,7 +116,7 @@ test('worker strategy reuses an existing unclaimed exact matching tab', async ()
   assert.equal(state.tabHintsByTaskId['__session_worker__:s1'].tabId, existing.id);
 });
 
-test('persisted worker tabId is only a hint and wrong live URL identity is not navigated', async () => {
+test('wrong worker URL is not navigated and the proven owned stale tab is retired', async () => {
   const chrome = fakeChrome();
   const { state, first, second } = fixture(TabStrategy.ONE_WORKER_TAB_PER_SESSION);
   const original = await resolveTaskTab(chrome.api, state, 's1', first);
@@ -128,7 +128,7 @@ test('persisted worker tabId is only a hint and wrong live URL identity is not n
   assert.equal(rebound.url, second.normalizedUrl);
   assert.equal(chrome.creates(), 2);
   assert.equal(chrome.updates(), 0);
-  assert.equal(chrome.tabs().find(tab => tab.id === original.id).url, 'https://chatgpt.com/c/unrelated-after-restart');
+  assert.ok(!chrome.tabs().some(tab => tab.id === original.id), 'owned stale worker must not become an orphan');
 });
 
 test('manual close invalidates worker hint and restores only the missing worker tab', async () => {

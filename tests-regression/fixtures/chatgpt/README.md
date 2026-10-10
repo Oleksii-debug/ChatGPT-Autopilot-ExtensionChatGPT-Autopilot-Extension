@@ -33,3 +33,5 @@ P1 scenarios:
 - F23 offline/navigation failure -> `TEMPORARY_ERROR`.
 
 Implementation rule: semantic attributes/roles and visibility are primary evidence; coordinates, OCR, pixel matching, generic nth-child selectors, CAPTCHA/account/rate-limit bypasses, and unknown confirmation auto-acceptance are prohibited.
+
+Pilot 10 parity fixture: pilot10-adapter.js is the unchanged adapter from a4436cf3097c2a8faa6f99a04ad558837a746acd (10.0.0); SHA256 10d08ce9e1f33e041e0a5d08b94dda16fbf05785991d2879a72854e6f115bbdf. It makes the parity regression runnable from a source ZIP without .git. It is excluded from product archives.

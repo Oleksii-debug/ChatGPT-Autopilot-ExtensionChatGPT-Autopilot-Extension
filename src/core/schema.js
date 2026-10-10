@@ -4,11 +4,6 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
-import {
-  createTrustedOutcomeVerificationLedgerV1,
-  validateTrustedOutcomeVerificationLedgerStateV1,
-} from './trusted-outcome-verification-ledger.js';
-import { validateOutcomeContractRegistryStateV1 } from './outcome-contract-control.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -66,7 +61,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRoutePoolRevision: 1, aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -74,8 +69,6 @@ export function createEmptyState(now = Date.now()) {
     logs: {},
     diagnostics: [],
     migrationHistory: [],
-    outcomeContractsById: {},
-    trustedOutcomeVerificationLedger: structuredClone(createTrustedOutcomeVerificationLedgerV1()),
   };
 }
 
@@ -108,17 +101,17 @@ export function isExclusiveConversationUrl(url) {
 
 export function createTask({ id, url, promptOverride = '', enabled = true, label = '' }) {
   if (!id) throw new Error('Task id required');
-  return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '', lastConversationUrl: '', lastAssistantReport: '', lastAssistantReportAt: 0, lastAssistantBaselineCount: 0, lastAssistantBaselineKnown: false };
+  return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '', lastConversationUrl: '', lastAssistantReport: '', lastAssistantReportAt: 0, lastAssistantBaselineCount: 0, lastAssistantBaselineKnown: false, lastFreshConversationGenerationVerified: false };
 }
 
-export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, configuredTaskCount = tasks.length, minimumSendIntervalMs = 120000, preSendDelayMs = 20000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
+export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, configuredTaskCount = tasks.length, minimumSendIntervalMs = 120000, preSendDelayMs = 20000, tabReadyDelayMs = 0, postSendDelayMs = 0, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
   if (!id || !name) throw new Error('Session id and name required');
   if (tasks.length < 1 || tasks.length > MAX_PHYSICAL_TASKS) throw new Error(`Session requires 1-${MAX_PHYSICAL_TASKS} physical tasks`);
   const logicalCount = Number(configuredTaskCount);
   if (!Number.isInteger(logicalCount) || logicalCount < 1 || logicalCount > MAX_LOGICAL_TASKS) throw new Error(`Session configuredTaskCount must be 1-${MAX_LOGICAL_TASKS}`);
   if (logicalCount < tasks.length) throw new Error('Session configuredTaskCount cannot be smaller than physical task count');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, promptCadence: defaultSessionPromptCadence(), drivePromptSources: defaultSessionDrivePromptSources(), runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
+  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, promptCadence: defaultSessionPromptCadence(), drivePromptSources: defaultSessionDrivePromptSources(), runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, tabReadyDelayMs, postSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
 }
 
 function validateTask(task, taskId) {
@@ -140,6 +133,7 @@ function validateTask(task, taskId) {
   if (task.lastAssistantReportAt !== undefined) requireNonNegativeNumber(task.lastAssistantReportAt, `task ${taskId} lastAssistantReportAt`);
   if (task.lastAssistantBaselineCount !== undefined) requireNonNegativeNumber(task.lastAssistantBaselineCount, `task ${taskId} lastAssistantBaselineCount`);
   if (task.lastAssistantBaselineKnown !== undefined) requireBoolean(task.lastAssistantBaselineKnown, `task ${taskId} lastAssistantBaselineKnown`);
+  if (task.lastFreshConversationGenerationVerified !== undefined) requireBoolean(task.lastFreshConversationGenerationVerified, `task ${taskId} lastFreshConversationGenerationVerified`);
   const expectedNormalizedUrl = task.url ? normalizeChatUrl(task.url) : '';
   if (task.normalizedUrl !== expectedNormalizedUrl) throw new Error(`Invalid task ${taskId} normalizedUrl`);
 }
@@ -185,6 +179,8 @@ function validateOperation(operation, session) {
       throw new Error(`Invalid session ${session.id} operation ${field}`);
     }
   }
+  if (operation.domSubmitDispatched !== undefined) requireBoolean(operation.domSubmitDispatched, `session ${session.id} operation domSubmitDispatched`);
+  if (operation.activationBeforeSubmit !== undefined) requireBoolean(operation.activationBeforeSubmit, `session ${session.id} operation activationBeforeSubmit`);
 }
 
 function validateSession(session, id) {
@@ -211,6 +207,9 @@ function validateSession(session, id) {
   requireRecord(session.tasksById, `session ${id} tasksById`);
   if (!Number.isInteger(session.currentTaskIndex) || session.currentTaskIndex < 0 || session.currentTaskIndex >= session.taskOrder.length) {
     throw new Error('Invalid currentTaskIndex');
+  }
+  for (const field of ['tabReadyDelayMs', 'postSendDelayMs']) {
+    if (session[field] !== undefined && (!Number.isInteger(session[field]) || session[field] < 0 || session[field] > (field === 'postSendDelayMs' ? 3600000 : 60000))) throw new Error(`Invalid session ${id} ${field}`);
   }
   for (const field of ['minimumSendIntervalMs', 'preSendDelayMs', 'busyCheckDelayMs', 'retryBackoffMs', 'nextAllowedSendAt', 'lastActionAt', 'lastSuccessfulSendAt', 'createdAt', 'updatedAt']) {
     requireNonNegativeNumber(session[field], `session ${id} ${field}`);
@@ -260,7 +259,7 @@ export function validateState(state) {
   if (state.profile.maxConcurrentSessionOperations !== undefined) {
     if (!Number.isInteger(state.profile.maxConcurrentSessionOperations)
         || state.profile.maxConcurrentSessionOperations < 1
-        || state.profile.maxConcurrentSessionOperations > 32) {
+        || state.profile.maxConcurrentSessionOperations > 1000) {
       throw new Error('Invalid profile maxConcurrentSessionOperations');
     }
   }
@@ -272,10 +271,6 @@ export function validateState(state) {
     requireString(normalizedLocalAi.baseUrl, 'profile localAi baseUrl');
     requireString(normalizedLocalAi.model, 'profile localAi model');
     requireNonNegativeNumber(normalizedLocalAi.timeoutSeconds, 'profile localAi timeoutSeconds');
-  }
-  if (state.profile.aiRoutePoolRevision !== undefined
-      && (!Number.isSafeInteger(state.profile.aiRoutePoolRevision) || state.profile.aiRoutePoolRevision < 1)) {
-    throw new Error('Invalid profile aiRoutePoolRevision');
   }
   if (state.profile.aiRouter !== undefined) {
     requireRecord(state.profile.aiRouter, 'profile aiRouter');
@@ -301,6 +296,9 @@ export function validateState(state) {
     if (!Array.isArray(runtime.strongHistoryAt)) throw new Error('Invalid profile aiRouterRuntime strongHistoryAt');
     requireRecord(runtime.routeStates, 'profile aiRouterRuntime routeStates');
     requireString(runtime.lastRouteId, 'profile aiRouterRuntime lastRouteId');
+    requireString(runtime.lastProvider, 'profile aiRouterRuntime lastProvider');
+    requireString(runtime.lastModel, 'profile aiRouterRuntime lastModel');
+    requireString(runtime.lastEndpointId, 'profile aiRouterRuntime lastEndpointId');
     if (!Array.isArray(runtime.lastFailoverChain)) throw new Error('Invalid profile aiRouterRuntime lastFailoverChain');
   }
   if (state.profile.aiManager !== undefined) {
@@ -356,8 +354,6 @@ export function validateState(state) {
     throw new Error('Invalid diagnostics');
   }
   if (!Array.isArray(state.migrationHistory)) throw new Error('Invalid migrationHistory');
-  validateOutcomeContractRegistryStateV1(state);
-  validateTrustedOutcomeVerificationLedgerStateV1(state);
 
   const sessionIds = Object.keys(state.sessionsById);
   if (sessionIds.length !== state.sessionOrder.length || sessionIds.some(id => !state.sessionOrder.includes(id))) {

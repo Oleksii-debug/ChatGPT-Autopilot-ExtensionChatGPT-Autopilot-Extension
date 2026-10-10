@@ -167,7 +167,6 @@ export function inspectSpecialistProviderReadinessV1(input = {}) {
     schemaVersion: SPECIALIST_PROVIDER_READINESS_VERSION,
     registryId: selection.registryId,
     registryRevision: selection.registryRevision,
-    registryBindingKey: selection.registryBindingKey,
     specialistId: selection.specialistId,
     providerId: selection.providerId,
     definitionRevision: selection.definitionRevision,

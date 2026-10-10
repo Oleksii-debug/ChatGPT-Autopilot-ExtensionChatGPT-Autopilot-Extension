@@ -147,9 +147,6 @@ async function resolveTrustedExecutionVerificationV1(current, rawOptions, depend
   const verificationId = id(request.verificationId, 'verificationId');
   const at = request.at === undefined ? new Date().toISOString() : ts(request.at, 'at');
   if (current.leaseId !== leaseId) throw new Error('trusted verification execution lease identity mismatch');
-  if (expectedOutcome === TrustedExecutionVerificationOutcome.EFFECT_VERIFIED) {
-    assertLeaseLive(current, at);
-  }
   const resolver = dependencies?.resolveTrustedExecutionVerificationRecord;
   if (typeof resolver !== 'function') throw new Error('canonical trusted execution verification resolver is required');
   const lookup = freeze({
@@ -288,32 +285,6 @@ export function acceptExecutionHandoffV1(raw, { handoffId, ownerId, leaseId, lea
   assertLeaseLive(current, at);
   assertLeaseDuration(at, leaseUntil);
   return next(current, { state: ExecutionOwnershipState.OWNED, ownerPlane: current.handoffToPlane, ownerId: id(ownerId,'ownerId'), leaseId: id(leaseId,'leaseId'), leaseUntil: ts(leaseUntil,'leaseUntil'), handoffToPlane: '', handoffId: '' }, at);
-}
-
-export function requireExecutionReconciliationV1(raw, {
-  leaseId,
-  reason = 'provider effect may have occurred without verified completion',
-  at = new Date().toISOString(),
-} = {}) {
-  const current = normalizeExecutionOwnershipV1(raw);
-  const expectedLeaseId = id(leaseId, 'leaseId');
-  if (current.state === ExecutionOwnershipState.RECONCILE) {
-    if (current.leaseId !== expectedLeaseId) {
-      throw new Error('reconciliation lease identity mismatch');
-    }
-    // A canonical transition result is already deeply frozen. Preserve that
-    // exact durable object on duplicate admission, while still canonicalizing
-    // mutable caller-shaped records before returning them.
-    return Object.isFrozen(raw) ? raw : current;
-  }
-  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== expectedLeaseId) {
-    throw new Error('only the current execution owner may require reconciliation');
-  }
-  assertLeaseLive(current, at);
-  return next(current, {
-    state: ExecutionOwnershipState.RECONCILE,
-    ambiguityReason: boundedText(reason, 'reason'),
-  }, at);
 }
 
 export function recoverExpiredExecutionOwnershipV1(raw, { at = new Date().toISOString(), reason = 'owner lease expired before verified completion' } = {}) {

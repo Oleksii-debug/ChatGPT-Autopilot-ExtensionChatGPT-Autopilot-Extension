@@ -14,10 +14,7 @@ import {
   validateOrchestrationHierarchyRuntimeV1,
 } from './orchestration-hierarchy.js';
 import { normalizeSubagentResultEnvelopeV1 } from './subagent-result-envelope.js';
-import {
-  deriveSubagentTaskDispatchIdentityV1,
-  normalizeSubagentTaskEnvelopeV1,
-} from './subagent-task-envelope.js';
+import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
 
 export const SUBAGENT_RESULT_RECONCILIATION_VERSION = 1;
 export const SUBAGENT_TASK_ACTIVATION_BINDING_VERSION = 1;
@@ -31,7 +28,6 @@ export const SubagentResultReconciliationDecision = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
-const TASK_DISPATCH_IDENTITY = /^subagent-task:[a-f0-9]{64}$/u;
 const MAX_ROWS = 128;
 const REQUEST_KEYS = new Set([
   'resultEnvelope',
@@ -72,7 +68,6 @@ const BINDING_KEYS = new Set([
   'childAgentId',
   'taskId',
   'taskEnvelopeId',
-  'taskDispatchIdentity',
   'planId',
   'planRevision',
   'outcomeContractId',
@@ -124,13 +119,6 @@ function own(value, key, label) {
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(label + ' is invalid');
-  }
-  return value;
-}
-
-function exactTaskDispatchIdentity(value) {
-  if (typeof value !== 'string' || !TASK_DISPATCH_IDENTITY.test(value)) {
-    throw new Error('taskDispatchIdentity is invalid');
   }
   return value;
 }
@@ -260,12 +248,6 @@ function normalizeTerminalizableActivationAction(input) {
       !== 'EXISTING_CORE_SESSION_TASK_PATH') {
     throw new Error('Subagent activation action is not from the canonical Core session/task path');
   }
-  const rawProviderDispatchIdentity = Object.hasOwn(raw, 'providerDispatchIdentity')
-    ? raw.providerDispatchIdentity
-    : '';
-  const providerDispatchIdentity = rawProviderDispatchIdentity === ''
-    ? ''
-    : exactId(rawProviderDispatchIdentity, 'activationAction.providerDispatchIdentity');
 
   return {
     type,
@@ -286,7 +268,6 @@ function normalizeTerminalizableActivationAction(input) {
       'activationAction.round',
     ),
     purpose,
-    providerDispatchIdentity,
   };
 }
 
@@ -344,11 +325,6 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
     purpose: dataField(ledger, 'purpose', 'current child activation'),
     phase: dataField(ledger, 'phase', 'current child activation'),
     preparedAt: dataField(ledger, 'preparedAt', 'current child activation'),
-    providerDispatchIdentity: dataField(
-      ledger,
-      'providerDispatchIdentity',
-      'current child activation',
-    ),
   };
   if (ledgerFields.generation !== action.generation
       || ledgerFields.round !== action.round
@@ -358,22 +334,6 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
   if (![OrchestrationActivationPhase.PREPARED, OrchestrationActivationPhase.EFFECT_CONFIRMED]
     .includes(ledgerFields.phase)) {
     throw new Error('Subagent activation binding cannot be derived from a terminal, ambiguous, or superseded activation');
-  }
-
-  const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
-  if (action.purpose === OrchestrationActivationPurpose.WORK) {
-    if (!action.providerDispatchIdentity) {
-      throw new Error('Subagent WORK activation is missing durable task dispatch identity');
-    }
-    if (action.providerDispatchIdentity !== taskDispatchIdentity
-        || ledgerFields.providerDispatchIdentity !== taskDispatchIdentity) {
-      throw new Error('Subagent activation dispatch identity does not match task envelope');
-    }
-  } else if (action.providerDispatchIdentity || ledgerFields.providerDispatchIdentity) {
-    if (action.providerDispatchIdentity !== taskDispatchIdentity
-        || ledgerFields.providerDispatchIdentity !== taskDispatchIdentity) {
-      throw new Error('Subagent activation dispatch identity does not match task envelope');
-    }
   }
 
   const boundAt = canonicalTimestamp(
@@ -399,7 +359,6 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
     task.childAgentId,
     task.taskId,
     task.envelopeId,
-    taskDispatchIdentity,
     task.planId,
     String(task.planRevision),
     task.outcome.contractId,
@@ -419,7 +378,6 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
     childAgentId: task.childAgentId,
     taskId: task.taskId,
     taskEnvelopeId: task.envelopeId,
-    taskDispatchIdentity,
     planId: task.planId,
     planRevision: task.planRevision,
     outcomeContractId: task.outcome.contractId,
@@ -463,9 +421,6 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
       own(raw, 'taskEnvelopeId', 'TrustedSubagentTaskActivationBindingV1'),
       'taskEnvelopeId',
     ),
-    taskDispatchIdentity: exactTaskDispatchIdentity(
-      own(raw, 'taskDispatchIdentity', 'TrustedSubagentTaskActivationBindingV1'),
-    ),
     planId: exactId(own(raw, 'planId', 'TrustedSubagentTaskActivationBindingV1'), 'planId'),
     planRevision: exactInteger(
       own(raw, 'planRevision', 'TrustedSubagentTaskActivationBindingV1'),
@@ -508,7 +463,6 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
     normalized.childAgentId,
     normalized.taskId,
     normalized.taskEnvelopeId,
-    normalized.taskDispatchIdentity,
     normalized.planId,
     String(normalized.planRevision),
     normalized.outcomeContractId,

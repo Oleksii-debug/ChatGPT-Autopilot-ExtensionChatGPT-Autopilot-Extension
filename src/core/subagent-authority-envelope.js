@@ -1,5 +1,4 @@
 import { normalizeToolDescriptorV1 } from './universal-agent-contracts.js';
-import { compactOrchestrationEventId } from './orchestration-hierarchy.js';
 
 export const SUBAGENT_AUTHORITY_ENVELOPE_VERSION = 1;
 
@@ -34,12 +33,6 @@ const REQUEST_KEYS = new Set([
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_LIST = 256;
-const ALLOW_ENVELOPE_KEYS = new Set([
-  'schemaVersion', 'decision', 'reasonCode', 'projectId', 'parentAgentId',
-  'childAgentId', 'taskId', 'providerId', 'capabilityIds', 'sourceIds',
-  'artifactIds', 'toolIds', 'toolDescriptors', 'executionAuthority',
-  'credentialAuthority', 'policyAuthority',
-]);
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -117,15 +110,6 @@ function missing(requested, allowed) {
   return requested.filter(id => !allowedSet.has(id));
 }
 
-function compareCodeUnit(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function exactFalse(value, label) {
-  if (value !== false) throw new Error(`${label} must be false`);
-  return false;
-}
-
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -148,91 +132,6 @@ function denied(reasonCode, identities, details = {}) {
     policyAuthority: false,
     ...details,
   });
-}
-
-/**
- * Normalize an already-derived ALLOW envelope into deterministic semantic
- * order. This checks shape and internal consistency only; it does not
- * authenticate parent/owner/provider facts and grants no authority.
- */
-export function normalizeAllowedSubagentAuthorityEnvelopeV1(input) {
-  const raw = strictRecord(input, ALLOW_ENVELOPE_KEYS, 'SubagentAuthorityEnvelopeV1');
-  if (own(raw, 'schemaVersion') !== SUBAGENT_AUTHORITY_ENVELOPE_VERSION) {
-    throw new Error('Unsupported SubagentAuthorityEnvelopeV1 schemaVersion');
-  }
-  if (own(raw, 'decision') !== SubagentAuthorityDecision.ALLOW
-      || own(raw, 'reasonCode') !== 'LEAST_AUTHORITY_DERIVED') {
-    throw new Error('Subagent authority envelope is not an exact ALLOW envelope');
-  }
-
-  const providerId = requiredId(own(raw, 'providerId'), 'authorityEnvelope.providerId');
-  const capabilityIds = idList(own(raw, 'capabilityIds'), 'authorityEnvelope.capabilityIds').sort(compareCodeUnit);
-  const sourceIds = idList(own(raw, 'sourceIds'), 'authorityEnvelope.sourceIds').sort(compareCodeUnit);
-  const artifactIds = idList(own(raw, 'artifactIds'), 'authorityEnvelope.artifactIds').sort(compareCodeUnit);
-  const toolIds = idList(own(raw, 'toolIds'), 'authorityEnvelope.toolIds').sort(compareCodeUnit);
-  const toolDescriptors = dataArray(
-    own(raw, 'toolDescriptors'),
-    'authorityEnvelope.toolDescriptors',
-  ).map((descriptor, index) => {
-    try {
-      return normalizeToolDescriptorV1(descriptor);
-    } catch (error) {
-      throw new Error(`authorityEnvelope.toolDescriptors[${index}]: ${error.message}`);
-    }
-  }).sort((left, right) => compareCodeUnit(left.toolId, right.toolId));
-
-  if (new Set(toolDescriptors.map(item => item.toolId)).size !== toolDescriptors.length) {
-    throw new Error('authorityEnvelope.toolDescriptors contains duplicate toolId');
-  }
-  if (toolDescriptors.length !== toolIds.length
-      || toolDescriptors.some((descriptor, index) => descriptor.toolId !== toolIds[index])) {
-    throw new Error('authorityEnvelope toolIds and toolDescriptors must match exactly');
-  }
-  const capabilitySet = new Set(capabilityIds);
-  for (const descriptor of toolDescriptors) {
-    if (descriptor.providerId !== providerId) {
-      throw new Error('authorityEnvelope tool descriptor provider mismatch: ' + descriptor.toolId);
-    }
-    if (descriptor.capabilityIds.some(capabilityId => !capabilitySet.has(capabilityId))) {
-      throw new Error('authorityEnvelope tool descriptor capability exceeds child scope: ' + descriptor.toolId);
-    }
-  }
-
-  return freezeDeep({
-    schemaVersion: SUBAGENT_AUTHORITY_ENVELOPE_VERSION,
-    decision: SubagentAuthorityDecision.ALLOW,
-    reasonCode: 'LEAST_AUTHORITY_DERIVED',
-    projectId: requiredId(own(raw, 'projectId'), 'authorityEnvelope.projectId'),
-    parentAgentId: requiredId(own(raw, 'parentAgentId'), 'authorityEnvelope.parentAgentId'),
-    childAgentId: requiredId(own(raw, 'childAgentId'), 'authorityEnvelope.childAgentId'),
-    taskId: requiredId(own(raw, 'taskId'), 'authorityEnvelope.taskId'),
-    providerId,
-    capabilityIds,
-    sourceIds,
-    artifactIds,
-    toolIds,
-    toolDescriptors,
-    executionAuthority: exactFalse(own(raw, 'executionAuthority'), 'authorityEnvelope.executionAuthority'),
-    credentialAuthority: exactFalse(own(raw, 'credentialAuthority'), 'authorityEnvelope.credentialAuthority'),
-    policyAuthority: exactFalse(own(raw, 'policyAuthority'), 'authorityEnvelope.policyAuthority'),
-  });
-}
-
-export function deriveSubagentAuthorityEnvelopeIdentityV1(input) {
-  const canonical = JSON.stringify(normalizeAllowedSubagentAuthorityEnvelopeV1(input));
-  const prefix = 'subagent-authority';
-  const lanes = [];
-  for (let lane = 0; lane < 4; lane += 1) {
-    const compact = compactOrchestrationEventId(
-      prefix,
-      'SubagentAuthorityEnvelopeV1',
-      String(SUBAGENT_AUTHORITY_ENVELOPE_VERSION),
-      String(lane),
-      canonical,
-    );
-    lanes.push(compact.slice(prefix.length + 1));
-  }
-  return prefix + ':' + lanes.join('');
 }
 
 /**

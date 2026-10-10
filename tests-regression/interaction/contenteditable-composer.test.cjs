@@ -61,7 +61,8 @@ function makeEnvironment(options = {}) {
     createRange() { return { selectNodeContents() {} }; },
     execCommand(command, _showUi, value) {
       if (options.execCommand === false || command !== 'insertText' || !state.activeElement) return false;
-      state.activeElement._setFrameworkText(value);
+      state.activeElement._setFrameworkText(options.corruptInsert
+        ? options.corruptInsert(value) : value);
       return true;
     }
   };
@@ -165,6 +166,21 @@ test('INSERT_ONLY uses the composer ownerDocument editing transaction and never 
   assert.equal(env.clicks(), 0);
 });
 
+test('INSERT_ONLY accepts ProseMirror whitespace reflow when prompt content is intact', async () => {
+  const env = makeEnvironment({ corruptInsert: value => value.replace(/\n/gu, '\n ') });
+  const composer = env.makeComposer();
+  const adapter = loadAdapter();
+
+  const result = await adapter.execute(request({ promptText: 'Line one\nLine two\nLine three' }), {
+    document: env.buildDocument(composer),
+    wait: async () => {}
+  });
+
+  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
+  assert.equal(result.safeDiagnosticCode, 'INSERTION_TEXT_PROVEN');
+  assert.equal(env.clicks(), 0);
+});
+
 test('contenteditable fallback is accepted only when resulting editor text is observable', async () => {
   const env = makeEnvironment({ execCommand: false });
   const composer = env.makeComposer({ directMutationUpdatesModel: true });
@@ -219,5 +235,34 @@ test('INSERT_ONLY clears stale ProseMirror content and inserts the configured ta
   assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
   assert.equal(result.safeDiagnosticCode, 'INSERTION_TEXT_PROVEN');
   assert.equal(composer.innerText, 'Exact ProseMirror prompt ✅');
+  assert.equal(env.clicks(), 0);
+});
+
+test('a long malformed background insertion is replaced once and proved before Send', async () => {
+  const promptText = 'START ab\n' + 'рядок безпечного тексту\n'.repeat(200) + 'END';
+  const env = makeEnvironment({
+    corruptInsert: value => value.replace('ab', 'ba')
+  });
+  const composer = env.makeComposer({ directMutationUpdatesModel: true });
+  const adapter = loadAdapter();
+  const result = await adapter.execute(request({ promptText }), {
+    document: env.buildDocument(composer), wait: async () => {}
+  });
+  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
+  assert.equal(result.safeDiagnosticCode, 'INSERTION_TEXT_PROVEN');
+  assert.match(result.safeDiagnosticMessage, /repair=alternate/);
+  assert.equal(composer.innerText, promptText);
+  assert.equal(env.events.filter(event => event === 'execCommand:insertText').length, 1);
+  assert.equal(env.clicks(), 0);
+});
+
+test('editor repair that does not update ProseMirror state remains unsent', async () => {
+  const env = makeEnvironment({ corruptInsert: value => value.replace('ab', 'ba') });
+  const composer = env.makeComposer({ directMutationUpdatesModel: false });
+  const adapter = loadAdapter();
+  const result = await adapter.execute(request({ promptText: 'START ab END' }), {
+    document: env.buildDocument(composer), wait: async () => {}
+  });
+  assert.equal(result.safeDiagnosticCode, 'INSERTION_NOT_PROVEN');
   assert.equal(env.clicks(), 0);
 });

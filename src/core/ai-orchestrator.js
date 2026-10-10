@@ -62,106 +62,13 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
   strongHistoryAt: Object.freeze([]),
   routeStates: Object.freeze({}),
   lastRouteId: '',
+  lastProvider: '',
+  lastModel: '',
+  lastEndpointId: '',
   lastFailoverChain: Object.freeze([]),
 });
 
 const clean = value => typeof value === 'string' ? value.trim() : '';
-
-const MAX_PROVIDER_RESERVATION_RECEIPT_FIELDS = 32;
-const MAX_PROVIDER_RESERVATION_RECEIPT_TEXT = 10_000;
-
-function snapshotProviderReservationReceipt(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('AI provider-call lifecycle did not admit a durable budget reservation');
-  }
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error('AI provider-call lifecycle reservation must be a plain data object');
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const keys = Reflect.ownKeys(descriptors);
-  if (keys.length < 1 || keys.length > MAX_PROVIDER_RESERVATION_RECEIPT_FIELDS) {
-    throw new Error('AI provider-call lifecycle reservation has an invalid field count');
-  }
-  const snapshot = Object.create(null);
-  for (const key of keys) {
-    if (typeof key !== 'string') {
-      throw new Error('AI provider-call lifecycle reservation contains a symbol field');
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`AI provider-call lifecycle reservation.${key} must be an enumerable own data property`);
-    }
-    const item = descriptor.value;
-    if (item !== null && !['string', 'number', 'boolean'].includes(typeof item)) {
-      throw new Error(`AI provider-call lifecycle reservation.${key} must be scalar data`);
-    }
-    if (typeof item === 'number' && !Number.isFinite(item)) {
-      throw new Error(`AI provider-call lifecycle reservation.${key} must be finite`);
-    }
-    if (typeof item === 'string' && item.length > MAX_PROVIDER_RESERVATION_RECEIPT_TEXT) {
-      throw new Error(`AI provider-call lifecycle reservation.${key} is too long`);
-    }
-    snapshot[key] = item;
-  }
-  if (typeof snapshot.reservationId !== 'string'
-      || !snapshot.reservationId.trim()
-      || snapshot.reservationId !== snapshot.reservationId.trim()) {
-    throw new Error('AI provider-call lifecycle did not admit a durable budget reservation with canonical reservationId');
-  }
-  return Object.freeze(snapshot);
-}
-
-function assertProviderReservationSettlement(value) {
-  if (value == null || (typeof value !== 'object' && typeof value !== 'function')) return;
-  const descriptor = Object.getOwnPropertyDescriptor(value, 'settled');
-  if (!descriptor) return;
-  if (!Object.hasOwn(descriptor, 'value')) {
-    const error = new Error('AI provider-call lifecycle settlement status must be an own data property');
-    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
-    throw error;
-  }
-  if (descriptor.value !== true) {
-    const error = new Error('AI provider-call lifecycle did not settle the durable budget reservation');
-    error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED';
-    throw error;
-  }
-}
-
-function assertProviderReservationReceiptBinding(receipt, { context, route, callNumber }) {
-  if (!context || context.kind !== 'browser-agent') return receipt;
-  const expectedEpoch = Number(context.controlEpoch);
-  if (!Number.isSafeInteger(expectedEpoch) || Object.is(expectedEpoch, -0) || expectedEpoch < 0) {
-    throw new Error('AI provider-call budget context controlEpoch is invalid');
-  }
-  const expectedCallNumber = Number(callNumber);
-  if (!Number.isSafeInteger(expectedCallNumber) || expectedCallNumber < 1) {
-    throw new Error('AI provider-call reservation callNumber binding is invalid');
-  }
-  const expectedJobId = clean(context.jobId);
-  if (!expectedJobId) {
-    throw new Error('AI provider-call budget context jobId is required');
-  }
-  const expectedPrefix = `${expectedJobId}:model-budget:`;
-  if (!receipt.reservationId.startsWith(expectedPrefix)) {
-    throw new Error('AI provider-call reservation does not match the admitted Browser Agent job');
-  }
-  if (receipt.controlEpoch !== expectedEpoch) {
-    throw new Error('AI provider-call reservation controlEpoch does not match admission');
-  }
-  if (receipt.callNumber !== expectedCallNumber) {
-    throw new Error('AI provider-call reservation callNumber does not match admission');
-  }
-  for (const key of ['routeId', 'provider', 'model']) {
-    if (receipt[key] !== route[key]) {
-      throw new Error(`AI provider-call reservation ${key} does not match admitted route`);
-    }
-  }
-  if (receipt.modelCalls !== 1) {
-    throw new Error('AI provider-call reservation must admit exactly one model call');
-  }
-  return receipt;
-}
 
 function normalizeSlot(raw, fallback) {
   const provider = PROVIDERS.has(raw?.provider) ? raw.provider : fallback.provider;
@@ -239,7 +146,18 @@ export function normalizeAiRouterRuntime(raw = {}) {
     strongHistoryAt: Array.isArray(raw.strongHistoryAt) ? raw.strongHistoryAt.map(num).filter(Boolean).slice(-1000) : [],
     routeStates: normalizeAiRouteStates(raw.routeStates, routes.length ? routes : Object.keys(raw.routeStates || {}).map(routeId => ({ routeId }))),
     lastRouteId: clean(raw.lastRouteId),
-    lastFailoverChain: Array.isArray(raw.lastFailoverChain) ? raw.lastFailoverChain.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(-32).map(item => ({ routeId:clean(item.routeId), outcome:clean(item.outcome), code:clean(item.code), category:clean(item.category) })) : [],
+    lastProvider: clean(raw.lastProvider).slice(0, 100),
+    lastModel: clean(raw.lastModel).slice(0, 300),
+    lastEndpointId: clean(raw.lastEndpointId).slice(0, 180),
+    lastFailoverChain: Array.isArray(raw.lastFailoverChain) ? raw.lastFailoverChain.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(-32).map(item => ({
+      routeId:clean(item.routeId),
+      provider:clean(item.provider).slice(0, 100),
+      model:clean(item.model).slice(0, 300),
+      endpointId:clean(item.endpointId).slice(0, 180),
+      outcome:clean(item.outcome),
+      code:clean(item.code),
+      category:clean(item.category),
+    })) : [],
   };
 }
 
@@ -269,6 +187,13 @@ function automaticStrongGuard(settings, runtime, now) {
     }
   }
   return { allowed: true, reason: '', retryAt: 0 };
+}
+
+function routePolicyBlocksAutomaticFallback(settings) {
+  return Boolean(settings?.routes?.length) && (
+    Boolean(clean(settings?.routePolicy?.pinnedRouteId))
+    || settings?.routePolicy?.autoSwitch === false
+  );
 }
 
 function shouldScheduledStrong(settings, runtime, now) {
@@ -322,9 +247,22 @@ export class AiOrchestrator {
     let routeStates = normalizeAiRouteStates(runtime.routeStates, settings.routes);
     const routeAttempts = [];
     let selectedRouteId = runtime.lastRouteId;
+    let selectedRouteIdentity = Object.freeze({
+      provider: runtime.lastProvider,
+      model: runtime.lastModel,
+      endpointId: runtime.lastEndpointId,
+    });
     const consumedOutput = () => Math.max(0, Number(primaryResult?.usage?.outputTokens || 0)) + Math.max(0, Number(strongResult?.usage?.outputTokens || 0));
     const remainingOutput = () => outputCeiling ? Math.max(0, outputCeiling - consumedOutput()) : 0;
-    const routeRuntimeSnapshot = () => normalizeAiRouterRuntime({ ...runtime, routeStates, lastRouteId:selectedRouteId, lastFailoverChain:routeAttempts });
+    const routeRuntimeSnapshot = () => normalizeAiRouterRuntime({
+      ...runtime,
+      routeStates,
+      lastRouteId:selectedRouteId,
+      lastProvider:selectedRouteIdentity.provider,
+      lastModel:selectedRouteIdentity.model,
+      lastEndpointId:selectedRouteIdentity.endpointId,
+      lastFailoverChain:routeAttempts,
+    });
     const attachFailureRuntime = error => {
       if (error && typeof error === 'object') {
         error.modelCallsUsed = Math.max(Number(error.modelCallsUsed || 0), callsUsed);
@@ -333,22 +271,12 @@ export class AiOrchestrator {
       }
       return error;
     };
-    const nonProviderRouteFailures = new WeakSet();
-    const attachNonProviderFailureRuntime = error => {
-      if (error && (typeof error === 'object' || typeof error === 'function')) nonProviderRouteFailures.add(error);
-      return attachFailureRuntime(error);
-    };
     const invoke = async (route, callPrompt, callSystem, bounded) => {
       if (callCeiling && callsUsed >= callCeiling) {
         const error = new Error('AI model-call budget exhausted before another provider call');
         error.code = 'AI_MODEL_CALL_BUDGET_EXHAUSTED';
         error.modelCallsUsed = callsUsed;
-        throw attachNonProviderFailureRuntime(error);
-      }
-      if (providerCallBudgetContext && !this.providerCallLifecycle) {
-        const error = new Error('AI provider-call budget context requires the canonical provider-call lifecycle');
-        error.code = 'AI_PROVIDER_BUDGET_LIFECYCLE_UNAVAILABLE';
-        throw attachNonProviderFailureRuntime(error);
+        throw attachFailureRuntime(error);
       }
       const lifecycle = providerCallBudgetContext ? this.providerCallLifecycle : null;
       const routeIdentity = Object.freeze({
@@ -359,32 +287,14 @@ export class AiOrchestrator {
       });
       let reservation = null;
       if (lifecycle) {
-        let admittedReservation;
-        try {
-          admittedReservation = await lifecycle.beforeProviderCall({
-            context: providerCallBudgetContext,
-            route: routeIdentity,
-            prompt: callPrompt,
-            systemPrompt: callSystem,
-            maxOutputTokens: bounded,
-            callNumber: callsUsed + 1,
-          });
-        } catch (error) {
-          throw attachNonProviderFailureRuntime(error);
-        }
-        try {
-          reservation = assertProviderReservationReceiptBinding(
-            snapshotProviderReservationReceipt(admittedReservation),
-            {
-              context: providerCallBudgetContext,
-              route: routeIdentity,
-              callNumber: callsUsed + 1,
-            },
-          );
-        } catch (error) {
-          error.code = error.code || 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
-          throw attachNonProviderFailureRuntime(error);
-        }
+        reservation = await lifecycle.beforeProviderCall({
+          context: providerCallBudgetContext,
+          route: routeIdentity,
+          prompt: callPrompt,
+          systemPrompt: callSystem,
+          maxOutputTokens: bounded,
+          callNumber: callsUsed + 1,
+        });
       }
       callsUsed += 1;
       let value;
@@ -403,53 +313,52 @@ export class AiOrchestrator {
       } catch (error) {
         if (lifecycle) {
           try {
-            const settlement = await lifecycle.afterProviderCall({
+            await lifecycle.afterProviderCall({
               context: providerCallBudgetContext,
               reservation,
               route: routeIdentity,
               ok: false,
               error,
             });
-            assertProviderReservationSettlement(settlement);
           } catch (settlementError) {
-            throw attachNonProviderFailureRuntime(settlementError);
+            const classification = classifyAiRouteError(settlementError);
+            routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
+            throw attachFailureRuntime(settlementError);
           }
         }
+        const classification = classifyAiRouteError(error);
+        routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
         throw attachFailureRuntime(error);
       }
       if (lifecycle) {
         try {
-          const settlement = await lifecycle.afterProviderCall({
+          await lifecycle.afterProviderCall({
             context: providerCallBudgetContext,
             reservation,
             route: routeIdentity,
             ok: true,
             result: value,
           });
-          assertProviderReservationSettlement(settlement);
         } catch (settlementError) {
-          throw attachNonProviderFailureRuntime(settlementError);
+          const classification = classifyAiRouteError(settlementError);
+          routeAttempts.push({ ...routeIdentity, outcome:'FAILED', code:classification.code, category:classification.category });
+          throw attachFailureRuntime(settlementError);
         }
       }
-      return Object.freeze({
-        value,
-        providerReservation: reservation,
+      routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
+      selectedRouteId = routeIdentity.routeId;
+      selectedRouteIdentity = Object.freeze({
+        provider: routeIdentity.provider,
+        model: routeIdentity.model,
+        endpointId: routeIdentity.endpointId,
       });
+      return value;
     };
     const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
       const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));
       if (!settings.routes.length) {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
-        const admitted = await invoke(
-          { routeId:'', provider:slot.provider, model:slot.model, endpointId:'' },
-          callPrompt,
-          callSystem,
-          bounded,
-        );
-        return {
-          ...admitted.value,
-          ...(admitted.providerReservation ? { providerReservation: admitted.providerReservation } : {}),
-        };
+        return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
       const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
       if (!selected.candidates.length) {
@@ -464,30 +373,37 @@ export class AiOrchestrator {
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
           const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
-          const admitted = await invoke(route, routePrompt, routeSystem, bounded);
-          const value = admitted.value;
+          const value = await invoke(route, routePrompt, routeSystem, bounded);
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
-          selectedRouteId = route.routeId;
-          routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
-          return {
-            ...value,
-            ...(admitted.providerReservation ? { providerReservation: admitted.providerReservation } : {}),
-            routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' },
-          };
+          return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
         } catch (error) {
-          if (error && (typeof error === 'object' || typeof error === 'function')
-              && nonProviderRouteFailures.has(error)) {
-            throw attachFailureRuntime(error);
-          }
           const classification = classifyAiRouteError(error);
           if (error && typeof error === 'object') error.routeFailureClassification = classification;
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
-          routeAttempts.push({ routeId:route.routeId, outcome:'FAILED', code:classification.code, category:classification.category });
           attachFailureRuntime(error);
-          if (!classification.retryable || !settings.routePolicy.autoSwitch) throw error;
+          if (!classification.retryable) throw error;
+          if (!settings.routePolicy.autoSwitch) {
+            const failedState = routeStates[route.routeId];
+            const retryAt = Math.max(failedState?.backoffUntil || 0, failedState?.circuitOpenUntil || 0);
+            if (error && typeof error === 'object' && retryAt > now) error.retryAt = retryAt;
+            throw attachFailureRuntime(error);
+          }
         }
       }
-      throw attachFailureRuntime(createAiRoutePoolExhaustedError({ attempts:routeAttempts, message:'Every eligible AI route failed with a retryable provider error' }));
+      const exhausted = selectAiRouteCandidates({
+        routes: settings.routes,
+        policy: settings.routePolicy,
+        routeStates,
+        role: requestedRole,
+        capabilityIds,
+        requiresVision: Boolean(clean(imageDataUrl)),
+        now,
+      });
+      throw attachFailureRuntime(createAiRoutePoolExhaustedError({
+        attempts: routeAttempts,
+        retryAt: exhausted.retryAt,
+        message: 'Every eligible AI route failed with a retryable provider error',
+      }));
     };
 
     let primaryResult = null;
@@ -531,8 +447,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (error && (typeof error === 'object' || typeof error === 'function')
-            && nonProviderRouteFailures.has(error)) throw error;
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
@@ -550,8 +465,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (error && (typeof error === 'object' || typeof error === 'function')
-            && nonProviderRouteFailures.has(error)) throw error;
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
@@ -597,6 +511,9 @@ export class AiOrchestrator {
         : (runtime.strongHistoryAt || []).filter(at => now - at < 24 * 60 * 60_000),
       routeStates,
       lastRouteId: finalResult?.routeSelection?.routeId || selectedRouteId,
+      lastProvider: finalResult?.routeSelection?.provider || selectedRouteIdentity.provider,
+      lastModel: finalResult?.routeSelection?.model || selectedRouteIdentity.model,
+      lastEndpointId: finalResult?.routeSelection?.endpointId || selectedRouteIdentity.endpointId,
       lastFailoverChain: routeAttempts,
     };
 
@@ -621,10 +538,14 @@ export class AiOrchestrator {
       strong: strongResult ? { provider: strongResult.routeSelection?.provider || settings.strong.provider, model: strongResult.routeSelection?.model || settings.strong.model, routeId:strongResult.routeSelection?.routeId || '', text: strongResult.text, usage: strongResult.usage || null } : null,
       primaryError,
       strongError,
-      routing: { selectedRouteId:finalResult?.routeSelection?.routeId || '', reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'), failoverChain:structuredClone(routeAttempts) },
-      ...(finalResult?.providerReservation
-        ? { providerReservation: finalResult.providerReservation }
-        : {}),
+      routing: {
+        selectedRouteId:finalResult?.routeSelection?.routeId || '',
+        selectedProvider:finalResult?.routeSelection?.provider || selectedRouteIdentity.provider,
+        selectedModel:finalResult?.routeSelection?.model || selectedRouteIdentity.model,
+        selectedEndpointId:finalResult?.routeSelection?.endpointId || selectedRouteIdentity.endpointId,
+        reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'),
+        failoverChain:structuredClone(routeAttempts),
+      },
       runtime: nextRuntime,
     };
   }

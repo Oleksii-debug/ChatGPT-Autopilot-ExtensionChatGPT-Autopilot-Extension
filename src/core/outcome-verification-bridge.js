@@ -271,7 +271,7 @@ function normalizeTrustedEvidenceArtifacts(value, verification) {
   return byId;
 }
 
-export function normalizeTrustedOutcomeVerificationRecordV1(input) {
+function normalizeTrustedVerificationRecord(input) {
   const raw = record(input, 'TrustedVerificationRecordV1');
   exactKeys(raw, TRUSTED_RECORD_KEYS, 'TrustedVerificationRecordV1');
   if (raw.schemaVersion !== OUTCOME_VERIFICATION_BRIDGE_VERSION) {
@@ -424,17 +424,12 @@ function criterionResult({
     criterionId: criterion.criterionId,
     trustedRecordId: trustedRecord.recordId,
     verificationId: verification.verificationId,
-    invocationId: verification.invocationId,
-    observationId: verification.observationId,
     verificationStatus: verification.status,
     verifierId: trustedRecord.verifierId,
     verificationAuthorityId: trustedRecord.verificationAuthorityId,
-    trustedReasonCode: verification.reasonCode,
     accepted,
     reasonCode,
     evidenceArtifactIds: [...verification.evidenceArtifactIds].sort(compareCodeUnit),
-    trustedEvidenceArtifactRefs: [...trustedRecord.evidenceArtifacts]
-      .sort((left, right) => compareCodeUnit(left.artifactId, right.artifactId)),
     evidenceKinds: [...evidenceKinds].sort(compareCodeUnit),
     missingEvidenceKinds: missingKinds,
     missingEvidenceArtifactCount: missingArtifactCount,
@@ -523,7 +518,7 @@ export async function adjudicateOutcomeVerificationV1(
           + row.verificationId,
       );
     }
-    const trustedRecord = normalizeTrustedOutcomeVerificationRecordV1(rawTrustedRecord);
+    const trustedRecord = normalizeTrustedVerificationRecord(rawTrustedRecord);
     if (trustedRecord.verification.verificationId !== row.verificationId) {
       throw new Error('Trusted verification record verificationId is mismatched');
     }

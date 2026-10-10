@@ -175,6 +175,25 @@ test('pre-effect claim cannot downgrade a persisted native click to a safe retry
   assert.equal(after.sessionsById.s1.successfulSendCount, 0);
 });
 
+test('a lost DOM checkpoint acknowledgement cannot authorize replay or increment the sent counter', async () => {
+  const repo = new FakeRepository(fixture());
+  const clock = { value: 0 };
+  const coordinator = new DurableSubmissionCoordinator(repo, { now: () => clock.value, cryptoApi: webcrypto });
+  const identity = await prepareForSubmit(coordinator, clock);
+  clock.value = 1040;
+  const result = await coordinator.submitWithDurableCheckpoint({ sessionId: 's1', operationId: identity.operationId,
+    submit: async () => {
+      await repo.update(state => { state.sessionsById.s1.operation.domSubmitDispatched = true; return state; });
+      return { status: InteractionResult.TEMPORARY_ERROR, submissionEvidence: 'PROVEN_NO_EFFECT',
+        safeDiagnosticCode: 'SEND_DOM_CHECKPOINT_REJECTED' };
+    } });
+  const state = await repo.load();
+  assert.equal(result.status, InteractionResult.SUBMISSION_UNCERTAIN);
+  assert.equal(state.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(state.sessionsById.s1.operation.submitStartedAt, 1040);
+  assert.equal(state.sessionsById.s1.successfulSendCount, 0);
+});
+
 test('pre-send deadline prevents premature submit before any side effect', async () => {
   const repo = new FakeRepository(fixture());
   const clock = { value: 0 };

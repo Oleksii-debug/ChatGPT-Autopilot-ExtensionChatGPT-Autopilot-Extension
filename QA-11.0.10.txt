@@ -1,0 +1,20 @@
+11.0.10 — 2026-10-02T01:20:33+02:00
+
+RESULTS ON THE FINAL PRODUCTION CODE
+Core/Scenario/integration/interaction/UI: 784 PASS, 0 FAIL.
+Release/package: 22 PASS, 0 FAIL after aligning manifest.version_name to 11.0.10 High.
+Total distinct checks: 806 PASS. This is an aggregate of the full run's 784 non-release checks and the final 22-test release rerun; it is not a claim that the earlier full run had no failures.
+Focused Send/focus/frozen-tab suite: 66 PASS, 0 FAIL (overlaps with the total).
+Five new regression cases against unchanged 11.0.9: 0 PASS, 5 FAIL, as expected; the fixes make all five pass. These cover 15-slot fairness, no focus stealing from a pending Send, delayed thaw, activation DOM replacement, and no-effect retry eligibility. The sixth new concurrency test starts a Send during an in-flight observation; the seventh checks native visibility loss before any mouse effect.
+
+AUDIT TRAIL
+validation/11.0.10/before-11.0.9.txt
+validation/11.0.10/full-before-version-name-alignment.tap — 806 tests, 796 passed, 10 release failures caused by stale manifest.version_name; production checks all passed.
+validation/11.0.10/release-final.tap — all 22 passed after the metadata fix.
+validation/11.0.10/focused-final.txt — all 66 passed.
+git diff --check passed. Installer SHA256 and exact packaged-file count are in releases/11.0.10/SHA256SUMS.txt and validation/11.0.10/package.json.
+
+LIMITATIONS
+No physical Windows Chrome/ChatGPT/NVDA test was performed. This workspace has no installed Chrome executable. Mocked DOM/Chrome checks do not prove server delivery or actual PC responsiveness. No real prompts were sent from user accounts during this recheck. Historical counter 46 cannot be certified as 46 server receipts from existing reports alone. Private user diagnostics are not shipped.
+
+PACKAGED JAVASCRIPT: 231 syntax checks passed; CRC and new window-focus dependency inclusion passed.

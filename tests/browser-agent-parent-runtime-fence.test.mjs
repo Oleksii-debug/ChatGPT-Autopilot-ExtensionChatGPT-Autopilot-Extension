@@ -107,7 +107,7 @@ test('canonical durable job adapter derives runtime and definition scope without
       ...canonicalJob(),
       definitionScope: null,
     }),
-    /requires a durable Agent definition capability\/tool scope/,
+    /requires durable definitionScope/,
   );
 });
 
