@@ -17,15 +17,22 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Provider-owned Proxy traps may contain credentials or private data.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -37,10 +44,19 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) {
     throw new Error(label + ' must be a canonical array');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < 0 || length > max) {
     throw new Error(label + ' has invalid length');
@@ -122,7 +138,13 @@ function resolutionRequest(selection, asOf) {
 function validateResolvedStates(rawStates, selection) {
   const selectedTools = new Set(selection.grantedToolIds);
   return denseArray(rawStates, 'providerStates', MAX_PROVIDER_STATES).map((rawState, index) => {
-    const state = normalizeProviderReadinessV1(rawState);
+    let state;
+    try {
+      state = normalizeProviderReadinessV1(rawState);
+    } catch {
+      // Nested state belongs to the provider, not to the trusted caller.
+      throw new Error(`providerStates[${index}] is not canonical provider evidence`);
+    }
     if (state.providerId !== selection.providerId) {
       throw new Error(`providerStates[${index}] does not belong to selected provider`);
     }
@@ -177,7 +199,13 @@ export class SpecialistProviderReadinessResolverV1 {
     }
     const asOf = new Date(startedAtMs).toISOString();
     const request = resolutionRequest(selection, asOf);
-    const rawResult = await bound.resolveReadiness(request);
+    let rawResult;
+    try {
+      rawResult = await bound.resolveReadiness(request);
+    } catch {
+      // A provider failure is not trustworthy diagnostic text.
+      throw new Error('Trusted readiness provider resolution failed');
+    }
 
     const resolvedAtMs = this.#now();
     if (typeof resolvedAtMs !== 'number' || !Number.isSafeInteger(resolvedAtMs)
