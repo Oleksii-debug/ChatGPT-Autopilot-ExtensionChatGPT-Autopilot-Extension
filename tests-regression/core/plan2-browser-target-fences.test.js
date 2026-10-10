@@ -2859,3 +2859,62 @@ test('Plan2 S1 native checkbox refuses corrupted nonboolean state before any cli
   assert.equal(executeBrowserPageAction('native-coercion', restored).checked, false);
   assert.equal(element.clicked, 0);
 });
+
+
+test('Plan2 S1 multi-select cannot silently clear existing values during parse or JSON recovery', () => {
+  setup();
+  const priorSelect = globalThis.HTMLSelectElement;
+  try {
+    globalThis.HTMLSelectElement = FakeElement;
+    element.tagName = 'SELECT';
+    element.options = [
+      { value: 'keep', textContent: 'Keep', label: 'Keep' },
+      { value: 'allow', textContent: 'Allow', label: 'Allow' },
+    ];
+    element.value = 'keep';
+    element.multiple = true;
+    let formEvents = 0;
+    element.dispatchEvent = () => { formEvents += 1; return true; };
+    const multi = snapshotBrowserPage('plan2-multiple-select');
+    assert.equal(multi.elements[0].multiple, true, 'snapshot exposes multi-select semantics');
+    const proposed = { type: 'select', frameId: 0, ref: 'r1', value: 'allow' };
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify(proposed), {
+        frames: [{ frameId: 0, ...multi }], url: multi.url,
+      }),
+      /AGENT_SELECT_MULTIPLE_UNSUPPORTED/,
+      'planner must not authorize a single-value effect on a multiple control',
+    );
+    assert.equal(formEvents, 0);
+
+    // A persisted/approved action must also fail closed if a page changes a
+    // previously single-choice control to multiple choice after observation.
+    element.multiple = false;
+    const single = snapshotBrowserPage('plan2-multiple-select');
+    const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify(proposed), {
+      frames: [{ frameId: 0, ...single }], url: single.url,
+    })));
+    element.multiple = true;
+    const changed = snapshotBrowserPage('plan2-multiple-select');
+    const forgedRecovered = {
+      ...action,
+      expectedOptionFingerprint: changed.elements[0].optionFingerprint,
+    };
+    assert.throws(
+      () => executeBrowserPageAction('plan2-multiple-select', forgedRecovered),
+      /AGENT_SELECT_MULTIPLE_UNSUPPORTED/,
+      'even a matching forged persisted fingerprint must not authorize a multi-select effect',
+    );
+    assert.equal(element.value, 'keep');
+    assert.equal(formEvents, 0);
+
+    // The normal single-select contract and its input/change events survive.
+    element.multiple = false;
+    const result = executeBrowserPageAction('plan2-multiple-select', action);
+    assert.equal(result.ok, true);
+    assert.equal(element.value, 'allow');
+    assert.equal(formEvents, 2);
+  } finally {
+    globalThis.HTMLSelectElement = priorSelect;
+  }
+});
