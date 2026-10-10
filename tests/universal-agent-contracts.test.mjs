@@ -2034,3 +2034,40 @@ test('Plan-1 S1: nested prototype keys fail closed across invocation, observatio
     }
   }
 });
+
+test('Plan-1 S1: oversized but byte-small JSON evidence fails bounded traversal before durable admission', () => {
+  const base = {
+    schemaVersion: 1,
+    observationId: 'obs-json-budget-1',
+    invocationId: 'invoke-json-budget-1',
+    status: ObservationStatus.OK,
+    observedAt: AT,
+  };
+  // 65,536 numeric elements serialize to about 131 KB, below the existing
+  // 256 KB byte budget. This must not bypass the independent traversal bound.
+  const oversized = Array(65_536).fill(0);
+  const input = { ...base, data: oversized };
+  assert.ok(Buffer.byteLength(JSON.stringify(oversized), 'utf8') < 256_000);
+  assert.throws(() => normalizeObservationV1(input), /maximum JSON node budget/,
+    'a cheap serialized byte length cannot authorize unbounded evidence traversal');
+  assert.equal(oversized.length, 65_536);
+  assert.equal(oversized[0], 0);
+  assert.equal(oversized.at(-1), 0);
+  // Failure does not create or mutate an observation; the exact same payload
+  // remains rejected on a cold JSON restart.
+  assert.throws(
+    () => normalizeObservationV1(JSON.parse(JSON.stringify(input))),
+    /maximum JSON node budget/,
+  );
+  const valid = normalizeObservationV1({
+    ...base, data: [0, { provenance: 'fixture', items: [1, 2, 3] }],
+  });
+  assert.deepEqual(
+    normalizeObservationV1(JSON.parse(JSON.stringify(valid))),
+    valid,
+    'small valid nested evidence remains immutable and restart compatible',
+  );
+  assert.ok(Object.isFrozen(valid));
+  assert.ok(Object.isFrozen(valid.data));
+  assert.ok(Object.isFrozen(valid.data[1]));
+});
