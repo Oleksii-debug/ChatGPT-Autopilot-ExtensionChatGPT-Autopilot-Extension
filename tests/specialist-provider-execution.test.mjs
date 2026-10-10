@@ -429,3 +429,44 @@ test('Section 1: provider update must not occur after its observation, including
     /update cannot postdate its observation/,
   );
 });
+
+
+test('Section 1: pre-preparation provider observation cannot certify the current handoff after cold restart', () => {
+  const current = prepared();
+  const outcome = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_TERMINAL_PROVIDER_RECEIPT',
+    errorCode: '',
+    // The provider may have been updated before this attempt, but its
+    // observation must not predate the prepared exact handoff.
+    providerUpdatedAt: '2026-09-25T08:00:00.000Z',
+    providerObservedAt: '2026-09-27T14:39:59.999Z',
+    at: T1,
+  };
+  assert.throws(
+    () => recordSpecialistProviderExecutionOutcomeV1(current, outcome),
+    /observation predates exact preparation/,
+  );
+  assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(current.updatedAt, T0);
+  const legitimate = recordSpecialistProviderExecutionOutcomeV1(current, {
+    ...outcome,
+    providerObservedAt: T1,
+  });
+  assert.equal(legitimate.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.deepEqual(
+    normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(legitimate))),
+    legitimate,
+  );
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify({
+      ...legitimate,
+      providerObservedAt: '2026-09-27T14:39:59.999Z',
+    }))),
+    /observation predates exact preparation/,
+  );
+});
