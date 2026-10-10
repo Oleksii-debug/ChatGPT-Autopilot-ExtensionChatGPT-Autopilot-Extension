@@ -489,10 +489,19 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
   if (JSON.stringify(ownerAfter) !== JSON.stringify(originalOwner)) {
     throw new Error('canonical cloud workspace ownership changed during binding commit');
   }
+  // The final ownership callback itself crosses an async boundary. Re-read
+  // the canonical binding after it, rather than accepting a binding which
+  // may have been removed/replaced while the owner lookup was in flight.
+  const finalPersisted = cloudBindingReadback(
+    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+  );
+  if (!finalPersisted) {
+    throw new Error('canonical cloud workspace binding disappeared after owner readback');
+  }
   return frozen({
     schemaVersion: CLOUD_WORKSPACE_VERSION,
     status: 'CANONICAL_BINDING_DURABLE_READBACK',
-    binding: persisted,
+    binding: finalPersisted,
     isolationVerified: true,
     durableBindingVerified: true,
     executionAuthorized: false,
@@ -546,6 +555,14 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
       );
       current = Boolean(afterBinding)
         && JSON.stringify(ownerAfter) === JSON.stringify(ownerBefore);
+      if (current) {
+        // The last owner read may observe a stable owner while a concurrent
+        // writer removes its binding. Fence that final asynchronous gap.
+        const bindingAfterOwner = cloudBindingReadback(
+          binding, await trusted.loadCanonicalBinding(bindingKey),
+        );
+        current = Boolean(bindingAfterOwner);
+      }
     }
   }
   return frozen({
