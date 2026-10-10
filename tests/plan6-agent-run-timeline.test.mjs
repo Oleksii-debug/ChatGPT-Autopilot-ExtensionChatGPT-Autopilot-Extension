@@ -1574,7 +1574,7 @@ test('S1 recorded action kinds reject corrupt durable metadata without granting 
 
   const marker = 'PRIVATE_ACTION_KIND_NEVER_EXPORTED';
   for (const invalid of [undefined, null, false, 7, {}, [], '', ' click',
-    'click ', 'cli\\u202eck', 'bad\\nkind', 'x'.repeat(65), marker + '\\u0000']) {
+    'click ', 'cli\u202eck', 'bad\nkind', 'x'.repeat(65), marker + '\u0000']) {
     const x = job();
     x.runtime.history[1].action.type = invalid;
     assert.throws(() => buildAgentRunTimelineV1(x), error =>
