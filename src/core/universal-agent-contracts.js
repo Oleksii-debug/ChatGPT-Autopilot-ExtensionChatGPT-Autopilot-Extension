@@ -245,8 +245,11 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
   }
 }
 
-function jsonData(value, label, { optional = true } = {}) {
-  if (value == null && optional) return {};
+function jsonData(value, label, { optional = true, present = false } = {}) {
+  // Missing legacy observation data is not the same as an explicitly stored
+  // null/undefined. Never erase a corrupt observation on cold recovery.
+  if (value == null && optional && !present) return {};
+  if (value == null && present) throw new Error(`${label} contains corrupt explicitly present data`);
   const cloned = cloneJsonData(value, label);
   const serialized = JSON.stringify(cloned);
   if (serialized.length > MAX_DATA_JSON) throw new Error(`${label} is too large`);
@@ -422,7 +425,7 @@ export function normalizeObservationV1(input) {
     invocationId: id(raw.invocationId, 'invocationId'),
     status,
     summary: text(raw.summary, 'summary', { optional: true, max: 8000 }),
-    data: jsonData(raw.data, 'data'),
+    data: jsonData(raw.data, 'data', { present: Object.hasOwn(raw, 'data') }),
     artifactRefs,
     observedAt: timestamp(raw.observedAt, 'observedAt'),
   });
