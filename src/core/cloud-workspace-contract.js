@@ -543,7 +543,17 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
     expectedOwnershipRevision: binding.executionOwnershipRevision,
     requireAtomicOwnerLeaseCompareAndSet: true,
     requireExactCheckpoint: true,
+    requireBindingAbsent: true,
   });
+  // A crashed/ambiguous writer may already have durably committed this
+  // workspace. Never issue a second write based on caller-side retry, even
+  // when the persisted binding appears identical. Recovery is read-only.
+  // This is a preflight fence, NOT a replacement for the canonical store's
+  // atomic owner/lease/absence compare-and-set: another writer may race it.
+  const beforeCommit = await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding));
+  if (beforeCommit != null) {
+    throw new Error('canonical cloud workspace binding already exists; use read-only reconciliation');
+  }
   // A provider response cannot commit or authenticate its own binding.
   await trusted.atomicCommitCanonicalBinding(transaction);
   const persisted = cloudBindingReadback(
