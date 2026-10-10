@@ -62,18 +62,21 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   let source = raw;
   if (typeof raw === 'string') {
     const text = clean(raw);
-    if (!text) source = [];
+    // Only genuinely absent legacy configuration receives the local default.
+    // An explicitly stored [] means zero authorized endpoints, not implicit
+    // permission to contact the default endpoint after cold restart.
+    if (!text) source = [{
+      endpointId: 'default',
+      baseUrl: COMPATIBLE_BASE_URL,
+      apiKeyEnv: 'COMPATIBLE_API_KEY',
+    }];
     else {
       try { source = JSON.parse(text); }
       catch (_) { throw gatewayError('AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON must be valid JSON', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'); }
     }
   }
   if (!Array.isArray(source)) throw gatewayError('OpenAI-compatible endpoint registry must be an array', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-  const entries = source.length ? source : [{
-    endpointId: 'default',
-    baseUrl: COMPATIBLE_BASE_URL,
-    apiKeyEnv: 'COMPATIBLE_API_KEY',
-  }];
+  const entries = source;
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
   const seenPinnedCredentialRefs = new Set();
