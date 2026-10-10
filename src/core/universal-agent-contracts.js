@@ -29,11 +29,18 @@ const MAX_TEXT = 16_000;
 const MAX_DATA_JSON = 256_000;
 const MAX_LIST = 128;
 
+function safeContractReflection(label, inspect) {
+  // A hostile Proxy can throw an arbitrary secret-bearing message from a
+  // reflection trap. Never promote that untrusted text to diagnostics.
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function plain(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object' || safeContractReflection(label, () => Array.isArray(value))) {
     throw new Error(`${label} must be a plain object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = safeContractReflection(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
@@ -41,11 +48,11 @@ function plain(value, label) {
   // values without evaluating accessors so validation and normalization read
   // the exact same immutable input view.
   const out = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeContractReflection(label, () => Reflect.ownKeys(value))) {
     if (typeof key !== 'string') {
       throw new Error(`${label} contains unknown field`);
     }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = safeContractReflection(label, () => Object.getOwnPropertyDescriptor(value, key));
     if (!descriptor
         || descriptor.enumerable !== true
         || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
@@ -143,10 +150,10 @@ function bool(value, label, fallback = false, { present = false } = {}) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!safeContractReflection(label, () => Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype)) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const descriptors = safeContractReflection(label, () => Object.getOwnPropertyDescriptors(value));
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
