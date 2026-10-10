@@ -2,7 +2,7 @@ name: UI accessibility contract tests
 
 on:
   push:
-    branches: ["main", "source/0.9.19-canonical-convergence"]
+    branches: ["main", "source/0.9.19-canonical-convergence", "plan8/11-0-13-source-convergence-20261010"]
     paths:
       - "src/ui/**"
       - "tests-regression/ui/**"
