@@ -15,6 +15,11 @@ export const SpecialistProviderReadinessSource = Object.freeze({
 
 const REQUEST_KEYS = new Set(['selection', 'providerStates']);
 const MAX_PROVIDER_STATES = 512;
+const PROVIDER_FACT_KEYS = new Set([
+  'schemaVersion', 'providerId', 'toolId', 'health', 'installationRequired',
+  'installed', 'authenticationRequired', 'authenticated', 'pathKind',
+  'latencyMs', 'reasonCode',
+]);
 const EXECUTABLE = new Set([
   CapabilityPathReadiness.READY,
   CapabilityPathReadiness.DEGRADED,
@@ -32,15 +37,22 @@ function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // A lower-trust Proxy can throw arbitrary secret-bearing error text.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(label + ' must be a plain data object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(label + ' contains unknown field: ' + String(key));
+      throw new Error(label + ' contains unknown field');
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -52,10 +64,19 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) {
     throw new Error(label + ' must be a canonical array');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const length = descriptors.length?.value;
   if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < 0 || length > max) {
     throw new Error(label + ' has invalid length');
@@ -127,7 +148,10 @@ export function inspectSpecialistProviderReadinessV1(input = {}) {
   const raw = record(input, REQUEST_KEYS, 'Specialist provider readiness request');
   const selection = normalizeSpecialistSelectionV1(raw.selection);
   const states = denseArray(raw.providerStates === undefined ? [] : raw.providerStates, 'providerStates', MAX_PROVIDER_STATES)
-    .map(normalizeProviderReadinessV1);
+    // Validate/snapshot each lower-trust provider fact before the shared
+    // normalizer runs. This prevents Proxy traps, getters or unknown keys
+    // from leaking sensitive input through an exception at the readiness edge.
+    .map(item => normalizeProviderReadinessV1(record(item, PROVIDER_FACT_KEYS, 'ProviderReadinessV1')));
 
   const byIdentity = new Map();
   for (const state of states) {
