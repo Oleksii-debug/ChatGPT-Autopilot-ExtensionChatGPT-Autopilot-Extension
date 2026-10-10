@@ -1675,3 +1675,29 @@ test('S1 zero-width persisted identity and event labels fail closed without leak
   assert.equal(projected.evidenceMap.externalEffectVerified, false);
   assert.deepEqual(projected, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
 });
+
+
+test('S1 specialist provider receipt identity cannot hide invisible format controls', () => {
+  const base = job();
+  base.runtime.specialistDispatchByAgentId = {
+    'specialist:plan-1:node-1': {
+      state: 'PROVIDER_SUCCEEDED',
+      providerReceiptId: 'receipt-1',
+    },
+  };
+  const valid = buildAgentRunTimelineV1(base);
+  assert.equal(valid.evidenceMap.specialistProviderDispatch.receiptIdsRecorded, 1);
+  assert.equal(valid.evidenceMap.externalEffectVerified, false);
+  assert.equal(valid.evidenceMap.specialistProviderDispatch.externalEffectVerified, false);
+  assert.deepEqual(valid, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(base))));
+  const marker = 'SECRET_RECEIPT_CONTENT';
+  for (const control of ['\u200b', '\u200f', '\u2060', '\ufeff', '\u061c', '\u180e']) {
+    const corrupt = JSON.parse(JSON.stringify(base));
+    corrupt.runtime.specialistDispatchByAgentId['specialist:plan-1:node-1'].providerReceiptId = marker + control;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt), error =>
+      error instanceof Error && /receipt identity is invalid/u.test(error.message) &&
+      !error.message.includes(marker));
+    assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corrupt))),
+      /receipt identity is invalid/u);
+  }
+});
