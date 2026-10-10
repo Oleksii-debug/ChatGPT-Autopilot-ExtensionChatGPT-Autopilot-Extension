@@ -66,7 +66,7 @@ test('Local API listener rejects unsafe bind addresses and ambiguous Node overlo
     [-1, '127.0.0.1'], ['0', '127.0.0.1'],
   ]) {
     assert.throws(() => server.listen(...args),
-      /explicit 127\\.0\\.0\\.1 TCP binding/u);
+      /explicit 127\.0\.0\.1 TCP binding/u);
     assert.equal(server.listening, false);
     assert.equal(server.address(), null);
   }
