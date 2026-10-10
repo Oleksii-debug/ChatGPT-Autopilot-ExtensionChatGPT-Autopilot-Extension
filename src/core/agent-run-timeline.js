@@ -223,13 +223,15 @@ function freeze(value) {
 function planSummary(plan) {
   if (plan == null) return freeze({ revision: 0, nodeCount: 0, stateCounts: {} });
   record(plan, 'Agent plan');
-  const nodes = own(plan, 'nodes');
+  // One descriptor is both presence and value: a hostile persisted Proxy
+  // cannot show one plan shape at validation and another in the projection.
+  const { present: nodesPresent, value: nodes } = persistedField(plan, 'nodes');
   const stateCounts = {};
   let nodeCount = 0;
   // An explicitly persisted malformed plan must not be presented as an
   // empty plan after restart. Only a genuinely absent optional nodes field
   // preserves the legacy zero-node projection.
-  if (safeHasOwn(plan, 'nodes') && !plainArray(nodes)) {
+  if (nodesPresent && !plainArray(nodes)) {
     throw new Error('Agent plan nodes must be a plain array');
   }
   if (Array.isArray(nodes)) {
@@ -261,8 +263,10 @@ function recordedOutcomeSummary(value) {
   record(value, 'Agent recorded outcome');
   // Only a genuinely absent legacy field can mean "not recorded". An
   // explicit null/undefined after restart is corrupt evidence, not zero checks.
-  const checksPresent = safeHasOwn(value, 'checks');
-  const checks = own(value, 'checks');
+  // Read once, preserving the enumerable JSON-persisted evidence boundary.
+  // Two independent reads would permit a hostile descriptor to switch the
+  // outcome proof between validation and export.
+  const { present: checksPresent, value: checks } = persistedField(value, 'checks');
   let count = 0;
   if (checksPresent) {
     if (!plainArray(checks)) {
