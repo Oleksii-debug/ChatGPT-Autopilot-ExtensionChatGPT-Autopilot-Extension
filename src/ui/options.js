@@ -2552,9 +2552,9 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-model-route-policy-configured').checked = Boolean(modelRoutePolicy);
   $('agent-definition-model-route-auto-switch').checked = modelRoutePolicy?.autoSwitch ?? true;
   $('agent-definition-model-route-pinned-id').value = modelRoutePolicy?.pinnedRouteId || '';
-  $('agent-definition-model-route-ordered-ids').value = (modelRoutePolicy?.orderedRouteIds || []).join('\\n');
-  $('agent-definition-model-route-allow-ids').value = (modelRoutePolicy?.allowRouteIds || []).join('\\n');
-  $('agent-definition-model-route-deny-ids').value = (modelRoutePolicy?.denyRouteIds || []).join('\\n');
+  $('agent-definition-model-route-ordered-ids').value = (modelRoutePolicy?.orderedRouteIds || []).join('\n');
+  $('agent-definition-model-route-allow-ids').value = (modelRoutePolicy?.allowRouteIds || []).join('\n');
+  $('agent-definition-model-route-deny-ids').value = (modelRoutePolicy?.denyRouteIds || []).join('\n');
   $('agent-definition-model-route-free-only').checked = modelRoutePolicy?.freeOnly === true;
   $('agent-definition-model-route-locality').value = modelRoutePolicy?.locality || 'any';
   $('agent-definition-model-route-max-input-price').value = modelRoutePolicy?.maxInputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxInputPricePerMillionUsd);
