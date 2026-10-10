@@ -941,6 +941,7 @@ test('S1 canonical runtime atomically persists the isolation-verified binding an
     atomicCommitCanonicalBinding: async tx => {
       assert.equal(tx.requireAtomicOwnerLeaseCompareAndSet, true);
       assert.equal(tx.requireExactCheckpoint, true);
+      assert.equal(tx.requireBindingAbsent, true);
       assert.equal(tx.expectedOwnershipRevision, owner.revision);
       assert.equal(tx.executionLeaseId, owner.leaseId);
       assert.equal(tx.binding.checkpointSha256, CHECKPOINT_SHA);
@@ -961,6 +962,38 @@ test('S1 canonical runtime atomically persists the isolation-verified binding an
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.resumeAuthorized, false);
   assert.equal(Object.isFrozen(result.binding), true);
+});
+
+test('S1 cold-restart preflight refuses duplicate or competing canonical binding without a second write', async () => {
+  const owner = cloudOwnership();
+  const original = JSON.parse(JSON.stringify(createCloudWorkspaceBindingV1(
+    observation(), owner, { at: '2026-09-25T06:06:00.000Z' },
+  )));
+  for (const persisted of [
+    original,
+    { ...original, checkpointSha256: 'f'.repeat(64) },
+  ]) {
+    let commits = 0;
+    let bindingReads = 0;
+    await assert.rejects(
+      () => commitVerifiedCloudWorkspaceBindingV1(
+        JSON.parse(JSON.stringify(observation())),
+        JSON.parse(JSON.stringify(owner)), {
+          at: ISOLATION_AT,
+          loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(owner)),
+          verifyIsolation: async () => JSON.parse(JSON.stringify(isolationProof())),
+          loadCanonicalBinding: async () => {
+            bindingReads++;
+            return JSON.parse(JSON.stringify(persisted));
+          },
+          atomicCommitCanonicalBinding: async () => { commits++; },
+        },
+      ),
+      /binding already exists; use read-only reconciliation/u,
+    );
+    assert.equal(bindingReads, 1);
+    assert.equal(commits, 0, 'a retry may not submit another atomic commit');
+  }
 });
 
 test('S1 binding bridge fails closed on missing or forged canonical persistence', async () => {
@@ -1195,7 +1228,7 @@ test('S1 commit refuses a binding replaced during final async owner readback', a
   );
   assert.equal(commits, 1);
   assert.equal(ownerReads, 3);
-  assert.equal(bindingReads, 2);
+  assert.equal(bindingReads, 3);
 });
 
 test('S1 cold recovery checks binding again after final owner await; never resends', async () => {
