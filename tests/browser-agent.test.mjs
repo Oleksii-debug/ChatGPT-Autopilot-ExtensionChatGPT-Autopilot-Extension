@@ -60,7 +60,7 @@ function makeChrome({ permission = true } = {}) {
             url: tab?.url || 'https://ais.example.edu/app',
             title: 'AIS',
             text: `page version ${pageVersion}`,
-            elements: [{ ref: 'r1', tag: 'button', role: '', type: '', name: 'Add course', checked: false, selected: false }],
+            elements: [{ ref: 'r1', tag: 'button', role: '', type: '', name: 'Add course', semanticIdentity: 'fixture-button-add-course-v1', checked: false, selected: false }],
             viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 1600 },
           } }];
         }
