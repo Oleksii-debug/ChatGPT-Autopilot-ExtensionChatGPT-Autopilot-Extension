@@ -605,6 +605,58 @@ test('Plan4 S1: a mismatched durable budget route receipt cannot dispatch any mo
   assert.equal(validatedSettlements, 1);
 });
 
+test('Plan4 S1: bound endpoint must have complete durable provider identity before network I/O', async () => {
+  const route = {routeId:'bound-route', provider:'openai-compatible', model:'fixture',
+    endpointId:'account.endpoint'};
+  const configured = settings({
+    routes:[{...route, roles:['planner'], priority:1, costClass:'paid',
+      inputPricePerMillionUsd:1, outputPricePerMillionUsd:2}],
+  });
+  for (const missing of ['routeId', 'provider', 'model', 'endpointId']) {
+    let gatewayCalls = 0;
+    let settlementCalls = 0;
+    const incomplete = {reservationId:'durable-bound', ...route};
+    delete incomplete[missing];
+    const router = new AiOrchestrator({
+      now:() => 82_050,
+      gatewayClient:{async complete() { gatewayCalls += 1; throw new Error('unreachable'); }},
+      providerCallLifecycle:{
+        async beforeProviderCall() { return incomplete; },
+        async afterProviderCall() { settlementCalls += 1; return {settled:true}; },
+      },
+    });
+    await assert.rejects(
+      () => router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{kind:'browser-agent', jobId:'bound-receipt', controlEpoch:0},
+      }),
+      error => error.code === 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH',
+      missing,
+    );
+    assert.equal(gatewayCalls, 0, missing + ' never permits provider I/O');
+    assert.equal(settlementCalls, 0, missing + ' never creates an effect');
+  }
+  let positiveCalls = 0;
+  const validRouter = new AiOrchestrator({
+    now:() => 82_050,
+    gatewayClient:{async complete(req) {
+      positiveCalls += 1;
+      return {provider:req.provider, model:req.model, endpointId:req.endpointId,
+        text:'verified output', usage:{inputTokens:2, outputTokens:2, totalTokens:4}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall() {return {reservationId:'durable-bound', ...route};},
+      async afterProviderCall() {return {settled:true};},
+    },
+  });
+  const positive = await validRouter.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'bounded', {
+    maxOutputTokens:128,
+    providerCallBudgetContext:{kind:'browser-agent', jobId:'bound-receipt-positive', controlEpoch:0},
+  });
+  assert.equal(positive.text, 'verified output');
+  assert.equal(positiveCalls, 1);
+});
+
 test('Plan4 S1: forged provider routeId remains UNKNOWN after one settled effect, including cold restart', async () => {
   let providerCalls = 0;
   let settled = 0;
