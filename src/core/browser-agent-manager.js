@@ -1398,6 +1398,13 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+      // The durable parent lifecycle is the authority for delegation. A paused,
+      // stopped or completed parent must not mint a new READY child handoff.
+      // Check inside the serialized store mutation (not a pre-read) so a
+      // concurrent pause cannot be bypassed before persistence.
+      if (job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+        throw new Error('Automatic specialist delegation parent must be RUNNING');
+      }
       if (!job.definitionScope) throw new Error('Automatic specialist delegation requires a reusable Agent definition scope');
       const registry = store.specialistRegistriesById?.[registryId] || null;
       if (!registry) throw new Error('Specialist registry not found');
