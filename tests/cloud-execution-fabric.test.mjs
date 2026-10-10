@@ -738,3 +738,53 @@ test('S1 provider readiness rejects hostile reflection without secret disclosure
   assert.equal(recovered.dispatchAuthorized, false);
   assert.equal(recovered.executionAuthorized, false);
 });
+
+
+test('S1 refuses future and pre-owner cloud workspace bindings after JSON cold restart', () => {
+  const owner = ownedCloud();
+  const scenarios = [
+    {
+      label: 'future canonical binding',
+      binding: workspaceBinding(owner, {
+        boundAt: '2026-09-25T10:06:00.000Z',
+      }),
+    },
+    {
+      label: 'binding predates current owner epoch',
+      binding: workspaceBinding(owner, {
+        baselineObservedAt: '2026-09-25T09:59:59.000Z',
+        boundAt: '2026-09-25T10:00:00.000Z',
+      }),
+    },
+  ];
+  for (const scenario of scenarios) {
+    const input = request({
+      affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+      executionOwnership: owner,
+      cloudSlots: [slot('current-slot', { workspaceId: 'workspace-a' })],
+      workspaceBindings: [scenario.binding],
+    });
+    for (const durableInput of [input, JSON.parse(JSON.stringify(input))]) {
+      const result = assessCloudExecutionFabricV1(durableInput);
+      assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED, scenario.label);
+      assert.equal(result.reasonCode, 'CLOUD_WORKSPACE_BINDING_CHRONOLOGY', scenario.label);
+      assert.equal(result.selectedWorkspaceId, '', scenario.label);
+      assert.equal(result.requiredExecutionTransition, '', scenario.label);
+      assert.equal(result.provisioningAuthorized, false, scenario.label);
+      assert.equal(result.dispatchAuthorized, false, scenario.label);
+      assert.equal(result.executionAuthorized, false, scenario.label);
+      assert.equal(result.resumeAuthorized, false, scenario.label);
+    }
+  }
+  // A freshly bound workspace remains eligible for an advisory assessment.
+  const valid = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('current-slot', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  }))));
+  assert.equal(valid.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(valid.selectedWorkspaceId, 'workspace-a');
+  assert.equal(valid.requiredExecutionTransition, 'NONE');
+  assert.equal(valid.executionAuthorized, false);
+});
