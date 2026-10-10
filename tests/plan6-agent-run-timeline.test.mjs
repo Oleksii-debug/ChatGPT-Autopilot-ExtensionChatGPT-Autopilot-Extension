@@ -758,7 +758,7 @@ test('S1 dispatch-map identities are canonical before evidence counts, including
       assert.throws(() => buildAgentRunTimelineV1(candidate), error =>
         error instanceof Error &&
         /dispatch map exceeds the bounded record schema/u.test(error.message) &&
-        !error.message.includes(hostileIdentity) &&
+        (hostileIdentity.length === 0 || !error.message.includes(hostileIdentity)) &&
         !error.message.includes('PRIVATE_RECEIPT_NO_EXPORT'),
       );
     }
