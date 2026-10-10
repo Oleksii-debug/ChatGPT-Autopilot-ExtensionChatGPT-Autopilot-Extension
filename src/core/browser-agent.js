@@ -1355,6 +1355,22 @@ export function executeBrowserPageAction(snapshotId, action) {
     const current = readCheckedState();
     if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
     if (current !== desired) {
+      // CHECK is a low-authority state mutation, not permission to submit a
+      // form, reset it, or navigate through an ARIA-styled link. A native
+      // click on those controls could perform an unapproved external effect.
+      const tag = String(element.tagName || '').toLowerCase();
+      const type = String(element.getAttribute('type') || (tag === 'button' ? 'submit' : '')).trim().toLowerCase();
+      const navigates = (tag === 'a' || tag === 'area')
+        && Boolean(element.getAttribute('href') || element.href);
+      if ((tag === 'button' && type !== 'button')
+        || (tag === 'input' && ['submit', 'reset', 'image'].includes(type))
+        || navigates) throw new Error('AGENT_CHECK_CONTROL_EFFECT_UNSAFE');
+      // Radios cannot be unchecked by activating the same radio. Sending an
+      // extra click would still fire handlers even though it cannot satisfy
+      // the requested false postcondition; require a different chosen radio.
+      if (desired === false && (type === 'radio' || role === 'radio')) {
+        throw new Error('AGENT_RADIO_UNCHECK_UNSUPPORTED');
+      }
       // A focus handler may change a checkbox/radio/switch after the initial
       // check. Reobserve after focus and visibility/hit-test validation:
       // never click using a pre-focus state that would now invert the intent.
