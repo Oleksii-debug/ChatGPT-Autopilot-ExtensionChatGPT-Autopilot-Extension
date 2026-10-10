@@ -508,7 +508,13 @@ function cloudBindingLookupKey(binding) {
 }
 
 function cloudBindingReadback(binding, persisted) {
-  if (persisted == null) return null;
+  // An adapter returning undefined has not proven that the canonical store
+  // contains no binding. Only an explicit null is a verified absent record.
+  // A silent/partial read must never enable another commit or report recovery.
+  if (persisted === undefined) {
+    throw new Error('canonical cloud binding readback is ambiguous; reconciliation required');
+  }
+  if (persisted === null) return null;
   const canonical = normalizeCloudWorkspaceBindingV1(persisted);
   if (JSON.stringify(canonical) !== JSON.stringify(binding)) {
     throw new Error('canonical cloud workspace binding readback mismatch');
@@ -566,7 +572,10 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
   // This is a preflight fence, NOT a replacement for the canonical store's
   // atomic owner/lease/absence compare-and-set: another writer may race it.
   const beforeCommit = await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, cloudBindingLookupKey(binding), 'binding', trusted);
-  if (beforeCommit != null) {
+  if (beforeCommit === undefined) {
+    throw new Error('canonical cloud binding preflight is ambiguous; reconciliation required');
+  }
+  if (beforeCommit !== null) {
     throw new Error('canonical cloud workspace binding already exists; use read-only reconciliation');
   }
   // A provider response cannot commit or authenticate its own binding.
