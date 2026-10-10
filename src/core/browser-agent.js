@@ -1329,22 +1329,18 @@ export function executeBrowserPageAction(snapshotId, action) {
     const current = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
     if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
     if (current !== desired) {
-      // Checkbox/radio/switch toggles are click effects too: never bypass an
-      // overlay, an inert ancestor, or a focus-time semantic retarget.
+      // A focus handler may change a checkbox/radio/switch after the initial
+      // check. Reobserve after focus and visibility/hit-test validation:
+      // never click using a pre-focus state that would now invert the intent.
       element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       element.focus?.({ preventScroll: true });
-      ensureTarget();
-      const bounds = element.getBoundingClientRect();
-      const x = bounds.left + bounds.width / 2;
-      const y = bounds.top + bounds.height / 2;
-      if (!(bounds.width > 0 && bounds.height > 0)
-        || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
-        throw new Error('AGENT_TARGET_NOT_VISIBLE');
+      ensureUnoccluded(element);
+      const afterFocus = 'checked' in element
+        ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
+      if (afterFocus !== desired) {
+        ensureUnoccluded(element);
+        element.click();
       }
-      const hit = document.elementFromPoint(x, y);
-      if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
-      ensureTarget();
-      element.click();
     }
     const observed = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
     if (observed !== desired) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
