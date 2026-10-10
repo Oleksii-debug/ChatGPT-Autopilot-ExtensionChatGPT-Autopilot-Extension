@@ -473,3 +473,31 @@ test('registry mutation snapshots nested definitions without executing accessors
   }), /toolIds must be an enumerable own data property/);
   assert.equal(reads, 0);
 });
+
+
+test('specialist owner-facing metadata fails closed on bidi, hidden control and non-durable UTF-16', () => {
+  for (const [field, forged] of [
+    ['label', 'QA\u202Erelease'],
+    ['label', 'Research\nDifferent specialist'],
+    ['label', 'Coder\u200Bhidden'],
+    ['description', 'Safe description\rForged decision'],
+    ['description', 'Hidden\u2066isolate'],
+    ['description', 'Broken high surrogate \uD800'],
+    ['label', 'Broken low surrogate \uDC00'],
+  ]) {
+    assert.throws(
+      () => normalizeSpecialistDefinitionV1(definition({ [field]: forged })),
+      /must be exact bounded text/,
+      field + ' must not publish spoofable or non-durable owner-visible text',
+    );
+  }
+  const restored = JSON.parse(JSON.stringify(definition({
+    label: 'QA — valid emoji 🙂',
+    description: 'First line\nSecond line with legitimate Unicode: Україна',
+  })));
+  const accepted = normalizeSpecialistDefinitionV1(restored);
+  assert.equal(accepted.label, restored.label);
+  assert.equal(accepted.description, restored.description);
+  assert.equal(accepted.enabled, true);
+  assert.equal(accepted.definitionRevision, restored.definitionRevision);
+});
