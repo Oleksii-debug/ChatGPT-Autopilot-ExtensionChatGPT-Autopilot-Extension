@@ -1861,6 +1861,43 @@ test('Plan4 S1: endpoint model catalog remains exact and immutable across JSON r
 });
 
 
+test('Plan4 S1 endpoint catalog accepts the same exact safe Unicode model identity as its route', async () => {
+  const multilingual = 'модель/ο3-🚀';
+  const input = {
+    schemaVersion:1, registryRevision:22,
+    routes:[{...route, model:multilingual, endpointId:'local-unicode-1'}],
+    endpointProfiles:[{...endpoint, endpointId:'local-unicode-1', modelIds:[multilingual]}],
+  };
+  const live = await createAiRouteRegistryEvidenceV1(input);
+  const cold = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(input)));
+  assert.equal(live.routeIdentities[0].endpointBinding,'MATCHED');
+  assert.equal(live.routeIdentities[0].model,multilingual);
+  assert.deepEqual(live.endpointProfiles[0].modelIds,[multilingual]);
+  assert.equal(Object.isFrozen(live.endpointProfiles[0].modelIds),true);
+  assert.equal(live.configSha256,cold.configSha256);
+  assert.match(live.configSha256,/^[a-f0-9]{64}$/);
+
+  // Catalog identity is neither coerced to ASCII nor trimmed into another
+  // authorized model; malformed characters are rejected before any effect.
+  const unsafe = [
+    ' ' + multilingual, multilingual + ' ',
+    multilingual + '\\n', multilingual + '\\u202e', multilingual + '\\ud800',
+    '', 0, {}, null,
+  ];
+  for (const modelId of unsafe) {
+    const corrupted = {...input,endpointProfiles:[{...input.endpointProfiles[0], modelIds:[modelId]}]};
+    await assert.rejects(createAiRouteRegistryEvidenceV1(corrupted),/modelIds|model identity/);
+    if (typeof modelId === 'string' && !modelId.includes('\\ud800')) {
+      await assert.rejects(createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(corrupted))),/modelIds|model identity/);
+    }
+  }
+  const duplicates = {...input,endpointProfiles:[{...input.endpointProfiles[0],modelIds:[multilingual,multilingual]}]};
+  await assert.rejects(createAiRouteRegistryEvidenceV1(duplicates),/duplicates/);
+  await assert.rejects(createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(duplicates))),/duplicates/);
+  const notAuthorized = {...input, endpointProfiles:[{...endpoint,endpointId:'local-unicode-1',modelIds:['інша-модель']}]};
+  await assert.rejects(createAiRouteRegistryEvidenceV1(notAuthorized),/model is absent/);
+});
+
 test('Plan4 S1 model identity rejects controls, bidi and invalid Unicode before network and after JSON restart', async () => {
   let effects = 0;
   const router = new AiOrchestrator({ gatewayClient: { async complete() {
