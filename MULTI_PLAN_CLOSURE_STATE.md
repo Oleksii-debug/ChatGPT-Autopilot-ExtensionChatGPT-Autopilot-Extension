@@ -1,3 +1,10 @@
+### PLAN5_S1_STORE_AMBIGUITY_AND_OWNER_CHRONOLOGY_PR830_68F9E309_20261010 — NONTERMINAL 0/2
+- Scope EXCLUSIVELY canonical Drive Plan5 Section 1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. Section2 ACTIONABLE / NOT ADVANCED / NOT DONE. Other plans untouched.
+- Reuse existing 11.0.13 High Plan5 PR #714 and child #827, compatibility DRAFT PR #830 exact SHA 68f9e309a1074bb3613d567a1ce7c0a379a9e62e, child base 9daae87683f97c871ce7f13a5b4d6cbd62a47886. Upstream untouched.
+- Source: canonical cloud binding adapter undefined is ambiguous; only explicit null is confirmed absent; reject preflight/after-commit/recovery undefined without blind replay. Persisted workspace boundAt < canonicalOwner.updatedAt now means advisory RECONCILE_REQUIRED, read-only UNKNOWN and zero provider teardown/scrub invocations. Preserves reconcile/unowned branch priority; no second authority.
+- Added negative/recovery/positive tests including JSON cold restart. Exact HEAD source blob 5f7d2ab9df807536a59718f4ffef8814bd6d5747 and test blob dccf4da3f4b341c6b59c2760e3c66aa1d8c4b27e live readback verified. No Node PASS claimed.
+- Exact-head Github Actions Plan5 #38081962230/#38081958519, Core #38081962183, Chrome #38081962231, Release #38081962194 QUEUED at readback. Full trusted cloud lifecycle, canonical durable runtime/store, aggregate Release GREEN, 11.x-to-main integration, and post-main readback remain missing. 0/2 terminal. Evidence: https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/830
+
 ### PLAN5_S1_UNDEFINED_CANONICAL_BINDING_READBACK_PR830_20261010 — NONTERMINAL 0/2
 
 ### PLAN3_S1_CANONICAL_SELECTION_BEFORE_PROVIDER_LOOKUP_65A817BF_20261010 — SOURCE + ISOLATED FUNCTIONAL V8 PROBE; 0/2 TERMINAL
