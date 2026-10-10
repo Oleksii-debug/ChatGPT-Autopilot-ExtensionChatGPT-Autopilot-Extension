@@ -1898,9 +1898,13 @@ export function browserAgentSnapshotElement(snapshot, action) {
   // aliases must not resolve to frame 0 during policy or effect verification.
   if (!snapshot || !action || !Number.isInteger(action.frameId)
     || action.frameId < 0 || typeof action.ref !== 'string' || !action.ref) return null;
-  const frame = (snapshot.frames || []).find(item => item.frameId === action.frameId);
-  if (!frame) return null;
-  return (frame.elements || []).find(item => item.ref === action.ref) || null;
+  // After a JSON cold restart, a corrupted frame/ref alias must not silently
+  // choose the first matching benign node and under-classify an effect.
+  if (!Array.isArray(snapshot.frames)) return null;
+  const matchingFrames = snapshot.frames.filter(item => item && item.frameId === action.frameId);
+  if (matchingFrames.length !== 1 || !Array.isArray(matchingFrames[0].elements)) return null;
+  const matchingElements = matchingFrames[0].elements.filter(item => item && item.ref === action.ref);
+  return matchingElements.length === 1 ? matchingElements[0] : null;
 }
 
 export function classifyBrowserAgentActionRisk(snapshot, action) {
@@ -1938,9 +1942,15 @@ export function classifyBrowserAgentActionRisk(snapshot, action) {
   }
   if (!action || ![BrowserAgentActionType.CLICK, BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.KEY].includes(action.type)) return { requiresApproval: false, reason: '', targetName: '' };
   const element = browserAgentSnapshotElement(snapshot, action);
-  if (!element) return action.type === BrowserAgentActionType.CLICK_AT
-    ? { requiresApproval: true, reason: 'Owner approval required before a visual coordinate click whose target could not be semantically identified.', targetName: 'visual coordinate target' }
-    : { requiresApproval: false, reason: '', targetName: '' };
+  if (!element) {
+    const activation = action.type === BrowserAgentActionType.CLICK
+      || (action.type === BrowserAgentActionType.KEY && ['Enter', ' '].includes(action.key));
+    // An absent, duplicated or corrupt semantic target can never authorize
+    // an unapproved click or activation; the executor still checks live DOM.
+    return action.type === BrowserAgentActionType.CLICK_AT || activation
+      ? { requiresApproval: true, reason: 'Owner approval required: semantic target identity is missing or ambiguous.', targetName: 'unverified browser target' }
+      : { requiresApproval: false, reason: '', targetName: '' };
+  }
   const targetName = clean(element.name || element.href || 'consequential control', 800) || 'consequential control';
   const evidence = normalizeActionRiskText(`${element.name || ''} ${element.href || ''}`);
   const submitLike = element.submitLike === true || action.submitLike === true;
