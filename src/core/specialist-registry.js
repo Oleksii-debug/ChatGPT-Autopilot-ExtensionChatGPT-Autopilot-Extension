@@ -17,7 +17,7 @@ const PLANES = new Set(Object.values(AgentExecutionPlane));
 const DEF_KEYS = new Set(['schemaVersion','specialistId','providerId','label','description','executionPlane','capabilityIds','toolIds','resultContractId','enabled','definitionRevision']);
 const REG_KEYS = new Set(['schemaVersion','registryId','revision','definitions']);
 const DISC_KEYS = new Set(['registry','requiredCapabilityIds','requiredToolIds','parentCapabilityIds','parentToolIds','executionPlanes']);
-const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
+const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','registryBindingKey','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
 const BIND_KEYS = new Set(['registry','selection','handoff','parentCapabilityIds','parentToolIds']);
 const MUTATION_KEYS = new Set([
   'registry', 'registryId', 'expectedRegistryRevision', 'kind',
@@ -144,6 +144,9 @@ export function normalizeSpecialistSelectionV1(input) {
     schemaVersion:1,
     registryId:id(raw.registryId,'registryId'),
     registryRevision:integer(raw.registryRevision,'registryRevision'),
+    ...(Object.hasOwn(raw, 'registryBindingKey')
+      ? { registryBindingKey: id(raw.registryBindingKey, 'registryBindingKey') }
+      : {}),
     specialistId:id(raw.specialistId,'specialistId'),
     providerId:id(raw.providerId,'providerId'),
     definitionRevision:integer(raw.definitionRevision,'definitionRevision'),
