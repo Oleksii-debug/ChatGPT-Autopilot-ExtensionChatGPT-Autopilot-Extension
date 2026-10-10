@@ -2271,3 +2271,63 @@ test('Plan4 S1: settled provider response accessors cannot trigger another model
   assert.equal(verified.usage.totalTokens,3);
   assert.equal(verified.routing.selectedRouteId,'first');
 });
+
+
+test('Plan4 S1 rejects hostile owner route reflection without leaking trap content or dispatching', async () => {
+  const privateText = 'sk-private-fixture-proxy-error';
+  const fail = () => { throw new Error(privateText); };
+  const routeFixture = { routeId:'fixture', provider:'ollama', model:'llama3' };
+  const revoked = Proxy.revocable({ autoSwitch:true }, {});
+  revoked.revoke();
+
+  // Hostile Proxy reflection must be rejected deterministically at the
+  // existing router configuration boundary, BEFORE a provider call.
+  const invalid = [
+    () => normalizeAiRoutePolicy(new Proxy({ autoSwitch:true }, { getPrototypeOf:fail })),
+    () => normalizeAiRoutePolicy(new Proxy({ autoSwitch:true }, { ownKeys:fail })),
+    () => normalizeAiRoutePolicy(new Proxy({ autoSwitch:true }, { getOwnPropertyDescriptor:fail })),
+    () => normalizeAiRoutePolicy(revoked.proxy),
+    () => normalizeAiRoutePolicy(Object.defineProperty({}, 'autoSwitch', {
+      enumerable:true, get:fail,
+    })),
+    () => normalizeAiRoutePool(new Proxy([routeFixture], { getOwnPropertyDescriptor:fail })),
+    () => normalizeAiRoutePool([new Proxy(routeFixture, { getOwnPropertyDescriptor:fail })]),
+    () => normalizeAiWorkerPolicy({ manualRouteWorkers:new Proxy({ fixture:1 }, { ownKeys:fail }) }, [routeFixture]),
+    () => normalizeAiWorkerPolicy({ manualRouteWorkers:new Proxy({ fixture:1 }, { getOwnPropertyDescriptor:fail }) }, [routeFixture]),
+    () => normalizeAiRouterSettings(new Proxy({ enabled:true }, { ownKeys:fail })),
+    () => normalizeAiRouterSettings({ primary:new Proxy({ provider:'ollama', model:'llama3' }, { getPrototypeOf:fail }) }),
+  ];
+  for (const operation of invalid) {
+    assert.throws(operation, error => {
+      assert.equal(error instanceof Error, true);
+      assert.match(error.message, /^AI /);
+      assert.equal(error.message.includes(privateText), false);
+      return true;
+    });
+  }
+
+  let providerCalls = 0;
+  const router = new AiOrchestrator({ gatewayClient:{
+    async complete() { providerCalls += 1; throw new Error('must not dispatch'); },
+  } });
+  await assert.rejects(router.run({
+    enabled:true, mode:'primary', primary:{ provider:'ollama', model:'llama3' },
+    routePolicy:new Proxy({ autoSwitch:false }, { ownKeys:fail }),
+  }, {}, 'fixture request'), error => {
+    assert.equal(error.message.includes(privateText), false);
+    return true;
+  });
+  assert.equal(providerCalls, 0, 'invalid policy must be rejected before any model effect');
+
+  // Cold JSON-restart of legitimate owner config still works. No extra router,
+  // alternate provider, implicit remote fallback or credential is introduced.
+  const restarted = JSON.parse(JSON.stringify({
+    enabled:true, mode:'primary', primary:{ provider:'ollama', model:'llama3' },
+    routes:[routeFixture], routePolicy:{ autoSwitch:false, locality:'local' },
+    workerPolicy:{ allocationMode:'manual', manualRouteWorkers:{ fixture:1 } },
+  }));
+  const good = normalizeAiRouterSettings(restarted);
+  assert.equal(good.routePolicy.autoSwitch, false);
+  assert.equal(good.routes[0].routeId, 'fixture');
+  assert.equal(good.workerPolicy.manualRouteWorkers.fixture, 1);
+});
