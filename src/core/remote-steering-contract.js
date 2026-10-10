@@ -476,3 +476,51 @@ export async function submitRemoteSteeringViaCanonicalRuntimeV1(input, options) 
   }));
   return validateDurableRemoteReceipt(receipt, prepared);
 }
+
+const RECONCILE_OPTIONS_KEYS = new Set(['readDurableReceipt']);
+
+/**
+ * READ-ONLY crash recovery. A callback may throw after committing an effect.
+ * Never blindly re-submit: inspect the canonical durable command ledger by
+ * original id/fingerprint even when current control epoch has advanced.
+ */
+export async function reconcileRemoteSteeringPersistedCommitV1(input, options) {
+  const request = snapshotRecord(input, 'RemoteSteeringAssessmentRequestV1', REQUEST_KEYS);
+  const command = normalizeCommand(request.command);
+  if (command.expectedControlEpoch === null) {
+    throw new Error('remote steering reconciliation requires original control-epoch binding');
+  }
+  const trusted = snapshotRecord(options, 'Remote steering reconciliation options', RECONCILE_OPTIONS_KEYS);
+  if (typeof trusted.readDurableReceipt !== 'function') {
+    throw new Error('remote steering reconciliation requires canonical persisted readback');
+  }
+  const fingerprint = await createSha256FingerprintV1(canonicalFingerprintInput(command));
+  const key = Object.freeze({
+    jobId: command.jobId,
+    planId: command.planId,
+    commandId: command.commandId,
+  });
+  const persisted = await trusted.readDurableReceipt(key);
+  if (persisted == null) {
+    return Object.freeze({
+      schemaVersion: REMOTE_STEERING_SCHEMA_VERSION,
+      status: 'UNKNOWN_REQUIRES_CANONICAL_RECONCILIATION',
+      commandId: command.commandId,
+      commandFingerprint: fingerprint,
+      executionAuthorized: false,
+      mutationAuthorized: false,
+      safeRetryAuthorized: false,
+    });
+  }
+  const prepared = Object.freeze({
+    commandId: command.commandId,
+    commandFingerprint: fingerprint,
+    jobId: command.jobId,
+    planId: command.planId,
+    sourcePrincipalId: command.sourcePrincipalId,
+    sourceDeviceId: command.sourceDeviceId,
+    policyEnvelopeId: command.policyEnvelopeId,
+    controlEpoch: command.expectedControlEpoch,
+  });
+  return validateDurableRemoteReceipt(persisted, prepared);
+}
