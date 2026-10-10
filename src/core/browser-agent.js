@@ -760,6 +760,9 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     }
     action.value = raw.value;
     const observed = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref)?.element;
+    // This action promises one selected value. A multi-select mutation can
+    // silently clear other selected values; it needs a distinct exact-set contract.
+    if (observed?.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
     if (typeof observed?.optionFingerprint !== 'string' || !observed.optionFingerprint) {
       throw new Error('Browser Agent select options require observed target identity');
     }
@@ -1127,6 +1130,7 @@ export function snapshotBrowserPage(snapshotId) {
     };
     if (tag === 'a' || tag === 'area') item.href = normalize(element.href || element.getAttribute('href') || '', 1200);
     if (tag === 'select') {
+      item.multiple = Boolean(element.multiple);
       item.optionFingerprint = optionFingerprint(element);
       item.selected = normalize(element.options?.[element.selectedIndex]?.textContent || '', 500);
       item.options = Array.from(element.options || []).filter(option => !(
@@ -1335,9 +1339,11 @@ export function executeBrowserPageAction(snapshotId, action) {
   if (action.type === 'select') {
     const element = ensureTarget();
     if (!(element instanceof HTMLSelectElement)) throw new Error('AGENT_TARGET_NOT_SELECT');
+    if (element.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
     ensureUnoccluded(element);
+    if (element.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
     // After focus or restart a changed option set cannot inherit approval.
     if (typeof action.expectedOptionFingerprint !== 'string'
       || !action.expectedOptionFingerprint
