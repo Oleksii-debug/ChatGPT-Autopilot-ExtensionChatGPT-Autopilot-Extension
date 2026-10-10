@@ -3183,6 +3183,78 @@ test('Browser Agent persists provider-call budget before I/O and restart cannot 
   );
 });
 
+test('Plan4 S1: corrupt persisted pre-dispatch budget is quarantined across JSON cold restarts without replay', async () => {
+  const chrome = makeChrome();
+  let modelEffects = 0;
+  const routePrompt = async () => { modelEffects += 1; return { text:'{}' }; };
+  const manager = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 52_000 });
+  await manager.create({
+    id:'job-corrupt-model-reservation',
+    goal:'Never retry a provider effect with torn budget evidence',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:128,
+  });
+  await manager.update(store => {
+    const runtime = store.byId['job-corrupt-model-reservation'].runtime;
+    runtime.runState = 'RUNNING';
+    runtime.nextWakeAt = 52_100;
+    // An interrupted write may leave an opaque reservation that cannot be
+    // accounted for safely. It must not become a missing/fresh reservation.
+    runtime.modelBudgetReservation = {
+      reservationId:'',
+      controlEpoch:0,
+      modelCalls:1,
+      inputTokens:12,
+      outputTokens:128,
+      totalTokens:140,
+      routeId:'plan4-primary',
+      endpointId:'account.endpoint',
+    };
+    return store;
+  });
+  const first = await manager.get('job-corrupt-model-reservation');
+  assert.equal(first.job.runtime.modelBudgetReservation, null);
+  assert.equal(first.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(first.job.runtime.runState, 'PAUSED');
+  assert.equal(first.job.runtime.nextWakeAt, 0);
+
+  const restarted = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 53_000 });
+  const cold = await restarted.get('job-corrupt-model-reservation');
+  assert.equal(cold.job.runtime.modelBudgetReservationQuarantined, true);
+  assert.equal(cold.job.runtime.runState, 'PAUSED');
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-corrupt-model-reservation'), false,
+    'an unknown reservation must never be falsely settled as a known receipt');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-corrupt-model-reservation',
+      controlEpoch:0,
+      prompt:'do not send',
+      maxOutputTokens:128,
+      route:{ routeId:'plan4-primary', endpointId:'account.endpoint' },
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+
+  // Quarantine is sticky after the damaged payload has been dropped and
+  // after an additional store serialization/restart.
+  await restarted.update(store => store);
+  const again = new BrowserAgentManager({ chromeApi:chrome, routePrompt, now:() => 54_000 });
+  const final = await again.get('job-corrupt-model-reservation');
+  assert.equal(final.job.runtime.modelBudgetReservation, null);
+  assert.equal(final.job.runtime.modelBudgetReservationQuarantined, true);
+  await assert.rejects(
+    () => again.reserveProviderModelBudget({
+      jobId:'job-corrupt-model-reservation',
+      controlEpoch:0,
+      prompt:'still must not send',
+      maxOutputTokens:128,
+    }),
+    error => error.code === 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED',
+  );
+  assert.equal(modelEffects, 0);
+});
+
 test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 60_000 });
