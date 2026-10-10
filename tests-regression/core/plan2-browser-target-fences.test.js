@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   snapshotBrowserPage,
   parseBrowserAgentAction,
+  parseBrowserAgentOutcomeVerification,
   executeBrowserPageAction,
   executeBrowserCredentialFill,
   proveBrowserNativeClick,
@@ -3609,4 +3610,42 @@ test('Plan2 S1 Enter/Space inherit observed link DESTINATION owner rule, not sou
     assert.equal(allowed.decision, 'ALLOW');
     assert.equal(allowed.policyUrl, 'https://source.test/page#same-page');
   }
+});
+
+
+test('Plan2 S1 outcome verifier preserves typed criterion IDs after JSON cold restart', () => {
+  const config = { acceptanceCriteria: ['Observed destination', 'Verified saved result'] };
+  const approved = {
+    verified: true,
+    checks: [
+      { criterion: 1, detail: 'Observed semantic destination' },
+      { criterion: 2, detail: 'Observed saved state' },
+    ],
+  };
+  const parseRecovered = proof => parseBrowserAgentOutcomeVerification(
+    JSON.stringify(JSON.parse(JSON.stringify(proof))), config);
+  const valid = parseRecovered(approved);
+  assert.equal(valid.verified, true);
+  assert.deepEqual(valid.checks.map(item => item.criterion), [1, 2]);
+  assert.deepEqual(valid.checks.map(item => item.text), config.acceptanceCriteria);
+  // A read-only model response is never authorized to expand or coerce an
+  // acceptance contract. Reject even numerically equivalent JSON encodings.
+  for (const forged of ['1', '01', ' 1 ', true, false, null, [], {}, 1.5, 0, -1, 3]) {
+    assert.throws(
+      () => parseRecovered({
+        ...approved,
+        checks: [{ criterion: forged, detail: 'Forged evidence' }, approved.checks[1]],
+      }),
+      /did not cover each criterion exactly once/,
+      'invalid criterion: ' + JSON.stringify(forged));
+  }
+  for (const checks of [
+    [approved.checks[0], approved.checks[0]],
+    [approved.checks[0]],
+    [],
+  ]) {
+    assert.throws(() => parseRecovered({ ...approved, checks }),
+      /did not cover each criterion exactly once/);
+  }
+  assert.deepEqual(parseRecovered({ verified: false, checks: [] }), { verified: false, checks: [] });
 });

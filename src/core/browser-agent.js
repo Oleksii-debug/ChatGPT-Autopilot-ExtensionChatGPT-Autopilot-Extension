@@ -993,7 +993,9 @@ export function parseBrowserAgentOutcomeVerification(rawText, config) {
     if (!check || typeof check !== 'object' || Array.isArray(check) || Object.keys(check).some(key => !['criterion', 'detail'].includes(key))) {
       throw new Error(`Browser Agent verifier check ${index + 1} has an invalid shape`);
     }
-    const criterion = Number(check.criterion);
+    // Outcome proofs are typed contracts: JSON strings, booleans and null
+    // cannot impersonate the owner's numbered criterion after restart.
+    const criterion = check.criterion;
     const detail = clean(check.detail, 1000);
     if (!Number.isInteger(criterion) || criterion < 1 || criterion > criteria.length || seen.has(criterion) || !detail) {
       throw new Error('Browser Agent verifier did not cover each criterion exactly once');
