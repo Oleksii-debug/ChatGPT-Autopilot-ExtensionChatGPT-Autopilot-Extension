@@ -44,6 +44,9 @@ function copyDataRecord(value, label) {
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(label + ' містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error(label + ' містить заборонене поле.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' має бути enumerable data property.');
@@ -68,6 +71,9 @@ function copyModelRoutePolicy(value) {
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error('modelRoutePolicy містить заборонене поле.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('modelRoutePolicy.' + key + ' має бути enumerable data property.');
@@ -209,6 +215,9 @@ function copyStructuredData(value, label) {
   const descriptors = Object.getOwnPropertyDescriptors(value);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(label + ' містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error(label + ' містить заборонене поле.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' має бути enumerable data property.');
