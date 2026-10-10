@@ -1392,12 +1392,14 @@ test('Plan4 S2: forged local response readers are redacted and never authorize b
         forged.code = 'LOCAL_AI_AUTH';
         forged.category = 'AUTH';
         forged.retryable = true;
+        if (mode === 'fake-abort') forged.name = 'AbortError';
         throw forged;
       }};
     },
   });
   const restored = JSON.parse(JSON.stringify(settings));
   for (let i = 0; i < 2; i++) {
+    mode = i === 0 ? 'reader-error' : 'fake-abort';
     await assert.rejects(client.complete(restored,'owner approved'), error =>
       error.code === 'LOCAL_AI_RESPONSE_UNVERIFIED'
       && error.category === 'UNAVAILABLE'
