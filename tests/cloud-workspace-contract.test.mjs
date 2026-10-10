@@ -681,7 +681,7 @@ test('scrub does not accept a provider proof when canonical binding drifts after
       }),
       /canonical binding changed during teardown\/scrub/u,
     );
-    assert.equal(loads, 2, 'post-teardown canonical readback is mandatory');
+    assert.equal(loads, 3, 'pre-teardown and post-scrub canonical binding readbacks are mandatory');
     assert.equal(teardowns, 1);
     assert.equal(verifies, 1);
   }
@@ -694,7 +694,7 @@ test('scrub fails closed when final canonical binding readback fails', async () 
     () => teardownAndVerifyCloudWorkspaceV1(binding, {
       at: SCRUB_AT, loadCanonicalOwnership: async () => cloudOwnership(),
       loadCanonicalBinding: async () => {
-        if (++loads === 2) throw new Error('canonical store readback unavailable');
+        if (++loads === 3) throw new Error('canonical store readback unavailable');
         return binding;
       },
       teardown: async () => teardownCompletion(),
@@ -702,7 +702,7 @@ test('scrub fails closed when final canonical binding readback fails', async () 
     }),
     /canonical store readback unavailable/u,
   );
-  assert.equal(loads, 2);
+  assert.equal(loads, 3);
 });
 
 test('S1 scrub refuses stale canonical owner before any external teardown, even if binding matches', async () => {
@@ -1094,6 +1094,55 @@ test('S1 cold recovery checks binding again after final owner await; never resen
 });
 
 
+test('S1 never tears down a workspace rebound while canonical owner lookup is in flight', async () => {
+  const { binding, ownership } = bindingAndOwnership();
+  for (const change of ['deleted', 'checkpoint-replaced']) {
+    let persisted = JSON.parse(JSON.stringify(binding));
+    let bindingReads = 0;
+    let ownerReads = 0;
+    let teardowns = 0;
+    let scrubChecks = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(binding)), {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => {
+          bindingReads++;
+          return persisted;
+        },
+        loadCanonicalOwnership: async () => {
+          ownerReads++;
+          persisted = change === 'deleted' ? null
+            : { ...persisted, checkpointSha256: 'f'.repeat(64) };
+          return JSON.parse(JSON.stringify(ownership));
+        },
+        teardown: async () => { teardowns++; return teardownCompletion(); },
+        verifyScrub: async () => { scrubChecks++; return scrubProof(); },
+      }),
+      /plain data object|canonical binding changed before provider teardown/u,
+    );
+    assert.equal(bindingReads, 2, 'a second durable binding read is required before provider teardown');
+    assert.equal(ownerReads, 1);
+    assert.equal(teardowns, 0, 'revoked/rebound binding must not trigger destructive teardown');
+    assert.equal(scrubChecks, 0, 'no scrub receipt for an unauthorized teardown');
+  }
+
+  // A clean persisted binding still permits provider teardown attestation,
+  // without granting lease release, reuse or execution authority.
+  const { binding: goodBinding, ownership: goodOwner } = bindingAndOwnership();
+  let cleanTeardowns = 0;
+  const result = await teardownAndVerifyCloudWorkspaceV1(JSON.parse(JSON.stringify(goodBinding)), {
+    at: SCRUB_AT,
+    loadCanonicalBinding: async () => JSON.parse(JSON.stringify(goodBinding)),
+    loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(goodOwner)),
+    teardown: async () => { cleanTeardowns++; return teardownCompletion(); },
+    verifyScrub: async () => scrubProof(),
+  });
+  assert.equal(result.scrubVerified, true);
+  assert.equal(result.leaseReleaseAuthorized, false);
+  assert.equal(result.reuseAuthorized, false);
+  assert.equal(cleanTeardowns, 1);
+});
+
 // Plan 5 S1: final callback ordering must not turn revoked canonical state
 // into a positive scrub receipt after the provider has already been called.
 test('S1 scrub rejects canonical binding deleted or replaced during the final owner await', async () => {
@@ -1124,7 +1173,7 @@ test('S1 scrub rejects canonical binding deleted or replaced during the final ow
       /plain data object|canonical binding changed after final owner readback/u,
     );
     assert.equal(ownerReads, 2);
-    assert.equal(bindingReads, 3, 'the final owner await requires a new canonical binding lookup');
+    assert.equal(bindingReads, 4, 'pre-teardown and final post-owner readbacks are mandatory');
     assert.equal(teardownCalls, 1, 'uncertain teardown must not be blindly repeated');
     assert.equal(scrubCalls, 1, 'a stale prior scrub proof cannot authorize lease reuse');
   }
@@ -1152,7 +1201,7 @@ test('S1 scrub performs final canonical binding readback on clean JSON cold-rest
   assert.equal(receipt.leaseReleaseAuthorized, false);
   assert.equal(receipt.reuseAuthorized, false);
   assert.equal(receipt.requiresCanonicalRuntime, true);
-  assert.equal(bindingReads, 3);
+  assert.equal(bindingReads, 4);
   assert.equal(ownerReads, 2);
   assert.equal(providerTeardowns, 1);
 });
