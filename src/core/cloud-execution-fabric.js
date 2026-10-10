@@ -105,11 +105,19 @@ function snapshotRecord(value, label, allowed) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  let prototype;
+  let descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Provider/slot inputs can be hostile Proxies. Never forward their
+    // trap's exception message (which may contain credentials or page text).
+    throw new Error(`${label} has invalid own-data descriptors`);
+  }
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
@@ -131,10 +139,22 @@ function snapshotRecord(value, label, allowed) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let isArray;
+  let prototype;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    if (isArray) {
+      prototype = Object.getPrototypeOf(value);
+      descriptors = Object.getOwnPropertyDescriptors(value);
+    }
+  } catch {
+    // Revoked Proxies and reflection traps are untrusted input, not log text.
+    throw new Error(`${label} has invalid own-data descriptors`);
+  }
+  if (!isArray || prototype !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
