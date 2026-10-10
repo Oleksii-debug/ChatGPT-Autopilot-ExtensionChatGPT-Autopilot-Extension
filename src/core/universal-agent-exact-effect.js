@@ -93,7 +93,7 @@ function dataRecord(value, allowed, label) {
     if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
     const descriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, key));
     if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
+      throw new Error(`${label} requires an enumerable own data property`);
     }
     output[key] = descriptor.value;
   }
