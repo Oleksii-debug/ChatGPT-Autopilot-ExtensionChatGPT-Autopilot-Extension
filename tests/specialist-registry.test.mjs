@@ -527,3 +527,45 @@ test('specialist metadata rejects Arabic Letter Mark and Unicode line separator 
   assert.equal(recovered.description, persisted.description);
   assert.equal(recovered.enabled, true);
 });
+
+
+test('specialist owner-facing metadata rejects Unicode soft-hyphen and invisible script fillers', () => {
+  // These code points render as absent or near-absent characters, letting two
+  // distinct specialist definitions appear indistinguishable in owner UI.
+  // Reject them at import, including after a durable JSON cold restart.
+  const invisible = ['\u00AD', '\u034F', '\u115F', '\u1160', '\u180E', '\u3164', '\uFFA0'];
+  for (const field of ['label', 'description']) {
+    for (const marker of invisible) {
+      const candidate = JSON.parse(JSON.stringify(definition({
+        [field]: 'Qualified' + marker + 'Specialist',
+      })));
+      assert.throws(
+        () => normalizeSpecialistDefinitionV1(candidate),
+        /must be exact bounded text/,
+        field + ' must not accept visually hidden specialist identity data',
+      );
+      assert.throws(
+        () => normalizeSpecialistRegistryV1({
+          schemaVersion: 1,
+          registryId: 'registry:spoofed-label',
+          revision: 1,
+          definitions: [candidate],
+        }),
+        /must be exact bounded text/,
+      );
+    }
+  }
+  const canonical = JSON.parse(JSON.stringify(definition({
+    label: 'Specialist — 한글 Україна 🙂',
+    description: 'Allowed Arabic العربية and newline\nSecond line',
+  })));
+  const restored = normalizeSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'registry:valid-unicode',
+    revision: 4,
+    definitions: [canonical],
+  });
+  assert.equal(restored.definitions[0].label, canonical.label);
+  assert.equal(restored.definitions[0].description, canonical.description);
+  assert.equal(Object.isFrozen(restored.definitions[0]), true);
+});
