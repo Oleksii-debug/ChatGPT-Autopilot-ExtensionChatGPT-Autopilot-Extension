@@ -2360,6 +2360,10 @@ test('Plan4 S1 built-in OpenAI may never masquerade as local to bypass local-onl
 
   const corrected = JSON.parse(JSON.stringify(raw));
   corrected.routes[0].locality = 'remote';
+  // Selection must retain the existing known-price gate: UNKNOWN is not free.
+  corrected.routes[0].costClass = 'paid';
+  corrected.routes[0].inputPricePerMillionUsd = 1;
+  corrected.routes[0].outputPricePerMillionUsd = 2;
   const routes = normalizeAiRoutePool(corrected.routes);
   assert.equal(routes[0].locality, 'remote');
   assert.deepEqual(
