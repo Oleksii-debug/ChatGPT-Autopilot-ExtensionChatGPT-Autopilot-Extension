@@ -15,6 +15,7 @@ import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeBoundAgentModelOrchestratorEnvelopeV1 } from './agent-model-orchestrator-envelope.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
@@ -797,14 +798,41 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
       const state = await this.repo.load();
-      const baseSettings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-      const settings = payload.routerOverride
-        ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
-        : baseSettings;
-      const isolatedRuntime = payload.isolatedRuntime === true;
-      const runtime = isolatedRuntime
-        ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
-        : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
+      // The bound Agent envelope is advisory, not an alternative provider
+      // authority. Only an internal owner-budget context may admit it, and the
+      // canonical AiOrchestrator still validates the durable reservation.
+      const envelope = internal?.agentModelOrchestratorEnvelope
+        ? normalizeBoundAgentModelOrchestratorEnvelopeV1(internal.agentModelOrchestratorEnvelope)
+        : null;
+      if (envelope) {
+        if (internal?.providerCallBudgetContext?.kind !== 'browser-agent'
+            || internal.providerCallBudgetContext.jobId !== envelope.jobId
+            || !this.aiOrchestrator.providerCallLifecycle) {
+          throw new Error('Bound Agent model envelope requires an exact owner-budget provider lifecycle');
+        }
+        if (payload.settings || payload.routerOverride || payload.routerRuntime
+            || payload.forceStrong === true
+            || (payload.taskRole && payload.taskRole !== envelope.role)
+            || (Array.isArray(payload.capabilityIds)
+                && JSON.stringify(payload.capabilityIds) !== JSON.stringify(envelope.capabilityIds))
+            || (payload.imageDataUrl && envelope.requiresVision !== true)) {
+          throw new Error('Bound Agent model envelope cannot widen the admitted route, role or capability scope');
+        }
+      }
+      const baseSettings = envelope
+        ? envelope.settings
+        : normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+      const settings = envelope
+        ? baseSettings
+        : payload.routerOverride
+          ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
+          : baseSettings;
+      const isolatedRuntime = envelope ? true : payload.isolatedRuntime === true;
+      const runtime = envelope
+        ? envelope.runtime
+        : isolatedRuntime
+          ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
+          : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
         result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
@@ -813,9 +841,10 @@ export class CoreCommandDispatcher {
           maxOutputTokens: Number(payload.maxOutputTokens || 0),
           maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
           imageDataUrl: payload.imageDataUrl || '',
-          taskRole: payload.taskRole || 'planner',
+          taskRole: envelope?.role || payload.taskRole || 'planner',
           strongTaskRole: payload.strongTaskRole || 'verifier',
-          capabilityIds: Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
+          capabilityIds: envelope ? envelope.capabilityIds
+            : Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
           providerCallBudgetContext: internal?.providerCallBudgetContext || null,
         });
       } catch (error) {
