@@ -593,6 +593,35 @@ function exactModelBudgetRouteIdentity(route) {
 
 function normalizeModelBudgetReservation(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  // Persistent budget evidence must never be repaired by coercing an explicit
+  // negative/string/fractional token or call count into a cheaper receipt.
+  // Missing optional fields retain the legacy normalization below.
+  const integerBounds = {
+    controlEpoch:0, modelCalls:1, inputTokens:0, outputTokens:0,
+    totalTokens:0, createdAt:0, callNumber:1,
+  };
+  for (const [field, minimum] of Object.entries(integerBounds)) {
+    const descriptor = Object.getOwnPropertyDescriptor(raw, field);
+    if (!descriptor) continue;
+    if (!Object.hasOwn(descriptor, 'value')
+      || typeof descriptor.value !== 'number'
+      || !Number.isSafeInteger(descriptor.value)
+      || descriptor.value < minimum) return null;
+  }
+  const costDescriptor = Object.getOwnPropertyDescriptor(raw, 'estimatedCostUsd');
+  if (costDescriptor && (!Object.hasOwn(costDescriptor, 'value')
+    || typeof costDescriptor.value !== 'number'
+    || !Number.isFinite(costDescriptor.value)
+    || costDescriptor.value < 0)) return null;
+  const idDescriptor = Object.getOwnPropertyDescriptor(raw, 'reservationId');
+  if (!idDescriptor || !Object.hasOwn(idDescriptor, 'value')
+    || typeof idDescriptor.value !== 'string'
+    || !idDescriptor.value
+    || idDescriptor.value.length > 240
+    || idDescriptor.value !== idDescriptor.value.trim()) return null;
+  if (typeof raw.inputTokens === 'number' && typeof raw.outputTokens === 'number'
+    && typeof raw.totalTokens === 'number'
+    && raw.totalTokens < raw.inputTokens + raw.outputTokens) return null;
   const reservationId = clean(raw.reservationId, 240);
   const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
   const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
