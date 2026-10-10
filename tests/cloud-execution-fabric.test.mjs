@@ -428,3 +428,53 @@ test('accessor-backed outer authority is rejected without executing the getter',
   );
   assert.equal(reads, 0);
 });
+
+test('S1 cloud fabric rejects provider Proxy reflection traps without leaking untrusted secrets', () => {
+  const privateText = 'CLOUD_PROVIDER_ACCESS_TOKEN_MUST_NOT_APPEAR_IN_ERRORS';
+  let trapCalls = 0;
+  const hostileTrap = () => {
+    trapCalls += 1;
+    throw new Error(privateText);
+  };
+  const cases = [
+    () => normalizeCloudExecutionSlotV1(new Proxy(slot(), { getPrototypeOf: hostileTrap })),
+    () => normalizeCloudExecutionSlotV1(new Proxy(slot(), { ownKeys: hostileTrap })),
+    () => assessCloudExecutionFabricV1(new Proxy(request(), { getPrototypeOf: hostileTrap })),
+    () => assessCloudExecutionFabricV1(new Proxy(request(), { ownKeys: hostileTrap })),
+    () => assessCloudExecutionFabricV1(request({
+      cloudSlots: new Proxy([slot()], { getPrototypeOf: hostileTrap }),
+    })),
+    () => assessCloudExecutionFabricV1(request({
+      cloudSlots: new Proxy([slot()], { ownKeys: hostileTrap }),
+    })),
+  ];
+  for (const run of cases) {
+    assert.throws(run, error => {
+      assert.equal(error.message.includes(privateText), false, 'provider secrets must be redacted');
+      assert.match(error.message, /invalid own-data descriptors/u);
+      return true;
+    });
+  }
+  assert.equal(trapCalls, cases.length);
+});
+
+test('S1 cloud fabric rejects revoked provider-array Proxy on JSON cold restart', () => {
+  const { proxy, revoke } = Proxy.revocable([slot()], {});
+  revoke();
+  assert.throws(
+    () => assessCloudExecutionFabricV1({
+      ...JSON.parse(JSON.stringify(request())),
+      cloudSlots: proxy,
+    }),
+    error => {
+      assert.match(error.message, /invalid own-data descriptors/u);
+      assert.equal(error.message.includes('TypeError'), false);
+      return true;
+    },
+  );
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request())),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.executionAuthorized, false);
+});
