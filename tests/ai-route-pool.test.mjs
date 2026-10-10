@@ -309,7 +309,7 @@ test('economic numeric fields reject object coercion before caller code can exec
       provider:'ollama',
       model:'local',
     }]),
-    /schemaVersion is invalid/u,
+    /Unsupported AI route schemaVersion/u,
   );
   assert.equal(coercions, 0, 'schemaVersion normalization must reject objects before numeric coercion');
 
