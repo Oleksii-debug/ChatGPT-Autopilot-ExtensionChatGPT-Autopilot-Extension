@@ -1255,7 +1255,10 @@ test('S1 failed Core timeline refresh prevents stale evidence export until accep
   const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
   const begin = source.indexOf('async function refreshAgentRunTimeline()');
   const exportAt = source.indexOf('function exportAgentRunTimeline()', begin);
-  const end = source.indexOf('\n\n', exportAt);
+  // GitHub Windows checkout may use CRLF; identify the function boundary in both OS formats.
+  const boundary = /\r?\n\r?\n/gu;
+  boundary.lastIndex = exportAt;
+  const end = boundary.exec(source)?.index ?? -1;
   assert.ok(begin >= 0 && exportAt > begin && end > exportAt);
   const selectedJob = { id: 'agent-one', runtime: { history: [] } };
   const acceptedJob = { id: 'agent-new', runtime: { history: [] } };
