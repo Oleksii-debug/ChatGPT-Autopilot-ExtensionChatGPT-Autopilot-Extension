@@ -1492,8 +1492,8 @@ test('S1 persisted event types refuse forged data and Unicode spoofing across JS
 
   const forged = [
     undefined, null, false, 7, {}, [], '', ' ', ' action', 'action ',
-    'bad\\nkind', 'bad\\u202ekind', 'bad\\u2066kind', 'x'.repeat(129),
-    marker + '\\u0000',
+    'bad\nkind', 'bad\u202ekind', 'bad\u2066kind', 'x'.repeat(129),
+    marker + '\u0000',
   ];
   for (const value of forged) {
     const input = job();
