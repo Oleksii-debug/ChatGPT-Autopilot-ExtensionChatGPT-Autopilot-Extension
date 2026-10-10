@@ -655,6 +655,18 @@ export function assessCloudExecutionFabricV1(input) {
         CloudFabricDisposition.RECONCILE_REQUIRED,
       );
     }
+    // A canonical workspace cannot be bound in the future relative to this
+    // assessment, or before the current execution-owner revision existed.
+    // A replayed/future binding is not continuity evidence even if the lease,
+    // effect, checkpoint and policy identifiers happen to match.
+    if (Date.parse(existingBinding.boundAt) > Date.parse(request.assessedAt)
+        || Date.parse(existingBinding.boundAt) < Date.parse(ownership.updatedAt)) {
+      return blocked(
+        baseArgs,
+        'CLOUD_WORKSPACE_BINDING_CHRONOLOGY',
+        CloudFabricDisposition.RECONCILE_REQUIRED,
+      );
+    }
   }
 
   const localEligible = capabilitySubset(request.requiredCapabilities, request.localCapabilities);
