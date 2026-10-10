@@ -11,6 +11,7 @@ import {
   executeAutopilotProgrammaticControlV1,
   normalizeAutopilotProgrammaticRequestV1,
 } from '../../src/core/autopilot-programmatic-control.js';
+import { parseStrictControlJsonV1 } from './control-json.mjs';
 
 const MAX_BODY_BYTES = 65_536;
 const OWNER_TOKEN_RESOLVE_TIMEOUT_MS = 2_000;
@@ -69,38 +70,6 @@ function hasUnambiguousRawHeader(req, name, required = true) {
     if (req.rawHeaders[i].toLowerCase() === name && ++count > 1) return false;
   }
   return required ? count === 1 : count <= 1;
-}
-
-/**
- * JSON.parse silently accepts duplicate object members (last value wins).
- * The control endpoint must not let two parsers/intermediaries disagree on
- * request, principal, project, operation or nested artifact identities.
- * Run this lexical fence on an already JSON.parse-validated bounded document;
- * JSON.parse decodes escaped key aliases exactly like the real parser.
- * Frames are per object: an identical name in distinct objects is valid.
- */
-function assertNoDuplicateJsonMembers(source) {
-  const frames = [];
-  for (let i = 0; i < source.length; i++) {
-    const char = source[i];
-    if (char === '"') {
-      const start = i;
-      for (i += 1; i < source.length; i++) {
-        if (source[i] === '\\') { i += 1; continue; }
-        if (source[i] === '"') break;
-      }
-      let next = i + 1;
-      while (/\s/u.test(source[next] || '')) next += 1;
-      const frame = frames[frames.length - 1];
-      if (frame?.keys && source[next] === ':') {
-        const key = JSON.parse(source.slice(start, i + 1));
-        if (frame.keys.has(key)) throw new Error('Ambiguous duplicate JSON member');
-        frame.keys.add(key);
-      }
-    } else if (char === '{') frames.push({ keys: new Set() });
-    else if (char === '[') frames.push({ keys: null });
-    else if (char === '}' || char === ']') frames.pop();
-  }
 }
 
 function exactToken(input, label) {
@@ -250,9 +219,7 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       }
       // Fail closed on invalid UTF-8 and duplicate JSON member identities before
       // any scope lookup or canonical dispatch. No second JSON/API authority.
-      const rawBody = new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks));
-      const parsed = JSON.parse(rawBody);
-      assertNoDuplicateJsonMembers(rawBody);
+      const parsed = parseStrictControlJsonV1(Buffer.concat(chunks));
       // Reuse the exact Core request schema before touching request identities.
       // A second authenticated SDK/CLI instance must not race the same
       // request into canonical dispatch while its first transport is pending.
