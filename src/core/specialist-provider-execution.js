@@ -215,6 +215,12 @@ export function normalizeSpecialistProviderExecutionV1(input) {
     // a future-dated status as proven execution evidence.
     throw new Error('Specialist provider update cannot postdate its observation');
   }
+  if (providerObservedAt && Date.parse(providerObservedAt) < Date.parse(preparedAt)) {
+    // A provider observation from before this exact handoff was prepared cannot
+    // prove its terminal outcome. Historical provider updates may be older,
+    // but their observation must belong to this attempt's timeline.
+    throw new Error('Specialist provider observation predates exact preparation');
+  }
   if (providerObservedAt && Date.parse(providerObservedAt) > Date.parse(updatedAt)) {
     throw new Error('Specialist provider observation cannot postdate durable outcome');
   }
