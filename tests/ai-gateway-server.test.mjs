@@ -325,6 +325,50 @@ test('compatible endpoint registry loads local non-secret settings unless an exp
 });
 
 
+test('Plan4 S1: explicit erased endpoint env override cannot rebind saved credential origin on cold restart', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-env-endpoint-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  const saved = [{endpointId:'saved', baseUrl:'https://saved.example.test/v1', apiKeyEnv:'SAVED_KEY'}];
+  let getterReads = 0;
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({compatibleEndpoints:saved}));
+    assert.equal(loadCompatibleEndpointRegistry({env:{},configFile})[0].endpointId,'saved',
+      'true legacy omission loads the owner-persisted registry');
+    for (const override of ['', '   ', null, undefined, 0, false]) {
+      const env = {AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:override};
+      assert.throws(() => loadCompatibleEndpointRegistry({env,configFile}),
+        error => error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+        'an explicitly erased override must never switch credential namespaces');
+    }
+    const computed = Object.defineProperty({}, 'AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON', {
+      enumerable:true,
+      get() {getterReads++;throw new Error('fixture-secret-getter');},
+    });
+    assert.throws(() => loadCompatibleEndpointRegistry({env:computed,configFile}),
+      error => error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'
+        && !String(error.message).includes('fixture-secret-getter'));
+    const hostile = new Proxy({}, {
+      getOwnPropertyDescriptor() {throw new Error('fixture-secret-reflection');},
+    });
+    assert.throws(() => loadCompatibleEndpointRegistry({env:hostile,configFile}),
+      error => error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'
+        && !String(error.message).includes('fixture-secret-reflection'));
+    assert.equal(getterReads,0,'untrusted endpoint config getter must never run');
+    const intentionallyDisabled = loadCompatibleEndpointRegistry({
+      env:{AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:'[]'},configFile,
+    });
+    assert.deepEqual(intentionallyDisabled,[], 'explicit empty array is zero authorized endpoints');
+    const selected = loadCompatibleEndpointRegistry({
+      env:{AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:JSON.stringify([
+        {endpointId:'override',baseUrl:'https://override.example.test/v1',apiKeyEnv:'OVERRIDE_KEY'},
+      ])},configFile,
+    });
+    assert.equal(selected[0].endpointId,'override');
+  } finally {
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+
 test('gateway provider status distinguishes unavailable and unconfigured upstreams', async () => {
   const old = process.env.OPENAI_API_KEY;
   delete process.env.OPENAI_API_KEY;
