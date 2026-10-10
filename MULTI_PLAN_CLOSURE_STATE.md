@@ -1,3 +1,14 @@
+
+### PLAN7_S1_SDK_TOKEN_GRAMMAR_PARITY_PR722_20261010 — NONTERMINAL
+
+- Scope ONLY canonical Drive `7. Сьомий план` (doc `1hMDxTh8AtFgGR_6z_f9DwvdC3ybWtbaCSSou4UxjGpU`). The first actionable S1 is still ACTIONABLE / IN_PROGRESS / **NOT TERMINAL DONE**. S2 ROI remains ACTIONABLE / IN_PROGRESS / NOT DONE, unchanged by this workline due to S1 priority. S3+ and other Drive plans untouched.
+- Reused current canonical 11.0.13 High Plan7 S1 PR #712 at exact head `9b5245cfaa128c7e9ba2af223c0b754f952d1a65` (not 0.9.19 main). Draft compatible child [PR #722](https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/pull/722), head `f7607fc7c80d51224f99acba90845a3023116cf2`.
+- S1 implementation: SDK constructor now rejects token bytes outside printable ASCII 0x21..0x7e, matching existing Companion server admission grammar; invalid, whitespace, control, Unicode and DEL bearer values are rejected before transport. Commit `71f53f3aef337536cae8ae4fcae7aac2c600581d`, blob `bd11f4ac10568ca483b600fa2f6be051df03dc65`.
+- S1 negative/compatibility tests: existing `tests/plan7-local-client-identity.test.mjs` extended with explicit noncanonical token preflight and valid-token fixture. Commit `f7607fc7c80d51224f99acba90845a3023116cf2`, test blob `742ac67bf3e3db2067cbfd4c555f05f5fecba99e`. Source/test readback verified.
+- CI exact PR #722 head started Plan7 #38049967072 / Core #38049967302 / Release #38049967151, all **QUEUED** on first live readback, not counted PASS. Previous parent exact-head PR #712: Plan7 dual-OS 83/83 PASS each + Core SUCCESS; Release aggregate FAILURE with 118 pre-existing failed tests and 11 cancellations.
+- Terminal S1 blockers remain: live Native Companion owner-issued credential/token rotation bound to canonical Core control, durable idempotent request/effect reconciliation through cold restart and migration, full 11.x integrated packaging/release qualification, postintegration live SHA/readback. Never conflate transport `RECEIVED` or a green scoped CI with effect completion or terminal DONE. No real secret, no new scheduler/policy/effect authority. HUMAN_TESTED=false; NVDA_VERIFIED=false.
+
+
 ### PLAN5_S1_FINAL_EXACT_HEAD_CI_D8E40E09_20261010 — STILL NONTERMINAL
 
 - For exclusively Drive Plan 5, Section 1, existing PR #714 exact head `d8e40e09fd0aae803d3c07f197d2084b0e5fb4b3` remains OPEN/DRAFT. Its Plan5 Ubuntu and Windows jobs #38049741256 each PASS **90/90**; Core #38049741299 **SUCCESS**; Chrome #38049741242 **SUCCESS**.
