@@ -306,3 +306,42 @@ test('Plan4 S1 bound endpoint identity cannot silently fall through to builtin d
   assert.equal(providerEffects,0,'cold restart may not reset wrong account endpoint to default');
   assert.deepEqual(await listProviderModels('ollama',{fetchFn:async () => response({models:[{name:'fixture'}]})}),['fixture']);
 });
+
+
+test('Plan4 S1 standalone provider gateway rejects aliased and hostile model identity before upstream or credential effects', async () => {
+  let upstream = 0;
+  const fetchFn = async () => { upstream++; throw new Error('unexpected upstream model effect'); };
+  const bad = [
+    ' model', 'model ', 'model\u0000identity', 'model\u000Aidentity',
+    'model\u007fidentity', 'model\u0080identity', 'model\u061cidentity',
+    'model\u200eidentity', 'model\u202eidentity', 'model\u2028identity',
+    'model\u2066identity', 'model\ud800identity', 'model\udc00identity',
+    'x'.repeat(301),
+  ];
+  for (const malformed of bad) {
+    for (const persisted of [malformed, JSON.parse(JSON.stringify(malformed))]) {
+      for (const provider of ['ollama','openai','openai-compatible']) {
+        await assert.rejects(
+          completeProvider({provider,model:persisted,prompt:'approved'}, {fetchFn}),
+          error => error.statusCode === 400 && error.code === 'AI_MODEL_ID_INVALID'
+            && !String(error.message).includes('unexpected upstream'),
+        );
+      }
+    }
+  }
+  assert.equal(upstream,0,'no provider request can be sent with aliased or malformed model');
+});
+
+test('Plan4 S1 standalone gateway preserves exact multilingual model identity after JSON cold restart', async () => {
+  const model = 'Київ/模型:v2';
+  const persisted = JSON.parse(JSON.stringify({provider:'ollama',model,prompt:'approved'}));
+  const sent = [];
+  const result = await completeProvider(persisted, {fetchFn:async (url,init) => {
+    sent.push({url,body:JSON.parse(init.body)});
+    return response({message:{content:'verified'},prompt_eval_count:2,eval_count:1});
+  }});
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].body.model,model);
+  assert.equal(result.model,model);
+  assert.equal(result.text,'verified');
+});
