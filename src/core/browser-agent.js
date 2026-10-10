@@ -214,6 +214,27 @@ function browserAgentPolicyTargetUrl(snapshot, action) {
 }
 
 export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requiresApproval = false } = {}) {
+  // A model-parsed action may be replayed from durable state or an approval after
+  // restart. Policy must independently reject invalid direct destinations even
+  // if a stale/forged action bypasses the planner's safeHttpUrl normalization.
+  if ([BrowserAgentActionType.NAVIGATE, BrowserAgentActionType.NEW_TAB, BrowserAgentActionType.DOWNLOAD].includes(action?.type)) {
+    let safeDirectDestination = false;
+    if (typeof action.url === 'string' && action.url.trim()) {
+      try {
+        const destination = new URL(action.url);
+        safeDirectDestination = destination.protocol === 'https:' || destination.protocol === 'http:';
+      } catch { /* missing, malformed, or relative persisted URL is not authoritative */ }
+    }
+    if (!safeDirectDestination) {
+      return {
+        decision: BrowserAgentPolicyDecision.DENY,
+        source: 'browser:unsafe-direct-url',
+        pattern: '',
+        policyUrl: clean(snapshot?.url, 4096),
+        reason: 'Browser Agent blocked an unsafe persisted navigation/download destination',
+      };
+    }
+  }
   // A page-provided link destination is never owner policy authority. In
   // particular javascript:/data:/file:/mailto: cannot fall through an
   // unmatched site rule into a global ALLOW decision for semantic activation.
