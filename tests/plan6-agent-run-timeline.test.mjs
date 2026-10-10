@@ -11,7 +11,7 @@ function job() {
       estimatedCostUsd: 0.016,
       currentUrl: 'https://secret.invalid/?token=PRIVATE_999',
       lastError: 'CREDENTIAL_SECRET_999',
-      verifiedOutcome: { checks: [{ detail: 'PRIVATE_CHECK_999' }] },
+      verifiedOutcome: { checks: [{ criterion: 1, text: 'PRIVATE_CRITERION_999', detail: 'PRIVATE_CHECK_999' }] },
       plan: { revision: 4, nodes: [{ state: 'READY', prompt: 'PRIVATE_NODE_999' }, { state: 'VERIFIED' }] },
       history: [
         { at: 10, type: 'owner-instruction', message: 'PRIVATE_INSTRUCTION_999' },
@@ -1401,4 +1401,73 @@ test('S1 recorded Specialist artifact references require durable canonical ident
   valid.runtime.specialistDispatchByAgentId.specialist.resultArtifactRefs = [{}];
   assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))),
     /artifact reference identity is invalid/u);
+});
+
+
+test('S1 persisted verified criteria require canonical distinct durable evidence after JSON restart', () => {
+  const source = job();
+  source.runtime.verifiedOutcome.checks = [
+    { criterion: 1, text: 'PRIVATE_GOAL_A', detail: 'PRIVATE_VERIFIER_A' },
+    { criterion: 2, text: 'PRIVATE_GOAL_B', detail: 'PRIVATE_VERIFIER_B' },
+  ];
+  const recorded = buildAgentRunTimelineV1(source);
+  assert.equal(recorded.counters.verifiedChecks, 2);
+  assert.equal(recorded.evidenceMap.recordedOutcome.criteriaRecorded, 2);
+  assert.equal(recorded.mayReplayExternalEffect, false);
+  assert.equal(recorded.evidenceMap.externalEffectVerified, false);
+  assert.doesNotMatch(JSON.stringify(recorded), /PRIVATE_GOAL|PRIVATE_VERIFIER/u);
+  assert.deepEqual(recorded, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(source))));
+  const canonical = { criterion: 1, text: 'PRIVATE_GOAL', detail: 'PRIVATE_DETAIL' };
+  const invalid = [
+    [{}],
+    [{ ...canonical, criterion: 0 }],
+    [{ ...canonical, criterion: -1 }],
+    [{ ...canonical, criterion: 1.5 }],
+    [{ ...canonical, criterion: '1' }],
+    [{ ...canonical, criterion: null }],
+    [{ ...canonical, criterion: undefined }],
+    [{ ...canonical, text: '' }],
+    [{ ...canonical, text: '   ' }],
+    [{ ...canonical, detail: '' }],
+    [{ ...canonical, detail: 7 }],
+    [{ ...canonical, text: 'x'.repeat(1001) }],
+    [{ ...canonical, detail: 'x'.repeat(1001) }],
+    [canonical, { ...canonical, detail: 'PRIVATE_SECOND_DUPLICATE' }],
+  ];
+  for (const checks of invalid) {
+    const corrupt = job();
+    corrupt.runtime.verifiedOutcome.checks = checks;
+    assert.throws(() => buildAgentRunTimelineV1(corrupt), /criterion evidence is invalid/);
+    assert.throws(
+      () => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(corrupt))),
+      /criterion evidence is invalid/,
+    );
+  }
+});
+
+test('S1 verification metadata cannot become proof via hidden fields or hostile getter traps', () => {
+  const clean = { criterion: 1, text: 'PRIVATE_GOAL', detail: 'PRIVATE_DETAIL' };
+  for (const key of ['criterion', 'text', 'detail']) {
+    const hidden = job();
+    const check = { ...clean };
+    Object.defineProperty(check, key, { value: clean[key], enumerable: false, configurable: true });
+    hidden.runtime.verifiedOutcome.checks = [check];
+    assert.throws(() => buildAgentRunTimelineV1(hidden), /criterion evidence is invalid|enumerable data field/);
+    assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(hidden))), /criterion evidence is invalid/);
+    let getterCalls = 0;
+    const accessor = job();
+    Object.defineProperty(accessor.runtime.verifiedOutcome.checks[0], key, {
+      enumerable: true,
+      get() { getterCalls += 1; throw Error('PRIVATE_GETTER_MUST_NOT_RUN'); },
+    });
+    assert.throws(() => buildAgentRunTimelineV1(accessor), error =>
+      error instanceof Error && !error.message.includes('PRIVATE_GETTER_MUST_NOT_RUN'));
+    assert.equal(getterCalls, 0);
+  }
+  const legacy = job();
+  delete legacy.runtime.verifiedOutcome.checks;
+  const projected = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy)));
+  assert.equal(projected.counters.verifiedChecks, 0);
+  assert.equal(projected.evidenceMap.externalEffectVerified, false);
+  assert.equal(projected.mayReplayExternalEffect, false);
 });
