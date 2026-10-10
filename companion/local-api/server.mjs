@@ -202,6 +202,21 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // A second authenticated SDK/CLI instance must not race the same
       // request into canonical dispatch while its first transport is pending.
       const normalized = normalizeAutopilotProgrammaticRequestV1(parsed);
+      // The owner may revoke a bearer while a slow HTTP body is streaming.
+      // Re-read the Companion-owned current credential after parsing and BEFORE
+      // canonical scope/dispatch. Do not cache or accept a token retired after
+      // the first admission check; no new token authority is introduced.
+      if (tokenProvider !== undefined) {
+        let currentExpected;
+        try {
+          currentExpected = digest(exactToken(
+            await boundedOwnerToken(tokenProvider), 'Local API token',
+          ));
+        } catch {
+          return reject(res, 401);
+        }
+        if (!timingSafeEqual(candidateDigest, currentExpected)) return reject(res, 401);
+      }
       const requestKey = JSON.stringify([
         normalized.principalId, normalized.projectId, normalized.requestId,
       ]);
