@@ -714,12 +714,12 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   const ownerBefore = normalizeExactExecutionOwnershipV1(
     await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownerKey, 'ownership', trusted),
   );
+  // Verify the full canonical task/plan/node/effect/tenant identity as well
+  // as the owner/lease/revision before any destructive provider I/O. A wrong
+  // record returned by a broken or cross-tenant store lookup is never proof.
   if (ownerBefore.state !== ExecutionOwnershipState.OWNED
       || ownerBefore.ownerPlane !== 'CLOUD'
-      || ownerBefore.ownerId !== binding.executionOwnerId
-      || ownerBefore.leaseId !== binding.executionLeaseId
-      || ownerBefore.revision !== binding.executionOwnershipRevision
-      || ownerBefore.policyEnvelopeId !== binding.policyEnvelopeId) {
+      || !sameExecutionIdentity(binding, ownerBefore)) {
     throw new Error('cloud workspace teardown canonical ownership mismatch');
   }
   // Never send provider teardown against an expired owner lease or a
