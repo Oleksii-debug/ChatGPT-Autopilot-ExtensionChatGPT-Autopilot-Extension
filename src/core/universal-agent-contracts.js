@@ -256,7 +256,12 @@ function jsonData(value, label, { optional = true, present = false } = {}) {
   if (value == null && present) throw new Error(`${label} contains corrupt explicitly present data`);
   const cloned = cloneJsonData(value, label);
   const serialized = JSON.stringify(cloned);
-  if (serialized.length > MAX_DATA_JSON) throw new Error(`${label} is too large`);
+  // JSON evidence is transported and persisted as UTF-8; UTF-16 character
+  // counts underreport multibyte payloads and diverge from Agent I/O limits.
+  // Refuse oversized input before it is admitted as an invocation/observation.
+  if (new TextEncoder().encode(serialized).byteLength > MAX_DATA_JSON) {
+    throw new Error(`${label} is too large`);
+  }
   return cloned;
 }
 
