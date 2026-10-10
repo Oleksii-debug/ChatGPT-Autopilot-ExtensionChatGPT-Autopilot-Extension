@@ -415,6 +415,10 @@ function isolationProof(overrides = {}) {
   return {
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
+    workspaceRevision: 'rev.10',
+    environmentSha256: ENV_SHA,
+    checkpointArtifactId: 'artifact.checkpoint.10',
+    checkpointSha256: CHECKPOINT_SHA,
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:07:00.000Z',
@@ -428,6 +432,10 @@ function scrubProof(overrides = {}) {
   return {
     workspaceId: 'workspace.cloud.1',
     providerId: 'cloud.provider.1',
+    workspaceRevision: 'rev.10',
+    environmentSha256: ENV_SHA,
+    checkpointArtifactId: 'artifact.checkpoint.10',
+    checkpointSha256: CHECKPOINT_SHA,
     executionLeaseId: 'lease.cloud.1',
     executionOwnershipRevision: 2,
     verifiedAt: '2026-09-25T06:09:00.000Z',
@@ -459,6 +467,10 @@ test('trusted cloud isolation adapter binds canonical owner and cannot authorize
       assert.deepEqual(target, {
         workspaceId: 'workspace.cloud.1',
         providerId: 'cloud.provider.1',
+        workspaceRevision: 'rev.10',
+        environmentSha256: ENV_SHA,
+        checkpointArtifactId: 'artifact.checkpoint.10',
+        checkpointSha256: CHECKPOINT_SHA,
         executionLeaseId: 'lease.cloud.1',
         executionOwnershipRevision: 2,
       });
@@ -475,6 +487,11 @@ test('trusted cloud isolation adapter binds canonical owner and cannot authorize
 test('cloud isolation proof rejects mismatched, incomplete, stale, future and forged adapter receipts', async () => {
   for (const mutation of [
     { workspaceId: 'workspace.other' },
+    { workspaceRevision: 'rev.stale' },
+    { workspaceRevision: undefined },
+    { environmentSha256: 'c'.repeat(64) },
+    { checkpointArtifactId: 'artifact.stale' },
+    { checkpointSha256: 'd'.repeat(64) },
     { providerId: 'provider.other' },
     { executionLeaseId: 'lease.old' },
     { filesystemIsolated: false },
@@ -536,6 +553,11 @@ test('trusted cloud teardown must verify filesystem/browser/process/secret scrub
 test('cloud teardown never reports clean on incomplete/hostile proof or failed teardown', async () => {
   const { binding } = bindingAndOwnership();
   for (const mutation of [
+    { workspaceRevision: 'rev.stale' },
+    { workspaceRevision: undefined },
+    { environmentSha256: 'c'.repeat(64) },
+    { checkpointArtifactId: 'artifact.stale' },
+    { checkpointSha256: 'd'.repeat(64) },
     { filesystemScrubbed: false },
     { browserScrubbed: false },
     { processesTerminated: false },
