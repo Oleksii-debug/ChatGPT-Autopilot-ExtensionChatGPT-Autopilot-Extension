@@ -63,12 +63,12 @@ function headerString(raw) {
  * entire request before token resolution or canonical Core dispatch: different
  * intermediaries can select different duplicates.
  */
-function hasExactlyOneRawHeader(req, name) {
+function hasUnambiguousRawHeader(req, name, required = true) {
   let count = 0;
   for (let i = 0; i < req.rawHeaders.length; i += 2) {
     if (req.rawHeaders[i].toLowerCase() === name && ++count > 1) return false;
   }
-  return count === 1;
+  return required ? count === 1 : count <= 1;
 }
 
 function exactToken(input, label) {
@@ -142,8 +142,8 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       if (req.socket.remoteAddress !== '127.0.0.1') return reject(res);
       // HTTP/1 duplicate sensitive headers are ambiguous even if Node exposes
       // a seemingly valid normalized first value.
-      if (!hasExactlyOneRawHeader(req, 'host')
-        || !hasExactlyOneRawHeader(req, 'authorization')) return reject(res);
+      if (!hasUnambiguousRawHeader(req, 'host')
+        || !hasUnambiguousRawHeader(req, 'authorization', false)) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
       // Cross-origin and browser-driven requests are always denied, including
