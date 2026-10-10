@@ -12,7 +12,7 @@ function fixture() {
         'agent-1': {
           state: 'PROVIDER_SUCCEEDED',
           providerReceiptId: 'opaque-receipt-1',
-          resultArtifactRefs: [{ id: 'artifact-1' }],
+          resultArtifactRefs: [{ artifactId: 'artifact-1' }],
         },
       },
       specialistExecutionOwnerships: [

@@ -1333,3 +1333,72 @@ test('S1 stale timeline warning persists across filter renders after failed Core
   assert.match(render, /експорт заблоковано до успішного оновлення/u);
   assert.doesNotMatch(render, /innerHTML|outerHTML|insertAdjacentHTML/u);
 });
+
+
+test('S1 recorded Specialist artifact references require durable canonical identities across restart', () => {
+  const marker = 'PRIVATE_ARTIFACT_ID_TRAP_MUST_NOT_LEAK';
+  const valid = job();
+  valid.runtime.specialistDispatchByAgentId = {
+    specialist: {
+      state: 'PROVIDER_SUCCEEDED',
+      resultArtifactRefs: [{
+        artifactId: 'artifact-1',
+        sha256: 'a'.repeat(64),
+        secretNote: marker,
+      }],
+    },
+  };
+  const before = buildAgentRunTimelineV1(valid);
+  const after = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid)));
+  assert.equal(before.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded, 1);
+  assert.deepEqual(after.evidenceMap.specialistProviderDispatch, before.evidenceMap.specialistProviderDispatch);
+  assert.equal(before.evidenceMap.specialistProviderDispatch.artifactProvenanceVerified, false);
+  assert.equal(before.evidenceMap.externalEffectVerified, false);
+  assert.doesNotMatch(JSON.stringify(before), /PRIVATE_ARTIFACT_ID_TRAP_MUST_NOT_LEAK|artifact-1/u);
+
+  const broken = [
+    ['missing', { sha256: 'a'.repeat(64) }],
+    ['empty', { artifactId: '' }],
+    ['null', { artifactId: null }],
+    ['numeric', { artifactId: 1 }],
+    ['whitespace', { artifactId: 'not canonical' }],
+    ['unicode-control', { artifactId: 'ref-\u202e123' }],
+    ['oversized', { artifactId: 'x'.repeat(181) }],
+  ];
+  const hidden = { artifactId: 'artifact-hidden' };
+  Object.defineProperty(hidden, 'artifactId', { value: 'artifact-hidden', enumerable: false });
+  broken.push(['hidden', hidden]);
+  const accessor = {};
+  Object.defineProperty(accessor, 'artifactId', {
+    enumerable: true,
+    get() { throw Error(marker); },
+  });
+  broken.push(['accessor', accessor]);
+  const trapped = new Proxy({ artifactId: 'artifact-trapped' }, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'artifactId') throw Error(marker);
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  broken.push(['proxy-trap', trapped]);
+
+  for (const [name, ref] of broken) {
+    const input = job();
+    input.runtime.specialistDispatchByAgentId = {
+      specialist: { state: 'PROVIDER_SUCCEEDED', resultArtifactRefs: [ref] },
+    };
+    assert.throws(
+      () => buildAgentRunTimelineV1(input),
+      error => error instanceof Error &&
+        /artifact reference identity is invalid|persisted field cannot be safely inspected|accessor-backed|enumerable data field/u.test(error.message) &&
+        !error.message.includes(marker),
+      name,
+    );
+  }
+
+  // Explicitly corrupt reference metadata cannot become a plausible count
+  // after restart. No replay or external effect is initiated by projection.
+  valid.runtime.specialistDispatchByAgentId.specialist.resultArtifactRefs = [{}];
+  assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))),
+    /artifact reference identity is invalid/u);
+});

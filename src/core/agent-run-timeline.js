@@ -371,6 +371,15 @@ function recordedSpecialistDispatchEvidence(runtime) {
     }
     for (const ref of canonicalEvidenceElements(refs, length, 'Agent specialist artifact references')) {
       record(ref, 'Agent specialist artifact reference');
+      // A recorded artifact reference must carry a durable, canonical ID.
+      // Counting {} or a hidden/accessor-backed ID creates false evidence:
+      // it is visible before JSON cold restart but vanishes afterward. This
+      // remains metadata only; it never attests provenance or effect success.
+      const { present: artifactIdPresent, value: artifactId } = persistedField(ref, 'artifactId');
+      if (!artifactIdPresent || typeof artifactId !== 'string' ||
+          !RECORDED_OWNERSHIP_ID.test(artifactId)) {
+        throw new Error('Agent specialist artifact reference identity is invalid');
+      }
       artifactReferencesRecorded += 1;
     }
   }
