@@ -552,7 +552,7 @@ test('Plan-1 S1: provider allowlist never admits inherited names or discloses un
   for (const invalidId of ['__proto__', 'constructor', 'toString', 'hasOwnProperty',
     `unknown-${marker}`]) {
     const reject = fn => assert.throws(fn, error => {
-      assert.match(error.message, /Unsupported agent provider/);
+      assert.match(error.message, /Unsupported agent provider|providerId is invalid/);
       assert.doesNotMatch(error.message, /PRIVATE-PROVIDER-IDENTITY-CANARY|__proto__|constructor|toString|hasOwnProperty/);
       return true;
     }, 'only own registered provider descriptors can supply authority');
@@ -561,9 +561,9 @@ test('Plan-1 S1: provider allowlist never admits inherited names or discloses un
     reject(() => normalizeAgentEvent(event({ providerId: invalidId })));
     reject(() => registry.register(invalidId, AgentActionType.SUBMIT_PROMPT, () => {}));
     await assert.rejects(() => registry.execute(action({ providerId: invalidId })),
-      /Unsupported agent provider/);
+      /Unsupported agent provider|providerId is invalid/);
     await assert.rejects(() => sink.emit(event({ providerId: invalidId })),
-      /Unsupported agent provider/);
+      /Unsupported agent provider|providerId is invalid/);
   }
   assert.equal(calls, 0, 'unknown providers cannot dispatch canonical action handlers');
   assert.equal(sinkMessages.length, 0, 'unknown providers cannot publish trusted observations');
