@@ -125,7 +125,14 @@ function timestamp(value, label) {
 }
 
 function clockMs(now) {
-  const value = now();
+  // An injected clock is a dependency, not a trusted diagnostic authority.
+  // Fail closed without exposing exception messages, causes, or hostile getters.
+  let value;
+  try {
+    value = now();
+  } catch {
+    throw new Error('OpenHands readiness clock could not be observed safely');
+  }
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
       || value < 0 || value > MAX_DATE_MS) {
     throw new Error('OpenHands readiness clock returned an invalid time');
