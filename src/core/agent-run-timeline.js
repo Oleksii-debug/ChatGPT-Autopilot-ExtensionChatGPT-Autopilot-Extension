@@ -309,7 +309,17 @@ function recordedSpecialistDispatchEvidence(runtime) {
   // provider attempts. This remains metadata, not trusted external proof.
   const seenReceiptIds = new Set();
   for (const key of keys) {
-    const attempt = record(own(dispatches, key), 'Agent specialist dispatch attempt');
+    // Durable JSON serialization omits hidden and accessor-backed map keys.
+    // Counting either as evidence would change the audit trail after restart.
+    // Snapshot each own descriptor once; do not invoke untrusted getters or
+    // expose Proxy trap messages in diagnostics.
+    let descriptor;
+    try { descriptor = Object.getOwnPropertyDescriptor(dispatches, key); }
+    catch { throw new Error('Agent specialist dispatch record cannot be safely inspected'); }
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Agent specialist dispatch record must be an enumerable data field');
+    }
+    const attempt = record(descriptor.value, 'Agent specialist dispatch attempt');
     const state = own(attempt, 'state');
     if (!SPECIALIST_DISPATCH_STATES.has(state)) {
       throw new Error('Agent specialist dispatch state is invalid');
