@@ -1908,3 +1908,43 @@ test('Plan-1 S1: universal persisted JSON budgets count UTF-8 bytes', () => {
   assert.deepEqual(normalizeObservationV1(JSON.parse(JSON.stringify(validObservation))),
     validObservation, 'valid observations must survive exact cold JSON recovery');
 });
+
+
+test('Plan-1 S1: corrupt persisted artifact digest cannot erase evidence across recovery', () => {
+  const legacy = artifact();
+  delete legacy.sha256;
+  const compatible = normalizeArtifactRefV1(legacy);
+  assert.equal(compatible.sha256, '');
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(compatible))), compatible);
+  assert.deepEqual(normalizeArtifactRefV1(artifact({ sha256: '' })).sha256, '');
+
+  for (const sha256 of [null, undefined]) {
+    const corrupt = artifact({ sha256 });
+    const original = { ...corrupt };
+    const rejectEveryEvidencePath = (ref) => {
+      assert.throws(() => normalizeArtifactRefV1(ref), /sha256 is invalid/,
+        'an explicitly corrupt content hash must not silently become optional');
+      assert.throws(() => normalizeObservationV1({
+        schemaVersion: 1, observationId: 'obs-corrupt-sha',
+        invocationId: 'invoke-1', status: ObservationStatus.OK,
+        artifactRefs: [ref], observedAt: AT,
+      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+      assert.throws(() => normalizeSpecialistHandoffV1({
+        schemaVersion: 1, handoffId: 'handoff-corrupt-sha',
+        specialistId: 'specialist-1', goal: 'Verify artifact',
+        requestedCapabilityIds: ['filesystem.read'],
+        artifactRefs: [ref], createdAt: AT,
+      }), /artifactRefs\\[0\\].*sha256 is invalid/);
+    };
+    rejectEveryEvidencePath(corrupt);
+    assert.deepEqual(corrupt, original, 'rejected evidence must never mutate caller data');
+    // JSON preserves null, but drops undefined: catch both before persisting,
+    // then verify the persisted null form still fails closed on cold restart.
+    if (sha256 === null) rejectEveryEvidencePath(JSON.parse(JSON.stringify(corrupt)));
+  }
+
+  const verified = normalizeArtifactRefV1(artifact({ sha256: 'b'.repeat(64) }));
+  assert.equal(verified.sha256, 'b'.repeat(64));
+  assert.ok(Object.isFrozen(verified));
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(verified))), verified);
+});
