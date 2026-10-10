@@ -297,6 +297,16 @@ export function normalizeAiRoutePool(raw = []) {
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
+    // A FREE label must not override contradictory observed pricing, nor
+    // classify an unpriced remote account as free after JSON cold restart.
+    // A local Ollama route keeps its credentialless legacy free default.
+    if (costClass === AiRouteCostClass.FREE && (
+      (inputPriceKnown && price(own(item, 'inputPricePerMillionUsd'), 'AI route input price') !== 0)
+      || (outputPriceKnown && price(own(item, 'outputPricePerMillionUsd'), 'AI route output price') !== 0)
+      || (locality === AiRouteLocality.REMOTE && (!inputPriceKnown || !outputPriceKnown))
+    )) {
+      throw new Error('AI route FREE pricing requires noncontradictory observed zero cost; remote routes require both observed prices');
+    }
     return Object.freeze({
       schemaVersion: AI_ROUTE_POOL_VERSION,
       routeId: id(own(item, 'routeId'), 'AI route routeId'),
