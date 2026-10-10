@@ -1255,9 +1255,14 @@ export function executeBrowserPageAction(snapshotId, action) {
     }
     return target;
   };
-  const events = (element) => {
+  const events = (element, verify) => {
+    // Page-owned input handlers can change a field, retarget its semantic
+    // identity or open an overlay before change. Do not grant a second
+    // consequential listener invocation using an invalidated observation.
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    verify();
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    verify();
   };
   // Programmatic fill/select are browser effects too. Do not use synthetic
   // events to bypass a focus-time modal or an occluded/unavailable control.
@@ -1334,10 +1339,12 @@ export function executeBrowserPageAction(snapshotId, action) {
     // could persist or submit the wrong value in a page-level listener.
     const acceptedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
     if (acceptedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
-    events(element);
-    // Event handlers may synchronously change the field after dispatch.
-    const observedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
-    if (observedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    events(element, () => {
+      ensureUnoccluded(element);
+      const observedValue = tag === 'input' || tag === 'textarea'
+        ? String(element.value ?? '') : String(element.textContent ?? '');
+      if (observedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    });
     return { ok: true, kind: 'fill', effectVerified: true, url: location.href };
   }
   if (action.type === 'select') {
@@ -1387,9 +1394,13 @@ export function executeBrowserPageAction(snapshotId, action) {
     // become the selected value. Verify the accepted mutation before invoking
     // page listeners; otherwise change handlers can persist a different state.
     if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
-    events(element);
-    // Listeners can change selection synchronously; never claim that as DONE.
-    if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    events(element, () => {
+      ensureUnoccluded(element);
+      if (element.multiple === true || optionFingerprint(element) !== action.expectedOptionFingerprint) {
+        throw new Error('AGENT_SELECT_OPTIONS_STALE');
+      }
+      if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    });
     return { ok: true, kind: 'select', effectVerified: true, selected: String(option.textContent || option.label || option.value).trim(), url: location.href };
   }
   if (action.type === 'check') {
