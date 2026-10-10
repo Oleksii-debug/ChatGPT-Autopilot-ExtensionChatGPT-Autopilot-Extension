@@ -299,6 +299,84 @@ test('a live CLOUD owner requires exact existing workspace continuity binding an
   assert.equal(checkpointMismatch.reasonCode, 'CLOUD_CHECKPOINT_BINDING_MISMATCH');
 });
 
+test('S1 same-effect orphan and duplicate cloud bindings require canonical reconciliation after JSON restart', () => {
+  const cloud = ownedCloud();
+  const local = claimExecutionOwnershipV1(availableOwnership(), {
+    plane: 'LOCAL',
+    ownerId: 'local-owner',
+    leaseId: 'lease-local',
+    leaseUntil: '2026-09-25T10:30:00.000Z',
+    at: '2026-09-25T10:00:01.000Z',
+  });
+  const binding = workspaceBinding(cloud);
+  const cases = [
+    {
+      name: 'AVAILABLE with prior effect workspace',
+      owner: availableOwnership(),
+      bindings: [binding],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'LOCAL handoff with unswept cloud workspace',
+      owner: local,
+      bindings: [binding],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'same effect/lease with rotated policy',
+      owner: cloud,
+      bindings: [workspaceBinding(cloud, { policyEnvelopeId: 'policy-rotated' })],
+      reason: 'ORPHANED_CLOUD_EFFECT_BINDING',
+    },
+    {
+      name: 'two separate workspaces for one effect',
+      owner: cloud,
+      bindings: [binding, workspaceBinding(cloud, { workspaceId: 'workspace-b' })],
+      reason: 'AMBIGUOUS_CLOUD_EFFECT_BINDINGS',
+    },
+  ];
+  for (const scenario of cases) {
+    const original = request({
+      affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+      executionOwnership: scenario.owner,
+      cloudSlots: [slot('clean-new', { workspaceId: '' })],
+      workspaceBindings: scenario.bindings,
+    });
+    for (const input of [original, JSON.parse(JSON.stringify(original))]) {
+      const assessed = assessCloudExecutionFabricV1(input);
+      assert.equal(assessed.disposition, CloudFabricDisposition.RECONCILE_REQUIRED, scenario.name);
+      assert.equal(assessed.reasonCode, scenario.reason, scenario.name);
+      assert.equal(assessed.selectedSlotId, '', scenario.name);
+      assert.equal(assessed.requiredExecutionTransition, '', scenario.name);
+      assert.equal(assessed.dispatchAuthorized, false, scenario.name);
+      assert.equal(assessed.provisioningAuthorized, false, scenario.name);
+      assert.equal(assessed.executionAuthorized, false, scenario.name);
+      assert.equal(assessed.resumeAuthorized, false, scenario.name);
+    }
+  }
+
+  // A reconciled (removed) stale workspace record restores ordinary capacity
+  // assessment; this component still cannot authorize its actual provision.
+  const recovered = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    cloudSlots: [slot('clean-new', { workspaceId: '' })],
+    workspaceBindings: [],
+  }))));
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.selectedSlotId, 'clean-new');
+  assert.equal(recovered.provisioningAuthorized, false);
+
+  // A single current CLOUD owner/binding is legitimate continuity, not orphanage.
+  const current = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: cloud,
+    cloudSlots: [slot('current', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [binding],
+  }))));
+  assert.equal(current.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(current.requiredExecutionTransition, 'NONE');
+});
+
 test('expired execution ownership always requires reconciliation before fabric routing', () => {
   const ownership = ownedCloud({ leaseUntil: '2026-09-25T10:01:00.000Z' });
   const result = assessCloudExecutionFabricV1(request({
