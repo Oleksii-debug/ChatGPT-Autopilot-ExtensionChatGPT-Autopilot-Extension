@@ -301,6 +301,125 @@ function assessment(status, reasonCode, binding, ownership, at) {
   });
 }
 
+
+// Provider-neutral isolation and scrub verification hooks. These are invoked
+// ONLY by a trusted canonical runtime adapter. A provider's unverified JSON
+// observation must never self-grant executable authority.
+const ISOLATION_OPTIONS = new Set(['at', 'verifyIsolation']);
+const SCRUB_OPTIONS = new Set(['at', 'teardown', 'verifyScrub']);
+const ISOLATION_PROOF_KEYS = new Set([
+  'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
+  'filesystemIsolated', 'browserIsolated', 'processIsolated',
+]);
+const SCRUB_PROOF_KEYS = new Set([
+  'workspaceId', 'providerId', 'executionLeaseId', 'verifiedAt',
+  'filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged',
+]);
+
+function trustedLifecycleOptions(input, keys, required, label) {
+  const raw = dataRecord(input, keys, label);
+  for (const key of required) {
+    if (typeof raw[key] !== 'function') throw new Error(`${label} requires trusted ${key} callback`);
+  }
+  return Object.freeze({
+    at: exactTimestamp(raw.at, `${label}.at`),
+    ...Object.fromEntries(required.map(key => [key, raw[key]])),
+  });
+}
+
+function verifyExactLifecycleProof(input, keys, binding, at, properties, label) {
+  const raw = dataRecord(input, keys, label);
+  if (raw.workspaceId !== binding.workspaceId
+    || raw.providerId !== binding.providerId
+    || raw.executionLeaseId !== binding.executionLeaseId) {
+    throw new Error(`${label} does not match exact cloud workspace/lease identity`);
+  }
+  const verifiedAt = exactTimestamp(raw.verifiedAt, `${label}.verifiedAt`);
+  if (Date.parse(verifiedAt) < Date.parse(binding.boundAt)
+      || Date.parse(verifiedAt) > Date.parse(at)) {
+    throw new Error(`${label} has stale or future verification chronology`);
+  }
+  for (const property of properties) {
+    if (raw[property] !== true) throw new Error(`${label} did not verify ${property}`);
+  }
+  return verifiedAt;
+}
+
+/**
+ * Validates an isolation attestation obtained by the canonical runtime from
+ * its trusted provider adapter. Does not grant execution, resume or policy.
+ */
+export async function verifyCloudWorkspaceIsolationV1(
+  observationInput, executionOwnershipInput, options,
+) {
+  const trusted = trustedLifecycleOptions(
+    options, ISOLATION_OPTIONS, ['verifyIsolation'], 'Cloud workspace isolation options',
+  );
+  // Bind before invoking external adapter. Rejected ownership / expired lease
+  // must never trigger provider-side work or an isolation authority claim.
+  const binding = createCloudWorkspaceBindingV1(
+    observationInput, executionOwnershipInput, { at: trusted.at },
+  );
+  const proof = await trusted.verifyIsolation(Object.freeze({
+    workspaceId: binding.workspaceId,
+    providerId: binding.providerId,
+    executionLeaseId: binding.executionLeaseId,
+    executionOwnershipRevision: binding.executionOwnershipRevision,
+  }));
+  const verifiedAt = verifyExactLifecycleProof(
+    proof, ISOLATION_PROOF_KEYS, binding, trusted.at,
+    ['filesystemIsolated', 'browserIsolated', 'processIsolated'],
+    'Cloud workspace isolation proof',
+  );
+  return frozen({
+    schemaVersion: CLOUD_WORKSPACE_VERSION,
+    binding,
+    isolationVerified: true,
+    verifiedAt,
+    executionAuthorized: false,
+    resumeAuthorized: false,
+    requiresCanonicalRuntime: true,
+    requiresFreshPolicy: true,
+  });
+}
+
+/**
+ * Executes provider teardown and verifies four independent scrub dimensions.
+ * A failed/ambiguous provider result never generates a clean receipt. The
+ * result remains diagnostic; a canonical owner must fence lease reuse.
+ */
+export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
+  const trusted = trustedLifecycleOptions(
+    options, SCRUB_OPTIONS, ['teardown', 'verifyScrub'], 'Cloud workspace scrub options',
+  );
+  const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
+  const target = Object.freeze({
+    workspaceId: binding.workspaceId,
+    providerId: binding.providerId,
+    executionLeaseId: binding.executionLeaseId,
+    executionOwnershipRevision: binding.executionOwnershipRevision,
+  });
+  await trusted.teardown(target);
+  const proof = await trusted.verifyScrub(target);
+  const verifiedAt = verifyExactLifecycleProof(
+    proof, SCRUB_PROOF_KEYS, binding, trusted.at,
+    ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
+    'Cloud workspace scrub proof',
+  );
+  return frozen({
+    schemaVersion: CLOUD_WORKSPACE_VERSION,
+    workspaceId: binding.workspaceId,
+    providerId: binding.providerId,
+    executionLeaseId: binding.executionLeaseId,
+    scrubVerified: true,
+    verifiedAt,
+    // External contracts cannot transfer or release execution ownership.
+    leaseReleaseAuthorized: false,
+    reuseAuthorized: false,
+    requiresCanonicalRuntime: true,
+  });
+}
+
 export function createCloudWorkspaceBindingV1(
   observationInput,
   executionOwnershipInput,
