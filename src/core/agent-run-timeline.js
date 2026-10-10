@@ -386,17 +386,15 @@ function recordedExecutionOwnershipEvidence(runtime) {
   if (!Number.isSafeInteger(count) || count < 0 || count > 128) {
     throw new Error('Agent execution ownership length is invalid');
   }
-  const keys = safeOwnKeys(records);
-  if (keys.length !== count + 1 || keys.some(key =>
-    typeof key !== 'string' || (key !== 'length' &&
-      (!/^(0|[1-9][0-9]*)$/u.test(key) || Number(key) >= count)))) {
-    throw new Error('Agent execution ownership records must be a bounded dense array');
-  }
+  // Reuse the canonical descriptor-only array inspection. A non-enumerable
+  // element is observable here but disappears from JSON storage/restart:
+  // it must not be counted as durable evidence. Never invoke its getter.
+  const elements = canonicalEvidenceElements(records, count, 'Agent execution ownership records');
   const stateCounts = { AVAILABLE: 0, OWNED: 0, HANDOFF_PENDING: 0, RECONCILE: 0, VERIFIED: 0, MANUAL_REVIEW: 0 };
   const seenNodes = new Set();
   const seenEffects = new Set();
-  for (let i = 0; i < count; i += 1) {
-    const item = record(own(records, String(i)), 'Agent execution ownership record');
+  for (const element of elements) {
+    const item = record(element, 'Agent execution ownership record');
     const state = own(item, 'state');
     const nodeId = own(item, 'nodeId');
     const effectId = own(item, 'effectId');
