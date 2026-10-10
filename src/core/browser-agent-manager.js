@@ -2470,13 +2470,23 @@ export class BrowserAgentManager {
     // Before any store/network effect, verify the exact route provenance
     // without invoking getters or coercing malformed explicit identities.
     const routeIdentity = exactModelBudgetRouteIdentity(route);
+    // Model-call admission is an accounting authority, not a convenience
+    // normalizer. Never turn strings, booleans, fractions or forged owner
+    // epochs into a valid reservation or silently round away caller limits.
+    const exactNumber = (value, minimum, field, code) => {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)
+          || Object.is(value, -0) || value < minimum) {
+        const error = new Error(`Browser Agent model budget ${field} must be an exact bounded integer`);
+        error.code = code;
+        throw error;
+      }
+      return value;
+    };
+    exactNumber(controlEpoch, 0, 'controlEpoch', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID');
+    exactNumber(callNumber, 1, 'callNumber', 'AI_MODEL_BUDGET_ADMISSION_INPUT_INVALID');
+    const pendingOutputTokens = exactNumber(maxOutputTokens, 1, 'maxOutputTokens',
+      'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED');
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
-    const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
-    if (pendingOutputTokens < 1) {
-      const error = new Error('Browser Agent model call requires a bounded output-token reservation');
-      error.code = 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED';
-      throw error;
-    }
     let reservation = null;
     await this.update(store => {
       const job = store.byId[jobId];
