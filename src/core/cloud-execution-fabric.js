@@ -599,9 +599,9 @@ export function assessCloudExecutionFabricV1(input) {
     }
   }
   const budget = evaluateResourceBudgetV1({
-    budget: snapshotRecord(raw.resourceBudget ?? {}, 'CloudFabricRequestV1.resourceBudget', FABRIC_BUDGET_KEYS),
-    usage: snapshotRecord(raw.resourceUsage ?? {}, 'CloudFabricRequestV1.resourceUsage', FABRIC_RESOURCE_KEYS),
-    request: snapshotRecord(raw.cloudResourceRequest ?? {}, 'CloudFabricRequestV1.cloudResourceRequest', FABRIC_RESOURCE_KEYS),
+    budget: snapshotRecord(raw.resourceBudget === undefined ? {} : raw.resourceBudget, 'CloudFabricRequestV1.resourceBudget', FABRIC_BUDGET_KEYS),
+    usage: snapshotRecord(raw.resourceUsage === undefined ? {} : raw.resourceUsage, 'CloudFabricRequestV1.resourceUsage', FABRIC_RESOURCE_KEYS),
+    request: snapshotRecord(raw.cloudResourceRequest === undefined ? {} : raw.cloudResourceRequest, 'CloudFabricRequestV1.cloudResourceRequest', FABRIC_RESOURCE_KEYS),
   });
 
   const baseArgs = {
