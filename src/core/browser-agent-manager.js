@@ -26,9 +26,9 @@ import {
   BrowserAgentPolicyDecision,
   browserAgentTargetFingerprint,
   browserAgentCoordinateTargetFingerprint,
+  browserAgentVisionOriginMatches,
   verifyBrowserApprovalTarget,
   probeBrowserCoordinateTarget,
-  verifyBrowserCoordinateTarget,
   focusBrowserAgentTarget,
   validateTrustedScriptSource,
   executeBrowserCredentialFill,
@@ -77,6 +77,27 @@ import {
   normalizeBrowserAgentOrchestrationBindingRequestV1,
   normalizeBrowserAgentOrchestrationNodeBindingV1,
 } from './browser-agent-orchestration-binding.js';
+
+// Resolve the CDP upload node using the same unique typed snapshot identity as
+// the semantic preflight. A page may clone a marked input between preflight and
+// Runtime.evaluate; document.querySelector would silently choose the first.
+export function buildUniqueBrowserFileInputExpression(ref, snapshotId) {
+  if (typeof ref !== 'string' || !ref || typeof snapshotId !== 'string' || !snapshotId) {
+    throw new Error('AGENT_FILE_INPUT_STALE');
+  }
+  const identity = JSON.stringify({ ref, snapshotId });
+  return `(() => {
+    const expected = ${identity};
+    const matches = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]'))
+      .filter(node => node.getAttribute('data-autopilot-agent-ref') === expected.ref
+        && node.getAttribute('data-autopilot-agent-snapshot') === expected.snapshotId);
+    if (matches.length !== 1) return null;
+    const input = matches[0];
+    return input instanceof HTMLInputElement
+      && String(input.type || '').toLowerCase() === 'file'
+      && input.isConnected ? input : null;
+  })()`;
+}
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -670,48 +691,12 @@ function normalizeRuntime(raw, now) {
       url: clean(raw.pendingApproval.url, 4096),
       tabId: Number.isInteger(raw.pendingApproval.tabId) && raw.pendingApproval.tabId >= 0 ? raw.pendingApproval.tabId : null,
       targetName: clean(raw.pendingApproval.targetName, 1000),
-      targetFingerprint: raw.pendingApproval.targetFingerprint && typeof raw.pendingApproval.targetFingerprint === 'object' ? {
-        tag: clean(raw.pendingApproval.targetFingerprint.tag, 80),
-        role: clean(raw.pendingApproval.targetFingerprint.role, 80),
-        type: clean(raw.pendingApproval.targetFingerprint.type, 80),
-        name: clean(raw.pendingApproval.targetFingerprint.name, 800),
-        href: clean(raw.pendingApproval.targetFingerprint.href, 1200),
-        submitLike: raw.pendingApproval.targetFingerprint.submitLike === true,
-        formAssociated: raw.pendingApproval.targetFingerprint.formAssociated === true,
-        formAction: clean(raw.pendingApproval.targetFingerprint.formAction, 1200),
-        formMethod: clean(raw.pendingApproval.targetFingerprint.formMethod, 20),
-        editable: raw.pendingApproval.targetFingerprint.editable === true,
-        sensitive: raw.pendingApproval.targetFingerprint.sensitive === true,
-        visualOnly: raw.pendingApproval.targetFingerprint.visualOnly === true,
-      } : null,
-      dragStartFingerprint: raw.pendingApproval.dragStartFingerprint && typeof raw.pendingApproval.dragStartFingerprint === 'object' ? {
-        tag: clean(raw.pendingApproval.dragStartFingerprint.tag, 80),
-        role: clean(raw.pendingApproval.dragStartFingerprint.role, 80),
-        type: clean(raw.pendingApproval.dragStartFingerprint.type, 80),
-        name: clean(raw.pendingApproval.dragStartFingerprint.name, 800),
-        href: clean(raw.pendingApproval.dragStartFingerprint.href, 1200),
-        submitLike: raw.pendingApproval.dragStartFingerprint.submitLike === true,
-        formAssociated: raw.pendingApproval.dragStartFingerprint.formAssociated === true,
-        formAction: clean(raw.pendingApproval.dragStartFingerprint.formAction, 1200),
-        formMethod: clean(raw.pendingApproval.dragStartFingerprint.formMethod, 20),
-        editable: raw.pendingApproval.dragStartFingerprint.editable === true,
-        sensitive: raw.pendingApproval.dragStartFingerprint.sensitive === true,
-        visualOnly: raw.pendingApproval.dragStartFingerprint.visualOnly === true,
-      } : null,
-      dragEndFingerprint: raw.pendingApproval.dragEndFingerprint && typeof raw.pendingApproval.dragEndFingerprint === 'object' ? {
-        tag: clean(raw.pendingApproval.dragEndFingerprint.tag, 80),
-        role: clean(raw.pendingApproval.dragEndFingerprint.role, 80),
-        type: clean(raw.pendingApproval.dragEndFingerprint.type, 80),
-        name: clean(raw.pendingApproval.dragEndFingerprint.name, 800),
-        href: clean(raw.pendingApproval.dragEndFingerprint.href, 1200),
-        submitLike: raw.pendingApproval.dragEndFingerprint.submitLike === true,
-        formAssociated: raw.pendingApproval.dragEndFingerprint.formAssociated === true,
-        formAction: clean(raw.pendingApproval.dragEndFingerprint.formAction, 1200),
-        formMethod: clean(raw.pendingApproval.dragEndFingerprint.formMethod, 20),
-        editable: raw.pendingApproval.dragEndFingerprint.editable === true,
-        sensitive: raw.pendingApproval.dragEndFingerprint.sensitive === true,
-        visualOnly: raw.pendingApproval.dragEndFingerprint.visualOnly === true,
-      } : null,
+      targetFingerprint: raw.pendingApproval.targetFingerprint && typeof raw.pendingApproval.targetFingerprint === 'object'
+        ? browserAgentCoordinateTargetFingerprint(raw.pendingApproval.targetFingerprint) : null,
+      dragStartFingerprint: raw.pendingApproval.dragStartFingerprint && typeof raw.pendingApproval.dragStartFingerprint === 'object'
+        ? browserAgentCoordinateTargetFingerprint(raw.pendingApproval.dragStartFingerprint) : null,
+      dragEndFingerprint: raw.pendingApproval.dragEndFingerprint && typeof raw.pendingApproval.dragEndFingerprint === 'object'
+        ? browserAgentCoordinateTargetFingerprint(raw.pendingApproval.dragEndFingerprint) : null,
       reason: clean(raw.pendingApproval.reason, 1600),
       requestedAt: Math.max(0, Number(raw.pendingApproval.requestedAt || 0)),
     } : null,
@@ -3039,7 +3024,7 @@ export class BrowserAgentManager {
     return false;
   }
 
-  async captureVision(tabId, { expectedUrl = '' } = {}) {
+  async captureVision(tabId, { expectedUrl = '', expectedViewport = null } = {}) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Browser Agent vision capture requires Chrome debugger capability');
     if (!this.chrome.tabs?.get) throw new Error('Browser Agent vision capture requires live tab identity');
     const expected = clean(expectedUrl, 4096);
@@ -3052,10 +3037,45 @@ export class BrowserAgentManager {
         throw error;
       }
       const liveUrl = clean(tab?.pendingUrl || tab?.url, 4096);
-      if (expected && liveUrl !== expected) {
+      const stale = () => {
         const error = new Error('AGENT_VISION_SNAPSHOT_STALE');
         error.code = 'AGENT_VISION_SNAPSHOT_STALE';
         throw error;
+      };
+      if (expected && liveUrl !== expected) stale();
+      // A same-URL reload, scroll or viewport change between DOM observation
+      // and screenshot invalidates visual coordinates. Chrome debugger attach
+      // can itself change the viewport; check before and after that effect.
+      if (expectedViewport) {
+        // Persisted visual origin values are evidence, never coercible
+        // defaults. A missing scroll=0 after restart cannot prove a frame.
+        const numericFields = ['width', 'height', 'scrollX', 'scrollY', 'documentEpoch'];
+        if (numericFields.some(field => typeof expectedViewport[field] !== 'number'
+          || !Number.isFinite(expectedViewport[field]))
+          || expectedViewport.width <= 0 || expectedViewport.height <= 0
+          || expectedViewport.documentEpoch <= 0) stale();
+        let proof;
+        try {
+          const frames = await this.requireScripting().executeScript({
+            target: { tabId, frameIds: [0] },
+            func: () => ({
+              url: location.href,
+              documentEpoch: Number(performance.timeOrigin),
+              width: innerWidth,
+              height: innerHeight,
+              scrollX: Math.round(Number(globalThis.scrollX || 0)),
+              scrollY: Math.round(Number(globalThis.scrollY || 0)),
+            }),
+          });
+          proof = frames?.[0]?.result;
+        } catch { stale(); }
+        if (!proof || proof.url !== liveUrl
+          || !Number.isFinite(proof.documentEpoch) || proof.documentEpoch <= 0
+          || proof.documentEpoch !== expectedViewport.documentEpoch
+          || proof.width !== expectedViewport.width
+          || proof.height !== expectedViewport.height
+          || proof.scrollX !== expectedViewport.scrollX
+          || proof.scrollY !== expectedViewport.scrollY) stale();
       }
       return liveUrl;
     };
@@ -3076,18 +3096,42 @@ export class BrowserAgentManager {
     }
   }
 
-  async dispatchKey(tabId, key) {
+  async dispatchKey(tabId, key, activation = null) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
     const target = { tabId };
     let attached = false;
+    let keyMayBeDown = false;
+    let releaseKey = null;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      if (activation) {
+        // The focus step and Chrome debugger attachment are asynchronous.
+        // Re-prove both owner epoch and target meaning inside this boundary.
+        if (!(await this.verifyOwnerAuthority(activation.jobId, activation.epoch))) throw new Error('AGENT_KEY_CANCELLED_BY_OWNER');
+        const checked = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [activation.frameId] },
+          func: proveBrowserNativeClick,
+          args: [activation.snapshotId, activation.ref, activation.expectedAction],
+        });
+        if (!checked?.[0]?.result) throw new Error('AGENT_KEY_TARGET_STALE');
+        if (!(await this.verifyOwnerAuthority(activation.jobId, activation.epoch))) throw new Error('AGENT_KEY_CANCELLED_BY_OWNER');
+      }
       const normalized = key === ' ' ? ' ' : key;
       const code = key === ' ' ? 'Space' : key;
+      releaseKey = { key: normalized, code };
+      // A rejected keyDown promise may still have caused a press in Chrome.
+      // Recovery may release it but must never repeat the activation.
+      keyMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyDown', key: normalized, code });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyUp', key: normalized, code });
+      keyMayBeDown = false;
     } finally {
+      if (attached && keyMayBeDown && releaseKey) {
+        try {
+          await this.chrome.debugger.sendCommand(target, 'Input.dispatchKeyEvent', { type: 'keyUp', ...releaseKey });
+        } catch { /* release is best effort; never blindly repeat keyDown */ }
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
@@ -3101,43 +3145,70 @@ export class BrowserAgentManager {
     return proof?.[0]?.result || null;
   }
 
-  async nativeClickAt(tabId, x, y, expectedFingerprint = null) {
+  async nativeClickAt(tabId, x, y, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    // The canonical owner epoch is mandatory even when a direct caller reaches
+    // this helper without passing through the normal action dispatcher.
+    if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+      throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+    }
     if (expectedFingerprint) {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [x, y, expectedFingerprint],
       });
       if (!verification?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
     }
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
-      if (expectedFingerprint) {
-        const postAttach = await this.requireScripting().executeScript({
-          target: { tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
-          args: [x, y, expectedFingerprint],
-        });
-        if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
-      }
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      const postAttach = await this.requireScripting().executeScript({
+        target: { tabId, frameIds: [0] },
+        func: probeBrowserCoordinateTarget,
+        args: [x, y, expectedFingerprint],
+      });
+      if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      // A rejected Chrome dispatch can still have pressed the button.
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+      pointerMayBeDown = false;
       return true;
     } finally {
+      if (attached && pointerMayBeDown) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
 
-  async nativeDragAt(tabId, action, startFingerprint, endFingerprint) {
+  async nativeDragAt(tabId, action, startFingerprint, endFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    if (!startFingerprint || !endFingerprint) throw new Error('AGENT_DRAG_TARGET_UNPROVEN');
+    // Persisted/recovered direct native calls must satisfy the same explicit
+    // duration envelope as the planner; do not coerce or clamp after attach.
+    if (!action || (action.durationMs !== undefined
+      && (typeof action.durationMs !== 'number' || !Number.isSafeInteger(action.durationMs)
+        || action.durationMs < 120 || action.durationMs > 2000))) {
+      throw new Error('AGENT_DRAG_DURATION_INVALID');
+    }
+    const requireOwner = async () => {
+      if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+        throw new Error('AGENT_DRAG_CANCELLED_BY_OWNER');
+      }
+    };
+    await requireOwner();
     const verifyPoint = async (x, y, fingerprint) => {
       const verification = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [x, y, fingerprint],
       });
       if (!verification?.[0]?.result?.ok) throw new Error('AGENT_DRAG_TARGET_STALE');
@@ -3147,96 +3218,165 @@ export class BrowserAgentManager {
 
     const target = { tabId };
     let attached = false;
+    let pointerDown = false;
+    let lastX = action.startX;
+    let lastY = action.startY;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      await requireOwner();
       await verifyPoint(action.startX, action.startY, startFingerprint);
       await verifyPoint(action.endX, action.endY, endFingerprint);
-      const durationMs = Math.max(120, Math.min(2000, Number(action.durationMs || 450)));
+      await requireOwner();
+      const durationMs = action.durationMs === undefined ? 450 : action.durationMs;
       const steps = Math.max(3, Math.min(12, Math.round(durationMs / 75)));
       const stepDelayMs = Math.max(16, Math.round(durationMs / steps));
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseMoved', x: action.startX, y: action.startY, button: 'none', buttons: 0,
       });
+      // A rejected press promise may still have effected a physical press.
+      pointerDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.startX, y: action.startY, button: 'left', buttons: 1, clickCount: 1,
       });
       await sleep(Math.min(50, stepDelayMs));
       for (let index = 1; index <= steps; index += 1) {
+        await requireOwner();
         const ratio = index / steps;
         const x = action.startX + ((action.endX - action.startX) * ratio);
         const y = action.startY + ((action.endY - action.startY) * ratio);
         await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
           type: 'mouseMoved', x, y, button: 'none', buttons: 1,
         });
+        lastX = x;
+        lastY = y;
         if (index < steps) await sleep(stepDelayMs);
       }
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased', x: action.endX, y: action.endY, button: 'left', buttons: 0, clickCount: 1,
       });
+      pointerDown = false;
       return true;
     } finally {
+      // Release an already-pressed pointer on Stop; never continue the drag.
+      if (attached && pointerDown) {
+        try {
+          await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+            type: 'mouseReleased', x: lastX, y: lastY, button: 'left', buttons: 0, clickCount: 1,
+          });
+        } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
 
-  async nativeTypeAt(tabId, action, expectedFingerprint) {
+  async nativeTypeAt(tabId, action, expectedFingerprint, jobId, epoch) {
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Native browser input is unavailable');
+    if (!expectedFingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
+    // Direct helper calls/recovered actions must obey the same bounded text
+    // envelope as parseSingleAction, not just the planner entrypoint.
+    // Check before debugger attachment, pointer or Input.insertText effects.
+    if (!action || typeof action.text !== 'string'
+      || action.text.length === 0 || action.text.length > 50000) {
+      throw new Error('AGENT_COORDINATE_TEXT_INVALID');
+    }
+    // Defense in depth for direct native helper callers and resumed actions:
+    // a visual fallback cannot turn a password/file target or a button into
+    // an arbitrary text sink when the normal dispatcher is skipped.
+    if (expectedFingerprint.sensitive === true) throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
+    if (expectedFingerprint.visualOnly !== true && expectedFingerprint.editable !== true) {
+      throw new Error('AGENT_TARGET_NOT_EDITABLE');
+    }
+    const requireOwner = async () => {
+      if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) {
+        throw new Error('AGENT_COORDINATE_CANCELLED_BY_OWNER');
+      }
+    };
+    await requireOwner();
     const verification = await this.requireScripting().executeScript({
       target: { tabId, frameIds: [0] },
-      func: verifyBrowserCoordinateTarget,
+      func: probeBrowserCoordinateTarget,
       args: [action.x, action.y, expectedFingerprint],
     });
     if (!verification?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      await requireOwner();
       const postAttach = await this.requireScripting().executeScript({
         target: { tabId, frameIds: [0] },
-        func: verifyBrowserCoordinateTarget,
+        func: probeBrowserCoordinateTarget,
         args: [action.x, action.y, expectedFingerprint],
       });
       if (!postAttach?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      await requireOwner();
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mousePressed', x: action.x, y: action.y, button: 'left', buttons: 1, clickCount: 1,
       });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
         type: 'mouseReleased', x: action.x, y: action.y, button: 'left', buttons: 0, clickCount: 1,
       });
+      pointerMayBeDown = false;
+      // A click may fire a handler that replaces the focused target.
+      const postClick = await this.requireScripting().executeScript({
+        target: { tabId, frameIds: [0] },
+        func: probeBrowserCoordinateTarget,
+        args: [action.x, action.y, expectedFingerprint, true],
+      });
+      if (!postClick?.[0]?.result?.ok) throw new Error('AGENT_COORDINATE_TARGET_STALE');
+      await requireOwner();
       await this.chrome.debugger.sendCommand(target, 'Input.insertText', { text: action.text });
       return true;
     } finally {
+      if (attached && pointerMayBeDown) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: action.x, y: action.y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
 
-  async nativeClick(tabId, frameId, snapshotId, ref) {
+  async nativeClick(tabId, frameId, snapshotId, ref, expectedAction, jobId, epoch) {
     if (frameId !== 0) return false;
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) return false;
+    // A delayed fallback is a new possible browser effect. An owner Pause/Stop
+    // invalidates the durable epoch even when the old DOM marker still exists.
+    if (!jobId || !Number.isSafeInteger(epoch) || !(await this.verifyOwnerAuthority(jobId, epoch))) return false;
     const prove = async () => (await this.requireScripting().executeScript({
-      target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref],
+      target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref, expectedAction],
     }))?.[0]?.result;
     const beforeAttach = await prove();
     if (!beforeAttach || !Number.isFinite(beforeAttach.x) || !Number.isFinite(beforeAttach.y)) return false;
     const target = { tabId };
     let attached = false;
+    let pointerMayBeDown = false;
+    let clickPoint = null;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) return false;
       // Debugger attach may resize the viewport. The original coordinates may
       // now hit a different control, so bind the click to the same snapshot ref
       // again after attach and use its newly measured position.
       const point = await prove();
       if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
         || point.x < 0 || point.y < 0 || (beforeAttach.url && point.url !== beforeAttach.url)) return false;
+      if (!(await this.verifyOwnerAuthority(jobId, epoch))) return false;
+      clickPoint = point;
+      pointerMayBeDown = true;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 });
+      pointerMayBeDown = false;
       return true;
     } catch {
       return false;
     } finally {
+      if (attached && pointerMayBeDown && clickPoint) {
+        try { await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: clickPoint.x, y: clickPoint.y, button: 'left', buttons: 0, clickCount: 1 }); } catch {}
+      }
       if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
     }
   }
@@ -3349,6 +3489,25 @@ export class BrowserAgentManager {
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
     }
+    // A damaged/legacy approval record must never suppress the required
+    // semantic/visual proof and fall through to an authorized effect.
+    const isCoordinatePoint = [BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT]
+      .includes(pending.action?.type);
+    const isCoordinateDrag = pending.action?.type === BrowserAgentActionType.DRAG_AT;
+    if ((pending.action?.ref && !pending.targetFingerprint)
+      || (isCoordinatePoint && !pending.targetFingerprint)
+      || (isCoordinateDrag && (!pending.dragStartFingerprint || !pending.dragEndFingerprint))) {
+      return pauseStaleApproval('Approved action is missing the persisted target evidence; nothing was executed.', pending.action);
+    }
+    // Credential approvals remain bound to the same observed frame/URL; no
+    // persisted string alias may be coerced into frame zero during replay.
+    if (pending.action?.type === BrowserAgentActionType.FILL_CREDENTIAL
+      && (!Number.isSafeInteger(pending.action.frameId) || pending.action.frameId < 0
+        || pending.action.frameId !== pending.action.passwordFrameId
+        || pending.action.expectedFrameUrl !== pending.url)) {
+      return pauseStaleApproval('Approved credential action has an invalid frame or URL proof; nothing was executed.', pending.action);
+    }
+    let approvedCredentialProof = false;
     if (pending.action?.ref && pending.targetFingerprint) {
       let proof = null;
       try {
@@ -3362,12 +3521,13 @@ export class BrowserAgentManager {
       if (!proof?.ok) {
         return pauseStaleApproval('Approved action became stale because the target control changed; nothing was executed.', pending.action);
       }
+      approvedCredentialProof = pending.action?.type === BrowserAgentActionType.FILL_CREDENTIAL;
     } else if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(pending.action?.type) && pending.targetFingerprint) {
       let proof = null;
       try {
         const verified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.x, pending.action.y, pending.targetFingerprint],
         });
         proof = verified?.[0]?.result || null;
@@ -3381,12 +3541,12 @@ export class BrowserAgentManager {
       try {
         const startVerified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.startX, pending.action.startY, pending.dragStartFingerprint],
         });
         const endVerified = await this.requireScripting().executeScript({
           target: { tabId: pending.tabId, frameIds: [0] },
-          func: verifyBrowserCoordinateTarget,
+          func: probeBrowserCoordinateTarget,
           args: [pending.action.endX, pending.action.endY, pending.dragEndFingerprint],
         });
         startProof = startVerified?.[0]?.result || null;
@@ -3420,7 +3580,17 @@ export class BrowserAgentManager {
     const live = await this.get(id);
     if (!live.job || !epoch) return this.get(id);
     try {
-      const executed = await this.executeAction(live.job, { snapshotId: pending.snapshotId, url: pending.url }, pending.action, epoch);
+      // Approved credential targets were just re-proved in the exact Chrome
+      // frame. Preserve that verified identity for the existing execution
+      // boundary, which otherwise receives only a shortened approval snapshot.
+      const approvedSnapshot = {
+        snapshotId: pending.snapshotId,
+        url: pending.url,
+        ...(approvedCredentialProof ? {
+          frames: [{ frameId: pending.action.passwordFrameId, url: pending.url }],
+        } : {}),
+      };
+      const executed = await this.executeAction(live.job, approvedSnapshot, pending.action, epoch);
       if (executed.kind === 'CANCELLED_BY_OWNER' || executed.kind === 'WAITING_PERMISSION' || executed.kind === 'WAITING_CAPABILITY') return this.get(id);
       await this.update(store => {
         const job = store.byId[id];
@@ -3431,8 +3601,8 @@ export class BrowserAgentManager {
         job.runtime.lastSnapshotSignature = pending.snapshotSignature || '';
         job.runtime.lastAction = clone(pending.action);
         job.runtime.lastActionSnapshotId = pending.snapshotId || '';
-        job.runtime.nativeFallbackTried = pending.action?.type === BrowserAgentActionType.CLICK
-          && (pending.action?.submitLike === true || pending.action?.navigationLike === true);
+        // An unchanged page is not proof that a click had no external effect.
+        job.runtime.nativeFallbackTried = pending.action?.type === BrowserAgentActionType.CLICK;
         job.runtime.consecutiveActionErrors = 0;
         job.runtime.nextWakeAt = now + Math.max(MIN_WAKE_MS, Number(job.config.stepDelayMs || 0));
         job.runtime.updatedAt = now;
@@ -3552,6 +3722,15 @@ export class BrowserAgentManager {
     try { priorTabs = (await this.chrome.tabs.query({})).map(tab => tab.id).filter(Number.isInteger); } catch {}
 
     if (action.type === BrowserAgentActionType.FILL_CREDENTIAL) {
+      // Durable approval/restart envelopes must not coerce an untrusted frame
+      // identifier or broker field into the active Chrome target.
+      if (!Number.isSafeInteger(action.passwordFrameId) || action.passwordFrameId < 0
+        || action.frameId !== action.passwordFrameId || action.ref !== action.passwordRef
+        || (action.usernameRef && action.usernameFrameId !== action.passwordFrameId)
+        || typeof action.expectedFrameUrl !== 'string' || !isHttpUrl(action.expectedFrameUrl)
+        || !Array.isArray(snapshot?.frames)
+        || !snapshot.frames.some(frame => frame.frameId === action.passwordFrameId
+          && frame.url === action.expectedFrameUrl)) throw new Error('AGENT_CREDENTIAL_FRAME_PROOF_STALE');
       if (!this.nativeCompanion) throw new Error('AGENT_CREDENTIAL_BROKER_UNAVAILABLE');
       const liveBefore = await this.chrome.tabs.get(tabId);
       const liveBeforeUrl = clean(liveBefore?.pendingUrl || liveBefore?.url, 4096);
@@ -3578,6 +3757,10 @@ export class BrowserAgentManager {
         const liveAfter = await this.chrome.tabs.get(tabId);
         const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
         if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+        // The native credential broker and tab reads are asynchronous: owner
+        // Stop/Pause may revoke this epoch while the secret is being resolved.
+        // A revoked run must never dispatch the credential to page JavaScript.
+        if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
 
         const execution = await this.requireScripting().executeScript({
           target: { tabId, frameIds: [Number(action.passwordFrameId)] },
@@ -3616,7 +3799,7 @@ export class BrowserAgentManager {
       if (job.config.visionOnDemand !== true) throw new Error('Browser Agent coordinate computer-use is disabled by owner policy');
       const fingerprint = browserAgentTargetFingerprint(snapshot, action);
       if (!fingerprint) throw new Error('AGENT_COORDINATE_TARGET_UNPROVEN');
-      await this.nativeClickAt(tabId, action.x, action.y, fingerprint);
+      await this.nativeClickAt(tabId, action.x, action.y, fingerprint, job.id, epoch);
       const child = await this.adoptNewChildTab(job.id, priorTabs, tabId);
       return { kind: 'ACTION', action, currentUrl: child?.pendingUrl || child?.url || snapshot.url || '' };
     }
@@ -3626,7 +3809,7 @@ export class BrowserAgentManager {
       const startFingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateStartTarget);
       const endFingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateEndTarget);
       if (!startFingerprint || !endFingerprint) throw new Error('AGENT_DRAG_TARGET_UNPROVEN');
-      await this.nativeDragAt(tabId, action, startFingerprint, endFingerprint);
+      await this.nativeDragAt(tabId, action, startFingerprint, endFingerprint, job.id, epoch);
       return { kind: 'ACTION', action, currentUrl: snapshot.url || '' };
     }
 
@@ -3635,7 +3818,7 @@ export class BrowserAgentManager {
       const fingerprint = browserAgentCoordinateTargetFingerprint(action.coordinateTarget);
       if (!fingerprint || fingerprint.sensitive === true) throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
       if (fingerprint.visualOnly !== true && fingerprint.editable !== true) throw new Error('AGENT_TARGET_NOT_EDITABLE');
-      await this.nativeTypeAt(tabId, action, fingerprint);
+      await this.nativeTypeAt(tabId, action, fingerprint, job.id, epoch);
       return { kind: 'ACTION', action, currentUrl: snapshot.url || '' };
     }
 
@@ -3802,17 +3985,40 @@ export class BrowserAgentManager {
       const download = (matches || []).find(item => item?.id === action.downloadId);
       if (!download || download.state !== 'complete' || !clean(download.filename, 32000)) throw new Error('Browser Agent upload source is not a completed tracked download');
       if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) throw new Error('Browser Agent native file-input capability is unavailable');
+      // CDP Runtime.evaluate operates on the main frame. Never accept an
+      // action from a different frame that coincidentally shares the same ref.
+      if (action.frameId !== 0 || action.expectedFrameUrl !== snapshot.url) throw new Error('AGENT_FILE_INPUT_STALE');
+      const requireOwner = async () => {
+        if (!(await this.verifyOwnerAuthority(job.id, epoch))) throw new Error('AGENT_FILE_INPUT_CANCELLED_BY_OWNER');
+      };
+      const proveInput = async () => {
+        const proof = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [0] },
+          func: proveBrowserNativeClick,
+          args: [snapshot.snapshotId, action.ref, action],
+        });
+        if (!proof?.[0]?.result) throw new Error('AGENT_FILE_INPUT_STALE');
+      };
+      // CDP file selection itself can trigger page-visible change handlers.
+      // Re-prove observed URL, semantic control, overlays and owner epoch
+      // before the first possible local-file effect, not only afterward.
+      await requireOwner();
+      await proveInput();
       const target = { tabId };
       let attached = false;
       try {
         await this.chrome.debugger.attach(target, '1.3');
         attached = true;
-        const expression = `document.querySelector('[data-autopilot-agent-ref="' + ${JSON.stringify(String(action.ref || ''))} + '"][data-autopilot-agent-snapshot="' + ${JSON.stringify(String(snapshot.snapshotId || ''))} + '"]')`;
+        await requireOwner();
+        await proveInput();
+        const expression = buildUniqueBrowserFileInputExpression(action.ref, snapshot.snapshotId);
         const evaluated = await this.chrome.debugger.sendCommand(target, 'Runtime.evaluate', { expression, returnByValue: false });
         const objectId = evaluated?.result?.objectId;
         if (!objectId) throw new Error('AGENT_FILE_INPUT_STALE');
         const node = await this.chrome.debugger.sendCommand(target, 'DOM.requestNode', { objectId });
         if (!Number.isInteger(node?.nodeId)) throw new Error('AGENT_FILE_INPUT_STALE');
+        await requireOwner();
+        await proveInput();
         await this.chrome.debugger.sendCommand(target, 'DOM.setFileInputFiles', { nodeId: node.nodeId, files: [download.filename] });
       } finally {
         if (attached) { try { await this.chrome.debugger.detach(target); } catch {} }
@@ -3854,14 +4060,30 @@ export class BrowserAgentManager {
     }
     if (action.type === BrowserAgentActionType.KEY) {
       if (action.ref) {
+        // Enter/Space can submit or purchase. An ordinal ref alone is not
+        // enough: verify the observed semantic target before focus and again
+        // after debugger attach, where the key is actually dispatched.
+        const proof = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [Number(action.frameId)] },
+          func: proveBrowserNativeClick,
+          args: [snapshot.snapshotId, action.ref, action],
+        });
+        if (!proof?.[0]?.result) throw new Error('AGENT_KEY_TARGET_STALE');
         const focused = await this.requireScripting().executeScript({
-          target: { tabId, frameIds: [Number(action.frameId || 0)] },
+          target: { tabId, frameIds: [Number(action.frameId)] },
           func: focusBrowserAgentTarget,
           args: [snapshot.snapshotId, action.ref],
         });
         if (!focused?.[0]?.result?.ok) throw new Error('AGENT_KEY_TARGET_STALE');
       }
-      await this.dispatchKey(tabId, action.key);
+      await this.dispatchKey(tabId, action.key, action.ref ? {
+        frameId: Number(action.frameId),
+        snapshotId: snapshot.snapshotId,
+        ref: action.ref,
+        expectedAction: action,
+        jobId: job.id,
+        epoch,
+      } : null);
       return { kind: 'ACTION', action };
     }
     if (action.type === BrowserAgentActionType.WAIT_FOR_CHANGE) {
@@ -4100,27 +4322,13 @@ export class BrowserAgentManager {
     }
     const signature = browserSnapshotSignature(snapshot);
 
-    // If a normal DOM click produced no observable change, try one native click
-    // against the exact same top-frame ref before asking the model again.
-    if (current.job.runtime.lastSnapshotSignature === signature
-      && current.job.runtime.lastAction?.type === BrowserAgentActionType.CLICK
-      && current.job.runtime.nativeFallbackTried !== true
-      && current.job.runtime.lastActionSnapshotId) {
-      if (!(await this.verifyOwnerAuthority(id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
-      const prior = current.job.runtime.lastAction;
-      const used = await this.nativeClick(current.job.runtime.tabId, prior.frameId, current.job.runtime.lastActionSnapshotId, prior.ref);
-      await this.update(store => {
-        const job = store.byId[id];
-        if (!job || job.runtime.controlEpoch !== epoch) return store;
-        job.runtime.nativeFallbackTried = true;
-        job.runtime.noProgressCount = Math.max(0, Number(job.runtime.noProgressCount || 0)) + 1;
-        job.runtime.nextWakeAt = now + job.config.stepDelayMs;
-        job.runtime.updatedAt = now;
-        appendHistory(job.runtime, { at: now, type: 'native-fallback', message: used ? 'Native click fallback dispatched' : 'Native click fallback unavailable' });
-        return store;
-      });
-      if (used) { await this.reconcileAlarm(); return { kind: 'NATIVE_CLICK_FALLBACK' }; }
-    }
+    // A DOM click may already have committed a remote effect even when the
+    // observed page signature does not change (AJAX/background requests).
+    // A restarted worker can also restore a legacy nativeFallbackTried=false.
+    // Neither case proves non-execution: never blindly replay via nativeClick.
+    // Reobserve and independently verify outcome instead of dispatching a
+    // second pointer effect. Native click remains available only by an
+    // explicitly authorized path that proves a fresh target/owner epoch.
 
     // A DOM/native action can be acknowledged by Chrome while producing no
     // observable application effect. Surface that fact to the reasoning model
@@ -4158,8 +4366,12 @@ export class BrowserAgentManager {
     let visionSnapshotStale = false;
     if (current.job.runtime.visionPending === true) {
       try {
-        imageDataUrl = await this.captureVision(current.job.runtime.tabId, { expectedUrl: snapshot.url });
         const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
+        if (!topFrame?.viewport) throw new Error('AGENT_VISION_SNAPSHOT_STALE');
+        imageDataUrl = await this.captureVision(current.job.runtime.tabId, {
+          expectedUrl: snapshot.url,
+          expectedViewport: topFrame.viewport,
+        });
         snapshot.visionAttached = true;
         snapshot.visionViewport = topFrame?.viewport ? clone(topFrame.viewport) : null;
       } catch (error) {
@@ -4298,10 +4510,9 @@ export class BrowserAgentManager {
       let proof = null;
       try { proof = await this.probeCoordinateTarget(current.job.runtime.tabId, action.x, action.y); }
       catch (error) { return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 }); }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      if (!proof?.target || proof.target.disabled === true || clean(proof.url, 4096) !== clean(snapshot.url, 4096)
-        || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
-        || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)) {
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      if (proof?.target?.disabled === true
+        || !browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       action.coordinateTarget = clone(proof.target);
@@ -4311,10 +4522,9 @@ export class BrowserAgentManager {
       let proof = null;
       try { proof = await this.probeCoordinateTarget(current.job.runtime.tabId, action.x, action.y); }
       catch (error) { return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 }); }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      if (!proof?.target || proof.target.disabled === true || proof.target.sensitive === true || clean(proof.url, 4096) !== clean(snapshot.url, 4096)
-        || Number(proof.viewportWidth || 0) !== Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0)
-        || Number(proof.viewportHeight || 0) !== Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0)) {
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      if (proof?.target?.disabled === true || proof?.target?.sensitive === true
+        || !browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error(proof?.target?.sensitive === true ? 'AGENT_SENSITIVE_FIELD_BLOCKED' : 'AGENT_COORDINATE_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
       if (proof.target.visualOnly !== true && proof.target.editable !== true) {
@@ -4332,13 +4542,9 @@ export class BrowserAgentManager {
       } catch (error) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error, action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
-      const topFrame = (snapshot.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot.frames?.[0] || null;
-      const expectedWidth = Number(topFrame?.viewport?.width || snapshot.visionViewport?.width || 0);
-      const expectedHeight = Number(topFrame?.viewport?.height || snapshot.visionViewport?.height || 0);
-      const proofValid = proof => proof?.target && proof.target.disabled !== true
-        && clean(proof.url, 4096) === clean(snapshot.url, 4096)
-        && Number(proof.viewportWidth || 0) === expectedWidth
-        && Number(proof.viewportHeight || 0) === expectedHeight;
+      const topFrame = (snapshot.frames || []).find(frame => frame.frameId === 0) || null;
+      const proofValid = proof => proof?.target?.disabled !== true
+        && browserAgentVisionOriginMatches(proof, snapshot.url, topFrame?.viewport);
       if (!proofValid(startProof) || !proofValid(endProof)) {
         return this.recordRecoverableFailure(id, epoch, { type: 'action', error: new Error('AGENT_DRAG_TARGET_STALE'), action, countStep: false, retryMs: 250, maxConsecutive: 4 });
       }
@@ -4547,8 +4753,7 @@ export class BrowserAgentManager {
       job.runtime.lastSnapshotSignature = signature;
       job.runtime.lastAction = clone(action);
       job.runtime.lastActionSnapshotId = snapshot.snapshotId;
-      job.runtime.nativeFallbackTried = action.type === BrowserAgentActionType.CLICK
-        && (action.submitLike === true || action.navigationLike === true);
+      job.runtime.nativeFallbackTried = action.type === BrowserAgentActionType.CLICK;
       job.runtime.lastError = '';
       job.runtime.nextWakeAt = now + Math.max(250, waitMs);
       job.runtime.updatedAt = now;

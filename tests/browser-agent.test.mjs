@@ -52,6 +52,14 @@ function makeChrome({ permission = true } = {}) {
     scripting: {
       async executeScript(details) {
         const name = details.func?.name || '';
+        if (name === 'func' || !name) {
+          const tab = tabs.get(details.target.tabId);
+          return [{ frameId: 0, result: {
+            url: tab?.url || '',
+            documentEpoch: 1700000000000 + pageVersion,
+            width: 1280, height: 720, scrollX: 0, scrollY: 0,
+          } }];
+        }
         if (name === 'snapshotBrowserPage') {
           const snapshotId = details.args[0];
           const tab = tabs.get(details.target.tabId);
@@ -60,8 +68,8 @@ function makeChrome({ permission = true } = {}) {
             url: tab?.url || 'https://ais.example.edu/app',
             title: 'AIS',
             text: `page version ${pageVersion}`,
-            elements: [{ ref: 'r1', tag: 'button', role: '', type: '', name: 'Add course', checked: false, selected: false }],
-            viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 1600 },
+            elements: [{ ref: 'r1', tag: 'button', role: '', type: '', name: 'Add course', semanticIdentity: 'fixture-button-add-course-v1', checked: false, selected: false }],
+            viewport: { width: 1280, height: 720, scrollX: 0, scrollY: 0, documentEpoch: 1700000000000 + pageVersion, documentHeight: 1600 },
           } }];
         }
         if (name === 'executeBrowserPageAction') {
@@ -92,14 +100,17 @@ test('native click rechecks the same target after debugger attach and uses its n
   let attached = false;
   chrome.scripting.executeScript = async ({ func, args }) => {
     assert.equal(func.name, 'proveBrowserNativeClick');
-    assert.deepEqual(args, ['snapshot-1', 'r1']);
+    assert.deepEqual(args, ['snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }]);
     return [{ result: { x: attached ? 45 : 10, y: attached ? 50 : 15, url: 'https://ais.example.edu/app' } }];
   };
   chrome.debugger.attach = async () => { attached = true; };
   chrome.debugger.detach = async () => { attached = false; };
   chrome.debugger.sendCommand = async (_target, _method, params) => { calls.push(params); };
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
-  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), true);
+  await manager.create({ id: 'direct-native-owner', goal: 'Verify native target', stepDelayMs: 0 });
+  await manager.start('direct-native-owner', { runInitial: false });
+  const epoch = (await manager.get('direct-native-owner')).job.runtime.controlEpoch;
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }, 'direct-native-owner', epoch), true);
   assert.deepEqual(calls.map(({ x, y }) => [x, y]), [[45, 50], [45, 50]]);
   assert.equal(attached, false);
 });
@@ -114,7 +125,10 @@ test('native click never dispatches when the proven target disappears after debu
   chrome.debugger.detach = async () => { detached = true; };
   chrome.debugger.sendCommand = async () => { dispatches += 1; };
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
-  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), false);
+  await manager.create({ id: 'native-missing-owner', goal: 'Reject vanished target', stepDelayMs: 0 });
+  await manager.start('native-missing-owner', { runInitial: false });
+  const epoch = (await manager.get('native-missing-owner')).job.runtime.controlEpoch;
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1', { type: 'click', expectedSemanticIdentity: 'fixture-button-add-course-v1', expectedFrameUrl: 'https://ais.example.edu/app' }, 'native-missing-owner', epoch), false);
   assert.equal(dispatches, 0);
   assert.equal(detached, true);
 });
@@ -466,7 +480,7 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
 test('consequential approval is default policy and classifies multilingual final actions', () => {
   const value = config();
   assert.equal(value.approvalMode, BrowserAgentApprovalMode.CONSEQUENTIAL);
-  const snapshot = { frames: [{ frameId: 0, elements: [
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/login', elements: [
     { ref: 'r1', name: 'Potvrdiť zápis predmetov', href: '' },
     { ref: 'r2', name: 'Search', href: '' },
     { ref: 'r3', name: 'Save', href: '', submitLike: true },
@@ -479,9 +493,9 @@ test('consequential approval is default policy and classifies multilingual final
 test('fill_credential parser accepts only a current broker ref and current password field', () => {
   const snapshot = {
     url: 'https://ais.example.edu/login',
-    frames: [{ frameId: 0, elements: [
-      { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false },
-      { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true },
+    frames: [{ frameId: 0, url: 'https://ais.example.edu/login', elements: [
+      { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false },
+      { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true },
       { ref: 'r3', tag: 'input', role: '', type: 'text', name: 'Other', sensitive: false },
     ] }],
     credentials: [{ ref: 'c1', credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password', scope: ['https://ais.example.edu'], expiresAt: null }],
@@ -498,6 +512,9 @@ test('fill_credential parser accepts only a current broker ref and current passw
   assert.equal(action.credentialId, 'ais-main');
   assert.equal(action.usernameRef, 'r1');
   assert.equal(action.passwordRef, 'r2');
+  assert.equal(action.expectedFrameUrl, snapshot.url);
+  assert.equal(action.expectedPasswordSemanticIdentity, 'fixture-password');
+  assert.equal(action.expectedUsernameSemanticIdentity, 'fixture-username');
 
   assert.throws(() => parseBrowserAgentAction(JSON.stringify({
     type: 'fill_credential',
@@ -555,8 +572,8 @@ test('credential ALLOW runs autonomous login fill while keeping secret out of pr
         title: 'AIS login',
         text: 'Sign in',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
@@ -658,8 +675,8 @@ test('credential ASK waits for owner confirmation before broker resolve and then
         title: 'AIS',
         text: 'Login',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
@@ -738,8 +755,8 @@ test('credential resolve is discarded if page origin changes before secret inser
         title: 'AIS',
         text: 'Login',
         elements: [
-          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
-          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
         ],
         viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
       } }];
@@ -773,6 +790,79 @@ test('credential resolve is discarded if page origin changes before secret inser
   assert.equal(credentialExecutions, 0, 'stale origin must block credential insertion');
   const live = await manager.get('job-1');
   assert.match(live.job.runtime.lastError, /AGENT_CREDENTIAL_ORIGIN_STALE/);
+  assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
+});
+test('owner Stop during credential broker resolution prevents any secret insertion', async () => {
+  const chrome = makeChrome();
+  let credentialExecutions = 0;
+  let manager;
+  const nativeCompanionClient = {
+    async listCredentials() {
+      return { credentialRefs: [{
+        schemaVersion: 1,
+        credentialId: 'ais-main',
+        brokerId: 'native-companion',
+        kind: 'username-password',
+        scope: ['https://ais.example.edu'],
+        expiresAt: null,
+      }] };
+    },
+    async resolveCredential(input) {
+      await manager.stop('job-1');
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: 'must-not-be-inserted',
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [{ frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/app',
+        title: 'AIS',
+        text: 'Login',
+        elements: [
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', semanticIdentity: 'fixture-username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', semanticIdentity: 'fixture-password', sensitive: true, editable: false },
+        ],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      credentialExecutions += 1;
+      return [{ frameId: 0, result: { ok: true, passwordFilled: true } }];
+    }
+    return original(details);
+  };
+  manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({
+      text: JSON.stringify({
+        type: 'fill_credential',
+        credentialRef: 'c1',
+        usernameFrameId: 0,
+        usernameRef: 'r1',
+        passwordFrameId: 0,
+        passwordRef: 'r2',
+      }),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+    }),
+    now: (() => { let n = 160_000; return () => ++n; })(),
+  });
+  await manager.create({ id: 'job-1', goal: 'Login only to AIS', credentialDecision: 'ALLOW', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
+  await manager.start('job-1', { runInitial: false });
+  const result = await manager.cycleOne('job-1');
+  assert.equal(result.kind, 'CANCELLED_BY_OWNER');
+  assert.equal(credentialExecutions, 0, 'owner Stop must revoke the credential execution epoch');
+  const live = await manager.get('job-1');
+  assert.equal(live.job.runtime.runState, 'STOPPED');
   assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
 });
 
@@ -840,7 +930,7 @@ test('vision coordinate click is allowed only for the screenshot turn and stays 
     /requires a screenshot attached to this exact reasoning turn/,
   );
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
-  assert.deepEqual(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 400.25, y: 250.75 }), vision), { type: 'click_at', x: 400.3, y: 250.8 });
+  assert.deepEqual(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 400.25, y: 250.75 }), vision), { type: 'click_at', x: 400.25, y: 250.75 });
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 1000, y: 250 }), vision),
     /outside the current visible viewport/,
@@ -866,7 +956,7 @@ test('vision coordinate drag is screenshot-turn-only, viewport-bounded and alway
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
   assert.deepEqual(
     parseBrowserAgentAction(JSON.stringify({ type: 'drag_at', startX: 100.25, startY: 100.75, endX: 500.15, endY: 300.85, durationMs: 700 }), vision),
-    { type: 'drag_at', startX: 100.3, startY: 100.8, endX: 500.2, endY: 300.9, durationMs: 700 },
+    { type: 'drag_at', startX: 100.25, startY: 100.75, endX: 500.15, endY: 300.85, durationMs: 700 },
   );
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'drag_at', startX: 100, startY: 100, endX: 1000, endY: 300 }), vision),
@@ -894,11 +984,11 @@ test('vision coordinate typing is screenshot-turn-only and visual-only targets r
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
   assert.deepEqual(
     parseBrowserAgentAction(JSON.stringify({ type: 'type_at', x: 400.25, y: 250.75, text: 'Course note' }), vision),
-    { type: 'type_at', x: 400.3, y: 250.8, text: 'Course note' },
+    { type: 'type_at', x: 400.25, y: 250.75, text: 'Course note' },
   );
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'type_at', x: 400, y: 250, text: '' }), vision),
-    /requires non-empty text/,
+    /requires bounded non-empty text/,
   );
   const semantic = { type: 'type_at', x: 10, y: 10, text: 'A', coordinateTarget: { tag: 'textarea', name: 'Note', editable: true, sensitive: false, visualOnly: false } };
   const visual = { type: 'type_at', x: 20, y: 20, text: 'A', coordinateTarget: { tag: 'div', name: 'Custom editor', editable: false, sensitive: false, visualOnly: true } };
@@ -908,9 +998,9 @@ test('vision coordinate typing is screenshot-turn-only and visual-only targets r
 
 
 test('Enter/Space activation keys require an exact snapshot target and Enter on a form cannot bypass approval', () => {
-  const snapshot = { frames: [{ frameId: 0, elements: [
-    { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' },
-    { ref: 'r2', tag: 'button', role: '', type: 'button', name: 'Open details', formAssociated: false },
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [
+    { ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' },
+    { ref: 'r2', tag: 'button', semanticIdentity: 'fixture-r2-button-v1', role: '', type: 'button', name: 'Open details', formAssociated: false },
   ] }] };
   assert.throws(() => parseBrowserAgentAction(JSON.stringify({ type: 'key', key: 'Enter' }), snapshot), /requires an exact current snapshot/);
   const enter = parseBrowserAgentAction(JSON.stringify({ type: 'key', key: 'Enter', frameId: 0, ref: 'r1' }), snapshot);
@@ -931,7 +1021,7 @@ test('approved Enter focuses the exact approved form control before native key d
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Course form',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'Course code', formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }],
       } }];
     }
     if (details.func?.name === 'focusBrowserAgentTarget') { focused += 1; return [{ frameId: 0, result: { ok: true } }]; }
@@ -966,7 +1056,7 @@ test('consequential click pauses before physical action and explicit approval ex
         url: 'https://ais.example.edu/app',
         title: 'AIS',
         text: 'Final registration',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1008,7 +1098,7 @@ test('approved submit click is never automatically repeated by native fallback o
         url: 'https://ais.example.edu/app',
         title: 'AIS',
         text: 'Unchanged form after async submit',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1049,7 +1139,7 @@ test('pending approval preserves full form fingerprint across manager restart', 
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final form',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/enrollment/save', formMethod: 'post' }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/enrollment/save', formMethod: 'post' }],
       } }];
     }
     return original(details);
@@ -1080,7 +1170,7 @@ test('approval fails closed when the live target fingerprint changes before owne
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final registration',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true }],
       } }];
     }
     if (details.func?.name === 'verifyBrowserApprovalTarget') {
@@ -1113,7 +1203,7 @@ test('rejecting consequential action pauses agent and never executes pending cli
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Odoslať prihlášku', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Odoslať prihlášku', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1138,7 +1228,7 @@ test('ALLOW_ALL approval policy keeps fully autonomous click execution available
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final',
-        elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
+        elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Confirm enrollment', submitLike: true }],
       } }];
     }
     return original(details);
@@ -1536,7 +1626,10 @@ test('INTERVAL completion schedules the next autonomous cycle instead of ending 
 });
 
 test('planner parser accepts bounded fill/select/check batch and rejects invented refs', () => {
-  const snapshot = { frames: [{ frameId: 0, elements: [{ ref: 'r1' }, { ref: 'r2' }] }] };
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [
+    { ref: 'r1', tag: 'input', name: 'A', semanticIdentity: 'input-a-v1' },
+    { ref: 'r2', tag: 'select', name: 'B', semanticIdentity: 'select-b-v1', optionFingerprint: 'fixture-option-b-v1' },
+  ] }] };
   const action = parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions: [
     { type: 'fill', frameId: 0, ref: 'r1', text: 'A' },
     { type: 'select', frameId: 0, ref: 'r2', value: 'B' },
@@ -1734,7 +1827,7 @@ test('partial batch preserves successful prefix evidence and replans instead of 
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'form',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'text', name: 'A' }, { ref: 'r2', tag: 'select', role: '', type: '', name: 'B', options: ['X'] }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'text', name: 'A' }, { ref: 'r2', tag: 'select', semanticIdentity: 'fixture-r2-select-v1', role: '', type: '', name: 'B', options: ['X'], optionFingerprint: 'fixture-option-x-v1' }],
       } }];
     }
     if (details.func?.name === 'executeBrowserPageAction' && details.args[1]?.ref === 'r2') throw new Error('select changed under us');
@@ -1989,9 +2082,11 @@ test('unchanged page after DOM and native click is surfaced as effect-not-observ
   await manager.create({ id: 'job-1', goal: 'Use control only if it really changes the page', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'NATIVE_CLICK_FALLBACK');
+  // An unchanged DOM never proves an AJAX/server click had no effect.
+  // Replan once without automatically emitting a second physical click.
   const final = await manager.cycleOne('job-1');
   assert.equal(final.kind, 'COMPLETED');
+  assert.equal(chrome._actionCalls.length, 1, 'unchanged DOM must not trigger blind click resend');
   const live = await manager.get('job-1');
   const evidence = live.job.runtime.history.find(item => item.type === 'effect-not-observed');
   assert.ok(evidence, 'the reasoning model must receive durable evidence that both click paths produced no observable effect');
@@ -2102,7 +2197,7 @@ test('new owner instruction supersedes an armed approval instead of leaving stal
   chrome.scripting.executeScript = async details => {
     if (details.func?.name === 'snapshotBrowserPage') {
       const snapshotId = details.args[0];
-      return [{ frameId: 0, result: { snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final', elements: [{ ref: 'r1', tag: 'button', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }] } }];
+      return [{ frameId: 0, result: { snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Final', elements: [{ ref: 'r1', tag: 'button', semanticIdentity: 'fixture-r1-button-v1', role: '', type: 'submit', name: 'Save', submitLike: true, formAssociated: true, formAction: 'https://ais.example.edu/save', formMethod: 'post' }] } }];
     }
     return original(details);
   };
@@ -2368,7 +2463,7 @@ test('upload_download accepts only completed tracked download handle and always 
   const complete = { ref: 'd1', filename: 'plan.pdf', state: 'complete' };
   Object.defineProperty(complete, 'downloadId', { value: 42, enumerable: false });
   const snapshot = {
-    frames: [{ frameId: 0, elements: [{ ref: 'r1', tag: 'input', role: '', type: 'file', name: 'Attach plan', sensitive: true }] }],
+    frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'file', name: 'Attach plan', sensitive: true }] }],
     downloads: [complete],
   };
   const action = parseBrowserAgentAction(JSON.stringify({ type: 'upload_download', frameId: 0, ref: 'r1', downloadRef: 'd1' }), snapshot);
@@ -2408,7 +2503,7 @@ test('approved upload_download uses internal tracked path through CDP and verifi
       const snapshotId = details.args[0];
       return [{ frameId: 0, result: {
         snapshotId, url: 'https://ais.example.edu/app', title: 'AIS', text: 'Upload',
-        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'file', name: 'Attach study plan', sensitive: true }],
+        elements: [{ ref: 'r1', tag: 'input', semanticIdentity: 'fixture-r1-input-v1', role: '', type: 'file', name: 'Attach study plan', sensitive: true }],
       } }];
     }
     if (details.func?.name === 'verifyBrowserFileInput') return [{ frameId: 0, result: { ok: true, files: [{ name: 'plan.pdf', size: 100, type: 'application/pdf' }] } }];
@@ -2481,10 +2576,16 @@ test('vision can drive a bounded native coordinate click without a DOM ref under
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: false },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: false },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: true } }];
@@ -2513,7 +2614,8 @@ test('vision can drive a bounded native coordinate click without a DOM ref under
   await manager.create({ id: 'job-1', goal: 'Open the visual timetable control', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   assert.match(prompts[1].prompt, /click_at/);
   assert.equal(prompts[1].imageDataUrl, 'data:image/jpeg;base64,QUJDRA==');
   const mouse = cdp.filter(([method]) => method === 'Input.dispatchMouseEvent');
@@ -2527,8 +2629,10 @@ test('coordinate click revalidates the exact target after debugger attach before
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') return [{ frameId: 0, result: {
       x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
       target: { tag: 'button', role: '', type: 'button', name: 'Open timetable', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', editable: false, sensitive: false, visualOnly: false },
@@ -2537,7 +2641,7 @@ test('coordinate click revalidates the exact target after debugger attach before
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2551,6 +2655,7 @@ test('coordinate click revalidates the exact target after debugger attach before
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.dispatchMouseEvent'), false, 'stale post-attach coordinate must never dispatch native mouse input');
 });
 
@@ -2560,10 +2665,15 @@ test('visual-only coordinate click waits for approval and stale coordinate appro
   let verifyOk = true;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: verifyOk } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'canvas', role: '', type: '', name: '', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'canvas', role: '', type: '', name: '', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: verifyOk } }];
@@ -2598,12 +2708,18 @@ test('vision can drive a bounded native coordinate drag under explicit ALLOW_ALL
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       const isSource = x < 400;
       return [{ frameId: 0, result: {
         x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
         target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 },
           tag: 'div', role: '', type: '', name: isSource ? 'Course A' : 'Monday slot', href: '', disabled: false,
           submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true,
         },
@@ -2634,7 +2750,8 @@ test('vision can drive a bounded native coordinate drag under explicit ALLOW_ALL
   await manager.create({ id: 'job-1', goal: 'Move Course A to Monday slot', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   const mouse = cdp.filter(([method]) => method === 'Input.dispatchMouseEvent');
   assert.ok(mouse.length >= 6, 'native drag must include movement, press, intermediate movement and release');
   const pressed = mouse.find(([, params]) => params.type === 'mousePressed');
@@ -2653,8 +2770,10 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       return [{ frameId: 0, result: { x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720, target: {
@@ -2665,7 +2784,7 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2679,6 +2798,7 @@ test('coordinate drag revalidates both endpoints after debugger attach before an
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.dispatchMouseEvent'), false, 'stale post-attach drag endpoint must stop before native mouse events');
 });
 
@@ -2688,11 +2808,16 @@ test('coordinate drag approval is TOCTOU-safe and stale source/destination dispa
   let verifyCalls = 0;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: ++verifyCalls === 1 } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       const [x, y] = details.args;
       return [{ frameId: 0, result: {
         x, y, url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'div', role: '', type: '', name: x < 400 ? 'Course A' : 'Monday slot', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'div', role: '', type: '', name: x < 400 ? 'Course A' : 'Monday slot', href: '', disabled: false, submitLike: false, formAssociated: false, formAction: '', formMethod: '', visualOnly: true },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') {
@@ -2729,10 +2854,16 @@ test('vision can focus a coordinate text target and insert text through native C
   const cdp = [];
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    // The same Chrome-injected verifier receives the fingerprint on live reproof.
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: true } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') {
       return [{ frameId: 0, result: {
         x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
-        target: { tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
+        target: {
+          pageUrl: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
+          viewportScrollX: 0, viewportScrollY: 0, documentEpoch: 1700000000000,
+          captureX: details.args[0], captureY: details.args[1],
+          rect: { left: 0, top: 0, width: 1280, height: 720 }, tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
       } }];
     }
     if (details.func?.name === 'verifyBrowserCoordinateTarget') return [{ frameId: 0, result: { ok: true } }];
@@ -2756,7 +2887,8 @@ test('vision can focus a coordinate text target and insert text through native C
   await manager.create({ id: 'job-1', goal: 'Enter schedule note visually', stepDelayMs: 0 });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
-  assert.equal((await manager.cycleOne('job-1')).kind, 'ACTION');
+  const effectCycle = await manager.cycleOne('job-1');
+  assert.equal(effectCycle.kind, 'ACTION', JSON.stringify({ effectCycle, lastError: (await manager.get('job-1')).job.runtime.lastError }));
   assert.ok(cdp.some(([method, params]) => method === 'Input.insertText' && params.text === 'No Friday conflict'));
   assert.equal((await manager.cycleOne('job-1')).kind, 'COMPLETED');
 });
@@ -2765,8 +2897,10 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
   const chrome = makeChrome();
   const cdp = [];
   let attached = false;
+  let reachedDebugger = false;
   const originalScript = chrome.scripting.executeScript;
   chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'probeBrowserCoordinateTarget' && details.args.length >= 3) return [{ frameId: 0, result: { ok: !attached } }];
     if (details.func?.name === 'probeBrowserCoordinateTarget') return [{ frameId: 0, result: {
       x: details.args[0], y: details.args[1], url: 'https://ais.example.edu/app', viewportWidth: 1280, viewportHeight: 720,
       target: { tag: 'textarea', role: '', type: '', name: 'Schedule note', href: '', disabled: false, submitLike: false, formAssociated: true, formAction: '', formMethod: 'post', editable: true, sensitive: false, visualOnly: false },
@@ -2775,7 +2909,7 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
     return originalScript(details);
   };
   chrome.debugger = {
-    async attach() { attached = true; },
+    async attach() { attached = true; reachedDebugger = true; },
     async sendCommand(_target, method) { cdp.push(method); if (method === 'Page.captureScreenshot') return { data: 'QUJDRA==' }; return {}; },
     async detach() { attached = false; },
   };
@@ -2789,6 +2923,7 @@ test('coordinate typing revalidates edit target after debugger attach before Inp
   await manager.cycleOne('job-1');
   const result = await manager.cycleOne('job-1');
   assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(reachedDebugger, true, 'negative proof must exercise post-attach revalidation, not fail earlier');
   assert.equal(cdp.includes('Input.insertText'), false, 'stale post-attach text target must block native text insertion');
 });
 

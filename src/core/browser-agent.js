@@ -521,6 +521,17 @@ export function validateTrustedScriptSource(code) {
   return source;
 }
 
+// Ref ordinals belong to exactly one observed frame and one element.
+// A duplicated persisted target cannot authorize a policy or credential effect.
+function uniqueObservedBrowserTarget(snapshot, frameId, ref) {
+  if (!Number.isInteger(frameId) || frameId < 0 || typeof ref !== 'string' || !ref
+    || !Array.isArray(snapshot?.frames)) return null;
+  const frames = snapshot.frames.filter(frame => frame && frame.frameId === frameId);
+  if (frames.length !== 1 || !Array.isArray(frames[0].elements)) return null;
+  const matching = frames[0].elements.filter(element => element && element.ref === ref);
+  return matching.length === 1 ? { frame: frames[0], element: matching[0] } : null;
+}
+
 function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   const type = clean(raw?.type, 40).toLowerCase();
   if (!ACTION_TYPES.has(type) || (!allowBatch && type === BrowserAgentActionType.BATCH)) {
@@ -528,8 +539,12 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   }
   if (type === BrowserAgentActionType.BATCH) {
     if (!allowBatch) throw new Error('Nested Browser Agent batches are not allowed');
-    const items = Array.isArray(raw.actions) ? raw.actions.slice(0, 8) : [];
-    if (!items.length) throw new Error('Browser Agent batch requires at least one action');
+    if (!Array.isArray(raw.actions) || raw.actions.length === 0 || raw.actions.length > 8) {
+      // Never silently drop actions from a model-proposed batch. A truncated
+      // form transaction can leave a partially mutated, misleading state.
+      throw new Error('Browser Agent batch requires 1–8 explicit actions');
+    }
+    const items = raw.actions;
     const actions = items.map(item => parseSingleAction(item, snapshot, refs, { allowBatch: false }));
     if (actions.some(action => !BATCH_ACTION_TYPES.has(action.type))) {
       throw new Error('Browser Agent batch may contain only fill/select/check actions');
@@ -550,36 +565,56 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     const evidence = raw.evidence;
     if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new Error('Browser Agent verify_plan_node requires evidence');
     const snapshotSignature = clean(evidence.snapshotSignature, 80);
-    const checks = Array.isArray(evidence.checks) ? evidence.checks.slice(0, 32).map((check, index) => {
+    // A verifier must receive the exact declared evidence set. Truncating a
+    // 33rd criterion or coercing an object/string to a numeric criterion can
+    // falsely change what the agent claims was independently verified.
+    if (evidence.checks !== undefined && (!Array.isArray(evidence.checks) || evidence.checks.length > 32)) {
+      throw new Error('Browser Agent verify_plan_node requires at most 32 explicit evidence checks');
+    }
+    const checks = (evidence.checks || []).map((check, index) => {
       if (!check || typeof check !== 'object' || Array.isArray(check)) throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} must be an object`);
-      const criterion = Number(check.criterion);
-      const detail = clean(check.detail || check.evidence, 1000);
-      if (!Number.isInteger(criterion) || criterion < 1 || !detail) throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} is invalid`);
-      return { criterion, detail };
-    }) : [];
+      const criterion = check.criterion;
+      const detailValue = check.detail === undefined ? check.evidence : check.detail;
+      if (!Number.isSafeInteger(criterion) || criterion < 1
+        || typeof detailValue !== 'string' || !detailValue.trim() || detailValue.length > 1000) {
+        throw new Error(`Browser Agent verify_plan_node evidence check ${index + 1} is invalid`);
+      }
+      return { criterion, detail: detailValue.trim() };
+    });
     action.evidence = { snapshotSignature, checks };
   }
   if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT].includes(type)) {
     if (snapshot?.visionAttached !== true) throw new Error(`Browser Agent ${type} requires a screenshot attached to this exact reasoning turn`);
-    const topFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === 0) || snapshot?.frames?.[0] || null;
+    // Screenshot CSS coordinates may only be borrowed from exact numeric
+    // Chrome main-frame identity, never a coercible ID or arbitrary iframe.
+    const topFrame = Array.isArray(snapshot?.frames)
+      ? snapshot.frames.find(frame => frame?.frameId === 0) || null
+      : null;
     const viewport = topFrame?.viewport || snapshot?.visionViewport || null;
-    const width = Number(viewport?.width || 0);
-    const height = Number(viewport?.height || 0);
-    if (!(width > 0) || !(height > 0)) throw new Error(`Browser Agent ${type} requires a current visible viewport`);
+    const width = viewport?.width;
+    const height = viewport?.height;
+    if (typeof width !== 'number' || !Number.isFinite(width)
+      || typeof height !== 'number' || !Number.isFinite(height)
+      || !(width > 0) || !(height > 0)) throw new Error(`Browser Agent ${type} requires a current visible viewport`);
     const normalizePoint = (xValue, yValue, label) => {
-      const x = Number(xValue);
-      const y = Number(yValue);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Browser Agent ${type} requires finite ${label} coordinates from the attached screenshot`);
+      const x = xValue;
+      const y = yValue;
+      if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Browser Agent ${type} requires finite ${label} coordinates from the attached screenshot`);
       if (x < 0 || y < 0 || x >= width || y >= height) throw new Error(`Browser Agent ${type} ${label} coordinates are outside the current visible viewport`);
-      return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      // Exact screenshot points must not be silently moved before native
+      // pointer input. Rounding can cross a subpixel hit-target boundary.
+      return { x, y };
     };
     if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(type)) {
       const point = normalizePoint(raw?.x, raw?.y, 'target');
       action.x = point.x;
       action.y = point.y;
       if (type === BrowserAgentActionType.TYPE_AT) {
-        action.text = typeof raw?.text === 'string' ? raw.text.slice(0, 50000) : '';
-        if (!action.text) throw new Error('Browser Agent type_at requires non-empty text');
+        if (typeof raw?.text !== 'string' || !raw.text.length || raw.text.length > 50000) {
+          // Partial native input is not the effect the owner/model requested.
+          throw new Error('Browser Agent type_at requires bounded non-empty text');
+        }
+        action.text = raw.text;
       }
     } else {
       const start = normalizePoint(raw?.startX, raw?.startY, 'start');
@@ -590,7 +625,14 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       action.startY = start.y;
       action.endX = end.x;
       action.endY = end.y;
-      action.durationMs = Math.min(2000, Math.max(120, Number(raw?.durationMs) || 450));
+      // Model JSON may contain null/string/boolean timing. Do not coerce a
+      // malformed effect envelope into a plausible native pointer duration.
+      const durationMs = raw?.durationMs;
+      if (durationMs !== undefined && (typeof durationMs !== 'number'
+        || !Number.isSafeInteger(durationMs) || durationMs < 120 || durationMs > 2000)) {
+        throw new Error('Browser Agent drag_at requires an exact bounded durationMs');
+      }
+      action.durationMs = durationMs === undefined ? 450 : durationMs;
     }
   }
   if (type === BrowserAgentActionType.TRUSTED_SCRIPT) {
@@ -603,22 +645,46 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.origin = new URL(pageUrl).origin;
   }
   if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.DOWNLOAD, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
-    action.frameId = Number(raw.frameId);
+    action.frameId = raw?.frameId;
     action.ref = clean(raw.ref, 120);
     if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) throw new Error('Browser Agent action references an element outside the current snapshot');
+    // The ref is only an observation-local ordinal. Bind mutations to the
+    // exact frame URL and semantic target observed before model reasoning.
+    // Page text/model output cannot manufacture this proof.
+    // A file picker is a consequential local-file effect, not a trusted
+    // ref alone. Bind its file-input meaning to the same snapshot/URL/label
+    // evidence used for clicks before Chrome DOM.setFileInputFiles.
+    if ([BrowserAgentActionType.CLICK, BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK, BrowserAgentActionType.UPLOAD_DOWNLOAD].includes(type)) {
+      const proof = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref);
+      const frame = proof?.frame;
+      const target = proof?.element;
+      if (!target?.semanticIdentity || !clean(frame?.url, 4096)) throw new Error('Browser Agent semantic target identity is missing or ambiguous');
+      action.expectedSemanticIdentity = target.semanticIdentity;
+      action.expectedFrameUrl = clean(frame.url, 4096);
+      // Bind live accessible labels, link destinations, and form endpoints, too.
+      // An external aria-labelledby label or parent form can change without
+      // changing the element's own attributes/textContent.
+      action.expectedSemanticName = String(target.name ?? '');
+      action.expectedSemanticHref = String(target.href ?? '');
+      action.expectedSemanticFormAction = String(target.formAction ?? '');
+      action.expectedSemanticFormMethod = String(target.formMethod ?? '');
+    }
   }
   if (type === BrowserAgentActionType.FILL_CREDENTIAL) {
     const credentialRef = clean(raw.credentialRef, 80);
-    const credential = (snapshot?.credentials || []).find(item => item?.ref === credentialRef);
+    const credentialMatches = Array.isArray(snapshot?.credentials)
+      ? snapshot.credentials.filter(item => item && item.ref === credentialRef) : [];
+    const credential = credentialMatches.length === 1 ? credentialMatches[0] : null;
     if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action references a credential outside the current snapshot');
 
-    const passwordFrameId = Number(raw.passwordFrameId);
+    const passwordFrameId = raw.passwordFrameId;
     const passwordRef = clean(raw.passwordRef, 120);
     if (!Number.isInteger(passwordFrameId) || !passwordRef || !refs.has(`${passwordFrameId}:${passwordRef}`)) {
       throw new Error('Browser Agent credential action requires an exact current password field');
     }
-    const passwordFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === passwordFrameId);
-    const passwordElement = (passwordFrame?.elements || []).find(item => item.ref === passwordRef);
+    const passwordProof = uniqueObservedBrowserTarget(snapshot, passwordFrameId, passwordRef);
+    const passwordFrame = passwordProof?.frame;
+    const passwordElement = passwordProof?.element;
     if (String(passwordElement?.tag || '').toLowerCase() !== 'input'
       || String(passwordElement?.type || '').toLowerCase() !== 'password'
       || passwordElement?.sensitive !== true) {
@@ -627,21 +693,48 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
 
     let usernameFrameId = null;
     let usernameRef = '';
+    let usernameElement = null;
     if (raw.usernameRef != null || raw.usernameFrameId != null) {
-      usernameFrameId = Number(raw.usernameFrameId);
+      usernameFrameId = raw.usernameFrameId;
       usernameRef = clean(raw.usernameRef, 120);
       if (!Number.isInteger(usernameFrameId) || !usernameRef || !refs.has(`${usernameFrameId}:${usernameRef}`)) {
         throw new Error('Browser Agent credential username target is outside the current snapshot');
       }
       if (usernameFrameId !== passwordFrameId) throw new Error('Browser Agent credential username/password fields must be in the same frame in V1');
-      const usernameFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === usernameFrameId);
-      const usernameElement = (usernameFrame?.elements || []).find(item => item.ref === usernameRef);
+      const usernameProof = uniqueObservedBrowserTarget(snapshot, usernameFrameId, usernameRef);
+      usernameElement = usernameProof?.element || null;
       const usernameType = String(usernameElement?.type || '').toLowerCase();
-      if (!usernameElement || usernameElement.sensitive === true || usernameType === 'password' || usernameType === 'file') {
+      const usernameTag = String(usernameElement?.tag || '').toLowerCase();
+      // Only real text input types may receive an owner broker username.
+      // A checkbox, button, radio, date, number or other input can emit a
+      // consequential change event even when its value setter accepts text.
+      const textInput = ['text', 'email', 'search', 'tel', 'url'].includes(usernameType);
+      if (!usernameElement || usernameElement.sensitive === true
+        || (usernameTag === 'input' && !textInput)
+        || usernameType === 'password' || usernameType === 'file') {
         throw new Error('Browser Agent credential username target is not a non-sensitive editable field');
       }
     }
 
+    // Broker origin is not sufficient after delayed approvals or navigation.
+    // Bind the password and optional username to exact observed DOM identities.
+    if (!clean(passwordFrame?.url, 4096) || !clean(passwordElement?.semanticIdentity, 80)) {
+      throw new Error('Browser Agent credential semantic target identity is missing');
+    }
+    action.expectedFrameUrl = clean(passwordFrame.url, 4096);
+    action.expectedPasswordSemanticIdentity = passwordElement.semanticIdentity;
+    action.expectedPasswordName = String(passwordElement.name ?? '');
+    action.expectedPasswordFormAction = String(passwordElement.formAction ?? '');
+    action.expectedPasswordFormMethod = String(passwordElement.formMethod ?? '');
+    if (usernameRef) {
+      if (!clean(usernameElement?.semanticIdentity, 80)) {
+        throw new Error('Browser Agent credential semantic target identity is missing');
+      }
+      action.expectedUsernameSemanticIdentity = usernameElement.semanticIdentity;
+      action.expectedUsernameName = String(usernameElement.name ?? '');
+      action.expectedUsernameFormAction = String(usernameElement.formAction ?? '');
+      action.expectedUsernameFormMethod = String(usernameElement.formMethod ?? '');
+    }
     action.credentialRef = credentialRef;
     action.credentialId = clean(credential.credentialId, 128);
     action.frameId = passwordFrameId;
@@ -651,26 +744,77 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.usernameFrameId = usernameFrameId;
     action.usernameRef = usernameRef;
   }
-  if (type === BrowserAgentActionType.FILL) action.text = typeof raw.text === 'string' ? raw.text.slice(0, 50000) : '';
-  if (type === BrowserAgentActionType.SELECT) {
-    action.value = clean(raw.value, 5000);
-    if (!action.value) throw new Error('Browser Agent select action requires value');
+  if (type === BrowserAgentActionType.FILL) {
+    // Empty strings intentionally clear a form field; non-string or oversized
+    // inputs are invalid rather than silently coercing/truncating an effect.
+    if (typeof raw?.text !== 'string' || raw.text.length > 50000) {
+      throw new Error('Browser Agent fill requires an exact bounded text value');
+    }
+    action.text = raw.text;
   }
-  if (type === BrowserAgentActionType.CHECK) action.checked = raw.checked !== false;
+  if (type === BrowserAgentActionType.SELECT) {
+    // Option values are exact remote form effect identities. Never silently
+    // trim or truncate a model-proposed value into another option.
+    if (typeof raw?.value !== 'string' || raw.value.length === 0 || raw.value.length > 5000) {
+      throw new Error('Browser Agent select requires an exact bounded option value');
+    }
+    action.value = raw.value;
+    const observed = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref)?.element;
+    // This action promises one selected value. A multi-select mutation can
+    // silently clear other selected values; it needs a distinct exact-set contract.
+    if (observed?.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
+    if (typeof observed?.optionFingerprint !== 'string' || !observed.optionFingerprint) {
+      throw new Error('Browser Agent select options require observed target identity');
+    }
+    action.expectedOptionFingerprint = observed.optionFingerprint;
+  }
+  if (type === BrowserAgentActionType.CHECK) {
+    // A missing, null, or string "false" model field must not silently
+    // authorize the opposite checkbox/radio side effect.
+    if (typeof raw.checked !== 'boolean') {
+      throw new Error('Browser Agent check requires an explicit boolean checked value');
+    }
+    action.checked = raw.checked;
+  }
   if (type === BrowserAgentActionType.KEY) {
     action.key = raw.key === 'Space' ? ' ' : String(raw.key || '');
     if (!ALLOWED_KEYS.has(action.key)) throw new Error(`Browser Agent key is not allowed: ${action.key}`);
     if (action.key === 'Enter' || action.key === ' ') {
-      action.frameId = Number(raw.frameId);
+      action.frameId = raw?.frameId;
       action.ref = clean(raw.ref, 120);
       if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) {
         throw new Error('Browser Agent Enter/Space key action requires an exact current snapshot frameId/ref target');
       }
+      // Keys can submit forms and activate controls. They need the same
+      // observed semantic identity as a pointer click, never a bare ordinal ref.
+      const proof = uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref);
+      const frame = proof?.frame;
+      const observed = proof?.element;
+      if (!observed?.semanticIdentity || !clean(frame?.url, 4096)) {
+        throw new Error('Browser Agent key target identity is missing or ambiguous');
+      }
+      action.expectedSemanticIdentity = observed.semanticIdentity;
+      action.expectedFrameUrl = clean(frame.url, 4096);
+      action.expectedSemanticName = String(observed.name ?? '');
+      action.expectedSemanticHref = String(observed.href ?? '');
+      action.expectedSemanticFormAction = String(observed.formAction ?? '');
+      action.expectedSemanticFormMethod = String(observed.formMethod ?? '');
     }
   }
   if (type === BrowserAgentActionType.SCROLL) {
-    action.direction = raw.direction === 'up' ? 'up' : 'down';
-    action.amount = Math.min(3, Math.max(0.25, Number(raw.amount) || 0.8));
+    // Never reinterpret a malformed or recovered owner scroll intent as "down".
+    // Legacy omission of amount keeps the documented default; an explicitly
+    // present null/string/boolean/out-of-range value is not a safe default.
+    if (raw?.direction !== 'up' && raw?.direction !== 'down') {
+      throw new Error('Browser Agent scroll requires an explicit up/down direction');
+    }
+    const amount = raw?.amount;
+    if (amount !== undefined && (typeof amount !== 'number'
+      || !Number.isFinite(amount) || amount < 0.25 || amount > 3)) {
+      throw new Error('Browser Agent scroll requires an exact bounded amount');
+    }
+    action.direction = raw.direction;
+    action.amount = amount === undefined ? 0.8 : amount;
   }
   if (type === BrowserAgentActionType.NAVIGATE) action.url = safeHttpUrl(raw.url);
   if (type === BrowserAgentActionType.WAIT) action.seconds = Math.min(60, Math.max(1, Number(raw.seconds) || 2));
@@ -691,13 +835,21 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     if (evidence != null) {
       if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new Error('Browser Agent done evidence must be an object');
       const snapshotSignature = clean(evidence.snapshotSignature, 80);
-      const checks = Array.isArray(evidence.checks) ? evidence.checks.slice(0, 20).map((check, index) => {
+      // Completion evidence is an exact owner-contract claim. Never silently
+      // truncate an additional check or coerce a model-supplied criterion.
+      if (evidence.checks !== undefined && (!Array.isArray(evidence.checks) || evidence.checks.length > 20)) {
+        throw new Error('Browser Agent done evidence requires at most 20 explicit checks without truncation');
+      }
+      const checks = (evidence.checks || []).map((check, index) => {
         if (!check || typeof check !== 'object' || Array.isArray(check)) throw new Error(`Browser Agent done evidence check ${index + 1} must be an object`);
-        const criterion = Number(check.criterion);
-        const detail = clean(check.detail || check.evidence, 1000);
-        if (!Number.isInteger(criterion) || criterion < 1 || !detail) throw new Error(`Browser Agent done evidence check ${index + 1} is invalid`);
-        return { criterion, detail };
-      }) : [];
+        const criterion = check.criterion;
+        const detailValue = check.detail === undefined ? check.evidence : check.detail;
+        if (!Number.isSafeInteger(criterion) || criterion < 1
+          || typeof detailValue !== 'string' || !detailValue.trim() || detailValue.length > 1000) {
+          throw new Error(`Browser Agent done evidence check ${index + 1} is invalid`);
+        }
+        return { criterion, detail: detailValue.trim() };
+      });
       action.evidence = { snapshotSignature, checks };
     }
   }
@@ -895,9 +1047,13 @@ export function snapshotBrowserPage(snapshotId) {
   const normalize = (value, max = 500) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   const visible = (element) => {
     if (!(element instanceof Element) || !element.isConnected) return false;
-    if (element.hidden || element.inert || element.getAttribute('aria-hidden') === 'true') return false;
-    const style = getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return false;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') return false;
+    }
     const rect = element.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   };
@@ -906,6 +1062,16 @@ export function snapshotBrowserPage(snapshotId) {
     const labels = element.labels ? Array.from(element.labels).map(label => label.textContent || '').join(' ') : '';
     const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
     return normalize(element.getAttribute('aria-label') || labelledBy(element) || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '', 800);
+  };
+  const semanticIdentity = (element) => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
   };
   try {
     document.querySelectorAll(`[${marker}]`).forEach(element => { element.removeAttribute(marker); element.removeAttribute(snapshotMarker); });
@@ -916,6 +1082,23 @@ export function snapshotBrowserPage(snapshotId) {
     '[role="checkbox"]', '[role="radio"]', '[role="tab"]', '[role="menuitem"]',
     '[role="option"]', '[role="treeitem"]', '[role="switch"]',
   ].join(',');
+  const optionFingerprint = (element) => {
+    if (String(element.tagName || '').toLowerCase() !== 'select') return '';
+    const options = element.options;
+    if (!options || options.length > 500) return '';
+    const entries = Array.from(options).map(option => [
+      String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
+      String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true', String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+    ]);
+    const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
+    if (source.length > 100000) return '';
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
   const candidates = Array.from(document.querySelectorAll(selector)).filter(visible).slice(0, 350);
   const elements = [];
   let ordinal = 0;
@@ -938,7 +1121,8 @@ export function snapshotBrowserPage(snapshotId) {
       role: normalize(element.getAttribute('role') || '', 80),
       type: normalize(controlType, 80),
       name: accessibleName(element),
-      disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
+      semanticIdentity: semanticIdentity(element),
+      disabled: Boolean(element.disabled || String(element.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true'),
       submitLike,
       formAssociated: Boolean(form),
       formAction: normalize(effectiveFormAction, 1200),
@@ -946,10 +1130,32 @@ export function snapshotBrowserPage(snapshotId) {
     };
     if (tag === 'a' || tag === 'area') item.href = normalize(element.href || element.getAttribute('href') || '', 1200);
     if (tag === 'select') {
+      item.multiple = Boolean(element.multiple);
+      item.optionFingerprint = optionFingerprint(element);
       item.selected = normalize(element.options?.[element.selectedIndex]?.textContent || '', 500);
-      item.options = Array.from(element.options || []).filter(option => !option.disabled).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
+      item.options = Array.from(element.options || []).filter(option => !(
+        option.disabled || option.hidden || option.parentElement?.disabled || option.parentElement?.hidden
+        || String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+        || String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+        || String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      )).slice(0, 60).map(option => normalize(option.textContent || option.label || option.value, 500));
     }
-    if (inputType === 'checkbox' || inputType === 'radio' || element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'radio') item.checked = Boolean(element.checked || element.getAttribute('aria-checked') === 'true');
+    if (inputType === 'checkbox' || inputType === 'radio' || ['checkbox', 'radio', 'switch'].includes(element.getAttribute('role'))) {
+      // Missing, mixed, or malformed ARIA checked state is not proof of false. Keep
+      // the ambiguity visible to the planner after snapshot/restart.
+      const ariaChecked = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
+      // Native checkboxes/radios expose a browser-owned boolean property.
+      // A custom ARIA control may expose an arbitrary page-defined .checked
+      // value; it is NOT accessibility state or trusted completion evidence.
+      const nativeCheckable = tag === 'input' && (inputType === 'checkbox' || inputType === 'radio');
+      if (nativeCheckable) {
+        const checked = element.checked;
+        item.checked = typeof checked === 'boolean' ? checked : null;
+      } else {
+        item.checked = ariaChecked === 'false' ? false : ariaChecked === 'true' ? true : null;
+      }
+    }
     if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
       item.sensitive = sensitive;
       item.filled = sensitive ? undefined : Boolean(normalize(element.value ?? element.textContent ?? '', 2));
@@ -964,81 +1170,312 @@ export function snapshotBrowserPage(snapshotId) {
     title: normalize(document.title || '', 500),
     text: bodyText,
     elements,
-    viewport: { width: innerWidth, height: innerHeight, scrollY: Math.round(scrollY), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
+    viewport: { width: innerWidth, height: innerHeight, scrollX: Math.round(Number(globalThis.scrollX || 0)), scrollY: Math.round(scrollY), documentEpoch: Number(performance.timeOrigin), documentHeight: Math.round(document.documentElement?.scrollHeight || 0) },
   };
 }
 
 export function executeBrowserPageAction(snapshotId, action) {
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const ref = String(action?.ref || '');
-  const target = ref ? Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId) : null;
+  const ref = typeof action?.ref === 'string' ? action.ref : '';
+  // A page can duplicate our observation marker after the snapshot (including
+  // after an approval/restart). The first matching node is not authoritative:
+  // reject ambiguous refs before ANY click, fill, select, or check effect.
+  const matches = ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll(`[${marker}]`)).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
+  const semanticIdentity = (element) => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const optionFingerprint = (element) => {
+    if (String(element.tagName || '').toLowerCase() !== 'select') return '';
+    const options = element.options;
+    if (!options || options.length > 500) return '';
+    const entries = Array.from(options).map(option => [
+      String(option.value ?? ''), String(option.textContent ?? ''), String(option.label ?? ''),
+      Boolean(option.disabled || option.parentElement?.disabled), Boolean(option.hidden || option.parentElement?.hidden),
+      String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true', String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true',
+      String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true',
+    ]);
+    const source = JSON.stringify([Boolean(element.multiple), Number(element.size ?? 0), entries]);
+    if (source.length > 100000) return '';
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
   const ensureTarget = () => {
     if (!target || !target.isConnected) throw new Error('AGENT_TARGET_STALE');
-    if (target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
+    const tag = String(target.tagName || '').toLowerCase();
+    const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
+      : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
+    const form = target.form instanceof HTMLFormElement ? target.form : null;
+    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
+    const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
+    const normalizeObserved = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    // Chrome scripting serializes this function without imported module helpers.
+    // Resolve accessible names entirely within this injected action function.
+    const labelIds = String(target.getAttribute('aria-labelledby') || '').split(/\s+/);
+    const labelledBy = labelIds.map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = target.labels ? Array.from(target.labels).map(label => label.textContent || '').join(' ') : '';
+    const imageAlt = target.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    const currentName = normalizeObserved(target.getAttribute('aria-label') || labelledBy || labels
+      || target.getAttribute('alt') || imageAlt || target.getAttribute('title') || target.textContent
+      || target.getAttribute('placeholder') || target.getAttribute('name') || target.id || '', 800);
+    const href = (tag === 'a' || tag === 'area') ? normalizeObserved(target.href || target.getAttribute('href'), 1200) : '';
+    if (!action.expectedSemanticIdentity || !action.expectedFrameUrl
+      || typeof action.expectedSemanticName !== 'string'
+      || typeof action.expectedSemanticHref !== 'string'
+      || typeof action.expectedSemanticFormAction !== 'string'
+      || typeof action.expectedSemanticFormMethod !== 'string'
+      || location.href !== action.expectedFrameUrl
+      || semanticIdentity(target) !== action.expectedSemanticIdentity
+      || currentName !== action.expectedSemanticName
+      || href !== action.expectedSemanticHref
+      || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
+      || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
+    // Do not activate a target whose ancestor has become hidden/inert or whose
+    // computed visibility changed after the planner's semantic observation.
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true' || node.disabled) throw new Error('AGENT_TARGET_UNAVAILABLE');
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') throw new Error('AGENT_TARGET_UNAVAILABLE');
+    }
     return target;
   };
-  const events = (element) => {
+  const events = (element, verify) => {
+    // Page-owned input handlers can change a field, retarget its semantic
+    // identity or open an overlay before change. Do not grant a second
+    // consequential listener invocation using an invalidated observation.
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    verify();
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    verify();
+  };
+  // Programmatic fill/select are browser effects too. Do not use synthetic
+  // events to bypass a focus-time modal or an occluded/unavailable control.
+  const ensureUnoccluded = (element) => {
+    ensureTarget();
+    const bounds = element.getBoundingClientRect();
+    const x = bounds.left + bounds.width / 2;
+    const y = bounds.top + bounds.height / 2;
+    if (!(bounds.width > 0 && bounds.height > 0)
+      || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
+      throw new Error('AGENT_TARGET_NOT_VISIBLE');
+    }
+    const hit = document.elementFromPoint(x, y);
+    if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
+    ensureTarget();
   };
   if (action.type === 'click') {
     const element = ensureTarget();
     element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     element.focus?.({ preventScroll: true });
+    // Focus handlers may synchronously repurpose the very same DOM node.
+    ensureTarget();
+    // Native pointer users cannot activate obscured controls; synthetic DOM
+    // clicks must not bypass a modal/overlay that appeared during planning.
+    const bounds = element.getBoundingClientRect();
+    const pointX = bounds.left + bounds.width / 2;
+    const pointY = bounds.top + bounds.height / 2;
+    if (!(bounds.width > 0 && bounds.height > 0)
+      || pointX < 0 || pointY < 0 || pointX >= innerWidth || pointY >= innerHeight) {
+      throw new Error('AGENT_TARGET_NOT_VISIBLE');
+    }
+    const hit = document.elementFromPoint(pointX, pointY);
+    if (hit !== element && !element.contains?.(hit)) throw new Error('AGENT_TARGET_OCCLUDED');
+    ensureTarget();
     element.click();
-    return { ok: true, kind: 'click', url: location.href };
+    // A click is an attempted effect, not proof of navigation/server commit.
+    return { ok: true, kind: 'click', effectVerified: false, url: location.href };
   }
   if (action.type === 'fill') {
+    // Approved/recovered actions can bypass planner parsing. Never coerce
+    // missing, non-string or oversized text into a different form effect.
+    if (typeof action.text !== 'string' || action.text.length > 50000) {
+      throw new Error('AGENT_FILL_TEXT_INVALID');
+    }
     const element = ensureTarget();
+    // FILL is a text edit, never an alias for CHECK or a hidden/control
+    // mutation that synthetic input/change events could silently trigger.
+    // Reject before focus handlers, pointer movement, setters or events.
+    const inputTag = String(element.tagName || '').toLowerCase();
+    const inputKind = inputTag === 'input'
+      ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
+    if (inputTag === 'input' && [
+      'hidden', 'password', 'file', 'checkbox', 'radio', 'submit', 'reset',
+      'button', 'image', 'range', 'color',
+    ].includes(inputKind)) throw new Error('AGENT_TARGET_NOT_FILLABLE');
+    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    element.focus?.({ preventScroll: true });
+    ensureUnoccluded(element);
     const tag = element.tagName.toLowerCase();
     const inputType = tag === 'input' ? String(element.type || 'text').toLowerCase() : '';
     if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_SENSITIVE_FIELD_BLOCKED');
-    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
-    element.focus?.({ preventScroll: true });
     const value = String(action.text ?? '');
     if (tag === 'input') {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
       if (setter) setter.call(element, value); else element.value = value;
-      events(element);
     } else if (tag === 'textarea') {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
       if (setter) setter.call(element, value); else element.value = value;
-      events(element);
     } else if (element.isContentEditable) {
       element.textContent = value;
-      events(element);
     } else throw new Error('AGENT_TARGET_NOT_FILLABLE');
-    const observedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
-    if (observedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    // Native typed fields can sanitize a value in their setter (number/date,
+    // for example). Reject the mismatch *before* firing input/change, which
+    // could persist or submit the wrong value in a page-level listener.
+    const acceptedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
+    if (acceptedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    events(element, () => {
+      ensureUnoccluded(element);
+      const observedValue = tag === 'input' || tag === 'textarea'
+        ? String(element.value ?? '') : String(element.textContent ?? '');
+      if (observedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    });
     return { ok: true, kind: 'fill', effectVerified: true, url: location.href };
   }
   if (action.type === 'select') {
     const element = ensureTarget();
     if (!(element instanceof HTMLSelectElement)) throw new Error('AGENT_TARGET_NOT_SELECT');
-    const wanted = String(action.value || '').trim().toLowerCase();
-    const option = Array.from(element.options).find(item => String(item.textContent || item.label || '').trim().toLowerCase() === wanted)
-      || Array.from(element.options).find(item => String(item.value || '').trim().toLowerCase() === wanted);
-    if (!option || option.disabled) throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    if (element.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
+    element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    element.focus?.({ preventScroll: true });
+    ensureUnoccluded(element);
+    if (element.multiple === true) throw new Error('AGENT_SELECT_MULTIPLE_UNSUPPORTED');
+    // After focus or restart a changed option set cannot inherit approval.
+    if (typeof action.expectedOptionFingerprint !== 'string'
+      || !action.expectedOptionFingerprint
+      || optionFingerprint(element) !== action.expectedOptionFingerprint) {
+      throw new Error('AGENT_SELECT_OPTIONS_STALE');
+    }
+    // A model-facing label can be used only when it resolves to one option.
+    // Prefer exact option values, including case and whitespace; never let
+    // normalized label equality silently pick a different consequential value.
+    if (typeof action.value !== 'string' || !action.value.length || action.value.length > 5000) {
+      throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    }
+    const options = Array.from(element.options);
+    const exact = options.filter(item => String(item.value) === action.value);
+    const normalizeOption = value => String(value ?? '').trim().toLowerCase();
+    const wanted = normalizeOption(action.value);
+    const candidates = exact.length ? exact : options.filter(item =>
+      normalizeOption(item.textContent || item.label || '') === wanted
+      || normalizeOption(item.value) === wanted);
+    if (!candidates.length) throw new Error('AGENT_SELECT_OPTION_NOT_FOUND');
+    if (candidates.length !== 1) throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
+    const option = candidates[0];
+    // Option visibility and optgroup availability are semantic eligibility,
+    // not merely stable fingerprints. A hidden/disabled option must not be
+    // selected through a programmatic change event that a user cannot trigger.
+    // This also applies to an already-unavailable option at snapshot time.
+    if (option.disabled || option.hidden || option.parentElement?.disabled
+      || option.parentElement?.hidden
+      || String(option.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+      || String(option.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(option.parentElement?.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true'
+      || String(option.parentElement?.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true') {
+      throw new Error('AGENT_SELECT_OPTION_AMBIGUOUS');
+    }
     element.value = option.value;
-    events(element);
+    // Even a selected option observed in the current snapshot may fail to
+    // become the selected value. Verify the accepted mutation before invoking
+    // page listeners; otherwise change handlers can persist a different state.
     if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    events(element, () => {
+      ensureUnoccluded(element);
+      if (element.multiple === true || optionFingerprint(element) !== action.expectedOptionFingerprint) {
+        throw new Error('AGENT_SELECT_OPTIONS_STALE');
+      }
+      if (element.value !== option.value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    });
     return { ok: true, kind: 'select', effectVerified: true, selected: String(option.textContent || option.label || option.value).trim(), url: location.href };
   }
   if (action.type === 'check') {
+    // The parser validates model JSON, but resumed/approved actions may reach
+    // this executor through persisted job state. Never let a missing or
+    // coercible checked value turn into an implicit true side effect.
+    if (typeof action.checked !== 'boolean') throw new Error('AGENT_CHECK_STATE_INVALID');
     const element = ensureTarget();
-    const desired = action.checked !== false;
-    const role = element.getAttribute('role');
-    const current = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
-    if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
-    if (current !== desired) element.click();
-    const observed = 'checked' in element ? Boolean(element.checked) : element.getAttribute('aria-checked') === 'true';
+    const desired = action.checked;
+    const role = String(element.getAttribute('role') || '').trim().toLowerCase();
+    const tagName = String(element.tagName || '').toLowerCase();
+    const inputType = tagName === 'input'
+      ? String(element.getAttribute('type') || 'text').trim().toLowerCase() : '';
+    const nativeCheckable = tagName === 'input' && ['checkbox', 'radio'].includes(inputType);
+    if (!nativeCheckable && !['checkbox', 'radio', 'switch'].includes(role)) {
+      throw new Error('AGENT_TARGET_NOT_CHECKABLE');
+    }
+    const readCheckedState = () => {
+      if (nativeCheckable) {
+        // Fail closed on nonboolean/overridden native state after a cold restart.
+        const checked = element.checked;
+        if (typeof checked !== 'boolean') throw new Error('AGENT_CHECK_STATE_INDETERMINATE');
+        return checked;
+      }
+      // ARIA custom controls are owned by the page; a synthetic .checked
+      // property (even boolean true) cannot replace explicit aria-checked.
+      const state = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
+      if (state !== 'true' && state !== 'false') throw new Error('AGENT_CHECK_STATE_INDETERMINATE');
+      return state === 'true';
+    };
+    const current = readCheckedState();
+    if (current !== desired) {
+      // CHECK is a low-authority state mutation, not permission to submit a
+      // form, reset it, or navigate through an ARIA-styled link. A native
+      // click on those controls could perform an unapproved external effect.
+      const tag = String(element.tagName || '').toLowerCase();
+      const type = String(element.getAttribute('type') || (tag === 'button' ? 'submit' : '')).trim().toLowerCase();
+      const navigates = (tag === 'a' || tag === 'area')
+        && Boolean(element.getAttribute('href') || element.href);
+      if ((tag === 'button' && type !== 'button')
+        || (tag === 'input' && ['submit', 'reset', 'image'].includes(type))
+        || navigates) throw new Error('AGENT_CHECK_CONTROL_EFFECT_UNSAFE');
+      // Radios cannot be unchecked by activating the same radio. Sending an
+      // extra click would still fire handlers even though it cannot satisfy
+      // the requested false postcondition; require a different chosen radio.
+      if (desired === false && (type === 'radio' || role === 'radio')) {
+        throw new Error('AGENT_RADIO_UNCHECK_UNSUPPORTED');
+      }
+      // A focus handler may change a checkbox/radio/switch after the initial
+      // check. Reobserve after focus and visibility/hit-test validation:
+      // never click using a pre-focus state that would now invert the intent.
+      element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      element.focus?.({ preventScroll: true });
+      ensureUnoccluded(element);
+      const afterFocus = readCheckedState();
+      if (afterFocus !== desired) {
+        ensureUnoccluded(element);
+        element.click();
+      }
+    }
+    const observed = readCheckedState();
     if (observed !== desired) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     return { ok: true, kind: 'check', effectVerified: true, checked: observed, url: location.href };
   }
   if (action.type === 'scroll') {
-    const amount = Math.max(0.25, Math.min(3, Number(action.amount) || 0.8));
-    const delta = innerHeight * amount * (action.direction === 'up' ? -1 : 1);
+    // The executor also receives persisted actions after JSON cold restart.
+    // Never silently turn corrupted direction/amount into a different scroll.
+    if (action.direction !== 'up' && action.direction !== 'down') {
+      throw new Error('AGENT_SCROLL_DIRECTION_INVALID');
+    }
+    if (typeof action.amount !== 'number' || !Number.isFinite(action.amount)
+      || action.amount < 0.25 || action.amount > 3) {
+      throw new Error('AGENT_SCROLL_AMOUNT_INVALID');
+    }
+    const delta = innerHeight * action.amount * (action.direction === 'up' ? -1 : 1);
     scrollBy({ top: delta, left: 0, behavior: 'instant' });
     return { ok: true, kind: 'scroll', url: location.href };
   }
@@ -1046,69 +1483,182 @@ export function executeBrowserPageAction(snapshotId, action) {
 }
 
 export function executeBrowserCredentialFill(snapshotId, action, username, secret) {
+  // Serialized Chrome script. Page content is untrusted and cannot provide
+  // policy authority or choose another field after a delayed approval.
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const find = ref => Array.from(document.querySelectorAll(`[${marker}]`)).find(element =>
-    element.getAttribute(marker) === String(ref || '')
-    && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
-
+  const find = ref => {
+    if (typeof ref !== 'string' || !ref || typeof snapshotId !== 'string' || !snapshotId) return null;
+    const matches = Array.from(document.querySelectorAll('[' + marker + ']')).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId);
+    return matches.length === 1 ? matches[0] : null;
+  };
+  const normalize = (value, max) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const semanticIdentity = element => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const proof = (element, kind) => {
+    const label = kind === 'password' ? 'PASSWORD' : 'USERNAME';
+    if (!element || !element.isConnected
+      || (kind === 'password' && !(element instanceof HTMLInputElement))
+      || (kind === 'username' && !(element instanceof HTMLInputElement
+        || element instanceof HTMLTextAreaElement || element.isContentEditable))
+      || !action || typeof action.expectedFrameUrl !== 'string' || !action.expectedFrameUrl
+      || location.href !== action.expectedFrameUrl) throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    const inputType = String(element.getAttribute('type') || 'text').toLowerCase();
+    if ((kind === 'password' && inputType !== 'password')
+      || (kind === 'username' && element instanceof HTMLInputElement
+        && !['text', 'email', 'search', 'tel', 'url'].includes(inputType))) {
+      // Recovered/approved actions do not inherit permission to write into a
+      // non-text input, even with a forged or stale semantic proof envelope.
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    }
+    const form = element.form instanceof HTMLFormElement ? element.form : null;
+    const formAction = form ? form.action || '' : '';
+    const formMethod = form ? String(form.method || 'get').toLowerCase() : '';
+    const labelIds = String(element.getAttribute('aria-labelledby') || '').split(/\s+/);
+    const labelledBy = labelIds.map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = element.labels ? Array.from(element.labels).map(item => item.textContent || '').join(' ') : '';
+    const currentName = normalize(element.getAttribute('aria-label') || labelledBy || labels
+      || element.getAttribute('alt') || element.getAttribute('title') || element.textContent
+      || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '', 800);
+    const prefix = kind === 'password' ? 'expectedPassword' : 'expectedUsername';
+    if (typeof action[prefix + 'SemanticIdentity'] !== 'string'
+      || !action[prefix + 'SemanticIdentity']
+      || semanticIdentity(element) !== action[prefix + 'SemanticIdentity']
+      || currentName !== action[prefix + 'Name']
+      || normalize(formAction, 1200) !== action[prefix + 'FormAction']
+      || normalize(formMethod, 20) !== action[prefix + 'FormMethod']) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
+    }
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse'
+        || Number(style.opacity) === 0 || style.pointerEvents === 'none') {
+        throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+      }
+    }
+    return element;
+  };
+  // A credential field must remain physically reachable after focus/scroll.
+  // The semantic identity alone does not prevent an overlay from obscuring it.
+  // This is a self-contained Chrome scripting function: no module helpers.
+  const ensureUnoccluded = (element, kind) => {
+    const label = kind === 'password' ? 'PASSWORD' : 'USERNAME';
+    proof(element, kind);
+    const rect = element.getBoundingClientRect?.();
+    const x = rect && rect.left + rect.width / 2;
+    const y = rect && rect.top + rect.height / 2;
+    if (!rect || !(rect.width > 0 && rect.height > 0)
+      || !Number.isFinite(x) || !Number.isFinite(y)
+      || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
+    }
+    const hit = document.elementFromPoint(x, y);
+    if (hit !== element && !element.contains?.(hit)) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_OCCLUDED');
+    }
+    proof(element, kind);
+  };
+  if (typeof secret !== 'string' || !secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
   const password = find(action?.passwordRef);
-  if (!(password instanceof HTMLInputElement)
-    || String(password.type || '').toLowerCase() !== 'password'
-    || password.disabled
-    || password.hidden
-    || password.inert
-    || password.getAttribute('aria-hidden') === 'true'
-    || password.getAttribute('aria-disabled') === 'true') {
-    throw new Error('AGENT_CREDENTIAL_PASSWORD_TARGET_STALE');
-  }
-
-  const passwordValue = String(secret ?? '');
-  if (!passwordValue) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
-
-  const dispatch = element => {
+  const user = action?.usernameRef ? find(action.usernameRef) : null;
+  proof(password, 'password');
+  if (action?.usernameRef) proof(user, 'username');
+  const setInputValue = (element, value, kind) => {
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+      if (setter) setter.call(element, value); else element.value = value;
+    } else element.textContent = value;
+    // Native typed setters can reject/sanitize a credential without throwing.
+    // Never emit page-owned input/change handlers for a value not accepted.
+    const accepted = () => element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+      ? element.value : element.textContent;
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    // The setter itself may retarget, hide, or occlude a credential field.
+    // This is the existing semantic/geometry proof, not a second authority.
+    ensureUnoccluded(element, kind);
+    // The page owns each listener. An input handler may repurpose the target,
+    // overwrite the accepted value or cover it with a modal. Re-prove before
+    // dispatching the subsequent change event, not only after both events.
     element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    ensureUnoccluded(element, kind);
     element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    ensureUnoccluded(element, kind);
   };
-  const setInputValue = (element, value) => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-    if (setter) setter.call(element, value); else element.value = value;
-    dispatch(element);
-  };
-
   let usernameFilled = false;
-  if (action?.usernameRef) {
-    const user = find(action.usernameRef);
-    if (!user || !user.isConnected || user.disabled || user.hidden || user.inert
-      || user.getAttribute('aria-hidden') === 'true' || user.getAttribute('aria-disabled') === 'true') {
-      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_STALE');
-    }
-    const value = String(username ?? '');
-    const tag = String(user.tagName || '').toLowerCase();
-    const inputType = tag === 'input' ? String(user.type || 'text').toLowerCase() : '';
-    if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
+  if (user) {
+    user.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
     user.focus?.({ preventScroll: true });
-    if (tag === 'input') {
-      setInputValue(user, value);
-    } else if (tag === 'textarea') {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
-      if (setter) setter.call(user, value); else user.value = value;
-      dispatch(user);
-    } else if (user.isContentEditable) {
-      user.textContent = value;
-      dispatch(user);
-    } else {
-      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
-    }
+    proof(user, 'username');
+    proof(password, 'password');
+    ensureUnoccluded(user, 'username');
+    setInputValue(user, typeof username === 'string' ? username : '', 'username');
     usernameFilled = true;
   }
-
+  // Username handlers may alter the password target. No secret is written
+  // until both the post-username and post-focus proofs still match.
+  password.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
+  proof(password, 'password');
   password.focus?.({ preventScroll: true });
-  setInputValue(password, passwordValue);
-  if (String(password.value || '') !== passwordValue) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+  proof(password, 'password');
+  ensureUnoccluded(password, 'password');
+  setInputValue(password, secret, 'password');
+  if (String(password.value || '') !== secret) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
   return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
 }
 
+// Compare live coordinate probes with the exact observed screenshot origin.
+// Evidence must be finite numeric source data, never Number(null), defaults,
+// implicit strings, a different document epoch, or an unknown frame.
+export function browserAgentVisionOriginMatches(proof, pageUrl, viewport) {
+  // Persisted screenshot evidence must use own data properties. Accessor or
+  // inherited values cannot authorize native pointer effects after restart.
+  const ownData = (obj, key) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
+  };
+  try {
+    if (typeof pageUrl !== 'string' || !pageUrl) return false;
+    const target = ownData(proof, 'target');
+    if (!target || typeof target !== 'object' || Array.isArray(target)) return false;
+    const numeric = (obj, key) => {
+      const value = ownData(obj, key);
+      return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    };
+    if (ownData(proof, 'url') !== pageUrl || ownData(target, 'pageUrl') !== pageUrl) return false;
+    const width = numeric(viewport, 'width');
+    const height = numeric(viewport, 'height');
+    const scrollX = numeric(viewport, 'scrollX');
+    const scrollY = numeric(viewport, 'scrollY');
+    const epoch = numeric(viewport, 'documentEpoch');
+    if (width === null || height === null || scrollX === null || scrollY === null
+      || epoch === null || width <= 0 || height <= 0 || epoch <= 0) return false;
+    return numeric(proof, 'viewportWidth') === width
+      && numeric(proof, 'viewportHeight') === height
+      && numeric(target, 'viewportWidth') === width
+      && numeric(target, 'viewportHeight') === height
+      && numeric(target, 'viewportScrollX') === scrollX
+      && numeric(target, 'viewportScrollY') === scrollY
+      && numeric(target, 'documentEpoch') === epoch;
+  } catch {
+    // Hostile property-descriptor traps fail closed without leaking diagnostics.
+    return false;
+  }
+}
 export function browserAgentTargetFingerprint(snapshot, action) {
   const element = browserAgentSnapshotElement(snapshot, action);
   if (!element) return null;
@@ -1130,14 +1680,52 @@ export function browserAgentCoordinateTargetFingerprint(element) {
     editable: element.editable === true,
     sensitive: element.sensitive === true,
     visualOnly: element.visualOnly === true,
+    // Persist exact finite numeric evidence without coercion. Number(null),
+    // Number('') and Number('0') would otherwise turn tampered or legacy
+    // approvals into seemingly valid origin/geometry values after restart.
+    ...(element.pageUrl && element.rect ? {
+      pageUrl: clean(element.pageUrl, 4096),
+      viewportWidth: typeof element.viewportWidth === 'number' && Number.isFinite(element.viewportWidth) ? element.viewportWidth : null,
+      viewportHeight: typeof element.viewportHeight === 'number' && Number.isFinite(element.viewportHeight) ? element.viewportHeight : null,
+      viewportScrollX: typeof element.viewportScrollX === 'number' && Number.isFinite(element.viewportScrollX) ? element.viewportScrollX : null,
+      viewportScrollY: typeof element.viewportScrollY === 'number' && Number.isFinite(element.viewportScrollY) ? element.viewportScrollY : null,
+      documentEpoch: typeof element.documentEpoch === 'number' && Number.isFinite(element.documentEpoch) ? element.documentEpoch : null,
+      captureX: typeof element.captureX === 'number' && Number.isFinite(element.captureX) ? element.captureX : null,
+      captureY: typeof element.captureY === 'number' && Number.isFinite(element.captureY) ? element.captureY : null,
+      rect: {
+        left: typeof element.rect.left === 'number' && Number.isFinite(element.rect.left) ? element.rect.left : null,
+        top: typeof element.rect.top === 'number' && Number.isFinite(element.rect.top) ? element.rect.top : null,
+        width: typeof element.rect.width === 'number' && Number.isFinite(element.rect.width) ? element.rect.width : null,
+        height: typeof element.rect.height === 'number' && Number.isFinite(element.rect.height) ? element.rect.height : null,
+      },
+    } : {}),
   };
 }
 
 export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
-  const target = Array.from(document.querySelectorAll(`[${marker}]`)).find(element => element.getAttribute(marker) === String(ref || '') && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll(`[${marker}]`)).filter(element =>
+      element.getAttribute(marker) === ref && element.getAttribute(snapshotMarker) === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
+  if (!target || !target.isConnected || target.hidden || target.inert || String(target.getAttribute('aria-hidden') || '').trim().toLowerCase() === 'true' || String(target.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true' || target.disabled) return { ok: false, reason: 'target-missing-or-unavailable' };
+  // Approval is replayed after a durable wait. A still-connected child of a
+  // hidden/inert/disabled ancestor is no longer an actionable control.
+  for (let node = target; node; node = node.parentElement) {
+    if (node.hidden || node.inert || node.disabled
+      || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') {
+      return { ok: false, reason: 'target-missing-or-unavailable' };
+    }
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden'
+      || style.visibility === 'collapse' || Number(style.opacity) === 0
+      || style.pointerEvents === 'none') {
+      return { ok: false, reason: 'target-missing-or-unavailable' };
+    }
+  }
   const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
   const labelledBy = (element) => normalize((element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' '));
   const accessibleName = (element) => {
@@ -1169,107 +1757,255 @@ export function verifyBrowserApprovalTarget(snapshotId, ref, expected = {}) {
 }
 
 export function focusBrowserAgentTarget(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === String(ref || '') && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) {
-    return { ok: false, reason: 'target-missing-or-unavailable' };
-  }
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
+  // Focus itself can trigger page-authored handlers. Do not focus a control
+  // hidden or disabled by any ancestor, including after scroll reflow.
+  const unavailable = () => {
+    if (!target || !target.isConnected) return true;
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return true;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return true;
+    }
+    return false;
+  };
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
   target.scrollIntoView?.({ block: 'center', inline: 'center', behavior: 'instant' });
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
   target.focus?.({ preventScroll: true });
-  return { ok: document.activeElement === target || target.contains?.(document.activeElement), reason: document.activeElement === target || target.contains?.(document.activeElement) ? '' : 'target-focus-failed' };
+  if (unavailable()) return { ok: false, reason: 'target-missing-or-unavailable' };
+  const focused = document.activeElement === target || Boolean(target.contains?.(document.activeElement));
+  return { ok: focused, reason: focused ? '' : 'target-focus-failed' };
 }
 
 export function verifyBrowserFileInput(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === String(ref || '') && element.getAttribute('data-autopilot-agent-snapshot') === String(snapshotId || ''));
-  if (!(target instanceof HTMLInputElement) || String(target.type || '').toLowerCase() !== 'file') throw new Error('AGENT_FILE_INPUT_STALE');
+  // Chrome serializes this function into the page. Site-visible input/change
+  // events are effects: prove target availability and chosen files first.
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
+  if (!(target instanceof HTMLInputElement) || String(target.type || '').toLowerCase() !== 'file'
+    || !target.isConnected) throw new Error('AGENT_FILE_INPUT_STALE');
+  for (let node = target; node; node = node.parentElement) {
+    if (node.hidden || node.inert || node.disabled
+      || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+      || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') throw new Error('AGENT_FILE_INPUT_STALE');
+    const style = getComputedStyle(node);
+    if (style.display === 'none' || style.visibility === 'hidden'
+      || style.visibility === 'collapse' || Number(style.opacity) === 0
+      || style.pointerEvents === 'none') throw new Error('AGENT_FILE_INPUT_STALE');
+  }
+  const files = Array.from(target.files || []).map(file => ({
+    name: String(file.name || '').slice(0, 500),
+    size: Number(file.size || 0),
+    type: String(file.type || '').slice(0, 200),
+  }));
+  if (!files.length) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+  // This proves local selection, not a completed remote upload.
   target.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   target.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-  const files = Array.from(target.files || []).map(file => ({ name: String(file.name || '').slice(0, 500), size: Number(file.size || 0), type: String(file.type || '').slice(0, 200) }));
-  if (!files.length) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
   return { ok: true, files };
 }
 
-export function proveBrowserNativeClick(snapshotId, ref) {
-  const target = Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).find(element => element.getAttribute('data-autopilot-agent-ref') === ref && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId);
-  if (!target || !target.isConnected || target.hidden || target.inert || target.getAttribute('aria-hidden') === 'true' || target.getAttribute('aria-disabled') === 'true' || target.disabled) return null;
+export function proveBrowserNativeClick(snapshotId, ref, expected) {
+  // This function is serialized into the page by Chrome scripting. A marker
+  // alone cannot prove a control still means the same action after a rerender.
+  if (!expected || typeof expected !== 'object'
+    || typeof expected.expectedSemanticIdentity !== 'string'
+    || !expected.expectedSemanticIdentity
+    || typeof expected.expectedFrameUrl !== 'string'
+    || location.href !== expected.expectedFrameUrl
+    || typeof expected.expectedSemanticName !== 'string'
+    || typeof expected.expectedSemanticHref !== 'string'
+    || typeof expected.expectedSemanticFormAction !== 'string'
+    || typeof expected.expectedSemanticFormMethod !== 'string') return null;
+  const matches = typeof ref === 'string' && ref && typeof snapshotId === 'string' && snapshotId
+    ? Array.from(document.querySelectorAll('[data-autopilot-agent-ref]')).filter(element =>
+      element.getAttribute('data-autopilot-agent-ref') === ref
+      && element.getAttribute('data-autopilot-agent-snapshot') === snapshotId)
+    : [];
+  const target = matches.length === 1 ? matches[0] : null;
+  if (!target || !target.isConnected) return null;
+  const normalized = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const identity = element => {
+    const attributes = ['id', 'role', 'type', 'name', 'aria-label', 'aria-labelledby', 'title', 'href', 'formaction', 'formmethod', 'contenteditable'];
+    const source = JSON.stringify([String(element.tagName || '').toLowerCase(),
+      ...attributes.map(name => element.getAttribute(name) || ''),
+      String(element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      Boolean(element.disabled), Boolean(element.isContentEditable)]);
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) { hash ^= source.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  };
+  const valid = () => {
+    if (!target.isConnected || location.href !== expected.expectedFrameUrl
+      || identity(target) !== expected.expectedSemanticIdentity) return false;
+    for (let node = target; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return false;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return false;
+    }
+    const tag = String(target.tagName || '').toLowerCase();
+    const type = tag === 'button' ? String(target.getAttribute('type') || 'submit').toLowerCase()
+      : tag === 'input' ? String(target.getAttribute('type') || 'text').toLowerCase() : '';
+    const submitLike = (tag === 'button' || tag === 'input') && type === 'submit';
+    const form = target.form instanceof HTMLFormElement ? target.form : null;
+    const formAction = form ? (submitLike && target.formAction ? target.formAction : form.action || '') : '';
+    const formMethod = form ? String((submitLike && target.formMethod ? target.formMethod : form.method) || 'get').toLowerCase() : '';
+    const labelledBy = String(target.getAttribute('aria-labelledby') || '').split(/\s+/)
+      .map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = target.labels ? Array.from(target.labels).map(label => label.textContent || '').join(' ') : '';
+    const alt = target.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    const name = normalized(target.getAttribute('aria-label') || labelledBy || labels
+      || target.getAttribute('alt') || alt || target.getAttribute('title') || target.textContent
+      || target.getAttribute('placeholder') || target.getAttribute('name') || target.id || '', 800);
+    const href = (tag === 'a' || tag === 'area') ? normalized(target.href || target.getAttribute('href') || '', 1200) : '';
+    return name === expected.expectedSemanticName
+      && href === expected.expectedSemanticHref
+      && normalized(formAction, 1200) === expected.expectedSemanticFormAction
+      && normalized(formMethod, 20) === expected.expectedSemanticFormMethod;
+  };
+  if (!valid()) return null;
   target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+  if (!valid()) return null;
   const rect = target.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
+  if (!(rect.width > 0 && rect.height > 0)) return null;
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
+  if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return null;
   const hit = document.elementFromPoint(x, y);
-  if (hit !== target && !target.contains(hit)) return null;
+  if (hit !== target && !target.contains?.(hit)) return null;
+  if (!valid()) return null;
   return { x, y, url: location.href };
 }
 
-function browserCoordinateAccessibleName(element) {
-  if (!(element instanceof Element)) return '';
-  const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
-  const labelledBy = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
-  const labels = element.labels ? Array.from(element.labels).map(label => label.textContent || '').join(' ') : '';
-  const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
-  return normalize(element.getAttribute('aria-label') || labelledBy || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '');
-}
+// The injected Chrome function must be self-contained: executeScript serializes
+// its function argument without any module-scope helpers or import bindings.
+export function probeBrowserCoordinateTarget(x, y, fingerprint, requireTextFocus = false) {
+  function browserCoordinateAccessibleName(element) {
+    if (!(element instanceof Element)) return '';
+    const normalize = (value, max = 800) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    const labelledBy = (element.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ');
+    const labels = element.labels ? Array.from(element.labels).map(label => label.textContent || '').join(' ') : '';
+    const imageAlt = element.querySelector?.('img[alt]')?.getAttribute('alt') || '';
+    return normalize(element.getAttribute('aria-label') || labelledBy || labels || element.getAttribute('alt') || imageAlt || element.getAttribute('title') || element.textContent || element.getAttribute('placeholder') || element.getAttribute('name') || element.id || '');
+  }
 
-function browserCoordinateTargetAt(x, y) {
-  const px = Number(x);
-  const py = Number(y);
-  if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
-  let element = document.elementFromPoint(px, py);
-  if (!(element instanceof Element)) return null;
-  // Prefer a semantic actionable ancestor when the point lands on an icon/span
-  // inside a button/link/control. Fall back to the hit element for canvas and
-  // other genuinely visual surfaces.
-  element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
-  const tag = String(element.tagName || '').toLowerCase();
-  const inputType = tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
-  const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
-  const sensitive = inputType === 'password' || inputType === 'file';
-  const nonTextInputTypes = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit']);
-  const editable = !sensitive && (
-    tag === 'textarea'
-    || element.isContentEditable === true
-    || String(element.getAttribute('role') || '').toLowerCase() === 'textbox'
-    || (tag === 'input' && !nonTextInputTypes.has(inputType || 'text'))
-  );
-  const form = element.form instanceof HTMLFormElement ? element.form : null;
-  const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
-  const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
-  const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
-  const rect = element.getBoundingClientRect();
-  const normalize = (value, max = 1200) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
-  return {
-    x: px,
-    y: py,
-    url: location.href,
-    viewportWidth: innerWidth,
-    viewportHeight: innerHeight,
-    target: {
-      tag,
-      role: normalize(element.getAttribute('role') || '', 80),
-      type: normalize(controlType, 80),
-      name: browserCoordinateAccessibleName(element),
-      href: normalize(element.href || element.getAttribute?.('href') || '', 1200),
-      disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
-      submitLike,
-      formAssociated: Boolean(form),
-      formAction: normalize(effectiveFormAction, 1200),
-      formMethod: normalize(effectiveFormMethod, 20),
-      editable,
-      sensitive,
-      visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
-      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-    },
-  };
-}
+  function browserCoordinateTargetAt(x, y) {
+    const px = x;
+    const py = y;
+    if (typeof px !== 'number' || typeof py !== 'number'
+      || !Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px >= innerWidth || py >= innerHeight) return null;
+    let element = document.elementFromPoint(px, py);
+    if (!(element instanceof Element)) return null;
+    // Prefer a semantic actionable ancestor when the point lands on an icon/span
+    // inside a button/link/control. Fall back to the hit element for canvas and
+    // other genuinely visual surfaces.
+    element = element.closest?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]') || element;
+    // The clicked element can stay visible while a handler focuses a different field.
+    // Input.insertText must be bound to the proven focused recipient.
+    if (requireTextFocus === true) {
+      const active = document.activeElement;
+      if (!(active === element || (active instanceof Element && element.contains?.(active)))) return null;
+    }
+    // A screenshot hit does not authorize effects through hidden, inert or
+    // inaccessible ancestor controls. Check again during each live preflight.
+    for (let node = element; node; node = node.parentElement) {
+      if (node.hidden || node.inert || node.disabled
+        || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
+        || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') return null;
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden'
+        || style.visibility === 'collapse' || Number(style.opacity) === 0
+        || style.pointerEvents === 'none') return null;
+    }
+    const tag = String(element.tagName || '').toLowerCase();
+    const inputType = tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase() : '';
+    const controlType = tag === 'button' ? String(element.getAttribute('type') || 'submit').toLowerCase() : inputType;
+    const sensitive = inputType === 'password' || inputType === 'file';
+    const nonTextInputTypes = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit']);
+    const editable = !sensitive && (
+      tag === 'textarea'
+      || element.isContentEditable === true
+      || String(element.getAttribute('role') || '').toLowerCase() === 'textbox'
+      || (tag === 'input' && !nonTextInputTypes.has(inputType || 'text'))
+    );
+    const form = element.form instanceof HTMLFormElement ? element.form : null;
+    const submitLike = (tag === 'button' || tag === 'input') && controlType === 'submit';
+    const effectiveFormAction = form ? (submitLike && element.formAction ? element.formAction : form.action || '') : '';
+    const effectiveFormMethod = form ? String((submitLike && element.formMethod ? element.formMethod : form.method) || 'get').toLowerCase() : '';
+    const rect = element.getBoundingClientRect();
+    const normalize = (value, max = 1200) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+    return {
+      x: px,
+      y: py,
+      url: location.href,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      target: {
+        tag,
+        role: normalize(element.getAttribute('role') || '', 80),
+        type: normalize(controlType, 80),
+        name: browserCoordinateAccessibleName(element),
+        href: normalize(element.href || element.getAttribute?.('href') || '', 1200),
+        disabled: Boolean(element.disabled || String(element.getAttribute('aria-disabled') || '').trim().toLowerCase() === 'true'),
+        submitLike,
+        formAssociated: Boolean(form),
+        formAction: normalize(effectiveFormAction, 1200),
+        formMethod: normalize(effectiveFormMethod, 20),
+        editable,
+        sensitive,
+        pageUrl: location.href,
+        viewportWidth: innerWidth,
+        viewportHeight: innerHeight,
+        viewportScrollX: Number(globalThis.scrollX || 0),
+        viewportScrollY: Number(globalThis.scrollY || 0),
+        documentEpoch: Number(performance.timeOrigin),
+        captureX: px,
+        captureY: py,
+        visualOnly: !element.matches?.('button,a[href],area[href],input,textarea,select,summary,[contenteditable="true"],[onclick],[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="tab"],[role="menuitem"],[role="option"],[role="treeitem"],[role="switch"]'),
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      },
+    };
+  }
 
-export function probeBrowserCoordinateTarget(x, y) {
-  return browserCoordinateTargetAt(x, y);
-}
-
-export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
   const proof = browserCoordinateTargetAt(x, y);
+  if (arguments.length < 3) return proof;
   if (!proof?.target || !fingerprint || typeof fingerprint !== 'object') return { ok: false, reason: 'missing-target' };
   const target = proof.target;
+  // The screenshot must authorize this exact coordinate, not another point
+  // inside the same canvas/slider/control with an identical semantic label.
+  if (typeof fingerprint.captureX !== 'number' || !Number.isFinite(fingerprint.captureX)
+    || typeof fingerprint.captureY !== 'number' || !Number.isFinite(fingerprint.captureY)
+    || fingerprint.captureX !== proof.x || fingerprint.captureY !== proof.y) {
+    return { ok: false, reason: 'changed-capture-point' };
+  }
+  // Persisted evidence must carry actual finite numbers. Coercion would let
+  // null/empty scroll origins masquerade as zero after restart.
+  const viewportFields = ['viewportWidth', 'viewportHeight', 'viewportScrollX', 'viewportScrollY', 'documentEpoch'];
+  if (fingerprint.pageUrl !== proof.url
+    || viewportFields.some(key => typeof fingerprint[key] !== 'number' || !Number.isFinite(fingerprint[key]))
+    || fingerprint.viewportWidth !== proof.viewportWidth
+    || fingerprint.viewportHeight !== proof.viewportHeight
+    || fingerprint.viewportScrollX !== target.viewportScrollX
+    || fingerprint.viewportScrollY !== target.viewportScrollY
+    || fingerprint.documentEpoch !== target.documentEpoch) return { ok: false, reason: 'changed-page-or-viewport' };
   const fields = ['tag', 'role', 'type', 'name', 'href', 'formAction', 'formMethod'];
   for (const field of fields) {
     if (String(target[field] || '') !== String(fingerprint[field] || '')) return { ok: false, reason: `changed-${field}` };
@@ -1280,7 +2016,19 @@ export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
     || Boolean(target.sensitive) !== Boolean(fingerprint.sensitive)
     || Boolean(target.visualOnly) !== Boolean(fingerprint.visualOnly)
     || target.disabled === true) return { ok: false, reason: 'changed-state' };
+  // Same label/role is insufficient: a visually shifted target can still
+  // contain the old click point and must not authorize a consequential effect.
+  if (!fingerprint.rect || !target.rect || ['left', 'top', 'width', 'height'].some(key =>
+    typeof fingerprint.rect[key] !== 'number' || !Number.isFinite(fingerprint.rect[key])
+      || typeof target.rect[key] !== 'number' || !Number.isFinite(target.rect[key])
+      || Math.abs(target.rect[key] - fingerprint.rect[key]) > 1)) {
+    return { ok: false, reason: 'changed-geometry' };
+  }
   return { ok: true, proof };
+}
+
+export function verifyBrowserCoordinateTarget(x, y, fingerprint) {
+  return probeBrowserCoordinateTarget(x, y, fingerprint);
 }
 
 const CONSEQUENTIAL_ACTION_TERMS = Object.freeze([
@@ -1298,10 +2046,17 @@ function normalizeActionRiskText(value) {
 
 export function browserAgentSnapshotElement(snapshot, action) {
   if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(action?.type) && action.coordinateTarget && typeof action.coordinateTarget === 'object') return action.coordinateTarget;
-  if (!snapshot || !action || !Number.isInteger(Number(action.frameId)) || !action.ref) return null;
-  const frame = (snapshot.frames || []).find(item => Number(item.frameId) === Number(action.frameId));
-  if (!frame) return null;
-  return (frame.elements || []).find(item => item.ref === action.ref) || null;
+  // Frame IDs are concrete Chrome frame identities. Null/false/empty/text
+  // aliases must not resolve to frame 0 during policy or effect verification.
+  if (!snapshot || !action || !Number.isInteger(action.frameId)
+    || action.frameId < 0 || typeof action.ref !== 'string' || !action.ref) return null;
+  // After a JSON cold restart, a corrupted frame/ref alias must not silently
+  // choose the first matching benign node and under-classify an effect.
+  if (!Array.isArray(snapshot.frames)) return null;
+  const matchingFrames = snapshot.frames.filter(item => item && item.frameId === action.frameId);
+  if (matchingFrames.length !== 1 || !Array.isArray(matchingFrames[0].elements)) return null;
+  const matchingElements = matchingFrames[0].elements.filter(item => item && item.ref === action.ref);
+  return matchingElements.length === 1 ? matchingElements[0] : null;
 }
 
 export function classifyBrowserAgentActionRisk(snapshot, action) {
@@ -1339,9 +2094,15 @@ export function classifyBrowserAgentActionRisk(snapshot, action) {
   }
   if (!action || ![BrowserAgentActionType.CLICK, BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.KEY].includes(action.type)) return { requiresApproval: false, reason: '', targetName: '' };
   const element = browserAgentSnapshotElement(snapshot, action);
-  if (!element) return action.type === BrowserAgentActionType.CLICK_AT
-    ? { requiresApproval: true, reason: 'Owner approval required before a visual coordinate click whose target could not be semantically identified.', targetName: 'visual coordinate target' }
-    : { requiresApproval: false, reason: '', targetName: '' };
+  if (!element) {
+    const activation = action.type === BrowserAgentActionType.CLICK
+      || (action.type === BrowserAgentActionType.KEY && ['Enter', ' '].includes(action.key));
+    // An absent, duplicated or corrupt semantic target can never authorize
+    // an unapproved click or activation; the executor still checks live DOM.
+    return action.type === BrowserAgentActionType.CLICK_AT || activation
+      ? { requiresApproval: true, reason: 'Owner approval required: semantic target identity is missing or ambiguous.', targetName: 'unverified browser target' }
+      : { requiresApproval: false, reason: '', targetName: '' };
+  }
   const targetName = clean(element.name || element.href || 'consequential control', 800) || 'consequential control';
   const evidence = normalizeActionRiskText(`${element.name || ''} ${element.href || ''}`);
   const submitLike = element.submitLike === true || action.submitLike === true;
