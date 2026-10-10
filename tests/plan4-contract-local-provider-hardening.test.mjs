@@ -302,7 +302,7 @@ test('endpoint identity must match provider and locality; missing and ambiguous 
   assert.equal(legacy.routeIdentities[0].endpointBinding,'UNRESOLVED_LEGACY');
   await assert.rejects(createAiRouteRegistryEvidenceV1({...snapshot,routes:[boundRoute]}),/no registry profile/);
   await assert.rejects(createAiRouteRegistryEvidenceV1({
-    ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,provider:'openai'}],
+    ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,provider:'openai-compatible'}],
   }),/does not match/);
   await assert.rejects(createAiRouteRegistryEvidenceV1({
     ...snapshot,routes:[boundRoute],endpointProfiles:[{...boundEndpoint,locality:'remote',origin:'https:\/\/provider.example/',credentialless:false,credentialRef:'opaque.ref'}],
