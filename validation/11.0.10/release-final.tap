@@ -1,0 +1,174 @@
+TAP version 13
+# (node:13) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/browser-harness.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: release development tree keeps practical Chromium qualification harnesses wired
+ok 1 - release development tree keeps practical Chromium qualification harnesses wired
+  ---
+  duration_ms: 1.107344
+  type: 'test'
+  ...
+# (node:14) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/cws-readiness.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: manifest follows Chrome Web Store structural requirements used by this product
+ok 2 - manifest follows Chrome Web Store structural requirements used by this product
+  ---
+  duration_ms: 7.590892
+  type: 'test'
+  ...
+# Subtest: extension pages do not load remote scripts or evaluate fetched strings
+ok 3 - extension pages do not load remote scripts or evaluate fetched strings
+  ---
+  duration_ms: 78.521797
+  type: 'test'
+  ...
+# Subtest: CWS ZIP is deterministic and has manifest.json at ZIP root
+ok 4 - CWS ZIP is deterministic and has manifest.json at ZIP root
+  ---
+  duration_ms: 484.711973
+  type: 'test'
+  ...
+# (node:15) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/nika-profile-contract.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy Nika regression fixture preserves the user-approved 30-cycle timing and unattended settings
+ok 5 - legacy Nika regression fixture preserves the user-approved 30-cycle timing and unattended settings
+  ---
+  duration_ms: 1.141815
+  type: 'test'
+  ...
+# Subtest: legacy Nika regression fixture shared prompt is byte-for-byte unchanged from the approved prompt
+ok 6 - legacy Nika regression fixture shared prompt is byte-for-byte unchanged from the approved prompt
+  ---
+  duration_ms: 0.579976
+  type: 'test'
+  ...
+# (node:16) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/package-release.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: release version is coherent across manifest, package metadata and README
+ok 7 - release version is coherent across manifest, package metadata and README
+  ---
+  duration_ms: 7.524493
+  type: 'test'
+  ...
+# Subtest: release allowlist contains release docs, extension files and complete companion distribution only
+ok 8 - release allowlist contains release docs, extension files and complete companion distribution only
+  ---
+  duration_ms: 141.971729
+  type: 'test'
+  ...
+# Subtest: release rejects top-level file and directory symlinks before source traversal
+ok 9 - release rejects top-level file and directory symlinks before source traversal
+  ---
+  duration_ms: 287.973726
+  type: 'test'
+  ...
+# Subtest: release fails closed on NUL bytes in packaged text sources
+ok 10 - release fails closed on NUL bytes in packaged text sources
+  ---
+  duration_ms: 218.495867
+  type: 'test'
+  ...
+# Subtest: release fails closed on NUL bytes in packaged YAML text sources
+ok 11 - release fails closed on NUL bytes in packaged YAML text sources
+  ---
+  duration_ms: 182.921165
+  type: 'test'
+  ...
+# Subtest: release rejects common credential data filenames even when their contents look benign
+ok 12 - release rejects common credential data filenames even when their contents look benign
+  ---
+  duration_ms: 374.419738
+  type: 'test'
+  ...
+# Subtest: release build packages the exact validated byte snapshot even if source paths mutate after scan
+ok 13 - release build packages the exact validated byte snapshot even if source paths mutate after scan
+  ---
+  duration_ms: 433.712178
+  type: 'test'
+  ...
+# Subtest: release ZIP is byte-for-byte reproducible and has one canonical root folder
+ok 14 - release ZIP is byte-for-byte reproducible and has one canonical root folder
+  ---
+  duration_ms: 543.285045
+  type: 'test'
+  ...
+# Subtest: release ZIP and unpacked files are identical across LF and Windows CRLF checkouts
+ok 15 - release ZIP and unpacked files are identical across LF and Windows CRLF checkouts
+  ---
+  duration_ms: 756.879418
+  type: 'test'
+  ...
+# (node:27) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/site-adapter-manifest-contract.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: every declared site-adapter host is covered by manifest host permission and content-script match
+ok 16 - every declared site-adapter host is covered by manifest host permission and content-script match
+  ---
+  duration_ms: 2.469282
+  type: 'test'
+  ...
+# (node:28) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/source-package.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: source package includes canonical Ukrainian Windows companion filename
+ok 17 - source package includes canonical Ukrainian Windows companion filename
+  ---
+  duration_ms: 25.267929
+  type: 'test'
+  ...
+# Subtest: source ZIP is deterministic and marks every filename UTF-8
+ok 18 - source ZIP is deterministic and marks every filename UTF-8
+  ---
+  duration_ms: 901.157419
+  type: 'test'
+  ...
+# (node:34) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/unlimited-storage-contract.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: manifest keeps unlimitedStorage so large prompt profiles are not blocked by storage.local quota
+ok 19 - manifest keeps unlimitedStorage so large prompt profiles are not blocked by storage.local quota
+  ---
+  duration_ms: 0.874241
+  type: 'test'
+  ...
+# (node:81) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/release/version-authority.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: release version has one authority across package, manifest and packagers
+ok 20 - release version has one authority across package, manifest and packagers
+  ---
+  duration_ms: 4.260469
+  type: 'test'
+  ...
+# Subtest: current release metadata files exist for the authoritative version
+ok 21 - current release metadata files exist for the authoritative version
+  ---
+  duration_ms: 3.053926
+  type: 'test'
+  ...
+# Subtest: release workflow derives user-facing Pilot daily names from the authoritative version and commit time
+ok 22 - release workflow derives user-facing Pilot daily names from the authoritative version and commit time
+  ---
+  duration_ms: 1.196708
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3068.799062

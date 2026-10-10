@@ -1,3 +1,4 @@
+import { resolveLaunchWindow, openWindowPilotPanel, localProfileScope } from '../core/window-binding.js';
 import { projectGlobalStatus } from '../core/global-status.js';
 import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../core/action-center-runtime.js';
 import { ProjectWorkspaceRepository } from '../core/project-workspace.js';
@@ -9,28 +10,28 @@ import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { InteractionProviderRouter } from '../core/interaction-provider-router.js';
 import { AgentProviderId, getAgentProvider } from '../core/capability-registry.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
+import { withTabLifecycle, createRecordedOwnedTab } from '../core/owned-tab-lifecycle.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
-import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
+import { performNativeInput, checkpointDomSubmit, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
-import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, normalizeAiRouterSettings } from '../core/ai-orchestrator.js';
+import { AiOrchestrator } from '../core/ai-orchestrator.js';
 import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
-import {
-  OPENHANDS_CODING_PROVIDER_ID,
-  OpenHandsCodingSpecialistClient,
-} from '../core/coding-specialist-provider.js';
-import {
-  createOpenHandsSpecialistReadinessBindingV1,
-  probeOpenHandsSpecialistProviderConfigV1,
-} from '../core/openhands-specialist-readiness.js';
-import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
-import { sameChatConversationUrl } from '../core/tabs.js';
+import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
+import { SpecialistProviderDispatcherV1 } from '../core/specialist-provider-dispatcher.js';
+import {
+  AiRouteSpecialistVerificationResolverV1,
+  ChromeAiRouteSpecialistArtifactStoreV1,
+  createMistralSpecialistDispatchBindingV1,
+  createMistralSpecialistReadinessBindingV1,
+} from '../core/ai-route-specialist-runtime.js';
+import { probeAssistantConversation as probeAssistantConversationCore } from '../core/assistant-report-probe.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
   DriveScalarProviderV1,
@@ -67,7 +68,6 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_REMOTE_DISPATCH_STATUS',
   'TEST_REMOTE_DISPATCH_FEED',
   'GET_ORCHESTRATION_V2_STATUS',
-  'GET_ORCHESTRATION_V2_AGENT_TREE',
   'LIST_ORCHESTRATION_V2_ORCHESTRAS',
   'PREVIEW_ORCHESTRATION_V2_PROFILE',
   'EXPORT_ORCHESTRATION_V2_PROFILE',
@@ -75,21 +75,17 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_GLOBAL_STATUS',
   'GET_ACTION_CENTER',
   'GET_PROJECT_WORKSPACE_SUMMARY',
-  'LIST_OUTCOME_CONTRACTS',
-  'GET_OUTCOME_CONTRACT',
   'GET_SCENARIO_WORK',
+  'GET_SCENARIO_CHAT_POOL',
   'LIST_BROWSER_AGENT_JOBS',
+  'GET_BROWSER_AGENT_EXECUTION_POLICY',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES',
   'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
-  'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY',
-  'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
-  'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
-  'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
-  'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
+  'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
 const repo = new StorageRepository(chrome);
 const projectWorkspaceRuntime = new ProjectWorkspaceRuntimeReader(new ProjectWorkspaceRepository(chrome));
@@ -99,7 +95,6 @@ const transport = new InteractionProviderRouter().register(AgentProviderId.CHATG
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
-const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({ fetchFn: (...args) => fetch(...args) });
 const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
@@ -143,6 +138,25 @@ const scenarioWork = new ScenarioWorkManager({
 });
 const AI_REPORT_ALARM = 'autopilot-ai-report-wake';
 const AI_MANAGER_ALARM = 'autopilot-ai-manager-wake';
+const CORE_WATCHDOG_ALARM = 'autopilot-core-watchdog';
+const CORE_WATCHDOG_PERIOD_MINUTES = 0.5;
+
+function coreNeedsWatchdog(state) {
+  return Object.values(state?.sessionsById || {}).some(session =>
+    session?.runState === 'RUNNING' || session?.runState === 'RECOVERING');
+}
+
+async function reconcileCoreWatchdog(state) {
+  if (!coreNeedsWatchdog(state)) {
+    try { await chrome.alarms.clear(CORE_WATCHDOG_ALARM); } catch (_) {}
+    return false;
+  }
+  await chrome.alarms.create(CORE_WATCHDOG_ALARM, {
+    delayInMinutes: CORE_WATCHDOG_PERIOD_MINUTES,
+    periodInMinutes: CORE_WATCHDOG_PERIOD_MINUTES,
+  });
+  return true;
+}
 
 async function resolveOrchestrationHierarchyProvider({ binding } = {}) {
   if (!binding?.sourceId) return null;
@@ -185,35 +199,16 @@ async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
 }
 
 async function probeAssistantConversation(job) {
-  const conversationUrl = String(job?.conversationUrl || '').trim();
-  if (!conversationUrl) throw new Error('Assistant report probe requires conversationUrl');
-  let tabId = null;
-  let temporaryTab = false;
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://chatgpt.com/*' });
-    const existing = (tabs || []).find(tab => tab?.id != null && sameChatConversationUrl(tab.url, conversationUrl));
-    if (existing?.id != null) {
-      tabId = existing.id;
-    } else {
-      const tab = await chrome.tabs.create({ url: conversationUrl, active: false });
-      tabId = tab?.id ?? null;
-      temporaryTab = true;
-    }
-    if (tabId == null) throw new Error('Assistant report probe could not resolve a ChatGPT tab');
-    return await transport.execute(tabId, {
-      requestId: `assistant-report:${job.id || job.workerId || job.taskId || 'probe'}:${Date.now()}`,
-      taskId: job.taskId || job.workerId || 'assistant-report',
-      mode: 'READ_ASSISTANT_REPORT',
-      expectedUrl: conversationUrl,
-      promptText: '',
-      assistantBaselineCount: Number(job.assistantBaselineCount || 0),
-      assistantBaselineKnown: job.assistantBaselineKnown === true,
-    });
-  } finally {
-    if (temporaryTab && tabId != null) {
-      try { await chrome.tabs.remove(tabId); } catch (_) {}
-    }
-  }
+  if (!job?.persistentManagedTab || !job.managedSessionId || !job.recoveryAction) return probeAssistantConversationCore(chrome, transport, job, { repository: repo });
+  return withTabLifecycle(repo, async () => {
+    const ownedChrome = Object.create(chrome);
+    ownedChrome.tabs = Object.create(chrome.tabs);
+    ownedChrome.tabs.create = options => createRecordedOwnedTab(repo, chrome, {
+      hintKey: job.taskId, taskId: job.taskId, sessionId: job.managedSessionId,
+      allowVerifiedResponse: true,
+    }, options);
+    return probeAssistantConversationCore(ownedChrome, transport, job, { repository: repo });
+  });
 }
 
 async function collectWebReportFromConversation(job) {
@@ -229,132 +224,30 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+const specialistArtifactStore = new ChromeAiRouteSpecialistArtifactStoreV1({ chromeApi: chrome });
+const specialistReadinessResolver = new SpecialistProviderReadinessResolverV1({
+  bindings: [createMistralSpecialistReadinessBindingV1({ repository: repo, aiGatewayClient })],
+});
+const specialistProviderDispatcher = new SpecialistProviderDispatcherV1({
+  bindings: [createMistralSpecialistDispatchBindingV1({
+    repository: repo,
+    routePrompt: payload => dispatchSerializedAiRoute(payload),
+    artifactStore: specialistArtifactStore,
+  })],
+});
+const specialistVerificationResolver = new AiRouteSpecialistVerificationResolverV1({
+  repository: repo,
+  routePrompt: payload => dispatchSerializedAiRoute(payload),
+  artifactStore: specialistArtifactStore,
+});
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
-  readModelRouteContext: async () => {
-    const state = await repo.load();
-    const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-    const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-      && state.profile.aiRoutePoolRevision > 0
-      ? state.profile.aiRoutePoolRevision
-      : 1;
-    return {
-      routePool: structuredClone(settings.routes),
-      routePoolRevision,
-      ownerAllowedRouteIds: settings.routes.map(route => route.routeId),
-    };
-  },
-  specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient]]),
+  specialistReadinessResolver,
+  specialistProviderDispatcher,
+  specialistVerificationResolver,
 });
 browserAgentLifecycle.current = browserAgent;
-const specialistReadinessConfigProvenance = new WeakMap();
-const specialistProviderReadinessResolver = Object.freeze({
-  async resolve(selection) {
-    const providerId = selection?.providerId || '';
-    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
-      throw new Error('No executable Specialist provider readiness adapter is installed for selected provider');
-    }
-    const persisted = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (persisted.quarantined) {
-      throw new Error('Selected Specialist provider config is quarantined as corrupt');
-    }
-    if (!persisted.config) {
-      throw new Error('Selected Specialist provider is not configured by the owner');
-    }
-    const resolver = new SpecialistProviderReadinessResolverV1({
-      bindings: [
-        createOpenHandsSpecialistReadinessBindingV1({
-          config: persisted.config.config,
-          client: openHandsSpecialistClient,
-        }),
-      ],
-    });
-    const readiness = await resolver.resolve(selection);
-    specialistReadinessConfigProvenance.set(readiness, Object.freeze({
-      providerId,
-      configSnapshot: JSON.stringify(persisted.config),
-    }));
-    return readiness;
-  },
-  async assertCurrent(readiness) {
-    const provenance = specialistReadinessConfigProvenance.get(readiness);
-    if (!provenance) {
-      throw new Error('Specialist provider readiness lacks durable config provenance');
-    }
-    const persisted = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
-    if (persisted.quarantined || !persisted.config
-        || JSON.stringify(persisted.config) !== provenance.configSnapshot) {
-      throw new Error('Specialist provider config changed after readiness probe');
-    }
-    return true;
-  },
-});
-
-function createSpecialistConversationId() {
-  const randomUuid = globalThis.crypto?.randomUUID;
-  if (typeof randomUuid !== 'function') {
-    throw new Error('Secure UUID generation is unavailable for Specialist provider execution');
-  }
-  return randomUuid.call(globalThis.crypto).toLowerCase();
-}
-
-let browserAgentAutomationCycleInFlight = null;
-export function runBrowserAgentAutomationCycle() {
-  if (browserAgentAutomationCycleInFlight) return browserAgentAutomationCycleInFlight;
-  const cycle = (async () => {
-    await ensureColdStartReconciled();
-    const agent = await browserAgent.cycleAll();
-    const claim = await browserAgent.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy({
-      specialistProviderReadinessResolver,
-    });
-    const { candidates } = await browserAgent.listSpecialistAutomationDispatchCandidates();
-
-    const executions = [];
-    for (const candidate of candidates) {
-      const payload = {
-        agentId: candidate.agentId,
-        conversationId: createSpecialistConversationId(),
-        expectedControlEpoch: candidate.expectedControlEpoch,
-      };
-      try {
-        const outcome = candidate.recoverPrepared
-          ? await browserAgent.executeClaimedSpecialistProvider(
-            candidate.jobId,
-            payload,
-            { specialistProviderReadinessResolver },
-          )
-          : await browserAgent.executeClaimedSpecialistProviderFromAutomationPolicy(
-            candidate.jobId,
-            payload,
-            { specialistProviderReadinessResolver },
-          );
-        executions.push({
-          jobId: candidate.jobId,
-          agentId: candidate.agentId,
-          recoverPrepared: candidate.recoverPrepared,
-          ok: true,
-          outcome,
-        });
-      } catch (error) {
-        executions.push({
-          jobId: candidate.jobId,
-          agentId: candidate.agentId,
-          recoverPrepared: candidate.recoverPrepared,
-          ok: false,
-          safeDiagnosticCode: error?.code || 'SPECIALIST_PROVIDER_EXECUTION_BLOCKED',
-        });
-      }
-    }
-    await browserAgent.reconcileAlarm();
-    return { kind: 'BROWSER_AGENT_AUTOMATION_CYCLE', agent, claim, executions };
-  })();
-  browserAgentAutomationCycleInFlight = cycle.finally(() => {
-    browserAgentAutomationCycleInFlight = null;
-  });
-  return browserAgentAutomationCycleInFlight;
-}
-
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -397,17 +290,19 @@ function beginColdStartReconciliation() {
 
   coldStartBarrier = (async () => {
     await ensureBundledBootstrapApplied();
-    await reconcileRuntimeColdStart({
+    const coreRecovery = await reconcileRuntimeColdStart({
       repository: repo,
       chromeApi: chrome,
       executionAvailable: EXECUTION_AVAILABLE,
       syncDrivePrompts: syncSessionDrivePrompts,
     });
+    await reconcileCoreWatchdog(coreRecovery.state);
     await restorePendingSendTabs(chrome, repo);
     await remoteDispatch.reconcileAlarm();
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
     // restarts are common and must not manufacture a coordinator reasoning tick.
     await orchestrationV2.reconcileAlarm();
+    await scenarioWork.enforceWindowBindings();
     await scenarioWork.reconcileAlarm();
     await browserAgent.reconcileAlarm();
     coldStartReconciled = true;
@@ -543,6 +438,7 @@ export function runExecutionCycle() {
     // scheduler-relevant state. A pure handoff/summary must not duplicate the
     // canonical core alarm on every wake.
     const state = await stateAfterManager(manager);
+    await reconcileCoreWatchdog(state);
     await notifyStatusChanged(state);
     return { ...result, state, manager, remoteSync, orchestrationSync, scenarioSync };
   })();
@@ -605,7 +501,7 @@ async function runStartupCycle() {
   // allowed to resume sends. Controller itself never performs browser sends.
   const orchestration = await orchestrationV2.cycleAll();
   const scenario = await scenarioWork.cycleAll();
-  const agent = await runBrowserAgentAutomationCycle();
+  const agent = await browserAgent.cycleAll();
   const execution = await runExecutionCycle();
   return { execution, orchestration, scenario, agent };
 }
@@ -620,6 +516,7 @@ export async function reconcileRuntime() {
     executionAvailable: false,
     syncDrivePrompts: syncSessionDrivePrompts,
   });
+  await reconcileCoreWatchdog(cycle.state);
   await notifyStatusChanged(cycle.state);
   return cycle.state;
 }
@@ -635,11 +532,55 @@ function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
   return run;
 }
 
-export async function dispatchUiMessage(message) {
+async function runAutomaticSpecialistHandoff(id, payload = {}) {
+  const registryId = payload.registryId || '';
+  const expectedRegistryRevision = payload.expectedRegistryRevision;
+  const agentId = payload.agentId || '';
+  const admitted = await browserAgent.admitAutomaticSpecialistHandoff(id, {
+    registryId,
+    expectedRegistryRevision,
+    expectedPlanRevision: payload.expectedPlanRevision,
+    agentId,
+    maxConcurrentHandoffs: Number.isSafeInteger(payload.maxConcurrentHandoffs)
+      ? payload.maxConcurrentHandoffs
+      : 4,
+    leaseSeconds: Number.isSafeInteger(payload.leaseSeconds) ? payload.leaseSeconds : 900,
+  });
+  const assignment = admitted.assignments.find(item => item.agentId === agentId);
+  if (!assignment?.leaseId) throw new Error('Automatic Specialist admission did not produce a lease');
+  const dispatched = await browserAgent.dispatchAdmittedSpecialistHandoff(id, {
+    registryId,
+    expectedRegistryRevision,
+    expectedPlanRevision: admitted.plan.revision,
+    agentId,
+    leaseId: assignment.leaseId,
+  });
+  const verificationId = `specialist-verification:${Date.now().toString(36)}:${agentId}`.slice(0, 180);
+  const verified = await browserAgent.verifySpecialistHandoff(id, {
+    agentId,
+    leaseId: assignment.leaseId,
+    verificationId,
+  });
+  return { admitted, dispatched, verified };
+}
+
+export async function dispatchUiMessage(message, sender = null) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
   let result;
-  if (message.command === 'GET_GLOBAL_STATUS') {
+  if (message.command === 'GET_DIAGNOSTIC_REPORT') {
+    result = await dispatcher.execute(message.command, message.payload || {});
+    const state = await scenarioWork.list();
+    const scope = await localProfileScope(chrome);
+    result.report += `\nЛокальна область профілю: ${scope}\nТехнічні дані сценарних пулів:\n`;
+    for (const pool of state.pools || []) {
+      const fields = ['id', 'ownerWindowId', 'slots', 'totalSentPrompts', 'totalReceivedResponses',
+        'plannedSends', 'firstPromptSent', 'firstPromptPending', 'completedResponses',
+        'transportVerifiedSends', 'transportVerifiedSendsOverall', 'sequenceVerifiedSends',
+        'retryVerifiedSends', 'replacementsUsed', 'replacementBudget', 'runState'];
+      result.report += fields.map(key => `${key}=${pool[key] ?? 'unknown'}`).join('; ') + '\n';
+    }
+  } else if (message.command === 'GET_GLOBAL_STATUS') {
     const [coreState, scenarioState, orchestraState, agentState] = await Promise.all([
       repo.load(), scenarioWork.list(), orchestrationV2.list(), browserAgent.list(),
     ]);
@@ -693,8 +634,6 @@ export async function dispatchUiMessage(message) {
       ...(await orchestrationV2.getStatus()),
       driveOAuth: inspectChromeDriveOAuth(chrome.runtime?.getManifest?.()),
     };
-  } else if (message.command === 'GET_ORCHESTRATION_V2_AGENT_TREE') {
-    result = await orchestrationV2.getAgentTreeProjection(message.payload?.id || '');
   } else if (message.command === 'PREVIEW_ORCHESTRATION_V2_PROFILE') {
     result = { preview: await orchestrationV2.previewProfile(message.payload?.profile) };
   } else if (message.command === 'IMPORT_ORCHESTRATION_V2_PROFILE') {
@@ -742,12 +681,34 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.get(message.payload?.id || '');
   } else if (message.command === 'CREATE_SCENARIO_WORK') {
     result = await scenarioWork.create(message.payload || {});
+  } else if (message.command === 'CREATE_SCENARIO_CHAT_POOL') {
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.createChatPool({ ...message.payload, preferredWindowId });
+  } else if (message.command === 'GET_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.getChatPool(message.payload?.id || '');
+  } else if (message.command === 'UPDATE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.updateChatPool(message.payload?.id || '', message.payload?.config || {}, {
+      replacementBudget: message.payload?.replacementBudget,
+      staggerSeconds: message.payload?.staggerSeconds,
+    });
+  } else if (message.command === 'START_SCENARIO_CHAT_POOL') {
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.startChatPool(message.payload?.id || '', { preferredWindowId });
+  } else if (message.command === 'PAUSE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.pauseChatPool(message.payload?.id || '');
+  } else if (message.command === 'RESUME_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.resumeChatPool(message.payload?.id || '');
+  } else if (message.command === 'STOP_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.stopChatPool(message.payload?.id || '');
+  } else if (message.command === 'DELETE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.deleteChatPool(message.payload?.id || '');
   } else if (message.command === 'SELECT_SCENARIO_WORK') {
     result = await scenarioWork.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_SCENARIO_WORK') {
     result = await scenarioWork.updateConfig(message.payload?.id || '', message.payload?.config || {});
   } else if (message.command === 'START_SCENARIO_WORK') {
-    result = await scenarioWork.start(message.payload?.id || '');
+    const preferredWindowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+    result = await scenarioWork.start(message.payload?.id || '', { preferredWindowId });
   } else if (message.command === 'PAUSE_SCENARIO_WORK') {
     result = await scenarioWork.pause(message.payload?.id || '');
   } else if (message.command === 'RESUME_SCENARIO_WORK') {
@@ -760,8 +721,20 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.cycleAll();
   } else if (message.command === 'LIST_BROWSER_AGENT_JOBS') {
     result = await browserAgent.list();
+  } else if (message.command === 'GET_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.getExecutionPolicy();
+  } else if (message.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.updateExecutionPolicy(message.payload || {});
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
+  } else if (message.command === 'GET_BROWSER_AGENT_ORCHESTRATION_BINDING') {
+    result = await browserAgent.inspectOrchestrationNodeBinding(
+      message.payload?.id || '',
+      {
+        resolveProjectHierarchyAuthority: projectId =>
+          orchestrationV2.resolveProjectHierarchyAuthority(projectId),
+      },
+    );
   } else if (message.command === 'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES') {
     result = await browserAgent.listAgentDefinitionRegistries();
   } else if (message.command === 'GET_BROWSER_AGENT_DEFINITION_REGISTRY') {
@@ -770,6 +743,8 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createAgentDefinitionRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
     result = await browserAgent.mutateAgentDefinitionRegistry(message.payload || {});
+  } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
+    result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES') {
     result = await browserAgent.listSpecialistRegistries();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_REGISTRY') {
@@ -778,111 +753,53 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createSpecialistRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
-  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
-    result = await browserAgent.getSpecialistAutomationPolicy();
-  } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
-    result = await browserAgent.setSpecialistAutomationPolicy(message.payload || {});
-  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
-    result = await browserAgent.clearSpecialistAutomationPolicy(message.payload || {});
-  } else if (message.command === 'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
-    result = await browserAgent.getOwnerResourceBudget();
-  } else if (message.command === 'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
-    result = await browserAgent.setOwnerResourceBudget(message.payload || {});
-  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
-    result = await browserAgent.listSpecialistProviderConfigs();
-  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
-  } else if (message.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    const providerId = message.payload?.providerId || '';
-    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
-      throw new Error('No read-only Specialist provider probe is installed for requested provider');
-    }
-    const beforeProbe = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (beforeProbe.quarantined) {
-      throw new Error('Selected Specialist provider config is quarantined as corrupt');
-    }
-    if (!beforeProbe.config) {
-      throw new Error('Selected Specialist provider is not configured by the owner');
-    }
-    const configSnapshot = JSON.stringify(beforeProbe.config);
-    const probe = await probeOpenHandsSpecialistProviderConfigV1({
-      config: beforeProbe.config.config,
-      client: openHandsSpecialistClient,
-    });
-    const afterProbe = await browserAgent.getSpecialistProviderConfig(providerId);
-    if (afterProbe.quarantined || !afterProbe.config
-        || JSON.stringify(afterProbe.config) !== configSnapshot) {
-      throw new Error('Specialist provider config changed during readiness probe');
-    }
-    result = {
-      providerId,
-      configRevision: afterProbe.config.revision,
-      observedAt: probe.observedAt,
-      providerState: probe.providerState,
-      authority: probe.authority,
-    };
-  } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.setSpecialistProviderConfig(message.payload || {});
-  } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
-    result = await browserAgent.clearSpecialistProviderConfig(message.payload || {});
-  } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
-    result = await browserAgent.createFromAgentDefinition(message.payload || {});
-  } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
-    const delegation = structuredClone(message.payload?.delegation || {});
-    delete delegation.at;
-    result = await browserAgent.prepareDefinitionSpecialistDelegation(
-      message.payload?.id || '',
-      delegation,
-    );
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_AUTOMATIC_SPECIALIST_DELEGATION') {
+    result = await browserAgent.prepareAutomaticSpecialistDelegation(
+      message.payload?.id || '',
+      message.payload?.delegation || {},
+    );
+  } else if (message.command === 'ADMIT_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF') {
+    result = await browserAgent.admitAutomaticSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.admission || {},
+    );
+  } else if (message.command === 'DISPATCH_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.dispatchAdmittedSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.dispatch || {},
+    );
+  } else if (message.command === 'RUN_BROWSER_AGENT_AUTOMATIC_SPECIALIST_HANDOFF') {
+    result = await runAutomaticSpecialistHandoff(
+      message.payload?.id || '',
+      message.payload?.run || {},
+    );
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.create(message.payload || {});
   } else if (message.command === 'SELECT_BROWSER_AGENT_JOB') {
     result = await browserAgent.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.updateConfig(message.payload?.id || '', message.payload?.config || {});
-  } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    const handoff = structuredClone(message.payload?.handoff || {});
-    delete handoff.at;
-    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', handoff);
-  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS_ACROSS_JOBS') {
-    const claim = structuredClone(message.payload?.claim || {});
-    delete claim.at;
-    result = await browserAgent.claimSpecialistHandoffsAcrossJobs(
-      claim,
-      { specialistProviderReadinessResolver },
-    );
-  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
-    const claim = structuredClone(message.payload?.claim || {});
-    delete claim.at;
-    result = await browserAgent.claimSpecialistHandoffs(
+  } else if (message.command === 'BIND_BROWSER_AGENT_ORCHESTRATION_NODE') {
+    result = await browserAgent.bindOrchestrationNode(
       message.payload?.id || '',
-      claim,
-      { specialistProviderReadinessResolver },
-    );
-  } else if (message.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION') {
-    result = await browserAgent.executeClaimedSpecialistProvider(
-      message.payload?.id || '',
+      message.payload?.binding || {},
       {
-        agentId: message.payload?.agentId || '',
-        conversationId: createSpecialistConversationId(),
-        expectedControlEpoch: message.payload?.expectedControlEpoch,
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
       },
-      { specialistProviderReadinessResolver },
     );
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
+  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
+    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
-    const reconciliation = structuredClone(message.payload?.reconciliation || {});
-    delete reconciliation.at;
-    result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', reconciliation);
+    result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    const completion = structuredClone(message.payload?.completion || {});
-    delete completion.at;
-    result = await browserAgent.completeSpecialistHandoff(message.payload?.id || '', completion);
+    result = await browserAgent.completeSpecialistHandoff(message.payload?.id || '', message.payload?.completion || {});
   } else if (message.command === 'VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    const verification = structuredClone(message.payload?.verification || {});
-    delete verification.at;
-    result = await browserAgent.verifySpecialistHandoff(message.payload?.id || '', verification);
+    result = await browserAgent.verifySpecialistHandoff(message.payload?.id || '', message.payload?.verification || {});
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
@@ -904,7 +821,7 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'DELETE_BROWSER_AGENT_JOB') {
     result = await browserAgent.delete(message.payload?.id || '');
   } else if (message.command === 'RUN_BROWSER_AGENT_NOW') {
-    result = await runBrowserAgentAutomationCycle();
+    result = await browserAgent.cycleAll();
   } else if (message.command === 'GET_REMOTE_DISPATCH_STATUS') {
     result = await remoteDispatch.getStatus();
   } else if (message.command === 'TEST_REMOTE_DISPATCH_FEED') {
@@ -921,11 +838,28 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'RUN_REMOTE_DISPATCH_NOW') {
     result = await runRemoteDispatchCycle({ execute: true });
   } else {
+    const importedLaunchWindow = message.command === 'IMPORT_PORTABLE_PROFILE' && message.payload?.confirmAutoStart === true
+      ? await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId) : null;
+    if (['START_SESSION', 'RESUME_SESSION'].includes(message.command)) {
+      const windowId = await resolveLaunchWindow(chrome, sender, message.payload?.sourceTabId);
+      await repo.update(state => {
+        const session = state.sessionsById?.[message.payload?.sessionId];
+        if (!session) throw new Error('Session not found');
+        if (message.command === 'START_SESSION' || !Number.isInteger(session.tabWindowId)) session.tabWindowId = windowId;
+        return state;
+      });
+    }
     result = message.command === 'RUN_AI_ROUTED_PROMPT'
       ? await dispatchSerializedAiRoute(message.payload || {})
       : message.command === 'RUN_AI_MANAGER_NOW'
         ? await aiManager.process({ force: true })
         : await dispatcher.execute(message.command, message.payload || {});
+    if (Number.isInteger(importedLaunchWindow)) await repo.update(state => {
+      for (const id of result?.summary?.importedSessionIds || []) {
+        if (state.sessionsById[id]) state.sessionsById[id].tabWindowId = importedLaunchWindow;
+      }
+      return state;
+    });
   }
   // Read-only status/configuration queries must not create a STATUS_CHANGED
   // feedback loop with the options page. Only state-changing UI commands need
@@ -942,14 +876,24 @@ chrome.runtime.onInstalled.addListener(() => { runSafely(runStartupCycle()); });
 chrome.runtime.onStartup.addListener(() => { runSafely(runStartupCycle()); });
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
+  if (alarm.name === CORE_WATCHDOG_ALARM) runSafely(runExecutionCycle());
   if (alarm.name === AI_REPORT_ALARM) runSafely(runAiReportCycle());
   if (alarm.name === AI_MANAGER_ALARM) runSafely(runAiManagerCycle());
-  if (alarm.name === BROWSER_AGENT_ALARM) runSafely(runBrowserAgentAutomationCycle());
+  if (alarm.name === BROWSER_AGENT_ALARM) runSafely(browserAgent.cycleAll());
   if (alarm.name === REMOTE_DISPATCH_ALARM) runSafely(runRemoteDispatchCycle());
   if (orchestrationV2.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const orchestration = await orchestrationV2.cycleAlarm(alarm.name); const state = await reconcileRuntime(); return { orchestration, state }; })());
   if (scenarioWork.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const scenario = await scenarioWork.cycleAll(); const state = await reconcileRuntime(); return { scenario, state }; })());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.channel === 'autopilot-dom-submit-checkpoint') {
+    ensureColdStartReconciled()
+      .then(() => checkpointDomSubmit(chrome, repo, message, _sender))
+      .then(() => sendResponse({ ok: true }))
+      .catch(error => sendResponse({ ok: false, error: {
+        safeDiagnosticCode: error?.safeDiagnosticCode || 'DOM_SUBMIT_CHECKPOINT_FAILED',
+      } }));
+    return true;
+  }
   if (message?.channel === 'autopilot-send-tab-activation') {
     const action = message.action === 'activate' ? activateOwnedSendTab
       : message.action === 'restore' ? restoreOwnedSendTab : null;
@@ -975,9 +919,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message?.channel !== 'autopilot-ui') return false;
-  dispatchUiMessage(message)
+  dispatchUiMessage(message, _sender)
     .then(data => sendResponse({ ok: true, data }))
     .catch(error => sendResponse({ ok: false, error: { message: error?.message || 'Core command failed' } }));
   return true;
 });
-chrome.action?.onClicked.addListener(() => { runSafely(chrome.runtime.openOptionsPage()); });
+chrome.action?.onClicked.addListener(tab => { runSafely(openWindowPilotPanel(chrome, tab)); });

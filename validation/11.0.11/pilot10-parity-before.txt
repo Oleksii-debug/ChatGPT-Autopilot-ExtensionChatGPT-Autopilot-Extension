@@ -1,0 +1,23 @@
+✖ the production submit callback must not turn a working Pilot 10 form into a debugger-dependent Send (30.334139ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 110.744989
+
+✖ failing tests:
+
+test at tests-regression/interaction/send-ack-v016.test.cjs:61:1
+✖ the production submit callback must not turn a working Pilot 10 form into a debugger-dependent Send (30.334139ms)
+  Error: debugger unavailable
+      at Object.unavailableNative [as submit] (/workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/interaction/send-ack-v016.test.cjs:64:63)
+      at submitExistingImpl (evalmachine.<anonymous>:1814:20)
+      at async submitExisting (evalmachine.<anonymous>:1697:18)
+      at async TestContext.<anonymous> (/workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/interaction/send-ack-v016.test.cjs:69:16)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    safeDiagnosticCode: 'NATIVE_INPUT_ATTACH_FAILED'
+  }

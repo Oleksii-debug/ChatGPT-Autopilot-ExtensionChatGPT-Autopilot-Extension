@@ -1,0 +1,11 @@
+11.0.8 qualification — 2026-10-01T20:39:24+02:00
+
+Full automated production-code regression: 797 PASS, 0 FAIL.
+Command: node --test --test-reporter=tap tests-regression/core/*.test.js tests-regression/integration/*.test.js tests/scenario-work*.test.mjs tests/scenario-v11-window-liveness.test.mjs tests/global-status.test.mjs tests-regression/interaction/*.test.cjs tests-regression/ui/*.test.js tests-regression/release/*.test.js
+Final targeted window/profile/UI/runtime-wiring checks:126 PASS, 0 FAIL.
+
+New cases: two five-chat pools in distinct windows, full sequences and replacements through focus changes/restart; cumulative totals20/20 perpool; missing-window creation has no fallback; moved task blocked before insertion; transport window recheck before effects/read; trusted local options source; separate Pilot panels; positive current-marker completed response reconciled once/no resend; stale unrelated answer gives0; legacy migration pauses and explicit Start restores authority; failed-safe Start/Resume cannot replay; repeated same-window Start remains live; copied foreign profile runtime rejected despite numeric IDs; keyboard-stable separate clickable/stop lists; labelled timing spinbuttons plus portable timing roundtrip; post-Send dwell before focus restore. Existing15×3 capacity,35/45 hard timeouts, full-cycle keep-open, ordinary open-close/restart and High advisory behavior retained.
+
+Tests use modeled Chrome APIs/DOM with production code. Windows/Chrome/NVDA, actual ChatGPT account isolation and server delivery are not physically qualified here. Frozen documents can delay read observations until resumed; no mass tab activation or autoDiscardable=false override. Full Agent platform gaps from earlier releases remain documented.
+
+Archive verification PASS: CRC, source byte equality, relative import closure and all230 shipped JavaScript files pass syntax checks. Rebuild is byte-identical.

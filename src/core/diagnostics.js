@@ -57,6 +57,7 @@ export function appendDiagnostic(state, entry, { at = Date.now() } = {}) {
     observed: redactChatGptUrl(entry?.observed),
     promptFingerprint: entryText(entry, 'promptFingerprint', 80)
       || optionalText(session?.operation?.promptFingerprint, 80),
+    promptSource: entryText(entry, 'promptSource', 80),
     operationIdSuffix: entryText(entry, 'operationIdSuffix', 80)
       || optionalText(session?.operation?.operationId?.slice(-16), 80),
     tabId: Number.isInteger(entry?.tabId) && entry.tabId >= 0 ? entry.tabId : null,
@@ -76,7 +77,7 @@ function formatTime(value) {
   return Number.isFinite(value) && value >= 0 ? new Date(value).toISOString() : 'немає';
 }
 
-function reportSession(session) {
+function reportSession(session, state) {
   const currentTask = session.tasksById?.[session.taskOrder?.[session.currentTaskIndex]] || null;
   const enabledIds = (session.taskOrder || []).filter(id => session.tasksById?.[id]?.enabled);
   const completedTaskCount = session.runMode === 'ONE_PASS'
@@ -84,17 +85,32 @@ function reportSession(session) {
     : 0;
   const isCompleted = session.runMode === 'ONE_PASS' && enabledIds.length > 0 && completedTaskCount >= enabledIds.length;
   const successfulSendCount = Math.max(completedTaskCount, Number(session.successfulSendCount || 0));
+  const scenarioAwaitingAssistant = session.scenarioWork?.managed === true
+    && isCompleted
+    && successfulSendCount > 0
+    && session.operation?.phase === OperationPhase.SENT_VERIFIED;
+  const hints = Object.values(state?.tabHintsByTaskId || {}).filter(hint => hint.sessionId === session.id);
   return [
     `Сеанс: ${safeText(session.name || 'без назви', 160)} (${safeText(session.id, 120)})`,
-    line('  стан', isCompleted ? 'COMPLETED' : session.runState),
+    line('  стан', scenarioAwaitingAssistant ? 'WAITING_RESPONSE' : (isCompleted ? 'COMPLETED' : session.runState)),
+    ...(scenarioAwaitingAssistant ? [line('  пояснення стану', 'Core підтвердив Send; Scenario Work ще має підтвердити завершення відповіді ChatGPT перед наступним промптом.')] : []),
     line('  успішно надіслано', successfulSendCount),
-    line('  виконано завдань', `${completedTaskCount}/${enabledIds.length}`),
-    line('  залишилось завдань', Math.max(0, enabledIds.length - completedTaskCount)),
+    line('  виконано завдань', session.runMode === 'CONTINUOUS' ? 'не застосовується — постійний цикл' : `${completedTaskCount}/${enabledIds.length}`),
+    line('  залишилось завдань', session.runMode === 'CONTINUOUS' ? 'не застосовується — постійний цикл' : Math.max(0, enabledIds.length - completedTaskCount)),
     line('  поточне завдання', safeText(currentTask?.label || currentTask?.id || '', 160)),
     line('  стан завдання', currentTask?.status),
+    line('  режим вкладок', session.tabStrategy),
+    line('  робоче вікно', session.tabWindowId ?? session.scenarioWork?.preferredWindowId),
+    line('  прив’язані вкладки', hints.map(hint => `${hint.tabId}; owned=${hint.ownedByExtension === true}; closing=${hint.retirePending === true}`).join(' | ')),
     line('  етап операції', session.operation?.phase || OperationPhase.NONE),
+    line('  DOM-відправлення зафіксовано', session.operation?.domSubmitDispatched === true ? 'так' : 'ні'),
+    line('  native-відправлення зафіксовано', session.operation?.nativeSubmitDispatched === true ? 'так' : 'ні'),
     line('  очікувана розмова', redactChatGptUrl(session.operation?.targetUrl || currentTask?.normalizedUrl || currentTask?.url)),
+    line('  розмова останнього Send', redactChatGptUrl(currentTask?.lastConversationUrl)),
     line('  повторна спроба не раніше', formatTime(currentTask?.retryAfterAt)),
+    line('  пауза після відкриття вкладки, мс', session.tabReadyDelayMs || 0),
+    line('  очікування після натискання Send, мс', session.postSendDelayMs || 0),
+    line('  postSendHoldUntil', formatTime(session.operation?.postSendHoldUntil)),
     line('  остання помилка', safeText(session.lastError || '', MAX_DIAGNOSTIC_MESSAGE_LENGTH)),
   ].join('\n');
 }
@@ -111,6 +127,7 @@ function reportEvent(entry) {
     entry.code ? `код=${entry.code}` : null,
     entry.target ? `ціль=${entry.target}` : null,
     entry.observed ? `спостережено=${entry.observed}` : null,
+    entry.promptSource ? `джерело_промпта=${entry.promptSource}` : null,
     entry.promptFingerprint ? `відбиток=${entry.promptFingerprint}` : null,
     entry.message ? `пояснення=${entry.message}` : null,
   ].filter(Boolean);
@@ -131,7 +148,7 @@ export function createDiagnosticReport(state, { now = Date.now(), extensionVersi
     'У звіт навмисно не включено: тексти промптів, повні приватні посилання, файли, дані сеансу браузера, ключі доступу, дані входу та вміст розмов.',
     '',
     'Поточний стан сеансів:',
-    sessions.length ? sessions.map(reportSession).join('\n\n') : 'Сеансів немає.',
+    sessions.length ? sessions.map(session => reportSession(session, state)).join('\n\n') : 'Сеансів немає.',
     '',
     `Діагностичні події (останні ${events.length}):`,
   ];

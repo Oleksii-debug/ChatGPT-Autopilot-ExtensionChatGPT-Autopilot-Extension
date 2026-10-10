@@ -45,7 +45,6 @@ const INPUT_KEYS = new Set([
   'plannerCapabilityIds',
   'verifierCapabilityIds',
   'requiresVision',
-  'requiresPlanner',
   'requiresVerifier',
   'now',
 ]);
@@ -252,7 +251,6 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
     plannerCapabilityIds: own(raw, 'plannerCapabilityIds') ?? [],
     verifierCapabilityIds: own(raw, 'verifierCapabilityIds') ?? [],
     requiresVision: own(raw, 'requiresVision') ?? false,
-    requiresPlanner: own(raw, 'requiresPlanner') ?? true,
     requiresVerifier: own(raw, 'requiresVerifier') ?? true,
     ...(Object.hasOwn(raw, 'now') ? { now: own(raw, 'now') } : {}),
   });

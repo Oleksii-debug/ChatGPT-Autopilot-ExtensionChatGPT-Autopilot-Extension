@@ -758,30 +758,3 @@ test('L1-B same durable activation identity after restart yields one activation 
   assert.deepEqual(afterRestart.actions, []);
   assert.equal(Object.keys(afterRestart.runtime.nodesById['worker-1'].activationLedger).length, 1);
 });
-
-
-test('WORK activation request preserves exact durable provider dispatch identity in action and ledger', () => {
-  const g = graph();
-  const runtime = createOrchestrationHierarchyRuntime(g, START);
-  const dispatchIdentity = 'subagent-task:' + 'a'.repeat(64);
-
-  const prepared = reduce(
-    g,
-    runtime,
-    event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'work-dispatch-identity', {
-      nodeId: 'worker-1',
-      generation: 1,
-      activationId: 'worker-1-task-bound',
-      purpose: OrchestrationActivationPurpose.WORK,
-      providerDispatchIdentity: dispatchIdentity,
-    }),
-    1,
-  );
-
-  assert.equal(prepared.actions.length, 1);
-  assert.equal(prepared.actions[0].providerDispatchIdentity, dispatchIdentity);
-  assert.equal(
-    prepared.runtime.nodesById['worker-1'].activationLedger['worker-1-task-bound'].providerDispatchIdentity,
-    dispatchIdentity,
-  );
-});

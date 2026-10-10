@@ -27,10 +27,7 @@ import {
   normalizeTrustedSubagentTaskActivationBindingV1,
   prepareSubagentResultReconciliationV1,
 } from '../src/core/subagent-result-reconciliation.js';
-import {
-  createSubagentTaskEnvelopeV1,
-  deriveSubagentTaskDispatchIdentityV1,
-} from '../src/core/subagent-task-envelope.js';
+import { createSubagentTaskEnvelopeV1 } from '../src/core/subagent-task-envelope.js';
 import {
   ObservationStatus,
   VerificationStatus,
@@ -84,7 +81,6 @@ function outcomeContract({
       sourceId: 'source-1',
       location: 'project://source-1',
       revisionId: 'rev-1',
-      contentSha256: '4'.repeat(64),
       purpose: 'Canonical task source.',
     }],
     allowedAuthority: [],
@@ -162,8 +158,6 @@ function taskEnvelope(contract = outcomeContract()) {
     createdAt: T2,
   });
 }
-
-const DEFAULT_TASK_DISPATCH_IDENTITY = deriveSubagentTaskDispatchIdentityV1(taskEnvelope());
 
 function rawVerification(overrides = {}) {
   return {
@@ -319,7 +313,6 @@ function runtimeFixture({ confirmEffect = true } = {}) {
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
-      providerDispatchIdentity: DEFAULT_TASK_DISPATCH_IDENTITY,
     },
     EPOCH_T1,
   );
@@ -351,7 +344,6 @@ function canonicalBindingId({
   childAgentId = 'child-1',
   taskId = 'task-1',
   taskEnvelopeId = 'envelope-1',
-  taskDispatchIdentity = DEFAULT_TASK_DISPATCH_IDENTITY,
   planId = 'plan-1',
   planRevision = 3,
   outcomeContractId = 'outcome-1',
@@ -369,7 +361,6 @@ function canonicalBindingId({
     childAgentId,
     taskId,
     taskEnvelopeId,
-    taskDispatchIdentity,
     planId,
     String(planRevision),
     outcomeContractId,
@@ -391,7 +382,6 @@ function binding(overrides = {}) {
     childAgentId: 'child-1',
     taskId: 'task-1',
     taskEnvelopeId: 'envelope-1',
-    taskDispatchIdentity: DEFAULT_TASK_DISPATCH_IDENTITY,
     planId: 'plan-1',
     planRevision: 3,
     outcomeContractId: 'outcome-1',
@@ -1103,7 +1093,6 @@ test('task activation binding identity changes with exact task, plan and outcome
     { childAgentId: 'child-other' },
     { taskId: 'task-other' },
     { taskEnvelopeId: 'envelope-other' },
-    { taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
     { planId: 'plan-other' },
     { planRevision: 4 },
     { outcomeContractId: 'outcome-other' },
@@ -1120,21 +1109,6 @@ test('task activation binding identity changes with exact task, plan and outcome
       planRevision: 4,
     }),
     /bindingId is not canonical/u,
-  );
-  assert.throws(
-    () => normalizeTrustedSubagentTaskActivationBindingV1({
-      ...binding(),
-      taskDispatchIdentity: 'subagent-task:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    }),
-    /bindingId is not canonical/u,
-  );
-  assert.throws(
-    () => normalizeTrustedSubagentTaskActivationBindingV1({
-      ...binding(),
-      taskDispatchIdentity: 'caller-chosen-task-fingerprint',
-      bindingId: canonicalBindingId({ taskDispatchIdentity: 'caller-chosen-task-fingerprint' }),
-    }),
-    /taskDispatchIdentity is invalid/u,
   );
 
   const revised = normalizeTrustedSubagentTaskActivationBindingV1({
@@ -1243,7 +1217,6 @@ test('derives task activation binding only from canonical task, reducer action a
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
-      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );
@@ -1278,7 +1251,6 @@ test('binding derivation rejects forged or stale activation actions and never ac
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
-      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );
@@ -1323,15 +1295,6 @@ test('binding derivation rejects forged or stale activation actions and never ac
     }),
     /purpose cannot terminalize a result/u,
   );
-
-  const substituted = { ...structuredClone(task), objective: task.objective + ' drift' };
-  assert.throws(
-    () => deriveSubagentTaskActivationBindingV1({
-      ...baseInput,
-      taskEnvelope: substituted,
-    }),
-    /dispatch identity does not match task envelope/u,
-  );
 });
 
 test('binding derivation rejects ambiguous/terminal activation state and pre-activation chronology', () => {
@@ -1350,7 +1313,6 @@ test('binding derivation rejects ambiguous/terminal activation state and pre-act
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
-      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );

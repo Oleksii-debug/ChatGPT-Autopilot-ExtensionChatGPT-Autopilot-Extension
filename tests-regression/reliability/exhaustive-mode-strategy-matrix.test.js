@@ -117,7 +117,9 @@ test('all 12 mode x tab-strategy combinations complete concurrently with real ro
 
   const transport = { async execute(tabId, request) {
     const liveState = await repo.load();
-    if (request.mode !== 'CHECK_ONLY') assert.equal(request.promptText, expectedPrompt(liveState, request.taskId));
+    if (!['CHECK_ONLY', 'ENSURE_HIGH_EFFORT'].includes(request.mode)) {
+      assert.equal(request.promptText, expectedPrompt(liveState, request.taskId));
+    }
     const sessionId = request.taskId.split('-t')[0];
     const session = liveState.sessionsById[sessionId];
     const ordinal = Number(request.taskId.match(/-t(\d+)$/)?.[1] || 0);
@@ -134,6 +136,9 @@ test('all 12 mode x tab-strategy combinations complete concurrently with real ro
         return { status: InteractionResult.BUSY };
       }
       return { status: InteractionResult.READY };
+    }
+    if (request.mode === 'ENSURE_HIGH_EFFORT') {
+      return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED' };
     }
     if (request.mode === 'INSERT_ONLY') {
       return {

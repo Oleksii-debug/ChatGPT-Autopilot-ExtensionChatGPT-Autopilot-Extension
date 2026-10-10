@@ -48,7 +48,7 @@ for (const status of [
   InteractionResult.UNKNOWN_UI,
   InteractionResult.MANUAL_REVIEW_REQUIRED,
 ]) {
-  test(`safe unattended pre-submit ${status} resets open-close tab before retry`, async () => {
+  test(`safe unattended pre-submit ${status} handles its owned tab before retry`, async () => {
     const repo = new Repo(stateFor('safe'));
     const chrome = chromeRecorder();
     const executor = new AutomaticSessionExecutor(repo, chrome.api, { execute: async () => ({}) }, {
@@ -63,9 +63,15 @@ for (const status of [
     const closed = await executor.closeOpenCloseTabAfterTerminalResult('s1', 't1', { status });
     const after = await repo.load();
 
-    assert.equal(closed, true);
-    assert.deepEqual(chrome.removed, [7]);
-    assert.equal(after.tabHintsByTaskId.t1, undefined);
+    if (status === InteractionResult.AUTH_REQUIRED) {
+      assert.equal(closed, false);
+      assert.deepEqual(chrome.removed, []);
+      assert.equal(after.tabHintsByTaskId.t1.tabId, 7, 'keep sign-in UI available');
+    } else {
+      assert.equal(closed, true);
+      assert.deepEqual(chrome.removed, [7]);
+      assert.equal(after.tabHintsByTaskId.t1, undefined);
+    }
     assert.equal(after.sessionsById.s1.runState, RunState.RUNNING);
     assert.equal(after.sessionsById.s1.tasksById.t1.status, 'RETRY_WAIT');
     assert.equal(after.sessionsById.s1.tasksById.t1.manualReviewReason, '');

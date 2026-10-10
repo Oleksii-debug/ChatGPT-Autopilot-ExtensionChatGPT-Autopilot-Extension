@@ -285,7 +285,6 @@ export function prepareAutomaticAgentSpecialistDelegationV1(input = {}) {
 
   const binding = bindSpecialistHandoffToRegistryV1({
     registry,
-    expectedRegistryBindingKey: registry.bindingKey,
     selection,
     handoff,
     parentCapabilityIds,

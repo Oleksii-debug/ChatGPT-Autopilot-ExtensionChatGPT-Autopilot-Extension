@@ -7,30 +7,15 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
-import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
+import {
+  OrchestrationHierarchyEventType,
+  compactOrchestrationEventId,
+  validateOrchestrationHierarchyRuntimeV1,
+} from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
-import { buildAgentTreeProjectionV1 } from './agent-tree-observability.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
-import {
-  createSubagentTaskActivationBindingRegistryV1,
-  normalizeSubagentTaskActivationBindingRegistryV1,
-  putSubagentTaskActivationBindingV1,
-  resolveSubagentTaskActivationBindingV1,
-  resolveSubagentTaskActivationEvidenceV1,
-} from './subagent-task-activation-binding-registry.js';
-import {
-  SubagentResultReconciliationDecision,
-  deriveSubagentTaskActivationBindingV1,
-  prepareSubagentResultReconciliationV1,
-} from './subagent-result-reconciliation.js';
-import { deriveSubagentAuthorityEnvelopeIdentityV1 } from './subagent-authority-envelope.js';
-import {
-  deriveSubagentTaskDispatchIdentityV1,
-  normalizeSubagentTaskEnvelopeV1,
-} from './subagent-task-envelope.js';
-import { projectDurableSubagentTaskContextV1 } from './subagent-context-projection.js';
-import { ProjectWorkspaceRepository } from './project-workspace.js';
+import { createOrchestrationProjectAuthorityV1 } from './browser-agent-orchestration-binding.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -38,30 +23,24 @@ const MANAGER_SCHEMA_VERSION = 1;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
-const SUBAGENT_BINDING_LOOKUP_KEYS = new Set(['bindingId']);
-const SUBAGENT_BINDING_REGISTRATION_KEYS = new Set([
-  'taskEnvelope',
-  'activationAction',
-  'invocationId',
-  'authorityEnvelope',
-]);
-const SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS = new Set([
-  'taskEnvelope',
-  'activationAction',
-  'invocationId',
-  'authorityEnvelope',
-]);
-const SUBAGENT_CONTEXT_RESOLUTION_KEYS = new Set([
-  'bindingId',
-  'expectedProjectRevisionId',
-  'capsuleId',
-]);
-const SUBAGENT_RESULT_RECONCILIATION_KEYS = new Set([
-  'resultEnvelope',
-  'outcomeContract',
-  'criterionVerifications',
-  'taskActivationBindingId',
-]);
+
+export const OrchestrationProjectAuthorityErrorCode = Object.freeze({
+  PROJECT_UNOWNED: 'PROJECT_UNOWNED',
+  PROJECT_NON_UNIQUE: 'PROJECT_NON_UNIQUE',
+  HIERARCHY_UNAVAILABLE: 'HIERARCHY_UNAVAILABLE',
+  HIERARCHY_INCONSISTENT: 'HIERARCHY_INCONSISTENT',
+});
+
+function orchestrationProjectAuthorityError(code, message, cause = undefined) {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  Object.defineProperty(error, 'code', {
+    value: code,
+    enumerable: true,
+    writable: false,
+    configurable: false,
+  });
+  return error;
+}
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
@@ -85,143 +64,6 @@ function plainIntent(value, label) {
 }
 function storedSubagentPolicy(value) {
   return { ...normalizeSubagentStructurePolicyV1(value === undefined ? {} : value) };
-}
-function storedSubagentTaskActivationBindingRegistry(runtime) {
-  const value = runtime?.subagentTaskActivationBindingRegistry;
-  return value === undefined
-    ? createSubagentTaskActivationBindingRegistryV1()
-    : normalizeSubagentTaskActivationBindingRegistryV1(value);
-}
-function plainSubagentBindingLookup(value, label = 'Subagent activation-binding lookup') {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`${label} must be a plain object`);
-  }
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error(`${label} must be a plain object`);
-  }
-  const normalized = {};
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== 'string' || !SUBAGENT_BINDING_LOOKUP_KEYS.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
-    }
-    normalized[key] = descriptor.value;
-  }
-  return normalized;
-}
-function snapshotDataOnly(value, label, depth = 0) {
-  if (depth > 64) throw new Error(`${label} nesting is too deep`);
-  if (value === null || ['string', 'number', 'boolean', 'undefined'].includes(typeof value)) return value;
-  if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype) throw new Error(`${label} array prototype is invalid`);
-    if (Object.getOwnPropertySymbols(value).length) throw new Error(`${label} contains symbol field`);
-    const names = Object.getOwnPropertyNames(value).filter(name => name !== 'length');
-    if (names.length !== value.length || names.some((name, index) => name !== String(index))) {
-      throw new Error(`${label} arrays must be dense and undecorated`);
-    }
-    return Object.freeze(names.map((name, index) => {
-      const descriptor = Object.getOwnPropertyDescriptor(value, name);
-      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-        throw new Error(`${label}[${index}] must be an enumerable own data property`);
-      }
-      return snapshotDataOnly(descriptor.value, `${label}[${index}]`, depth + 1);
-    }));
-  }
-  if (typeof value !== 'object') throw new Error(`${label} contains unsupported value`);
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must contain plain objects only`);
-  const output = {};
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-      throw new Error(`${label}.${key} must be an enumerable own data property`);
-    }
-    output[key] = snapshotDataOnly(descriptor.value, `${label}.${key}`, depth + 1);
-  }
-  return Object.freeze(output);
-}
-function snapshotSubagentBindingRegistration(value) {
-  const snapshot = snapshotDataOnly(value, 'Subagent activation-binding registration');
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-    throw new Error('Subagent activation-binding registration must be a plain object');
-  }
-  for (const key of Object.keys(snapshot)) {
-    if (!SUBAGENT_BINDING_REGISTRATION_KEYS.has(key)) {
-      throw new Error('Subagent activation-binding registration contains unknown field: ' + key);
-    }
-  }
-  for (const key of SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS) {
-    if (!Object.hasOwn(snapshot, key)) {
-      throw new Error('Subagent activation-binding registration is missing field: ' + key);
-    }
-  }
-  return snapshot;
-}
-
-function snapshotSubagentContextResolution(value) {
-  const snapshot = snapshotDataOnly(value, 'Subagent durable-context resolution');
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-    throw new Error('Subagent durable-context resolution must be a plain object');
-  }
-  for (const key of Object.keys(snapshot)) {
-    if (!SUBAGENT_CONTEXT_RESOLUTION_KEYS.has(key)) {
-      throw new Error('Subagent durable-context resolution contains unknown field: ' + key);
-    }
-  }
-  for (const key of ['bindingId', 'expectedProjectRevisionId']) {
-    if (!Object.hasOwn(snapshot, key)) {
-      throw new Error('Subagent durable-context resolution is missing field: ' + key);
-    }
-  }
-  return snapshot;
-}
-
-function snapshotSubagentResultReconciliation(value) {
-  const snapshot = snapshotDataOnly(value, 'Subagent result reconciliation');
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-    throw new Error('Subagent result reconciliation must be a plain object');
-  }
-  for (const key of Object.keys(snapshot)) {
-    if (!SUBAGENT_RESULT_RECONCILIATION_KEYS.has(key)) {
-      throw new Error('Subagent result reconciliation contains unknown field: ' + key);
-    }
-  }
-  for (const key of SUBAGENT_RESULT_RECONCILIATION_KEYS) {
-    if (!Object.hasOwn(snapshot, key)) {
-      throw new Error('Subagent result reconciliation is missing field: ' + key);
-    }
-  }
-  return snapshot;
-}
-
-function assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding) {
-  const exact = [
-    ['projectId', task.projectId],
-    ['parentAgentId', task.parentAgentId],
-    ['childAgentId', task.childAgentId],
-    ['taskId', task.taskId],
-    ['taskEnvelopeId', task.envelopeId],
-    ['taskDispatchIdentity', taskDispatchIdentity],
-    ['planId', task.planId],
-    ['planRevision', task.planRevision],
-    ['outcomeContractId', task.outcome.contractId],
-    ['outcomeContractRevision', task.outcome.contractRevision],
-  ];
-  for (const [key, value] of exact) {
-    if (binding[key] !== value) {
-      throw new Error('Subagent task does not match durable activation binding: ' + key);
-    }
-  }
-}
-function sameBindingIdentity(left, right) {
-  if (!left || !right) return false;
-  return Object.keys(left).every(key => key === 'boundAt' || left[key] === right[key])
-    && Object.keys(right).every(key => key === 'boundAt' || left[key] === right[key]);
 }
 function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
@@ -302,9 +144,6 @@ export class OrchestrationV2Manager {
     fetchFn = globalThis.fetch,
     collectAssistantReport = null,
     resolveHierarchyProvider = null,
-    projectWorkspaceRepository = null,
-    resolveTrustedOutcomeContract = null,
-    resolveTrustedVerificationRecord = null,
     now = () => Date.now(),
     createId = null,
   } = {}) {
@@ -314,20 +153,14 @@ export class OrchestrationV2Manager {
     this.fetchFn = fetchFn;
     this.collectAssistantReport = collectAssistantReport;
     this.resolveHierarchyProvider = typeof resolveHierarchyProvider === 'function' ? resolveHierarchyProvider : null;
-    this.projectWorkspaceRepository = projectWorkspaceRepository || new ProjectWorkspaceRepository(chromeApi);
-    if (typeof this.projectWorkspaceRepository?.resolveContext !== 'function') {
-      throw new Error('Project Workspace context resolver dependency is required');
-    }
-    this.resolveTrustedOutcomeContract = typeof resolveTrustedOutcomeContract === 'function'
-      ? resolveTrustedOutcomeContract
-      : null;
-    this.resolveTrustedVerificationRecord = typeof resolveTrustedVerificationRecord === 'function'
-      ? resolveTrustedVerificationRecord
-      : null;
     this.now = now;
     this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     this.controllers = new Map();
     this.updateChain = Promise.resolve();
+    // Canonical in-process authority fence. Manager-owned mutations that can
+    // change Project ownership, hierarchy provenance or owner subagent policy
+    // serialize with Browser Agent binding admission through this same chain.
+    this.projectAuthorityChain = Promise.resolve();
     this.migrationBarrier = null;
   }
 
@@ -352,6 +185,30 @@ export class OrchestrationV2Manager {
     });
     this.updateChain = operation.catch(() => undefined);
     return operation;
+  }
+
+  runProjectAuthorityExclusive(operation) {
+    if (typeof operation !== 'function') {
+      throw new Error('Orchestration Project authority operation must be a function');
+    }
+    const run = this.projectAuthorityChain.then(operation);
+    this.projectAuthorityChain = run.catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Keep canonical Project -> hierarchy authority stable while a dependent
+   * durable mutation commits. The callback is awaited under the same fence
+   * used by manager-owned authority mutations.
+   */
+  withProjectHierarchyAuthority(projectId, operation) {
+    if (typeof operation !== 'function') {
+      throw new Error('Orchestration Project authority callback is required');
+    }
+    return this.runProjectAuthorityExclusive(async () => {
+      const authority = await this.resolveProjectHierarchyAuthority(projectId);
+      return operation(authority);
+    });
   }
 
   ensureMigrated() {
@@ -415,28 +272,6 @@ export class OrchestrationV2Manager {
     return { selectedId: meta.selectedId, orchestras: out };
   }
 
-  async getAgentTreeProjection(id = '') {
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) {
-      return { selectedId: '', projection: null };
-    }
-    const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
-    const hierarchy = runtime?.hierarchy;
-    if (!hierarchy?.graph || !hierarchy?.state) {
-      return { selectedId: orchestraId, projection: null };
-    }
-    return {
-      selectedId: orchestraId,
-      projection: buildAgentTreeProjectionV1({
-        schemaVersion: 1,
-        graph: hierarchy.graph,
-        runtime: hierarchy.state,
-        telemetry: [],
-      }),
-    };
-  }
-
   async getStatus(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
@@ -468,13 +303,18 @@ export class OrchestrationV2Manager {
       try {
         await this.updateConfig({ ...config, enabled: false }, id);
       } catch (error) {
-        await this.chrome.storage.local.remove?.([configKey(id), runtimeKey(id)]);
-        this.controllers.delete(id);
-        await this.updateMeta(meta => {
-          delete meta.byId[id];
-          meta.order = meta.order.filter(value => value !== id);
-          if (meta.selectedId === id) meta.selectedId = meta.order[0] || '';
-          return meta;
+        // updateConfig is authority-fenced, but a failing repository write may
+        // have partially persisted config/runtime. Keep cleanup under the same
+        // fence so BIND cannot observe authority that is being rolled back.
+        await this.runProjectAuthorityExclusive(async () => {
+          await this.chrome.storage.local.remove?.([configKey(id), runtimeKey(id)]);
+          this.controllers.delete(id);
+          await this.updateMeta(meta => {
+            delete meta.byId[id];
+            meta.order = meta.order.filter(value => value !== id);
+            if (meta.selectedId === id) meta.selectedId = meta.order[0] || '';
+            return meta;
+          });
         });
         throw error;
       }
@@ -492,6 +332,10 @@ export class OrchestrationV2Manager {
   }
 
   async rename(id, name) {
+    return this.runProjectAuthorityExclusive(() => this._renameUnfenced(id, name));
+  }
+
+  async _renameUnfenced(id, name) {
     await this.updateMeta(meta => {
       if (!meta.byId[id]) throw new Error('Orchestra not found');
       meta.byId[id].name = safeName(name);
@@ -512,6 +356,10 @@ export class OrchestrationV2Manager {
   }
 
   async pause(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._pauseUnfenced(id));
+  }
+
+  async _pauseUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
@@ -557,6 +405,10 @@ export class OrchestrationV2Manager {
   }
 
   async resume(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._resumeUnfenced(id));
+  }
+
+  async _resumeUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -628,6 +480,23 @@ export class OrchestrationV2Manager {
   }
 
   async updateConfig(raw, id = '') {
+    return this.runProjectAuthorityExclusive(() => this._updateConfigUnfenced(raw, id));
+  }
+
+  async purgeManagedProjectSessionState(projectId, graphId = '') {
+    await this.coreRepository.update(state => {
+      for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
+        if (!isManagedSession(session, projectId, graphId)) continue;
+        if (isUnresolvedOperation(session)) {
+          throw new Error('Unresolved Send prevents project identity change.');
+        }
+        purgeManagedSessionState(state, sessionId);
+      }
+      return state;
+    });
+  }
+
+  async _updateConfigUnfenced(raw, id = '', { deferManagedSessionPurge = false } = {}) {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -645,14 +514,9 @@ export class OrchestrationV2Manager {
       if (current.projectId && current.projectId !== next.projectId) {
         const currentRuntime = await controller.runtimeRepository.load();
         const currentGraphId = hierarchyGraphId(currentRuntime);
-        await this.coreRepository.update(state => {
-          for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
-            if (!isManagedSession(session, current.projectId, currentGraphId)) continue;
-            if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
-            purgeManagedSessionState(state, sessionId);
-          }
-          return state;
-        });
+        if (!deferManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(current.projectId, currentGraphId);
+        }
       }
       await controller.configRepository.save(next);
       await controller.runtimeRepository.reset();
@@ -663,7 +527,60 @@ export class OrchestrationV2Manager {
     return this.getStatus(orchestraId);
   }
 
+  async snapshotImportAuthorityState(orchestraId, metaRecord) {
+    const keys = [configKey(orchestraId), runtimeKey(orchestraId)];
+    const raw = await this.chrome.storage.local.get(keys);
+    return {
+      orchestraId,
+      configPresent: Object.hasOwn(raw || {}, keys[0]),
+      config: Object.hasOwn(raw || {}, keys[0]) ? clone(raw[keys[0]]) : undefined,
+      runtimePresent: Object.hasOwn(raw || {}, keys[1]),
+      runtime: Object.hasOwn(raw || {}, keys[1]) ? clone(raw[keys[1]]) : undefined,
+      metaRecord: clone(metaRecord),
+    };
+  }
+
+  async restoreImportAuthorityState(snapshot) {
+    const configStorageKey = configKey(snapshot.orchestraId);
+    const runtimeStorageKey = runtimeKey(snapshot.orchestraId);
+    const restore = {};
+    const remove = [];
+
+    if (snapshot.configPresent) restore[configStorageKey] = clone(snapshot.config);
+    else remove.push(configStorageKey);
+    if (snapshot.runtimePresent) restore[runtimeStorageKey] = clone(snapshot.runtime);
+    else remove.push(runtimeStorageKey);
+
+    if (Object.keys(restore).length) {
+      await this.chrome.storage.local.set(restore);
+    }
+    if (remove.length) {
+      await this.chrome.storage.local.remove(remove);
+    }
+
+    await this.updateMeta(meta => {
+      if (!meta.byId[snapshot.orchestraId]) {
+        throw new Error('Orchestra disappeared while rolling back failed profile import.');
+      }
+      meta.byId[snapshot.orchestraId] = clone(snapshot.metaRecord);
+      return meta;
+    });
+
+    // Alarm state is derived from the restored canonical config/runtime. A
+    // reconcile failure must not replace the original import error or weaken
+    // the already-restored authority snapshot.
+    try {
+      await this.controllerFor(snapshot.orchestraId).reconcileAlarm({ nowMs: this.now() });
+    } catch {
+      // Recovery/alarm reconciliation remains retryable from canonical state.
+    }
+  }
+
   async start(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._startUnfenced(id));
+  }
+
+  async _startUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -682,6 +599,10 @@ export class OrchestrationV2Manager {
   }
 
   async delete(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._deleteUnfenced(id));
+  }
+
+  async _deleteUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -714,334 +635,66 @@ export class OrchestrationV2Manager {
     return this.getStatus();
   }
 
+  /**
+   * Read-only canonical Project -> Orchestration hierarchy authority resolver.
+   * Project identity comes from durable orchestra config; topology and owner
+   * subagent policy come from the same orchestra's durable state. No spawn,
+   * scheduling or execution authority is granted here.
+   */
+  async resolveProjectHierarchyAuthority(projectId) {
+    if (typeof projectId !== 'string'
+        || projectId !== projectId.trim()
+        || !projectId
+        || projectId.length > 180
+        || !/^[A-Za-z0-9._:@/+~-]+$/u.test(projectId)) {
+      throw new Error('Project ID for orchestration authority is invalid');
+    }
+    const meta = await this.loadMeta();
+    const matches = [];
+    for (const orchestraId of meta.order) {
+      const controller = this.controllerFor(orchestraId);
+      const config = await controller.configRepository.load();
+      if (config.projectId === projectId) {
+        matches.push({ orchestraId, item: meta.byId[orchestraId], controller });
+      }
+    }
+    if (matches.length === 0) {
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.PROJECT_UNOWNED, 'No canonical orchestra owns this Project ID');
+    }
+    if (matches.length !== 1) {
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.PROJECT_NON_UNIQUE, 'Project ID is not uniquely owned by one canonical orchestra');
+    }
+    const match = matches[0];
+    const runtime = await match.controller.runtimeRepository.load();
+    const graph = runtime?.hierarchy?.graph;
+    const state = runtime?.hierarchy?.state;
+    if (!graph || !state) {
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.HIERARCHY_UNAVAILABLE, 'Canonical orchestra has no durable orchestration hierarchy');
+    }
+    if (state.graphId !== graph.graphId || state.controlEpoch !== graph.controlEpoch) {
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.HIERARCHY_INCONSISTENT, 'Canonical orchestration hierarchy runtime provenance is inconsistent');
+    }
+    try {
+      validateOrchestrationHierarchyRuntimeV1(graph, state);
+    } catch (error) {
+      throw orchestrationProjectAuthorityError(
+        OrchestrationProjectAuthorityErrorCode.HIERARCHY_INCONSISTENT,
+        'Canonical orchestration hierarchy runtime is invalid',
+        error,
+      );
+    }
+    return createOrchestrationProjectAuthorityV1({
+      orchestraId: match.orchestraId,
+      projectId,
+      graph,
+      subagentPolicy: match.item.subagentPolicy,
+    });
+  }
+
   async selectedController() {
     const meta = await this.loadMeta();
     if (!meta.selectedId || !meta.byId[meta.selectedId]) throw new Error('Create or select an orchestra first.');
     return { id: meta.selectedId, item: meta.byId[meta.selectedId], controller: this.controllerFor(meta.selectedId) };
-  }
-
-  /**
-   * Persists one canonical task↔activation↔invocation binding inside the existing
-   * namespaced OrchestrationRuntimeRepository. The registry remains an append-only
-   * owner-state projection and grants no execution/scheduling/completion authority.
-   *
-   * Input is normalized synchronously before the first await so caller mutation or
-   * accessor-backed objects cannot alter the durable record after admission starts.
-   */
-  async registerSubagentTaskActivationBinding(input = {}, id = '') {
-    const request = snapshotSubagentBindingRegistration(input);
-    const taskEnvelope = normalizeSubagentTaskEnvelopeV1(request.taskEnvelope);
-    if (!taskEnvelope.authorityEnvelopeIdentity) {
-      throw new Error('Subagent activation binding requires task-bound authority envelope identity');
-    }
-    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
-      request.authorityEnvelope,
-    );
-    if (authorityEnvelopeIdentity !== taskEnvelope.authorityEnvelopeIdentity) {
-      throw new Error('Subagent activation binding authority envelope does not match task identity');
-    }
-    const ownerBoundAt = new Date(this.now()).toISOString();
-
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
-    const controller = this.controllerFor(orchestraId);
-
-    let persistedBinding = null;
-    const runtime = await controller.runtimeRepository.update(current => {
-      const hierarchy = current?.hierarchy;
-      if (!hierarchy?.graph || !hierarchy?.state) {
-        throw new Error('Durable orchestration hierarchy is required for subagent activation binding');
-      }
-      const derived = deriveSubagentTaskActivationBindingV1({
-        taskEnvelope,
-        graph: hierarchy.graph,
-        runtime: hierarchy.state,
-        activationAction: request.activationAction,
-        invocationId: request.invocationId,
-        boundAt: ownerBoundAt,
-      });
-      if (derived.projectId !== current.projectId) {
-        throw new Error('Subagent activation binding project does not match orchestra owner project');
-      }
-
-      const registry = storedSubagentTaskActivationBindingRegistry(current);
-      const existingEvidence = resolveSubagentTaskActivationEvidenceV1(
-        registry,
-        { bindingId: derived.bindingId },
-      );
-      if (existingEvidence) {
-        const existingAuthorityIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
-          existingEvidence.authorityEnvelope,
-        );
-        if (existingAuthorityIdentity !== authorityEnvelopeIdentity) {
-          throw new Error('Subagent activation binding replay authority provenance mismatch');
-        }
-        persistedBinding = existingEvidence.binding;
-        return current;
-      }
-
-      current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
-        registry,
-        {
-          binding: derived,
-          taskEnvelope,
-          authorityEnvelope: request.authorityEnvelope,
-          registeredAt: ownerBoundAt,
-        },
-      );
-      const evidence = resolveSubagentTaskActivationEvidenceV1(
-        current.subagentTaskActivationBindingRegistry,
-        { bindingId: derived.bindingId },
-      );
-      persistedBinding = evidence?.binding ?? null;
-      return current;
-    });
-
-    if (!persistedBinding) throw new Error('Subagent activation binding was not persisted');
-    const registry = storedSubagentTaskActivationBindingRegistry(runtime);
-    return Object.freeze({
-      orchestraId,
-      revision: registry.revision,
-      binding: persistedBinding,
-    });
-  }
-
-  /**
-   * Trusted read adapter for prepareSubagentResultReconciliationV1. Reads only the
-   * existing Orchestration runtime owner and never accepts caller-supplied registry
-   * state. Missing bindings resolve to null; corrupt durable history fails closed.
-   */
-  async resolveSubagentTaskActivationBinding(input = {}, id = '') {
-    const lookup = plainSubagentBindingLookup(input);
-    // Validate exact bindingId synchronously before any owner-state await.
-    resolveSubagentTaskActivationBindingV1(
-      createSubagentTaskActivationBindingRegistryV1(),
-      lookup,
-    );
-
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
-    const runtime = await this.controllerFor(orchestraId).runtimeRepository.load();
-    const binding = resolveSubagentTaskActivationBindingV1(
-      storedSubagentTaskActivationBindingRegistry(runtime),
-      lookup,
-    );
-    if (binding && binding.projectId !== runtime.projectId) {
-      throw new Error('Durable subagent activation binding crosses orchestra project authority');
-    }
-    return binding;
-  }
-
-
-  /**
-   * Resolve one child-visible Project context from self-contained durable
-   * task+authority activation evidence. Project bytes then come from the existing canonical
-   * ProjectWorkspaceRepository; neither caller state nor this adapter can mint
-   * execution, retrieval, scheduling, completion, credential, or policy authority.
-   */
-  async resolveDurableSubagentTaskContext(input = {}, id = '') {
-    const request = snapshotSubagentContextResolution(input);
-    const bindingLookup = plainSubagentBindingLookup({
-      bindingId: request.bindingId,
-    }, 'Subagent durable-context binding lookup');
-    // Reject malformed lookup identities before any durable owner-state await.
-    resolveSubagentTaskActivationBindingV1(
-      createSubagentTaskActivationBindingRegistryV1(),
-      bindingLookup,
-    );
-
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
-    const controller = this.controllerFor(orchestraId);
-    const runtime = await controller.runtimeRepository.load();
-    const evidence = resolveSubagentTaskActivationEvidenceV1(
-      storedSubagentTaskActivationBindingRegistry(runtime),
-      bindingLookup,
-    );
-    const binding = evidence?.binding ?? null;
-    if (!binding) throw new Error('Durable subagent activation binding not found');
-    if (!evidence.taskEnvelope) {
-      throw new Error('Durable subagent activation binding lacks task provenance');
-    }
-    if (!evidence.authorityEnvelope) {
-      throw new Error('Durable subagent activation binding lacks authority provenance');
-    }
-    const task = normalizeSubagentTaskEnvelopeV1(evidence.taskEnvelope);
-    if (!task.authorityEnvelopeIdentity) {
-      throw new Error('Durable subagent context requires task-bound authority envelope identity');
-    }
-    const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
-    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
-      evidence.authorityEnvelope,
-    );
-    if (authorityEnvelopeIdentity !== task.authorityEnvelopeIdentity) {
-      throw new Error('Durable subagent authority provenance does not match task identity');
-    }
-    if (binding.projectId !== runtime.projectId) {
-      throw new Error('Durable subagent activation binding crosses orchestra project authority');
-    }
-
-    assertTaskMatchesDurableActivationBinding(task, taskDispatchIdentity, binding);
-    const contextRequest = {
-      schemaVersion: 1,
-      authorityEnvelope: evidence.authorityEnvelope,
-      taskEnvelope: task,
-      expectedParentAgentId: binding.parentAgentId,
-      expectedChildAgentId: binding.childAgentId,
-      expectedTaskId: binding.taskId,
-      expectedProjectRevisionId: request.expectedProjectRevisionId,
-    };
-    if (Object.hasOwn(request, 'capsuleId')) contextRequest.capsuleId = request.capsuleId;
-
-    const projected = await projectDurableSubagentTaskContextV1(
-      contextRequest,
-      lookup => this.projectWorkspaceRepository.resolveContext(lookup),
-    );
-    return Object.freeze({
-      ...projected,
-      orchestraId,
-      bindingId: binding.bindingId,
-      taskDispatchIdentity,
-      authorityEnvelopeIdentity,
-      activationId: binding.activationId,
-      generation: binding.generation,
-      activationPurpose: binding.activationPurpose,
-    });
-  }
-
-  /**
-   * Admit one child result through the existing trusted Outcome Verification
-   * boundary, then commit only the returned inert terminal event through the
-   * canonical OrchestrationHierarchy reducer owner.
-   *
-   * Caller input cannot supply graph/runtime/evaluation time or trusted binding
-   * state. Those facts come from this manager's durable owner repositories and
-   * owner clock. Trusted OutcomeContract / VerificationRecord authorities remain
-   * injected canonical dependencies rather than new stores owned here.
-   */
-  async reconcileDurableSubagentResult(input = {}, id = '') {
-    const request = snapshotSubagentResultReconciliation(input);
-    if (typeof this.resolveTrustedOutcomeContract !== 'function') {
-      throw new Error('Trusted OutcomeContract resolver dependency is required');
-    }
-    if (typeof this.resolveTrustedVerificationRecord !== 'function') {
-      throw new Error('Trusted VerificationRecord resolver dependency is required');
-    }
-
-    const bindingLookup = plainSubagentBindingLookup(
-      { bindingId: request.taskActivationBindingId },
-      'Subagent result activation-binding lookup',
-    );
-    // Exact binding identity is rejected before the first durable read.
-    resolveSubagentTaskActivationBindingV1(
-      createSubagentTaskActivationBindingRegistryV1(),
-      bindingLookup,
-    );
-
-    const meta = await this.loadMeta();
-    const orchestraId = id || meta.selectedId;
-    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
-    const controller = this.controllerFor(orchestraId);
-    const runtime = await controller.runtimeRepository.load();
-    const hierarchy = runtime?.hierarchy;
-    if (!hierarchy?.graph || !hierarchy?.state) {
-      throw new Error('Durable orchestration hierarchy is required for subagent result reconciliation');
-    }
-
-    const registry = storedSubagentTaskActivationBindingRegistry(runtime);
-    const durableBinding = resolveSubagentTaskActivationBindingV1(registry, bindingLookup);
-    if (!durableBinding) {
-      throw new Error('Durable subagent activation binding not found');
-    }
-    if (durableBinding.projectId !== runtime.projectId) {
-      throw new Error('Durable subagent activation binding crosses orchestra project authority');
-    }
-
-    const evaluatedAtMs = this.now();
-    if (!Number.isFinite(evaluatedAtMs) || evaluatedAtMs < 0) {
-      throw new Error('Owner reconciliation clock is invalid');
-    }
-    const evaluatedAt = new Date(evaluatedAtMs).toISOString();
-
-    const reconciliation = await prepareSubagentResultReconciliationV1(
-      {
-        resultEnvelope: request.resultEnvelope,
-        outcomeContract: request.outcomeContract,
-        criterionVerifications: request.criterionVerifications,
-        evaluatedAt,
-        graph: hierarchy.graph,
-        runtime: hierarchy.state,
-        taskActivationBindingId: durableBinding.bindingId,
-      },
-      {
-        resolveTrustedOutcomeContract: this.resolveTrustedOutcomeContract,
-        resolveTrustedVerificationRecord: this.resolveTrustedVerificationRecord,
-        resolveTrustedTaskActivationBinding: async lookup => {
-          const binding = resolveSubagentTaskActivationBindingV1(
-            registry,
-            { bindingId: lookup.bindingId },
-          );
-          if (binding && binding.projectId !== runtime.projectId) {
-            throw new Error('Trusted subagent activation binding crosses orchestra project authority');
-          }
-          return binding;
-        },
-      },
-    );
-
-    const terminal = new Set([
-      SubagentResultReconciliationDecision.ADMIT_TERMINAL,
-      SubagentResultReconciliationDecision.REOPEN,
-    ]).has(reconciliation.decision);
-    if (!terminal) {
-      return Object.freeze({
-        orchestraId,
-        reconciliation,
-        committed: false,
-        dispatch: null,
-      });
-    }
-    if (!reconciliation.terminalEvent) {
-      throw new Error('Terminal subagent reconciliation omitted canonical terminal event');
-    }
-
-    const commitNowMs = this.now();
-    if (!Number.isFinite(commitNowMs) || commitNowMs < evaluatedAtMs) {
-      throw new Error('Owner reconciliation commit clock regressed');
-    }
-    const dispatch = await controller.dispatchHierarchyEvent(
-      reconciliation.terminalEvent,
-      { nowMs: commitNowMs },
-    );
-
-    // Prove the canonical reducer persisted the exact activation terminal state.
-    // A concurrent recovery/supersession must not be reported as completion.
-    const committedRuntime = await controller.runtimeRepository.load();
-    const nodeRuntime = committedRuntime?.hierarchy?.state?.nodesById?.[
-      reconciliation.terminalEvent.nodeId
-    ];
-    const ledger = nodeRuntime?.activationLedger?.[
-      reconciliation.terminalEvent.activationId
-    ];
-    if (!ledger
-        || ledger.phase !== 'TERMINAL'
-        || ledger.generation !== reconciliation.terminalEvent.generation
-        || ledger.terminalStatus !== reconciliation.terminalEvent.status) {
-      throw new Error('Canonical subagent terminal event was not durably committed');
-    }
-
-    return Object.freeze({
-      orchestraId,
-      reconciliation,
-      committed: true,
-      dispatch,
-      activationId: reconciliation.terminalEvent.activationId,
-      generation: reconciliation.terminalEvent.generation,
-      terminalStatus: reconciliation.terminalEvent.status,
-    });
   }
 
   /**
@@ -1072,6 +725,10 @@ export class OrchestrationV2Manager {
   }
 
   async configureHierarchyTemplate(options = {}) {
+    return this.runProjectAuthorityExclusive(() => this._configureHierarchyTemplateUnfenced(options));
+  }
+
+  async _configureHierarchyTemplateUnfenced(options = {}) {
     const { id, item, controller } = await this.selectedController();
     const { config } = await controller.getStatus();
     if (!config.projectId || !config.targetRepository) {
@@ -1183,24 +840,79 @@ export class OrchestrationV2Manager {
     if (current.enabled && !selected.item.ownerPaused) {
       throw new Error('Pause the orchestra before importing configuration.');
     }
-    const status = await this.updateConfig({ ...imported, enabled: false }, selected.id);
-    if (importedDocument.hierarchy) {
-      const currentRuntime = await selected.controller.runtimeRepository.load();
-      const currentGraphId = hierarchyGraphId(currentRuntime);
-      const safety = await this.managedCoreSafety(status.config.projectId, currentGraphId);
-      if (safety.managed.length) {
-        throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
-      }
-      await selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
-    }
+
+    // Import is one composite Project-authority mutation: config identity,
+    // hierarchy provenance and owner subagent policy must never be observable
+    // by Browser Agent binding as three independently committed snapshots.
+    // Re-check the live owner state inside the same authority fence and call
+    // the unfenced config primitive to avoid promise-chain self-deadlock.
     const importedPolicy = storedSubagentPolicy(importedDocument.subagentPolicy);
-    await this.updateMeta(meta => {
-      const record = meta.byId[selected.id];
-      if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
-      record.subagentPolicy = importedPolicy;
-      record.updatedAt = this.now();
-      return meta;
+    const status = await this.runProjectAuthorityExclusive(async () => {
+      const liveMeta = await this.loadMeta();
+      const liveItem = liveMeta.byId[selected.id];
+      if (!liveItem) throw new Error('Orchestra not found while importing profile.');
+      const liveController = this.controllerFor(selected.id);
+      const liveCurrent = await liveController.configRepository.load();
+      if (liveCurrent.enabled && !liveItem.ownerPaused) {
+        throw new Error('Pause the orchestra before importing configuration.');
+      }
+
+      const authoritySnapshot = await this.snapshotImportAuthorityState(selected.id, liveItem);
+      const oldRuntime = await liveController.runtimeRepository.load();
+      const deferredManagedSessionPurge = liveItem.ownerPaused === true
+        && Boolean(liveCurrent.projectId)
+        && liveCurrent.projectId !== imported.projectId
+        ? {
+            projectId: liveCurrent.projectId,
+            graphId: hierarchyGraphId(oldRuntime),
+          }
+        : null;
+      let mutationStarted = false;
+      try {
+        mutationStarted = true;
+        const nextStatus = await this._updateConfigUnfenced(
+          { ...imported, enabled: false },
+          selected.id,
+          { deferManagedSessionPurge: Boolean(deferredManagedSessionPurge) },
+        );
+        if (importedDocument.hierarchy) {
+          const currentRuntime = await liveController.runtimeRepository.load();
+          const currentGraphId = hierarchyGraphId(currentRuntime);
+          const safety = await this.managedCoreSafety(nextStatus.config.projectId, currentGraphId);
+          if (safety.managed.length) {
+            throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+          }
+          await liveController.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
+        }
+        await this.updateMeta(meta => {
+          const record = meta.byId[selected.id];
+          if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
+          record.subagentPolicy = importedPolicy;
+          record.updatedAt = this.now();
+          return meta;
+        });
+        if (deferredManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(
+            deferredManagedSessionPurge.projectId,
+            deferredManagedSessionPurge.graphId,
+          );
+        }
+        return nextStatus;
+      } catch (error) {
+        if (mutationStarted) {
+          try {
+            await this.restoreImportAuthorityState(authoritySnapshot);
+          } catch (rollbackError) {
+            throw new AggregateError(
+              [error, rollbackError],
+              'Profile import failed and canonical Project authority rollback also failed.',
+            );
+          }
+        }
+        throw error;
+      }
     });
+
     return {
       config: status.config,
       hierarchy: importedDocument.hierarchy,
@@ -1257,6 +969,10 @@ export class OrchestrationV2Manager {
   }
 
   async emergencyStop(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._emergencyStopUnfenced(id));
+  }
+
+  async _emergencyStopUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');

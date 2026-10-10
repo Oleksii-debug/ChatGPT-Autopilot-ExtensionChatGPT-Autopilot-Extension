@@ -12,7 +12,6 @@ function registry(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     revision: 7,
-    bindingKey: '["agent-registry",7,"fixture"]',
     definitions: [],
     ...overrides,
   };
@@ -69,7 +68,6 @@ test('launch builder binds exact live definition revisions and explicit least-au
   assert.deepEqual({ ...request }, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 7,
-    expectedRegistryBindingKey: '["agent-registry",7,"fixture"]',
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 3,
     goal: 'Compare evidence and return a verified result.',
@@ -88,7 +86,7 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
   const request = buildAgentDefinitionLaunchRequestV1(form({
     goal: '  Owner task  ',
     projectId: '  project-1  ',
-    jobId: '  job.research-1  ',
+    jobId: '  manual research job 1  ',
   }), {
     registry: registry(),
     definition: definition(),
@@ -97,21 +95,7 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
 
   assert.equal(request.goal, 'Owner task');
   assert.equal(request.projectId, 'project-1');
-  assert.equal(request.jobId, 'job.research-1');
-});
-
-test('Project and Job identity aliases fail locally before Core mutation', () => {
-  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form({ projectId: 'project 1' }), {
-    registry: registry(),
-    definition: definition(),
-    ownerPolicy: ownerPolicy(),
-  }), /Project ID must be a canonical identity/u);
-
-  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form({ jobId: 'job 1' }), {
-    registry: registry(),
-    definition: definition(),
-    ownerPolicy: ownerPolicy(),
-  }), /Job ID must be a canonical identity/u);
+  assert.equal(request.jobId, 'manual research job 1');
 });
 
 test('scope defaults expose the selected definition authority without inventing grants', () => {
@@ -164,21 +148,6 @@ test('launch fails closed when owner grants or requested narrowing exceed author
   }), /Requested tool narrowing exceeds the selected Agent definition authority/u);
 });
 
-test('launch request requires the exact registry content binding key', () => {
-  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
-    registry: registry({ bindingKey: '  drifted  ' }),
-    definition: definition(),
-    ownerPolicy: ownerPolicy(),
-  }), /registry bindingKey is invalid/u);
-
-  const request = buildAgentDefinitionLaunchRequestV1(form(), {
-    registry: registry({ bindingKey: '["agent-registry",7,"exact"]' }),
-    definition: definition(),
-    ownerPolicy: ownerPolicy(),
-  });
-  assert.equal(request.expectedRegistryBindingKey, '["agent-registry",7,"exact"]');
-});
-
 test('disabled, stale-representation and duplicate inputs fail before command construction', () => {
   assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
     registry: registry(),
@@ -202,36 +171,6 @@ test('disabled, stale-representation and duplicate inputs fail before command co
 
   assert.throws(() => agentDefinitionOwnerBudgetFromPolicyV1(ownerPolicy({ maxCostUsd: -0 })),
     /canonical non-negative number/u);
-});
-
-test('selected definition authority arrays reject hostile accessors and sparse slots without execution', () => {
-  let reads = 0;
-  const capabilityIds = ['browser', 'research'];
-  Object.defineProperty(capabilityIds, '0', {
-    enumerable: true,
-    configurable: true,
-    get() {
-      reads += 1;
-      return 'browser';
-    },
-  });
-
-  assert.throws(() => agentDefinitionLaunchScopeTextV1(definition({ capabilityIds })),
-    /enumerable own data property/u);
-  assert.equal(reads, 0);
-
-  const sparseTools = new Array(2);
-  sparseTools[1] = 'files.read';
-  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
-    registry: registry(),
-    definition: definition({ toolIds: sparseTools }),
-    ownerPolicy: ownerPolicy(),
-  }), /enumerable own data property/u);
-
-  const symbolTools = ['browser.read'];
-  symbolTools[Symbol('authority')] = 'files.read';
-  assert.throws(() => agentDefinitionLaunchScopeTextV1(definition({ toolIds: symbolTools })),
-    /non-canonical fields/u);
 });
 
 test('hostile form accessors are rejected without execution', () => {

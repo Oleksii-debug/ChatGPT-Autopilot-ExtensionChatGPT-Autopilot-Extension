@@ -3,14 +3,13 @@ import {
   normalizeAgentPlanV1,
 } from './agent-plan.js';
 import { normalizeOutcomeContractV1 } from './outcome-contract.js';
-import { compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+import { compactOrchestrationEventId } from './orchestration-hierarchy.js';
 
 export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
 
-const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
-const SHA256 = /^[a-f0-9]{64}$/u;
 const AUTHORITY_ENVELOPE_IDENTITY = /^subagent-authority:[a-f0-9]{64}$/u;
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_REFS = 256;
 const INPUT_KEYS = new Set([
   'envelopeId',
@@ -105,16 +104,9 @@ function id(value, label) {
   return value;
 }
 
-function sha256(value, label) {
-  if (typeof value !== 'string' || !SHA256.test(value)) {
-    throw new Error(label + ' must be an exact lowercase SHA-256 digest');
-  }
-  return value;
-}
-
-function authorityEnvelopeIdentity(value, label) {
+function authorityEnvelopeIdentity(value) {
   if (typeof value !== 'string' || !AUTHORITY_ENVELOPE_IDENTITY.test(value)) {
-    throw new Error(label + ' must be an exact subagent authority-envelope identity');
+    throw new Error('authorityEnvelopeIdentity must be an exact subagent authority-envelope identity');
   }
   return value;
 }
@@ -187,16 +179,26 @@ function compareCodeUnit(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function exactSourceSha256(value) {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/u.test(value)) {
+    throw new Error('inputSourceRef.contentSha256 must be canonical lowercase SHA-256');
+  }
+  return value;
+}
+
 function normalizeSourceRef(value) {
   const raw = record(value, SOURCE_REF_KEYS, 'SubagentTaskSourceRefV1');
   return {
     sourceId: id(own(raw, 'sourceId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.sourceId'),
     location: text(own(raw, 'location', 'SubagentTaskSourceRefV1'), 'inputSourceRef.location', 8_000),
     revisionId: id(own(raw, 'revisionId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.revisionId'),
-    contentSha256: sha256(
-      own(raw, 'contentSha256', 'SubagentTaskSourceRefV1'),
-      'inputSourceRef.contentSha256',
-    ),
+    // Cross-feature Project Context may bind immutable source bytes. Preserve the
+    // hash when present; legacy OutcomeContract references remain un-hashed.
+    // Explicitly present invalid/undefined values must not silently downgrade
+    // the source identity fence after a JSON restart.
+    ...(Object.hasOwn(raw, 'contentSha256')
+      ? { contentSha256: exactSourceSha256(raw.contentSha256) }
+      : {}),
   };
 }
 
@@ -303,16 +305,10 @@ function sourceRefsForIds(inputSourceIds, outcome) {
     if (!source) {
       throw new Error('Subagent task input source is not bound to OutcomeContract sourceTruth: ' + sourceId);
     }
-    if (typeof source.contentSha256 !== 'string' || !SHA256.test(source.contentSha256)) {
-      throw new Error(
-        'Subagent task input source must carry contentSha256 immutable identity: ' + sourceId,
-      );
-    }
     return {
       sourceId: source.sourceId,
       location: source.location,
       revisionId: source.revisionId,
-      contentSha256: source.contentSha256,
     };
   });
 }
@@ -347,12 +343,7 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
     parentAgentId,
     childAgentId,
     ...(Object.hasOwn(raw, 'authorityEnvelopeIdentity')
-      ? {
-          authorityEnvelopeIdentity: authorityEnvelopeIdentity(
-            raw.authorityEnvelopeIdentity,
-            'authorityEnvelopeIdentity',
-          ),
-        }
+      ? { authorityEnvelopeIdentity: authorityEnvelopeIdentity(raw.authorityEnvelopeIdentity) }
       : {}),
     taskId: id(own(raw, 'taskId', 'SubagentTaskEnvelopeV1'), 'taskId'),
     planId: id(own(raw, 'planId', 'SubagentTaskEnvelopeV1'), 'planId'),
@@ -362,7 +353,7 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
       own(raw, 'conflictKeys', 'SubagentTaskEnvelopeV1'),
       'conflictKeys',
       128,
-    ).sort(compareCodeUnit),
+    ),
     budget: normalizeBudget(own(raw, 'budget', 'SubagentTaskEnvelopeV1')),
     inputSourceRefs: sourceRefList(
       own(raw, 'inputSourceRefs', 'SubagentTaskEnvelopeV1'),
@@ -385,10 +376,8 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
 }
 
 /**
- * Deterministic content identity for the exact normalized task envelope that is
- * handed to the canonical hierarchy activation path. This is an internal
- * dispatch/replay fence, not verification authority and not a replacement for
- * ArtifactRef SHA-256.
+ * Deterministic identity for an exact normalized untrusted task handoff.
+ * A replay/content fence only: it never grants execution or verification authority.
  */
 export function deriveSubagentTaskDispatchIdentityV1(input) {
   const canonical = JSON.stringify(normalizeSubagentTaskEnvelopeV1(input));
@@ -406,6 +395,7 @@ export function deriveSubagentTaskDispatchIdentityV1(input) {
   }
   return 'subagent-task:' + lanes.join('');
 }
+
 
 /**
  * Bind one canonical AgentPlan node to one child Agent task.
@@ -483,12 +473,7 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
     parentAgentId,
     childAgentId,
     ...(Object.hasOwn(raw, 'authorityEnvelopeIdentity')
-      ? {
-          authorityEnvelopeIdentity: authorityEnvelopeIdentity(
-            raw.authorityEnvelopeIdentity,
-            'authorityEnvelopeIdentity',
-          ),
-        }
+      ? { authorityEnvelopeIdentity: authorityEnvelopeIdentity(raw.authorityEnvelopeIdentity) }
       : {}),
     taskId: node.nodeId,
     planId: plan.planId,

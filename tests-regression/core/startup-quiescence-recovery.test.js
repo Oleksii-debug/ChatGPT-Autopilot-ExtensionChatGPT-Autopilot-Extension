@@ -55,6 +55,7 @@ function addNativePreEffectLease(state, { dispatched = false, includeOwnedHint =
   session.operation.previousSendTabId = 3;
   session.operation.previousSendWindowId = 9;
   session.operation.nativeSubmitDispatched = dispatched;
+  session.operation.activationBeforeSubmit = true;
   if (includeOwnedHint) {
     state.tabHintsByTaskId.t1 = {
       tabId: 7,
@@ -101,4 +102,13 @@ test('startup rejects an unbound focus lease as zero-effect proof', () => {
   assert.equal(session.operation.phase, OperationPhase.AMBIGUOUS);
   assert.notEqual(session.tasksById.t1.status, 'RETRY_WAIT');
   assert.equal(computeNextWake(state, 100), 100);
+});
+
+test('a legacy observation focus lease cannot prove a DOM Send never happened', () => {
+  const state = addNativePreEffectLease(stateWithSubmitting(RunState.RUNNING));
+  delete state.sessionsById.s1.operation.activationBeforeSubmit;
+  reconcileStateForStartup(state, 100);
+  assert.equal(state.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(state.sessionsById.s1.operation.submitStartedAt, 10);
+  assert.notEqual(state.sessionsById.s1.tasksById.t1.status, 'RETRY_WAIT');
 });

@@ -76,14 +76,27 @@ test('model policy rejects duplicate, coercive and contradictory form aliases', 
     })),
     /дублікат/u,
   );
-  const noResilienceAuthority = buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
+  // The current 11.x Router schema treats explicit resilience values as
+  // subordinate constraints. They are data-only, not provider/scheduler authority.
+  const constrainedPolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
     modelRouteRetryBackoffSeconds:'120',
     modelRouteCircuitBreakerFailures:'1',
     modelRouteCircuitBreakerSeconds:'600',
   }));
-  assert.equal(Object.hasOwn(noResilienceAuthority, 'retryBackoffSeconds'), false);
-  assert.equal(Object.hasOwn(noResilienceAuthority, 'circuitBreakerFailures'), false);
-  assert.equal(Object.hasOwn(noResilienceAuthority, 'circuitBreakerSeconds'), false);
+  assert.equal(constrainedPolicy.retryBackoffSeconds, 120);
+  assert.equal(constrainedPolicy.circuitBreakerFailures, 1);
+  assert.equal(constrainedPolicy.circuitBreakerSeconds, 600);
+  assert.deepEqual(JSON.parse(JSON.stringify(constrainedPolicy)), constrainedPolicy);
+  for (const [key, invalid] of [
+    ['modelRouteRetryBackoffSeconds', '0120'],
+    ['modelRouteCircuitBreakerFailures', '0'],
+    ['modelRouteCircuitBreakerSeconds', '86401'],
+  ]) {
+    assert.throws(
+      () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({ [key]:invalid })),
+      /канонічному форматі|діапазоном/u,
+    );
+  }
   assert.throws(
     () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicy({
       modelRouteAllowRouteIdsText:'route.fast',

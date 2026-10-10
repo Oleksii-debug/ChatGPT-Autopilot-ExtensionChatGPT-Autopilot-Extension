@@ -370,7 +370,8 @@ details[open] > summary { margin-bottom: .65rem; }
 .agent-actions button { margin: 0; }
 #agent-run-prompt-button, #agent-resume-button, #agent-send-follow-up-button { background: var(--accent); border-color: var(--accent); color: #fff; }
 #agent-stop-button, #agent-delete-button { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
-#agent-status, #agent-usage, #agent-permission-status, #agent-history {
+#agent-status, #agent-usage, #agent-permission-status, #agent-history,
+#agent-plan-summary, #agent-specialist-handoff-summary {
   margin-top: .75rem;
   padding: .75rem .9rem;
   border: 1px solid var(--border);
@@ -378,6 +379,14 @@ details[open] > summary { margin-bottom: .65rem; }
   background: var(--surface-subtle);
 }
 #agent-history { max-height: 24rem; overflow: auto; white-space: pre-wrap; }
+#agent-plan-tree, #agent-specialist-handoff-list {
+  margin: .5rem 0 1rem;
+  padding-inline-start: 1.6rem;
+}
+#agent-plan-tree li, #agent-specialist-handoff-list li {
+  margin-block: .45rem;
+  overflow-wrap: anywhere;
+}
 #agent-job-list { min-height: 8rem; }
 @media (prefers-color-scheme: dark) {
   #agent-run-prompt-button, #agent-resume-button, #agent-send-follow-up-button { color: #101828; }

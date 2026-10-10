@@ -41,7 +41,6 @@ function selection(overrides = {}) {
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 4,
-    registryBindingKey: 'registry-binding:openhands-test',
     specialistId: 'openhands-coding',
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     definitionRevision: 2,
@@ -384,7 +383,6 @@ test('binding rejects another provider identity and caller authority fields befo
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 1,
-    registryBindingKey: 'registry-binding:openhands-direct',
     specialistId: 'openhands-coding',
     providerId: 'provider.other',
     definitionRevision: 1,
@@ -394,10 +392,6 @@ test('binding rejects another provider identity and caller authority fields befo
     asOf: '2026-09-27T13:00:00.025Z',
   };
   await assert.rejects(binding.resolveReadiness(request), /targets another provider/u);
-  await assert.rejects(
-    binding.resolveReadiness({ ...request, registryBindingKey: '' }),
-    /registryBindingKey is invalid/u,
-  );
   assert.equal(probes, 0);
 
   await assert.rejects(
@@ -456,7 +450,6 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 1,
-    registryBindingKey: 'registry-binding:openhands-direct',
     specialistId: 'openhands-coding',
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     definitionRevision: 1,

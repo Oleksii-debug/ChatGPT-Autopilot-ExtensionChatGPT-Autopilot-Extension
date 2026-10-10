@@ -1,4 +1,5 @@
 import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -43,6 +44,9 @@ function copyDataRecord(value, label) {
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(label + ' містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error(label + ' містить заборонене поле.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' має бути enumerable data property.');
@@ -57,15 +61,75 @@ function copyDataRecord(value, label) {
   return out;
 }
 
+
+const MODEL_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds',
+  'denyRouteIds', 'freeOnly', 'locality',
+  'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
+]);
+
+function copyModelRoutePolicy(value) {
+  if (value == null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new Error('modelRoutePolicy має бути data object.');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const out = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error('modelRoutePolicy містить заборонене поле.');
+    }
+    if (!MODEL_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('modelRoutePolicy містить неканонічне поле: ' + key);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('modelRoutePolicy.' + key + ' має бути enumerable data property.');
+    }
+    const item = descriptor.value;
+    if (Array.isArray(item)) {
+      if (Object.getPrototypeOf(item) !== Array.prototype) throw new Error('modelRoutePolicy.' + key + ' має бути canonical array.');
+      const arrayDescriptors = Object.getOwnPropertyDescriptors(item);
+      const length = arrayDescriptors.length?.value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > 32) throw new Error('modelRoutePolicy.' + key + ' має некоректну довжину.');
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      if (Reflect.ownKeys(arrayDescriptors).some(arrayKey => typeof arrayKey !== 'string' || !expected.has(arrayKey))) {
+        throw new Error('modelRoutePolicy.' + key + ' має бути dense data array.');
+      }
+      out[key] = Array.from({ length }, (_, index) => {
+        const entry = arrayDescriptors[String(index)];
+        if (!entry || entry.enumerable !== true || !Object.hasOwn(entry, 'value') || typeof entry.value !== 'string') {
+          throw new Error('modelRoutePolicy.' + key + ' має містити лише text data values.');
+        }
+        return entry.value;
+      });
+      continue;
+    }
+    if (item === null || ['string','number','boolean'].includes(typeof item)) {
+      if (typeof item === 'number' && (!Number.isFinite(item) || Object.is(item,-0))) {
+        throw new Error('modelRoutePolicy.' + key + ' має бути exact data value.');
+      }
+      out[key] = item;
+      continue;
+    }
+    throw new Error('modelRoutePolicy.' + key + ' має бути scalar або array data value.');
+  }
+  return out;
+}
+
 function exactIntegerText(value, label, { min, max }) {
+  // Form controls return text. Reject coercion, padded/negative aliases and
+  // imprecise numbers before they enter the durable specialist profile.
   if (typeof value !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(value)) {
-    throw new Error(label + ' має бути у канонічному форматі цілого числа.');
+    throw new Error(label + ' має бути в канонічному форматі цілого числа.');
   }
-  const number = Number(value);
-  if (!Number.isSafeInteger(number) || number < min || number > max) {
-    throw new Error(label + ' має бути в дозволеному діапазоні.');
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(label + ' виходить за дозволеним діапазоном.');
   }
-  return number;
+  return parsed;
 }
 
 function optionalPriceText(value, label) {
@@ -112,6 +176,26 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     const field = ownData(input, key, key);
     return field.present ? field.value : fallback;
   };
+  const persisted = copyModelRoutePolicy(persistedPolicy);
+  // The displayed defaults do not silently become explicit owner authority
+  // when an older stored policy omitted these three failover controls.
+  const resilience = {};
+  for (const [formKey, policyKey, displayDefault, max] of [
+    ['modelRouteRetryBackoffSeconds', 'retryBackoffSeconds', 60, 86_400],
+    ['modelRouteCircuitBreakerFailures', 'circuitBreakerFailures', 2, 100],
+    ['modelRouteCircuitBreakerSeconds', 'circuitBreakerSeconds', 300, 86_400],
+  ]) {
+    const field = ownData(input, formKey, formKey);
+    const savedField = persisted ? ownData(persisted, policyKey, policyKey) : { present:false };
+    if (field.present) {
+      const value = exactIntegerText(field.value, formKey, { min:1, max });
+      if (value !== displayDefault || savedField.present || persisted == null) {
+        resilience[policyKey] = value;
+      }
+    } else if (savedField.present) {
+      resilience[policyKey] = savedField.value;
+    }
+  }
   const pinned = read('modelRoutePinnedRouteId', '');
   const locality = read('modelRouteLocality', 'any');
   const autoSwitch = read('modelRouteAutoSwitch', true);
@@ -129,15 +213,19 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality,
     maxInputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxInputPriceText', ''), 'Максимальна input-ціна'),
     maxOutputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxOutputPriceText', ''), 'Максимальна output-ціна'),
+    ...resilience,
   });
   if (policy.allowRouteIds.length) {
     const allow = new Set(policy.allowRouteIds);
-    for (const routeId of [...policy.orderedRouteIds, ...policy.denyRouteIds]) {
-      if (!allow.has(routeId)) throw new Error('Model route ID поза allow scope: ' + routeId);
+    for (const routeId of policy.orderedRouteIds) {
+      if (!allow.has(routeId)) throw new Error('Ordered model route ID поза allow scope: ' + routeId);
+    }
+    for (const routeId of policy.denyRouteIds) {
+      if (!allow.has(routeId)) throw new Error('Denied model route ID поза allow scope: ' + routeId);
     }
     if (policy.pinnedRouteId && !allow.has(policy.pinnedRouteId)) throw new Error('Pinned model route ID поза allow scope: ' + policy.pinnedRouteId);
     const denied = new Set(policy.denyRouteIds);
-    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) throw new Error('Model Router policy deny scope перекриває весь allow scope.');
+    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) throw new Error('Model Router policy deny scope перекриває весь явний allow scope.');
   }
   if (policy.pinnedRouteId && policy.denyRouteIds.includes(policy.pinnedRouteId)) throw new Error('Pinned model route ID одночасно заборонений deny policy.');
   return {
@@ -150,6 +238,7 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality:policy.locality,
     maxInputPricePerMillionUsd:policy.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd:policy.maxOutputPricePerMillionUsd,
+    ...Object.fromEntries(Object.keys(resilience).map(key => [key, policy[key]])),
   };
 }
 
@@ -161,12 +250,93 @@ function copyStructuredData(value, label) {
   const descriptors = Object.getOwnPropertyDescriptors(value);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(label + ' містить неканонічне поле.');
+    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
+      throw new Error(label + ' містить заборонене поле.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' має бути enumerable data property.');
     }
   }
   return structuredClone(value);
+}
+
+
+
+const MODEL_DEFAULT_FIELDS = Object.freeze([
+  'aiRoutingMode', 'aiPinnedRouteId', 'aiPrimaryProvider',
+  'aiPrimaryModel', 'aiStrongProvider', 'aiStrongModel',
+]);
+const MODEL_ROUTING_MODES = new Set(['auto', 'primary', 'strong', 'hybrid-rules', 'hybrid-auto', 'inherit']);
+export function mergeAgentDefinitionModelDefaultsV1(input = {}, persisted = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) {
+    throw new Error('Agent model defaults input має бути data object.');
+  }
+  const result = copyDataRecord(persisted, 'configDefaults');
+  for (const key of MODEL_DEFAULT_FIELDS) {
+    const field = ownData(input, key, key);
+    if (!field.present) continue;
+    const value = field.value;
+    if (typeof value !== 'string') throw new Error(key + ' має бути канонічним текстом.');
+    if (value === '') {
+      delete result[key];
+      continue;
+    }
+    if (value !== value.trim() || value.includes('\0')
+        || value.length > (key.endsWith('Model') ? 300 : 180)) {
+      throw new Error(key + ' має бути канонічним текстом.');
+    }
+    if (key === 'aiRoutingMode' && !MODEL_ROUTING_MODES.has(value)) {
+      throw new Error('AI routing mode не підтримується.');
+    }
+    if (key === 'aiPinnedRouteId') parseCanonicalAgentIdentity(value, key);
+    if (key.endsWith('Provider') && value !== 'inherit') {
+      parseCanonicalAgentIdentity(value, key);
+    }
+    result[key] = value;
+  }
+  for (const [provider, model, label] of [
+    ['aiPrimaryProvider', 'aiPrimaryModel', 'Primary'],
+    ['aiStrongProvider', 'aiStrongModel', 'Strong'],
+  ]) {
+    if (Object.hasOwn(result, provider) && result[provider] !== 'inherit'
+        && !Object.hasOwn(result, model)) {
+      throw new Error(label + ' provider override вимагає model ID.');
+    }
+  }
+  return result;
+}
+
+
+function resolveSpecialistDelegationFromFormV1(input, persisted) {
+  const configured = ownData(input, 'specialistDelegationConfigured', 'Specialist delegation configured');
+  if (!configured.present) {
+    return persisted === undefined ? undefined
+      : persisted === null ? null : normalizeAgentSpecialistDelegationProfileV1(persisted);
+  }
+  if (typeof configured.value !== 'boolean') {
+    throw new Error('Specialist delegation configured має бути boolean.');
+  }
+  if (configured.value === false) return persisted === undefined ? undefined : null;
+  const field = (key, label = key) => ownData(input, key, label);
+  const enabled = field('specialistDelegationEnabled');
+  if (!enabled.present || typeof enabled.value !== 'boolean') {
+    throw new Error('Specialist delegation enabled має бути boolean.');
+  }
+  const get = (key, label = key) => field(key, label).value;
+  return normalizeAgentSpecialistDelegationProfileV1({
+    schemaVersion: 1,
+    registryId: parseCanonicalAgentIdentity(get('specialistRegistryId', 'Specialist registry ID'), 'Specialist registry ID'),
+    requiredCapabilityIds: listFromLines(get('specialistCapabilityIdsText'), 'Specialist capability ID', { maxItems:64, itemMax:180, identity:true }),
+    requiredToolIds: listFromLines(get('specialistToolIdsText'), 'Specialist tool ID', { maxItems:128, itemMax:180, identity:true }),
+    policyEnvelopeId: parseCanonicalAgentIdentity(get('specialistPolicyEnvelopeId'), 'Specialist policy envelope ID'),
+    deadlineSeconds: exactIntegerText(get('specialistDeadlineSeconds'), 'Specialist deadline', { min:1, max:31536000 }),
+    maxConcurrentHandoffs: exactIntegerText(get('specialistMaxConcurrentHandoffs'), 'Specialist concurrency', { min:0, max:256 }),
+    leaseSeconds: exactIntegerText(get('specialistLeaseSeconds'), 'Specialist lease', { min:1, max:86400 }),
+    priority: exactIntegerText(get('specialistPriority'), 'Specialist priority', { min:0, max:1000000 }),
+    enabled: enabled.value,
+  });
 }
 
 export function buildAgentDefinitionFromFormV1(input = {}, {
@@ -179,21 +349,30 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
-  const effectiveConfigDefaults = copyDataRecord(configDefaults, 'configDefaults');
+  // Validate every directly-read owner input before evaluation. An accessor may
+  // otherwise run during form serialization, beyond the canonical Core fence.
+  for (const [key, label] of [
+    ['agentDefinitionId', 'Agent definition ID'],
+    ['label', 'Назва'], ['description', 'Опис'], ['instructions', 'Інструкції'],
+    ['capabilityIdsText', 'Capability ID'], ['toolIdsText', 'Tool ID'],
+    ['tagsText', 'Тег'], ['acceptanceCriteriaText', 'Критерій завершення'],
+  ]) ownData(input, key, label);
+  const enabled = ownData(input, 'enabled', 'Agent definition enabled');
+  if (enabled.present && typeof enabled.value !== 'boolean') throw new Error('Agent definition enabled має бути boolean.');
+  const resolvedSpecialist = resolveSpecialistDelegationFromFormV1(input, specialistDelegationProfile);
+  const effectiveConfigDefaults = mergeAgentDefinitionModelDefaultsV1(input, configDefaults);
   const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
-    persistedPolicy: modelRoutePolicy,
+    persistedPolicy: copyModelRoutePolicy(modelRoutePolicy),
   });
-  const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
-  if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
-    if (effectiveModelRoutePolicy.pinnedRouteId
-        && effectiveModelRoutePolicy.pinnedRouteId !== legacyPinnedRouteId) {
+  const legacyPin = effectiveConfigDefaults.aiPinnedRouteId || '';
+  if (legacyPin && effectiveModelRoutePolicy) {
+    if (effectiveModelRoutePolicy.pinnedRouteId && effectiveModelRoutePolicy.pinnedRouteId !== legacyPin) {
       throw new Error('Legacy pinned route конфліктує з Model Router policy pinned route.');
     }
-    if (effectiveModelRoutePolicy.allowRouteIds.length
-        && !effectiveModelRoutePolicy.allowRouteIds.includes(legacyPinnedRouteId)) {
+    if (effectiveModelRoutePolicy.allowRouteIds?.length && !effectiveModelRoutePolicy.allowRouteIds.includes(legacyPin)) {
       throw new Error('Legacy pinned route поза Model Router policy allow scope.');
     }
-    if (effectiveModelRoutePolicy.denyRouteIds.includes(legacyPinnedRouteId)) {
+    if (effectiveModelRoutePolicy.denyRouteIds?.includes(legacyPin)) {
       throw new Error('Legacy pinned route заборонений Model Router policy deny scope.');
     }
   }
@@ -209,10 +388,8 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: effectiveConfigDefaults,
     modelRoutePolicy: effectiveModelRoutePolicy,
-    ...(specialistDelegationProfile === undefined
-      ? {}
-      : { specialistDelegationProfile: copyStructuredData(specialistDelegationProfile, 'specialistDelegationProfile') }),
-    enabled: input.enabled === true,
+    ...(resolvedSpecialist === undefined ? {} : { specialistDelegationProfile: resolvedSpecialist }),
+    enabled: enabled.value === true,
     definitionRevision,
   };
 }

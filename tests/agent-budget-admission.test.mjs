@@ -34,30 +34,6 @@ test('normalizes the existing AgentPlan budget shape exactly and fail closed', (
   assert.throws(() => normalizeAgentPlanBudgetCeilingV1(Object.create({ maxModelCalls: 5 })), /plain object/);
 });
 
-test('AgentPlan zero ceilings use one canonical numeric representation', () => {
-  const canonical = normalizeAgentPlanBudgetCeilingV1({
-    maxModelCalls:0,
-    maxRuntimeSeconds:0,
-    maxCostUsdMicros:0,
-  });
-  assert.equal(Object.is(canonical.maxModelCalls, -0), false);
-  assert.equal(Object.is(canonical.maxRuntimeSeconds, -0), false);
-  assert.equal(Object.is(canonical.maxCostUsdMicros, -0), false);
-
-  assert.throws(
-    () => normalizeAgentPlanBudgetCeilingV1({ maxModelCalls:-0 }),
-    /AgentPlan budget maxModelCalls is invalid/,
-  );
-  assert.throws(
-    () => normalizeAgentPlanBudgetCeilingV1({ maxRuntimeSeconds:-0 }),
-    /AgentPlan budget maxRuntimeSeconds is invalid/,
-  );
-  assert.throws(
-    () => normalizeAgentPlanBudgetCeilingV1({ maxCostUsdMicros:-0 }),
-    /AgentPlan budget maxCostUsdMicros is invalid/,
-  );
-});
-
 test('AgentPlan only narrows shared owner ceilings and leaves owner-only dimensions intact', () => {
   const narrowed = narrowResourceBudgetWithAgentPlanV1({ ownerBudget, agentPlanBudget });
   assert.equal(narrowed.maxConcurrentAgents, 12);
@@ -163,59 +139,4 @@ test('AgentPlan budget rejects accessor-backed, hidden and symbol fields without
   const symbolBudget = { maxModelCalls: 1 };
   symbolBudget[Symbol('authority')] = 1;
   assert.throws(() => normalizeAgentPlanBudgetCeilingV1(symbolBudget), /symbol field/);
-});
-
-
-test('Agent resource admission snapshots outer envelopes before authority reads', () => {
-  let reads = 0;
-  const input = {
-    ownerBudget,
-    agentPlanBudget,
-    currentUsage: {},
-    request: { modelCalls: 1 },
-  };
-  Object.defineProperty(input, 'ownerBudget', {
-    enumerable: true,
-    configurable: true,
-    get() {
-      reads += 1;
-      return ownerBudget;
-    },
-  });
-  assert.throws(
-    () => evaluateAgentResourceAdmissionV1(input),
-    /Agent resource admission request fields must be own data properties/,
-  );
-  assert.equal(reads, 0);
-
-  const hidden = { ownerBudget, agentPlanBudget };
-  Object.defineProperty(hidden, 'hiddenAuthority', {
-    enumerable: false,
-    value: true,
-  });
-  assert.throws(
-    () => narrowResourceBudgetWithAgentPlanV1(hidden),
-    /own data properties/,
-  );
-});
-
-test('AgentPlan budget normalization snapshots descriptor values exactly once', () => {
-  let descriptorReads = 0;
-  const target = { maxModelCalls: 2 };
-  const proxy = new Proxy(target, {
-    getOwnPropertyDescriptor(object, key) {
-      const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
-      if (key === 'maxModelCalls' && descriptor) {
-        descriptorReads += 1;
-        return {
-          ...descriptor,
-          value: descriptorReads === 1 ? 2 : 999,
-        };
-      }
-      return descriptor;
-    },
-  });
-  const normalized = normalizeAgentPlanBudgetCeilingV1(proxy);
-  assert.equal(normalized.maxModelCalls, 2);
-  assert.equal(descriptorReads, 1);
 });

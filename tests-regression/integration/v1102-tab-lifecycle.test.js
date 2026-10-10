@@ -1,0 +1,287 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
+import { StorageRepository } from '../../src/core/storage.js';
+import { AutomaticSessionExecutor } from '../../src/core/automatic-executor.js';
+import { ScenarioWorkManager } from '../../src/core/scenario-work-manager.js';
+import { probeAssistantConversation } from '../../src/core/assistant-report-probe.js';
+import { runRuntimeCycle, reconcileRuntimeColdStart } from '../../src/core/runtime-execution.js';
+import { createRecordedOwnedTab, withTabLifecycle } from '../../src/core/owned-tab-lifecycle.js';
+import { createSession, createTask, RunState, TabStrategy } from '../../src/core/schema.js';
+import { waitForTaskTabReady } from '../../src/core/tabs.js';
+
+function fixture() {
+  const data = {}, tabs = new Map([[1, {id: 1, windowId: 11, url: 'https://chatgpt.com/', status: 'complete'}],
+    [2, {id: 2, windowId: 22, url: 'https://www.youtube.com/', status: 'complete'}]]);
+  let serial = 2, maxTabs = 2, now = 1_800_000_000_000, focused = 11, generated = 0;
+  const drafts = new Map(), sends = [], closeFaults = new Set();
+  let injectCloseFaults = false, failNavigation = false, requiredTurnsBeforeClose = 0, reportOverride = null;
+  const chrome = { storage: {local: {
+    async get(key) { return {[key]: structuredClone(data[key])}; },
+    async set(record) { Object.assign(data, structuredClone(record)); },
+  }}, alarms: {async create(){}, async clear(){}}, windows: {async get(id){ return {id}; }}, tabs: {
+    async query(q) { return [...tabs.values()].filter(t => !q?.url || t.url.startsWith('https://chatgpt.com/')).map(t => structuredClone(t)); },
+    async get(id) { if (!tabs.has(id)) throw Error('No tab with id'); return structuredClone(tabs.get(id)); },
+    async create(options) { const tab = {id: ++serial, windowId: options.windowId ?? focused, status: 'loading', ...options}; tabs.set(tab.id,tab); maxTabs = Math.max(maxTabs,tabs.size); return structuredClone(tab); },
+    async update(id, patch) {
+      if (!tabs.has(id)) throw Error('No tab with id');
+      if (patch.url?.startsWith('https://chatgpt.com/')) {
+        const state = await repo.load();
+        assert.ok(Object.values(state.tabHintsByTaskId).some(h => h.tabId === id && h.ownedByExtension), 'navigation must follow durable ownership');
+        if (failNavigation) { failNavigation = false; throw Error('synthetic navigation interruption'); }
+      }
+      Object.assign(tabs.get(id),patch); return structuredClone(tabs.get(id));
+    },
+    async remove(id) {
+      if (requiredTurnsBeforeClose && tabs.get(id)?.url.includes('/c/')) {
+        const url = tabs.get(id).url;
+        assert.equal(sends.filter(send => send.url === url).length, requiredTurnsBeforeClose,
+          'a scenario physical tab is never closed between prompts or polling');
+      }
+      if (injectCloseFaults && id % 9 === 0 && !closeFaults.has(id)) { closeFaults.add(id); throw Error('synthetic transient close refusal'); }
+      if (!tabs.delete(id)) throw Error('No tab with id'); drafts.delete(id);
+    },
+    async reload(id) { if (!tabs.has(id)) throw Error('No tab with id'); },
+  }};
+  const repo = new StorageRepository(chrome);
+  const transport = {async execute(id, req) {
+    const tab = tabs.get(id); assert.ok(tab,'interaction tab exists');
+    if (req.mode === 'CHECK_ONLY' || req.mode === 'ENSURE_HIGH_EFFORT' || req.mode === 'PREPARE_SEND') return {status:'READY'};
+    if (req.mode === 'INSERT_ONLY') { drafts.set(id,req.promptText); return {status:'INSERTED_NOT_SENT',composerState:'VISIBLE_NONEMPTY',safeDiagnosticCode:'INSERTION_TEXT_PROVEN'}; }
+    if (req.mode === 'SUBMIT_EXISTING') {
+      assert.equal(drafts.get(id),req.promptText); assert.ok(!sends.some(s => s.operation === req.requestId), 'one Send per durable operation');
+      drafts.delete(id); if (tab.url === 'https://chatgpt.com/') tab.url = `https://chatgpt.com/c/generated-${++generated}`;
+      sends.push({operation:req.requestId,tabId:id,url:tab.url});
+      return {status:'SENT_VERIFIED', normalizedObservedUrl:tab.url,assistantBaselineCount:0, submittedUserMessageKey:`message:${req.requestId}`};
+    }
+    if (req.mode === 'READ_ASSISTANT_REPORT' && reportOverride) return typeof reportOverride==='function'
+      ? reportOverride(id,req,tab) : structuredClone(reportOverride);
+    if (req.mode === 'READ_ASSISTANT_REPORT') return {status:'READY',assistantComplete:true,assistantText:'OK',safeDiagnosticCode:'ASSISTANT_RESPONSE_READY'};
+    throw Error(`Unexpected ${req.mode}`);
+  }};
+  let executor, manager;
+  const restart = () => {
+    executor = new AutomaticSessionExecutor(repo,chrome,transport,{now:()=>now,cryptoApi:webcrypto});
+    manager = new ScenarioWorkManager({coreRepository:repo,chromeApi:chrome,now:()=>now,
+      createId:()=>`scenario-${++serial}`,collectAssistantReport:job=>probeAssistantConversation(chrome,transport,job)});
+  }; restart();
+  return {chrome,repo,tabs,sends,restart,get executor(){return executor;},get manager(){return manager;},
+    get maxTabs(){return maxTabs;},get now(){return now;},advance(ms=16000){now+=ms;focused=22;},
+    setReport(report){reportOverride=report;},guardCycle(turns){requiredTurnsBeforeClose=turns;},faults(){injectCloseFaults=true;},navigationFault(){failNavigation=true;}};
+}
+
+async function addSession(f, id='ordinary', strategy=TabStrategy.OPEN_CLOSE_PER_TASK) {
+  await f.repo.update(state=> {
+    const session = createSession({id,name:id,tasks:[createTask({id:`${id}-task`,url:'https://chatgpt.com/'})],sharedPrompt:'Continue',
+      minimumSendIntervalMs:1000,preSendDelayMs:1000,tabStrategy:strategy,now:f.now});
+    session.runState=RunState.RUNNING; state.sessionsById[id]=session;state.sessionOrder.push(id); return state;
+  });
+}
+
+test('open-close exceeds 12 sends through restart and failed closes without orphan tabs or other-window drafts',async()=>{
+  const f=fixture(); await addSession(f); f.faults();
+  for(let i=0;i<90;i++) {
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    f.advance(2000);
+    if(i===27 || i===61) f.restart();
+    const state=await f.repo.load();
+    const hints=Object.values(state.tabHintsByTaskId);
+    assert.ok(hints.length<=1);
+    for(const tab of f.tabs.values()) if(tab.id>2) {
+      assert.equal(tab.windowId,11); assert.ok(hints.some(h=>h.tabId===tab.id),'every created tab stays owned');
+    }
+  }
+  assert.ok(f.sends.length>=35,`verified sends=${f.sends.length}`);
+  assert.ok(f.maxTabs<=3,`peak=${f.maxTabs}`);
+  assert.equal(f.tabs.get(2).url,'https://www.youtube.com/');
+});
+
+test('five scenario slots complete 17 turns and one replacement each with bounded live tabs through restart',async()=>{
+  const f=fixture(); f.faults(); f.guardCycle(17);
+  await f.manager.createChatPool({count:5,replacementBudget:5,config:{mode:'CHAT_CYCLE',roundsPerGeneration:1,
+    launchUrl:'https://chatgpt.com/',steps:[{prompt:'START',repeat:1},{prompt:'CONTINUE',repeat:15},{prompt:'FINAL',repeat:1}],
+    closeTabsBetweenChecks:true,pollSeconds:15,preSendDelaySeconds:1,retryBackoffSeconds:5,responseTimeoutMinutes:10}});
+  await f.manager.startChatPool((await f.manager.list()).pools[0].id);
+  for(let i=0;i<360;i++) {
+    await Promise.all([f.manager.cycleAll(),f.manager.cycleAll()]);
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    await f.manager.cycleAll(); f.advance();
+    if(i===62 || i===185) f.restart();
+    const state=await f.repo.load(); const hints=Object.values(state.tabHintsByTaskId);
+    const ids=hints.map(h=>h.tabId); assert.equal(new Set(ids).size,ids.length,'one physical owner per tab');
+    assert.ok(hints.length<=5,`hints=${hints.length}`);
+    for(const tab of f.tabs.values()) if(tab.id>2) {
+      assert.equal(tab.windowId,11); assert.ok(hints.some(h=>h.tabId===tab.id),'no untracked probe or draft');
+    }
+    if(f.sends.length===170) break;
+  }
+  assert.equal(f.sends.length,170);
+  assert.ok(f.maxTabs<=7,`peak=${f.maxTabs}`);
+  for(let i=0;i<5;i++){f.advance();await f.manager.cycleAll();await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,now:()=>f.now});}
+  assert.equal(f.tabs.size,2,'all owned scenario tabs retired');
+});
+
+test('navigation interruption resumes the recorded blank tab without creating another page',async()=>{
+  const f=fixture();await addSession(f);f.navigationFault();
+  await assert.rejects(f.executor.bindTaskTab('ordinary','ordinary-task'),/navigation interruption/);
+  assert.equal(f.tabs.size,3);
+  const id=(await f.repo.load()).tabHintsByTaskId['ordinary-task'].tabId;
+  assert.match(f.tabs.get(id).url,/^about:blank#autopilot-owned:/);
+  f.restart();const resumed=await f.executor.bindTaskTab('ordinary','ordinary-task');
+  assert.equal(resumed.id,id);assert.equal(f.tabs.size,3);
+});
+
+test('cold start removes only identifiable unrecorded blank placeholders',async()=>{
+  const f=fixture();
+  const orphan=await f.chrome.tabs.create({url:'about:blank#autopilot-owned:missing:task',active:false});
+  await reconcileRuntimeColdStart({repository:f.repo,chromeApi:f.chrome,executionAvailable:true,now:()=>f.now});
+  assert.ok(!f.tabs.has(orphan.id));assert.equal(f.tabs.size,2);
+});
+
+test('parallel run requests join the same operation and create one draft only',async()=>{
+  const f=fixture();await addSession(f);
+  const results=await Promise.all(Array.from({length:20},()=>f.executor.runSessionOnce('ordinary')));
+  assert.ok(results.every(result=>result.kind==='WAIT_PRE_SEND'));assert.equal(f.tabs.size,3);
+  f.advance(2000);
+  await Promise.all(Array.from({length:20},()=>f.executor.runSessionOnce('ordinary')));
+  assert.equal(f.sends.length,1);assert.equal(f.tabs.size,2);
+});
+
+test('usable loading document can be checked, but a conflicting pending navigation stays blocked',async()=>{
+  let now=0;
+  const chrome={tabs:{async get(){return {id:7,url:'https://chatgpt.com/c/current',status:'loading'};}}};
+  const ready=await waitForTaskTabReady(chrome,7,'https://chatgpt.com/c/current',
+    {allowLoadingDocument:true,now:()=>now,wait:async ms=>{now+=ms;}});
+  assert.equal(ready.id,7);assert.equal(now,1500);
+  chrome.tabs.get=async()=>({id:7,url:'https://chatgpt.com/c/current',pendingUrl:'https://chatgpt.com/c/other',status:'loading'});
+  await assert.rejects(waitForTaskTabReady(chrome,7,'https://chatgpt.com/c/current',
+    {allowLoadingDocument:true,timeoutMs:2000,now:()=>now,wait:async ms=>{now+=ms;}}),error=>error.safeDiagnosticCode==='TAB_NAVIGATION_TIMEOUT');
+});
+
+test('physical tab budget applies to held drafts across the whole profile, not just concurrent promises',async()=>{
+  const f=fixture();await f.repo.update(state=>{state.profile.maxConcurrentSessionOperations=3;return state;});
+  for(let i=0;i<12;i++)await addSession(f,`bounded-${i}`);
+  const results=await Promise.allSettled(Array.from({length:12},(_,i)=>f.executor.bindTaskTab(`bounded-${i}`,`bounded-${i}-task`)));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,3);
+  assert.ok(results.filter(r=>r.status==='rejected').every(r=>r.reason.safeDiagnosticCode==='TAB_RESOURCE_CAPACITY_WAIT'));
+  assert.equal(f.tabs.size,5);assert.equal(Object.values((await f.repo.load()).tabHintsByTaskId).length,3);
+});
+
+for (const minutes of [35, 45]) test(`scenario keeps its exact physical tab until the ${minutes}-minute hard timeout, then creates a fresh chat`,async()=>{
+  const f=fixture();
+  f.setReport({status:'BUSY',assistantComplete:false,responseAnchorMatched:true,
+    safeDiagnosticCode:'ASSISTANT_RESPONSE_STREAMING'});
+  const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{mode:'CHAT_CYCLE',launchUrl:'https://chatgpt.com/',steps:[{prompt:'CONTINUE',repeat:2}],
+      closeTabsBetweenChecks:true,responseTimeoutMinutes:minutes,preSendDelaySeconds:1}});
+  const id=pool.ids[0]; await f.manager.startChatPool(pool.pool.id);
+  const initial=(await f.manager.get(id)).scenario.runtime;
+  const sid=initial.chat.sessionId;
+  await f.executor.runSessionOnce(sid); f.advance(2000); await f.executor.runSessionOnce(sid);
+  await f.manager.cycleOne(id);
+  const sent=f.sends[0]; assert.ok(sent.url.includes('/c/'));
+  let scenario=(await f.manager.get(id)).scenario;
+  const deadline=scenario.runtime.chat.deadlineAt;
+  f.advance(deadline-f.now-1); f.restart(); await f.manager.cycleOne(id);
+  assert.ok(f.tabs.has(sent.tabId));
+  assert.equal((await f.manager.get(id)).scenario.runtime.chat.deadlineAt,deadline);
+  assert.equal(f.sends.length,1);
+  f.advance(2); await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(sent.tabId),'the expired physical chat was closed');
+  scenario=(await f.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.totalCompletedTurns,0);
+  assert.equal(scenario.runtime.poolReplacementsUsed,1);
+  await f.executor.runSessionOnce(scenario.runtime.chat.sessionId);
+  f.advance(2000); await f.executor.runSessionOnce(scenario.runtime.chat.sessionId);
+  assert.equal(f.sends.length,2);
+  assert.notEqual(f.sends[1].tabId,sent.tabId);
+  assert.notEqual(f.sends[1].url,sent.url,'replacement is a fresh conversation, not a report-only reopen');
+  assert.equal(f.tabs.get(f.sends[1].tabId).windowId,11);
+});
+
+
+test('15 resident scenario chats advance independently with executor concurrency 3, restart and another focused window', async () => {
+  const f=fixture(); f.guardCycle(3);
+  await f.repo.update(state=>{state.profile.maxConcurrentSessionOperations=3;return state;});
+  const pool=await f.manager.createChatPool({count:15,replacementBudget:0,config:{mode:'CHAT_CYCLE',
+    steps:[{prompt:'Привіт',repeat:1},{prompt:'Як справи',repeat:1},{prompt:'Розкажи новини',repeat:1}],
+    responseTimeoutMinutes:45,preSendDelaySeconds:1,pollSeconds:15}});
+  await f.manager.startChatPool(pool.pool.id);
+  for(let i=0;i<30;i++) {
+    await f.manager.cycleAll();
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    f.advance(2000);
+    if(i===3) f.restart();
+    const core=await f.repo.load(); const hints=Object.values(core.tabHintsByTaskId);
+    assert.ok(hints.length<=15); assert.equal(new Set(hints.map(h=>h.tabId)).size,hints.length);
+    for(const tab of f.tabs.values()) if(tab.id>2) {
+      assert.equal(tab.windowId,11);assert.ok(hints.some(h=>h.tabId===tab.id));
+    }
+    if(f.sends.length===45) break;
+  }
+  assert.equal(f.sends.length,45);assert.equal(new Set(f.sends.map(x=>x.tabId)).size,15);
+  assert.ok(f.maxTabs<=17);
+  for(let i=0;i<4;i++){f.advance();await f.manager.cycleAll();}
+  assert.equal(f.tabs.size,2);
+  assert.equal((await f.manager.list()).pools[0].completedResponses,45);
+});
+
+test('queued launch waits past 45 minutes without spending replacements; admitted unconfirmed Send has a hard timeout',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{steps:[{prompt:'Hello',repeat:2}],responseTimeoutMinutes:45,preSendDelaySeconds:1}});
+  await f.manager.startChatPool(pool.pool.id);const id=pool.ids[0];
+  f.advance(46*60_000);await f.manager.cycleOne(id);f.restart();f.advance(46*60_000);await f.manager.cycleOne(id);
+  let scenario=(await f.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.chat.deadlineAt,0);assert.equal(scenario.runtime.poolReplacementsUsed,0);
+  const sid=scenario.runtime.chat.sessionId;await f.executor.runSessionOnce(sid);
+  await f.manager.cycleOne(id);scenario=(await f.manager.get(id)).scenario;
+  const hint=Object.values((await f.repo.load()).tabHintsByTaskId)[0];
+  const deadline=scenario.runtime.chat.deadlineAt;assert.equal(deadline,f.now+45*60_000);
+  f.advance(45*60_000-1);await f.manager.cycleOne(id);assert.ok(f.tabs.has(hint.tabId));
+  f.advance(2);await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(hint.tabId));assert.notEqual((await f.repo.load()).sessionsById[sid]?.operation?.phase,'PRE_SEND_WAIT');
+  assert.equal((await f.manager.get(id)).scenario.runtime.poolReplacementsUsed,1);
+  assert.equal(f.sends.length,0);
+});
+
+test('restart drains a retired PRE_SEND_WAIT session and its exact held tab instead of leaving a stopped owner forever',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:1,replacementBudget:1,
+    config:{steps:[{prompt:'Hello',repeat:2}],preSendDelaySeconds:1}});
+  await f.manager.startChatPool(pool.pool.id);const id=pool.ids[0];
+  let scenario=(await f.manager.get(id)).scenario;const sid=scenario.runtime.chat.sessionId;
+  await f.executor.runSessionOnce(sid);const hint=Object.values((await f.repo.load()).tabHintsByTaskId)[0];
+  await f.manager.update(store=>{const r=store.byId[id].runtime;r.cleanupPendingSessionIds=[sid];
+    r.chat.sessionId='';r.chat.taskId='';r.chat.taskIdCore='';r.chat.state='NEW';return store;});
+  f.restart();await f.manager.cycleOne(id);
+  assert.ok(!f.tabs.has(hint.tabId));assert.notEqual((await f.repo.load()).sessionsById[sid]?.operation?.phase,'PRE_SEND_WAIT');
+  assert.equal((await f.manager.get(id)).scenario.runtime.cleanupPendingSessionIds.length,0);
+  assert.equal(f.sends.length,0);
+});
+
+
+test('five incident chats keep their physical documents when each provisional URL changes after Send',async()=>{
+  const f=fixture();const pool=await f.manager.createChatPool({count:5,replacementBudget:0,config:{
+    steps:[{prompt:'Hello',repeat:2}],preSendDelaySeconds:1,pollSeconds:15}});
+  await f.manager.startChatPool(pool.pool.id);
+  f.setReport({status:'BUSY',assistantComplete:false,safeDiagnosticCode:'ASSISTANT_RESPONSE_STREAMING'});
+  for(let i=0;i<5 && f.sends.length<5;i++) {
+    await runRuntimeCycle({repository:f.repo,chromeApi:f.chrome,executor:f.executor,executionAvailable:true,now:()=>f.now});
+    f.advance(2000);
+  }
+  assert.equal(f.sends.length,5);
+  const firstIds=f.sends.map(x=>x.tabId);
+  for(const id of firstIds) f.tabs.get(id).url=`https://chatgpt.com/c/canonical-${id}`;
+  f.setReport((id,req,tab)=>({status:'READY',assistantComplete:true,assistantText:'Hello back',
+    responseAnchorMatched:true,correlationTokenMatched:true,responseAnchorKind:'STEP_MARKER',
+    normalizedObservedUrl:tab.url}));
+  await f.manager.cycleAll();
+  const core=await f.repo.load();
+  for(const scenario of (await f.manager.list()).scenarios) {
+    const session=core.sessionsById[scenario.runtime.chat.sessionId];const task=session.tasksById[session.taskOrder[0]];
+    const hint=core.tabHintsByTaskId[task.id];
+    assert.equal(task.normalizedUrl,`https://chatgpt.com/c/canonical-${hint.tabId}`);
+    assert.equal(task.lastConversationUrl,task.normalizedUrl);assert.equal(hint.normalizedUrl,task.normalizedUrl);
+    assert.equal(scenario.runtime.totalCompletedTurns,1);assert.ok(firstIds.includes(hint.tabId));
+  }
+  assert.equal(f.tabs.size,7);assert.equal(f.sends.length,5);
+});
