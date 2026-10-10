@@ -108,7 +108,7 @@ function denseDataArray(value, label, max) {
     }
     descriptors = Object.getOwnPropertyDescriptors(value);
   } catch {
-    throw new Error(`${label} must be a bounded data-only array`);
+    throw new Error(`${label} must be a bounded array`);
   }
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
