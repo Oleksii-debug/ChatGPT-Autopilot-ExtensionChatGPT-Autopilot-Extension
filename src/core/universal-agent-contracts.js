@@ -455,11 +455,15 @@ export function normalizeSpecialistHandoffV1(input) {
   });
 }
 
-export function capabilityV1FromRegistry(capabilityId, {
-  description = '',
-  riskClass = 'R0',
-  attributes = {},
-} = {}) {
+const CAPABILITY_ADAPTER_OPTION_KEYS = new Set(['description', 'riskClass', 'attributes']);
+const TOOL_ADAPTER_OPTION_KEYS = new Set(['toolId', 'label', 'description', 'readOnly']);
+
+export function capabilityV1FromRegistry(capabilityId, options = {}) {
+  // Provider metadata and adapter options are descriptors, not executable
+  // authority. Reject accessors before unpacking user-controlled values.
+  const config = plain(options, 'capability adapter options');
+  exactKeys(config, CAPABILITY_ADAPTER_OPTION_KEYS, 'capability adapter options');
+  const { description = '', riskClass = 'R0', attributes = {} } = config;
   return normalizeCapabilityV1({
     schemaVersion: 1,
     capabilityId,
@@ -469,12 +473,10 @@ export function capabilityV1FromRegistry(capabilityId, {
   });
 }
 
-export function toolDescriptorV1FromAgentProvider(provider, {
-  toolId,
-  label = '',
-  description = '',
-  readOnly = false,
-} = {}) {
+export function toolDescriptorV1FromAgentProvider(provider, options = {}) {
+  const config = plain(options, 'tool adapter options');
+  exactKeys(config, TOOL_ADAPTER_OPTION_KEYS, 'tool adapter options');
+  const { toolId, label = '', description = '', readOnly = false } = config;
   const raw = plain(provider, 'agent provider');
   return normalizeToolDescriptorV1({
     schemaVersion: 1,
