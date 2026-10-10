@@ -62,6 +62,13 @@ function copyDataRecord(value, label) {
 }
 
 
+const MODEL_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds',
+  'denyRouteIds', 'freeOnly', 'locality',
+  'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
+]);
+
 function copyModelRoutePolicy(value) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
@@ -71,8 +78,8 @@ function copyModelRoutePolicy(value) {
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
-    if (key === '__proto__' || key === 'prototype' || key === 'constructor') {
-      throw new Error('modelRoutePolicy містить заборонене поле.');
+    if (!MODEL_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('modelRoutePolicy містить неканонічне поле: ' + key);
     }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
@@ -166,6 +173,26 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     const field = ownData(input, key, key);
     return field.present ? field.value : fallback;
   };
+  const persisted = copyModelRoutePolicy(persistedPolicy);
+  // The displayed defaults do not silently become explicit owner authority
+  // when an older stored policy omitted these three failover controls.
+  const resilience = {};
+  for (const [formKey, policyKey, displayDefault, max] of [
+    ['modelRouteRetryBackoffSeconds', 'retryBackoffSeconds', 60, 86_400],
+    ['modelRouteCircuitBreakerFailures', 'circuitBreakerFailures', 2, 100],
+    ['modelRouteCircuitBreakerSeconds', 'circuitBreakerSeconds', 300, 86_400],
+  ]) {
+    const field = ownData(input, formKey, formKey);
+    const savedField = persisted ? ownData(persisted, policyKey, policyKey) : { present:false };
+    if (field.present) {
+      const value = exactIntegerText(field.value, formKey, { min:1, max });
+      if (value !== displayDefault || savedField.present || persisted == null) {
+        resilience[policyKey] = value;
+      }
+    } else if (savedField.present) {
+      resilience[policyKey] = savedField.value;
+    }
+  }
   const pinned = read('modelRoutePinnedRouteId', '');
   const locality = read('modelRouteLocality', 'any');
   const autoSwitch = read('modelRouteAutoSwitch', true);
@@ -183,15 +210,19 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality,
     maxInputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxInputPriceText', ''), 'Максимальна input-ціна'),
     maxOutputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxOutputPriceText', ''), 'Максимальна output-ціна'),
+    ...resilience,
   });
   if (policy.allowRouteIds.length) {
     const allow = new Set(policy.allowRouteIds);
-    for (const routeId of [...policy.orderedRouteIds, ...policy.denyRouteIds]) {
-      if (!allow.has(routeId)) throw new Error('Model route ID поза allow scope: ' + routeId);
+    for (const routeId of policy.orderedRouteIds) {
+      if (!allow.has(routeId)) throw new Error('Ordered model route ID поза allow scope: ' + routeId);
+    }
+    for (const routeId of policy.denyRouteIds) {
+      if (!allow.has(routeId)) throw new Error('Denied model route ID поза allow scope: ' + routeId);
     }
     if (policy.pinnedRouteId && !allow.has(policy.pinnedRouteId)) throw new Error('Pinned model route ID поза allow scope: ' + policy.pinnedRouteId);
     const denied = new Set(policy.denyRouteIds);
-    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) throw new Error('Model Router policy deny scope перекриває весь allow scope.');
+    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) throw new Error('Model Router policy deny scope перекриває весь явний allow scope.');
   }
   if (policy.pinnedRouteId && policy.denyRouteIds.includes(policy.pinnedRouteId)) throw new Error('Pinned model route ID одночасно заборонений deny policy.');
   return {
@@ -204,6 +235,7 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality:policy.locality,
     maxInputPricePerMillionUsd:policy.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd:policy.maxOutputPricePerMillionUsd,
+    ...Object.fromEntries(Object.keys(resilience).map(key => [key, policy[key]])),
   };
 }
 
