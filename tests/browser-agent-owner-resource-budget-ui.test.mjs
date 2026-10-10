@@ -154,3 +154,28 @@ test('valid owner budget CAS save preserves unrelated dimensions and publishes t
   assert.equal(harness.nodes['agent-owner-resource-budget-save-button'].disabled, false);
   assert.match(harness.nodes['agent-owner-resource-budget-status'].textContent, /Збережено/);
 });
+
+test('stale SET receipts cannot declare successful capacity writes or silently retry', async () => {
+  const baseline = { revision: 6, quarantined: false, budget: { maxConcurrentAgents: 3, maxDollars: 20 } };
+  const staleReceipts = [
+    { revision: 6, quarantined: false, budget: { maxConcurrentAgents: 7, maxDollars: 20 } },
+    { revision: 7, quarantined: false, budget: { maxConcurrentAgents: 3, maxDollars: 20 } },
+    { revision: 9, quarantined: false, budget: { maxConcurrentAgents: 7, maxDollars: 20 } },
+  ];
+  for (const receipt of staleReceipts) {
+    const harness = createOwnerBudgetUiHarness(async command => command === 'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET'
+      ? receipt : baseline);
+    await harness.loadBrowserAgentOwnerResourceBudget();
+    harness.nodes['agent-owner-max-concurrent'].value = '7';
+    await harness.saveBrowserAgentOwnerResourceBudget();
+    assert.deepEqual(harness.calls.map(call => call.name), [
+      'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
+      'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
+      'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
+    ], 'a stale receipt triggers read-only recovery, never a second SET');
+    assert.equal(harness.nodes['agent-owner-max-concurrent'].value, '3');
+    assert.equal(harness.ui.ownerResourceBudgetState.revision, 6);
+    assert.match(harness.nodes['agent-owner-resource-budget-status'].textContent, /не збережено/);
+    assert.ok(harness.announcements.every(message => message !== 'Глобальну Specialist capacity збережено.'));
+  }
+});
