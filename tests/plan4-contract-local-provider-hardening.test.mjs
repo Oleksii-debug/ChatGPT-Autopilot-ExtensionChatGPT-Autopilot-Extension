@@ -81,6 +81,45 @@ test('Plan4 S1 persisted route and endpoint identity is exact, not a whitespace 
   assert.equal(evidence.routeIdentities[0].endpointBinding,'MATCHED');
 });
 
+test('Plan4 S1 provider/model route identity never aliases by trimming before dispatch or after restart', async () => {
+  let providerEffects = 0;
+  const orchestrator = new AiOrchestrator({gatewayClient:{
+    async complete() { providerEffects += 1; throw new Error('unexpected provider dispatch'); },
+  }});
+  const invalid = [
+    {...route, provider:' ollama'},
+    {...route, provider:'ollama '},
+    {...route, provider:'ollama\\n'},
+    {...route, model:' llama3'},
+    {...route, model:'llama3 '},
+    {...route, model:'llama3\\n'},
+    {...route, model:''},
+    {...route, model:null},
+    {...route, model:'x'.repeat(301)},
+  ].map(entry => ({...entry,
+    provider:entry.provider.replaceAll('\\n','\n'),
+    model:typeof entry.model === 'string' ? entry.model.replaceAll('\\n','\n') : entry.model,
+  }));
+  for (const bad of invalid) {
+    for (const persisted of [[bad], JSON.parse(JSON.stringify([bad]))]) {
+      assert.throws(() => normalizeAiRoutePool(persisted), /AI route provider|AI route model/);
+      assert.throws(() => normalizeAiRouterSettings({enabled:true,mode:'primary',routes:persisted}),
+        /AI route provider|AI route model/);
+      await assert.rejects(orchestrator.run({enabled:true,mode:'primary',routes:persisted}, {}, 'approved prompt'),
+        /AI route provider|AI route model/);
+    }
+    await assert.rejects(createAiRouteRegistryEvidenceV1({...snapshot,routes:[bad]}),
+      /AI route provider|AI route model/);
+  }
+  assert.equal(providerEffects,0);
+  const exact = {...route, model:'namespace/model:v1'};
+  assert.equal(normalizeAiRoutePool([exact])[0].model,exact.model);
+  const first = await createAiRouteRegistryEvidenceV1({...snapshot,routes:[exact]});
+  const cold = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({...snapshot,routes:[exact]})));
+  assert.equal(first.configSha256,cold.configSha256);
+  assert.equal(first.routeIdentities[0].model,exact.model);
+});
+
 test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
   const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
     locality:'local', costClass:'free' };
