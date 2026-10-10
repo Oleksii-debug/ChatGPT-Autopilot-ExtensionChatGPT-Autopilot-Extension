@@ -48,6 +48,7 @@ jobs:
             tests/specialist-provider-dispatch-chronology.test.mjs \
             tests/specialist-provider-config.test.mjs \
             tests/specialist-provider-execution.test.mjs \
+            tests/openhands-specialist-readiness.test.mjs \
             tests/specialist-assignment.test.mjs \
             tests/specialist-provider-ui.test.mjs \
             tests/specialist-registry-ui.test.mjs \
