@@ -400,7 +400,7 @@ export class AiOrchestrator {
       ['maxOutputTokens', maxOutputTokens],
       ['maxModelCallsForRequest', maxModelCallsForRequest],
     ]) {
-      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || ceiling < 0) {
+      if (typeof ceiling !== 'number' || !Number.isSafeInteger(ceiling) || Object.is(ceiling, -0) || ceiling < 0) {
         throw new Error('AI model budget ' + label + ' must be a non-negative safe integer');
       }
     }
