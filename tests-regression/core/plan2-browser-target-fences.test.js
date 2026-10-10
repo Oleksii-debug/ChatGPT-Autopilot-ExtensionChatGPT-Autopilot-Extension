@@ -3053,6 +3053,7 @@ test('Plan2 S1 credential native setter must accept and preserve value before pa
     const password = new GuardedInput('password', 'Password');
     password.rect = { left: 210, top: 10, width: 90, height: 30 };
     const nodes = [user, password];
+    let passwordOccluded = false;
     pageUrl = 'https://example.test/login';
     globalThis.location = { get href() { return pageUrl; } };
     globalThis.document = {
@@ -3061,7 +3062,7 @@ test('Plan2 S1 credential native setter must accept and preserve value before pa
       querySelectorAll: selector => selector.includes('data-autopilot-agent-ref')
         ? nodes.filter(input => input.getAttribute('data-autopilot-agent-ref'))
         : nodes,
-      elementFromPoint: x => (x < 150 ? user : password),
+      elementFromPoint: x => (x < 150 || passwordOccluded ? user : password),
     };
     const snap = snapshotBrowserPage('credential-value-fence');
     const action = JSON.parse(JSON.stringify(parseBrowserAgentAction(JSON.stringify({
@@ -3108,6 +3109,36 @@ test('Plan2 S1 credential native setter must accept and preserve value before pa
     assert.equal(password.value, 'changed-by-page',
       'an event-driven change must not be marked verified');
     password.onDispatch = null;
+
+    // Page-owned input handlers can mutate the control before change is sent.
+    reset();
+    user.onDispatch = event => {
+      if (event.type === 'input') user.value = 'modified-by-page';
+    };
+    assert.throws(attempt, /AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED/);
+    assert.deepEqual(events, ['text:input'], 'no change event after rejected username input');
+    assert.equal(password.value, '', 'rejected username input cannot release password');
+    user.onDispatch = null;
+
+    reset();
+    password.onDispatch = event => {
+      if (event.type === 'input') password.setAttribute('aria-label', 'Repurposed by input');
+    };
+    assert.throws(attempt, /AGENT_CREDENTIAL_PASSWORD_TARGET_STALE/);
+    assert.deepEqual(events, ['text:input', 'text:change', 'password:input'],
+      'retargeted password must not receive the change event');
+    password.onDispatch = null;
+    password.setAttribute('aria-label', 'Password');
+
+    reset();
+    password.onDispatch = event => {
+      if (event.type === 'input') passwordOccluded = true;
+    };
+    assert.throws(attempt, /AGENT_CREDENTIAL_PASSWORD_TARGET_OCCLUDED/);
+    assert.deepEqual(events, ['text:input', 'text:change', 'password:input'],
+      'input-triggered overlay blocks the password change event');
+    password.onDispatch = null;
+    passwordOccluded = false;
 
     // A cold JSON recovery restores only observed target identity, not an
     // authorization to skip native value acceptance or post-event evidence.
