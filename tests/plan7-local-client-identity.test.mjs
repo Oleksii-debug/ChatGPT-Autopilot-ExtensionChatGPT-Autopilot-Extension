@@ -498,3 +498,69 @@ test('SDK rejects noncanonical bearer characters at construction before any tran
     token: 'test-only-'.repeat(5), port: 12345, fetchImpl: attemptedFetch,
   }), 'existing valid Companion tokens remain compatible');
 });
+
+test('owner-managed SDK bearer rotates per call without caching stale credentials', async () => {
+  let current = 'first-owner-token-'.repeat(3);
+  let resolutions = 0;
+  const sent = [];
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => { resolutions += 1; return current; },
+    port: 12345,
+    fetchImpl: async (_, options) => {
+      sent.push(options.headers.Authorization);
+      return { ok: true, json: async () => transportResponse() };
+    },
+  });
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  current = 'rotated-owner-token-'.repeat(3);
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(resolutions, 2);
+  assert.deepEqual(sent, [
+    'Bearer ' + 'first-owner-token-'.repeat(3),
+    'Bearer ' + 'rotated-owner-token-'.repeat(3),
+  ]);
+});
+
+test('owner-token resolver fails closed before networking and recovers on next call', async () => {
+  let value = null;
+  let sent = 0;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => value,
+    port: 12345,
+    fetchImpl: async () => {
+      sent += 1;
+      return { ok: true, json: async () => transportResponse() };
+    },
+  });
+  await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
+  assert.equal(sent, 0);
+  value = 'new-owner-secret-'.repeat(3);
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(sent, 1);
+  assert.throws(() => createAutopilotLocalClientV1({
+    token: value, tokenProvider: () => value, port: 12345,
+  }), /never both/u);
+  assert.throws(() => createAutopilotLocalClientV1({
+    tokenProvider: 'not-a-provider', port: 12345,
+  }), /never both/u);
+});
+
+test('hung SDK owner-token lookup is bounded and cannot dispatch or become sticky', async () => {
+  let hanging = true;
+  let sent = 0;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: () => hanging
+      ? new Promise(() => {}) : 'restored-owner-secret-'.repeat(3),
+    port: 12345,
+    timeoutMs: 100,
+    fetchImpl: async () => {
+      sent += 1;
+      return { ok: true, json: async () => transportResponse() };
+    },
+  });
+  await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
+  assert.equal(sent, 0);
+  hanging = false;
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(sent, 1);
+});

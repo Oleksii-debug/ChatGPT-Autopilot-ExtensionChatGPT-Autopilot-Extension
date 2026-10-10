@@ -8,6 +8,14 @@ import { normalizeAutopilotProgrammaticRequestV1, isAutopilotProgrammaticOperati
  */
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
+// The trusted Companion/owner may rotate its bearer between SDK requests.
+// The SDK reads the current token per call, never stores an old fallback.
+function validLocalApiToken(candidate) {
+  return typeof candidate === 'string'
+    && candidate.length >= 32 && candidate.length <= 512
+    && !/[^\x21-\x7e]/u.test(candidate);
+}
+
 function canonicalUtcTimestamp(value) {
   if (typeof value !== 'string') return false;
   const millis = Date.parse(value);
@@ -161,9 +169,12 @@ function validBoundScopeAndChronology(result, sentRequest) {
     && observed <= completed && dispatched <= validThrough;
 }
 
-export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
-  if (typeof token !== 'string' || token.length < 32 || token.length > 512
-    || /[^\x21-\x7e]/u.test(token)) {
+export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetchImpl = fetch, timeoutMs = 10_000 } = {}) {
+  if (tokenProvider !== undefined
+    && (typeof tokenProvider !== 'function' || token !== undefined)) {
+    throw new Error('Use either a trusted token or owner tokenProvider, never both');
+  }
+  if (tokenProvider === undefined && !validLocalApiToken(token)) {
     throw new Error('A trusted local API token is required');
   }
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Valid loopback port required');
@@ -198,6 +209,32 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
       inFlightRequests.add(requestKey);
       let timeoutHandle;
       try {
+      // An owner-issued token is a credential read, not a second authorization
+      // authority. Resolve it AFTER canonical preflight and BEFORE transmission.
+      // A failed, late or invalid resolver never opens a socket, never falls
+      // back to a retired secret and never triggers an automatic effect retry.
+      let requestToken = token;
+      if (tokenProvider !== undefined) {
+        let credentialTimer;
+        try {
+          requestToken = await Promise.race([
+            Promise.resolve().then(() => tokenProvider()),
+            new Promise((_, reject) => {
+              credentialTimer = setTimeout(
+                () => reject(new Error('Owner token resolution deadline')),
+                Math.min(timeoutMs, 2_000),
+              );
+            }),
+          ]);
+        } catch {
+          throw new Error('Trusted local API owner token unavailable before transmission');
+        } finally {
+          clearTimeout(credentialTimer);
+        }
+        if (!validLocalApiToken(requestToken)) {
+          throw new Error('Trusted local API owner token unavailable before transmission');
+        }
+      }
       // A custom/mock fetch may ignore AbortSignal and return a late RECEIVED.
       // Enforce one wall-clock deadline across transport AND body parsing.
       // Timeout is always ambiguous, not evidence of zero external effects.
@@ -213,7 +250,7 @@ export function createAutopilotLocalClientV1({ token, port, fetchImpl = fetch, t
         res = await Promise.race([fetchImpl('http://127.0.0.1:' + port + '/v1/control', {
           method: 'POST',
           headers: {
-            Authorization: 'Bearer ' + token,
+            Authorization: 'Bearer ' + requestToken,
             'Content-Type': 'application/json',
           },
           body,
