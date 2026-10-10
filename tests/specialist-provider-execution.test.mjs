@@ -232,3 +232,105 @@ test('execution record rejects identity drift, malformed outcome and accessor fi
   );
   assert.equal(reads, 0);
 });
+
+test('Section 1: hostile provider execution records never leak Proxy errors or caller field names, while JSON restart survives', () => {
+  const secret = 'PRIVATE_PROVIDER_TOKEN_CANARY_7e2a';
+  const legitimate = JSON.parse(JSON.stringify(prepared()));
+  for (const trapName of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const input = new Proxy({ ...legitimate }, {
+      [trapName]() { throw new Error(secret); },
+    });
+    assert.throws(
+      () => normalizeSpecialistProviderExecutionV1(input),
+      error => error instanceof Error
+        && /cannot be inspected safely/u.test(error.message)
+        && !error.message.includes(secret)
+        && !('cause' in error),
+      trapName + ' must be redacted',
+    );
+  }
+
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1({ ...legitimate, [secret]: 'ignored' }),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  let accessorCalls = 0;
+  const accessorRecord = { ...legitimate };
+  Object.defineProperty(accessorRecord, 'status', {
+    enumerable: true,
+    get() { accessorCalls += 1; throw new Error(secret); },
+  });
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(accessorRecord),
+    error => error instanceof Error
+      && /data property/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  assert.equal(accessorCalls, 0);
+
+  // The rejected input must not corrupt the durable good execution snapshot.
+  const restarted = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(legitimate)),
+  );
+  assert.equal(restarted.leaseId, legitimate.leaseId);
+  assert.equal(restarted.providerId, legitimate.providerId);
+  assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.deepEqual(JSON.parse(JSON.stringify(restarted)), legitimate);
+});
+
+test('Section 1: preparation request is descriptor-safe before any execution/lease binding', () => {
+  const canonical = prepared();
+  const request = {
+    planId: canonical.planId,
+    nodeId: canonical.nodeId,
+    agentId: canonical.agentId,
+    handoffId: canonical.handoffId,
+    providerId: canonical.providerId,
+    leaseId: canonical.leaseId,
+    leaseUntil: canonical.leaseUntil,
+    conversationId: canonical.conversationId,
+    providerConfig: canonical.providerConfig,
+    at: canonical.preparedAt,
+  };
+  const secret = 'PRIVATE_PREPARATION_CREDENTIAL_CANARY_8121';
+  for (const trapName of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const proxy = new Proxy({ ...request }, {
+      [trapName]() { throw new Error(secret); },
+    });
+    assert.throws(
+      () => createSpecialistProviderExecutionV1(proxy),
+      error => error instanceof Error
+        && /cannot be inspected safely/u.test(error.message)
+        && !error.message.includes(secret)
+        && !('cause' in error),
+    );
+  }
+  let reads = 0;
+  const getterRequest = { ...request };
+  Object.defineProperty(getterRequest, 'leaseId', {
+    enumerable: true,
+    get() { reads += 1; throw new Error(secret); },
+  });
+  assert.throws(
+    () => createSpecialistProviderExecutionV1(getterRequest),
+    error => error instanceof Error
+      && /data property/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  assert.equal(reads, 0);
+  assert.throws(
+    () => createSpecialistProviderExecutionV1({ ...request, [secret]: 'x' }),
+    error => error instanceof Error
+      && /unknown field/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+
+  const restarted = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(createSpecialistProviderExecutionV1(request))),
+  );
+  assert.equal(restarted.leaseId, canonical.leaseId);
+  assert.equal(restarted.conversationId, canonical.conversationId);
+  assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
+});
