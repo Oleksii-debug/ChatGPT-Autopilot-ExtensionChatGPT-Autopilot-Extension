@@ -310,6 +310,50 @@ test('expired execution ownership always requires reconciliation before fabric r
   assert.equal(result.recommendedPlane, '');
 });
 
+test('cloud lease deadline is exclusive before and after JSON cold restart', () => {
+  const owner = ownedCloud({ leaseUntil: '2026-09-25T10:01:00.000Z' });
+  const raw = request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: owner,
+    cloudSlots: [slot('slot-owned', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(owner)],
+  });
+  const prior = assessCloudExecutionFabricV1({
+    ...raw,
+    assessedAt: '2026-09-25T10:00:59.999Z',
+  });
+  assert.equal(prior.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(prior.executionAuthorized, false);
+
+  for (const assessedAt of [
+    '2026-09-25T10:01:00.000Z',
+    '2026-09-25T10:01:00.001Z',
+  ]) {
+    const restarted = JSON.parse(JSON.stringify({ ...raw, assessedAt }));
+    const result = assessCloudExecutionFabricV1(restarted);
+    assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+    assert.equal(result.reasonCode, 'EXECUTION_LEASE_EXPIRED');
+    assert.equal(result.recommendedPlane, '');
+    assert.equal(result.executionAuthorized, false);
+  }
+});
+
+test('owner clock rollback fails closed before cloud slot recommendation', () => {
+  const owner = ownedCloud({
+    at: '2026-09-25T10:10:00.000Z',
+    leaseUntil: '2026-09-25T10:30:00.000Z',
+  });
+  const result = assessCloudExecutionFabricV1(JSON.parse(JSON.stringify(request({
+    executionOwnership: owner,
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    assessedAt: '2026-09-25T10:05:00.000Z',
+  }))));
+  assert.equal(result.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+  assert.equal(result.reasonCode, 'EXECUTION_CLOCK_ROLLBACK');
+  assert.equal(result.recommendedPlane, '');
+  assert.equal(result.executionAuthorized, false);
+});
+
 test('checkpoint resume requires a complete exact artifact identity', () => {
   assert.throws(
     () => assessCloudExecutionFabricV1(request({ checkpointSha256: '' })),
