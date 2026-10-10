@@ -243,6 +243,27 @@ function normalizedState(input) {
     };
   }
 
+  const commitId = optionalId(raw.commitId, 'commitId');
+  // A cold-restarted ledger may be stale or corrupt. The persisted phase
+  // alone cannot grant COMMIT or SAFE_RETRY: these transitions require the
+  // same bound verifier/reconciliation receipts as the event reducer.
+  // Otherwise a forged VERIFIED state could be committed without evidence,
+  // or a forged SAFE_RETRY could blindly repeat a consequential effect.
+  const independentlyVerified = !!verification
+    && [VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status);
+  if ((phase === ExactEffectPhase.VERIFIED || phase === ExactEffectPhase.COMMITTED)
+      && !independentlyVerified) {
+    throw new Error('Verified exact-effect state requires bound positive verification evidence');
+  }
+  if (phase === ExactEffectPhase.SAFE_RETRY
+      && (!observation || verification?.status !== VerificationStatus.FAILED
+          || reconciliation.outcome !== ReconciliationOutcome.SAFE_RETRY)) {
+    throw new Error('SAFE_RETRY state requires bound failed verification and reconciliation evidence');
+  }
+  if (phase === ExactEffectPhase.COMMITTED && !commitId) {
+    throw new Error('COMMITTED exact-effect state requires an exact commitId receipt');
+  }
+
   return freeze({
     schemaVersion: UniversalExactEffectVersion,
     effectId,
@@ -254,7 +275,7 @@ function normalizedState(input) {
     verification,
     ambiguity,
     reconciliation,
-    commitId: optionalId(raw.commitId, 'commitId'),
+    commitId,
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
     processedEventIds,
