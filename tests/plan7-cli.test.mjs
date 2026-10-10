@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { parseStrictControlJsonV1 } from '../companion/local-api/control-json.mjs';
+import { startAutopilotLocalApiLoopbackV1 } from '../companion/local-api/server.mjs';
 
 const here=dirname(fileURLToPath(import.meta.url));
 const cli=resolve(here,'../companion/local-api/cli.mjs');
@@ -108,4 +109,80 @@ test('strict control JSON rejects leading UTF-8 BOM before CLI network access an
   assert.equal((result.stderr + result.stdout).includes(secret), false);
   assert.deepEqual(parseStrictControlJsonV1(Buffer.from(CANONICAL_CLI_INPUT)),
     JSON.parse(CANONICAL_CLI_INPUT), 'clean JSON still parses after denial');
+});
+
+ 
+// End-to-end CLI -> loopback HTTP -> canonical programmatic-control fixture.
+// The fixture does not grant policy/effect rights or simulate a provider login.
+async function runRealLoopbackCli(port, requestId) {
+  const child = spawn(process.execPath, [cli], {
+    env: { ...process.env, AUTOPILOT_LOCAL_API_TOKEN: secret,
+      AUTOPILOT_LOCAL_API_PORT: String(port) },
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', bytes => { stdout += bytes.toString('utf8'); });
+  child.stderr.on('data', bytes => { stderr += bytes.toString('utf8'); });
+  const exit = new Promise((resolveExit, rejectExit) => {
+    child.once('error', rejectExit);
+    child.once('close', (code, signal) => resolveExit({ code, signal, stdout, stderr }));
+  });
+  child.stdin.end(JSON.stringify({ ...JSON.parse(CANONICAL_CLI_INPUT), requestId }));
+  return exit;
+}
+
+test('CLI reports canonical Core REJECTED as exit 2, then a fresh COMPLETED returns exit 0', async () => {
+  const seen = { scopes: 0, dispatches: 0 };
+  const at = '2026-10-08T11:02:00.000Z';
+  const server = await startAutopilotLocalApiLoopbackV1({
+    token: secret,
+    dependencies: {
+      now() { return Date.parse(at); },
+      resolveTrustedScope({ request }) {
+        seen.scopes++;
+        return {
+          schemaVersion: 1, scopeRevisionId: 'core-scope-revision-1',
+          requestId: request.requestId, principalId: request.principalId,
+          projectId: request.projectId, operation: request.operation,
+          targetId: request.targetId, payloadArtifactId: null, payloadSha256: null,
+          allowed: true, verifiedAt: '2026-10-08T11:01:00.000Z',
+          validThrough: '2026-10-08T11:05:00.000Z',
+        };
+      },
+      dispatchCanonicalControl({ request }) {
+        seen.dispatches++;
+        return {
+          schemaVersion: 1, requestId: request.requestId,
+          projectId: request.projectId, operation: request.operation,
+          dispatchId: 'core-dispatch-' + seen.dispatches,
+          status: request.requestId === 'cli-core-rejected' ? 'REJECTED' : 'COMPLETED',
+          resultArtifactRef: null, observedAt: at,
+        };
+      },
+    },
+  });
+  try {
+    const port = server.address().port;
+    const rejected = await runRealLoopbackCli(port, 'cli-core-rejected');
+    assert.equal(rejected.signal, null);
+    assert.equal(rejected.code, 2, 'a rejected canonical outcome is not a successful shell action');
+    assert.equal(rejected.stderr, '');
+    const rejectedReceipt = JSON.parse(rejected.stdout);
+    assert.equal(rejectedReceipt.status, 'RECEIVED', 'transport did receive Core evidence');
+    assert.equal(rejectedReceipt.result.receipt.status, 'REJECTED');
+    assert.equal(rejectedReceipt.result.executionAuthorized, false);
+    const completed = await runRealLoopbackCli(port, 'cli-core-completed');
+    assert.equal(completed.signal, null);
+    assert.equal(completed.code, 0, 'a separate verified completed Core response stays compatible');
+    assert.equal(completed.stderr, '');
+    const completedReceipt = JSON.parse(completed.stdout);
+    assert.equal(completedReceipt.status, 'RECEIVED');
+    assert.equal(completedReceipt.result.receipt.status, 'COMPLETED');
+    assert.deepEqual(seen, { scopes: 2, dispatches: 2 });
+    assert.equal((rejected.stderr + completed.stderr).includes(secret), false);
+  } finally {
+    await new Promise((resolveClose, rejectClose) =>
+      server.close(error => error ? rejectClose(error) : resolveClose()));
+  }
 });
