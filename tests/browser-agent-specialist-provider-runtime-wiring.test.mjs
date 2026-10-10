@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { normalizeSpecialistSelectionV1 } from '../src/core/specialist-registry.js';
 
 test('service worker composes one trusted durable Specialist readiness path', async () => {
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
@@ -92,5 +93,46 @@ test('service worker composes one trusted durable Specialist readiness path', as
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
     0,
     'service worker must not own a second Browser Agent persistence implementation',
+  );
+});
+
+
+test('service worker refuses getter-backed Specialist selection before provider config lookup', async () => {
+  const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
+  assert.match(source, /import \{ normalizeSpecialistSelectionV1 \} from '\.\.\/core\/specialist-registry\.js'/u);
+  const match = source.match(
+    /const specialistProviderReadinessResolver = Object\.freeze\(\{\s*async resolve\(selectionInput\) \{([\s\S]*?)\n  \},\s*async assertCurrent/u,
+  );
+  assert.ok(match, 'one canonical service-worker Specialist resolver entrypoint must exist');
+  const body = match[1];
+  const normalized = body.indexOf('normalizeSpecialistSelectionV1(selectionInput)');
+  const identity = body.indexOf('selection.providerId');
+  const providerRead = body.indexOf('getSpecialistProviderConfig');
+  assert.ok(normalized >= 0 && normalized < identity && identity < providerRead,
+    'validate the entire caller selection before provider ID lookup or provider config I/O');
+  assert.doesNotMatch(body, /selectionInput\?\.|selectionInput\.providerId/u);
+
+  let getterReads = 0;
+  const getterSelection = { schemaVersion: 1 };
+  Object.defineProperty(getterSelection, 'providerId', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      throw new Error('SECRET_SELECTION_GETTER_MUST_NOT_EXECUTE');
+    },
+  });
+  assert.throws(
+    () => normalizeSpecialistSelectionV1(getterSelection),
+    e => !e.message.includes('SECRET_SELECTION_GETTER_MUST_NOT_EXECUTE'),
+  );
+  assert.equal(getterReads, 0);
+
+  const hostileProxy = new Proxy({ schemaVersion: 1 }, {
+    ownKeys() { throw new Error('SECRET_REFLECTION_20261010'); },
+  });
+  assert.throws(
+    () => normalizeSpecialistSelectionV1(hostileProxy),
+    e => /cannot be inspected safely/u.test(e.message)
+      && !e.message.includes('SECRET_REFLECTION_20261010'),
   );
 });
