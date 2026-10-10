@@ -360,3 +360,119 @@ export async function assessRemoteSteeringCommandV1(input, options = undefined) 
     requiresCanonicalControlEpochRecheck: true,
   });
 }
+
+// The canonical job store remains the ONLY policy, deduplication and state
+// transition authority. This adapter performs no in-memory deduplication,
+// durable writes, or remote-device credential verification of its own.
+const RUNTIME_OPTIONS_KEYS = new Set([
+  'assessmentAt', 'resolveCurrentSnapshot', 'atomicAuthenticateAuthorizeAndCommit',
+  'readDurableReceipt',
+]);
+const DURABLE_RECEIPT_KEYS = new Set([
+  'schemaVersion', 'commandId', 'commandFingerprint', 'jobId', 'planId',
+  'sourcePrincipalId', 'sourceDeviceId', 'policyEnvelopeId',
+  'expectedControlEpoch', 'outcome', 'authenticated', 'policyRechecked',
+  'controlEpochRechecked', 'durablyDeduplicated', 'persisted',
+]);
+const DURABLE_OUTCOMES = new Set(['APPLIED', 'ALREADY_APPLIED']);
+
+function validateDurableRemoteReceipt(receiptInput, prepared) {
+  const receipt = snapshotRecord(
+    receiptInput, 'CanonicalRemoteSteeringDurableReceiptV1', DURABLE_RECEIPT_KEYS,
+  );
+  requireSchemaVersion(receipt.schemaVersion, 'CanonicalRemoteSteeringDurableReceiptV1');
+  const fields = [
+    ['commandId', prepared.commandId],
+    ['commandFingerprint', prepared.commandFingerprint],
+    ['jobId', prepared.jobId],
+    ['planId', prepared.planId],
+    ['sourcePrincipalId', prepared.sourcePrincipalId],
+    ['sourceDeviceId', prepared.sourceDeviceId],
+    ['policyEnvelopeId', prepared.policyEnvelopeId],
+    ['expectedControlEpoch', prepared.controlEpoch],
+  ];
+  for (const [key, expected] of fields) {
+    if (receipt[key] !== expected) {
+      throw new Error('canonical remote steering durable receipt identity mismatch: ' + key);
+    }
+  }
+  if (!DURABLE_OUTCOMES.has(receipt.outcome)
+      || receipt.authenticated !== true
+      || receipt.policyRechecked !== true
+      || receipt.controlEpochRechecked !== true
+      || receipt.durablyDeduplicated !== true
+      || receipt.persisted !== true) {
+    throw new Error('canonical remote steering durable receipt lacks authenticated atomic policy/epoch/dedup evidence');
+  }
+  return Object.freeze({
+    schemaVersion: REMOTE_STEERING_SCHEMA_VERSION,
+    status: 'CANONICAL_DURABLE_READBACK',
+    commandId: prepared.commandId,
+    commandFingerprint: prepared.commandFingerprint,
+    jobId: prepared.jobId,
+    planId: prepared.planId,
+    controlEpoch: prepared.controlEpoch,
+    outcome: receipt.outcome,
+    readbackVerified: true,
+    // Execution/effect authority belongs exclusively to the canonical runtime.
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    requiresCanonicalRuntime: true,
+  });
+}
+
+/**
+ * A thin bridge to the existing canonical durable job transaction.
+ * atomicAuthenticateAuthorizeAndCommit MUST reauthenticate the device/session
+ * and check principal revocation, fresh policy, job revision, control epoch,
+ * command idempotency and state transition in ONE canonical transaction.
+ * A failed or ambiguous commit must never be retried automatically.
+ */
+export async function submitRemoteSteeringViaCanonicalRuntimeV1(input, options) {
+  const trusted = snapshotRecord(options, 'Remote steering runtime options', RUNTIME_OPTIONS_KEYS);
+  for (const callback of [
+    'resolveCurrentSnapshot', 'atomicAuthenticateAuthorizeAndCommit', 'readDurableReceipt',
+  ]) {
+    if (typeof trusted[callback] !== 'function') {
+      throw new Error('remote steering runtime requires trusted ' + callback);
+    }
+  }
+  const assessmentAt = requireTimestamp(trusted.assessmentAt, 'Remote steering runtime assessmentAt');
+  const prepared = await assessRemoteSteeringCommandV1(input, {
+    assessmentAt,
+    resolveCurrentSnapshot: trusted.resolveCurrentSnapshot,
+  });
+  // The legacy epoch-less contract remains advisory-only, never executable.
+  if (!prepared.controlEpochBound) {
+    throw new Error('remote steering canonical execution requires control-epoch binding');
+  }
+  const transaction = Object.freeze({
+    commandId: prepared.commandId,
+    commandFingerprint: prepared.commandFingerprint,
+    action: prepared.action,
+    jobId: prepared.jobId,
+    planId: prepared.planId,
+    expectedJobRevision: prepared.jobRevision,
+    expectedPlanRevision: prepared.planRevision,
+    expectedControlEpoch: prepared.controlEpoch,
+    policyEnvelopeId: prepared.policyEnvelopeId,
+    sourcePrincipalId: prepared.sourcePrincipalId,
+    sourceDeviceId: prepared.sourceDeviceId,
+    sourceSessionId: prepared.sourceSessionId,
+    expiresAt: prepared.expiresAt,
+    redirectTarget: prepared.redirectTarget,
+    requireAtomicAuthentication: true,
+    requireFreshPolicy: true,
+    requireExactEpochRecheck: true,
+    requireDurableDeduplication: true,
+  });
+  // Do not try to infer success from the command callback's response.
+  // Only readback from the same canonical persisted command ledger counts.
+  await trusted.atomicAuthenticateAuthorizeAndCommit(transaction);
+  const receipt = await trusted.readDurableReceipt(Object.freeze({
+    jobId: transaction.jobId,
+    planId: transaction.planId,
+    commandId: transaction.commandId,
+  }));
+  return validateDurableRemoteReceipt(receipt, prepared);
+}
