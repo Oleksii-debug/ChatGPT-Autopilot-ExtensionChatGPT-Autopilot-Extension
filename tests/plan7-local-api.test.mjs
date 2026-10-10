@@ -198,6 +198,24 @@ test('bad media and oversized declared payload reject before owner credentials, 
         schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE',
       });
     }
+    // A raw HTTP client can omit Content-Type altogether; Fetch normally
+    // synthesizes text/plain for string bodies. Verify missing media type is
+    // rejected before owner secret lookup as well.
+    const missingMedia = await new Promise((resolve, reject) => {
+      const raw = httpRequest({
+        hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + TOKEN,
+          'Content-Length': String(Buffer.byteLength(validBody)),
+        },
+      }, res => {
+        res.resume();
+        res.once('end', () => resolve(res.statusCode));
+      });
+      raw.once('error', reject);
+      raw.end(validBody);
+    });
+    assert.equal(missingMedia, 415);
     const oversized = await fetch(endpoint, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
