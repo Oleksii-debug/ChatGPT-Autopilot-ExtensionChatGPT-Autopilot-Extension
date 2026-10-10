@@ -846,7 +846,7 @@ test('vision coordinate click is allowed only for the screenshot turn and stays 
     /requires a screenshot attached to this exact reasoning turn/,
   );
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
-  assert.deepEqual(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 400.25, y: 250.75 }), vision), { type: 'click_at', x: 400.3, y: 250.8 });
+  assert.deepEqual(parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 400.25, y: 250.75 }), vision), { type: 'click_at', x: 400.25, y: 250.75 });
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'click_at', x: 1000, y: 250 }), vision),
     /outside the current visible viewport/,
@@ -872,7 +872,7 @@ test('vision coordinate drag is screenshot-turn-only, viewport-bounded and alway
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
   assert.deepEqual(
     parseBrowserAgentAction(JSON.stringify({ type: 'drag_at', startX: 100.25, startY: 100.75, endX: 500.15, endY: 300.85, durationMs: 700 }), vision),
-    { type: 'drag_at', startX: 100.3, startY: 100.8, endX: 500.2, endY: 300.9, durationMs: 700 },
+    { type: 'drag_at', startX: 100.25, startY: 100.75, endX: 500.15, endY: 300.85, durationMs: 700 },
   );
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'drag_at', startX: 100, startY: 100, endX: 1000, endY: 300 }), vision),
@@ -900,11 +900,11 @@ test('vision coordinate typing is screenshot-turn-only and visual-only targets r
   const vision = { ...base, visionAttached: true, visionViewport: { width: 1000, height: 600 } };
   assert.deepEqual(
     parseBrowserAgentAction(JSON.stringify({ type: 'type_at', x: 400.25, y: 250.75, text: 'Course note' }), vision),
-    { type: 'type_at', x: 400.3, y: 250.8, text: 'Course note' },
+    { type: 'type_at', x: 400.25, y: 250.75, text: 'Course note' },
   );
   assert.throws(
     () => parseBrowserAgentAction(JSON.stringify({ type: 'type_at', x: 400, y: 250, text: '' }), vision),
-    /requires non-empty text/,
+    /requires bounded non-empty text/,
   );
   const semantic = { type: 'type_at', x: 10, y: 10, text: 'A', coordinateTarget: { tag: 'textarea', name: 'Note', editable: true, sensitive: false, visualOnly: false } };
   const visual = { type: 'type_at', x: 20, y: 20, text: 'A', coordinateTarget: { tag: 'div', name: 'Custom editor', editable: false, sensitive: false, visualOnly: true } };
@@ -1542,7 +1542,10 @@ test('INTERVAL completion schedules the next autonomous cycle instead of ending 
 });
 
 test('planner parser accepts bounded fill/select/check batch and rejects invented refs', () => {
-  const snapshot = { frames: [{ frameId: 0, elements: [{ ref: 'r1' }, { ref: 'r2' }] }] };
+  const snapshot = { frames: [{ frameId: 0, url: 'https://ais.example.edu/app', elements: [
+    { ref: 'r1', tag: 'input', name: 'A', semanticIdentity: 'input-a-v1' },
+    { ref: 'r2', tag: 'select', name: 'B', semanticIdentity: 'select-b-v1' },
+  ] }] };
   const action = parseBrowserAgentAction(JSON.stringify({ type: 'batch', actions: [
     { type: 'fill', frameId: 0, ref: 'r1', text: 'A' },
     { type: 'select', frameId: 0, ref: 'r2', value: 'B' },
