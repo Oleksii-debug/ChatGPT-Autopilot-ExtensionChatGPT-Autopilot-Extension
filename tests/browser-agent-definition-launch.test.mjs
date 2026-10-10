@@ -297,7 +297,7 @@ test('definition launch request boundary is exact-shape, data-only and zero-gett
   });
   await assert.rejects(
     () => manager.createFromAgentDefinition(hostile),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(reads, 0);
 
@@ -348,7 +348,7 @@ test('nested launch authority rejects accessors without executing them', async (
       jobId: 'job.nested-getter',
       ownerBudget: budget,
     })),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(reads, 0);
 });
@@ -442,7 +442,7 @@ test('Plan-1: direct prompt-first intake rejects getter-backed policy and goal f
     enumerable: true,
     get() { invoked += 1; throw new Error('side-effect-secret'); },
   });
-  await assert.rejects(() => manager.create(hostile), /enumerable data property/);
+  await assert.rejects(() => manager.create(hostile), /enumerable (?:own )?data propert(?:y|ies)/);
   assert.equal(invoked, 0);
   assert.equal((await manager.get('job.direct-getter')).job, null);
 
@@ -552,7 +552,7 @@ test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects
   await assert.rejects(() => manager.create({
     id: 'job.site-getter', goal: 'Should not read owner policy getter.',
     siteRules: [accessorRule],
-  }), /enumerable data property/);
+  }), /enumerable (?:own )?data propert(?:y|ies)/);
 
   const decisions = {};
   Object.defineProperty(decisions, 'credentials', {
@@ -562,7 +562,7 @@ test('Plan-1: direct site-policy intake snapshots nested owner rules and rejects
   await assert.rejects(() => manager.create({
     id: 'job.decision-getter', goal: 'Should not invoke nested decision getter.',
     siteRules: [{ pattern: 'example.com', actionDecisions: decisions }],
-  }), /enumerable data property/);
+  }), /enumerable (?:own )?data propert(?:y|ies)/);
   assert.equal(invoked, 0, 'nested policy accessors must never run');
   assert.equal((await manager.get('job.site-getter')).job, null);
   assert.equal((await manager.get('job.decision-getter')).job, null);
@@ -668,7 +668,7 @@ test('Plan-1: direct job intake rejects unknown authority-bearing fields without
   });
   await assert.rejects(
     () => manager.create(getter),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(reads, 0);
   assert.deepEqual(Object.keys(data), [], 'no denied request may mutate durable storage');
@@ -810,7 +810,7 @@ test('Plan-1: hostile Outcome Contract admission fails closed before any durable
   });
   await assert.rejects(
     () => manager.create({ id: 'job.contract-getter', goal, outcomeContract: contract }),
-    /enumerable data property/,
+    /enumerable (?:own )?data propert(?:y|ies)/,
   );
   assert.equal(getterCalls, 0, 'untrusted getters must never be evaluated');
 
