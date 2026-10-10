@@ -15,7 +15,11 @@ test('service worker composes one trusted durable Specialist readiness path', as
   // resolver that issued the observation must repeat a harmless provider
   // health/identity probe before the existing durable admission boundary.
   assert.match(source, /specialistReadinessConfigProvenance\.set\(readiness,[\s\S]*?configSnapshot:[\s\S]*?resolver,/);
-  assert.match(source, /return provenance\.resolver\.assertCurrent\(readiness\)/);
+  assert.match(source, /await provenance\.resolver\.assertCurrent\(readiness\)/);
+  assert.match(
+    source,
+    /await provenance\.resolver\.assertCurrent\(readiness\)[\s\S]*?const afterProbe = await browserAgent\.getSpecialistProviderConfig\(provenance\.providerId\)[\s\S]*?changed during readiness revalidation/,
+  );
   assert.doesNotMatch(
     source,
     /Specialist provider config changed after readiness probe'[\s\S]{0,120}return true;/,
