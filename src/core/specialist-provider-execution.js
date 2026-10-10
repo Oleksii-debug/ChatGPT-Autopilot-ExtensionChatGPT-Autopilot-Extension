@@ -125,8 +125,12 @@ function deriveStatus({
   errorCode,
 }) {
   if (reconciliationRequired) {
-    if (safeToRetry || !errorCode) {
-      throw new Error('Reconciliation outcome requires non-retryable canonical errorCode');
+    // Ambiguous provider effects cannot simultaneously certify success,
+    // terminal status, manual acceptance, or trustworthy effect evidence.
+    // Reconciliation is evidence of uncertainty, not proof of completion.
+    if (safeToRetry || !errorCode || providerSucceeded || manualReviewRequired
+        || effectEvidence || TERMINAL.has(providerStatus)) {
+      throw new Error('Reconciliation outcome requires non-retryable, non-terminal canonical evidence');
     }
     return SpecialistProviderExecutionStatus.RECONCILE;
   }
@@ -313,6 +317,7 @@ export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcome
   // Reconciliation or a genuinely new attempt belongs to the existing canonical
   // effect/lease authority, never an overwrite of this historical record.
   if (current.status === SpecialistProviderExecutionStatus.RECONCILE
+      || current.status === SpecialistProviderExecutionStatus.BLOCKED_FAILURE
       || current.status === SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED
       || current.status === SpecialistProviderExecutionStatus.PROVIDER_FAILED) {
     return current;
