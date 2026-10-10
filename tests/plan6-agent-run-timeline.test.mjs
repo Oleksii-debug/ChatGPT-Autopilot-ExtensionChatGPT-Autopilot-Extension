@@ -1308,6 +1308,9 @@ test('S1 failed Core timeline refresh prevents stale evidence export until accep
   // cross-Agent JSON export is rightly rejected by the identity fence.
   nextRead = async () => {
     ui.selectedBrowserAgentId = acceptedJob.id;
+    // Emulate the real loadBrowserAgentJobs acceptance path, which restores
+    // freshness only after an accepted Core read and no active owner command.
+    ui.agentTimelineStale = false;
     return { applied: true, job: acceptedJob };
   };
   await refreshAgentRunTimeline();
