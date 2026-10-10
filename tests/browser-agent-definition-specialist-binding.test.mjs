@@ -112,7 +112,7 @@ function launch(overrides = {}) {
 }
 
 
-test('11.x registry admission rejects obsolete binding-key aliases before durable mutation', async () => {
+test('11.x registry admission rejects forged expected bindingKey before durable mutation', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
@@ -124,7 +124,7 @@ test('11.x registry admission rejects obsolete binding-key aliases before durabl
       kind: AgentDefinitionRegistryMutationKind.CREATE,
       definition: definition(),
     }),
-    /unknown field/,
+    /registry bindingKey drifted before mutation/,
   );
   const after = await manager.getAgentDefinitionRegistry('agents:project-1');
   assert.equal(after.registry.revision, 1);
