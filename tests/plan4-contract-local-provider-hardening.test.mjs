@@ -1775,3 +1775,42 @@ test('Plan4 S1 requires complete identity receipts for endpoint-bound provider d
   assert.equal(response.routing.selectedRouteId,'account.bound');
   assert.equal(sends,1);
 });
+
+test('Plan4 S1: direct gateway dispatch never aliases provider/model identities after cold restart', async () => {
+  let outbound = 0;
+  const sent = [];
+  const gateway = new AiGatewayClient({fetchFn:async (url, init) => {
+    outbound += 1;
+    sent.push({url, body:init.body});
+    return {
+      ok:true, status:200, headers:{get:()=>null},
+      text:async () => JSON.stringify({text:'verified',models:[]}),
+    };
+  }});
+  const base = {provider:'ollama',model:'namespace/model:v1',prompt:'approved fixture'};
+  const invalidIds = [null, undefined, 7, false, {}, [], new String('ollama'),
+    '', ' ', ' ollama', 'ollama ', '\tollama', 'ollama\n', 'x'.repeat(81)];
+  for (const invalid of invalidIds) {
+    for (const persisted of [false, true]) {
+      const value = persisted ? JSON.parse(JSON.stringify(invalid)) : invalid;
+      await assert.rejects(gateway.complete({...base,provider:value}), /AI provider must be an exact bounded identity/);
+      await assert.rejects(gateway.listModels({provider:value}), /AI provider must be an exact bounded identity/);
+    }
+  }
+  for (const invalid of [null, undefined, 7, false, {}, [], new String('model'),
+    '', ' ', ' name', 'name ', 'model\t', 'model\n', 'x'.repeat(301)]) {
+    for (const persisted of [false, true]) {
+      const value = persisted ? JSON.parse(JSON.stringify(invalid)) : invalid;
+      await assert.rejects(gateway.complete({...base,model:value}), /AI model must be an exact bounded identity/);
+    }
+  }
+  assert.equal(outbound,0,'invalid provider/model identities cannot reach the network');
+  const restarted = JSON.parse(JSON.stringify(base));
+  const completion = await gateway.complete(restarted);
+  await gateway.listModels({provider:restarted.provider});
+  assert.equal(completion.text,'verified');
+  assert.equal(outbound,2);
+  assert.equal(JSON.parse(sent[0].body).provider,restarted.provider);
+  assert.equal(JSON.parse(sent[0].body).model,restarted.model);
+  assert.match(sent[1].url,/provider=ollama/);
+});
