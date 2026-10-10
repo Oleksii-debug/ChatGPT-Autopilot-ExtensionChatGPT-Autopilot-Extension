@@ -37,10 +37,10 @@ test('Plan-1 S1: artifact location identity survives JSON restart without whites
   const hostile = [
     ' ' + canonical.uri,
     canonical.uri + ' ',
-    '\\t' + canonical.uri,
-    canonical.uri + '\\n',
-    canonical.uri + '\\u0000',
-    canonical.uri + '\\u007f',
+    '\t' + canonical.uri,
+    canonical.uri + '\n',
+    canonical.uri + '\u0000',
+    canonical.uri + '\u007f',
     '',
     null,
     undefined,
@@ -51,7 +51,7 @@ test('Plan-1 S1: artifact location identity survives JSON restart without whites
     const bad = { ...canonical, uri: value };
     assert.throws(() => normalizeArtifactRefV1(bad), error => {
       assert.match(error.message, /uri must be an exact canonical artifact location/);
-      assert.doesNotMatch(error.message, /job-1\\/report/);
+      assert.doesNotMatch(error.message, /job-1\/report/);
       return true;
     }, 'corrupt artifact locations must fail closed rather than change on restart');
     assert.throws(() => normalizeObservationV1({
