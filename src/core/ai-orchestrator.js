@@ -502,9 +502,13 @@ export class AiOrchestrator {
         // must have every exact identity before any potentially billable I/O.
         for (const field of ['routeId', 'provider', 'model', 'endpointId']) {
           let binding = null;
-          try { binding = Object.getOwnPropertyDescriptor(reservation, field); } catch { /* invalid binding */ }
-          if (!binding && !routeIdentity.endpointId) continue;
-          if (!binding || !Object.hasOwn(binding, 'value') || binding.value !== routeIdentity[field]) {
+          let reflectionFailed = false;
+          try { binding = Object.getOwnPropertyDescriptor(reservation, field); }
+          catch { reflectionFailed = true; }
+          // Genuine omission is legacy-compatible only on an unbound local
+          // route. A Proxy trap is *not* omission and cannot authorize I/O.
+          if (!binding && !reflectionFailed && !routeIdentity.endpointId) continue;
+          if (reflectionFailed || !binding || !Object.hasOwn(binding, 'value') || binding.value !== routeIdentity[field]) {
             const mismatch = new Error('Model-budget reservation does not match the authorized route');
             mismatch.code = 'AI_MODEL_BUDGET_RECEIPT_ROUTE_MISMATCH';
             throw mismatch;
