@@ -313,11 +313,14 @@ export function createCloudWorkspaceBindingV1(
   if (ownership.state !== ExecutionOwnershipState.OWNED || ownership.ownerPlane !== 'CLOUD') {
     throw new Error('cloud workspace binding requires a currently OWNED CLOUD execution lease');
   }
-  if (Date.parse(assessedAt) > Date.parse(ownership.leaseUntil)) {
+  if (Date.parse(assessedAt) >= Date.parse(ownership.leaseUntil)) {
     throw new Error('cloud workspace binding requires a live execution lease');
   }
   if (!sameExecutionIdentity(observation, ownership)) {
     throw new Error('cloud workspace observation does not match canonical execution ownership');
+  }
+  if (Date.parse(observation.observedAt) < Date.parse(ownership.updatedAt)) {
+    throw new Error('cloud workspace observation predates canonical ownership revision');
   }
   if (observation.health !== CloudWorkspaceHealth.READY) {
     throw new Error('cloud workspace binding requires READY workspace health');
@@ -362,6 +365,9 @@ export function assessCloudWorkspaceContinuityV1(
   const ownership = normalizeExactExecutionOwnershipV1(executionOwnershipInput);
   const assessedAt = optionAt(options, 'Cloud workspace continuity options');
 
+  if (Date.parse(binding.boundAt) > Date.parse(assessedAt)) {
+    return assessment(CloudWorkspaceContinuityStatus.BLOCKED, 'BINDING_FROM_FUTURE', binding, ownership, assessedAt);
+  }
   if (ownership.state === ExecutionOwnershipState.RECONCILE
       || ownership.state === ExecutionOwnershipState.MANUAL_REVIEW) {
     return assessment(
@@ -390,7 +396,7 @@ export function assessCloudWorkspaceContinuityV1(
       assessedAt,
     );
   }
-  if (Date.parse(assessedAt) > Date.parse(ownership.leaseUntil)) {
+  if (Date.parse(assessedAt) >= Date.parse(ownership.leaseUntil)) {
     return assessment(
       CloudWorkspaceContinuityStatus.RECONCILE_REQUIRED,
       'EXECUTION_LEASE_EXPIRED',
@@ -421,6 +427,7 @@ export function assessCloudWorkspaceContinuityV1(
     );
   }
   if (Date.parse(observation.observedAt) < Date.parse(binding.baselineObservedAt)
+      || Date.parse(observation.observedAt) < Date.parse(ownership.updatedAt)
       || Date.parse(observation.observedAt) > Date.parse(assessedAt)) {
     return assessment(
       CloudWorkspaceContinuityStatus.BLOCKED,
