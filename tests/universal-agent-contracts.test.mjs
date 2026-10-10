@@ -1554,3 +1554,56 @@ test('Plan-1 S1: persisted evidence-list presence cannot silently erase verifica
     assert.deepEqual(normalize(JSON.parse(JSON.stringify(valid))), valid);
   }
 });
+
+
+test('Plan-1 S1: duplicate evidence and credential identities fail closed across JSON restart', () => {
+  const duplicateArtifact = artifact({ artifactId: 'artifact-secret-identity' });
+  const observation = {
+    schemaVersion: 1,
+    observationId: 'observation-dedup',
+    invocationId: 'invoke-1',
+    status: ObservationStatus.OK,
+    artifactRefs: [duplicateArtifact, { ...duplicateArtifact, sha256: 'b'.repeat(64) }],
+    observedAt: AT,
+  };
+  const handoff = {
+    schemaVersion: 1,
+    handoffId: 'handoff-dedup',
+    specialistId: 'specialist-1',
+    goal: 'Continue owner-approved work',
+    requestedCapabilityIds: ['filesystem.read'],
+    artifactRefs: observation.artifactRefs,
+    credentialRefs: [credential(), { ...credential(), scope: ['drive.readonly'] }],
+    createdAt: AT,
+  };
+  for (const candidate of [observation, JSON.parse(JSON.stringify(observation))]) {
+    assert.throws(
+      () => normalizeObservationV1(candidate),
+      error => /artifactRefs contains duplicate durable identities/.test(error.message)
+        && !error.message.includes('artifact-secret-identity'),
+    );
+  }
+  for (const candidate of [handoff, JSON.parse(JSON.stringify(handoff))]) {
+    assert.throws(() => normalizeSpecialistHandoffV1(candidate), /artifactRefs contains duplicate durable identities/);
+    const distinctArtifacts = {
+      ...candidate,
+      artifactRefs: [artifact({ artifactId: 'artifact-a' }), artifact({ artifactId: 'artifact-b' })],
+    };
+    assert.throws(
+      () => normalizeSpecialistHandoffV1(distinctArtifacts),
+      /credentialRefs contains duplicate durable identities/,
+    );
+  }
+  const valid = normalizeSpecialistHandoffV1({
+    ...handoff,
+    artifactRefs: [artifact({ artifactId: 'artifact-a' }), artifact({ artifactId: 'artifact-b' })],
+    credentialRefs: [credential({ credentialId: 'cred-a' }), credential({ credentialId: 'cred-b' })],
+  });
+  assert.deepEqual(
+    normalizeSpecialistHandoffV1(JSON.parse(JSON.stringify(valid))),
+    valid,
+    'distinct durable identities must survive a cold JSON restart',
+  );
+  assert.ok(Object.isFrozen(valid.artifactRefs));
+  assert.ok(Object.isFrozen(valid.credentialRefs));
+});
