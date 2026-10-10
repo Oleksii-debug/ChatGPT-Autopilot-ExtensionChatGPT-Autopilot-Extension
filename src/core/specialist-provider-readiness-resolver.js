@@ -270,6 +270,14 @@ export class SpecialistProviderReadinessResolverV1 {
     const selection = this.#selectionByReadiness.get(readiness);
     if (!selection) throw new Error('Readiness observation lacks trusted resolver provenance');
     const current = await this.resolve(selection);
+    // A later trusted re-probe cannot move causally behind the original
+    // observation. Equal facts after a wall-clock rollback are not proof
+    // of renewed provider readiness; require monotonic fresh evidence.
+    // These timestamps are canonical ISO-8601 UTC, so lexical order is exact.
+    if (current.resolvedAt < readiness.resolvedAt
+        || current.observedAt < readiness.observedAt) {
+      throw new Error('Trusted provider readiness revalidation moved backwards');
+    }
     if (!current.executable || current.readiness !== readiness.readiness
         || current.providerId !== readiness.providerId
         || current.registryRevision !== readiness.registryRevision
