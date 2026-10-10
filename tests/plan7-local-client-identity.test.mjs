@@ -45,7 +45,7 @@ async function attempt(response) {
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => {
       invocations += 1;
-      return { ok: true, json: async () => response };
+      return { ok: true, status: 200, json: async () => response };
     },
   });
   const result = await client.control(BASE);
@@ -103,7 +103,7 @@ test('payload reference needs exact size, sensitivity, provenance, and digest', 
   const client = createAutopilotLocalClientV1({
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => ({
-      ok: true, json: async () => {
+      ok: true, status: 200, json: async () => {
         const malicious = transportResponse({
           operation: request.operation, payloadArtifactRef: { ...artifact, sensitive: false },
         }, { operation: request.operation });
@@ -124,7 +124,7 @@ test('response identity is bound to serialized wire bytes despite caller TOCTOU 
       invocations += 1;
       sentProject = JSON.parse(options.body).projectId;
       request.projectId = 'foreign-project';
-      return { ok: true, json: async () => transportResponse({ projectId: 'foreign-project' },
+      return { ok: true, status: 200, json: async () => transportResponse({ projectId: 'foreign-project' },
         { projectId: 'foreign-project' }) };
     },
   });
@@ -271,7 +271,7 @@ test('SDK serializes only canonical request fields and preserves wire-bound iden
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async (_url, options) => {
       seen.push(JSON.parse(options.body));
-      return { ok: true, json: async () => transportResponse() };
+      return { ok: true, status: 200, json: async () => transportResponse() };
     },
   });
   const request = { ...BASE };
@@ -296,7 +296,7 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
     token: 'test-only-'.repeat(5), port: 12345,
     fetchImpl: async () => {
       networkCalls += 1;
-      return { ok: true, json: async () => {
+      return { ok: true, status: 200, json: async () => {
         const reply = transportResponse({ operation: original.operation, targetId: original.targetId,
           payloadArtifactRef: { ...artifact } }, { operation: original.operation });
         Object.assign(reply.result.scopeProof, {
@@ -334,7 +334,7 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
     });
     const attempt = createAutopilotLocalClientV1({
       token: 'test-only-'.repeat(5), port: 12345,
-      fetchImpl: async () => ({ ok: true, json: async () => reply }),
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => reply }),
     });
     const result = await attempt.control(original);
     assert.equal(result.status, 'UNKNOWN_NETWORK_RESULT', shape);
@@ -403,7 +403,7 @@ test('SDK deadline refuses late transport completion even when fetch ignores Abo
       calls += 1;
       signal = options.signal;
       return new Promise(resolve => setTimeout(
-        () => resolve({ ok: true, json: async () => transportResponse() }), 250,
+        () => resolve({ ok: true, status: 200, json: async () => transportResponse() }), 250,
       ));
     },
   });
@@ -420,7 +420,7 @@ test('SDK deadline covers slow JSON body after early HTTP headers', async () => 
     fetchImpl: async () => {
       calls += 1;
       return {
-        ok: true,
+        ok: true, status: 200,
         json: () => new Promise(resolve => setTimeout(() => resolve(transportResponse()), 250)),
       };
     },
@@ -497,4 +497,164 @@ test('SDK rejects noncanonical bearer characters at construction before any tran
   assert.doesNotThrow(() => createAutopilotLocalClientV1({
     token: 'test-only-'.repeat(5), port: 12345, fetchImpl: attemptedFetch,
   }), 'existing valid Companion tokens remain compatible');
+});
+
+test('owner-managed SDK bearer rotates per call without caching stale credentials', async () => {
+  let current = 'first-owner-token-'.repeat(3);
+  let resolutions = 0;
+  const sent = [];
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => { resolutions += 1; return current; },
+    port: 12345,
+    fetchImpl: async (_, options) => {
+      sent.push(options.headers.Authorization);
+      return { ok: true, status: 200, json: async () => transportResponse() };
+    },
+  });
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  current = 'rotated-owner-token-'.repeat(3);
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(resolutions, 2);
+  assert.deepEqual(sent, [
+    'Bearer ' + 'first-owner-token-'.repeat(3),
+    'Bearer ' + 'rotated-owner-token-'.repeat(3),
+  ]);
+});
+
+test('owner-token resolver fails closed before networking and recovers on next call', async () => {
+  let value = null;
+  let sent = 0;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => value,
+    port: 12345,
+    fetchImpl: async () => {
+      sent += 1;
+      return { ok: true, status: 200, json: async () => transportResponse() };
+    },
+  });
+  await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
+  assert.equal(sent, 0);
+  value = 'new-owner-secret-'.repeat(3);
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(sent, 1);
+  assert.throws(() => createAutopilotLocalClientV1({
+    token: value, tokenProvider: () => value, port: 12345,
+  }), /never both/u);
+  assert.throws(() => createAutopilotLocalClientV1({
+    tokenProvider: 'not-a-provider', port: 12345,
+  }), /never both/u);
+});
+
+test('hung SDK owner-token lookup is bounded and cannot dispatch or become sticky', async () => {
+  let hanging = true;
+  let sent = 0;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: () => hanging
+      ? new Promise(() => {}) : 'restored-owner-secret-'.repeat(3),
+    port: 12345,
+    timeoutMs: 100,
+    fetchImpl: async () => {
+      sent += 1;
+      return { ok: true, status: 200, json: async () => transportResponse() };
+    },
+  });
+  await assert.rejects(client.control(BASE), /owner token unavailable before transmission/u);
+  assert.equal(sent, 0);
+  hanging = false;
+  assert.equal((await client.control(BASE)).status, 'RECEIVED');
+  assert.equal(sent, 1);
+});
+
+test('SDK one total deadline includes owner-token lookup and retains safe recovery', async () => {
+  const token = 'test-only-'.repeat(5);
+  let slow = true;
+  let calls = 0;
+  let lastSignal;
+  const client = createAutopilotLocalClientV1({
+    tokenProvider: async () => {
+      if (slow) await new Promise(resolve => setTimeout(resolve, 100));
+      return token;
+    },
+    port: 12345,
+    timeoutMs: 250,
+    fetchImpl: async (_url, { signal }) => {
+      calls += 1;
+      lastSignal = signal;
+      if (slow) await new Promise(resolve => setTimeout(resolve, 190));
+      return { ok: true, status: 200, json: async () => transportResponse() };
+    },
+  });
+  const late = await client.control(BASE);
+  assert.equal(late.status, 'UNKNOWN_NETWORK_RESULT',
+    'owner lookup must consume the same budget as network and receipt parsing');
+  assert.equal(lastSignal.aborted, true,
+    'late uncooperative transport must be aborted even after owner lookup');
+  assert.equal(calls, 1, 'uncertain operation may never be retried automatically');
+  slow = false;
+  const recovered = await client.control(BASE);
+  assert.equal(recovered.status, 'RECEIVED', 'fresh request after timeout recovers');
+  assert.equal(recovered.result.receipt.status, 'COMPLETED');
+  assert.equal(calls, 2);
+});
+
+
+test('streamed SDK receipts reject excessive bytes, forged media, UTF-8 errors and recover', async () => {
+  const encode = text => new TextEncoder().encode(text);
+  const canonical = encode(JSON.stringify(transportResponse()));
+  // Stream deliberately has no Content-Length: size enforcement must count
+  // actual bytes, not trust headers or res.json() allocation behavior.
+  const streamReply = (bytes, headers = {}) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
+  const replies = [
+    streamReply(canonical, { 'Content-Type': 'text/html' }),
+    streamReply(canonical, { 'Content-Length': '999999999' }),
+    streamReply(new Uint8Array(262_145)),
+    streamReply(new Uint8Array([0xc3, 0x28])),
+    streamReply(encode('\uFEFF' + JSON.stringify(transportResponse()))),
+    streamReply(canonical),
+  ];
+  let transmissions = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345,
+    fetchImpl: async () => replies[transmissions++],
+  });
+  for (let i = 0; i < replies.length - 1; i += 1) {
+    const denied = await client.control(BASE);
+    assert.equal(denied.status, 'UNKNOWN_NETWORK_RESULT',
+      'malformed or unbounded transport receipt cannot become Core evidence');
+    assert.equal(denied.instruction.includes('Reconcile'), true);
+  }
+  const valid = await client.control(BASE);
+  assert.equal(valid.status, 'RECEIVED',
+    'fresh valid bounded JSON request must recover without cached denial');
+  assert.equal(valid.result.receipt.status, 'COMPLETED');
+  assert.equal(transmissions, replies.length, 'SDK must never blindly resend');
+});
+
+test('SDK total deadline covers a stalled streamed HTTP 200 body with clean recovery', async () => {
+  let transmissions = 0;
+  const client = createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, timeoutMs: 100,
+    fetchImpl: async () => {
+      transmissions += 1;
+      if (transmissions === 1) {
+        return new Response(new ReadableStream({ start() {} }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(transportResponse()), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+  const stalled = await client.control(BASE);
+  assert.equal(stalled.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(transmissions, 1);
+  const recovered = await client.control(BASE);
+  assert.equal(recovered.status, 'RECEIVED');
+  assert.equal(transmissions, 2);
 });
