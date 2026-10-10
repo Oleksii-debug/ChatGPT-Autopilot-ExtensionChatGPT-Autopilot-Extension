@@ -295,9 +295,14 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds: normalized.retryBackoffSeconds,
-    circuitBreakerFailures: normalized.circuitBreakerFailures,
-    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
+    // Omitted legacy failover fields inherit the parent Router authority;
+    // injecting default values here would silently weaken the parent fence.
+    ...(Object.hasOwn(raw, 'retryBackoffSeconds')
+      ? { retryBackoffSeconds: normalized.retryBackoffSeconds } : {}),
+    ...(Object.hasOwn(raw, 'circuitBreakerFailures')
+      ? { circuitBreakerFailures: normalized.circuitBreakerFailures } : {}),
+    ...(Object.hasOwn(raw, 'circuitBreakerSeconds')
+      ? { circuitBreakerSeconds: normalized.circuitBreakerSeconds } : {}),
   });
 }
 
