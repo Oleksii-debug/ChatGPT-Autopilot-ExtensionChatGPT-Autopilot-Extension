@@ -2506,6 +2506,16 @@ export class BrowserAgentManager {
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
         throw error;
       }
+      // The persisted owner per-call ceiling is also an admission fence:
+      // direct lifecycle callers must not bypass outputBudgetForCall().
+      if (Number.isSafeInteger(job.config.maxOutputTokensPerCall)
+          && job.config.maxOutputTokensPerCall > 0
+          && pendingOutputTokens > job.config.maxOutputTokensPerCall) {
+        const error = new Error('Browser Agent model call exceeds the owner per-call output ceiling');
+        error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+        error.safeBudgetReason = 'maximum per-call output-token budget reached';
+        throw error;
+      }
       const reason = this.budgetReason(job, {
         pendingInputTokens,
         pendingOutputTokens,
