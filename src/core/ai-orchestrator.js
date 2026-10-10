@@ -1,4 +1,5 @@
 import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js';
+import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 import {
   AiRouteRole,
   DEFAULT_AI_ROUTE_POLICY,
@@ -308,7 +309,8 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
+  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null,
+    routeQualityEvidenceResolver = null, routeQualityEvidenceTimeoutMs = 250 } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -317,9 +319,20 @@ export class AiOrchestrator {
     )) {
       throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
     }
+    if (routeQualityEvidenceResolver !== null && typeof routeQualityEvidenceResolver !== 'function') {
+      throw new Error('AI route quality evidence resolver must be a function');
+    }
+    if (typeof routeQualityEvidenceTimeoutMs !== 'number'
+        || !Number.isSafeInteger(routeQualityEvidenceTimeoutMs)
+        || Object.is(routeQualityEvidenceTimeoutMs, -0)
+        || routeQualityEvidenceTimeoutMs < 1 || routeQualityEvidenceTimeoutMs > 5000) {
+      throw new Error('AI route quality evidence timeout must be a whole number from 1 to 5000 milliseconds');
+    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
+    this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
+    this.routeQualityEvidenceTimeoutMs = routeQualityEvidenceTimeoutMs;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -458,7 +471,53 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      const requiresVision = Boolean(clean(imageDataUrl));
+      const selectFresh = () => selectAiRouteCandidates({
+        routes:settings.routes, policy:settings.routePolicy, routeStates,
+        role:requestedRole, capabilityIds, requiresVision, now:this.now(),
+      });
+      let selected = selectFresh();
+      // Quality evidence is advisory: refresh owner eligibility after async lookup.
+      if (this.routeQualityEvidenceResolver && settings.routePolicy.autoSwitch
+          && !settings.routePolicy.pinnedRouteId && selected.candidates.length > 1) {
+        const request = Object.freeze({
+          routeIds:Object.freeze(selected.candidates.map(route => route.routeId)),
+          role:requestedRole,
+          capabilityIds:Object.freeze([...capabilityIds]),
+          requiresVision,
+        });
+        let timer;
+        let evidence = null;
+        try {
+          evidence = await Promise.race([
+            Promise.resolve().then(() => this.routeQualityEvidenceResolver(request)),
+            new Promise(resolve => { timer = setTimeout(() => resolve(null), this.routeQualityEvidenceTimeoutMs); }),
+          ]);
+        } catch {
+          // No evidence never widens permissions or blocks canonical dispatch.
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
+        }
+        selected = selectFresh();
+        if (Array.isArray(evidence) && selected.candidates.length > 1) {
+          try {
+            const ranked = await rankAiRouteCandidatesByEvidenceV1({
+              routes:settings.routes, policy:settings.routePolicy, routeStates,
+              role:requestedRole, capabilityIds, requiresVision,
+              now:this.now(), benchmarkRequests:evidence,
+            });
+            const canonical = new Map(selected.candidates.map(route => [route.routeId, route]));
+            const reordered = ranked.rankedRouteIds
+              .filter(routeId => canonical.has(routeId))
+              .map(routeId => canonical.get(routeId));
+            if (reordered.length === selected.candidates.length) {
+              selected = { ...selected, candidates:reordered };
+            }
+          } catch {
+            // Invalid, expired, or untrusted evidence keeps canonical owner order.
+          }
+        }
+      }
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,
