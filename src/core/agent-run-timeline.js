@@ -258,7 +258,10 @@ function recordedSpecialistDispatchEvidence(runtime) {
   });
   const dispatches = record(own(runtime, 'specialistDispatchByAgentId'), 'Agent specialist dispatch map');
   const keys = safeOwnKeys(dispatches);
-  if (keys.length > 128 || keys.some(key => typeof key !== 'string' || !key || key.length > 180)) {
+  // The map keys are durable Agent identities, not arbitrary provider text.
+  // Reject forged/control-character identities before counting any attempt.
+  // Reuse the canonical ownership ID grammar; do not expose IDs in export.
+  if (keys.length > 128 || keys.some(key => typeof key !== 'string' || !RECORDED_OWNERSHIP_ID.test(key))) {
     throw new Error('Agent specialist dispatch map exceeds the bounded record schema');
   }
   const statusCounts = { DISPATCHING: 0, FAILED_SAFE: 0, AMBIGUOUS: 0, PROVIDER_SUCCEEDED: 0 };
