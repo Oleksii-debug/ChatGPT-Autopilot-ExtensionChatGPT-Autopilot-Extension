@@ -1019,3 +1019,57 @@ test('duplicate JSON control member identities fail closed before canonical Core
       server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+
+test('Companion graceful shutdown prevents NEW Core dispatch after pending scope; restart remains healthy', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const canonical = dependencies(counters);
+  let enteredScope, allowScope;
+  const scopeEntered = new Promise(resolve => { enteredScope = resolve; });
+  const scopeGate = new Promise(resolve => { allowScope = resolve; });
+  const deps = {
+    now: canonical.now,
+    async resolveTrustedScope(lookup) {
+      enteredScope();
+      await scopeGate;
+      return canonical.resolveTrustedScope(lookup);
+    },
+    dispatchCanonicalControl: canonical.dispatchCanonicalControl,
+  };
+  const server = await startAutopilotLocalApiLoopbackV1({
+    token: TOKEN, dependencies: deps,
+  });
+  const client = createAutopilotLocalClientV1({
+    token: TOKEN, port: server.address().port,
+  });
+  // The owner initiates a graceful shutdown while the request is already
+  // authenticated and waiting for canonical scope, not after dispatch.
+  const pending = client.control(request('owner-close-pending-scope'));
+  await scopeEntered;
+  const closed = new Promise((resolve, reject) =>
+    server.close(error => error ? reject(error) : resolve()));
+  allowScope();
+  const outcome = await pending;
+  assert.equal(outcome.status, 'UNKNOWN_NETWORK_RESULT');
+  assert.equal(outcome.httpStatus, 503);
+  assert.deepEqual(counters, { scopes: 1, dispatches: 0 },
+    'closing Companion must not initiate any new Core work');
+  await closed;
+  // A subsequent opt-in Companion lifecycle may still accept an independent
+  // request using the same canonical Core authority; no cached denial state.
+  const recovered = await startAutopilotLocalApiLoopbackV1({
+    token: TOKEN, dependencies: canonical,
+  });
+  try {
+    const next = createAutopilotLocalClientV1({
+      token: TOKEN, port: recovered.address().port,
+    });
+    const receipt = await next.control(request('owner-close-restart-recovery'));
+    assert.equal(receipt.status, 'RECEIVED');
+    assert.equal(receipt.result.receipt.status, 'COMPLETED');
+    assert.deepEqual(counters, { scopes: 2, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) =>
+      recovered.close(error => error ? reject(error) : resolve()));
+  }
+});
