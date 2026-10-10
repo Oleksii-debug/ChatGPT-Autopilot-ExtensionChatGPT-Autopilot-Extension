@@ -54,9 +54,14 @@ export const DEFAULT_AI_WORKER_POLICY = Object.freeze({
 });
 
 function object(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
+  // A revoked/hostile Proxy can throw private text even during Array.isArray.
+  // Reject it without forwarding user-controlled reflection exception messages.
+  let plain = false;
+  try {
+    plain = Boolean(value && typeof value === 'object' && !Array.isArray(value)
+      && [Object.prototype, null].includes(Object.getPrototypeOf(value)));
+  } catch { plain = false; }
+  if (!plain) throw new Error(`${label} must be a plain data object`);
   return value;
 }
 function exact(value, allowed, label) {
@@ -72,12 +77,17 @@ function exact(value, allowed, label) {
 }
 function dataRecord(value, allowed, label) {
   object(value, label);
-  const keys = Reflect.ownKeys(value);
+  // A single own-descriptor snapshot prevents check/use drift; Proxy errors
+  // are fail-closed and never exposed as route or credential diagnostics.
+  let descriptors;
+  try { descriptors = Object.getOwnPropertyDescriptors(value); }
+  catch { throw new Error(`${label} fields are not inspectable own data`); }
+  const keys = Reflect.ownKeys(descriptors);
   const out = Object.create(null);
   for (const key of keys) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label} field must be an enumerable own data property: ${key}`);
     }
@@ -91,10 +101,15 @@ function dataRecord(value, allowed, label) {
   return Object.freeze(out);
 }
 function denseDataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
-    throw new Error(`${label} must be a bounded array`);
+  let descriptors;
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new Error('invalid array');
+    }
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    throw new Error(`${label} must be a bounded data-only array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
@@ -348,7 +363,9 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   const suppliedWorkers = own(policy, 'manualRouteWorkers');
   const source = Object.hasOwn(policy, 'manualRouteWorkers') ? suppliedWorkers : {};
   object(source, 'AI worker manualRouteWorkers');
-  const descriptors = Object.getOwnPropertyDescriptors(source);
+  let descriptors;
+  try { descriptors = Object.getOwnPropertyDescriptors(source); }
+  catch { throw new Error('AI worker manualRouteWorkers fields are not inspectable own data'); }
   const keys = Reflect.ownKeys(descriptors);
   if (keys.length > MAX_ROUTES) throw new Error('AI worker manualRouteWorkers is too large');
   const entries = [];
