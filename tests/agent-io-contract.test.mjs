@@ -10,7 +10,7 @@ import {
   normalizeAgentAction,
   normalizeAgentEvent,
 } from '../src/core/agent-io-contract.js';
-import { AgentProviderId, CapabilityId, getAgentProvider } from '../src/core/capability-registry.js';
+import { AgentProviderId, CapabilityId, getAgentProvider, requireAgentProviderCapabilities } from '../src/core/capability-registry.js';
 
 function action(overrides = {}) {
   return {
@@ -573,4 +573,57 @@ test('Plan-1 S1: provider allowlist never admits inherited names or discloses un
   assert.deepEqual(normalizeAgentAction(JSON.parse(JSON.stringify(valid))), valid);
   assert.equal(await registry.execute(action()), true);
   assert.equal(calls, 1);
+});
+
+test('Plan-1 S1: provider capability grants reject hostile lists without effects or secret-bearing diagnostics', () => {
+  const provider = AgentProviderId.CHATGPT_BROWSER;
+  const allowed = [CapabilityId.VERIFIED_PROMPT_SUBMIT, CapabilityId.SAFE_RESTART_RECOVERY];
+  const known = requireAgentProviderCapabilities(provider, allowed);
+  assert.equal(known.id, provider);
+  assert.ok(known.capabilities.includes(allowed[0]));
+  assert.deepEqual(requireAgentProviderCapabilities(provider, JSON.parse(JSON.stringify(allowed))), known,
+    'valid caller capability data must survive JSON cold restart');
+  assert.deepEqual(allowed, [CapabilityId.VERIFIED_PROMPT_SUBMIT, CapabilityId.SAFE_RESTART_RECOVERY],
+    'admission must not mutate the caller');
+
+  const secret = 'PRIVATE-CAPABILITY-GRANT-CANARY-DO-NOT-LOG';
+  let getterCalls = 0;
+  const accessor = [allowed[0]];
+  Object.defineProperty(accessor, '0', {
+    enumerable: true, configurable: true, get() {
+      getterCalls += 1;
+      throw new Error(secret);
+    },
+  });
+  const unexpectedIterator = [allowed[0]];
+  Object.defineProperty(unexpectedIterator, Symbol.iterator, {
+    enumerable: false, configurable: true, value() {
+      getterCalls += 1;
+      throw new Error(secret);
+    },
+  });
+  const nonIndex = [allowed[0]];
+  Object.defineProperty(nonIndex, 'unexpected', { value: secret, enumerable: false });
+  const foreignPrototype = [allowed[0]];
+  Object.setPrototypeOf(foreignPrototype, null);
+  const invalid = [
+    [secret], [allowed[0], secret], [allowed[0] + ' '], [null], [undefined],
+    [new String(allowed[0])], accessor, unexpectedIterator, nonIndex,
+    foreignPrototype, new Array(1), new Set(allowed), null, { 0: allowed[0], length: 1 },
+    new Proxy([allowed[0]], { ownKeys() { throw new Error(secret); } }),
+    new Proxy([allowed[0]], { getPrototypeOf() { throw new Error(secret); } }),
+  ];
+  for (const request of invalid) {
+    assert.throws(() => requireAgentProviderCapabilities(provider, request), error => {
+      assert.match(error.message, /Agent provider/);
+      assert.doesNotMatch(error.message, /PRIVATE-CAPABILITY-GRANT-CANARY-DO-NOT-LOG/);
+      return true;
+    }, 'no malformed list may broaden provider authority');
+  }
+  assert.equal(getterCalls, 0, 'no user getter or iterator may execute');
+  assert.equal(accessor.length, 1, 'failed admission must not mutate accessor-backed input');
+  assert.equal(nonIndex.unexpected, secret);
+  const restart = requireAgentProviderCapabilities(provider,
+    JSON.parse(JSON.stringify([allowed[0], allowed[0]])));
+  assert.deepEqual(restart, known, 'duplicate exact IDs must not widen persisted authority');
 });
