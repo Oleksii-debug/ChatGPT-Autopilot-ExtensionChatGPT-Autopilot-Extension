@@ -199,7 +199,7 @@ function recordedOutcomeSummary(value) {
     }
     const checksLength = own(checks, 'length');
     if (!Number.isSafeInteger(checksLength) || checksLength < 0 || checksLength > 20) {
-      throw new Error('Agent recorded outcome checks must be a bounded dense array (invalid length)');
+      throw new Error('Agent recorded outcome checks length is invalid (must be a bounded dense array)');
     }
     for (let i = 0; i < checksLength; i += 1) {
       const item = own(checks, String(i));
