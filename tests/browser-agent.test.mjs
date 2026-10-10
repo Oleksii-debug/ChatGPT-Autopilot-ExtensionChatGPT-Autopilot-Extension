@@ -3282,7 +3282,7 @@ test('Plan4 S1: model budget route identities reject getters, coercion and persi
     getterRoute,
     { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:null },
     { routeId:' route-1', provider:'ollama', model:'fixture' },
-    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'account\\nspoof' },
+    { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'account\nspoof' },
     { routeId:'route-1', provider:'ollama', model:'fixture', endpointId:'x'.repeat(181) },
   ];
   for (const route of rejectedRoutes) {
