@@ -67,7 +67,7 @@ test('Plan-1 S1: empty optional effect and approval references cannot be erased 
       }, key + ' must not silently become an absent durable identity');
       assert.deepEqual(corrupt, { ...original, [key]: '' },
         'rejected identity may not mutate incoming persisted data');
-      const present = normalize({ ...original, [key]: 'known-ref-1' });
+      const present = normalize({ ...original, ...(key === 'approvalId' ? { decision: PolicyDecisionKind.REQUIRE_APPROVAL } : {}), [key]: 'known-ref-1' });
       assert.equal(present[key], 'known-ref-1');
       assert.deepEqual(normalize(JSON.parse(JSON.stringify(present))), present,
         'a real exact reference must survive restart without aliasing');
