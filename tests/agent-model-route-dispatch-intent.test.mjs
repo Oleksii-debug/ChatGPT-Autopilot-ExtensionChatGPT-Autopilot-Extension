@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createAgentDefinitionRegistryV1,
   materializeAgentDefinitionV1,
   selectAgentDefinitionV1,
 } from '../src/core/agent-definition-registry.js';
@@ -76,13 +77,19 @@ function definition() {
   };
 }
 
-function registry() {
-  return {
+function registry() { 
+  const input = {
     schemaVersion: 1,
     registryId: 'agents:project.alpha',
     revision: 6,
     definitions: [definition()],
   };
+  // Repair historical fixture format, never skip malformed-input negatives.
+  try {
+    return { ...input, bindingKey: createAgentDefinitionRegistryV1(input).bindingKey };
+  } catch {
+    return input;
+  }
 }
 
 function selection() {
