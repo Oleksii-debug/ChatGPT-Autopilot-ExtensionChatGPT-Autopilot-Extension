@@ -1141,8 +1141,16 @@ export function snapshotBrowserPage(snapshotId) {
       // Missing, mixed, or malformed ARIA checked state is not proof of false. Keep
       // the ambiguity visible to the planner after snapshot/restart.
       const ariaChecked = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
-      item.checked = 'checked' in element ? Boolean(element.checked)
-        : (ariaChecked === 'false' ? false : ariaChecked === 'true' ? true : null);
+      // Native checkboxes/radios expose a browser-owned boolean property.
+      // A custom ARIA control may expose an arbitrary page-defined .checked
+      // value; it is NOT accessibility state or trusted completion evidence.
+      const nativeCheckable = tag === 'input' && (inputType === 'checkbox' || inputType === 'radio');
+      if (nativeCheckable) {
+        const checked = element.checked;
+        item.checked = typeof checked === 'boolean' ? checked : null;
+      } else {
+        item.checked = ariaChecked === 'false' ? false : ariaChecked === 'true' ? true : null;
+      }
     }
     if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
       item.sensitive = sensitive;
@@ -1376,17 +1384,28 @@ export function executeBrowserPageAction(snapshotId, action) {
     if (typeof action.checked !== 'boolean') throw new Error('AGENT_CHECK_STATE_INVALID');
     const element = ensureTarget();
     const desired = action.checked;
-    const role = element.getAttribute('role');
+    const role = String(element.getAttribute('role') || '').trim().toLowerCase();
+    const tagName = String(element.tagName || '').toLowerCase();
+    const inputType = tagName === 'input'
+      ? String(element.getAttribute('type') || 'text').trim().toLowerCase() : '';
+    const nativeCheckable = tagName === 'input' && ['checkbox', 'radio'].includes(inputType);
+    if (!nativeCheckable && !['checkbox', 'radio', 'switch'].includes(role)) {
+      throw new Error('AGENT_TARGET_NOT_CHECKABLE');
+    }
     const readCheckedState = () => {
-      if ('checked' in element) return Boolean(element.checked);
+      if (nativeCheckable) {
+        // Fail closed on nonboolean/overridden native state after a cold restart.
+        const checked = element.checked;
+        if (typeof checked !== 'boolean') throw new Error('AGENT_CHECK_STATE_INDETERMINATE');
+        return checked;
+      }
+      // ARIA custom controls are owned by the page; a synthetic .checked
+      // property (even boolean true) cannot replace explicit aria-checked.
       const state = String(element.getAttribute('aria-checked') || '').trim().toLowerCase();
-      // Missing/"mixed"/"undefined"/invalid aria-checked cannot be silently
-      // converted into the false state and reported as a verified effect.
       if (state !== 'true' && state !== 'false') throw new Error('AGENT_CHECK_STATE_INDETERMINATE');
       return state === 'true';
     };
     const current = readCheckedState();
-    if (!['checkbox', 'radio'].includes(String(element.type || '').toLowerCase()) && !['checkbox', 'radio', 'switch'].includes(role)) throw new Error('AGENT_TARGET_NOT_CHECKABLE');
     if (current !== desired) {
       // CHECK is a low-authority state mutation, not permission to submit a
       // form, reset it, or navigate through an ARIA-styled link. A native
