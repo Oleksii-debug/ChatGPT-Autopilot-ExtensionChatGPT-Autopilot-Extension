@@ -185,11 +185,15 @@ export function normalizeSpecialistRegistryV1(input) {
 export function normalizeSpecialistSelectionV1(input) {
   const raw = record(input, SEL_KEYS, 'SpecialistSelectionV1');
   if (raw.schemaVersion !== SPECIALIST_SELECTION_VERSION) throw new Error('SpecialistSelectionV1.schemaVersion must be numeric 1');
+  // Legacy read-only selections may predate content-bound registry keys.
+  // Never synthesize a key: bindSpecialistHandoffToRegistryV1 requires an
+  // exact match against the current canonical registry before any admission.
+  const hasBindingKey = Object.hasOwn(raw, 'registryBindingKey');
   return freeze({
     schemaVersion:1,
     registryId:id(raw.registryId,'registryId'),
     registryRevision:integer(raw.registryRevision,'registryRevision'),
-    registryBindingKey:exactBindingKey(raw.registryBindingKey,'registryBindingKey'),
+    ...(hasBindingKey ? { registryBindingKey:exactBindingKey(raw.registryBindingKey,'registryBindingKey') } : {}),
     specialistId:id(raw.specialistId,'specialistId'),
     providerId:id(raw.providerId,'providerId'),
     definitionRevision:integer(raw.definitionRevision,'definitionRevision'),
