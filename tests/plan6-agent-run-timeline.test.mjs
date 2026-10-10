@@ -1550,3 +1550,57 @@ test('S1 persisted plan-node state integrity rejects corrupted evidence without 
   assert.equal(future.evidenceMap.externalEffectVerified, false);
   assert.equal(future.evidenceMap.specialistPlanLinks.agentTreeEdgesVerified, false);
 });
+
+
+test('S1 recorded action kinds reject corrupt durable metadata without granting replay', () => {
+  const valid = job();
+  valid.runtime.history[1].action.type = 'click';
+  const canonical = buildAgentRunTimelineV1(valid);
+  assert.equal(canonical.entries[1].actionType, 'click');
+  assert.deepEqual(canonical, buildAgentRunTimelineV1(JSON.parse(JSON.stringify(valid))));
+
+  const legacy = job();
+  delete legacy.runtime.history[1].action.type;
+  assert.equal(buildAgentRunTimelineV1(legacy).entries[1].actionType, '');
+  assert.deepEqual(buildAgentRunTimelineV1(legacy),
+    buildAgentRunTimelineV1(JSON.parse(JSON.stringify(legacy))));
+
+  const future = job();
+  future.runtime.history[1].action.type = 'future-semantic-action';
+  const safe = buildAgentRunTimelineV1(JSON.parse(JSON.stringify(future)));
+  assert.equal(safe.entries[1].actionType, '');
+  assert.equal(safe.mayReplayExternalEffect, false);
+  assert.equal(safe.evidenceMap.externalEffectVerified, false);
+
+  const marker = 'PRIVATE_ACTION_KIND_NEVER_EXPORTED';
+  for (const invalid of [undefined, null, false, 7, {}, [], '', ' click',
+    'click ', 'cli\\u202eck', 'bad\\nkind', 'x'.repeat(65), marker + '\\u0000']) {
+    const x = job();
+    x.runtime.history[1].action.type = invalid;
+    assert.throws(() => buildAgentRunTimelineV1(x), error =>
+      error instanceof Error && /recorded action type is invalid/u.test(error.message) &&
+      !error.message.includes(marker));
+    if (invalid !== undefined) {
+      assert.throws(() => buildAgentRunTimelineV1(JSON.parse(JSON.stringify(x))),
+        /recorded action type is invalid/u);
+    }
+  }
+  let getterCalls = 0;
+  const accessor = job();
+  Object.defineProperty(accessor.runtime.history[1].action, 'type', {
+    enumerable: true,
+    get() { getterCalls += 1; throw Error(marker); },
+  });
+  assert.throws(() => buildAgentRunTimelineV1(accessor), error =>
+    error instanceof Error && !error.message.includes(marker));
+  assert.equal(getterCalls, 0);
+
+  const hidden = job();
+  Object.defineProperty(hidden.runtime.history[1].action, 'type', {
+    value: 'click', enumerable: false,
+  });
+  assert.throws(() => buildAgentRunTimelineV1(hidden), /enumerable data field/u);
+  assert.doesNotMatch(JSON.stringify(canonical), /PRIVATE_|SECRET|SENSITIVE/u);
+  assert.equal(canonical.evidenceOnly, true);
+  assert.equal(canonical.mayReplayExternalEffect, false);
+});
