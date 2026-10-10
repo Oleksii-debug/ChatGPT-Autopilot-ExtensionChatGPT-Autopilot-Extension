@@ -51,7 +51,10 @@ function id(value, label) {
   return value;
 }
 
-function optionalId(value, label) {
+function optionalId(value, label, present = false) {
+  // An explicitly persisted undefined identity disappears through JSON, so it
+  // must never be silently treated as an omitted legacy field after restart.
+  if (present && value === undefined) throw new Error(`${label} cannot be explicitly undefined`);
   return value == null || value === '' ? '' : id(value, label);
 }
 
@@ -212,7 +215,7 @@ function normalizedState(input) {
     throw new Error('Exact effect attempt is invalid');
   }
   const expectedExecutionId = attempt > 0 ? executionId(effectId, attempt) : '';
-  if (optionalId(raw.executionId, 'executionId') !== expectedExecutionId) {
+  if (optionalId(raw.executionId, 'executionId', Object.hasOwn(raw, 'executionId')) !== expectedExecutionId) {
     throw new Error('Exact effect executionId is inconsistent');
   }
   const observation = raw.observation == null ? null : normalizeObservationV1(raw.observation);
@@ -242,7 +245,7 @@ function normalizedState(input) {
       'ambiguity',
     );
     ambiguity = {
-      reasonCode: optionalId(value.reasonCode, 'ambiguity.reasonCode'),
+      reasonCode: optionalId(value.reasonCode, 'ambiguity.reasonCode', Object.hasOwn(value, 'reasonCode')),
       summary: optionalText(value.summary, 'ambiguity.summary'),
       declaredAt: value.declaredAt == null || value.declaredAt === ''
         ? ''
@@ -263,7 +266,7 @@ function normalizedState(input) {
     }
     reconciliation = {
       outcome,
-      reasonCode: optionalId(value.reasonCode, 'reconciliation.reasonCode'),
+      reasonCode: optionalId(value.reasonCode, 'reconciliation.reasonCode', Object.hasOwn(value, 'reasonCode')),
       summary: optionalText(value.summary, 'reconciliation.summary'),
       resolvedAt: value.resolvedAt == null || value.resolvedAt === ''
         ? ''
@@ -271,7 +274,7 @@ function normalizedState(input) {
     };
   }
 
-  const commitId = optionalId(raw.commitId, 'commitId');
+  const commitId = optionalId(raw.commitId, 'commitId', Object.hasOwn(raw, 'commitId'));
   // A cold-restarted ledger may be stale or corrupt. The persisted phase
   // alone cannot grant COMMIT or SAFE_RETRY: these transitions require the
   // same bound verifier/reconciliation receipts as the event reducer.
@@ -361,7 +364,7 @@ function normalizeEvent(input) {
     summary: raw.summary,
     outcome: raw.outcome,
     commitId: raw.commitId,
-    executionId: optionalId(raw.executionId, 'event.executionId'),
+    executionId: optionalId(raw.executionId, 'event.executionId', Object.hasOwn(raw, 'executionId')),
   };
 }
 
