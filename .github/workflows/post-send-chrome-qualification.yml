@@ -1,5 +1,16 @@
 name: Post-Send Chrome qualification
 on:
+  push:
+    branches: ["plan8/11-0-13-source-convergence-20261010"]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "tests-regression/**"
+      - "scripts/browser-smoke-lib.cjs"
+      - "scripts/native-browser-smoke.cjs"
+      - "scripts/chrome-ui-accessibility-smoke.mjs"
+      - "scripts/post-send-multitab-browser-smoke.mjs"
+      - ".github/workflows/post-send-chrome-qualification.yml"
   pull_request:
     paths:
       - "src/**"
