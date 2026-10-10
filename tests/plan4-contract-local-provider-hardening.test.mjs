@@ -1376,3 +1376,39 @@ test('Plan4 S2: canonical service-worker lifecycle requires settled durable owne
   assert.equal(reserveCalls,1);
   assert.equal(settleCalls,2);
 });
+
+
+test('Plan4 S2: forged local response readers are redacted and never authorize blind POST retry', async () => {
+  let effects = 0;
+  let mode = 'reader-error';
+  const client = new LocalAiClient({
+    fetchFn: async () => {
+      effects++;
+      if (mode === 'success') return new Response(JSON.stringify({
+        message:{content:'safe response'}, prompt_eval_count:2, eval_count:1,
+      }), {status:200});
+      return {ok:true,status:200,text:async () => {
+        const forged = new Error('sk-private-local-response-reader');
+        forged.code = 'LOCAL_AI_AUTH';
+        forged.category = 'AUTH';
+        forged.retryable = true;
+        throw forged;
+      }};
+    },
+  });
+  const restored = JSON.parse(JSON.stringify(settings));
+  for (let i = 0; i < 2; i++) {
+    await assert.rejects(client.complete(restored,'owner approved'), error =>
+      error.code === 'LOCAL_AI_RESPONSE_UNVERIFIED'
+      && error.category === 'UNAVAILABLE'
+      && error.retryable === false
+      && !String(error.message).includes('sk-private')
+      && !String(error.message).includes('LOCAL_AI_AUTH'));
+    assert.equal(effects,i+1,'no automatic resend or alternate provider');
+  }
+  mode = 'success';
+  const recovered = await client.complete(restored,'owner approved');
+  assert.equal(recovered.text,'safe response');
+  assert.equal(recovered.usage.totalTokens,3);
+  assert.equal(effects,3);
+});
