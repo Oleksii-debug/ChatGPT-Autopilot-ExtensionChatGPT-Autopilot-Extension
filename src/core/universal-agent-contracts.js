@@ -249,7 +249,9 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
       // spread or legacy object hydration. Reject at the shared contract
       // boundary rather than accepting non-portable durable evidence.
       // The untrusted key is intentionally absent from diagnostics.
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      // Existing V1 deliberately preserves a data-only __proto__ member via
+      // Object.defineProperty; do not break that cold-restart contract.
+      if (key === 'constructor' || key === 'prototype') {
         throw new Error(`${label} contains unsafe property key`);
       }
       Object.defineProperty(out, key, {
