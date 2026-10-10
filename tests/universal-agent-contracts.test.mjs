@@ -1875,3 +1875,36 @@ test('Plan-1 S1: web postcondition verifier preserves optional refs across ambig
     'stale independent observation must not be promoted to verified or committed');
   assert.deepEqual(normalizeVerificationV1(JSON.parse(JSON.stringify(mismatch))), mismatch);
 });
+
+
+test('Plan-1 S1: universal persisted JSON budgets count UTF-8 bytes', () => {
+  const makeInvocation = (data, invocationId) => ({
+    schemaVersion: 1, invocationId, toolId: 'file.read',
+    providerId: 'native-companion', requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1', arguments: data, createdAt: AT,
+  });
+  const makeObservation = data => ({
+    schemaVersion: 1, observationId: 'obs-utf8-budget',
+    invocationId: 'invoke-utf8-budget', status: ObservationStatus.OK,
+    data, observedAt: AT,
+  });
+  // The old UTF-16 check admitted this payload despite exceeding the
+  // configured UTF-8 budget (> 256_000 bytes) on durable transport.
+  const oversized = Object.freeze({ payload: 'é'.repeat(130_000) });
+  assert.ok(JSON.stringify(oversized).length < 256_000,
+    'pre-fix character count would incorrectly permit the payload');
+  assert.ok(new TextEncoder().encode(JSON.stringify(oversized)).byteLength > 256_000);
+  const invocation = makeInvocation(oversized, 'invoke-utf8-budget');
+  const observation = makeObservation(oversized);
+  assert.throws(() => normalizeToolInvocationV1(invocation), /arguments is too large/);
+  assert.throws(() => normalizeObservationV1(observation), /data is too large/);
+  assert.equal(oversized.payload.length, 130_000, 'negative check must not mutate caller evidence');
+
+  const normal = Object.freeze({ payload: 'é'.repeat(1_000), verified: true });
+  const validInvocation = normalizeToolInvocationV1(makeInvocation(normal, 'invoke-utf8-valid'));
+  const validObservation = normalizeObservationV1(makeObservation(normal));
+  assert.deepEqual(normalizeToolInvocationV1(JSON.parse(JSON.stringify(validInvocation))),
+    validInvocation, 'valid effect inputs must survive exact cold JSON recovery');
+  assert.deepEqual(normalizeObservationV1(JSON.parse(JSON.stringify(validObservation))),
+    validObservation, 'valid observations must survive exact cold JSON recovery');
+});
