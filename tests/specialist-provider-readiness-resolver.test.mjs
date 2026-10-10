@@ -420,3 +420,116 @@ test('Section 1 opaque clock failure does not poison canonical cold-restart reco
   assert.equal(durable.authority.providerExecutionAuthorized, false);
   assert.equal(providerCalls, 2);
 });
+
+test('Section 1: second trusted admission accepts harmless probe latency drift, never skips probe', async () => {
+  let probes = 0;
+  const resolver = runtime([binding(async () => ({
+    observedAt: NOW,
+    providerStates: [state({ latencyMs: ++probes === 1 ? 5 : 29 })],
+  }))]);
+  const first = await resolver.resolve(selection());
+  assert.equal(first.executable, true);
+  assert.equal(first.inspection.checks[0].providerReadiness.latencyMs, 5);
+  assert.equal(await resolver.assertCurrent(first), true);
+  assert.equal(probes, 2, 'readiness admission must perform a second fresh probe');
+});
+
+test('Section 1: second trusted admission refuses provider health and reason drift', async () => {
+  for (const second of [
+    { health: 'UNAVAILABLE', reasonCode: 'OPENHANDS_TRANSPORT_FAILURE' },
+    { health: 'READY', reasonCode: 'CHANGED_READY_PROVENANCE' },
+    { installed: false, installationRequired: true },
+  ]) {
+    let probes = 0;
+    const resolver = runtime([binding(async () => ({
+      observedAt: NOW,
+      providerStates: [state(++probes === 1 ? {} : second)],
+    }))]);
+    const first = await resolver.resolve(selection());
+    assert.equal(first.executable, true);
+    await assert.rejects(
+      resolver.assertCurrent(first),
+      /Provider readiness changed since its trusted observation/,
+    );
+    assert.equal(probes, 2);
+    assert.equal(first.authority.providerExecutionAuthorized, false);
+  }
+});
+
+
+test('Section 1: original readiness expires at admission despite matching fresh provider facts', async () => {
+  const create = (elapsedMs, counters) => {
+    const ticks = [NOW_MS, NOW_MS, NOW_MS + elapsedMs, NOW_MS + elapsedMs];
+    return new SpecialistProviderReadinessResolverV1({
+      bindings: [binding(async request => {
+        counters.probes += 1;
+        return { observedAt: request.asOf, providerStates: [state()] };
+      })],
+      now: () => {
+        assert.ok(ticks.length, 'clock fixture must be bounded');
+        return ticks.shift();
+      },
+    });
+  };
+
+  const atBoundary = { probes: 0 };
+  const acceptedResolver = create(30_000, atBoundary);
+  const accepted = await acceptedResolver.resolve(selection());
+  assert.equal(await acceptedResolver.assertCurrent(accepted), true);
+  assert.equal(atBoundary.probes, 2, 'fresh admission must always re-probe');
+  assert.equal(accepted.authority.providerExecutionAuthorized, false);
+
+  const expiredCounter = { probes: 0 };
+  const expiredResolver = create(30_001, expiredCounter);
+  const expired = await expiredResolver.resolve(selection());
+  await assert.rejects(
+    expiredResolver.assertCurrent(expired),
+    /readiness observation expired before admission/u,
+    'matching health and capabilities cannot refresh the original evidence lifetime',
+  );
+  assert.equal(expiredCounter.probes, 2);
+  assert.equal(expired.authority.providerExecutionAuthorized, false);
+  assert.equal(expired.authority.capacityReserved, false);
+
+  // A JSON-restored copy is not an owner-issued in-memory observation.
+  const forged = JSON.parse(JSON.stringify(accepted));
+  await assert.rejects(
+    acceptedResolver.assertCurrent(forged),
+    /lacks trusted resolver provenance/u,
+  );
+});
+
+
+test('Section 1: original provider observation age consumes readiness TTL before admission', async () => {
+  const exercise = async elapsedMs => {
+    const ticks = [NOW_MS, NOW_MS, NOW_MS + elapsedMs, NOW_MS + elapsedMs];
+    let probes = 0;
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [binding(async request => ({
+        observedAt: ++probes === 1
+          ? new Date(NOW_MS - 29_999).toISOString()
+          : request.asOf,
+        providerStates: [state()],
+      }))],
+      now: () => {
+        assert.ok(ticks.length, 'admission cannot observe an unbounded fake clock');
+        return ticks.shift();
+      },
+    });
+    const original = await resolver.resolve(selection());
+    assert.equal(original.ageMs, 29_999);
+    return { resolver, original, getProbes: () => probes };
+  };
+
+  const atBoundary = await exercise(1);
+  assert.equal(await atBoundary.resolver.assertCurrent(atBoundary.original), true);
+  assert.equal(atBoundary.getProbes(), 2);
+
+  const expired = await exercise(2);
+  await assert.rejects(
+    expired.resolver.assertCurrent(expired.original),
+    /readiness observation expired before admission/u,
+  );
+  assert.equal(expired.getProbes(), 2);
+  assert.equal(expired.original.authority.capacityReserved, false);
+});

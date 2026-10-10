@@ -32,6 +32,7 @@ import {
   createOpenHandsSpecialistReadinessBindingV1,
   probeOpenHandsSpecialistProviderConfigV1,
 } from '../core/openhands-specialist-readiness.js';
+import { normalizeSpecialistSelectionV1 } from '../core/specialist-registry.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { SpecialistProviderDispatcherV1 } from '../core/specialist-provider-dispatcher.js';
 import {
@@ -246,8 +247,12 @@ const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({
 });
 const specialistReadinessConfigProvenance = new WeakMap();
 const specialistProviderReadinessResolver = Object.freeze({
-  async resolve(selection) {
-    const providerId = selection?.providerId || '';
+  async resolve(selectionInput) {
+    // Normalize before reading any caller-owned selection property. A hostile
+    // accessor or Proxy may otherwise execute before the trusted registry
+    // rejects its noncanonical capability/identity envelope.
+    const selection = normalizeSpecialistSelectionV1(selectionInput);
+    const providerId = selection.providerId;
     if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
       return mistralSpecialistReadinessResolver.resolve(selection);
     }
@@ -268,6 +273,7 @@ const specialistProviderReadinessResolver = Object.freeze({
     specialistReadinessConfigProvenance.set(readiness, Object.freeze({
       providerId,
       configSnapshot: JSON.stringify(persisted.config),
+      resolver,
     }));
     return readiness;
   },
@@ -278,6 +284,17 @@ const specialistProviderReadinessResolver = Object.freeze({
     if (persisted.quarantined || !persisted.config
         || JSON.stringify(persisted.config) !== provenance.configSnapshot) {
       throw new Error('Specialist provider config changed after readiness probe');
+    }
+    // A stable owner config does not prove live provider health. Re-probe
+    // through the SAME trusted resolver/selection before durable admission;
+    // latency drift alone is not permission drift or a second authority.
+    await provenance.resolver.assertCurrent(readiness);
+    // Owner settings can change while the harmless network probe is in
+    // flight. Close this TOCTOU window before the existing admission lease.
+    const afterProbe = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
+    if (afterProbe.quarantined || !afterProbe.config
+        || JSON.stringify(afterProbe.config) !== provenance.configSnapshot) {
+      throw new Error('Specialist provider config changed during readiness revalidation');
     }
     return true;
   },

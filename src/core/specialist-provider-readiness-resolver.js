@@ -172,6 +172,22 @@ function validateResolvedStates(rawStates, selection) {
   });
 }
 
+// Probe latency is an observation metric, never a capability or authorization
+// fact. A fresh healthy provider may have a different harmless GET latency.
+// Compare all other canonical fields, including health, identity, source,
+// reason code, installation and authentication, at the second admission gate.
+function readinessFactsKey(inspection) {
+  return JSON.stringify({
+    ...inspection,
+    checks: inspection.checks.map(check => ({
+      ...check,
+      providerReadiness: check.providerReadiness === null
+        ? null
+        : { ...check.providerReadiness, latencyMs: null },
+    })),
+  });
+}
+
 /**
  * Owner-constructed, in-memory binding from a Specialist provider identity to
  * the provider-specific function that can resolve fresh readiness facts.
@@ -287,11 +303,19 @@ export class SpecialistProviderReadinessResolverV1 {
         || current.observedAt < readiness.observedAt) {
       throw new Error('Trusted provider readiness revalidation moved backwards');
     }
+    // A fresh re-probe does not renew the lifetime of the original
+    // owner-issued admission observation. Otherwise a cached READY token
+    // could authorize work arbitrarily long after its bounded lease expired.
+    // Resolve first so clock rollback is checked with the canonical clock,
+    // then fail closed even when the new provider facts happen to match.
+    if (Date.parse(current.resolvedAt) - Date.parse(readiness.observedAt) > readiness.maxAgeMs) {
+      throw new Error('Trusted provider readiness observation expired before admission');
+    }
     if (!current.executable || current.readiness !== readiness.readiness
         || current.providerId !== readiness.providerId
         || current.registryRevision !== readiness.registryRevision
         || current.definitionRevision !== readiness.definitionRevision
-        || JSON.stringify(current.inspection) !== JSON.stringify(readiness.inspection)) {
+        || readinessFactsKey(current.inspection) !== readinessFactsKey(readiness.inspection)) {
       throw new Error('Provider readiness changed since its trusted observation');
     }
     return true;
