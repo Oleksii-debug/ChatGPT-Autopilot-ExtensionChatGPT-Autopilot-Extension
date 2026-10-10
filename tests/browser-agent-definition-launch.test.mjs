@@ -210,10 +210,12 @@ test('launch requires exact live registry and definition revisions at the serial
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
+  const currentBindingKey = (await manager.getAgentDefinitionRegistry('agents:project-1')).registry.bindingKey;
 
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: currentBindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -248,10 +250,12 @@ test('a registry mutation queued before launch cannot be bypassed by stale launc
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
+  const currentBindingKey = (await manager.getAgentDefinitionRegistry('agents:project-1')).registry.bindingKey;
 
   const mutation = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: currentBindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
