@@ -415,7 +415,8 @@ test('owner model-routing failover booleans reject coercion and accessor traps a
     }
     const malicious = {};
     Object.defineProperty(malicious,flag,{enumerable:true,get(){throw new Error('forged getter evaluated');}});
-    assert.throws(() => normalizeAiRouterSettings(malicious), /must be boolean/);
+    // Descriptor admission rejects the accessor before reading it; no getter executes.
+    assert.throws(() => normalizeAiRouterSettings(malicious), /must be enumerable own data properties/);
   }
   const denied = JSON.parse(JSON.stringify({
     enabled:true, carryStrongResultToPrimary:false,
