@@ -303,6 +303,10 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
           operation: original.operation, targetId: original.targetId,
           payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
         });
+        // OUTCOME_SUBMIT is consequential; its transport acknowledgement
+        // must preserve Core's non-read-only, downstream-authority contract.
+        reply.result.readOnly = false;
+        reply.result.downstreamAuthorityRequired = true;
         return reply;
       }};
     },
@@ -316,6 +320,9 @@ test('payload receipt rejects extra, symbol and accessor fields without reading 
       operation: original.operation, targetId: original.targetId,
       payloadArtifactId: artifact.artifactId, payloadSha256: artifact.sha256,
     });
+    // Negative cases must differ ONLY by their hostile ArtifactRef shape.
+    reply.result.readOnly = false;
+    reply.result.downstreamAuthorityRequired = true;
     const ref = reply.result.request.payloadArtifactRef;
     if (shape === 'extra') ref.privateToken = 'MUST_NOT_LEAK';
     if (shape === 'symbol') ref[Symbol('secret')] = 'MUST_NOT_LEAK';
