@@ -82,6 +82,12 @@ test('forged digest, missing integration paths and malformed JSON reject', () =>
 }));
 
 test('unrelated or unknown commit cannot impersonate reachable 11.x baseline', () => withFixture(f => {
+  // A real unrelated commit may contain the exact expected tree and version:
+  // the source must still be an ancestor, not merely a plausible Git blob.
+  const independent = f.git('commit-tree', f.git('rev-parse', 'HEAD^{tree}'),
+    '-m', 'independent 11.x source impersonator');
+  assert.match(independent, /^[0-9a-f]{40}$/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: independent }), /not an ancestor/u);
   assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: 'f'.repeat(40) }), /not an ancestor/u);
   assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: '../not-a-sha' }), /full lowercase Git SHA/u);
 }));
