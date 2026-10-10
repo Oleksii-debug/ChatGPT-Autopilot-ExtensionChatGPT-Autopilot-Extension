@@ -581,7 +581,7 @@ function exactModelBudgetRouteIdentity(route) {
       || typeof value !== 'string'
       || value.length > max
       || value !== value.trim()
-      || /[\\u0000-\\u001f\\u007f]/u.test(value)) {
+      || /[\u0000-\u001f\u007f]/u.test(value)) {
       const error = new Error('Model budget route identity contains an invalid explicit field');
       error.code = 'AI_MODEL_BUDGET_ROUTE_IDENTITY_INVALID';
       throw error;
