@@ -182,6 +182,10 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // This v1 endpoint accepts only literal strict UTF-8 JSON bytes. Reject
       // Content-Encoding at admission, before consulting the owner token
       // provider or canonical Core; decompression is not an API feature.
+      // Trailer declarations change the control envelope after header admission.
+      // Reject them before Companion credentials or Core; this v1 endpoint
+      // accepts one bounded JSON document with no trailing metadata.
+      if (req.headers.trailer !== undefined) return reject(res);
       if (req.headers['content-encoding'] !== undefined) return reject(res);
       const expectedHost = '127.0.0.1:' + server.address()?.port;
       if (headerString(req.headers.host) !== expectedHost) return reject(res);
@@ -189,6 +193,23 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       // attempts to induce local requests from arbitrary websites.
       if (req.headers.origin !== undefined || req.headers['access-control-request-method'] !== undefined) {
         return reject(res);
+      }
+      // Refuse unknown methods/routes before consulting the trusted owner's
+      // credential resolver. An irrelevant endpoint cannot consume bearer
+      // broker capacity or touch canonical Core, even with a valid token.
+      if (req.method !== 'POST' || req.url !== '/v1/control') {
+        return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
+      }
+      // Reject invalid media type and declared body size before invoking the
+      // owner credential resolver. These are public transport constraints,
+      // not authentication or Core authorization decisions. A malformed
+      // request must not exhaust DPAPI/credential-broker capacity.
+      if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(headerString(req.headers['content-type']))) {
+        return send(res, 415, { schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE' });
+      }
+      const len = req.headers['content-length'];
+      if (len !== undefined && (!/^\d+$/u.test(len) || Number(len) > MAX_BODY_BYTES)) {
+        return send(res, 413, { schemaVersion: 1, status: 'TOO_LARGE' });
       }
       const authorization = headerString(req.headers.authorization);
       const candidate = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
@@ -211,16 +232,6 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
         }
       }
       if (!timingSafeEqual(candidateDigest, activeExpected)) return reject(res, 401);
-      if (req.method !== 'POST' || req.url !== '/v1/control') {
-        return send(res, 404, { schemaVersion: 1, status: 'NOT_FOUND' });
-      }
-      if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(headerString(req.headers['content-type']))) {
-        return send(res, 415, { schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE' });
-      }
-      const len = req.headers['content-length'];
-      if (len !== undefined && (!/^\d+$/u.test(len) || Number(len) > MAX_BODY_BYTES)) {
-        return send(res, 413, { schemaVersion: 1, status: 'TOO_LARGE' });
-      }
       let chunks = [], total = 0;
       for await (const chunk of req) {
         total += chunk.length;
@@ -229,6 +240,9 @@ export function createAutopilotLocalApiServerV1({ token, tokenProvider, dependen
       }
       // Fail closed on invalid UTF-8 and duplicate JSON member identities before
       // any scope lookup or canonical dispatch. No second JSON/API authority.
+      // HTTP/1.1 chunked clients can send undeclared trailers after the body.
+      // They must not be silently ignored in an authenticated control request.
+      if (req.rawTrailers.length !== 0) return reject(res);
       const parsed = parseStrictControlJsonV1(Buffer.concat(chunks));
       // Reuse the exact Core request schema before touching request identities.
       // A second authenticated SDK/CLI instance must not race the same

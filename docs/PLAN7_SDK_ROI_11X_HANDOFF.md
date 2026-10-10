@@ -35,3 +35,11 @@ Cases include: schema mismatch, wrong scope/identity, malformed getters/accessor
 2. Production Native Companion lifecycle and owner-specific auth/token rotation, durable request identity reconciliation, schema migration and policy/budget/approval/effect integration. No credential secrets in Git.
 3. Owner-visible live UI/API wiring to canonical run evidence, restart/migration and human-time accounting; tests of actual state persistence and accessibility semantics.
 4. Exact-head green Ubuntu/Windows/security tests, post-integration/packaging readback and synced GitHub+Drive Plan 7 terminal evidence. Physical Windows Chrome/NVDA is separately Plan 8; never fabricate `NVDA_VERIFIED`.
+
+
+## 2026-10-10 Section 1 checkpoint — pre-auth HTTP admission (NONTERMINAL)
+- Preserve the existing 11.0.13 High lineage through Plan7 owning feature PR #727 and stacked PR #829. Do not use stale `main` (0.9.19) for a source downgrade.
+- The Local API now refuses unsupported method/path (404) before owner-token resolution; it also refuses malformed public Content-Type (415) and oversized declared body Content-Length (413) before any owner credential broker/DPAPI lookup. Never treat these transport denials as proof that an *already submitted* request had no effect.
+- Negative and recovery fixture: invalid `text/plain`, foreign JSON charset, bogus JSON parameter, and >65,536-byte declared body demand zero owner-token lookups and zero canonical Core dispatch. Valid authenticated recovery demands three owner-token checks and exactly one Core dispatch.
+- At exact HEAD `49a845e187f6ee2327cf4a1a2047dc55fd4bc67d`: source blob `0d2cb4eb487e9c510760f92b9427fb4d3480c1a1`; tests blob `b066ba4a06718f5ea001e8b6c48feb40452b4fa7`. GitHub files read back. Plan7 #38081010957, Core #38081010871 and Release #38081010878 were QUEUED at first readback; **no green tests claimed**.
+- Still not DONE: no actual production Native Companion owner token/Core binding, no persisted exact-request/effect recovery through cold restart/migration, no full Release PASS, no 11.x-to-main/post-main exact verification. Section 2 ROI must not be advanced until first ACTIONABLE Section 1 is terminal. **Terminal DONE: 0/2.**

@@ -51,6 +51,54 @@ async function withServer(run, deps = dependencies()) {
   finally { await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve())); }
 }
 
+test('declared and undeclared HTTP trailers never enter owner broker or Core; clean control recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const body = JSON.stringify(request('untrusted-trailer-identity'));
+    async function chunkedWithTrailer(advertise) {
+      const socket = netConnect({ host: '127.0.0.1', port });
+      socket.setTimeout(4_000, () => socket.destroy(new Error('trailer request timeout')));
+      const requestWire = [
+        'POST /v1/control HTTP/1.1',
+        'Host: 127.0.0.1:' + port,
+        'Authorization: Bearer ' + TOKEN,
+        'Content-Type: application/json',
+        'Transfer-Encoding: chunked',
+        ...(advertise ? ['Trailer: X-Injected-Authority'] : []),
+        'Connection: close', '', '',
+      ].join('\r\n')
+        + Buffer.byteLength(body).toString(16) + '\r\n'
+        + body + '\r\n0\r\nX-Injected-Authority: false\r\n\r\n';
+      socket.once('connect', () => socket.end(requestWire));
+      const chunks = [];
+      for await (const chunk of socket) chunks.push(chunk);
+      return Buffer.concat(chunks).toString('utf8');
+    }
+    assert.match(await chunkedWithTrailer(true), /^HTTP\/1\.1 403\b/u,
+      'declared trailer must fail pre-auth');
+    assert.match(await chunkedWithTrailer(false), /^HTTP\/1\.1 403\b/u,
+      'undeclared trailing fields must fail after streaming and before Core');
+    assert.equal(tokenLookups, 1,
+      'only the unadvertised trailer reaches the initial credential lookup');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'neither trailer shape can enter Core');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await client.control(request('trailer-free-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 4);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
 test('legacy HTTP/1.0 downgrade is denied before owner-token lookup or Core and HTTP/1.1 recovers', async () => {
   const counters = { scopes: 0, dispatches: 0 };
   let tokenLookups = 0;
@@ -136,6 +184,106 @@ test('encoded and duplicate Content-Encoding requests are rejected before owner 
   } finally {
     await new Promise((resolve, reject) =>
       server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test('unknown method/route rejects before owner token resolver and Core; valid route recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const endpoint = 'http://127.0.0.1:' + port;
+    const headers = {
+      Authorization: 'Bearer ' + TOKEN,
+      'Content-Type': 'application/json',
+    };
+    const unknownPath = await fetch(endpoint + '/v2/control', {
+      method: 'POST', headers, body: JSON.stringify(request('route-denied')),
+    });
+    assert.equal(unknownPath.status, 404);
+    const unknownMethod = await fetch(endpoint + '/v1/control', {
+      method: 'GET', headers,
+    });
+    assert.equal(unknownMethod.status, 404);
+    assert.equal(tokenLookups, 0, 'unknown endpoints must not resolve owner bearer');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'unknown endpoints must not reach canonical Core');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const positive = await client.control(request('route-valid-recovery'));
+    assert.equal(positive.status, 'RECEIVED');
+    assert.equal(positive.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3, 'valid Core dispatch still rechecks current owner token');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test('bad media and oversized declared payload reject before owner credentials, clean Core request recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups += 1; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const endpoint = 'http://127.0.0.1:' + port + '/v1/control';
+    const validBody = JSON.stringify(request('media-preauth-denied'));
+    for (const contentType of ['text/plain', 'application/json; charset=latin1', 'application/json; bogus=yes']) {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': contentType },
+        body: validBody,
+      });
+      assert.equal(response.status, 415);
+      assert.deepEqual(await response.json(), {
+        schemaVersion: 1, status: 'UNSUPPORTED_MEDIA_TYPE',
+      });
+    }
+    // A raw HTTP client can omit Content-Type altogether; Fetch normally
+    // synthesizes text/plain for string bodies. Verify missing media type is
+    // rejected before owner secret lookup as well.
+    const missingMedia = await new Promise((resolve, reject) => {
+      const raw = httpRequest({
+        hostname: '127.0.0.1', port, path: '/v1/control', method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + TOKEN,
+          'Content-Length': String(Buffer.byteLength(validBody)),
+        },
+      }, res => {
+        res.resume();
+        res.once('end', () => resolve(res.statusCode));
+      });
+      raw.once('error', reject);
+      raw.end(validBody);
+    });
+    assert.equal(missingMedia, 415);
+    const oversized = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: 'x'.repeat(65_537),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { schemaVersion: 1, status: 'TOO_LARGE' });
+    assert.equal(tokenLookups, 0, 'transport-invalid requests never consult owner bearer');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'transport-invalid requests have no Core admission or effects');
+
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await client.control(request('media-preauth-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3, 'recovered request uses every owner-token check');
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 });
+  } finally {
+    await new Promise((resolve, reject) => server.close(
+      error => error ? reject(error) : resolve()));
   }
 });
 
