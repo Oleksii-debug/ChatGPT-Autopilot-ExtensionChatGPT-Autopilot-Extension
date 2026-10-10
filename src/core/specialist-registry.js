@@ -105,13 +105,15 @@ function subset(requested, allowed, label) {
 function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
 function exactBindingKey(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) {
-    throw new Error(label + ' is invalid');
-  }
-  // Durable registry keys are JSON.stringify arrays (which may contain spaces
-  // inside human-readable definition fields). Legacy read-only selections can
-  // carry opaque identity tokens, but must not accept arbitrary whitespace,
-  // control characters or noncanonical representations as authority.
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) throw new Error(label + ' is invalid');
+  return value;
+}
+
+// A historical selection is read-only until re-bound against the canonical
+// registry. Validate its *representation* here, without changing the registry
+// normalization contract (which must report a forged key as inconsistent).
+function exactSelectionBindingKey(value, label) {
+  exactBindingKey(value, label);
   if (value.startsWith('[')) {
     let parsed;
     try { parsed = JSON.parse(value); } catch { throw new Error(label + ' is invalid'); }
@@ -208,7 +210,7 @@ export function normalizeSpecialistSelectionV1(input) {
     schemaVersion:1,
     registryId:id(raw.registryId,'registryId'),
     registryRevision:integer(raw.registryRevision,'registryRevision'),
-    ...(hasBindingKey ? { registryBindingKey:exactBindingKey(raw.registryBindingKey,'registryBindingKey') } : {}),
+    ...(hasBindingKey ? { registryBindingKey:exactSelectionBindingKey(raw.registryBindingKey,'registryBindingKey') } : {}),
     specialistId:id(raw.specialistId,'specialistId'),
     providerId:id(raw.providerId,'providerId'),
     definitionRevision:integer(raw.definitionRevision,'definitionRevision'),
