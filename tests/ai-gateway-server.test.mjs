@@ -117,11 +117,11 @@ test('Plan4 S1 real gateway registry preserves exact account endpoint and creden
   for(const bad of [
     {...endpoint,endpointId:' team '},
     {...endpoint,endpointId:'team '},
-    {...endpoint,endpointId:'\\tteam'},
+    {...endpoint,endpointId:'\tteam'},
     {...endpoint,endpointId:null},
     {...endpoint,endpointId:undefined},
     {...endpoint,apiKeyEnv:' TEAM_KEY '},
-    {...endpoint,apiKeyEnv:'TEAM_KEY\\n'},
+    {...endpoint,apiKeyEnv:'TEAM_KEY\n'},
     {...endpoint,apiKeyEnv:null},
   ]) {
     assert.throws(
@@ -143,7 +143,7 @@ test('Plan4 S1 real gateway denies malformed endpoint IDs before account credent
   let fetchCalls=0;
   const fetchFn=async ()=>{fetchCalls++;return response({data:[{id:'model'}]});};
   const env={TEAM_KEY:'test-fixture-opaque-credential'};
-  for(const endpointId of [' team ','team ', '\\tteam',null,{},42]) {
+  for(const endpointId of [' team ','team ', '\tteam',null,{},42]) {
     await assert.rejects(
       listProviderModels('openai-compatible',{endpointId,compatibleEndpoints,env,fetchFn}),
       error=>error.code==='AI_COMPATIBLE_ENDPOINT_ID_INVALID',
