@@ -620,3 +620,43 @@ test('AVAILABLE execution ownership clock rollback is fenced before any new clai
   assert.equal(forwardClock.dispatchAuthorized, false);
   assert.equal(forwardClock.executionAuthorized, false);
 });
+
+test('S1 provider readiness rejects hostile reflection without secret disclosure or side effects', () => {
+  const privateText = 'PRIVATE_PROVIDER_CREDENTIAL_NOT_FOR_DIAGNOSTICS';
+  let getterCalls = 0;
+  let reflectionCalls = 0;
+  const hostileReflection = () => {
+    reflectionCalls += 1;
+    throw new Error(privateText);
+  };
+  const cases = [
+    new Proxy(provider(), { getPrototypeOf: hostileReflection }),
+    new Proxy(provider(), { ownKeys: hostileReflection }),
+    Object.defineProperty(provider(), 'health', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        throw new Error(privateText);
+      },
+    }),
+    { ...provider(), [privateText]: 'forbidden' },
+  ];
+  for (const state of cases) {
+    assert.throws(
+      () => assessCloudExecutionFabricV1(request({ providerStates: [state] })),
+      error => error instanceof Error
+        && !error.message.includes(privateText)
+        && /providerStates\[0\]/u.test(error.message),
+    );
+  }
+  assert.equal(reflectionCalls, 2);
+  assert.equal(getterCalls, 0);
+
+  const recovered = assessCloudExecutionFabricV1(
+    JSON.parse(JSON.stringify(request({ providerStates: [provider()] }))),
+  );
+  assert.equal(recovered.disposition, CloudFabricDisposition.CLOUD);
+  assert.equal(recovered.dispatchAuthorized, false);
+  assert.equal(recovered.executionAuthorized, false);
+});
