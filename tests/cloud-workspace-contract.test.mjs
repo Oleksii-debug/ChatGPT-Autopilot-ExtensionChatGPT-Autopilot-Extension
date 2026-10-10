@@ -436,6 +436,16 @@ function scrubProof(overrides = {}) {
     ...overrides,
   };
 }
+function teardownCompletion(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    workspaceId: 'workspace.cloud.1',
+    providerId: 'cloud.provider.1',
+    executionLeaseId: 'lease.cloud.1',
+    completedAt: '2026-09-25T06:08:30.000Z',
+    ...overrides,
+  };
+}
 test('trusted cloud isolation adapter binds canonical owner and cannot authorize execution', async () => {
   let called = 0;
   const result = await verifyCloudWorkspaceIsolationV1(observation(), cloudOwnership(), {
@@ -511,7 +521,7 @@ test('trusted cloud teardown must verify filesystem/browser/process/secret scrub
     JSON.parse(JSON.stringify(binding)), {
       at: SCRUB_AT,
       loadCanonicalBinding: async () => binding,
-      teardown: async target => { calls.push('teardown'); assert.equal(target.workspaceId, binding.workspaceId); },
+      teardown: async target => { calls.push('teardown'); assert.equal(target.workspaceId, binding.workspaceId); return teardownCompletion(); },
       verifyScrub: async () => { calls.push('verify'); return scrubProof(); },
     },
   );
@@ -535,7 +545,7 @@ test('cloud teardown never reports clean on incomplete/hostile proof or failed t
     await assert.rejects(
       () => teardownAndVerifyCloudWorkspaceV1(binding, {
         at: SCRUB_AT, loadCanonicalBinding: async () => binding,
-      teardown: async () => {},
+      teardown: async () => teardownCompletion(),
         verifyScrub: async () => scrubProof(mutation),
       }), /proof/u,
     );
@@ -550,6 +560,66 @@ test('cloud teardown never reports clean on incomplete/hostile proof or failed t
     }), /teardown failed/u,
   );
   assert.equal(verified, false);
+});
+
+test('S1 refuses stale pre-teardown scrub proof and never reports a clean lease', async () => {
+  const { binding } = bindingAndOwnership();
+  let readbacks = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => { readbacks++; return binding; },
+      teardown: async () => teardownCompletion(),
+      verifyScrub: async () => scrubProof({ verifiedAt: '2026-09-25T06:08:29.000Z' }),
+    }),
+    /proof has stale or future verification chronology/u,
+  );
+  assert.equal(readbacks, 1, 'invalid proof must not manufacture a final clean receipt');
+});
+
+test('S1 requires versioned exact teardown completion before scrub verification', async () => {
+  const { binding } = bindingAndOwnership();
+  const invalid = [
+    undefined,
+    null,
+    false,
+    teardownCompletion({ schemaVersion: 2 }),
+    teardownCompletion({ workspaceId: 'workspace.other' }),
+    teardownCompletion({ providerId: 'provider.other' }),
+    teardownCompletion({ executionLeaseId: 'lease.other' }),
+    teardownCompletion({ completedAt: '2026-09-25T06:05:59.000Z' }),
+    teardownCompletion({ completedAt: '2026-09-25T06:11:00.000Z' }),
+    teardownCompletion({ extra: 'injected' }),
+  ];
+  for (const bad of invalid) {
+    let scrubCalls = 0;
+    await assert.rejects(
+      () => teardownAndVerifyCloudWorkspaceV1(binding, {
+        at: SCRUB_AT,
+        loadCanonicalBinding: async () => binding,
+        teardown: async () => bad,
+        verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+      }),
+      /teardown completion/u,
+    );
+    assert.equal(scrubCalls, 0, 'teardown failure must never trigger scrub attestation');
+  }
+  let getterReads = 0;
+  const hostile = teardownCompletion();
+  Object.defineProperty(hostile, 'completedAt', {
+    enumerable: true,
+    get() { getterReads++; return SCRUB_AT; },
+  });
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(binding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => binding,
+      teardown: async () => hostile,
+      verifyScrub: async () => { throw Error('should never verify'); },
+    }),
+    /own data properties/u,
+  );
+  assert.equal(getterReads, 0);
 });
 
 test('isolation refuses canonical ownership drift during asynchronous proof', async () => {
@@ -573,7 +643,7 @@ test('scrub rejects forged caller binding before any provider teardown', async (
     () => teardownAndVerifyCloudWorkspaceV1(forged, {
       at: SCRUB_AT,
       loadCanonicalBinding: async () => binding,
-      teardown: async () => { teardowns++; },
+      teardown: async () => { teardowns++; return teardownCompletion(); },
       verifyScrub: async () => scrubProof(),
     }), /does not match canonical binding/u,
   );
@@ -596,6 +666,7 @@ test('scrub does not accept a provider proof when canonical binding drifts after
           if (driftOn === 'teardown') {
             current = { ...binding, checkpointSha256: 'f'.repeat(64) };
           }
+          return teardownCompletion();
         },
         verifyScrub: async () => {
           verifies++;
@@ -623,7 +694,7 @@ test('scrub fails closed when final canonical binding readback fails', async () 
         if (++loads === 2) throw new Error('canonical store readback unavailable');
         return binding;
       },
-      teardown: async () => {},
+      teardown: async () => teardownCompletion(),
       verifyScrub: async () => scrubProof(),
     }),
     /canonical store readback unavailable/u,
