@@ -82,7 +82,7 @@ function snapshotRequiredCapabilities(required) {
   // never execute a custom iterator, an accessor or an inherited authority list.
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)
+    if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)
         || !Number.isSafeInteger(Number(key)) || Number(key) >= length) {
       throw new Error(`${label} contains noncanonical fields`);
     }
