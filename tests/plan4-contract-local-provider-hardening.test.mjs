@@ -881,6 +881,7 @@ test('route failover preserves model-budget reservation settlement and JSON rest
     },
     async afterProviderCall({route,reservation,ok}) {
       settlements.push({routeId:route.routeId,reservationId:reservation.reservationId,ok});
+      return {settled:true};
     },
   };
   const orchestrator=new AiOrchestrator({gatewayClient:client,now:()=>now,providerCallLifecycle:lifecycle});
@@ -1881,4 +1882,56 @@ test('Plan4 S1 model identity rejects controls, bidi and invalid Unicode before 
   const first = await createAiRouteRegistryEvidenceV1({...snapshot, routes:[accepted]});
   const restarted = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify({...snapshot, routes:[accepted]})));
   assert.equal(first.configSha256, restarted.configSha256);
+});
+
+
+test('Plan4 S1: durable settlement requires explicit data receipt before publication or failover', async () => {
+  const owner=JSON.parse(JSON.stringify({
+    enabled:true,mode:'primary',fallbackToStrongOnPrimaryError:true,
+    primary:{provider:'openai-compatible',model:'fixture'},
+    routePolicy:{autoSwitch:true},
+    routes:[
+      {routeId:'primary',provider:'openai-compatible',model:'fixture',locality:'local',costClass:'free',priority:10},
+      {routeId:'backup',provider:'openai-compatible',model:'backup',locality:'local',costClass:'free',priority:1},
+    ],
+  }));
+  const context={kind:'browser-agent',jobId:'explicit-settlement',controlEpoch:1};
+  const options={providerCallBudgetContext:context,maxOutputTokens:128,maxModelCallsForRequest:2};
+  const invalidReceipts=[undefined,null,false,{}, {settled:false}, {settled:0},
+    Object.defineProperty({},'settled',{enumerable:true,get(){throw new Error('private-ledger-token');}}),
+  ];
+  for (const transportFails of [false,true]) {
+    for (const receipt of invalidReceipts) {
+      let sends=0;
+      let settlements=0;
+      const router=new AiOrchestrator({
+        gatewayClient:{async complete(){
+          sends++;
+          if (transportFails) throw new Error('provider transient failure');
+          return {text:'must-not-publish',provider:'openai-compatible',model:'fixture'};
+        }},
+        providerCallLifecycle:{
+          async beforeProviderCall(){return {reservationId:'explicit-settlement:1'};},
+          async afterProviderCall(){settlements++;return receipt;},
+        },
+      });
+      await assert.rejects(router.run(JSON.parse(JSON.stringify(owner)),{},'approved',options),
+        error=>error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN'
+          && error.routeAttempts?.[0]?.outcome==='UNKNOWN'
+          && !String(error.message).includes('private-ledger-token'));
+      assert.equal(sends,1,'UNKNOWN must never invoke backup provider');
+      assert.equal(settlements,1,'one attempted effect must have one settlement call');
+    }
+  }
+  let sends=0;
+  const admitted=new AiOrchestrator({
+    gatewayClient:{async complete(){sends++;return {text:'verified',provider:'openai-compatible',model:'fixture'};}},
+    providerCallLifecycle:{
+      async beforeProviderCall(){return {reservationId:'explicit-settlement:2'};},
+      async afterProviderCall(){return {settled:true};},
+    },
+  });
+  const response=await admitted.run(JSON.parse(JSON.stringify(owner)),{},'approved',options);
+  assert.equal(response.text,'verified');
+  assert.equal(sends,1);
 });
