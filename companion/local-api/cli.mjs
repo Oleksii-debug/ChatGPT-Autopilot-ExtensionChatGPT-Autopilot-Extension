@@ -15,6 +15,8 @@ const help = `ChatGPT Автопілот — локальний CLI, API v1
   Дані запиту: JSON із schemaVersion, requestId, principalId, projectId,
   operation, targetId, payloadArtifactRef, requestedAt.
   Операції проходять звичайні перевірки політик і дозволів Core.
+  RECEIVED не означає, що задачу завершено; перевіряйте Core receipt.status.
+  Код 0: Core ACCEPTED (ще виконується) або COMPLETED; код 2: REJECTED/UNKNOWN.
   UNKNOWN_NETWORK_RESULT: перевірте стан за requestId, не повторюйте ефект сліпо.
 `;
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
