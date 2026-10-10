@@ -455,3 +455,46 @@ test('Section 1: second trusted admission refuses provider health and reason dri
     assert.equal(first.authority.providerExecutionAuthorized, false);
   }
 });
+
+
+test('Section 1: original readiness expires at admission despite matching fresh provider facts', async () => {
+  const create = (elapsedMs, counters) => {
+    const ticks = [NOW_MS, NOW_MS, NOW_MS + elapsedMs, NOW_MS + elapsedMs];
+    return new SpecialistProviderReadinessResolverV1({
+      bindings: [binding(async request => {
+        counters.probes += 1;
+        return { observedAt: request.asOf, providerStates: [state()] };
+      })],
+      now: () => {
+        assert.ok(ticks.length, 'clock fixture must be bounded');
+        return ticks.shift();
+      },
+    });
+  };
+
+  const atBoundary = { probes: 0 };
+  const acceptedResolver = create(30_000, atBoundary);
+  const accepted = await acceptedResolver.resolve(selection());
+  assert.equal(await acceptedResolver.assertCurrent(accepted), true);
+  assert.equal(atBoundary.probes, 2, 'fresh admission must always re-probe');
+  assert.equal(accepted.authority.providerExecutionAuthorized, false);
+
+  const expiredCounter = { probes: 0 };
+  const expiredResolver = create(30_001, expiredCounter);
+  const expired = await expiredResolver.resolve(selection());
+  await assert.rejects(
+    expiredResolver.assertCurrent(expired),
+    /readiness observation expired before admission/u,
+    'matching health and capabilities cannot refresh the original evidence lifetime',
+  );
+  assert.equal(expiredCounter.probes, 2);
+  assert.equal(expired.authority.providerExecutionAuthorized, false);
+  assert.equal(expired.authority.capacityReserved, false);
+
+  // A JSON-restored copy is not an owner-issued in-memory observation.
+  const forged = JSON.parse(JSON.stringify(accepted));
+  await assert.rejects(
+    acceptedResolver.assertCurrent(forged),
+    /lacks trusted resolver provenance/u,
+  );
+});
