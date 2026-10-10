@@ -214,7 +214,9 @@ export function discoverSpecialistsV1(input = {}) {
   const parentTools = ids(raw.parentToolIds, 'parentToolIds', 128);
   subset(required, parentCapabilities, 'Requested specialist capabilities');
   subset(requiredTools, parentTools, 'Requested specialist tools');
-  const allowedPlanes = new Set(raw.executionPlanes === undefined ? [...PLANES] : planes(raw.executionPlanes));
+  // Only an ABSENT field means unrestricted discovery. A present but undefined
+  // executionPlanes field must fail closed instead of widening child placement.
+  const allowedPlanes = new Set(Object.hasOwn(raw, 'executionPlanes') ? planes(raw.executionPlanes) : [...PLANES]);
   const specialists = registry.definitions
     .filter(item => item.enabled && allowedPlanes.has(item.executionPlane))
     .filter(item => required.every(capabilityId => item.capabilityIds.includes(capabilityId)))
