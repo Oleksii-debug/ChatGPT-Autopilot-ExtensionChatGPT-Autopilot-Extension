@@ -87,10 +87,11 @@ function ownerBudget(overrides = {}) {
 }
 
 async function seedRegistry(manager, def = definition()) {
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
