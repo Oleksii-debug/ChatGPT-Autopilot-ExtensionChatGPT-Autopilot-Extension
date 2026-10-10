@@ -1785,6 +1785,7 @@ export class BrowserAgentManager {
     if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
     const projectId = initial.job.config?.projectId || '';
     if (!projectId) throw new Error('Automatic delegation requires a durable Project binding');
+    if (!initial.job.definitionScope) throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
     const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
     const preflightAt = new Date(this.now()).toISOString();
 
@@ -1887,7 +1888,6 @@ export class BrowserAgentManager {
       this.now(),
     );
 
-    await assertSpecialistReadinessCurrent(providerReadiness);
     return withProjectHierarchyAuthority(projectId, async authority => {
       const at = new Date(this.now()).toISOString();
       let result = null;
@@ -2511,7 +2511,7 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
       if ((job.runtime.specialistDelegationBindings || []).some(binding => (job.runtime.specialistHandoffs || []).some(item => item.agentId === specialistAssignmentIdForPlanNodeV1(job.runtime.plan.planId, binding.nodeId) && item.state === 'READY'))) {
-        throw new Error('Automatic delegation requires product-wide trusted readiness admission; per-job claim is not authorized');
+        throw new Error('Automatic delegation requires canonical cross-job claim admission; per-job claim is not authorized');
       }
       const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = claimed.plan;
@@ -2655,7 +2655,6 @@ export class BrowserAgentManager {
           item.selection,
           this.now(),
         );
-        await trustedDependencies.assertSpecialistReadinessCurrent(readiness);
         readinessByNode.set(item.nodeId, readiness);
       }
       automaticAdmissions.set(jobId, Object.freeze({
