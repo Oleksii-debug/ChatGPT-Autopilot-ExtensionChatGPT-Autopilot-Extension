@@ -338,13 +338,15 @@ function recordedSpecialistDispatchEvidence(runtime) {
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('Agent specialist dispatch record must be an enumerable data field');
     }
+    // Persisted evidence must survive JSON cold restart. Hidden scalar fields
+    // are not durable receipts/identities and must fail before counting.
     const attempt = record(descriptor.value, 'Agent specialist dispatch attempt');
-    const state = own(attempt, 'state');
+    const state = persistedField(attempt, 'state').value;
     if (!SPECIALIST_DISPATCH_STATES.has(state)) {
       throw new Error('Agent specialist dispatch state is invalid');
     }
     statusCounts[state] += 1;
-    const receiptId = own(attempt, 'providerReceiptId');
+    const receiptId = persistedField(attempt, 'providerReceiptId').value;
     if (receiptId !== undefined && receiptId !== null && receiptId !== '') {
       // Refuse corrupt/spoofed persisted IDs instead of silently dropping
       // them or counting the same external receipt twice after restart.
@@ -356,9 +358,8 @@ function recordedSpecialistDispatchEvidence(runtime) {
       seenReceiptIds.add(receiptId);
       receiptIdsRecorded += 1;
     }
-    const referencesPresent = safeHasOwn(attempt, 'resultArtifactRefs');
+    const { present: referencesPresent, value: refs } = persistedField(attempt, 'resultArtifactRefs');
     if (!referencesPresent) continue;
-    const refs = own(attempt, 'resultArtifactRefs');
     if (!plainArray(refs)) throw new Error('Agent specialist artifact references must be a bounded dense array');
     const length = own(refs, 'length');
     if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
@@ -413,10 +414,12 @@ function recordedExecutionOwnershipEvidence(runtime) {
   const seenNodes = new Set();
   const seenEffects = new Set();
   for (const element of elements) {
+    // A non-enumerable state/node/effect identity vanishes after restart:
+    // never export its pre-restart value as durable evidence.
     const item = record(element, 'Agent execution ownership record');
-    const state = own(item, 'state');
-    const nodeId = own(item, 'nodeId');
-    const effectId = own(item, 'effectId');
+    const state = persistedField(item, 'state').value;
+    const nodeId = persistedField(item, 'nodeId').value;
+    const effectId = persistedField(item, 'effectId').value;
     if (!RECORDED_OWNERSHIP_STATES.has(state) ||
         typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId) ||
         typeof effectId !== 'string' || !RECORDED_OWNERSHIP_ID.test(effectId) ||
