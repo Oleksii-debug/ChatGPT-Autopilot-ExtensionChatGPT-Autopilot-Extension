@@ -2510,6 +2510,30 @@ function agentDefinitionModelPolicySummary(definition) {
   return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
 }
 
+function agentDefinitionSpecialistDelegationSummary(definition) {
+  if (!definition || !Object.hasOwn(definition, 'specialistDelegationProfile')) return 'Specialist delegation: не налаштовано.';
+  const profile = definition.specialistDelegationProfile;
+  if (!profile) return 'Specialist delegation: очищено.';
+  return `Specialist delegation: ${profile.enabled ? 'увімкнено' : 'вимкнено'}; реєстр ${profile.registryId}; max concurrent ${profile.maxConcurrentHandoffs}.`;
+}
+
+function syncAgentDefinitionSpecialistDelegationControls() {
+  const configured = $('agent-definition-specialist-delegation-configured').checked;
+  for (const id of [
+    'agent-definition-specialist-delegation-enabled',
+    'agent-definition-specialist-registry-id',
+    'agent-definition-specialist-capabilities',
+    'agent-definition-specialist-tools',
+    'agent-definition-specialist-policy-envelope',
+    'agent-definition-specialist-deadline-seconds',
+    'agent-definition-specialist-max-concurrent',
+    'agent-definition-specialist-lease-seconds',
+    'agent-definition-specialist-priority'
+  ]) {
+    $(id).disabled = !configured;
+  }
+}
+
 function syncAgentDefinitionModelRoutePolicyControls() {
   const configured = $('agent-definition-model-route-policy-configured').checked;
   for (const id of [
@@ -2560,8 +2584,22 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-model-route-max-input-price').value = modelRoutePolicy?.maxInputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxInputPricePerMillionUsd);
   $('agent-definition-model-route-max-output-price').value = modelRoutePolicy?.maxOutputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxOutputPricePerMillionUsd);
   syncAgentDefinitionModelRoutePolicyControls();
+  const specialistDelegationProfile = definition && Object.hasOwn(definition, 'specialistDelegationProfile')
+    ? definition.specialistDelegationProfile : undefined;
+  const specialistProfileConfigured = Boolean(specialistDelegationProfile);
+  $('agent-definition-specialist-delegation-configured').checked = specialistProfileConfigured;
+  $('agent-definition-specialist-delegation-enabled').checked = specialistDelegationProfile?.enabled === true;
+  $('agent-definition-specialist-registry-id').value = specialistDelegationProfile?.registryId || '';
+  $('agent-definition-specialist-capabilities').value = (specialistDelegationProfile?.requiredCapabilityIds || []).join('\n');
+  $('agent-definition-specialist-tools').value = (specialistDelegationProfile?.requiredToolIds || []).join('\n');
+  $('agent-definition-specialist-policy-envelope').value = specialistDelegationProfile?.policyEnvelopeId || '';
+  $('agent-definition-specialist-deadline-seconds').value = specialistDelegationProfile?.deadlineSeconds == null ? '900' : String(specialistDelegationProfile.deadlineSeconds);
+  $('agent-definition-specialist-max-concurrent').value = specialistDelegationProfile?.maxConcurrentHandoffs == null ? '1' : String(specialistDelegationProfile.maxConcurrentHandoffs);
+  $('agent-definition-specialist-lease-seconds').value = specialistDelegationProfile?.leaseSeconds == null ? '600' : String(specialistDelegationProfile.leaseSeconds);
+  $('agent-definition-specialist-priority').value = specialistDelegationProfile?.priority == null ? '0' : String(specialistDelegationProfile.priority);
+  syncAgentDefinitionSpecialistDelegationControls();
   $('agent-definition-revision').textContent = definition
-    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}. ${agentDefinitionSpecialistDelegationSummary(definition)}`
     : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
   $('agent-definition-save-button').disabled = !hasRegistry;
   $('agent-definition-toggle-enabled-button').disabled = !definition;
@@ -2818,6 +2856,16 @@ function agentDefinitionFormValue() {
     aiPrimaryModel: $('agent-definition-ai-primary-model').value,
     aiStrongProvider: $('agent-definition-ai-strong-provider').value,
     aiStrongModel: $('agent-definition-ai-strong-model').value,
+    specialistDelegationConfigured: $('agent-definition-specialist-delegation-configured').checked,
+    specialistDelegationEnabled: $('agent-definition-specialist-delegation-enabled').checked,
+    specialistRegistryId: $('agent-definition-specialist-registry-id').value,
+    specialistCapabilityIdsText: $('agent-definition-specialist-capabilities').value,
+    specialistToolIdsText: $('agent-definition-specialist-tools').value,
+    specialistPolicyEnvelopeId: $('agent-definition-specialist-policy-envelope').value,
+    specialistDeadlineSeconds: $('agent-definition-specialist-deadline-seconds').value,
+    specialistMaxConcurrentHandoffs: $('agent-definition-specialist-max-concurrent').value,
+    specialistLeaseSeconds: $('agent-definition-specialist-lease-seconds').value,
+    specialistPriority: $('agent-definition-specialist-priority').value,
     modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
     modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
     modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,
@@ -2850,6 +2898,8 @@ async function saveAgentDefinition() {
       definitionRevision,
       configDefaults: current?.configDefaults || {},
       modelRoutePolicy: current?.modelRoutePolicy ?? null,
+      specialistDelegationProfile: current && Object.hasOwn(current, 'specialistDelegationProfile')
+        ? current.specialistDelegationProfile : undefined,
     });
     const payload = current
       ? {
@@ -5750,6 +5800,7 @@ $('agent-definition-create-registry-button').addEventListener('click', createAge
 $('agent-definition-list').addEventListener('change', selectAgentDefinition);
 $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
+$('agent-definition-specialist-delegation-configured').addEventListener('change', syncAgentDefinitionSpecialistDelegationControls);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
