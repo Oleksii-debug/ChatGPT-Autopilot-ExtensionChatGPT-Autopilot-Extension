@@ -757,6 +757,9 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.text = raw.text;
   }
   if (type === BrowserAgentActionType.SELECT) {
+    if (uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref)?.element?.readonly === true) {
+      throw new Error('Browser Agent select refuses readonly semantic target');
+    }
     // Option values are exact remote form effect identities. Never silently
     // trim or truncate a model-proposed value into another option.
     if (typeof raw?.value !== 'string' || raw.value.length === 0 || raw.value.length > 5000) {
@@ -1160,8 +1163,9 @@ export function snapshotBrowserPage(snapshotId) {
         item.checked = ariaChecked === 'false' ? false : ariaChecked === 'true' ? true : null;
       }
     }
-    if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
-      // Read-only HTML and ARIA fields are observable, not editable targets.
+    if (tag === 'select' || ['input', 'textarea'].includes(tag) || element.isContentEditable) {
+      // Read-only HTML and ARIA fields, including semantic select controls,
+      // are observations and must never inherit edit authority.
       // Persist this semantic state so the planner cannot propose a write.
       let ariaReadonly = false;
       for (let node = element; node; node = node.parentElement) {
@@ -1172,6 +1176,8 @@ export function snapshotBrowserPage(snapshotId) {
       }
       item.readonly = element.readOnly === true
         || element.getAttribute?.('readonly') !== null || ariaReadonly;
+    }
+    if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
       item.sensitive = sensitive;
       item.filled = sensitive ? undefined : Boolean(normalize(element.value ?? element.textContent ?? '', 2));
       item.placeholder = sensitive ? '' : normalize(element.getAttribute('placeholder') || '', 500);
@@ -1259,8 +1265,8 @@ export function executeBrowserPageAction(snapshotId, action) {
       || href !== action.expectedSemanticHref
       || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
       || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
-    if (action.type === 'fill') {
-      // Focus and event listeners can make the field readonly between checks.
+    if (action.type === 'fill' || action.type === 'select') {
+      // Focus and event listeners can make the semantic edit target readonly between checks.
       if (target.readOnly === true || target.getAttribute?.('readonly') !== null) {
         throw new Error('AGENT_TARGET_READONLY');
       }
