@@ -16,6 +16,7 @@ import {
   browserAgentVisionOriginMatches,
   browserAgentSnapshotElement,
   classifyBrowserAgentActionRisk,
+  resolveBrowserAgentOwnerPolicy,
   BrowserAgentRunState,
 } from '../../src/core/browser-agent.js';
 import { BrowserAgentManager, buildUniqueBrowserFileInputExpression } from '../../src/core/browser-agent-manager.js';
@@ -3524,4 +3525,44 @@ test('Plan2 S1 SELECT readonly observation, focus and input-event transitions fa
     if (oldSelect === undefined) delete globalThis.HTMLSelectElement;
     else globalThis.HTMLSelectElement = oldSelect;
   }
+});
+
+test('Plan2 S1 unsafe link protocol cannot inherit global allow before or after JSON recovery', () => {
+  const baseUrl = 'https://example.test/editor';
+  const observed = { ref: 'r1', href: 'https://example.test/safe', name: 'Open', submitLike: false };
+  const snapshot = {
+    url: baseUrl,
+    frames: [{ frameId: 0, url: baseUrl, elements: [observed] }],
+  };
+  const config = {
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'example.test', defaultDecision: 'ALLOW', actionDecisions: {} },
+      { pattern: 'blocked.test', defaultDecision: 'DENY', actionDecisions: {} },
+    ],
+  };
+  const click = { type: 'click', frameId: 0, ref: 'r1' };
+  const judge = action => resolveBrowserAgentOwnerPolicy(config, JSON.parse(JSON.stringify(snapshot)),
+    JSON.parse(JSON.stringify(action)));
+  for (const target of [
+    'javascript:alert(1)', 'data:text/html,test', 'file:///etc/passwd',
+    'mailto:someone@example.test', 'http://[not-valid',
+  ]) {
+    observed.href = target;
+    for (const action of [
+      click, { type: 'key', key: 'Enter', frameId: 0, ref: 'r1' },
+      { type: 'key', key: ' ', frameId: 0, ref: 'r1' },
+    ]) {
+      const result = judge(action);
+      assert.equal(result.decision, 'DENY', target);
+      assert.equal(result.source, 'browser:unsafe-link-scheme', target);
+    }
+  }
+  observed.href = '#section';
+  assert.equal(judge(click).decision, 'ALLOW', 'a same-document anchor stays HTTP(S)');
+  observed.href = 'https://blocked.test/path';
+  assert.equal(judge(click).decision, 'DENY', 'the destination-specific owner deny wins');
+  observed.href = 'https://example.test/safe';
+  assert.equal(judge({ ...click, href: 'javascript:alert(1)', policy: 'DENY' }).decision, 'ALLOW',
+    'action/model fields cannot forge observed link authority');
 });
