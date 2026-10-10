@@ -43,6 +43,7 @@ const ui = {
   selectedScenarioPoolId: '',
   selectedScenarioWork: null,
   browserAgentJobs: [],
+  ownerResourceBudgetState: null,
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
   agentDefinitionRegistries: [],
@@ -3703,6 +3704,77 @@ async function saveBrowserAgentExecutionPolicy() {
   }
 }
 
+async function loadBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  try {
+    const state = await core('GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET');
+    ui.ownerResourceBudgetState = state;
+    input.value = String(state?.budget?.maxConcurrentAgents ?? 0);
+    const quarantined = state?.quarantined === true;
+    input.disabled = quarantined;
+    saveButton.disabled = quarantined;
+    status.textContent = quarantined
+      ? `ResourceBudgetV1 у карантині як пошкоджений; нова Specialist capacity закрита. Revision ${state?.revision ?? 0}.`
+      : `Глобальна Specialist capacity: ${state?.budget?.maxConcurrentAgents ?? 0}; revision ${state?.revision ?? 0}.`;
+  } catch (error) {
+    ui.ownerResourceBudgetState = null;
+    input.disabled = true;
+    saveButton.disabled = true;
+    status.textContent = `Не вдалося завантажити глобальний ResourceBudgetV1: ${error.message}`;
+  }
+}
+
+async function saveBrowserAgentOwnerResourceBudget() {
+  const status = $('agent-owner-resource-budget-status');
+  const input = $('agent-owner-max-concurrent');
+  const saveButton = $('agent-owner-resource-budget-save-button');
+  const state = ui.ownerResourceBudgetState;
+  if (!state || state.quarantined === true) {
+    status.textContent = 'ResourceBudgetV1 недоступний для безпечного збереження; спочатку перечитайте стан.';
+    return;
+  }
+  let maxConcurrentAgents;
+  try {
+    maxConcurrentAgents = parseStrictBoundedInteger(input.value, {
+      min: 0,
+      max: 256,
+      label: 'Глобальна Specialist capacity',
+    });
+  } catch (error) {
+    status.textContent = error.message;
+    input.focus();
+    return;
+  }
+  input.disabled = true;
+  saveButton.disabled = true;
+  status.textContent = 'Зберігаю глобальну Specialist capacity…';
+  try {
+    const committed = await core('SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET', {
+      expectedRevision: state.revision,
+      budget: {
+        ...(state.budget || {}),
+        maxConcurrentAgents,
+      },
+    });
+    ui.ownerResourceBudgetState = committed;
+    input.value = String(committed?.budget?.maxConcurrentAgents ?? 0);
+    status.textContent = `Збережено глобальну Specialist capacity ${committed?.budget?.maxConcurrentAgents ?? 0}; revision ${committed?.revision ?? 0}.`;
+    announce('Глобальну Specialist capacity збережено.');
+  } catch (error) {
+    await loadBrowserAgentOwnerResourceBudget();
+    status.textContent = `Глобальну capacity не збережено: ${error.message}. Поточний стан перечитано.`;
+    announce('Глобальну Specialist capacity не збережено.');
+    return;
+  } finally {
+    if (ui.ownerResourceBudgetState && ui.ownerResourceBudgetState.quarantined !== true) {
+      input.disabled = false;
+      saveButton.disabled = false;
+    }
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   const ticket = agentViewFence.beginRead();
   try {
@@ -5868,6 +5940,7 @@ $('agent-definition-save-button').addEventListener('click', saveAgentDefinition)
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
+$('agent-owner-resource-budget-save-button').addEventListener('click', saveBrowserAgentOwnerResourceBudget);
 $('agent-specialist-registry-list').addEventListener('change', selectSpecialistRegistry);
 $('agent-specialist-create-registry-button').addEventListener('click', createSpecialistRegistry);
 $('agent-specialist-list').addEventListener('change', selectSpecialist);
@@ -6089,6 +6162,7 @@ async function initialLoad() {
   await loadScenarioWork();
   await loadBrowserAgentJobs();
   await loadBrowserAgentExecutionPolicy();
+  await loadBrowserAgentOwnerResourceBudget();
   await loadAgentDefinitionRegistries();
   await loadSpecialistRegistries();
   await loadRemoteDispatchStatus();
