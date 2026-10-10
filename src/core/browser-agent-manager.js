@@ -3736,6 +3736,10 @@ export class BrowserAgentManager {
         const liveAfter = await this.chrome.tabs.get(tabId);
         const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
         if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+        // The native credential broker and tab reads are asynchronous: owner
+        // Stop/Pause may revoke this epoch while the secret is being resolved.
+        // A revoked run must never dispatch the credential to page JavaScript.
+        if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
 
         const execution = await this.requireScripting().executeScript({
           target: { tabId, frameIds: [Number(action.passwordFrameId)] },
