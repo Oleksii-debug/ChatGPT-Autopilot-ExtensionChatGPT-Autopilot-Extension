@@ -1392,3 +1392,35 @@ test('Plan-1 S1: artifact digest identity is exact through persisted observation
   }
   assert.deepEqual(normalizeArtifactRefV1(artifact({ sha256: '' })).sha256, '');
 });
+
+
+test('Plan-1 S1: explicitly present malformed artifact byte length fails closed across evidence paths', () => {
+  // Legacy absent size is compatible; an explicitly persisted null/undefined
+  // must never be converted into evidence that the artifact is zero bytes.
+  const legacy = artifact();
+  delete legacy.sizeBytes;
+  assert.equal(normalizeArtifactRefV1(legacy).sizeBytes, 0);
+  assert.equal(normalizeArtifactRefV1(artifact({ sizeBytes: 0 })).sizeBytes, 0);
+  assert.equal(normalizeArtifactRefV1(artifact({ sizeBytes: 123 })).sizeBytes, 123);
+  for (const sizeBytes of [null, undefined, -0, NaN, Infinity, -1, 1.5]) {
+    const malformed = artifact({ sizeBytes });
+    assert.throws(() => normalizeArtifactRefV1(malformed), /sizeBytes is invalid/);
+    assert.throws(() => normalizeObservationV1({
+      schemaVersion: 1, observationId: 'obs-invalid-byte-length',
+      invocationId: 'invoke-1', status: ObservationStatus.OK,
+      artifactRefs: [malformed], observedAt: AT,
+    }), /artifactRefs\[0\].*sizeBytes is invalid/);
+    assert.throws(() => normalizeSpecialistHandoffV1({
+      schemaVersion: 1, handoffId: 'handoff-invalid-byte-length',
+      specialistId: 'specialist-1', goal: 'Verify durable artifact evidence',
+      requestedCapabilityIds: ['filesystem.read'],
+      artifactRefs: [malformed], createdAt: AT,
+    }), /artifactRefs\[0\].*sizeBytes is invalid/);
+  }
+  for (const sizeBytes of [null, -1, 1.5]) {
+    assert.throws(() => normalizeArtifactRefV1(JSON.parse(JSON.stringify(artifact({ sizeBytes })))), /sizeBytes is invalid/);
+  }
+  const normalized = normalizeArtifactRefV1(artifact());
+  assert.ok(Object.isFrozen(normalized));
+  assert.deepEqual(normalizeArtifactRefV1(JSON.parse(JSON.stringify(normalized))), normalized);
+});
