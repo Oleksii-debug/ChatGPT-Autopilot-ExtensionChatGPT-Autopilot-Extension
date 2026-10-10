@@ -80,8 +80,29 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
   const seenPinnedCredentialRefs = new Set();
-  return Object.freeze(entries.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  return Object.freeze(entries.map((candidate, index) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    // Persisted endpoint/account identities may arrive from lower-trust config.
+    // Snapshot own data descriptors before reading *any* field: an accessor,
+    // inherited setting or Proxy trap must not change the selected credential
+    // namespace between validation and actual provider dispatch.
+    let item;
+    try {
+      const prototype = Object.getPrototypeOf(candidate);
+      if (prototype !== Object.prototype && prototype !== null) throw new Error('non-plain endpoint profile');
+      const descriptors = Object.getOwnPropertyDescriptors(candidate);
+      item = Object.create(null);
+      for (const key of Reflect.ownKeys(descriptors)) {
+        if (typeof key !== 'string') throw new Error('symbol endpoint profile field');
+        const descriptor = descriptors[key];
+        if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+          throw new Error('computed or hidden endpoint profile field');
+        }
+        Object.defineProperty(item, key, { value: descriptor.value, enumerable: true });
+      }
+    } catch {
+      throw gatewayError('OpenAI-compatible endpoint must contain only own enumerable data fields', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
     const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
     if (extra.length) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has unsupported field: ${extra[0]}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     // Endpoint identity is bound to an account/credential namespace; never
