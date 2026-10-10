@@ -2589,3 +2589,54 @@ test('Plan2 S1 radio uncheck is effect-free while valid radio selection recovers
   assert.equal(executeBrowserPageAction(id, selected).checked, true);
   assert.equal(element.clicked, 1, 'already selected radio must not click again');
 });
+
+
+// Section 1: scrolling is an owner-directed browser mutation. A malformed
+// action must not silently become a downward scroll after parsing or restart.
+test('Plan2 S1 scroll preserves exact owner intent at parse and JSON restart boundaries', () => {
+  const snapshot = setup();
+  for (const direction of [undefined, null, '', 'DOWN', 'left', false, 1]) {
+    const input = { type: 'scroll', amount: 0.5 };
+    if (direction !== undefined) input.direction = direction;
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify(input), snapshot),
+      /scroll requires an explicit up\/down direction/,
+    );
+  }
+  for (const amount of [null, '0.5', false, 0, 0.249, 3.01, -1, [], {}]) {
+    assert.throws(
+      () => parseBrowserAgentAction(JSON.stringify({ type: 'scroll', direction: 'up', amount }), snapshot),
+      /scroll requires an exact bounded amount/,
+    );
+  }
+  assert.equal(parseBrowserAgentAction('{"type":"scroll","direction":"down"}', snapshot).amount, 0.8);
+  assert.equal(parseBrowserAgentAction('{"type":"scroll","direction":"up","amount":0.25}', snapshot).amount, 0.25);
+  assert.equal(element.clicked, 0);
+});
+
+test('Plan2 S1 resumed scroll denies malformed intent without physical scrolling', () => {
+  setup();
+  const effects = [];
+  const previousScrollBy = globalThis.scrollBy;
+  globalThis.scrollBy = payload => { effects.push(payload); };
+  try {
+    const valid = JSON.parse(JSON.stringify({ type: 'scroll', direction: 'up', amount: 0.5 }));
+    for (const direction of [undefined, null, 'left', 'DOWN', 0]) {
+      const restored = { ...valid, direction };
+      assert.throws(() => executeBrowserPageAction('s1', restored), /AGENT_SCROLL_DIRECTION_INVALID/);
+    }
+    for (const amount of [undefined, null, '0.5', false, 0, 0.24, 3.01]) {
+      const restored = { ...valid, amount };
+      assert.throws(() => executeBrowserPageAction('s1', restored), /AGENT_SCROLL_AMOUNT_INVALID/);
+    }
+    assert.equal(effects.length, 0, 'invalid persisted actions must be effect-free');
+    assert.equal(executeBrowserPageAction('s1', valid).kind, 'scroll');
+    assert.deepEqual(effects, [{ top: -150, left: 0, behavior: 'instant' }]);
+    const recovered = JSON.parse(JSON.stringify({ ...valid, direction: 'down', amount: 1 }));
+    assert.equal(executeBrowserPageAction('s1', recovered).kind, 'scroll');
+    assert.deepEqual(effects.at(-1), { top: 300, left: 0, behavior: 'instant' });
+  } finally {
+    if (previousScrollBy === undefined) delete globalThis.scrollBy;
+    else globalThis.scrollBy = previousScrollBy;
+  }
+});
