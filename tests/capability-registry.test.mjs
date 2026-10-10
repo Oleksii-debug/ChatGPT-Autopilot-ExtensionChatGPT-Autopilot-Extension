@@ -62,3 +62,44 @@ test('provider launch URL is bound to its declared site adapter', () => {
   assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://example.com/'), /does not accept URL/);
   assert.throws(() => resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, 'https://www.chatgpt.com/'), /does not accept URL/);
 });
+
+
+test('Plan-1 S1: provider launch admission is data-only and redacts rejected URL secrets', () => {
+  const providerId = AgentProviderId.CHATGPT_BROWSER;
+  const secret = 'OWNER_PRIVATE_LAUNCH_CREDENTIAL_DO_NOT_LOG';
+  let calls = 0;
+  const hostile = {
+    toString() { calls += 1; throw new Error(secret); },
+    valueOf() { calls += 1; throw new Error(secret); },
+  };
+  for (const input of [hostile, 1, false, true, Symbol(secret)]) {
+    assert.throws(
+      () => resolveAgentProviderLaunchUrl(providerId, input),
+      error => {
+        assert.match(error.message, /must be text/);
+        assert.doesNotMatch(error.message, /OWNER_PRIVATE|CREDENTIAL_DO_NOT_LOG/);
+        return true;
+      },
+    );
+  }
+  assert.equal(calls, 0, 'hostile conversion hooks must never run');
+  assert.throws(
+    () => resolveAgentProviderLaunchUrl(providerId, `https://not-chatgpt.example/${secret}`),
+    error => {
+      assert.match(error.message, /rejected by site adapter/);
+      assert.doesNotMatch(error.message, /OWNER_PRIVATE|CREDENTIAL_DO_NOT_LOG|not-chatgpt/);
+      return true;
+    },
+  );
+  // Legacy omitted/null request, explicit canonical URL and JSON cold restart
+  // preserve the same existing site adapter authority without mutation.
+  assert.equal(resolveAgentProviderLaunchUrl(providerId), 'https://chatgpt.com/');
+  assert.equal(resolveAgentProviderLaunchUrl(providerId, null), 'https://chatgpt.com/');
+  const input = { providerId, requestedUrl: 'https://chatgpt.com/c/legitimate' };
+  const persisted = JSON.parse(JSON.stringify(input));
+  assert.equal(
+    resolveAgentProviderLaunchUrl(persisted.providerId, persisted.requestedUrl),
+    input.requestedUrl,
+  );
+  assert.deepEqual(persisted, input);
+});
