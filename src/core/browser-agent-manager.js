@@ -2465,11 +2465,42 @@ export class BrowserAgentManager {
       let totalTokens = reservation.totalTokens;
       let estimatedCostUsd = reservation.estimatedCostUsd;
       if (ok) {
-        const usage = result?.usage || {};
-        inputTokens = Math.max(1, Math.floor(Number(usage.inputTokens || usage.input_tokens || reservation.inputTokens)));
-        outputTokens = Math.max(1, Math.floor(Number(usage.outputTokens || usage.output_tokens || estimateAgentTokens(result?.text || ''))));
-        totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(usage.totalTokens || usage.total_tokens || 0)));
+        // Model/provider JSON is measured evidence, not trusted accounting authority.
+        // Explicitly forged, non-finite or accessor-backed usage must leave the
+        // durable reservation pending for conservative restart reconciliation.
+        const invalidUsage = () => {
+          const error = new Error('Provider model usage is not a bounded data-only receipt');
+          error.code = 'AI_MODEL_BUDGET_USAGE_INVALID';
+          throw error;
+        };
+        if (!result || typeof result !== 'object' || Array.isArray(result)) invalidUsage();
+        const usageDescriptor = Object.getOwnPropertyDescriptor(result, 'usage');
+        if (usageDescriptor && !Object.hasOwn(usageDescriptor, 'value')) invalidUsage();
+        const usage = usageDescriptor ? usageDescriptor.value : {};
+        if (!usage || typeof usage !== 'object' || Array.isArray(usage)) invalidUsage();
+        const usagePrototype = Object.getPrototypeOf(usage);
+        if (usagePrototype !== Object.prototype && usagePrototype !== null) invalidUsage();
+        const observed = (camel, snake, fallback) => {
+          for (const key of [camel, snake]) {
+            const descriptor = Object.getOwnPropertyDescriptor(usage, key);
+            if (!descriptor) continue;
+            if (!Object.hasOwn(descriptor, 'value')
+                || typeof descriptor.value !== 'number'
+                || !Number.isSafeInteger(descriptor.value)
+                || descriptor.value < 0) invalidUsage();
+            return descriptor.value;
+          }
+          return fallback;
+        };
+        const replyTextDescriptor = Object.getOwnPropertyDescriptor(result, 'text');
+        if (replyTextDescriptor && (!Object.hasOwn(replyTextDescriptor, 'value')
+            || typeof replyTextDescriptor.value !== 'string')) invalidUsage();
+        const replyText = replyTextDescriptor?.value || '';
+        inputTokens = Math.max(1, observed('inputTokens', 'input_tokens', reservation.inputTokens));
+        outputTokens = Math.max(1, observed('outputTokens', 'output_tokens', estimateAgentTokens(replyText)));
+        totalTokens = Math.max(inputTokens + outputTokens, observed('totalTokens', 'total_tokens', 0));
         estimatedCostUsd = agentUsageCostUsd(job.config, { inputTokens, outputTokens });
+        if (!Number.isFinite(estimatedCostUsd) || estimatedCostUsd < 0) invalidUsage();
       }
       job.runtime.modelCalls += reservation.modelCalls;
       job.runtime.inputTokens += inputTokens;

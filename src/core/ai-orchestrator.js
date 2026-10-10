@@ -1,6 +1,7 @@
 import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js';
 import {
   AiRouteRole,
+  hasUnsafeAiDispatchUnicode,
   DEFAULT_AI_ROUTE_POLICY,
   DEFAULT_AI_WORKER_POLICY,
   classifyAiRouteError,
@@ -12,6 +13,7 @@ import {
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
+import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 
 export const AiRouterMode = Object.freeze({
   PRIMARY: 'primary',
@@ -84,10 +86,17 @@ function ownerRoutingBoolean(raw, field, fallback) {
 // Snapshot only data fields before interpreting owner-controlled model routing.
  // Accessor/prototype coercion must never select a different provider or route.
 function snapshotRouterOwnerData(raw, label) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${label} must be a plain data object`);
-  const prototype = Object.getPrototypeOf(raw);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
-  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  // Owner settings and slots are security-relevant. A malicious or revoked
+  // Proxy must fail closed without exposing trap-supplied secret text.
+  let descriptors;
+  try {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid owner object');
+    const prototype = Object.getPrototypeOf(raw);
+    if (prototype !== Object.prototype && prototype !== null) throw new Error('invalid owner prototype');
+    descriptors = Object.getOwnPropertyDescriptors(raw);
+  } catch {
+    throw new Error(`${label} must contain inspectable own data fields`);
+  }
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     const descriptor = descriptors[key];
@@ -105,7 +114,8 @@ function normalizeSlot(raw, fallback) {
   const provider = Object.hasOwn(slot, 'provider') ? slot.provider : fallback.provider;
   if (!PROVIDERS.has(provider)) throw new Error('AI model slot provider is invalid');
   const model = Object.hasOwn(slot, 'model') ? slot.model : '';
-  if (typeof model !== 'string' || model !== model.trim() || model.length > 300) {
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300
+      || hasUnsafeAiDispatchUnicode(model)) {
     throw new Error('AI model slot name must be exact trimmed text of at most 300 characters');
   }
   return { provider, model };
@@ -125,6 +135,20 @@ function ownerRouterNumber(source, key, fallback) {
 
 export function normalizeAiRouterSettings(raw = {}) {
   const source = snapshotRouterOwnerData(raw, 'AI router settings');
+  // Versionless stored settings are the supported legacy v1 shape. Reject a
+  // future/invalid declared version instead of silently routing it as v1.
+  if (Object.hasOwn(source, 'schemaVersion') && source.schemaVersion !== 1) {
+    throw new Error('Unsupported AI router settings schemaVersion');
+  }
+  // Owner settings control endpoint selection, provider and fallback policy.
+  // Unknown persisted fields must not be silently ignored (including typos
+  // in restrictions), and their untrusted names must not leak to diagnostics.
+  const admitted = new Set(Object.keys(DEFAULT_AI_ROUTER_SETTINGS));
+  for (const key of Object.keys(source)) {
+    if (key !== 'schemaVersion' && !admitted.has(key)) {
+      throw new Error('AI router settings contain an unknown owner-controlled field');
+    }
+  }
   const timeoutSeconds = ownerRouterNumber(source, 'timeoutSeconds', DEFAULT_AI_ROUTER_SETTINGS.timeoutSeconds);
   const strongEveryNRequests = ownerRouterNumber(source, 'strongEveryNRequests', DEFAULT_AI_ROUTER_SETTINGS.strongEveryNRequests);
   const strongEveryMinutes = ownerRouterNumber(source, 'strongEveryMinutes', DEFAULT_AI_ROUTER_SETTINGS.strongEveryMinutes);
@@ -137,6 +161,13 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
+  // Explicitly erased owner-controlled fields are corrupt, not legacy omissions.
+  // Never silently restore defaults that could change endpoint, account or route.
+  for (const field of ['gatewayUrl', 'primary', 'strong', 'routes', 'routePolicy', 'workerPolicy']) {
+    if (Object.hasOwn(source, field) && source[field] === undefined) {
+      throw new Error(`AI router ${field} cannot be undefined when explicitly supplied`);
+    }
+  }
   const routes = normalizeAiRoutePool(source.routes === undefined ? [] : source.routes);
   const mode = Object.hasOwn(source, 'mode') ? source.mode : DEFAULT_AI_ROUTER_SETTINGS.mode;
   if (!MODES.has(mode)) throw new Error('AI router mode is invalid');
@@ -263,8 +294,59 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
   return `You are the stronger escalation/review model in a persistent hybrid AI workflow.\n\nTRIGGER: ${trigger}\n\nORIGINAL TASK:\n${clean(prompt)}\n\nPRIMARY/LOCAL WORKER REPORT OR DRAFT:\n${report || '(no primary report)'}${previous}\n\nContinue the task from this handoff. Correct errors, resolve uncertainty, and return the best usable result. Do not merely comment on the handoff.`.slice(0, settings.handoffMaxChars + clean(prompt).length + 2000);
 }
 
+// The durable budget broker must explicitly acknowledge settlement. An absent,
+// false, accessor-backed or forged receipt cannot authorize publishing output or
+// another provider effect after the first attempt may have been charged.
+function isCommittedProviderSettlement(receipt) {
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) return false;
+  const settled = Object.getOwnPropertyDescriptor(receipt, 'settled');
+  return Boolean(settled && Object.hasOwn(settled, 'value') && settled.value === true);
+}
+
+// Model/provider replies are untrusted even after a trusted transport and
+// durable budget settlement. Spreading a reply or reading nested usage getters
+// after settlement can throw a forged transient error and dispatch another
+// provider for an effect that has already incurred usage.
+function snapshotAiProviderCompletion(value) {
+  const data = (record, label) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new Error(label + ' must be an own-data record');
+    }
+    const prototype = Object.getPrototypeOf(record);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(label + ' must be a plain own-data record');
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(record);
+    const copy = Object.create(null);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key];
+      if (typeof key !== 'string' || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(label + ' contains an unsupported or computed property');
+      }
+      Object.defineProperty(copy, key, {
+        value: descriptor.value, enumerable: true, configurable: false, writable: false,
+      });
+    }
+    return copy;
+  };
+  const result = data(value, 'AI provider response');
+  if (typeof result.text !== 'string') {
+    throw new Error('AI provider response text must be data text');
+  }
+  if (Object.hasOwn(result, 'usage') && result.usage != null) {
+    const usage = Object.freeze(data(result.usage, 'AI provider usage'));
+    // Preserve the response shape while replacing only its untrusted nested
+    // usage reference; the rest remains advisory and never gains authority.
+    return Object.freeze(Object.assign(Object.create(null), result, { usage }));
+  }
+  return Object.freeze(result);
+}
+
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
+  constructor({
+    gatewayClient, now = () => Date.now(), providerCallLifecycle = null,
+    routeQualityEvidenceResolver = null, routeQualityEvidenceTimeoutMs = 150,
+  } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -273,9 +355,20 @@ export class AiOrchestrator {
     )) {
       throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
     }
+    if (routeQualityEvidenceResolver != null && typeof routeQualityEvidenceResolver !== 'function') {
+      throw new Error('AI route quality evidence resolver must be a function');
+    }
+    if (typeof routeQualityEvidenceTimeoutMs !== 'number'
+        || !Number.isSafeInteger(routeQualityEvidenceTimeoutMs)
+        || Object.is(routeQualityEvidenceTimeoutMs, -0)
+        || routeQualityEvidenceTimeoutMs < 1 || routeQualityEvidenceTimeoutMs > 5000) {
+      throw new Error('AI route quality evidence timeout must be a whole number from 1 to 5000 milliseconds');
+    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
+    this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
+    this.routeQualityEvidenceTimeoutMs = routeQualityEvidenceTimeoutMs;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -367,6 +460,21 @@ export class AiOrchestrator {
           maxOutputTokens: bounded,
           callNumber: callsUsed + 1,
         });
+        // A configured lifecycle is not proof that this effect was reserved.
+        // In particular, an unrecognized budget context or stopped owner must
+        // never receive a provider call with null/forged reservation evidence.
+        if (!reservation || typeof reservation !== 'object' || Array.isArray(reservation)) {
+          const unreserved = new Error('Model-budget reservation was not committed before dispatch');
+          unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
+          throw unreserved;
+        }
+        const receipt = Object.getOwnPropertyDescriptor(reservation, 'reservationId');
+        if (!receipt || !Object.hasOwn(receipt, 'value')
+            || typeof receipt.value !== 'string' || receipt.value.length < 1 || receipt.value.length > 240) {
+          const unreserved = new Error('Model-budget reservation has no exact durable identity');
+          unreserved.code = 'AI_MODEL_BUDGET_RESERVATION_REQUIRED';
+          throw unreserved;
+        }
       }
       callsUsed += 1;
       let value;
@@ -385,13 +493,14 @@ export class AiOrchestrator {
       } catch (error) {
         if (lifecycle) {
           try {
-            await lifecycle.afterProviderCall({
+            const settlement = await lifecycle.afterProviderCall({
               context: providerCallBudgetContext,
               reservation,
               route: routeIdentity,
               ok: false,
               error,
             });
+            if (!isCommittedProviderSettlement(settlement)) throw new Error('Unverified model budget settlement');
           } catch (settlementError) {
             // A provider may already have incurred a charge or produced an output.
             // Do not retry another model while its settlement is uncertain.
@@ -408,13 +517,14 @@ export class AiOrchestrator {
       }
       if (lifecycle) {
         try {
-          await lifecycle.afterProviderCall({
+          const settlement = await lifecycle.afterProviderCall({
             context: providerCallBudgetContext,
             reservation,
             route: routeIdentity,
             ok: true,
             result: value,
           });
+          if (!isCommittedProviderSettlement(settlement)) throw new Error('Unverified model budget settlement');
         } catch (settlementError) {
           // A provider may already have incurred a charge or produced an output.
           // Do not retry another model while its settlement is uncertain.
@@ -424,6 +534,57 @@ export class AiOrchestrator {
           routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:classification.code, category:classification.category });
           throw attachFailureRuntime(pending);
         }
+      }
+      // Provider/account receipts are observations, not routing authority.
+      // Even after recording consumed budget, a response claiming a different
+      // provider, model or bound endpoint must never be published or retried.
+      // Missing identity fields remain legacy *unverified* (not a proof of
+      // binding); declared mismatches and accessors fail closed.
+      let receiptIdentityMismatch = false;
+      try {
+        // A specifically bound compatible endpoint must supply all three
+        // exact receipt identities. Treat missing fields (and malformed
+        // responses) as UNKNOWN, not as successful account provenance.
+        // Unbound legacy slots retain the earlier compatibility behavior.
+        const requiresBoundReceipt = Boolean(routeIdentity.endpointId);
+        if (requiresBoundReceipt && (!value || typeof value !== 'object' || Array.isArray(value))) {
+          receiptIdentityMismatch = true;
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const fields = Object.getOwnPropertyDescriptors(value);
+          for (const field of ['provider', 'model', 'endpointId']) {
+            if (field === 'endpointId' && !requiresBoundReceipt) continue;
+            if (!Object.hasOwn(fields, field)) {
+              if (requiresBoundReceipt) receiptIdentityMismatch = true;
+              continue;
+            }
+            if (!Object.hasOwn(fields[field], 'value')
+                || fields[field].value !== routeIdentity[field]) receiptIdentityMismatch = true;
+          }
+        }
+      } catch {
+        receiptIdentityMismatch = true;
+      }
+      if (receiptIdentityMismatch) {
+        const unverified = new Error('Model provider identity receipt does not match the authorized route');
+        unverified.code = 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED';
+        unverified.category = 'UNAVAILABLE';
+        unverified.retryable = false;
+        routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:unverified.code, category:unverified.category });
+        throw attachFailureRuntime(unverified);
+      }
+      // Verify the complete provider payload before reporting a SUCCESS or
+      // exposing nested usage to later arithmetic. The provider call is
+      // already settled: a malformed payload is UNKNOWN, never retryable.
+      try {
+        value = snapshotAiProviderCompletion(value);
+      } catch {
+        const unverified = new Error('AI provider completion payload is unverified after dispatch');
+        unverified.code = 'AI_PROVIDER_RESPONSE_UNVERIFIED';
+        unverified.category = 'UNAVAILABLE';
+        unverified.retryable = false;
+        routeAttempts.push({ ...routeIdentity, outcome:'UNKNOWN', code:unverified.code, category:unverified.category });
+        throw attachFailureRuntime(unverified);
       }
       routeAttempts.push({ ...routeIdentity, outcome:'SUCCESS', code:'', category:'' });
       selectedRouteId = routeIdentity.routeId;
@@ -440,7 +601,53 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      const requiresVision = Boolean(clean(imageDataUrl));
+      const selectCanonical = () => selectAiRouteCandidates({
+        routes:settings.routes, policy:settings.routePolicy, routeStates,
+        role:requestedRole, capabilityIds, requiresVision, now:this.now(),
+      });
+      let selected = selectCanonical();
+      // Existing quality governor is advisory only. It may reorder an exact,
+      // freshly authorized route set, never introduce a new route or perform
+      // model I/O. Explicit owner pins and no-auto-switch bypass quality lookup.
+      if (this.routeQualityEvidenceResolver && settings.routePolicy.autoSwitch
+          && !settings.routePolicy.pinnedRouteId && selected.candidates.length > 1) {
+        const lookup = Object.freeze({
+          routeIds:Object.freeze(selected.candidates.map(candidate => candidate.routeId)),
+          role:requestedRole,
+          requiresVision,
+        });
+        let timer = null;
+        try {
+          const evidence = await Promise.race([
+            Promise.resolve().then(() => this.routeQualityEvidenceResolver(lookup)),
+            new Promise(resolve => { timer = setTimeout(() => resolve(null), this.routeQualityEvidenceTimeoutMs); }),
+          ]);
+          if (evidence !== null) {
+            const ranking = await rankAiRouteCandidatesByEvidenceV1({
+              routes:settings.routes, policy:settings.routePolicy,
+              routeStates, role:requestedRole, capabilityIds,
+              requiresVision, now:this.now(), benchmarkRequests:evidence,
+            });
+            const fresh = selectCanonical();
+            const order = new Map(ranking.rankedRouteIds.map((routeId,index) => [routeId,index]));
+            selected = {
+              ...fresh,
+              candidates:[...fresh.candidates].sort((left,right) =>
+                (order.get(left.routeId) ?? Number.MAX_SAFE_INTEGER)
+                - (order.get(right.routeId) ?? Number.MAX_SAFE_INTEGER)),
+            };
+          } else {
+            selected = selectCanonical();
+          }
+        } catch {
+          // Invalid/unavailable quality evidence cannot grant authority or
+          // prevent canonical routing; reselect after its asynchronous lookup.
+          selected = selectCanonical();
+        } finally {
+          if (timer !== null) clearTimeout(timer);
+        }
+      }
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,

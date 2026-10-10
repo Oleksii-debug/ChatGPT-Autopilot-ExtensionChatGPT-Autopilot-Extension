@@ -40,15 +40,15 @@ test('gateway client rejects final-URL authority smuggling before fetch', async 
 
   await assert.rejects(
     () => client.request('http://127.0.0.1:17621', 30, '@example.com/steal'),
-    /exact local API path/,
+    /not an approved model endpoint/,
   );
   await assert.rejects(
     () => client.request('http://127.0.0.1:17621', 30, '//example.com/steal'),
-    /exact local API path/,
+    /not an approved model endpoint/,
   );
   await assert.rejects(
     () => client.request('http://127.0.0.1:17621', 30, '/\\example.com/steal'),
-    /exact local API path/,
+    /not an approved model endpoint/,
   );
   await assert.rejects(
     () => client.request('http://127.0.0.1:17621', 30, {
@@ -57,7 +57,7 @@ test('gateway client rejects final-URL authority smuggling before fetch', async 
         return '/health';
       },
     }),
-    /exact local API path/,
+    /not an approved model endpoint/,
   );
   assert.equal(fetchCalls, 0);
   assert.equal(coercions, 0);
@@ -114,9 +114,9 @@ test('gateway client includes compatible endpoint identity in model discovery', 
     requestedUrl = String(url);
     return new Response(JSON.stringify({ ok:true, models:['coder'] }), { status:200 });
   } });
-  const result = await client.listModels({ gatewayUrl:'http://127.0.0.1:17621', timeoutSeconds:30, provider:'openai-compatible', endpointId:'team a' });
+  const result = await client.listModels({ gatewayUrl:'http://127.0.0.1:17621', timeoutSeconds:30, provider:'openai-compatible', endpointId:'team-a' });
   assert.deepEqual(result.models, ['coder']);
-  assert.match(requestedUrl, /provider=openai-compatible&endpointId=team%20a$/);
+  assert.match(requestedUrl, /provider=openai-compatible&endpointId=team-a$/);
 });
 
 
@@ -260,14 +260,14 @@ test('gateway client enforces the exact request byte ceiling before fetch', asyn
 
   await client.request('http://127.0.0.1:17621', 30, '/complete', {
     method: 'POST',
-    body: 'x'.repeat(MAX_REQUEST_BYTES),
+    body: jsonWithExactBytes(MAX_REQUEST_BYTES),
   });
   assert.equal(calls, 1);
 
   await assert.rejects(
     () => client.request('http://127.0.0.1:17621', 30, '/complete', {
       method: 'POST',
-      body: 'x'.repeat(MAX_REQUEST_BYTES + 1),
+      body: jsonWithExactBytes(MAX_REQUEST_BYTES + 1),
     }),
     error => error?.code === 'AI_GATEWAY_REQUEST_TOO_LARGE',
   );
@@ -280,7 +280,7 @@ test('gateway client counts request size in UTF-8 bytes before fetch', async () 
     calls += 1;
     return new Response('{"ok":true}', { status: 200 });
   } });
-  const body = '€'.repeat(Math.floor(MAX_REQUEST_BYTES / 3) + 1);
+  const body = JSON.stringify({ payload:'€'.repeat(Math.floor(MAX_REQUEST_BYTES / 3) + 1) });
   assert.ok(body.length < MAX_REQUEST_BYTES);
   assert.ok(new TextEncoder().encode(body).byteLength > MAX_REQUEST_BYTES);
 
@@ -355,7 +355,7 @@ test('gateway client snapshots public request envelopes before authority reads',
       prompt: 'test',
       maxOutputTokens: '256',
     }),
-    /maxOutputTokens must be a number/,
+    /maxOutputTokens must be a non-negative safe integer/,
   );
 });
 
@@ -415,11 +415,11 @@ test('gateway client rejects endpoint and resource aliases before fetch', async 
   );
   await assert.rejects(
     () => client.listModels({ gatewayUrl: base.gatewayUrl, timeoutSeconds: 30, provider: 'ollama', endpointId: 7 }),
-    /endpointId must be text when supplied/,
+    /endpointId must be an exact bounded identity when supplied/,
   );
   await assert.rejects(
     () => client.complete({ ...base, endpointId: 7 }),
-    /endpointId must be text when supplied/,
+    /endpointId must be an exact bounded identity when supplied/,
   );
   await assert.rejects(
     () => client.complete({ ...base, systemPrompt: 7 }),
@@ -431,15 +431,16 @@ test('gateway client rejects endpoint and resource aliases before fetch', async 
   );
   await assert.rejects(
     () => client.complete({ ...base, maxOutputTokens: -1 }),
-    /maxOutputTokens must be 0 or at least 1/,
+    /maxOutputTokens must be a non-negative safe integer/,
   );
   await assert.rejects(
     () => client.complete({ ...base, maxOutputTokens: 0.5 }),
-    /maxOutputTokens must be 0 or at least 1/,
+    /maxOutputTokens must be a non-negative safe integer/,
   );
   assert.equal(fetchCalls, 0);
 
-  await client.complete({ ...base, maxOutputTokens: 1.9 });
+  // Only exact positive integer owner ceilings may reach the canonical gateway.
+  await client.complete({ ...base, maxOutputTokens: 1 });
   assert.equal(fetchCalls, 1);
   assert.equal(lastBody.maxOutputTokens, 1);
 });

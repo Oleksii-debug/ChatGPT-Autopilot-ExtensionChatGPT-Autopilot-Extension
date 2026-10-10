@@ -100,7 +100,11 @@ const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
     beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
-      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) {
+        const error = new Error('Canonical Browser Agent model-budget owner is unavailable');
+        error.code = 'AI_MODEL_BUDGET_LIFECYCLE_REQUIRED';
+        throw error;
+      }
       return browserAgentLifecycle.current.reserveProviderModelBudget({
         jobId: context.jobId,
         controlEpoch: context.controlEpoch,
@@ -112,13 +116,23 @@ const aiOrchestrator = new AiOrchestrator({
       });
     },
     afterProviderCall: async ({ context, reservation, ok, result }) => {
-      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current || !reservation?.reservationId) return;
-      await browserAgentLifecycle.current.settleProviderModelBudget({
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current || !reservation?.reservationId) {
+        const error = new Error('Canonical Browser Agent budget settlement owner is unavailable');
+        error.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+        throw error;
+      }
+      const settlement = await browserAgentLifecycle.current.settleProviderModelBudget({
         jobId: context.jobId,
         reservationId: reservation.reservationId,
         ok,
         result,
       });
+      if (!settlement || settlement.settled !== true) {
+        const error = new Error('Durable model-budget settlement is UNKNOWN; reconcile before retry');
+        error.code = 'AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN';
+        throw error;
+      }
+      return settlement;
     },
   },
 });

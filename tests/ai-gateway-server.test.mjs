@@ -1,4 +1,5 @@
 import test from 'node:test';
+import http from 'node:http';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -96,6 +97,52 @@ test('gateway selects bounded compatible endpoints by ID and resolves secrets on
   );
 });
 
+test('Plan4 S1 custom account is never selected without its exact endpointId, including after cold restart', async () => {
+  // An unbound legacy call may only select the literal default endpoint,
+  // even when the user configured exactly one non-default account.
+  const custom = { endpointId:'account-b', baseUrl:'https://account-b.example.test/v1', apiKeyEnv:'ACCOUNT_B_KEY' };
+  const fixtures = [normalizeCompatibleEndpointRegistry([custom]),
+    normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([custom])))];
+  let outbound = 0;
+  const fetchFn = async (url, init = {}) => {
+    outbound++;
+    assert.equal(url.startsWith('https://account-b.example.test/v1/'), true);
+    assert.equal(init.headers.authorization, 'Bearer fixture-only-key');
+    if (url.endsWith('/models')) return response({ data:[{ id:'approved-model' }] });
+    return response({ choices:[{ message:{ content:'approved text' } }] });
+  };
+  for (const compatibleEndpoints of fixtures) {
+    const options = { fetchFn, compatibleEndpoints, env:{ ACCOUNT_B_KEY:'fixture-only-key' } };
+    await assert.rejects(
+      listProviderModels('openai-compatible', options),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND' && error.statusCode === 404,
+    );
+    await assert.rejects(
+      completeProvider({ provider:'openai-compatible', model:'approved-model', prompt:'test' }, options),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND' && error.statusCode === 404,
+    );
+    assert.equal(outbound, fixtures.indexOf(compatibleEndpoints) * 2, 'no provider request for unbound identity');
+    assert.deepEqual(await listProviderModels('openai-compatible', { ...options, endpointId:'account-b' }), ['approved-model']);
+    const receipt = await completeProvider({
+      provider:'openai-compatible', endpointId:'account-b', model:'approved-model', prompt:'test',
+    }, options);
+    assert.equal(receipt.endpointId, 'account-b');
+    assert.equal(receipt.model, 'approved-model');
+    assert.equal(receipt.text, 'approved text');
+  }
+  assert.equal(outbound, 4);
+
+  const legacy = normalizeCompatibleEndpointRegistry([{ endpointId:'default',
+    baseUrl:'http://127.0.0.1:1234/v1', apiKeyEnv:'' }]);
+  const calls = [];
+  assert.deepEqual(await listProviderModels('openai-compatible', {
+    compatibleEndpoints:legacy,
+    fetchFn:async (url, init) => { calls.push([url, init]); return response({ data:[{ id:'local' }] }); },
+  }), ['local']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'http://127.0.0.1:1234/v1/models');
+});
+
 test('compatible endpoint registry rejects duplicate IDs, inline secrets and insecure remote HTTP', () => {
   assert.throws(() => normalizeCompatibleEndpointRegistry([
     { endpointId:'same', baseUrl:'https://one.example/v1' },
@@ -108,6 +155,98 @@ test('compatible endpoint registry rejects duplicate IDs, inline secrets and ins
     { endpointId:'unsafe', baseUrl:'http://models.example.com/v1' },
   ]), /must use HTTPS/);
   assert.throws(() => normalizeCompatibleEndpointRegistry('{bad json'), /must be valid JSON/);
+});
+
+test('Plan4 S1 real gateway registry preserves exact account endpoint and credential-ref identity after JSON restart', () => {
+  const endpoint={endpointId:'team',baseUrl:'https://models.example.test/v1',apiKeyEnv:'TEAM_KEY'};
+  const valid=normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([endpoint])));
+  assert.deepEqual(valid[0],endpoint);
+  for(const bad of [
+    {...endpoint,endpointId:' team '},
+    {...endpoint,endpointId:'team '},
+    {...endpoint,endpointId:'\tteam'},
+    {...endpoint,endpointId:null},
+    {...endpoint,endpointId:undefined},
+    {...endpoint,apiKeyEnv:' TEAM_KEY '},
+    {...endpoint,apiKeyEnv:'TEAM_KEY\n'},
+    {...endpoint,apiKeyEnv:null},
+  ]) {
+    assert.throws(
+      ()=>normalizeCompatibleEndpointRegistry([bad]),
+      error=>error.code==='INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+    );
+    assert.throws(
+      ()=>normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([bad]))),
+      error=>error.code==='INVALID_COMPATIBLE_ENDPOINT_REGISTRY',
+    );
+  }
+});
+
+test('Plan4 S1 endpoint descriptor traps cannot redirect credentials after validation or JSON restart', async () => {
+  const authorized = {endpointId:'team', baseUrl:'https://models.example.test/v1', apiKeyEnv:'TEAM_KEY'};
+  const canonical = normalizeCompatibleEndpointRegistry(JSON.parse(JSON.stringify([authorized])));
+  assert.deepEqual(canonical[0], authorized);
+  let accessorCalls = 0;
+  const accessor = Object.defineProperty({...authorized}, 'baseUrl', {
+    enumerable:true, get(){accessorCalls++;throw new Error('sk-private-accessor-secret');},
+  });
+  const inherited = Object.assign(Object.create({accountId:'inherited-owner'}), authorized);
+  const hidden = Object.defineProperty({...authorized}, 'accountId', {value:'secret',enumerable:false});
+  const withSymbol = {...authorized};
+  withSymbol[Symbol('sk-private-symbol')] = 'secret';
+  const throwingProxy = new Proxy({...authorized}, {
+    ownKeys(){throw new Error('sk-private-proxy-secret');},
+  });
+  for (const candidate of [accessor, inherited, hidden, withSymbol, throwingProxy]) {
+    assert.throws(() => normalizeCompatibleEndpointRegistry([candidate]), error =>
+      error.code === 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'
+      && !String(error.message).includes('sk-private')
+      && !String(error.message).includes('secret'));
+  }
+  assert.equal(accessorCalls, 0, 'no lower-trust accessor may execute');
+  let outbound = 0;
+  const request = await completeProvider(
+    {provider:'openai-compatible',endpointId:'team',model:'fixture',prompt:'approved fixture'},
+    {
+      compatibleEndpoints:canonical,env:{TEAM_KEY:'fixture-only-key'},
+      fetchFn:async (url,init) => {
+        outbound++;
+        assert.equal(url,'https://models.example.test/v1/chat/completions');
+        assert.equal(init.headers.authorization,'Bearer fixture-only-key');
+        return response({choices:[{message:{content:'verified fixture'}}]});
+      },
+    },
+  );
+  assert.equal(request.endpointId,'team');
+  assert.equal(request.text,'verified fixture');
+  assert.equal(outbound,1);
+});
+
+test('Plan4 S1 real gateway denies malformed endpoint IDs before account credential/network effect', async () => {
+  const compatibleEndpoints=normalizeCompatibleEndpointRegistry([
+    {endpointId:'local',baseUrl:'http://127.0.0.1:1234/v1',apiKeyEnv:''},
+    {endpointId:'team',baseUrl:'https://models.example.test/v1',apiKeyEnv:'TEAM_KEY'},
+  ]);
+  let fetchCalls=0;
+  const fetchFn=async ()=>{fetchCalls++;return response({data:[{id:'model'}]});};
+  const env={TEAM_KEY:'test-fixture-opaque-credential'};
+  for(const endpointId of [' team ','team ', '\tteam',null,{},42]) {
+    await assert.rejects(
+      listProviderModels('openai-compatible',{endpointId,compatibleEndpoints,env,fetchFn}),
+      error=>error.code==='AI_COMPATIBLE_ENDPOINT_ID_INVALID',
+    );
+    await assert.rejects(
+      completeProvider({provider:'openai-compatible',endpointId,model:'model',prompt:'test'},
+        {compatibleEndpoints,env,fetchFn}),
+      error=>error.code==='AI_COMPATIBLE_ENDPOINT_ID_INVALID',
+    );
+  }
+  assert.equal(fetchCalls,0);
+  const ok=await listProviderModels('openai-compatible',{
+    endpointId:'team',compatibleEndpoints,env,fetchFn,
+  });
+  assert.deepEqual(ok,['model']);
+  assert.equal(fetchCalls,1);
 });
 
 test('compatible endpoint registry loads local non-secret settings unless an explicit env registry overrides them', () => {
@@ -223,4 +362,176 @@ test('gateway preserves typed retry evidence for provider quota, timeout and ava
     () => completeProvider({ provider:'ollama', model:'local', prompt:'task' }, { fetchFn:async () => { const error = new Error('aborted'); error.name = 'AbortError'; throw error; } }),
     error => error.statusCode === 504 && error.code === 'AI_PROVIDER_TIMEOUT',
   );
+});
+
+test('Plan4 S1 bound endpoint identity cannot silently fall through to builtin default account', async () => {
+  let providerEffects=0;
+  const fetchFn=async () => { providerEffects++; return response({models:[],data:[]}); };
+  // Builtin OpenAI and Ollama each have exactly one configured transport
+  // identity; a persisted route endpointId for a different account is not
+  // evidence that the transport can honor it.
+  for (const provider of ['ollama', 'openai']) {
+    for (const endpointId of ['team.account', ' local ', null, 13, {}]) {
+      await assert.rejects(
+        listProviderModels(provider, { endpointId, fetchFn }),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+      await assert.rejects(
+        completeProvider({provider, endpointId, model:'fixture', prompt:'approved'}, {fetchFn}),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+      await assert.rejects(
+        probeProvider(provider, { endpointId, fetchFn }),
+        error => error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED' && error.statusCode === 400,
+      );
+    }
+  }
+  assert.equal(providerEffects,0,'no discovery or completion I/O on wrong account identity');
+  const restored=JSON.parse(JSON.stringify({provider:'ollama',endpointId:'team.account',model:'fixture',prompt:'approved'}));
+  await assert.rejects(completeProvider(restored,{fetchFn}),error =>
+    error.code === 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+  assert.equal(providerEffects,0,'cold restart may not reset wrong account endpoint to default');
+  assert.deepEqual(await listProviderModels('ollama',{fetchFn:async () => response({models:[{name:'fixture'}]})}),['fixture']);
+});
+
+
+test('Plan4 S1 standalone provider gateway rejects aliased and hostile model identity before upstream or credential effects', async () => {
+  let upstream = 0;
+  const fetchFn = async () => { upstream++; throw new Error('unexpected upstream model effect'); };
+  const bad = [
+    ' model', 'model ', 'model\u0000identity', 'model\u000Aidentity',
+    'model\u007fidentity', 'model\u0080identity', 'model\u061cidentity',
+    'model\u200eidentity', 'model\u202eidentity', 'model\u2028identity',
+    'model\u2066identity', 'model\ud800identity', 'model\udc00identity',
+    'x'.repeat(301),
+  ];
+  for (const malformed of bad) {
+    for (const persisted of [malformed, JSON.parse(JSON.stringify(malformed))]) {
+      for (const provider of ['ollama','openai','openai-compatible']) {
+        await assert.rejects(
+          completeProvider({provider,model:persisted,prompt:'approved'}, {fetchFn}),
+          error => error.statusCode === 400 && error.code === 'AI_MODEL_ID_INVALID'
+            && !String(error.message).includes('unexpected upstream'),
+        );
+      }
+    }
+  }
+  assert.equal(upstream,0,'no provider request can be sent with aliased or malformed model');
+});
+
+test('Plan4 S1 standalone gateway preserves exact multilingual model identity after JSON cold restart', async () => {
+  const model = 'Київ/模型:v2';
+  const persisted = JSON.parse(JSON.stringify({provider:'ollama',model,prompt:'approved'}));
+  const sent = [];
+  const result = await completeProvider(persisted, {fetchFn:async (url,init) => {
+    sent.push({url,body:JSON.parse(init.body)});
+    return response({message:{content:'verified'},prompt_eval_count:2,eval_count:1});
+  }});
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].body.model,model);
+  assert.equal(result.model,model);
+  assert.equal(result.text,'verified');
+});
+
+
+test('Plan4 S1 explicit empty compatible endpoint registry stays disabled across JSON restart', async () => {
+  // A missing legacy registry retains the local discovery default.
+  assert.equal(normalizeCompatibleEndpointRegistry('')[0].endpointId, 'default');
+  for (const configured of [[], JSON.parse(JSON.stringify([])), '[]']) {
+    const endpoints = normalizeCompatibleEndpointRegistry(configured);
+    assert.deepEqual(endpoints, []);
+    assert.equal(Object.isFrozen(endpoints), true);
+    let effects = 0;
+    const fetchFn = async () => {
+      effects += 1;
+      throw new Error('unapproved provider network effect');
+    };
+    await assert.rejects(
+      listProviderModels('openai-compatible', { compatibleEndpoints:endpoints, fetchFn }),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND',
+    );
+    await assert.rejects(
+      completeProvider({ provider:'openai-compatible', model:'fixture', prompt:'approved' },
+        { compatibleEndpoints:endpoints, fetchFn }),
+      error => error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND',
+    );
+    assert.equal(effects, 0);
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-empty-endpoints-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:[] }), 'utf8');
+    assert.deepEqual(loadCompatibleEndpointRegistry({ env:{}, configFile }), []);
+    // Environment override [] must not silently revive the local fallback.
+    assert.deepEqual(loadCompatibleEndpointRegistry({
+      env:{ AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:'[]' }, configFile,
+    }), []);
+  } finally {
+    fs.rmSync(dir, { recursive:true, force:true });
+  }
+});
+
+
+test('Plan4 S1 provider redirect cannot cross endpoint with credential, model or prompt', async () => {
+  // Physical loopback HTTP exercises native Node fetch redirect handling, not
+  // just an option-spy. A response from another origin must never be fetched.
+  let redirectedHits = 0;
+  const authorizedHits = [];
+  const destination = http.createServer((_req, res) => {
+    redirectedHits += 1;
+    res.writeHead(200, { 'content-type':'application/json' });
+    res.end(JSON.stringify({
+      data:[{id:'model-v1'}],
+      choices:[{message:{content:'unapproved destination replied'}}],
+    }));
+  });
+  const listen = server => new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolve(server.address().port));
+  });
+  const close = server => new Promise(resolve => {
+    server.closeAllConnections?.();
+    server.close(() => resolve());
+  });
+  let origin;
+  try {
+    const destinationPort = await listen(destination);
+    origin = http.createServer((req, res) => {
+      authorizedHits.push({ path:req.url, authorization:req.headers.authorization });
+      res.writeHead(307, {
+        location:'http://127.0.0.1:' + destinationPort + '/unapproved-account',
+      });
+      res.end();
+    });
+    const originPort = await listen(origin);
+    const endpoints = normalizeCompatibleEndpointRegistry([
+      { endpointId:'bound-account', baseUrl:'http://127.0.0.1:' + originPort + '/v1', apiKeyEnv:'FIXTURE_CREDENTIAL' },
+    ]);
+    const options = {
+      compatibleEndpoints:endpoints,
+      endpointId:'bound-account',
+      env:{ FIXTURE_CREDENTIAL:'local-fixture-token' },
+      fetchFn:fetch,
+    };
+    await assert.rejects(
+      listProviderModels('openai-compatible', options),
+      error => error.code === 'AI_PROVIDER_UNAVAILABLE',
+    );
+    await assert.rejects(
+      completeProvider({
+        provider:'openai-compatible', endpointId:'bound-account',
+        model:'model-v1', prompt:'private fixture prompt',
+      }, options),
+      error => error.code === 'AI_PROVIDER_UNAVAILABLE',
+    );
+    assert.equal(authorizedHits.length, 2, 'only two owner-authorized upstream requests are allowed');
+    assert.equal(authorizedHits[0].path, '/v1/models');
+    assert.equal(authorizedHits[1].path, '/v1/chat/completions');
+    assert.deepEqual(authorizedHits.map(hit => hit.authorization),
+      ['Bearer local-fixture-token', 'Bearer local-fixture-token']);
+    assert.equal(redirectedHits, 0, 'a second origin must not receive tokens, model or prompts');
+  } finally {
+    if (origin?.listening) await close(origin);
+    if (destination.listening) await close(destination);
+  }
 });

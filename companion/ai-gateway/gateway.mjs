@@ -62,30 +62,64 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   let source = raw;
   if (typeof raw === 'string') {
     const text = clean(raw);
-    if (!text) source = [];
+    // Only genuinely absent legacy configuration receives the local default.
+    // An explicitly stored [] means zero authorized endpoints, not implicit
+    // permission to contact the default endpoint after cold restart.
+    if (!text) source = [{
+      endpointId: 'default',
+      baseUrl: COMPATIBLE_BASE_URL,
+      apiKeyEnv: 'COMPATIBLE_API_KEY',
+    }];
     else {
       try { source = JSON.parse(text); }
       catch (_) { throw gatewayError('AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON must be valid JSON', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'); }
     }
   }
   if (!Array.isArray(source)) throw gatewayError('OpenAI-compatible endpoint registry must be an array', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-  const entries = source.length ? source : [{
-    endpointId: 'default',
-    baseUrl: COMPATIBLE_BASE_URL,
-    apiKeyEnv: 'COMPATIBLE_API_KEY',
-  }];
+  const entries = source;
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
   const seenPinnedCredentialRefs = new Set();
-  return Object.freeze(entries.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  return Object.freeze(entries.map((candidate, index) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    // Persisted endpoint/account identities may arrive from lower-trust config.
+    // Snapshot own data descriptors before reading *any* field: an accessor,
+    // inherited setting or Proxy trap must not change the selected credential
+    // namespace between validation and actual provider dispatch.
+    let item;
+    try {
+      const prototype = Object.getPrototypeOf(candidate);
+      if (prototype !== Object.prototype && prototype !== null) throw new Error('non-plain endpoint profile');
+      const descriptors = Object.getOwnPropertyDescriptors(candidate);
+      item = Object.create(null);
+      for (const key of Reflect.ownKeys(descriptors)) {
+        if (typeof key !== 'string') throw new Error('symbol endpoint profile field');
+        const descriptor = descriptors[key];
+        if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+          throw new Error('computed or hidden endpoint profile field');
+        }
+        Object.defineProperty(item, key, { value: descriptor.value, enumerable: true });
+      }
+    } catch {
+      throw gatewayError('OpenAI-compatible endpoint must contain only own enumerable data fields', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
     const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
     if (extra.length) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has unsupported field: ${extra[0]}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-    const endpointId = clean(item.endpointId);
+    // Endpoint identity is bound to an account/credential namespace; never
+    // canonicalize a corrupt persisted identity by trimming whitespace.
+    if (typeof item.endpointId !== 'string' || item.endpointId !== item.endpointId.trim()) {
+      throw gatewayError('OpenAI-compatible endpoint requires an exact endpointId', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
+    const endpointId = item.endpointId;
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(endpointId)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has an invalid endpointId`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     if (seen.has(endpointId)) throw gatewayError(`Duplicate OpenAI-compatible endpointId: ${endpointId}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     seen.add(endpointId);
-    const apiKeyEnv = clean(item.apiKeyEnv);
+    // apiKeyEnv is an opaque credential reference, not free-form text.
+    if (item.apiKeyEnv !== undefined && (typeof item.apiKeyEnv !== 'string'
+        || item.apiKeyEnv !== item.apiKeyEnv.trim())) {
+      throw gatewayError('OpenAI-compatible credential reference must be exact', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    }
+    const apiKeyEnv = item.apiKeyEnv === undefined ? '' : item.apiKeyEnv;
     if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const baseUrl = normalizeCompatibleBaseUrl(item.baseUrl);
     const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
@@ -117,10 +151,30 @@ export function loadCompatibleEndpointRegistry({ env = process.env, configFile =
 const COMPATIBLE_ENDPOINTS = loadCompatibleEndpointRegistry();
 
 function resolveCompatibleEndpoint(endpointId = '', registry = COMPATIBLE_ENDPOINTS) {
-  const requested = clean(endpointId) || (registry.length === 1 ? registry[0].endpointId : 'default');
+  // A provided endpointId must match the stored account endpoint exactly,
+  // including at runtime after JSON cold restart. Only genuine omission ('')
+  // retains legacy default selection.
+  if (typeof endpointId !== 'string' || endpointId !== endpointId.trim()) {
+    throw gatewayError('OpenAI-compatible requested endpointId must be exact', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+  }
+  // A missing endpoint identity is compatible only with the historical
+  // literal 'default' binding. Selecting the sole custom endpoint would
+  // silently promote an unbound request into a different provider account.
+  // Discovery, status probes and completion must use the same rule.
+  const requested = endpointId || 'default';
   const endpoint = registry.find(item => item.endpointId === requested);
   if (!endpoint) throw gatewayError(`Unknown OpenAI-compatible endpointId: ${requested}`, 404, 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
   return endpoint;
+}
+
+// An endpointId is a provider/account identity, not a free-form label. The
+// built-in Ollama/OpenAI transports have one configured origin each and cannot
+// honor an arbitrary registry endpoint. Reject it before any provider I/O.
+function requireBuiltinEndpointUnbound(provider, endpointId) {
+  if (provider === 'openai-compatible') return;
+  if (endpointId !== '') {
+    throw gatewayError('Built-in provider does not support a bound endpointId', 400, 'AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED');
+  }
 }
 
 export function createInferenceQueue({ maxPending = DEFAULT_MAX_PENDING_INFERENCE } = {}) {
@@ -372,7 +426,11 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
   let response;
   let text;
   try {
-    response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
+    // Pin every provider request to its approved origin: native fetch follows
+    // cross-origin 30x redirects by default, which can leak tokens, prompts or
+    // model/account identity and bypass an exact endpoint profile binding.
+    // The caller cannot re-enable redirects through init.
+    response = await fetchFn(url, { ...init, redirect: 'error', signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
     text = await readBoundedUpstreamText(response, controller);
   } catch (error) {
     if (error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE' || error?.code === 'AI_PROVIDER_INVALID_RESPONSE') throw error;
@@ -441,6 +499,7 @@ function openAiText(body) {
 
 export async function listProviderModels(provider, { fetchFn = globalThis.fetch, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
+  requireBuiltinEndpointUnbound(provider, endpointId);
   if (provider === 'ollama') {
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/tags`);
     return (body.models || []).map(item => clean(item?.name || item?.model)).filter(Boolean).sort();
@@ -454,9 +513,28 @@ export async function listProviderModels(provider, { fetchFn = globalThis.fetch,
   return (body.data || body.models || []).map(item => clean(item?.id || item?.name || item?.model)).filter(Boolean).sort();
 }
 
+
+function exactProviderModelId(model) {
+  // The HTTP gateway is an independently callable transport boundary. An
+  // untrusted request must never alias to a different charged model by
+  // trimming or accepting malformed Unicode, even if extension validation
+  // was bypassed. Keep the companion standalone (no dependency on src/).
+  if (!clean(model)) throw new Error('Model is required');
+  if (typeof model !== 'string' || model !== model.trim() || model.length > 300
+      || /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(model)
+      || Array.from(model).some(char => {
+        const point = char.codePointAt(0);
+        return point >= 0xd800 && point <= 0xdfff;
+      })) {
+    throw gatewayError('AI provider model identity must be exact bounded Unicode', 400, 'AI_MODEL_ID_INVALID');
+  }
+  return model;
+}
+
 export async function completeProvider({ provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch, compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
-  if (!clean(model)) throw new Error('Model is required');
+  requireBuiltinEndpointUnbound(provider, endpointId);
+  const dispatchModel = exactProviderModelId(model);
   if (!clean(prompt)) throw new Error('Prompt is required');
   const visionImage = normalizeImageDataUrl(imageDataUrl);
   if (provider === 'ollama') {
@@ -466,17 +544,17 @@ export async function completeProvider({ provider, model, endpointId = '', promp
     const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/chat`, {
       method: 'POST',
-      body: JSON.stringify({ model: clean(model), messages, stream: false, ...(tokenLimit ? { options: { num_predict: tokenLimit } } : {}) }),
+      body: JSON.stringify({ model: dispatchModel, messages, stream: false, ...(tokenLimit ? { options: { num_predict: tokenLimit } } : {}) }),
     });
     const text = clean(body?.message?.content) || clean(body?.response);
     if (!text) throw new Error('Ollama returned no assistant text');
     const inputTokens = Math.max(0, Number(body?.prompt_eval_count || 0));
     const outputTokens = Math.max(0, Number(body?.eval_count || 0));
-    return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, modelCalls: 1 } };
+    return { provider, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, modelCalls: 1 } };
   }
 
   if (provider === 'openai') {
-    const payload = { model: clean(model), input: visionImage ? [{ role: 'user', content: [{ type: 'input_text', text: clean(prompt) }, { type: 'input_image', image_url: visionImage }] }] : clean(prompt) };
+    const payload = { model: dispatchModel, input: visionImage ? [{ role: 'user', content: [{ type: 'input_text', text: clean(prompt) }, { type: 'input_image', image_url: visionImage }] }] : clean(prompt) };
     if (clean(systemPrompt)) payload.instructions = clean(systemPrompt);
     const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
     if (tokenLimit) payload.max_output_tokens = tokenLimit;
@@ -490,7 +568,7 @@ export async function completeProvider({ provider, model, endpointId = '', promp
     const inputTokens = Math.max(0, Number(body?.usage?.input_tokens || 0));
     const outputTokens = Math.max(0, Number(body?.usage?.output_tokens || 0));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(body?.usage?.total_tokens || 0));
-    return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
+    return { provider, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
   }
 
   const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
@@ -501,19 +579,20 @@ export async function completeProvider({ provider, model, endpointId = '', promp
   const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: compatibleHeaders(endpoint, env),
-    body: JSON.stringify({ model: clean(model), messages, stream: false, ...(tokenLimit ? { max_tokens: tokenLimit } : {}) }),
+    body: JSON.stringify({ model: dispatchModel, messages, stream: false, ...(tokenLimit ? { max_tokens: tokenLimit } : {}) }),
   });
   const text = clean(body?.choices?.[0]?.message?.content) || clean(body?.choices?.[0]?.text);
   if (!text) throw new Error('OpenAI-compatible server returned no assistant text');
   const inputTokens = Math.max(0, Number(body?.usage?.prompt_tokens || 0));
   const outputTokens = Math.max(0, Number(body?.usage?.completion_tokens || 0));
   const totalTokens = Math.max(inputTokens + outputTokens, Number(body?.usage?.total_tokens || 0));
-  return { provider, endpointId: endpoint.endpointId, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
+  return { provider, endpointId: endpoint.endpointId, model: dispatchModel, text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
 }
 
 
 export async function probeProvider(provider, { fetchFn = globalThis.fetch, timeoutMs = STATUS_PROBE_TIMEOUT_MS, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
+  requireBuiltinEndpointUnbound(provider, endpointId);
   if (provider === 'openai' && !clean(process.env.OPENAI_API_KEY)) {
     return { provider, configured: false, ok: false, models: 0, reason: 'api-key-not-configured' };
   }
@@ -556,8 +635,12 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
           providers: [...PROVIDERS],
           openaiConfigured: Boolean(clean(process.env.OPENAI_API_KEY)),
           compatibleApiKeyConfigured: compatibleEndpoints.some(item => item.apiKeyEnv && clean(env[item.apiKeyEnv])),
-          compatibleBaseUrl: compatibleEndpoints[0].baseUrl,
-          compatibleTransport: new URL(compatibleEndpoints[0].baseUrl).protocol.replace(':', ''),
+          // [] is a valid explicitly disabled account registry. Health must
+          // stay readable without conjuring an implicit default endpoint.
+          compatibleBaseUrl: compatibleEndpoints[0]?.baseUrl || '',
+          compatibleTransport: compatibleEndpoints[0]
+            ? new URL(compatibleEndpoints[0].baseUrl).protocol.replace(':', '')
+            : '',
           compatibleEndpoints: compatibleEndpoints.map(item => ({ endpointId:item.endpointId, baseUrl:item.baseUrl, transport:new URL(item.baseUrl).protocol.replace(':', ''), apiKeyConfigured:Boolean(item.apiKeyEnv && clean(env[item.apiKeyEnv])) })),
           ollamaBaseUrl: OLLAMA_BASE_URL,
           nodeVersion: process.version,
@@ -584,12 +667,24 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
       }
       if (req.method === 'GET' && url.pathname === '/models') {
         const provider = clean(url.searchParams.get('provider'));
-        const endpointId = clean(url.searchParams.get('endpointId'));
+        // Preserve exact account binding across the HTTP boundary. Do not
+        // trim malicious endpointId query values or pick one of duplicates.
+        const endpointIds = url.searchParams.getAll('endpointId');
+        if (endpointIds.length > 1 || (endpointIds.length === 1 && !endpointIds[0])) {
+          throw gatewayError('Gateway endpointId query must be a unique exact value', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+        }
+        const endpointId = endpointIds[0] ?? '';
         const models = await listProviderModels(provider, { fetchFn, endpointId, compatibleEndpoints, env });
         return json(res, 200, { ok: true, provider, ...(provider === 'openai-compatible' ? { endpointId:resolveCompatibleEndpoint(endpointId, compatibleEndpoints).endpointId } : {}), models }, { corsOrigin });
       }
       if (req.method === 'POST' && url.pathname === '/complete') {
         const body = await readBody(req);
+        // A declared-but-erased endpoint binding is not the legacy omission.
+        // It must never select a default account after JSON migration.
+        if (body && typeof body === 'object' && !Array.isArray(body)
+            && Object.hasOwn(body, 'endpointId') && body.endpointId === '') {
+          throw gatewayError('Explicitly empty gateway endpointId is not allowed', 400, 'AI_COMPATIBLE_ENDPOINT_ID_INVALID');
+        }
         const result = await inferenceQueue.run(() => completeProvider(body, { fetchFn, compatibleEndpoints, env }));
         return json(res, 200, { ok: true, ...result }, { corsOrigin });
       }

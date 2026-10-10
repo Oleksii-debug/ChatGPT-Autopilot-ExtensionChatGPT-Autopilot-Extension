@@ -33,7 +33,7 @@ test('Agent pins its own Mistral route and passes endpointId to Gateway without 
   const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
     aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
       calls.push(request);
-      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+      return { provider:request.provider, model:request.model, endpointId:request.endpointId, text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
     } } }),
   });
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {

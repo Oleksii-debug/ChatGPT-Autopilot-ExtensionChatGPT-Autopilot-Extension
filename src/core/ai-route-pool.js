@@ -20,6 +20,17 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_ROUTES = 32;
 const MAX_PARALLEL_WORKERS = 200;
 
+// Shared, pure check for exact provider/model dispatch identities across
+// the registry, legacy model slots and the final outbound gateway boundary.
+// A legitimate Unicode model name is not normalized into a different model.
+export function hasUnsafeAiDispatchUnicode(value) {
+  return /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(value)
+    || Array.from(value).some(char => {
+      const point = char.codePointAt(0);
+      return point >= 0xd800 && point <= 0xdfff;
+    });
+}
+
 export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
   autoSwitch: true,
   pinnedRouteId: '',
@@ -43,9 +54,14 @@ export const DEFAULT_AI_WORKER_POLICY = Object.freeze({
 });
 
 function object(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
+  // A revoked/hostile Proxy can throw private text even during Array.isArray.
+  // Reject it without forwarding user-controlled reflection exception messages.
+  let plain = false;
+  try {
+    plain = Boolean(value && typeof value === 'object' && !Array.isArray(value)
+      && [Object.prototype, null].includes(Object.getPrototypeOf(value)));
+  } catch { plain = false; }
+  if (!plain) throw new Error(`${label} must be a plain data object`);
   return value;
 }
 function exact(value, allowed, label) {
@@ -61,12 +77,17 @@ function exact(value, allowed, label) {
 }
 function dataRecord(value, allowed, label) {
   object(value, label);
-  const keys = Reflect.ownKeys(value);
+  // A single own-descriptor snapshot prevents check/use drift; Proxy errors
+  // are fail-closed and never exposed as route or credential diagnostics.
+  let descriptors;
+  try { descriptors = Object.getOwnPropertyDescriptors(value); }
+  catch { throw new Error(`${label} fields are not inspectable own data`); }
+  const keys = Reflect.ownKeys(descriptors);
   const out = Object.create(null);
   for (const key of keys) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label} field must be an enumerable own data property: ${key}`);
     }
@@ -80,10 +101,15 @@ function dataRecord(value, allowed, label) {
   return Object.freeze(out);
 }
 function denseDataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  let descriptors;
+  try {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new Error('invalid array');
+    }
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
     throw new Error(`${label} must be a bounded array`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const lengthDescriptor = descriptors.length;
   if (!lengthDescriptor
       || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
@@ -115,7 +141,18 @@ function exactPromptText(value, label, max = 8_000) {
   if (value.length > max) throw new Error(`${label} is too long`);
   return value;
 }
-function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
+function id(value, label, optional = false) {
+  if (optional && (value == null || value === '')) return '';
+  // Route, profile, endpoint and credential identifiers are exact identities.
+  // Silent trim would alias a corrupt persisted identity to a different
+  // authorized provider/endpoint after JSON restart.
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(`${label} must be an exact bounded identifier`);
+  }
+  const out = clean(value, 180);
+  if (!ID.test(out)) throw new Error(`${label} is invalid`);
+  return out;
+}
 // Optional identity may be absent in legacy snapshots, but an explicitly
 // persisted null/undefined cannot erase a previously bound endpoint or credential.
 function optionalIdentity(record, key, label) {
@@ -202,30 +239,84 @@ function optionalIds(record, key, label, max = MAX_ROUTES) {
   return ids(own(record, key), label, max);
 }
 
+// A model catalog names dispatch identities, not ASCII route/profile keys.
+// Share the route's exact Unicode safety boundary (no silent normalization),
+// while preserving dense-array, duplicate and size checks.
+function endpointModelIds(value, label) {
+  const source = denseDataArray(value, label, 64);
+  const models = source.map((model, index) => {
+    if (typeof model !== 'string' || !model || model !== model.trim()
+        || model.length > 300 || hasUnsafeAiDispatchUnicode(model)) {
+      throw new Error(`${label}[${index}] must be an exact bounded model identity`);
+    }
+    return model;
+  });
+  if (new Set(models).size !== models.length) throw new Error(`${label} contains duplicates`);
+  return models;
+}
+
 export function normalizeAiRoutePool(raw = []) {
   if (raw === null) throw new Error('AI route pool must be a bounded array');
   const source = denseDataArray(raw, 'AI route pool', MAX_ROUTES);
   const routes = source.map((rawItem, index) => {
     const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
     if (Object.hasOwn(item, 'schemaVersion') && own(item, 'schemaVersion') !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
-    const provider = clean(own(item, 'provider'), 40);
-    if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
-    const model = clean(own(item, 'model'), 300);
-    if (!model) throw new Error('AI route model is required');
+    // Provider and model form the exact execution identity. Silently trimming
+    // corrupted persisted values could dispatch to a different approved model.
+    const provider = own(item, 'provider');
+    if (typeof provider !== 'string' || provider !== provider.trim() || provider.length > 40
+        || !PROVIDERS.has(provider)) throw new Error('AI route provider must be an exact supported identity');
+    const model = own(item, 'model');
+    // Exact provider dispatch IDs must never contain terminal control characters,
+    // bidi overrides or malformed Unicode. Do not normalize valid Unicode IDs.
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300
+        || hasUnsafeAiDispatchUnicode(model)) {
+      throw new Error('AI route model must be an exact bounded identity');
+    }
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const rawLocality = own(item, 'locality');
+    // Omission supports legacy defaults; an explicitly persisted undefined must
+    // not reset a user-approved locality constraint after a partial migration.
+    if (Object.hasOwn(item, 'locality') && rawLocality === undefined) throw new Error('AI route locality cannot be undefined when supplied');
     if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route locality must be text');
+    // Locality is an owner/security boundary: never turn an invalid persisted alias into an allowed destination.
+    if (rawLocality !== undefined && rawLocality !== rawLocality.trim()) throw new Error('AI route locality must be exact');
     const locality = clean(rawLocality === undefined ? (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE) : rawLocality, 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
+    // The built-in OpenAI gateway always dispatches to a remote API. A
+    // persisted owner route must not relabel that transport as local to pass
+    // a local-only policy filter and send private prompts off-device.
+    if (provider === 'openai' && locality !== AiRouteLocality.REMOTE) {
+      throw new Error('AI route built-in OpenAI provider requires remote locality');
+    }
     const rawCostClass = own(item, 'costClass');
+    if (Object.hasOwn(item, 'costClass') && rawCostClass === undefined) throw new Error('AI route costClass cannot be undefined when supplied');
     if (rawCostClass !== undefined && typeof rawCostClass !== 'string') throw new Error('AI route costClass must be text');
     // A remote Ollama-compatible endpoint is not provably free merely because its provider name is Ollama.
     // Only explicitly local Ollama keeps the legacy zero-cost default; all other unpriced routes stay UNKNOWN.
+    // A stored cost tier must be an exact enum, not a whitespace-repaired alias.
+    if (rawCostClass !== undefined && rawCostClass !== rawCostClass.trim()) throw new Error('AI route costClass must be exact');
     const costClass = clean(rawCostClass === undefined ? (provider === 'ollama' && locality === AiRouteLocality.LOCAL ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN) : rawCostClass, 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
+    // A caller's FREE label is not sufficient evidence for a *remote*
+    // account. Both input/output prices must be observed zero, including
+    // after JSON cold restart. Preserve existing local-only pricing behavior:
+    // local price caps still independently check observed dimensions.
+    if (costClass === AiRouteCostClass.FREE && locality === AiRouteLocality.REMOTE) {
+      // Retain the existing canonical cost-meter error contract for
+      // contradictory paid dimensions, and separately fail closed on
+      // missing remote FREE evidence before any provider request.
+      if ((inputPriceKnown && price(own(item, 'inputPricePerMillionUsd'), 'AI route input price') !== 0)
+          || (outputPriceKnown && price(own(item, 'outputPricePerMillionUsd'), 'AI route output price') !== 0)) {
+        throw new Error('Free AI route cannot declare non-zero paid pricing');
+      }
+      if (!inputPriceKnown || !outputPriceKnown) {
+        throw new Error('AI route remote FREE pricing requires observed zero input and output cost');
+      }
+    }
     return Object.freeze({
       schemaVersion: AI_ROUTE_POOL_VERSION,
       routeId: id(own(item, 'routeId'), 'AI route routeId'),
@@ -256,8 +347,18 @@ export function normalizeAiRoutePool(raw = []) {
 export function normalizeAiRoutePolicy(raw = {}) {
   if (raw === null) throw new Error('AI route policy must be a plain data object');
   const source = dataRecord(raw, new Set(['autoSwitch','pinnedRouteId','orderedRouteIds','allowRouteIds','denyRouteIds','freeOnly','locality','maxInputPricePerMillionUsd','maxOutputPricePerMillionUsd','retryBackoffSeconds','circuitBreakerFailures','circuitBreakerSeconds']), 'AI route policy');
+  // A persisted explicit null/undefined must not silently lift the owner's
+  // pinned route and authorize a different account/model on recovery.
+  if (Object.hasOwn(source, 'pinnedRouteId') && typeof own(source, 'pinnedRouteId') !== 'string') {
+    throw new Error('AI route pinnedRouteId must be exact text when explicitly supplied');
+  }
   const rawLocality = own(source, 'locality');
+  // An explicit undefined is not a legacy omission: falling back to `any`
+  // would silently widen the owner's persisted locality policy.
+  if (Object.hasOwn(source, 'locality') && rawLocality === undefined) throw new Error('AI route policy locality cannot be undefined when supplied');
   if (rawLocality !== undefined && typeof rawLocality !== 'string') throw new Error('AI route policy locality must be text');
+  // In particular, ' any ' must not silently widen an owner's locality restriction.
+  if (rawLocality !== undefined && rawLocality !== rawLocality.trim()) throw new Error('AI route policy locality must be exact');
   const locality = clean(rawLocality === undefined ? DEFAULT_AI_ROUTE_POLICY.locality : rawLocality, 20);
   if (!['any', ...LOCALITIES].includes(locality)) throw new Error('AI route policy locality is invalid');
   return Object.freeze({
@@ -290,7 +391,9 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   const suppliedWorkers = own(policy, 'manualRouteWorkers');
   const source = Object.hasOwn(policy, 'manualRouteWorkers') ? suppliedWorkers : {};
   object(source, 'AI worker manualRouteWorkers');
-  const descriptors = Object.getOwnPropertyDescriptors(source);
+  let descriptors;
+  try { descriptors = Object.getOwnPropertyDescriptors(source); }
+  catch { throw new Error('AI worker manualRouteWorkers fields are not inspectable own data'); }
   const keys = Reflect.ownKeys(descriptors);
   if (keys.length > MAX_ROUTES) throw new Error('AI worker manualRouteWorkers is too large');
   const entries = [];
@@ -439,17 +542,22 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
         - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER)
       || (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0);
   });
-  const available = candidates.filter(route => {
+  // Owner autoSwitch=false pins the FIRST eligible route, including while
+  // it is in durable backoff or its circuit is open. Filtering for health
+  // before taking the first route silently dispatches to a different model.
+  // Automatic fallback is allowed only when the owner enabled autoSwitch.
+  const admitted = normalizedPolicy.autoSwitch ? candidates : candidates.slice(0, 1);
+  const available = admitted.filter(route => {
     const state = own(states, route.routeId);
     return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= selectionNow;
   });
-  const retryAt = candidates.length && !available.length
-    ? Math.min(...candidates.map(route => {
+  const retryAt = admitted.length && !available.length
+    ? Math.min(...admitted.map(route => {
       const state = own(states, route.routeId);
       return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
     }).filter(value => value > selectionNow))
     : 0;
-  return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
+  return Object.freeze({ candidates: Object.freeze(available), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
 }
 
 export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy = {}, routeStates = {}, role = AiRouteRole.FAST_WORKER, capabilityIds = [], requiresVision = false, desiredWorkers = 0, now = Date.now() } = {}) {
@@ -460,7 +568,10 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
     ? Math.max(requested, normalizedWorkerPolicy.minWorkers) : requested, normalizedWorkerPolicy.maxParallelWorkers);
   const selected = selectAiRouteCandidates({
     routes: pool,
-    policy: { ...normalizeAiRoutePolicy(routePolicy), autoSwitch: true },
+    // Worker allocation must honor the same owner no-auto-switch policy as
+    // individual model dispatch. Bypassing it here would allocate to a backup
+    // provider while the preferred route is in durable backoff/circuit-open.
+    policy: normalizeAiRoutePolicy(routePolicy),
     routeStates,
     role,
     capabilityIds,
@@ -565,16 +676,27 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
   const profiles = denseDataArray(suppliedProfiles === undefined ? [] : suppliedProfiles, 'AI endpoint profiles', 32);
   const seen = new Set();
   const normalizedProfiles = profiles.map((entry, index) => {
-    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless']), `AI endpoint profile ${index + 1}`);
+    const item = dataRecord(entry, new Set(['schemaVersion', 'profileId', 'provider', 'endpointId', 'origin', 'locality', 'credentialRef', 'credentialless', 'accountId', 'capabilityIds', 'modelIds']), `AI endpoint profile ${index + 1}`);
     if (own(item, 'schemaVersion') !== 1) throw new Error('Unsupported AI endpoint profile schemaVersion');
     const profileId = id(own(item, 'profileId'), 'AI endpoint profileId');
     if (seen.has(profileId)) throw new Error('Duplicate AI endpoint profileId');
     seen.add(profileId);
-    const provider = clean(own(item, 'provider'), 40);
-    if (!PROVIDERS.has(provider)) throw new Error('AI endpoint provider is invalid');
+    // Provider is part of the persisted endpoint/account binding. Never
+    // trim an invalid identity into a different authorized provider on reload.
+    const provider = own(item, 'provider');
+    if (typeof provider !== 'string' || provider.length > 40
+        || provider !== provider.trim() || !PROVIDERS.has(provider)) {
+      throw new Error('AI endpoint provider must be an exact supported identity');
+    }
     const endpointId = optionalIdentity(item, 'endpointId', 'AI endpoint endpointId');
     const locality = own(item, 'locality');
     if (!LOCALITIES.has(locality)) throw new Error('AI endpoint locality is invalid');
+    // Evidence cannot relabel the built-in OpenAI transport as local: it always
+    // uses a remote API, independent of any endpoint profile's claimed origin.
+    // Keep this aligned with normalizeAiRoutePool's route-level locality fence.
+    if (provider === 'openai' && locality !== AiRouteLocality.REMOTE) {
+      throw new Error('AI endpoint built-in OpenAI provider requires remote locality');
+    }
     const origin = own(item, 'origin');
     if (typeof origin !== 'string' || origin !== origin.trim()) throw new Error('AI endpoint origin is invalid');
     let parsed;
@@ -590,7 +712,28 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (typeof credentialless !== 'boolean') throw new Error('AI endpoint credentialless must be explicit');
     if (credentialless === Boolean(credentialRef)) throw new Error('AI endpoint must have exactly one credential mode');
     if (credentialless && locality !== 'local') throw new Error('Remote AI endpoint cannot be credentialless');
-    return Object.freeze({ schemaVersion: 1, profileId, provider, endpointId, origin: parsed.origin, locality, credentialRef, credentialless });
+    // Account and capability evidence extends the existing registry; it never
+    // becomes an independent routing, authentication or permission authority.
+    // Omitted fields preserve the legacy V1 evidence hash after cold restart.
+    const accountId = Object.hasOwn(item, 'accountId')
+      ? id(own(item, 'accountId'), 'AI endpoint accountId') : '';
+    const declaredCapabilities = Object.hasOwn(item, 'capabilityIds')
+      ? Object.freeze(optionalIds(item, 'capabilityIds', 'AI endpoint capabilityIds', 64)) : null;
+    // Advisory model-catalog scope for an endpoint; omitted legacy profiles
+    // remain unrestricted evidence, not a fabricated positive model match.
+    // Exact model IDs are checked before hashing and after JSON restart.
+    const declaredModels = Object.hasOwn(item, 'modelIds')
+      ? Object.freeze(endpointModelIds(own(item, 'modelIds'), 'AI endpoint modelIds')) : null;
+    return Object.freeze({
+      // The profile returned as evidence must itself remain a valid canonical
+      // registry input after JSON persistence. A bare parsed.origin drops the
+      // required trailing slash and breaks the very next cold-restart read.
+      schemaVersion: 1, profileId, provider, endpointId, origin: `${parsed.origin}/`,
+      locality, credentialRef, credentialless,
+      ...(accountId ? { accountId } : {}),
+      ...(declaredCapabilities !== null ? { capabilityIds: declaredCapabilities } : {}),
+      ...(declaredModels !== null ? { modelIds: declaredModels } : {}),
+    });
   });
   // Endpoint identity is advisory evidence, never a second source of dispatch authority.
   // Versionless legacy routes may have no endpointId; explicitly record that gap
@@ -606,6 +749,13 @@ export async function createAiRouteRegistryEvidenceV1(raw) {
     if (route.endpointId && !profile) throw new Error('AI route endpoint has no registry profile');
     if (profile && (route.provider !== profile.provider || route.locality !== profile.locality)) {
       throw new Error('AI route provider/locality does not match its endpoint profile');
+    }
+    if (profile && Object.hasOwn(profile, 'capabilityIds')
+        && route.capabilityIds.some(capability => !profile.capabilityIds.includes(capability))) {
+      throw new Error('AI route claims a capability absent from its bound endpoint profile');
+    }
+    if (profile && Object.hasOwn(profile, 'modelIds') && !profile.modelIds.includes(route.model)) {
+      throw new Error('AI route model is absent from its bound endpoint profile');
     }
     return Object.freeze({
       routeId: route.routeId, provider: route.provider, model: route.model,

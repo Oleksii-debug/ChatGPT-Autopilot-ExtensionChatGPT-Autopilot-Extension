@@ -312,8 +312,21 @@ test('durable backoff and autoSwitch=false remain canonical Router authority', a
     },
   });
 
-  assert.deepEqual(report.rankedRouteIds, ['route-b']);
-  assert.equal(report.retryAt, 0);
+  // autoSwitch=false pins the canonical priority winner, even while it
+  // is cooling down. Quality scores must not re-enable implicit failover.
+  assert.deepEqual(report.rankedRouteIds, []);
+  assert.equal(report.retryAt, NOW + 10_000);
+
+  const ownerAllowsFallback = await rank({
+    routes: [route('route-a'), route('route-b')],
+    policy: { autoSwitch: true },
+    routeStates: {
+      'route-a': { successes: 1, backoffUntil: NOW + 10_000, lastLatencyMs: 10 },
+      'route-b': { successes: 1, lastLatencyMs: 20 },
+    },
+  });
+  assert.deepEqual(ownerAllowsFallback.rankedRouteIds, ['route-b']);
+  assert.equal(ownerAllowsFallback.retryAt, 0);
 
   const bothBlocked = await rank({
     routes: [route('route-a'), route('route-b')],
