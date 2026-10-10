@@ -2379,6 +2379,35 @@ test('Plan4 S1 built-in OpenAI may never masquerade as local to bypass local-onl
 });
 
 
+test('Plan4 S1 endpoint evidence cannot claim the built-in remote OpenAI provider is local', async () => {
+  // The route-level local-only guard is not enough: independent persisted
+  // endpoint profiles could previously mint a hash for a false local identity.
+  const forged = {
+    schemaVersion:1, profileId:'forged.local-openai', provider:'openai',
+    endpointId:'', locality:'local', origin:'http://127.0.0.1:11434/',
+    credentialRef:'owner.openai', credentialless:false,
+  };
+  for (const profile of [forged, JSON.parse(JSON.stringify(forged))]) {
+    await assert.rejects(
+      createAiRouteRegistryEvidenceV1({...snapshot, endpointProfiles:[profile]}),
+      /built-in OpenAI provider requires remote locality/,
+    );
+  }
+  // A valid remote profile still produces deterministic evidence after restart,
+  // without reading any provider credential or contacting a remote service.
+  const authorized = {
+    ...forged, profileId:'remote.openai', locality:'remote',
+    origin:'https://api.openai.com/',
+  };
+  const original = {...snapshot, endpointProfiles:[authorized]};
+  const evidence = await createAiRouteRegistryEvidenceV1(original);
+  const restarted = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(original)));
+  assert.equal(evidence.configSha256, restarted.configSha256);
+  assert.equal(evidence.endpointProfiles[0].locality, 'remote');
+  assert.equal(evidence.authority.canReadCredentials, false);
+  assert.equal(evidence.authority.canSelectRoute, false);
+});
+
 test('Plan4 S1 FREE classification cannot disguise remote UNKNOWN or positive provider price across restart', async () => {
   const remote = {
     routeId:'remote-free', provider:'openai-compatible', model:'fixture-remote',
