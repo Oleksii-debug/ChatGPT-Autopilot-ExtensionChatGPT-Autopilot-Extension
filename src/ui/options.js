@@ -3783,7 +3783,9 @@ async function saveBrowserAgentOwnerResourceBudget() {
         maxConcurrentAgents,
       },
     });
-    if (!isWritableOwnerResourceBudgetSnapshot(committed)) {
+    if (!isWritableOwnerResourceBudgetSnapshot(committed)
+        || committed.revision !== state.revision + 1
+        || committed.budget.maxConcurrentAgents !== maxConcurrentAgents) {
       throw new Error('Некоректне підтвердження durable ResourceBudgetV1; потрібне повторне читання');
     }
     ui.ownerResourceBudgetState = committed;
