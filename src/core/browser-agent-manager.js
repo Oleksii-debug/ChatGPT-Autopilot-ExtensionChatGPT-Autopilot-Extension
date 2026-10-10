@@ -606,23 +606,26 @@ function normalizeModelBudgetReservation(raw) {
     if (!Object.hasOwn(descriptor, 'value')
       || typeof descriptor.value !== 'number'
       || !Number.isSafeInteger(descriptor.value)
-      || descriptor.value < minimum) return null;
+      || descriptor.value < minimum
+      || Object.is(descriptor.value, -0)) return null;
   }
   const costDescriptor = Object.getOwnPropertyDescriptor(raw, 'estimatedCostUsd');
   if (costDescriptor && (!Object.hasOwn(costDescriptor, 'value')
     || typeof costDescriptor.value !== 'number'
     || !Number.isFinite(costDescriptor.value)
-    || costDescriptor.value < 0)) return null;
+    || costDescriptor.value < 0
+    || Object.is(costDescriptor.value, -0))) return null;
   const idDescriptor = Object.getOwnPropertyDescriptor(raw, 'reservationId');
   if (!idDescriptor || !Object.hasOwn(idDescriptor, 'value')
     || typeof idDescriptor.value !== 'string'
     || !idDescriptor.value
     || idDescriptor.value.length > 240
-    || idDescriptor.value !== idDescriptor.value.trim()) return null;
+    || idDescriptor.value !== idDescriptor.value.trim()
+    || /[\u0000-\u001f\u007f]/u.test(idDescriptor.value)) return null;
   if (typeof raw.inputTokens === 'number' && typeof raw.outputTokens === 'number'
     && typeof raw.totalTokens === 'number'
     && raw.totalTokens < raw.inputTokens + raw.outputTokens) return null;
-  const reservationId = clean(raw.reservationId, 240);
+  const reservationId = idDescriptor.value;
   const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
   const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
   const inputTokens = Math.max(0, Math.floor(Number(raw.inputTokens || 0)));
