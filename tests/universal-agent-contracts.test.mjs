@@ -27,6 +27,55 @@ import {
 
 const AT = '2026-09-19T03:00:00Z';
 
+
+test('Plan-1 S1: empty optional effect and approval references cannot be erased on restart', () => {
+  const cases = [
+    [normalizePolicyDecisionV1, {
+      schemaVersion: 1, decisionId: 'decision-empty-ref',
+      invocationId: 'invoke-empty-ref', decision: PolicyDecisionKind.ALLOW,
+      reasonCode: 'OWNER_OK', decidedAt: AT,
+    }, ['approvalId']],
+    [normalizeToolInvocationV1, {
+      schemaVersion: 1, invocationId: 'invoke-empty-ref', toolId: 'fs.read',
+      providerId: 'native-companion', requestedCapabilityIds: ['filesystem.read'],
+      policyDecisionId: 'decision-empty-ref', arguments: {}, createdAt: AT,
+    }, ['parentInvocationId']],
+    [normalizeArtifactRefV1, {
+      schemaVersion: 1, artifactId: 'artifact-empty-ref', kind: 'file',
+      uri: 'artifact://run/empty-ref', createdAt: AT,
+    }, ['producerInvocationId']],
+    [normalizeVerificationV1, {
+      schemaVersion: 1, verificationId: 'verification-empty-ref',
+      invocationId: 'invoke-empty-ref', status: VerificationStatus.NOT_APPLICABLE,
+      reasonCode: 'NO_EFFECT', verifiedAt: AT,
+    }, ['observationId', 'verifierId', 'verificationAuthorityId', 'effectId', 'executionId']],
+    [normalizeSpecialistHandoffV1, {
+      schemaVersion: 1, handoffId: 'handoff-empty-ref',
+      specialistId: 'specialist-empty-ref', goal: 'Check persisted references',
+      requestedCapabilityIds: ['filesystem.read'], createdAt: AT,
+    }, ['parentInvocationId']],
+  ];
+  for (const [normalize, original, optionalKeys] of cases) {
+    const legacy = normalize(original);
+    assert.deepEqual(normalize(JSON.parse(JSON.stringify(legacy))), legacy,
+      'canonical absent references must remain compatible after cold JSON restart');
+    for (const key of optionalKeys) {
+      const corrupt = { ...original, [key]: '' };
+      assert.throws(() => normalize(corrupt), error => {
+        assert.match(error.message, new RegExp(key + ' is invalid'));
+        return true;
+      }, key + ' must not silently become an absent durable identity');
+      assert.deepEqual(corrupt, { ...original, [key]: '' },
+        'rejected identity may not mutate incoming persisted data');
+      const present = normalize({ ...original, [key]: 'known-ref-1' });
+      assert.equal(present[key], 'known-ref-1');
+      assert.deepEqual(normalize(JSON.parse(JSON.stringify(present))), present,
+        'a real exact reference must survive restart without aliasing');
+    }
+  }
+});
+
+
 test('Plan-1 S1: observation data presence is exact across cold restart and corruption', () => {
   const base = {
     schemaVersion: 1, observationId: 'obs-data-presence',
