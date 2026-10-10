@@ -22,6 +22,13 @@
 
 # ChatGPT Autopilot — Multi-Plan Closure State
 
+### PLAN4_S1_BUILTIN_ENDPOINT_ACCOUNT_FENCE_BAC4C4E8_20261010 — NONTERMINAL
+- Only canonical Drive Plan 4, Section 1. Existing 11.0.13 High PR #700 head `bac4c4e8169d0d0bbef9eea943077ed724332e8a` (OPEN/DRAFT/UNMERGED at checkpoint), do not use stale main 0.9.19 as source.
+- Existing Gateway fixed: built-in Ollama/OpenAI provider calls and model discovery previously ignored any supplied nonempty foreign endpointId and fell back to a default account/origin. They now reject the wrong account identity before any provider network I/O with typed `AI_BUILTIN_ENDPOINT_ID_UNSUPPORTED` HTTP 400. Code commit `d14e806e7802541213a342dd0c0f42736b85d057`, blob `cbf40c6848611587f46ad4c38d7542fd43bf87b2`; existing adapter test commit `166f81100a401c9122dea7eff3db3d1efab0400e`, blob `79f22823919f8541b418bbf40ded18ada4bd6abc`; actual HTTP loopback fixture commit `bac4c4e8169d0d0bbef9eea943077ed724332e8a`, test blob `2a49f79b1c774d1b5af216ebc52ef8cf87ecfe42`. All 3 blobs read back; tests written but not yet proven green on exact head.
+- New CI on this exact head: Core #38049510544, Chrome #38049510541, Release #38049510525 QUEUED at checkpoint (no fabricated PASS). Evidence PR #700 comment #6097155604.
+- **S1 ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE; S2 ACTIONABLE / IN_PROGRESS / NOT DONE**; no Section 2 new changes this wave; S3 untouched. Still missing complete route/profile/account/credential-to-dispatch binding, durable budget reserve/settle/UNKNOWN cold-restart/failover reconciliation, relevant exact-head full CI, canonical 11.x main integration and postmerge SHA readback. Real provider credentials not an engineering blocker. Other Drive plans unchanged.
+
+
 ### PLAN4_S1_CI_FIX_44638C5C_EXACT_READBACK_20261010 — NONTERMINAL
 
 - ONLY canonical Drive `4. Четвертий план` (id `1fx4sR_jCfIoKlFHPed7chAr5zy2eJKwWRQq_mjuALh4`). Section 1 has priority, still ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. Section 2 remains ACTIONABLE / IN_PROGRESS / NOT DONE, not newly mutated. Other Drive plans unchanged.
