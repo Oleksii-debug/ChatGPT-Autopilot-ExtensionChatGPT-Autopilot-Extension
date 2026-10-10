@@ -577,7 +577,7 @@ test('S1 refuses stale pre-teardown scrub proof and never reports a clean lease'
     }),
     /proof has stale or future verification chronology/u,
   );
-  assert.equal(readbacks, 1, 'invalid proof must not manufacture a final clean receipt');
+  assert.equal(readbacks, 2, 'pre-teardown binding fence is checked but invalid proof never produces a clean receipt');
 });
 
 test('S1 requires versioned exact teardown completion before scrub verification', async () => {
