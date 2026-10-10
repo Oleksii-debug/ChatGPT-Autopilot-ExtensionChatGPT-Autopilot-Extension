@@ -303,6 +303,14 @@ export class SpecialistProviderReadinessResolverV1 {
         || current.observedAt < readiness.observedAt) {
       throw new Error('Trusted provider readiness revalidation moved backwards');
     }
+    // A fresh re-probe does not renew the lifetime of the original
+    // owner-issued admission observation. Otherwise a cached READY token
+    // could authorize work arbitrarily long after its bounded lease expired.
+    // Resolve first so clock rollback is checked with the canonical clock,
+    // then fail closed even when the new provider facts happen to match.
+    if (Date.parse(current.resolvedAt) - Date.parse(readiness.observedAt) > readiness.maxAgeMs) {
+      throw new Error('Trusted provider readiness observation expired before admission');
+    }
     if (!current.executable || current.readiness !== readiness.readiness
         || current.providerId !== readiness.providerId
         || current.registryRevision !== readiness.registryRevision
