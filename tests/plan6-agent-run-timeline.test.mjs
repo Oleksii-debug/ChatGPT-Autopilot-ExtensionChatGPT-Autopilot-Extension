@@ -308,3 +308,53 @@ test('S1 hostile persisted Proxy cannot spoof numeric plan or recorded-check arr
     assert.equal(valid.evidenceMap.externalEffectVerified, false);
   }
 });
+
+test('S1 cost evidence observes one descriptor and never coerces attacker-controlled values', () => {
+  const marker = 'PRIVATE_COST_COERCION_EFFECT';
+  const input = job();
+  const runtime = input.runtime;
+  let costReads = 0;
+  let hostileCoercions = 0;
+  input.runtime = new Proxy(runtime, {
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+      if (key !== 'estimatedCostUsd') return descriptor;
+      costReads += 1;
+      return {
+        ...descriptor,
+        value: costReads === 1 ? 0.016 : {
+          valueOf() {
+            hostileCoercions += 1;
+            throw Error(marker);
+          },
+        },
+      };
+    },
+  });
+  const output = buildAgentRunTimelineV1(input);
+  assert.equal(costReads, 1, 'evidence must use one recorded observation');
+  assert.equal(hostileCoercions, 0, 'a changed descriptor must not run code');
+  assert.equal(output.counters.estimatedCostUsd, 0.016);
+  assert.equal(output.evidenceOnly, true);
+  assert.equal(output.mayReplayExternalEffect, false);
+  assert.equal(output.evidenceMap.externalEffectVerified, false);
+  assert.doesNotMatch(JSON.stringify(output), /PRIVATE_COST_COERCION_EFFECT/u);
+
+  const corrupt = job();
+  corrupt.runtime.estimatedCostUsd = {
+    valueOf() {
+      hostileCoercions += 1;
+      throw Error(marker);
+    },
+  };
+  assert.equal(buildAgentRunTimelineV1(corrupt).counters.estimatedCostUsd, null);
+  assert.equal(hostileCoercions, 0);
+
+  for (const value of ['0.016', -1, Number.POSITIVE_INFINITY, 1_000_000.01]) {
+    const restored = JSON.parse(JSON.stringify(job()));
+    restored.runtime.estimatedCostUsd = value;
+    const projected = buildAgentRunTimelineV1(restored);
+    assert.equal(projected.counters.estimatedCostUsd, null);
+    assert.equal(projected.mayReplayExternalEffect, false);
+  }
+});
