@@ -410,6 +410,80 @@ function recordedSpecialistDispatchEvidence(runtime) {
   });
 }
 
+// This is a *structural* correlation of already persisted Specialist child
+// handoffs against their canonical parent job and AgentPlan nodes. It is not
+// independent execution or Agent-tree verification, and never grants authority.
+const RECORDED_HANDOFF_STATES = new Set(['READY', 'LEASED', 'COMPLETED', 'FAILED', 'CANCELLED']);
+const EXTERNAL_NODE_PLANES = new Set(['LOCAL', 'CLOUD', 'REMOTE']);
+function recordedSpecialistPlanLinks(runtime, plan, jobId) {
+  const { present, value: rawHandoffs } = persistedField(runtime, 'specialistHandoffs');
+  const empty = () => freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_HANDOFF_METADATA_ONLY',
+    recordPresent: false,
+    inspectedHandoffs: 0,
+    structurallyLinkedChildren: 0,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+  if (!present) return empty();
+  if (!plainArray(rawHandoffs)) throw new Error('Agent specialist handoffs must be a bounded dense array');
+  const length = own(rawHandoffs, 'length');
+  if (!Number.isSafeInteger(length) || length < 0 || length > 128) {
+    throw new Error('Agent specialist handoff length is invalid');
+  }
+  const handoffs = canonicalEvidenceElements(rawHandoffs, length, 'Agent specialist handoffs');
+  if (length === 0) return freeze({ ...empty(), recordPresent: true });
+  const durablePlan = record(plan, 'Agent specialist linked plan');
+  const planId = persistedField(durablePlan, 'planId').value;
+  if (typeof planId !== 'string' || !RECORDED_OWNERSHIP_ID.test(planId)) {
+    throw new Error('Agent specialist linked plan identity is invalid');
+  }
+  const { present: nodesPresent, value: nodes } = persistedField(durablePlan, 'nodes');
+  if (!nodesPresent || !plainArray(nodes)) throw new Error('Agent specialist linked plan nodes are invalid');
+  const nodeLength = own(nodes, 'length');
+  if (!Number.isSafeInteger(nodeLength) || nodeLength < 0 || nodeLength > 4096) {
+    throw new Error('Agent specialist linked plan node length is invalid');
+  }
+  const expectedAgents = new Set();
+  for (const node of canonicalEvidenceElements(nodes, nodeLength, 'Agent specialist linked plan nodes')) {
+    record(node, 'Agent specialist linked plan node');
+    const nodeId = persistedField(node, 'nodeId').value;
+    const plane = persistedField(node, 'executionPlane').value;
+    if (typeof nodeId !== 'string' || !RECORDED_OWNERSHIP_ID.test(nodeId)) {
+      throw new Error('Agent specialist linked plan node identity is invalid');
+    }
+    if (EXTERNAL_NODE_PLANES.has(plane)) {
+      const canonicalAgentId = 'specialist:' + planId + ':' + nodeId;
+      if (!RECORDED_OWNERSHIP_ID.test(canonicalAgentId) || expectedAgents.has(canonicalAgentId)) {
+        throw new Error('Agent specialist linked plan agent identity is invalid or duplicated');
+      }
+      expectedAgents.add(canonicalAgentId);
+    }
+  }
+  const seen = new Set();
+  for (const item of handoffs) {
+    const handoff = record(item, 'Agent specialist linked handoff');
+    const agentId = persistedField(handoff, 'agentId').value;
+    const parentAgentId = persistedField(handoff, 'parentAgentId').value;
+    const persistedJobId = persistedField(handoff, 'jobId').value;
+    const state = persistedField(handoff, 'state').value;
+    if (typeof agentId !== 'string' || !expectedAgents.has(agentId) || seen.has(agentId) ||
+        parentAgentId !== 'browser-agent:' + jobId || persistedJobId !== jobId ||
+        !RECORDED_HANDOFF_STATES.has(state)) {
+      throw new Error('Agent specialist handoff is not structurally bound to its parent plan');
+    }
+    seen.add(agentId);
+  }
+  return freeze({
+    source: 'CANONICAL_AGENT_RUNTIME_HANDOFF_METADATA_ONLY',
+    recordPresent: true,
+    inspectedHandoffs: handoffs.length,
+    structurallyLinkedChildren: seen.size,
+    agentTreeEdgesVerified: false,
+    externalEffectVerified: false,
+  });
+}
+
 // Read-only projection of the EXISTING durable ExecutionOwnershipV1 records.
 // State and structural link counts are NOT Agent-tree ancestry, execution
 // receipts, independent verification or permission to resume/replay effects.
@@ -485,6 +559,10 @@ export function buildAgentRunTimelineV1(job, options = {}) {
   const filter = filterValue === undefined ? 'ALL' : filterValue;
   if (!FILTERS.has(filter)) throw new Error('Agent timeline filter is invalid');
   const runtime = record(persistedField(job, 'runtime').value, 'Agent timeline runtime');
+  // Snapshot these durable fields once for all projections to avoid mixing
+  // a different job/plan identity into the evidence map on a hostile Proxy.
+  const durableJobId = boundedJobId(persistedField(job, 'id').value);
+  const durablePlan = persistedField(runtime, 'plan').value;
   // One persisted descriptor is the sole authority for both presence and value.
   // Separate reads permit hostile storage Proxies to change the apparent
   // snapshot between validation and projection, or hide it from JSON restart.
@@ -564,6 +642,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     externalEffectVerified: false,
     recordedOutcome,
     specialistProviderDispatch: recordedSpecialistDispatchEvidence(runtime),
+    specialistPlanLinks: recordedSpecialistPlanLinks(runtime, durablePlan, durableJobId),
     specialistExecutionOwnership: recordedExecutionOwnershipEvidence(runtime),
   };
   // Preserve a single observation of this persisted accounting field. A
@@ -577,7 +656,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
       ? Math.round(rawEstimatedCostUsd * 1000000) / 1000000 : null;
   const result = {
     schemaVersion: AGENT_RUN_TIMELINE_VERSION,
-    jobId: boundedJobId(persistedField(job, 'id').value),
+    jobId: durableJobId,
     entryIdentityScope: 'RETAINED_HISTORY_ORDINAL_NOT_DURABLE',
     filter,
     totalRecorded: history.total,
@@ -588,7 +667,7 @@ export function buildAgentRunTimelineV1(job, options = {}) {
     evidenceOnly: true,
     mayReplayExternalEffect: false,
     includesPrivatePrompts: false,
-    plan: planSummary(persistedField(runtime, 'plan').value),
+    plan: planSummary(durablePlan),
     evidenceMap,
     counters: {
       steps: recordedCounter(runtime, 'stepCount'),
