@@ -376,11 +376,26 @@ function cloudProviderTarget(binding) {
   });
 }
 
-async function invokeCloudProviderEvidence(callback, target, phase) {
+async function invokeCloudProviderEvidence(callback, target, phase, receiver) {
   try {
-    return await callback(target);
+    // Trusted provider adapters may depend on their validated callback receiver.
+    // Preserve that receiver without exposing raw provider error diagnostics.
+    return await Reflect.apply(callback, receiver, [target]);
   } catch {
     throw new Error(`cloud workspace provider ${phase} failed; canonical reconciliation required`);
+  }
+}
+
+// Canonical store adapters can fail with secret-bearing database/transport
+// errors. A failed read does not mean a write or teardown was rolled back.
+// Never propagate raw adapter diagnostics or automatically retry an effect.
+async function invokeCanonicalCloudReadback(callback, key, kind, receiver) {
+  try {
+    // Keep the canonical adapter's original method receiver. An adapter may
+    // legitimately use its own metadata/configuration as this.
+    return await Reflect.apply(callback, receiver, [key]);
+  } catch {
+    throw new Error(`canonical cloud ${kind} readback failed; reconciliation required`);
   }
 }
 
@@ -444,7 +459,7 @@ export async function verifyCloudWorkspaceIsolationV1(
     effectId: callerOwnership.effectId,
   });
   const persistedOwner = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(identity),
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, identity, 'ownership', trusted),
   );
   if (JSON.stringify(persistedOwner) !== JSON.stringify(callerOwnership)) {
     throw new Error('cloud workspace ownership drifted from canonical store');
@@ -452,11 +467,11 @@ export async function verifyCloudWorkspaceIsolationV1(
   const binding = createCloudWorkspaceBindingV1(
     observationInput, persistedOwner, { at: trusted.at },
   );
-  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, cloudProviderTarget(binding), 'isolation attestation');
+  const proof = await invokeCloudProviderEvidence(trusted.verifyIsolation, cloudProviderTarget(binding), 'isolation attestation', trusted);
   // Fail closed if the lease changed while asynchronous provider attestation
   // was in flight. This remains non-authorizing evidence, not a new lease.
   const ownerAfter = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(identity),
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, identity, 'ownership', trusted),
   );
   if (JSON.stringify(ownerAfter) !== JSON.stringify(persistedOwner)) {
     throw new Error('cloud workspace ownership changed during isolation attestation');
@@ -550,7 +565,7 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
   // when the persisted binding appears identical. Recovery is read-only.
   // This is a preflight fence, NOT a replacement for the canonical store's
   // atomic owner/lease/absence compare-and-set: another writer may race it.
-  const beforeCommit = await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding));
+  const beforeCommit = await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, cloudBindingLookupKey(binding), 'binding', trusted);
   if (beforeCommit != null) {
     throw new Error('canonical cloud workspace binding already exists; use read-only reconciliation');
   }
@@ -565,14 +580,14 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
     throw new Error('canonical cloud binding commit outcome ambiguous; read-only reconciliation required');
   }
   const persisted = cloudBindingReadback(
-    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+    binding, await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, cloudBindingLookupKey(binding), 'binding', trusted),
   );
   if (!persisted) throw new Error('canonical cloud workspace binding was not durably persisted');
   const ownerAfter = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(Object.freeze({
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, Object.freeze({
       taskId: binding.taskId, planId: binding.planId,
       nodeId: binding.nodeId, effectId: binding.effectId,
-    })),
+    }), 'ownership', trusted),
   );
   if (JSON.stringify(ownerAfter) !== JSON.stringify(originalOwner)) {
     throw new Error('canonical cloud workspace ownership changed during binding commit');
@@ -581,7 +596,7 @@ export async function commitVerifiedCloudWorkspaceBindingV1(
   // the canonical binding after it, rather than accepting a binding which
   // may have been removed/replaced while the owner lookup was in flight.
   const finalPersisted = cloudBindingReadback(
-    binding, await trusted.loadCanonicalBinding(cloudBindingLookupKey(binding)),
+    binding, await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, cloudBindingLookupKey(binding), 'binding', trusted),
   );
   if (!finalPersisted) {
     throw new Error('canonical cloud workspace binding disappeared after owner readback');
@@ -620,12 +635,12 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
   // owner may have lost the lease or changed while the first read was in flight.
   // This is read-only and must never issue another atomic commit or provider call.
   const persisted = cloudBindingReadback(
-    binding, await trusted.loadCanonicalBinding(bindingKey),
+    binding, await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, bindingKey, 'binding', trusted),
   );
   let current = Boolean(persisted);
   if (current) {
     const ownerBefore = normalizeExactExecutionOwnershipV1(
-      await trusted.loadCanonicalOwnership(ownershipKey),
+      await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownershipKey, 'ownership', trusted),
     );
     current = ownerBefore.state === ExecutionOwnershipState.OWNED
       && ownerBefore.ownerPlane === 'CLOUD'
@@ -636,10 +651,10 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
       && Date.parse(at) < Date.parse(ownerBefore.leaseUntil);
     if (current) {
       const afterBinding = cloudBindingReadback(
-        binding, await trusted.loadCanonicalBinding(bindingKey),
+        binding, await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, bindingKey, 'binding', trusted),
       );
       const ownerAfter = normalizeExactExecutionOwnershipV1(
-        await trusted.loadCanonicalOwnership(ownershipKey),
+        await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownershipKey, 'ownership', trusted),
       );
       current = Boolean(afterBinding)
         && JSON.stringify(ownerAfter) === JSON.stringify(ownerBefore);
@@ -647,7 +662,7 @@ export async function reconcileCloudWorkspaceBindingCommitV1(bindingInput, optio
         // The last owner read may observe a stable owner while a concurrent
         // writer removes its binding. Fence that final asynchronous gap.
         const bindingAfterOwner = cloudBindingReadback(
-          binding, await trusted.loadCanonicalBinding(bindingKey),
+          binding, await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, bindingKey, 'binding', trusted),
         );
         current = Boolean(bindingAfterOwner);
       }
@@ -678,11 +693,11 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   );
   const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
   const persistedBinding = normalizeCloudWorkspaceBindingV1(
-    await trusted.loadCanonicalBinding(Object.freeze({
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, Object.freeze({
       workspaceId: binding.workspaceId,
       providerId: binding.providerId,
       executionLeaseId: binding.executionLeaseId,
-    })),
+    }), 'binding', trusted),
   );
   if (JSON.stringify(persistedBinding) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace scrub target does not match canonical binding');
@@ -697,7 +712,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
     effectId: binding.effectId,
   });
   const ownerBefore = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(ownerKey),
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownerKey, 'ownership', trusted),
   );
   if (ownerBefore.state !== ExecutionOwnershipState.OWNED
       || ownerBefore.ownerPlane !== 'CLOUD'
@@ -721,11 +736,11 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // reassignment or checkpoint replacement during that await must not allow
   // a stale worker to delete a potentially reused cloud workspace.
   const bindingBeforeTeardown = normalizeCloudWorkspaceBindingV1(
-    await trusted.loadCanonicalBinding(Object.freeze({
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, Object.freeze({
       workspaceId: binding.workspaceId,
       providerId: binding.providerId,
       executionLeaseId: binding.executionLeaseId,
-    })),
+    }), 'binding', trusted),
   );
   if (JSON.stringify(bindingBeforeTeardown) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace canonical binding changed before provider teardown');
@@ -735,7 +750,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // is unchanged. Refuse destructive provider I/O on that stale ownership
   // snapshot; the provider must independently enforce the same lease fence.
   const ownerBeforeProvider = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(ownerKey),
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownerKey, 'ownership', trusted),
   );
   if (JSON.stringify(ownerBeforeProvider) !== JSON.stringify(ownerBefore)) {
     throw new Error('cloud workspace canonical owner changed before provider teardown');
@@ -745,7 +760,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // finished. An attested completion timestamp must precede fresh scrub proof,
   // so a previously captured "clean" receipt cannot be replayed post-teardown.
   const completed = dataRecord(
-    await invokeCloudProviderEvidence(trusted.teardown, target, 'teardown'), TEARDOWN_RECEIPT_KEYS,
+    await invokeCloudProviderEvidence(trusted.teardown, target, 'teardown', trusted), TEARDOWN_RECEIPT_KEYS,
     'Cloud workspace teardown completion',
   );
   if (completed.schemaVersion !== CLOUD_WORKSPACE_VERSION
@@ -770,7 +785,7 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
       || Date.parse(completedAt) > Date.parse(trusted.at)) {
     throw new Error('Cloud workspace teardown completion chronology is invalid');
   }
-  const proof = await invokeCloudProviderEvidence(trusted.verifyScrub, target, 'scrub verification');
+  const proof = await invokeCloudProviderEvidence(trusted.verifyScrub, target, 'scrub verification', trusted);
   const verifiedAt = verifyExactLifecycleProof(
     proof, SCRUB_PROOF_KEYS, binding, trusted.at,
     ['filesystemScrubbed', 'browserScrubbed', 'processesTerminated', 'secretsPurged'],
@@ -788,17 +803,17 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // has changed (including same lease with a different checkpoint revision).
   // Read back from the canonical store AFTER the provider's scrub verification.
   const finalPersistedBinding = normalizeCloudWorkspaceBindingV1(
-    await trusted.loadCanonicalBinding(Object.freeze({
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, Object.freeze({
       workspaceId: binding.workspaceId,
       providerId: binding.providerId,
       executionLeaseId: binding.executionLeaseId,
-    })),
+    }), 'binding', trusted),
   );
   if (JSON.stringify(finalPersistedBinding) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace canonical binding changed during teardown/scrub');
   }
   const ownerAfter = normalizeExactExecutionOwnershipV1(
-    await trusted.loadCanonicalOwnership(ownerKey),
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalOwnership, ownerKey, 'ownership', trusted),
   );
   if (JSON.stringify(ownerAfter) !== JSON.stringify(ownerBefore)) {
     throw new Error('cloud workspace canonical ownership changed during teardown/scrub');
@@ -808,11 +823,11 @@ export async function teardownAndVerifyCloudWorkspaceV1(bindingInput, options) {
   // that owner read resolves, even when the owner itself remains unchanged.
   // Never publish scrubVerified for a binding that no longer exists exactly.
   const bindingAfterOwner = normalizeCloudWorkspaceBindingV1(
-    await trusted.loadCanonicalBinding(Object.freeze({
+    await invokeCanonicalCloudReadback(trusted.loadCanonicalBinding, Object.freeze({
       workspaceId: binding.workspaceId,
       providerId: binding.providerId,
       executionLeaseId: binding.executionLeaseId,
-    })),
+    }), 'binding', trusted),
   );
   if (JSON.stringify(bindingAfterOwner) !== JSON.stringify(binding)) {
     throw new Error('cloud workspace canonical binding changed after final owner readback');
