@@ -248,6 +248,14 @@ function readiness(input, selection, ownership, nowMs) {
   return freeze(evidence);
 }
 
+function unknownProviderOutcome() {
+  // Provider effects and receipt validation are both beyond the trust boundary.
+  // Their outcome cannot be classified as NO_EFFECT merely from an exception.
+  const error = new Error('Specialist provider outcome is UNKNOWN after dispatch; reconcile the canonical effect before any retry');
+  error.code = 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN';
+  return error;
+}
+
 export class SpecialistProviderDispatcherV1 {
   #bindings;
   #now;
@@ -322,44 +330,49 @@ export class SpecialistProviderDispatcherV1 {
     try {
       rawResult = await binding.execute(request);
     } catch {
-      const error = new Error('Specialist provider outcome is UNKNOWN after dispatch; reconcile the canonical effect before any retry');
-      error.code = 'SPECIALIST_PROVIDER_OUTCOME_UNKNOWN';
-      throw error;
+      throw unknownProviderOutcome();
     }
-    const completedAtMs = clock(this.#now);
-    if (completedAtMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards');
-    const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
-    const observed = timestamp(result.observedAt, 'provider result observedAt');
-    if (observed.ms < startedAtMs || observed.ms > completedAtMs) throw new Error('Specialist provider result chronology is invalid');
-    // A provider receipt is lower-trust input, even after the provider call.
-    // Snapshot descriptor-safe artifact metadata before contract normalization:
-    // getters and proxies must not run while verifying completion evidence.
-    const refs = array(result.resultArtifactRefs, 'resultArtifactRefs', 64)
-      .map((item, index) => normalizeArtifactRefV1(
-        cloneReadinessEvidence(item, `resultArtifactRefs[${index}]`),
-      ));
-    if (!refs.length) throw new Error('Specialist provider result requires artifact evidence');
-    if (new Set(refs.map(item => item.artifactId)).size !== refs.length) throw new Error('Specialist provider result contains duplicate artifactId');
-    for (const ref of refs) {
-      if (!ref.sha256) throw new Error(`Specialist result artifact requires sha256: ${ref.artifactId}`);
-      const created = timestamp(ref.createdAt, `artifact ${ref.artifactId} createdAt`);
-      if (created.ms < startedAtMs || created.ms > observed.ms) throw new Error(`Specialist result artifact chronology is invalid: ${ref.artifactId}`);
-      if (ref.producerInvocationId !== leaseId) throw new Error(`Specialist result artifact producer does not match execution lease: ${ref.artifactId}`);
+    // An accepted provider promise is not yet a verified receipt. A malformed
+    // result, failed observation clock or adversarial ArtifactRef is an UNKNOWN
+    // post-effect outcome, never evidence that the effect did not occur.
+    try {
+      const completedAtMs = clock(this.#now);
+      if (completedAtMs < startedAtMs) throw new Error('Specialist dispatcher clock moved backwards');
+      const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
+      const observed = timestamp(result.observedAt, 'provider result observedAt');
+      if (observed.ms < startedAtMs || observed.ms > completedAtMs) throw new Error('Specialist provider result chronology is invalid');
+      // A provider receipt is lower-trust input, even after the provider call.
+      // Snapshot descriptor-safe artifact metadata before contract normalization:
+      // getters and proxies must not run while verifying completion evidence.
+      const refs = array(result.resultArtifactRefs, 'resultArtifactRefs', 64)
+        .map((item, index) => normalizeArtifactRefV1(
+          cloneReadinessEvidence(item, `resultArtifactRefs[${index}]`),
+        ));
+      if (!refs.length) throw new Error('Specialist provider result requires artifact evidence');
+      if (new Set(refs.map(item => item.artifactId)).size !== refs.length) throw new Error('Specialist provider result contains duplicate artifactId');
+      for (const ref of refs) {
+        if (!ref.sha256) throw new Error(`Specialist result artifact requires sha256: ${ref.artifactId}`);
+        const created = timestamp(ref.createdAt, `artifact ${ref.artifactId} createdAt`);
+        if (created.ms < startedAtMs || created.ms > observed.ms) throw new Error(`Specialist result artifact chronology is invalid: ${ref.artifactId}`);
+        if (ref.producerInvocationId !== leaseId) throw new Error(`Specialist result artifact producer does not match execution lease: ${ref.artifactId}`);
+      }
+      return freeze({
+        schemaVersion: SPECIALIST_PROVIDER_DISPATCHER_VERSION,
+        providerId: selection.providerId,
+        specialistId: selection.specialistId,
+        providerReceiptId: id(result.providerReceiptId, 'providerReceiptId'),
+        effectId: ownership.effectId,
+        executionId: leaseId,
+        observedAt: observed.value,
+        completedAt: new Date(completedAtMs).toISOString(),
+        resultArtifactRefs: refs,
+        trustedDispatcherInvoked: true,
+        callerResultAccepted: false,
+        completionAuthorized: false,
+        verificationRequired: true,
+      });
+    } catch {
+      throw unknownProviderOutcome();
     }
-    return freeze({
-      schemaVersion: SPECIALIST_PROVIDER_DISPATCHER_VERSION,
-      providerId: selection.providerId,
-      specialistId: selection.specialistId,
-      providerReceiptId: id(result.providerReceiptId, 'providerReceiptId'),
-      effectId: ownership.effectId,
-      executionId: leaseId,
-      observedAt: observed.value,
-      completedAt: new Date(completedAtMs).toISOString(),
-      resultArtifactRefs: refs,
-      trustedDispatcherInvoked: true,
-      callerResultAccepted: false,
-      completionAuthorized: false,
-      verificationRequired: true,
-    });
   }
 }
