@@ -569,3 +569,39 @@ test('specialist owner-facing metadata rejects Unicode soft-hyphen and invisible
   assert.equal(restored.definitions[0].description, canonical.description);
   assert.equal(Object.isFrozen(restored.definitions[0]), true);
 });
+
+
+test('explicitly present undefined execution plane filter cannot widen specialist placement', () => {
+  const unsafe = discovery({ executionPlanes: undefined });
+  assert.throws(
+    () => discoverSpecialistsV1(unsafe),
+    /executionPlanes must be a canonical array/,
+    'present undefined must never mean unrestricted plane selection',
+  );
+  assert.throws(
+    () => discoverSpecialistsV1(discovery({ executionPlanes: null })),
+    /executionPlanes must be a canonical array/,
+  );
+  const selected = discoverSpecialistsV1(
+    JSON.parse(JSON.stringify(discovery({ executionPlanes: [AgentExecutionPlane.LOCAL] }))),
+  );
+  assert.equal(selected.specialists.length, 1);
+  assert.equal(selected.specialists[0].executionPlane, AgentExecutionPlane.LOCAL);
+  // Legacy callers may truly omit the optional filter: only genuine absence
+  // preserves the documented fallback, including after a cold JSON restart.
+  const legacy = discovery();
+  delete legacy.executionPlanes;
+  assert.equal(discoverSpecialistsV1(JSON.parse(JSON.stringify(legacy))).specialists.length, 1);
+
+  let getterReads = 0;
+  const hostile = discovery();
+  Object.defineProperty(hostile, 'executionPlanes', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      throw new Error('SECRET_EXECUTION_PLANE_VALUE');
+    },
+  });
+  assert.throws(() => discoverSpecialistsV1(hostile), /executionPlanes must be an enumerable own data property/);
+  assert.equal(getterReads, 0, 'owner discovery must not execute untrusted accessors');
+});
