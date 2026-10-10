@@ -219,10 +219,15 @@ export function normalizeAiRoutePool(raw = []) {
   const routes = source.map((rawItem, index) => {
     const item = dataRecord(rawItem, new Set(['schemaVersion','routeId','provider','model','endpointId','displayName','systemPrompt','workerPrompt','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
     if (Object.hasOwn(item, 'schemaVersion') && own(item, 'schemaVersion') !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
-    const provider = clean(own(item, 'provider'), 40);
-    if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
-    const model = clean(own(item, 'model'), 300);
-    if (!model) throw new Error('AI route model is required');
+    // Provider and model form the exact execution identity. Silently trimming
+    // corrupted persisted values could dispatch to a different approved model.
+    const provider = own(item, 'provider');
+    if (typeof provider !== 'string' || provider !== provider.trim() || provider.length > 40
+        || !PROVIDERS.has(provider)) throw new Error('AI route provider must be an exact supported identity');
+    const model = own(item, 'model');
+    if (typeof model !== 'string' || !model || model !== model.trim() || model.length > 300) {
+      throw new Error('AI route model must be an exact bounded identity');
+    }
     const roles = optionalIds(item, 'roles', `AI route ${index + 1} roles`, 12);
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const rawLocality = own(item, 'locality');
