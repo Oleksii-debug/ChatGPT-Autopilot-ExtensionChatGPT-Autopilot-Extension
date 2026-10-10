@@ -1,3 +1,7 @@
+### PLAN8_S1_CORE_FINAL_8BD406BD_20261010 — EXACT HEAD CORE GREEN, RELEASE STILL RED, 0/2 DONE
+- ONLY Plan8 S1 SHA `8bd406bde00d727607a57ab5dbe0c33fb7f162cb` Core #38070275602 COMPLETED SUCCESS. Raw core job #114266138100: 483/483 core and 59/59 web deterministic PASS, zero failed/cancelled/skipped. Chrome #38070275584, UI #38070275623 and Windows packaging #38070275569 SUCCESS. Linux Release #38070275569 still FAILURE (3632 total / 3371 PASS / 250 FAIL / 11 CANCELLED).
+- Existing child PR #780 remains unmerged to parent #716, parent to main unmerged; main 0.9.19. Section1 FIRST ACTIONABLE / IN_PROGRESS / NOT DONE; Section2 WAITING_UPSTREAM / NOT DONE. No premature terminal DONE (0/2), no other Drive plans edited. Physical NVDA/authenticated effects not claimed.
+
 ### PLAN8_S1_FINAL_RELEASE_8BD406BD_20261010 — VERIFIED RELEASE RED, 3371/3632 PASS, 0/2 TERMINAL
 - ONLY canonical `8. Восьмий план` Drive document, Section 1 first ACTIONABLE, IN_PROGRESS / NOT DONE; Section 2 WAITING_UPSTREAM / NOT ADVANCED / NOT DONE. Child PR #780 exact SHA `8bd406bde00d727607a57ab5dbe0c33fb7f162cb` OPEN/DRAFT/UNMERGED; parent PR #716 OPEN/DRAFT/UNMERGED/mergeable=false. Main 0.9.19 remains stale.
 - New exact SHA Ubuntu Release #38070275569 COMPLETED FAILURE: **3632 tests; 3371 PASS; 250 FAIL; 11 CANCELLED; 0 SKIPPED** (raw Linux job #114266144583). Windows release package job #114266144838 COMPLETED SUCCESS. Chrome #38070275584 SUCCESS; UI #38070275623 SUCCESS; Core #38070275602 IN_PROGRESS at this readback, no PASS imputed.
