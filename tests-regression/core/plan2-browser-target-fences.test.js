@@ -2247,7 +2247,7 @@ test('credential parser refuses duplicated broker and password/username snapshot
   cases.push(duplicateFrame);
   for (const corrupted of cases) {
     assert.throws(() => parse(JSON.parse(JSON.stringify(corrupted))),
-      /one exact current credential reference|current password input|username target is not|semantic target identity is missing/);
+      /credential outside the current snapshot|current password input|username target is not|semantic target identity is missing/);
   }
   assert.equal(element.clicked, 0, 'broker selection must remain effect-free');
 });
