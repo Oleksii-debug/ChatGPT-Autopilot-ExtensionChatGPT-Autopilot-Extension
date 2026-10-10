@@ -472,3 +472,29 @@ test('SDK preserves safe HTTP error status but never treats it as zero-effect ev
   assert.equal(reply.httpStatus, 503);
   assert.equal(calls, 1);
 });
+
+test('SDK rejects noncanonical bearer characters at construction before any transport', () => {
+  let networkCalls = 0;
+  const attemptedFetch = async () => { networkCalls += 1; throw new Error('unexpected network'); };
+  const invalidTokens = [
+    'abc def'.repeat(7),
+    'x'.repeat(32) + '\r',
+    'x'.repeat(32) + '\n',
+    '\t' + 'x'.repeat(40),
+    'x'.repeat(32) + '\u0000',
+    'x'.repeat(32) + 'é',
+    'x'.repeat(32) + '\u2028',
+    'x'.repeat(32) + '\u007f',
+  ];
+  for (const token of invalidTokens) {
+    assert.throws(
+      () => createAutopilotLocalClientV1({ token, port: 12345, fetchImpl: attemptedFetch }),
+      /token/u,
+      'SDK and Companion must enforce one exact bearer alphabet',
+    );
+  }
+  assert.equal(networkCalls, 0, 'invalid credentials must not reach fetch or Core');
+  assert.doesNotThrow(() => createAutopilotLocalClientV1({
+    token: 'test-only-'.repeat(5), port: 12345, fetchImpl: attemptedFetch,
+  }), 'existing valid Companion tokens remain compatible');
+});
