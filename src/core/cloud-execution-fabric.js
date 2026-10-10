@@ -548,6 +548,16 @@ export function assessCloudExecutionFabricV1(input) {
   const providerStates = normalizeProviderStates(raw.providerStates);
   const providerById = new Map(providerStates.map(state => [state.providerId, state]));
   const workspaceBindings = normalizeWorkspaceBindings(raw.workspaceBindings);
+  // A capacity observation is not ownership evidence. A provider's warm slot
+  // must not advertise a workspace already bound to another canonical effect,
+  // even when the current job is AVAILABLE and has no cloud binding itself.
+  const bindingByWorkspace = new Map(workspaceBindings.map(binding => [binding.workspaceId, binding]));
+  const slotWorkspaceCounts = new Map();
+  for (const slot of slots) {
+    if (slot.workspaceId) {
+      slotWorkspaceCounts.set(slot.workspaceId, (slotWorkspaceCounts.get(slot.workspaceId) ?? 0) + 1);
+    }
+  }
   const budget = evaluateResourceBudgetV1({
     budget: raw.resourceBudget,
     usage: raw.resourceUsage,
@@ -624,6 +634,14 @@ export function assessCloudExecutionFabricV1(input) {
       reasonCode = 'STALE_SLOT_OBSERVATION';
     } else if (slot.health === CloudSlotHealth.UNAVAILABLE) {
       reasonCode = 'SLOT_UNAVAILABLE';
+    } else if (slot.workspaceId && slotWorkspaceCounts.get(slot.workspaceId) > 1) {
+      // Multiple slot identities for one existing workspace are ambiguous;
+      // do not select one based on temperature, provider or cost ordering.
+      reasonCode = 'AMBIGUOUS_WORKSPACE_SLOT';
+    } else if (slot.workspaceId && bindingByWorkspace.has(slot.workspaceId)
+        && (!existingBinding || existingBinding.workspaceId !== slot.workspaceId
+          || existingBinding.providerId !== slot.providerId)) {
+      reasonCode = 'WORKSPACE_BOUND_TO_OTHER_EXECUTION';
     } else if (!providerExecutable(provider)) {
       reasonCode = 'PROVIDER_NOT_READY';
     } else if (!capabilitySubset(request.requiredCapabilities, slot.capabilities)) {
