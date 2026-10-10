@@ -369,6 +369,7 @@ function recordedSpecialistDispatchEvidence(runtime) {
       // Refuse corrupt/spoofed persisted IDs instead of silently dropping
       // them or counting the same external receipt twice after restart.
       if (typeof receiptId !== 'string' || receiptId.length > 240 ||
+          !receiptId.trim() || receiptId !== receiptId.trim() ||
           /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(receiptId) ||
           seenReceiptIds.has(receiptId)) {
         throw new Error('Agent specialist dispatch receipt identity is invalid or duplicated');
