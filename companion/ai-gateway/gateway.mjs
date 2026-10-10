@@ -122,6 +122,16 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
     const apiKeyEnv = item.apiKeyEnv === undefined ? '' : item.apiKeyEnv;
     if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const baseUrl = normalizeCompatibleBaseUrl(item.baseUrl);
+    // The provider/account profile requires an explicit credential namespace
+    // for every remote origin. Omission must not silently promote a remote
+    // endpoint into the credentialless local-only mode after cold restart.
+    if (!isLoopbackHostname(new URL(baseUrl).hostname) && !apiKeyEnv) {
+      throw gatewayError(
+        'Remote OpenAI-compatible endpoint requires an opaque credential reference',
+        500,
+        'AI_COMPATIBLE_CREDENTIAL_REF_REQUIRED',
+      );
+    }
     const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
     if (pinnedCredential) {
       if (endpointId !== pinnedCredential.endpointId || new URL(baseUrl).origin !== pinnedCredential.origin) {
