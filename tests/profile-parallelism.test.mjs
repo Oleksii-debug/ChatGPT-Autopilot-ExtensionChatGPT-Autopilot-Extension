@@ -413,6 +413,17 @@ test('tab creation runs outside the serialized repository update queue', async (
         return [];
       },
       async get() { throw new Error('not expected'); },
+      async update(id, { url, active }) {
+        assert.equal(repo.insideUpdate, false, 'Chrome navigation must not run inside repository.update');
+        assert.equal(id, 1);
+        assert.equal(url, 'https://chatgpt.com/');
+        assert.equal(active, false);
+        const persisted = await repo.load();
+        assert.equal(persisted.tabHintsByTaskId.t1.tabId, id,
+          'the owned tab must be durably recorded before real ChatGPT navigation');
+        assert.equal(persisted.tabHintsByTaskId.t1.opening, true);
+        return { id, url, active, status: 'complete' };
+      },
     },
   };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, { execute: async () => ({ status: InteractionResult.READY }) }, { now: () => 1000 });
