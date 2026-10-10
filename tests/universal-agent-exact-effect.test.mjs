@@ -973,3 +973,70 @@ test('Plan-1 S1: authenticated SAFE_RETRY survives cold restart without permissi
   assert.equal(continued.state.attempt, 2);
   assert.equal(continued.action, 'EXECUTE');
 });
+
+
+test('Plan-1 S1: hostile exact-effect reflection cannot leak secrets or publish retry authority', () => {
+  const secret = 'OWNER_PRIVATE_EXACT_EFFECT_SECRET';
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  let traps = 0;
+  for (const operation of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const proxy = target => new Proxy(target, {
+      [operation]() { traps += 1; throw new Error(secret); },
+    });
+    const assertDenied = fn => assert.throws(fn, error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+    assertDenied(() => normalizeExactEffectStateV1(proxy({ ...state })));
+    assertDenied(() => normalizeExactEffectStateV1({
+      ...state, ambiguity: proxy({ ...state.ambiguity }),
+    }));
+    assertDenied(() => normalizeExactEffectStateV1({
+      ...state, reconciliation: proxy({ ...state.reconciliation }),
+    }));
+    assertDenied(() => reduceExactEffectV1(state, proxy(event(
+      ExactEffectEventType.BEGIN_EXECUTION, 'proxy-event', '2026-09-19T12:00:01Z',
+    ))));
+  }
+  assert.equal(traps, 12);
+
+  const unknown = { ...state };
+  Object.defineProperty(unknown, secret, { value: 'FORGED_PERMISSION', enumerable: true });
+  assert.throws(() => normalizeExactEffectStateV1(unknown), error => {
+    assert.match(error.message, /contains unknown field/);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+  let unsafeLengthReads = 0;
+  const wrappedIds = new Proxy(['completed-event-1'], {
+    get(target, key, receiver) {
+      if (key === 'length') {
+        unsafeLengthReads += 1;
+        throw new Error(secret);
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const safe = normalizeExactEffectStateV1({ ...state, processedEventIds: wrappedIds });
+  assert.deepEqual(safe.processedEventIds, ['completed-event-1']);
+  assert.equal(unsafeLengthReads, 0, 'descriptor-only array copy never executes length getter');
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(safe))), safe);
+
+  const corrupt = ['existing-event'];
+  Object.defineProperty(corrupt, secret, { enumerable: true, value: 'AUTHORIZE' });
+  assert.throws(() => normalizeExactEffectStateV1({ ...state, processedEventIds: corrupt }),
+    error => {
+      assert.match(error.message, /non-index fields/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  assert.equal(exactEffectCanExecuteV1(state), true,
+    'rejected hostile state may not poison canonical PREPARED path');
+  const began = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'valid-after-rejection',
+    '2026-09-19T12:00:01Z',
+  ));
+  assert.equal(began.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(began.state.attempt, 1);
+});
