@@ -3105,6 +3105,90 @@ test('Browser Agent input-token admission includes an existing durable reservati
   );
 });
 
+test('Plan4 S1: canonical router and durable manager prevent duplicate effect after unknown settlement and JSON restart', async () => {
+  const chrome=makeChrome();
+  const jobId='job-plan4-router-manager-unknown';
+  const manager=new BrowserAgentManager({
+    chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>91_000,
+  });
+  await manager.create({
+    id:jobId,goal:'Make one bounded provider call and preserve its budget on restart',
+    maxModelCalls:1,maxOutputTokensPerCall:64,
+  });
+  await manager.update(store => {
+    store.byId[jobId].runtime.runState='RUNNING';
+    return store;
+  });
+  const originalUpdate=manager.update.bind(manager);
+  let blockSettlement=false;
+  manager.update=async mutation => {
+    if (blockSettlement) throw new Error('fixture: durable settlement write failed');
+    return originalUpdate(mutation);
+  };
+  let providerEffects=0;
+  const orchestrator=new AiOrchestrator({
+    now:()=>91_000,
+    gatewayClient:{async complete(request) {
+      providerEffects+=1;
+      blockSettlement=true; // Reservation is durable, but commit now fails.
+      return {text:'effect occurred',provider:request.provider,model:request.model,
+        usage:{inputTokens:6,outputTokens:4,totalTokens:10}};
+    }},
+    providerCallLifecycle:{
+      async beforeProviderCall({context,route,prompt,systemPrompt,maxOutputTokens,callNumber}) {
+        return manager.reserveProviderModelBudget({
+          jobId:context.jobId,controlEpoch:context.controlEpoch,
+          route,prompt,systemPrompt,maxOutputTokens,callNumber,
+        });
+      },
+      async afterProviderCall({context,reservation,ok,result}) {
+        return manager.settleProviderModelBudget({
+          jobId:context.jobId,reservationId:reservation.reservationId,ok,result,
+        });
+      },
+    },
+  });
+  const settings={
+    enabled:true,mode:'primary',
+    primary:{provider:'ollama',model:'fixture-one'},
+    routes:[
+      {routeId:'route-one',provider:'ollama',model:'fixture-one',roles:['planner'],priority:2},
+      {routeId:'route-two',provider:'ollama',model:'fixture-two',roles:['planner'],priority:1},
+    ],
+    routePolicy:{autoSwitch:true},
+    fallbackToStrongOnPrimaryError:true,
+  };
+  await assert.rejects(
+    () => orchestrator.run(settings, {}, 'durable offline model test', {
+      maxOutputTokens:64,
+      providerCallBudgetContext:{kind:'browser-agent',jobId,controlEpoch:0},
+    }),
+    error => error.code==='AI_MODEL_BUDGET_SETTLEMENT_UNKNOWN',
+  );
+  assert.equal(providerEffects,1,'uncertain durable settlement prohibits backup provider effect');
+  const pending=(await manager.get(jobId)).job.runtime;
+  assert.equal(pending.modelBudgetReservation?.reservationId,jobId+':model-budget:1');
+  assert.equal(pending.modelCalls,0,'pending write must not masquerade as committed');
+  const restarted=new BrowserAgentManager({
+    chromeApi:chrome,routePrompt:async()=>({text:'{}'}),now:()=>92_000,
+  });
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation(jobId),true);
+  const recovered=(await restarted.get(jobId)).job.runtime;
+  assert.equal(recovered.modelBudgetReservation,null);
+  assert.equal(recovered.modelCalls,1,'uncertain call remains conservatively charged');
+  assert.ok(recovered.outputTokens>=64,'reserved output ceiling is charged on recovery');
+  assert.equal(recovered.history.at(-1)?.type,'model-budget-recovered-after-restart');
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId,controlEpoch:0,prompt:'forbidden replay',maxOutputTokens:64,
+      route:{routeId:'route-two',provider:'ollama',model:'fixture-two',endpointId:''},
+      callNumber:2,
+    }),
+    error => error.code==='AI_MODEL_BUDGET_EXHAUSTED',
+  );
+  assert.equal(providerEffects,1,'restart cannot create an unbudgeted second effect');
+});
+
 test('Browser Agent persists provider-call budget before I/O and restart cannot regain the reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 50_000 });
