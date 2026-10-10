@@ -334,3 +334,61 @@ test('Section 1: preparation request is descriptor-safe before any execution/lea
   assert.equal(restarted.conversationId, canonical.conversationId);
   assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
 });
+
+
+test('terminal Specialist provider success is immutable across durable replay and contradictory late outcome', () => {
+  const terminal = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'VERIFIED_TERMINAL_EFFECT_RECEIPT',
+    errorCode: '',
+    at: T1,
+  });
+  const cold = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(terminal)));
+  const lateContradiction = {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: true,
+    effectEvidence: '',
+    errorCode: 'LATE_TRANSPORT_RETRY',
+    at: T2,
+  };
+  assert.strictEqual(recordSpecialistProviderExecutionOutcomeV1(cold, lateContradiction), cold);
+  assert.equal(cold.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.equal(cold.effectEvidence, 'VERIFIED_TERMINAL_EFFECT_RECEIPT');
+  assert.equal(cold.safeToRetry, false);
+  assert.equal(cold.updatedAt, T1, 'late retries must not replace terminal provenance');
+});
+
+test('terminal provider failure cannot be rewritten as success or execute hostile replay getters', () => {
+  const failed = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: 'error',
+    providerSucceeded: false,
+    manualReviewRequired: true,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'VERIFIED_FAILURE_RECEIPT',
+    errorCode: '',
+    at: T1,
+  });
+  const restored = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(failed)));
+  let getterCalls = 0;
+  const replay = { at: T2 };
+  Object.defineProperty(replay, 'providerStatus', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw Error('SECRET_MUST_NOT_BE_READ');
+    },
+  });
+  assert.strictEqual(recordSpecialistProviderExecutionOutcomeV1(restored, replay), restored);
+  assert.equal(getterCalls, 0);
+  assert.equal(restored.status, SpecialistProviderExecutionStatus.PROVIDER_FAILED);
+  assert.equal(restored.effectEvidence, 'VERIFIED_FAILURE_RECEIPT');
+  assert.equal(restored.safeToRetry, false);
+});
