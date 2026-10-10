@@ -1563,10 +1563,6 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
   const user = action?.usernameRef ? find(action.usernameRef) : null;
   proof(password, 'password');
   if (action?.usernameRef) proof(user, 'username');
-  const dispatch = element => {
-    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-  };
   const setInputValue = (element, value, kind) => {
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
@@ -1581,10 +1577,15 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
     // The setter itself may retarget, hide, or occlude a credential field.
     // This is the existing semantic/geometry proof, not a second authority.
     ensureUnoccluded(element, kind);
-    dispatch(element);
-    // Event listeners may synchronously overwrite the field or its identity.
+    // The page owns each listener. An input handler may repurpose the target,
+    // overwrite the accepted value or cover it with a modal. Re-prove before
+    // dispatching the subsequent change event, not only after both events.
+    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
     if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
-    proof(element, kind);
+    ensureUnoccluded(element, kind);
+    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    if (accepted() !== value) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+    ensureUnoccluded(element, kind);
   };
   let usernameFilled = false;
   if (user) {
