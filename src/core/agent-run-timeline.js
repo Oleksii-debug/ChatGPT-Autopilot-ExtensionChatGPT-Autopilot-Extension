@@ -109,9 +109,6 @@ function boundedJobId(value) {
   }
   return value;
 }
-function safeTime(value) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8_640_000_000_000_000 ? value : 0;
-}
 function storedEventTime(value, present) {
   // Absent legacy timestamps remain compatible but are explicitly identified
   // as missing evidence. A recorded epoch-zero is not "unknown" time.
@@ -191,9 +188,12 @@ function recordedOutcomeSummary(value) {
     externalEffectVerified: false,
   });
   record(value, 'Agent recorded outcome');
+  // Only a genuinely absent legacy field can mean "not recorded". An
+  // explicit null/undefined after restart is corrupt evidence, not zero checks.
+  const checksPresent = safeHasOwn(value, 'checks');
   const checks = own(value, 'checks');
   let count = 0;
-  if (checks != null) {
+  if (checksPresent) {
     if (!plainArray(checks)) {
       throw new Error('Agent recorded outcome checks must be a bounded dense array');
     }
@@ -208,12 +208,20 @@ function recordedOutcomeSummary(value) {
     }
     count = checksLength;
   }
-  const at = safeTime(own(value, 'verifiedAt'));
+  const timePresent = safeHasOwn(value, 'verifiedAt');
+  const rawAt = own(value, 'verifiedAt');
+  if (timePresent && (!Number.isSafeInteger(rawAt) || Object.is(rawAt, -0) ||
+      rawAt < 0 || rawAt > 8_640_000_000_000_000)) {
+    throw new Error('Agent recorded outcome verifiedAt is invalid');
+  }
+  // 0 is the canonical unverified placeholder; do not fabricate an observed
+  // timestamp or external-effect receipt from it. Missing legacy time is null.
+  const at = timePresent ? rawAt : null;
   return freeze({
     source: 'CANONICAL_AGENT_RUNTIME_RECORDED_ONLY',
     recordPresent: true,
     criteriaRecorded: count,
-    recordedAt: at || null,
+    recordedAt: at === 0 ? null : at,
     externalEffectVerified: false,
   });
 }
