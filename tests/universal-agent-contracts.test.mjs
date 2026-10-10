@@ -118,6 +118,23 @@ test('Plan-1 S1: credential expiry cannot be erased by empty timestamp on recove
     assert.deepEqual(corrupt, { ...legacy, expiresAt },
       'rejected expiration must not mutate durable credential references');
   }
+  // An explicit undefined cannot be silently serialized away, which would
+  // destroy the original expiry evidence after a cold JSON restart.
+  const corruptUndefined = { ...legacy, expiresAt: undefined };
+  assert.equal(Object.hasOwn(corruptUndefined, 'expiresAt'), true);
+  assert.throws(() => normalizeCredentialRefV1(corruptUndefined),
+    /expiresAt must be an ISO timestamp or canonical null/,
+    'explicit undefined expiry must fail closed before persistence');
+  assert.equal(Object.hasOwn(corruptUndefined, 'expiresAt'), true,
+    'failed admission must not erase or mutate the caller field');
+  assert.equal(corruptUndefined.expiresAt, undefined);
+
+  // Explicit canonical null is a documented V1 no-expiry identity.
+  const canonicalUnbounded = normalizeCredentialRefV1({ ...legacy, expiresAt: null });
+  assert.equal(canonicalUnbounded.expiresAt, null);
+  assert.deepEqual(normalizeCredentialRefV1(JSON.parse(JSON.stringify(canonicalUnbounded))),
+    canonicalUnbounded, 'canonical null remains restart-compatible');
+
   const active = normalizeCredentialRefV1({ ...legacy, expiresAt: '2026-09-19T04:00:00Z' });
   assert.ok(Object.isFrozen(active));
   assert.equal(active.expiresAt, '2026-09-19T04:00:00.000Z');
