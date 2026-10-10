@@ -1323,15 +1323,19 @@ export function executeBrowserPageAction(snapshotId, action) {
     if (tag === 'input') {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
       if (setter) setter.call(element, value); else element.value = value;
-      events(element);
     } else if (tag === 'textarea') {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
       if (setter) setter.call(element, value); else element.value = value;
-      events(element);
     } else if (element.isContentEditable) {
       element.textContent = value;
-      events(element);
     } else throw new Error('AGENT_TARGET_NOT_FILLABLE');
+    // Native typed fields can sanitize a value in their setter (number/date,
+    // for example). Reject the mismatch *before* firing input/change, which
+    // could persist or submit the wrong value in a page-level listener.
+    const acceptedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
+    if (acceptedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
+    events(element);
+    // Event handlers may synchronously change the field after dispatch.
     const observedValue = tag === 'input' || tag === 'textarea' ? String(element.value ?? '') : String(element.textContent ?? '');
     if (observedValue !== value) throw new Error('AGENT_EFFECT_NOT_OBSERVED');
     return { ok: true, kind: 'fill', effectVerified: true, url: location.href };
