@@ -17,6 +17,37 @@ test('route migration accepts versionless v1 and rejects unknown versions', () =
   assert.throws(() => normalizeAiRoutePool([{...route,schemaVersion:2}]));
 });
 
+test('Plan4 S1 owner router rejects unsupported versions and unknown policy fields before any provider effect', async () => {
+  let providerEffects=0;
+  const gatewayClient={async complete(){providerEffects++;throw new Error('must never send');}};
+  const router=new AiOrchestrator({gatewayClient});
+  const owner={enabled:true,mode:'primary',primary:{provider:'ollama',model:'fixture'},fallbackToStrongOnPrimaryError:false};
+  const invalid=[
+    ...[null,undefined,0,2,'1',true,{}].map(version=>({...owner,schemaVersion:version})),
+    {...owner,providerCredential:'sk-sensitive-example'},
+    {...owner,localOnly:true},
+    {...owner,routePolciy:{locality:'local'}},
+    JSON.parse(JSON.stringify({...owner,schemaVersion:2})),
+    JSON.parse(JSON.stringify({...owner,localOnly:true})),
+  ];
+  for(const bad of invalid) {
+    assert.throws(()=>normalizeAiRouterSettings(bad),/schemaVersion|unknown owner-controlled field/);
+    await assert.rejects(router.run(bad,{},'approved prompt'),/schemaVersion|unknown owner-controlled field/);
+  }
+  const secretKey='sk-sensitive-untrusted-field';
+  const hostile={...owner,[secretKey]:true};
+  assert.throws(()=>normalizeAiRouterSettings(hostile), error=>
+    !error.message.includes(secretKey) && /unknown owner-controlled field/.test(error.message));
+  assert.equal(providerEffects,0);
+  // Versionless v1 documents and exact explicit v1 retain the same route policy
+  // after JSON-cold restart; no implicit account/locality promotion.
+  const legacy=normalizeAiRouterSettings(JSON.parse(JSON.stringify(owner)));
+  const declared=normalizeAiRouterSettings(JSON.parse(JSON.stringify({...owner,schemaVersion:1})));
+  assert.deepEqual(declared,legacy);
+  assert.equal(declared.primary.provider,'ollama');
+  assert.equal(declared.fallbackToStrongOnPrimaryError,false);
+});
+
 test('price-capped route eligibility fails closed on unreported cost after migration/restart', () => {
   const unreported = { routeId:'fixture.free', provider:'openai-compatible', model:'fixture',
     locality:'local', costClass:'free' };
