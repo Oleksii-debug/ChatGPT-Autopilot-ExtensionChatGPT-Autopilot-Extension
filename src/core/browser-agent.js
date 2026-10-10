@@ -687,8 +687,8 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     const passwordElement = passwordProof?.element;
     if (String(passwordElement?.tag || '').toLowerCase() !== 'input'
       || String(passwordElement?.type || '').toLowerCase() !== 'password'
-      || passwordElement?.sensitive !== true) {
-      throw new Error('Browser Agent credential password target must be a current password input');
+      || passwordElement?.sensitive !== true || passwordElement?.readonly === true) {
+      throw new Error('Browser Agent credential password target must be a current editable password input');
     }
 
     let usernameFrameId = null;
@@ -709,7 +709,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       // A checkbox, button, radio, date, number or other input can emit a
       // consequential change event even when its value setter accepts text.
       const textInput = ['text', 'email', 'search', 'tel', 'url'].includes(usernameType);
-      if (!usernameElement || usernameElement.sensitive === true
+      if (!usernameElement || usernameElement.sensitive === true || usernameElement.readonly === true
         || (usernameTag === 'input' && !textInput)
         || usernameType === 'password' || usernameType === 'file') {
         throw new Error('Browser Agent credential username target is not a non-sensitive editable field');
@@ -745,6 +745,10 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.usernameRef = usernameRef;
   }
   if (type === BrowserAgentActionType.FILL) {
+    // A read-only observation never grants a normal fill effect.
+    if (uniqueObservedBrowserTarget(snapshot, action.frameId, action.ref)?.element?.readonly === true) {
+      throw new Error('Browser Agent fill refuses readonly semantic target');
+    }
     // Empty strings intentionally clear a form field; non-string or oversized
     // inputs are invalid rather than silently coercing/truncating an effect.
     if (typeof raw?.text !== 'string' || raw.text.length > 50000) {
@@ -1157,6 +1161,17 @@ export function snapshotBrowserPage(snapshotId) {
       }
     }
     if (['input', 'textarea'].includes(tag) || element.isContentEditable) {
+      // Read-only HTML and ARIA fields are observable, not editable targets.
+      // Persist this semantic state so the planner cannot propose a write.
+      let ariaReadonly = false;
+      for (let node = element; node; node = node.parentElement) {
+        if (String(node.getAttribute?.('aria-readonly') || '').trim().toLowerCase() === 'true') {
+          ariaReadonly = true;
+          break;
+        }
+      }
+      item.readonly = element.readOnly === true
+        || element.getAttribute?.('readonly') !== null || ariaReadonly;
       item.sensitive = sensitive;
       item.filled = sensitive ? undefined : Boolean(normalize(element.value ?? element.textContent ?? '', 2));
       item.placeholder = sensitive ? '' : normalize(element.getAttribute('placeholder') || '', 500);
@@ -1244,6 +1259,17 @@ export function executeBrowserPageAction(snapshotId, action) {
       || href !== action.expectedSemanticHref
       || normalizeObserved(formAction, 1200) !== action.expectedSemanticFormAction
       || normalizeObserved(formMethod, 20) !== action.expectedSemanticFormMethod) throw new Error('AGENT_SEMANTIC_TARGET_STALE');
+    if (action.type === 'fill') {
+      // Focus and event listeners can make the field readonly between checks.
+      if (target.readOnly === true || target.getAttribute?.('readonly') !== null) {
+        throw new Error('AGENT_TARGET_READONLY');
+      }
+      for (let node = target; node; node = node.parentElement) {
+        if (String(node.getAttribute?.('aria-readonly') || '').trim().toLowerCase() === 'true') {
+          throw new Error('AGENT_TARGET_READONLY');
+        }
+      }
+    }
     // Do not activate a target whose ancestor has become hidden/inert or whose
     // computed visibility changed after the planner's semantic observation.
     for (let node = target; node; node = node.parentElement) {
@@ -1538,7 +1564,13 @@ export function executeBrowserCredentialFill(snapshotId, action, username, secre
       || normalize(formMethod, 20) !== action[prefix + 'FormMethod']) {
       throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_STALE');
     }
+    if (element.readOnly === true || element.getAttribute?.('readonly') !== null) {
+      throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_READONLY');
+    }
     for (let node = element; node; node = node.parentElement) {
+      if (String(node.getAttribute?.('aria-readonly') || '').trim().toLowerCase() === 'true') {
+        throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_READONLY');
+      }
       if (node.hidden || node.inert || node.disabled || String(node.getAttribute?.('aria-hidden') || '').trim().toLowerCase() === 'true'
         || String(node.getAttribute?.('aria-disabled') || '').trim().toLowerCase() === 'true') throw new Error('AGENT_CREDENTIAL_' + label + '_TARGET_UNAVAILABLE');
       const style = getComputedStyle(node);
