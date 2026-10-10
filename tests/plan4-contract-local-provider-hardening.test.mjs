@@ -1611,3 +1611,61 @@ test('Plan4 S1 wrong provider/model/endpoint receipts settle consumption but nev
   assert.equal(recovered.text,'verified');
   assert.equal(effects,1);
 });
+
+
+test('Plan4 S1 requires complete identity receipts for endpoint-bound provider dispatch', async () => {
+  const owner = JSON.parse(JSON.stringify({
+    enabled:true, mode:'primary', fallbackToStrongOnPrimaryError:false,
+    primary:{provider:'openai-compatible',model:'fixture'},
+    routePolicy:{autoSwitch:true,pinnedRouteId:'account.bound'},
+    routes:[{routeId:'account.bound',provider:'openai-compatible',model:'fixture',
+      endpointId:'account.endpoint',locality:'local',costClass:'free'}],
+  }));
+  const options = {
+    providerCallBudgetContext:{kind:'browser-agent',jobId:'account-bound-job',controlEpoch:1},
+    maxModelCallsForRequest:2, maxOutputTokens:128,
+  };
+  const incomplete = [
+    null, [], {text:'unsafe'},
+    {text:'unsafe',provider:'openai-compatible'},
+    {text:'unsafe',provider:'openai-compatible',model:'fixture'},
+    {text:'unsafe',provider:'openai-compatible',endpointId:'account.endpoint'},
+    {text:'unsafe',model:'fixture',endpointId:'account.endpoint'},
+    Object.defineProperty({
+      text:'unsafe',provider:'openai-compatible',model:'fixture'
+    },'endpointId',{enumerable:true,get(){throw new Error('secret accessor');}}),
+  ];
+  for (const unsafe of incomplete) {
+    let sends = 0;
+    const settlements = [];
+    const router = new AiOrchestrator({
+      gatewayClient:{async complete(){sends++;return unsafe;}},
+      providerCallLifecycle:{
+        async beforeProviderCall(){return {reservationId:'account-bound-job:reservation:1'};},
+        async afterProviderCall({ok}){settlements.push(ok);return {settled:true};},
+      },
+    });
+    await assert.rejects(router.run(owner,{},'approved after restart',options),
+      error => error.code === 'AI_PROVIDER_RECEIPT_IDENTITY_UNVERIFIED'
+        && error.retryable === false
+        && error.routeAttempts?.[0]?.outcome === 'UNKNOWN'
+        && !String(error.message).includes('secret'));
+    assert.equal(sends,1,'no blind resend after unknown account receipt');
+    assert.deepEqual(settlements,[true],'account usage still settled once');
+  }
+  let sends = 0;
+  const admitted = new AiOrchestrator({
+    gatewayClient:{async complete(){sends++;return {
+      text:'verified',provider:'openai-compatible',model:'fixture',
+      endpointId:'account.endpoint',usage:{inputTokens:1,outputTokens:1,totalTokens:2},
+    };}},
+    providerCallLifecycle:{
+      async beforeProviderCall(){return {reservationId:'account-bound-job:reservation:2'};},
+      async afterProviderCall(){return {settled:true};},
+    },
+  });
+  const response=await admitted.run(JSON.parse(JSON.stringify(owner)),{},'approved after restart',options);
+  assert.equal(response.text,'verified');
+  assert.equal(response.routing.selectedRouteId,'account.bound');
+  assert.equal(sends,1);
+});
