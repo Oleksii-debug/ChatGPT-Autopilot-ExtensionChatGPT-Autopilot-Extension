@@ -2187,3 +2187,68 @@ test('Plan-2 S1: CDP upload uses unique typed resolver before file effect', () =
   assert.equal((upload.match(/await proveInput\(\)/g) || []).length, 3,
     'semantic owner preflight remains in place');
 });
+
+test('semantic planner rejects duplicated frame and target refs before action or approval', () => {
+  const observed = setup();
+  const click = { type: 'click', frameId: 0, ref: 'r1' };
+  const activate = { type: 'key', key: 'Enter', frameId: 0, ref: 'r1' };
+  const parse = (a, snapshot) => parseBrowserAgentAction(JSON.stringify(a), snapshot);
+  assert.equal(parse(click, observed).expectedFrameUrl, observed.frames[0].url);
+  assert.equal(parse(activate, observed).expectedSemanticName, observed.frames[0].elements[0].name);
+
+  const duplicateElement = structuredClone(observed);
+  duplicateElement.frames[0].elements.push({
+    ...duplicateElement.frames[0].elements[0], name: 'Repurposed Save',
+  });
+  const duplicateFrame = structuredClone(observed);
+  duplicateFrame.frames.push(structuredClone(duplicateFrame.frames[0]));
+
+  for (const snapshot of [duplicateElement, duplicateFrame, structuredClone(duplicateElement)]) {
+    for (const action of [click, activate, { ...activate, key: 'Space' },
+      { type: 'fill', frameId: 0, ref: 'r1', text: 'untrusted' },
+      { type: 'check', frameId: 0, ref: 'r1', checked: true }]) {
+      assert.throws(() => parse(action, snapshot), /missing or ambiguous/);
+    }
+  }
+  assert.equal(element.clicked, 0, 'ambiguous planner target must never activate a page control');
+});
+
+test('credential parser refuses duplicated broker and password/username snapshot identities', () => {
+  const source = setup();
+  source.frames[0].elements = [
+    { ref: 'p1', tag: 'input', type: 'password', sensitive: true,
+      semanticIdentity: 'password-observation', name: 'Password', formAction: '', formMethod: '' },
+    { ref: 'u1', tag: 'input', type: 'text', sensitive: false,
+      semanticIdentity: 'username-observation', name: 'Username', formAction: '', formMethod: '' },
+  ];
+  source.credentials = [{ ref: 'cred1', credentialId: 'owner-broker-record' }];
+  const action = { type: 'fill_credential', credentialRef: 'cred1',
+    passwordFrameId: 0, passwordRef: 'p1', usernameFrameId: 0, usernameRef: 'u1' };
+  const parse = snapshot => parseBrowserAgentAction(JSON.stringify(action), snapshot);
+  const valid = parse(structuredClone(source));
+  assert.equal(valid.credentialId, 'owner-broker-record');
+  assert.equal(valid.expectedPasswordName, 'Password');
+  assert.equal(valid.expectedUsernameName, 'Username');
+
+  const cases = [];
+  const duplicateCredential = structuredClone(source);
+  duplicateCredential.credentials.push({ ref: 'cred1', credentialId: 'different-record' });
+  cases.push(duplicateCredential);
+  const duplicatePassword = structuredClone(source);
+  duplicatePassword.frames[0].elements.push({ ...duplicatePassword.frames[0].elements[0],
+    semanticIdentity: 'repurposed-password' });
+  cases.push(duplicatePassword);
+  const duplicateUsername = structuredClone(source);
+  duplicateUsername.frames[0].elements.push({ ...duplicateUsername.frames[0].elements[1],
+    semanticIdentity: 'repurposed-username' });
+  cases.push(duplicateUsername);
+  const duplicateFrame = structuredClone(source);
+  duplicateFrame.frames.push(structuredClone(duplicateFrame.frames[0]));
+  cases.push(duplicateFrame);
+  for (const corrupted of cases) {
+    assert.throws(() => parse(JSON.parse(JSON.stringify(corrupted))),
+      /one exact current credential reference|current password input|username target is not|semantic target identity is missing/);
+  }
+  assert.equal(element.clicked, 0, 'broker selection must remain effect-free');
+});
+
