@@ -8,6 +8,72 @@ import { normalizeAutopilotProgrammaticRequestV1, isAutopilotProgrammaticOperati
  */
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
+const MAX_RESPONSE_BYTES = 262_144;
+
+/**
+ * A remote/compromised loopback peer must not force the SDK to buffer an
+ * unbounded HTTP 200 body before the canonical Core proof is validated.
+ * The timeout promise belongs to the entire SDK control call, including
+ * every streamed chunk. No response parsing failure grants retry authority.
+ *
+ * Small test doubles without a Fetch ReadableStream retain the older json()
+ * fixture interface; real HTTP Response bodies always use the bounded path.
+ */
+async function readBoundedControlResponseJson(res, deadline) {
+  const type = res?.headers?.get?.('content-type');
+  if (type != null
+    && !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(type)) {
+    throw new Error('Local API response media type is invalid');
+  }
+  const declared = res?.headers?.get?.('content-length');
+  if (declared != null
+    && (!/^\d+$/u.test(declared)
+      || !Number.isSafeInteger(Number(declared))
+      || Number(declared) > MAX_RESPONSE_BYTES)) {
+    throw new Error('Local API response content length is invalid');
+  }
+  if (res?.body === undefined && typeof res?.json === 'function') {
+    // Compatibility for internal in-process fetch stubs only.
+    return Promise.race([res.json(), deadline]);
+  }
+  if (!res?.body || typeof res.body.getReader !== 'function') {
+    throw new Error('Local API response stream is missing');
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await Promise.race([reader.read(), deadline]);
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) {
+        throw new Error('Local API response chunk is invalid');
+      }
+      size += chunk.value.byteLength;
+      if (size > MAX_RESPONSE_BYTES) {
+        // A stream can omit or forge Content-Length. Do not retain its data
+        // or wait for the peer to finish sending it.
+        void reader.cancel().catch(() => {});
+        throw new Error('Local API response is too large');
+      }
+      chunks.push(chunk.value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    // Fatal decoding rejects replacements; preserve a BOM so JSON.parse
+    // rejects it exactly as the shared CLI/HTTP control JSON parser does.
+    const json = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    return JSON.parse(json);
+  } finally {
+    try { reader.releaseLock(); } catch { /* no peer diagnostics */ }
+  }
+}
+
+
 // The trusted Companion/owner may rotate its bearer between SDK requests.
 // The SDK reads the current token per call, never stores an old fallback.
 function validLocalApiToken(candidate) {
@@ -304,7 +370,7 @@ export function createAutopilotLocalClientV1({ token, tokenProvider, port, fetch
       }
       try {
         // Validate and return only immutable snapshots, never original Proxies.
-        const body = await Promise.race([res.json(), deadline]);
+        const body = await readBoundedControlResponseJson(res, deadline);
         if (abortController.signal.aborted) throw new Error('Late Local API response');
         const envelope = snapshotTransportRecord(body, RESPONSE_FIELDS);
         const outer = snapshotTransportRecord(envelope.result, RESULT_FIELDS);
