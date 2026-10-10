@@ -415,3 +415,83 @@ test('owner token resolver timeout fails closed and a late resolution cannot dis
     await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+
+test('Local API pins canonical Core scope/dispatch/clock despite owner object mutation', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  const original = dependencies(counters);
+  let swappedScope = 0, swappedDispatch = 0, swappedClock = 0;
+  await withServer(async port => {
+    // Attacker/accidental mutation of an injected container after listen
+    // must not replace the functions admitted during Companion creation.
+    original.resolveTrustedScope = () => {
+      swappedScope += 1;
+      throw new Error('UNTRUSTED_SCOPE_REPLACEMENT');
+    };
+    original.dispatchCanonicalControl = () => {
+      swappedDispatch += 1;
+      throw new Error('UNTRUSTED_EFFECT_DISPATCH_REPLACEMENT');
+    };
+    original.now = () => {
+      swappedClock += 1;
+      throw new Error('UNTRUSTED_CLOCK_REPLACEMENT');
+    };
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    for (const id of ['pinned-core-1', 'pinned-core-2']) {
+      const answer = await client.control(request(id));
+      assert.equal(answer.status, 'RECEIVED');
+      assert.equal(answer.result.adapterGrantsAuthority, false);
+      assert.equal(answer.result.exactEffectAuthority, false);
+    }
+  }, original);
+  assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
+  assert.deepEqual([swappedScope, swappedDispatch, swappedClock], [0, 0, 0],
+    'post-construction dependency replacement must never gain control authority');
+});
+
+test('Local API refuses accessor, inherited, symbol and Proxy dependency injection before listen', () => {
+  const base = dependencies();
+  let getterCalls = 0;
+  const accessor = { ...base };
+  Object.defineProperty(accessor, 'dispatchCanonicalControl', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('SECRET_DEPENDENCY_GETTER');
+    },
+  });
+  const symbol = { ...base };
+  symbol[Symbol('extra authority')] = () => {};
+  const inherited = Object.create({
+    dispatchCanonicalControl: base.dispatchCanonicalControl,
+  });
+  inherited.now = base.now;
+  inherited.resolveTrustedScope = base.resolveTrustedScope;
+  const extra = { ...base, grantEffects: () => true };
+  const hidden = { ...base };
+  Object.defineProperty(hidden, 'hiddenCredential', { value: 'DO_NOT_DISCLOSE' });
+  let proxyGets = 0;
+  const hostile = new Proxy({ ...base }, {
+    get() {
+      proxyGets += 1;
+      throw new Error('SECRET_DEPENDENCY_GET_TRAP');
+    },
+  });
+  const trapped = new Proxy({ ...base }, {
+    ownKeys() {
+      throw new Error('SECRET_DEPENDENCY_OWNKEYS_TRAP');
+    },
+  });
+  for (const input of [accessor, symbol, inherited, extra, hidden, trapped]) {
+    assert.throws(() => createAutopilotLocalApiServerV1({
+      token: TOKEN, dependencies: input,
+    }), /Trusted canonical control dependencies/u);
+  }
+  const server = createAutopilotLocalApiServerV1({
+    token: TOKEN, dependencies: hostile,
+  });
+  assert.equal(proxyGets, 0, 'admitted data descriptors cannot execute Proxy get');
+  server.close();
+  assert.equal(getterCalls, 0, 'malicious getter must not execute');
+  assert.equal(proxyGets, 0, 'admission must pin descriptor values without property reads');
+});
