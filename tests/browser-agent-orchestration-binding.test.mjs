@@ -1290,7 +1290,7 @@ test('lifecycle adapter options are exact descriptor-safe data and private Brows
       bound.binding,
       applyBoundLifecycle => applyBoundLifecycle('PAUSE', hostileOptions),
     ),
-    /enumerable own data properties/,
+    /enumerable own data property/,
   );
   assert.equal(reads, 0);
 
