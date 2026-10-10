@@ -27,6 +27,9 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_TEXT = 16_000;
 const MAX_DATA_JSON = 256_000;
+// Bound traversal work before serialization: short JSON values can still
+// contain tens of thousands of nested elements and exhaust recovery budgets.
+const MAX_JSON_NODES = 65_536;
 const MAX_LIST = 128;
 
 function safeContractReflection(label, inspect) {
@@ -222,7 +225,8 @@ function stringList(value, label, { optional = true, max = MAX_LIST, itemMax = 5
   return normalized;
 }
 
-function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
+function cloneJsonData(value, label, stack = new WeakSet(), depth = 0, budget = { visited: 0 }) {
+  if (++budget.visited > MAX_JSON_NODES) throw new Error(`${label} exceeds maximum JSON node budget`);
   if (depth > 64) throw new Error(`${label} exceeds maximum nesting depth`);
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -239,7 +243,7 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
   try {
     if (Array.isArray(value)) {
       const items = dataArray(value, label, MAX_DATA_JSON);
-      return items.map((item, index) => cloneJsonData(item, `${label}[${index}]`, stack, depth + 1));
+      return items.map((item, index) => cloneJsonData(item, `${label}[${index}]`, stack, depth + 1, budget));
     }
     const raw = plain(value, label);
     const out = {};
@@ -257,7 +261,7 @@ function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
       Object.defineProperty(out, key, {
         // Never interpolate attacker-owned JSON member names into errors:
         // key names can carry credentials and are not diagnostic authority.
-        value: cloneJsonData(raw[key], label + ' nested field', stack, depth + 1),
+        value: cloneJsonData(raw[key], label + ' nested field', stack, depth + 1, budget),
         enumerable: true,
         writable: true,
         configurable: true,
