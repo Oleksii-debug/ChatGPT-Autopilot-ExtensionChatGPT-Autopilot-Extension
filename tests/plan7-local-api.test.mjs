@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
+import { connect as netConnect } from 'node:net';
 import { startAutopilotLocalApiLoopbackV1, createAutopilotLocalApiServerV1 } from '../companion/local-api/server.mjs';
 import { createAutopilotLocalClientV1 } from '../companion/local-api/client.mjs';
 
@@ -46,6 +47,47 @@ async function withServer(run, deps = dependencies()) {
   try { return await run(server.address().port); }
   finally { await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve())); }
 }
+
+test('legacy HTTP/1.0 downgrade is denied before owner-token lookup or Core and HTTP/1.1 recovers', async () => {
+  const counters = { scopes: 0, dispatches: 0 };
+  let tokenLookups = 0;
+  const server = await startAutopilotLocalApiLoopbackV1({
+    tokenProvider: async () => { tokenLookups++; return TOKEN; },
+    dependencies: dependencies(counters),
+  });
+  try {
+    const port = server.address().port;
+    const body = JSON.stringify(request('http10-must-never-dispatch'));
+    const socket = netConnect({ host: '127.0.0.1', port });
+    socket.setTimeout(4_000, () => socket.destroy(new Error('legacy HTTP timeout')));
+    socket.once('connect', () => socket.write([
+      'POST /v1/control HTTP/1.0',
+      'Host: 127.0.0.1:' + port,
+      'Authorization: Bearer ' + TOKEN,
+      'Content-Type: application/json',
+      'Content-Length: ' + Buffer.byteLength(body),
+      'Connection: close', '', '', 
+    ].join('\\r\\n') + body));
+    const chunks = [];
+    for await (const chunk of socket) chunks.push(chunk);
+    const response = Buffer.concat(chunks).toString('utf8');
+    assert.match(response, /^HTTP\\/1\\.1 403\\b/u);
+    assert.equal(tokenLookups, 0,
+      'HTTP downgrade must not invoke trusted credential resolution');
+    assert.deepEqual(counters, { scopes: 0, dispatches: 0 },
+      'HTTP downgrade must never reach Core authorization or effect dispatch');
+    const client = createAutopilotLocalClientV1({ token: TOKEN, port });
+    const recovered = await client.control(request('http11-clean-recovery'));
+    assert.equal(recovered.status, 'RECEIVED');
+    assert.equal(recovered.result.receipt.status, 'COMPLETED');
+    assert.equal(tokenLookups, 3);
+    assert.deepEqual(counters, { scopes: 1, dispatches: 1 },
+      'HTTP/1.1 recovery dispatches through canonical Core only once');
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+  }
+});
 
 test('Local API is opt-in and rejects missing runtime or short secrets', () => {
   assert.throws(() => createAutopilotLocalApiServerV1(), /high-entropy/u);
