@@ -2075,3 +2075,51 @@ test('Plan4 S1: verified Unicode model identity remains unchanged in legacy-slot
   assert.equal(routed.text,'verified');
   assert.equal(modelCalls,1);
 });
+
+
+test('Plan4 S1 endpoint evidence round-trips canonical origin through JSON cold restart', async () => {
+  // Regression: the original normalizer accepted a canonical origin ending in
+  // '/' but emitted parsed.origin without '/', so its own evidence failed
+  // validation on the next cold restart.
+  for (const candidate of [
+    {
+      boundRoute: {...route,endpointId:'local.loopback'},
+      boundEndpoint: {...endpoint,endpointId:'local.loopback'},
+    },
+    {
+      boundRoute: {routeId:'remote',provider:'openai-compatible',model:'fixture',
+        endpointId:'remote.compatible',locality:'remote'},
+      boundEndpoint: {schemaVersion:1,profileId:'remote.profile',
+        provider:'openai-compatible',endpointId:'remote.compatible',
+        locality:'remote',origin:'https://models.example/',
+        credentialRef:'opaque.remote',credentialless:false,accountId:'account.fixture',
+        modelIds:['fixture']},
+    },
+  ]) {
+    const owner = {schemaVersion:1,registryRevision:4,
+      routes:[candidate.boundRoute],endpointProfiles:[candidate.boundEndpoint]};
+    const before = await createAiRouteRegistryEvidenceV1(JSON.parse(JSON.stringify(owner)));
+    assert.equal(before.endpointProfiles[0].origin,candidate.boundEndpoint.origin);
+    assert.equal(before.routeIdentities[0].endpointBinding,'MATCHED');
+    const restarted = JSON.parse(JSON.stringify({
+      ...owner, endpointProfiles:before.endpointProfiles,
+    }));
+    const after = await createAiRouteRegistryEvidenceV1(restarted);
+    assert.equal(after.configSha256,before.configSha256,
+      'evidence hash must be identical after persisted normalized-profile reload');
+    assert.equal(after.endpointProfiles[0].origin,candidate.boundEndpoint.origin);
+    assert.equal(after.routeIdentities[0].endpointBinding,'MATCHED');
+    for (const origin of [
+      candidate.boundEndpoint.origin.slice(0,-1),
+      candidate.boundEndpoint.origin + '?token=private',
+      candidate.boundEndpoint.origin + '#private',
+    ]) {
+      await assert.rejects(
+        createAiRouteRegistryEvidenceV1({
+          ...restarted,
+          endpointProfiles:[{...restarted.endpointProfiles[0],origin}],
+        }),/AI endpoint origin/,
+        'noncanonical or secret-bearing origin must fail closed');
+    }
+  }
+});
