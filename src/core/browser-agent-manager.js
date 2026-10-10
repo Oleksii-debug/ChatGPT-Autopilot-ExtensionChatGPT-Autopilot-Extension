@@ -3688,40 +3688,56 @@ export class BrowserAgentManager {
     };
   }
 
-  async authorizeSpecialistSafeRetry(id, payload = {}) {
+  async authorizeSpecialistSafeRetry(id, payload = {}, dependencies = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
-    if (!this.specialistVerificationResolver) throw new Error('Specialist SAFE_RETRY requires canonical trusted verifier provenance; no resolver is configured');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      }, {
-        resolveTrustedExecutionVerificationRecord: lookup => this.specialistVerificationResolver.resolve({
-          lookup,
-          dispatch: clone(job.runtime.specialistDispatchByAgentId?.[request.agentId] || null),
-        }),
-      });
+      const providerExecution = (job.runtime.specialistProviderExecutions || [])
+        .find(item => item?.agentId === request.agentId && item?.leaseId === request.leaseId
+          && item?.status === SpecialistProviderExecutionStatus.RECONCILE);
+      if (providerExecution && Object.hasOwn(request, 'at')) {
+        throw new Error('Browser Agent specialist reconciliation request unknown field: at');
+      }
+      const injected = Object.getOwnPropertyDescriptor(dependencies, 'resolveTrustedExecutionVerificationRecord');
+      const resolver = providerExecution
+        ? (injected && Object.hasOwn(injected, 'value') && typeof injected.value === 'function' ? injected.value : null)
+        : (this.specialistVerificationResolver
+          ? lookup => this.specialistVerificationResolver.resolve({
+            lookup,
+            dispatch: clone(job.runtime.specialistDispatchByAgentId?.[request.agentId] || null),
+          })
+          : null);
+      if (!resolver) throw new Error('Canonical trusted execution verification resolver is required');
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        { resolveTrustedExecutionVerificationRecord: resolver },
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
       job.runtime.updatedAt = this.now();
+      const trusted = retriable.trustedVerification;
       appendHistory(job.runtime, {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
-        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        trustedRecordId: trusted.recordId,
+        verificationOutcome: trusted.outcome,
+        verifierId: trusted.verifierId,
+        verificationAuthorityId: trusted.verificationAuthorityId,
+        verificationId: trusted.verificationId,
+        evidenceArtifactIds: trusted.evidenceArtifactIds,
+        message: 'Independently resolved canonical NO_EFFECT record released exactly one fenced lease without replay.',
       });
       result = clone(retriable);
       return store;
@@ -3749,27 +3765,39 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async verifySpecialistHandoff(id, payload = {}) {
+  async verifySpecialistHandoff(id, payload = {}, dependencies = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
-    if (!this.specialistVerificationResolver) throw new Error('Specialist verification requires canonical trusted verifier provenance; no resolver is configured');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
+      const providerExecution = (job.runtime.specialistProviderExecutions || [])
+        .find(item => item?.agentId === request.agentId && item?.leaseId === request.leaseId
+          && item?.status === SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+      if (providerExecution && Object.hasOwn(request, 'at')) {
+        throw new Error('Browser Agent specialist verification request unknown field: at');
+      }
       const dispatch = job.runtime.specialistDispatchByAgentId?.[request.agentId] || null;
-      if (!dispatch || dispatch.state !== 'PROVIDER_SUCCEEDED') throw new Error('Trusted Specialist verification requires a successful durable provider dispatch');
+      if (!providerExecution && (!dispatch || dispatch.state !== 'PROVIDER_SUCCEEDED')) {
+        if (!this.specialistVerificationResolver) {
+          throw new Error('Canonical trusted execution verification resolver is required');
+        }
+        throw new Error('Trusted Specialist verification requires a successful durable provider dispatch');
+      }
+      const injected = Object.getOwnPropertyDescriptor(dependencies, 'resolveTrustedExecutionVerificationRecord');
+      const resolver = providerExecution
+        ? (injected && Object.hasOwn(injected, 'value') && typeof injected.value === 'function' ? injected.value : null)
+        : (this.specialistVerificationResolver
+          ? lookup => this.specialistVerificationResolver.resolve({ lookup, dispatch: clone(dispatch) })
+          : null);
+      if (!resolver) throw new Error('Canonical trusted execution verification resolver is required');
       const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
         job.runtime.plan,
         job.runtime.specialistHandoffs || [],
-        { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at },
-        {
-          resolveTrustedExecutionVerificationRecord: lookup => this.specialistVerificationResolver.resolve({
-            lookup,
-            dispatch: clone(dispatch),
-          }),
-        },
+        { ...request, executionOwnerships: job.runtime.specialistExecutionOwnerships || [], at },
+        { resolveTrustedExecutionVerificationRecord: resolver },
       );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
@@ -3783,7 +3811,14 @@ export class BrowserAgentManager {
         automation.updatedAt = this.now();
       }
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        trustedRecordId: verified.trustedVerification.recordId,
+        verificationOutcome: verified.trustedVerification.outcome,
+        message: 'Independent canonical trusted record verified Specialist result evidence and advanced the plan.',
+      });
       result = clone(verified);
       return store;
     });
