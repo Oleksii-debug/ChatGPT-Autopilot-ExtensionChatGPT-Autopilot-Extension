@@ -1636,3 +1636,146 @@ test('S1 isolation and scrub targets carry full exact canonical identity after J
   assert.equal(receipt.reuseAuthorized, false);
   assert.equal(receipt.requiresCanonicalRuntime, true);
 });
+
+
+// A trusted callback is a capability supplied by the canonical runtime, not
+// a guarantee that its database/transport exception is safe to log. Treat
+// failed reads as ambiguous across cold restart and destructive transitions.
+test('S1 canonical store callback errors remain redacted and cannot start provider I/O', async () => {
+  const secret = 'PRIVATE_DATABASE_CONNECTION_TOKEN_NEVER_LOG';
+  const { binding, ownership } = bindingAndOwnership();
+  const coldOwner = JSON.parse(JSON.stringify(ownership));
+  const coldBinding = JSON.parse(JSON.stringify(binding));
+  let isolationCalls = 0;
+  let writes = 0;
+  let teardownCalls = 0;
+  let scrubCalls = 0;
+  const fail = async () => { throw new Error(secret); };
+  const rejectsWithoutSecret = async (operation, code) => assert.rejects(operation, error => {
+    assert.equal(error.message.includes(secret), false);
+    assert.match(error.message, code);
+    return true;
+  });
+
+  await rejectsWithoutSecret(
+    () => verifyCloudWorkspaceIsolationV1(observation(), coldOwner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: fail,
+      verifyIsolation: async () => { isolationCalls++; return isolationProof(); },
+    }),
+    /canonical cloud ownership readback failed; reconciliation required/u,
+  );
+  assert.equal(isolationCalls, 0, 'failed ownership read must not reach provider isolation');
+
+  await rejectsWithoutSecret(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), coldOwner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(coldOwner)),
+      verifyIsolation: async () => isolationProof(),
+      loadCanonicalBinding: fail,
+      atomicCommitCanonicalBinding: async () => { writes++; },
+    }),
+    /canonical cloud binding readback failed; reconciliation required/u,
+  );
+  assert.equal(writes, 0, 'failed preflight store read must not commit');
+
+  await rejectsWithoutSecret(
+    () => teardownAndVerifyCloudWorkspaceV1(coldBinding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: fail,
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(coldOwner)),
+      teardown: async () => { teardownCalls++; return teardownCompletion(); },
+      verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+    }),
+    /canonical cloud binding readback failed; reconciliation required/u,
+  );
+  assert.equal(teardownCalls, 0);
+  assert.equal(scrubCalls, 0);
+});
+
+test('S1 post-commit store transport failure is ambiguous, never a retry authorization', async () => {
+  const secret = 'POST_COMMIT_DATABASE_PASSWORD_PRIVATE';
+  const owner = JSON.parse(JSON.stringify(cloudOwnership()));
+  let readbacks = 0;
+  let writes = 0;
+  await assert.rejects(
+    () => commitVerifiedCloudWorkspaceBindingV1(observation(), owner, {
+      at: ISOLATION_AT,
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(owner)),
+      verifyIsolation: async () => isolationProof(),
+      loadCanonicalBinding: async () => {
+        readbacks++;
+        if (readbacks === 1) return null;
+        throw new Error(secret); // The transaction may already have committed.
+      },
+      atomicCommitCanonicalBinding: async transaction => {
+        writes++;
+        assert.equal(transaction.requireAtomicOwnerLeaseCompareAndSet, true);
+      },
+    }),
+    error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /canonical cloud binding readback failed; reconciliation required/u);
+      return true;
+    },
+  );
+  assert.equal(readbacks, 2);
+  assert.equal(writes, 1, 'no automatic second canonical write after uncertain outcome');
+});
+
+test('S1 post-teardown store failure cannot manufacture scrub or reuse evidence', async () => {
+  const secret = 'POST_TEARDOWN_CLOUD_ACCOUNT_SECRET';
+  const { binding, ownership } = bindingAndOwnership();
+  const coldBinding = JSON.parse(JSON.stringify(binding));
+  let bindingReads = 0;
+  let teardownCalls = 0;
+  let scrubCalls = 0;
+  await assert.rejects(
+    () => teardownAndVerifyCloudWorkspaceV1(coldBinding, {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => {
+        bindingReads++;
+        if (bindingReads === 3) throw new Error(secret);
+        return JSON.parse(JSON.stringify(coldBinding));
+      },
+      loadCanonicalOwnership: async () => JSON.parse(JSON.stringify(ownership)),
+      teardown: async () => { teardownCalls++; return teardownCompletion(); },
+      verifyScrub: async () => { scrubCalls++; return scrubProof(); },
+    }),
+    error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /canonical cloud binding readback failed; reconciliation required/u);
+      return true;
+    },
+  );
+  assert.equal(bindingReads, 3);
+  assert.equal(teardownCalls, 1, 'destructive provider effects must never be repeated automatically');
+  assert.equal(scrubCalls, 1);
+});
+
+test('S1 read-only JSON restart reconciliation redacts owner lookup failures', async () => {
+  const secret = 'COLD_RESTART_CANONICAL_STORE_TOKEN';
+  const { binding } = bindingAndOwnership();
+  let bindingReads = 0;
+  let ownerReads = 0;
+  await assert.rejects(
+    () => reconcileCloudWorkspaceBindingCommitV1(JSON.parse(JSON.stringify(binding)), {
+      at: SCRUB_AT,
+      loadCanonicalBinding: async () => {
+        bindingReads++;
+        return JSON.parse(JSON.stringify(binding));
+      },
+      loadCanonicalOwnership: async () => {
+        ownerReads++;
+        throw new Error(secret);
+      },
+    }),
+    error => {
+      assert.equal(error.message.includes(secret), false);
+      assert.match(error.message, /canonical cloud ownership readback failed; reconciliation required/u);
+      return true;
+    },
+  );
+  assert.equal(bindingReads, 1);
+  assert.equal(ownerReads, 1);
+});
