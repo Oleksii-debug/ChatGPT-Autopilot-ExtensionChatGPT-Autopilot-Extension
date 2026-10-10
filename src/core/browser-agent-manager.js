@@ -587,6 +587,12 @@ function normalizeRuntime(raw, now) {
   if (!raw || typeof raw !== 'object') return base;
   const allowed = new Set(Object.values(BrowserAgentRunState));
   const runState = allowed.has(raw.runState) ? raw.runState : BrowserAgentRunState.STOPPED;
+  // A torn/corrupt persisted pre-dispatch reservation is not evidence that
+  // its provider effect failed. Persist a sticky quarantine instead of
+  // restoring an empty reservation and allowing a second provider call.
+  const pendingModelReservation = normalizeModelBudgetReservation(raw.modelBudgetReservation);
+  const modelBudgetReservationQuarantined = raw.modelBudgetReservationQuarantined === true
+    || (raw.modelBudgetReservation != null && !pendingModelReservation);
   const plan = raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null;
   // Handoffs live in the already-durable Browser Agent job record.  A corrupt
   // record is ignored here and later actions fail closed against the plan.
@@ -631,12 +637,13 @@ function normalizeRuntime(raw, now) {
     specialistProviderHandoffsByAgentId,
     specialistDispatchByAgentId,
     specialistAutomationByAgentId,
-    runState,
+    runState: modelBudgetReservationQuarantined ? BrowserAgentRunState.PAUSED : runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
     modelCalls: Math.max(0, Number(raw.modelCalls || 0)),
     modelBudgetReservationSeq: Math.max(0, Math.floor(Number(raw.modelBudgetReservationSeq || 0))),
-    modelBudgetReservation: normalizeModelBudgetReservation(raw.modelBudgetReservation),
+    modelBudgetReservation: modelBudgetReservationQuarantined ? null : pendingModelReservation,
+    modelBudgetReservationQuarantined,
     aiRouterRuntime: normalizeAiRouterRuntime(raw.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
     inputTokens: Math.max(0, Number(raw.inputTokens || 0)),
     outputTokens: Math.max(0, Number(raw.outputTokens || 0)),
@@ -729,7 +736,7 @@ function normalizeRuntime(raw, now) {
         detail: clean(check?.detail, 1000),
       })).filter(check => check.criterion > 0 && check.text && check.detail),
     } : null,
-    nextWakeAt: Math.max(0, Number(raw.nextWakeAt || 0)),
+    nextWakeAt: modelBudgetReservationQuarantined ? 0 : Math.max(0, Number(raw.nextWakeAt || 0)),
     updatedAt: Math.max(0, Number(raw.updatedAt || now)),
   };
 }
@@ -2401,6 +2408,11 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[jobId];
       if (!job) throw new Error('Browser Agent job not found');
+      if (job.runtime.modelBudgetReservationQuarantined === true) {
+        const error = new Error('Browser Agent provider budget reservation is quarantined after corrupt persisted evidence');
+        error.code = 'AI_MODEL_BUDGET_RESERVATION_QUARANTINED';
+        throw error;
+      }
       if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
         const error = new Error('Browser Agent owner authority changed before model budget reservation');
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
