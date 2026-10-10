@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import { connect as netConnect } from 'node:net';
+import { mkdtempSync, existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { startAutopilotLocalApiLoopbackV1, createAutopilotLocalApiServerV1 } from '../companion/local-api/server.mjs';
 import { createAutopilotLocalClientV1 } from '../companion/local-api/client.mjs';
 
@@ -1271,5 +1274,101 @@ test('SDK does not resend an ambiguous same-identity control after a real Core d
     assert.deepEqual(counters, { scopes: 2, dispatches: 2 });
   } finally {
     await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
+  }
+});
+
+test('SDK restart delegates mutating same-ID reconciliation to persisted canonical Core fixture', async () => {
+  // This fixture exercises the transport/Core boundary across listener and
+  // SDK recreation. It is NOT the product's durable Core store, and proves no
+  // production persistence or authorization wiring.
+  const home = mkdtempSync(join(tmpdir(), 'plan7-canonical-fixture-'));
+  const storeFile = join(home, 'core-fixture.json');
+  let physicalEffects = 0;
+  const counters = { scopes: 0, dispatches: 0 };
+  const trusted = dependencies(counters);
+  function persistedCoreDependencies() {
+    return {
+      now: trusted.now,
+      resolveTrustedScope: trusted.resolveTrustedScope,
+      dispatchCanonicalControl({ request: r }) {
+        counters.dispatches++;
+        const state = existsSync(storeFile)
+          ? JSON.parse(readFileSync(storeFile, 'utf8'))
+          : { schemaVersion: 1, entries: [] };
+        const key = JSON.stringify([r.principalId, r.projectId, r.requestId]);
+        const previous = state.entries.find(entry => entry.key === key);
+        if (previous) {
+          if (JSON.stringify(previous.request) !== JSON.stringify(r)) {
+            throw new Error('Canonical persisted Core identity conflict');
+          }
+          return previous.receipt;
+        }
+        physicalEffects++;
+        const receipt = {
+          schemaVersion: 1, requestId: r.requestId, projectId: r.projectId,
+          operation: r.operation, dispatchId: 'fixture-dispatch-' + physicalEffects,
+          status: 'COMPLETED', resultArtifactRef: null, observedAt: AT,
+        };
+        state.entries.push({ key, request: r, receipt });
+        writeFileSync(storeFile, JSON.stringify(state));
+        return receipt;
+      },
+    };
+  }
+  const mutating = { ...request('durable-request-id'), operation: 'AGENT_START' };
+  let server;
+  try {
+    server = await startAutopilotLocalApiLoopbackV1({
+      token: TOKEN, dependencies: persistedCoreDependencies(),
+    });
+    const first = createAutopilotLocalClientV1({
+      token: TOKEN, port: server.address().port,
+      fetchImpl: async (...args) => {
+        // Core actually completed/persisted the effect, but the transport
+        // acknowledgement disappears before the SDK can inspect it.
+        const result = await fetch(...args);
+        await result.arrayBuffer();
+        throw new Error('lost after durable canonical dispatch');
+      },
+    });
+    const ambiguous = await first.control(mutating);
+    assert.equal(ambiguous.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(physicalEffects, 1);
+    assert.equal(JSON.parse(readFileSync(storeFile, 'utf8')).entries.length, 1);
+    await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+    server = null;
+    // Entire HTTP listener and SDK instance are recreated. This time the
+    // persisted CANONICAL CORE fixture, not a new transport store, owns dedup.
+    server = await startAutopilotLocalApiLoopbackV1({
+      token: TOKEN, dependencies: persistedCoreDependencies(),
+    });
+    const second = createAutopilotLocalClientV1({
+      token: TOKEN, port: server.address().port,
+    });
+    const replay = await second.control(mutating);
+    assert.equal(replay.status, 'RECEIVED');
+    assert.equal(replay.result.receipt.status, 'COMPLETED');
+    assert.equal(replay.result.receipt.dispatchId, 'fixture-dispatch-1');
+    assert.equal(physicalEffects, 1,
+      're-created SDK must not cause Core to repeat an already-persisted effect');
+    const conflict = await second.control({
+      ...mutating, targetId: 'other-agent-same-request-id',
+    });
+    assert.equal(conflict.status, 'UNKNOWN_NETWORK_RESULT');
+    assert.equal(conflict.httpStatus, 422);
+    assert.equal(physicalEffects, 1,
+      'conflicting payload under a persisted request identity is rejected by Core');
+    const fresh = await second.control({
+      ...mutating, requestId: 'fresh-request-after-restart',
+    });
+    assert.equal(fresh.status, 'RECEIVED');
+    assert.equal(fresh.result.receipt.dispatchId, 'fixture-dispatch-2');
+    assert.equal(physicalEffects, 2);
+    assert.equal(JSON.parse(readFileSync(storeFile, 'utf8')).entries.length, 2);
+  } finally {
+    if (server?.listening) await new Promise((resolve, reject) =>
+      server.close(error => error ? reject(error) : resolve()));
+    rmSync(home, { recursive: true, force: true });
   }
 });
