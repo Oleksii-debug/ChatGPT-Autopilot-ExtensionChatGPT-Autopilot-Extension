@@ -913,6 +913,41 @@ test('site policy governs destination for navigate, new-tab and visible link cli
   assert.equal(click.decision, BrowserAgentPolicyDecision.DENY);
 });
 
+test('Plan2 S1 unsafe persisted direct URLs cannot inherit source ALLOW after JSON recovery', () => {
+  const owner = config({
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'source.test', defaultDecision: 'ALLOW', actionDecisions: {} },
+      { pattern: 'blocked.test', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.test', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  });
+  const snapshot = JSON.parse(JSON.stringify({ url: 'https://source.test/current', frames: [] }));
+  const unsafe = [undefined, null, 14, {}, [], '', '/relative', '//blocked.test/path',
+    'javascript:alert(1)', 'data:text/html,unsafe', 'file:///tmp/proof',
+    'chrome-extension://opaque/path', 'not a URL'];
+  for (const type of ['navigate', 'new_tab', 'download']) {
+    for (const url of unsafe) {
+      // Exercise the owner policy on durable replay, not only parseSingleAction.
+      const replay = JSON.parse(JSON.stringify({ type, url }));
+      const result = resolveBrowserAgentOwnerPolicy(owner, snapshot, replay);
+      assert.equal(result.decision, BrowserAgentPolicyDecision.DENY, `${type}: ${String(url)}`);
+      assert.equal(result.source, 'browser:unsafe-direct-url');
+      assert.equal(result.policyUrl, snapshot.url);
+    }
+    const allowed = resolveBrowserAgentOwnerPolicy(owner, snapshot,
+      JSON.parse(JSON.stringify({ type, url: 'https://source.test/safe' })));
+    assert.equal(allowed.decision, BrowserAgentPolicyDecision.ALLOW);
+    const blocked = resolveBrowserAgentOwnerPolicy(owner, snapshot,
+      JSON.parse(JSON.stringify({ type, url: 'https://blocked.test/transfer' })));
+    assert.equal(blocked.decision, BrowserAgentPolicyDecision.DENY);
+    assert.equal(blocked.policyUrl, 'https://blocked.test/transfer');
+    const ask = resolveBrowserAgentOwnerPolicy(owner, snapshot,
+      JSON.parse(JSON.stringify({ type, url: 'https://ask.test/approval' })));
+    assert.equal(ask.decision, BrowserAgentPolicyDecision.ASK);
+  }
+});
+
 test('site policy validation rejects ambiguous duplicates and unsupported action keys', () => {
   assert.throws(() => config({ siteRules: [
     { pattern: 'example.com', defaultDecision: 'ALLOW' },
