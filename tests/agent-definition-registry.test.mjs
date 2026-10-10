@@ -246,7 +246,7 @@ test('selection carries a full immutable definition snapshot so same-revision by
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted|drifted from current registry definition/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -568,17 +568,17 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ revision: 4 }),
-  }), /registry identity or revision drifted/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('selection envelope cannot substitute a different definition identity or revision', () => {
