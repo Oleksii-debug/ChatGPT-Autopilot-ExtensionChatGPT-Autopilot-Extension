@@ -3532,6 +3532,11 @@ function renderAgentRunTimeline(job) {
       ', дій власника серед переглянутих ' + counters.ownerEvents + '.' +
       ' Карта доказів: подій редакції плану ' + timeline.evidenceMap.observed.planRevisionEvents +
       ', контрольних точок ' + timeline.evidenceMap.observed.checkpointRecordedEvents + '.' +
+      ' Збережені метадані Specialist: спроб ' + timeline.evidenceMap.specialistProviderDispatch.inspectedAttempts +
+      ', записаних ідентифікаторів квитанцій ' + timeline.evidenceMap.specialistProviderDispatch.receiptIdsRecorded +
+      ', записаних посилань на артефакти ' + timeline.evidenceMap.specialistProviderDispatch.artifactReferencesRecorded +
+      ', неоднозначних станів ' + timeline.evidenceMap.specialistProviderDispatch.statusCounts.AMBIGUOUS +
+      '. Це лише збережені метадані, не доказ зовнішнього виконання чи походження артефактів.' +
       ' Підтвердження зовнішніх ефектів, знімки до/після, квитанції інструментів, походження артефактів та зв’язки Agent tree цією хронологією не встановлені.' +
       (timeline.truncated ? ' Історію обмежено останніми подіями; підрахунки неповні.' : '') +
       ' Порядкові номери записів належать лише поточному збереженому зрізу і можуть змінюватися після обрізання історії.' +
