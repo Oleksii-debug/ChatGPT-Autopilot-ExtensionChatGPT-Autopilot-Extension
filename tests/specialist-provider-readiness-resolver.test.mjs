@@ -498,3 +498,38 @@ test('Section 1: original readiness expires at admission despite matching fresh 
     /lacks trusted resolver provenance/u,
   );
 });
+
+
+test('Section 1: original provider observation age consumes readiness TTL before admission', async () => {
+  const exercise = async elapsedMs => {
+    const ticks = [NOW_MS, NOW_MS, NOW_MS + elapsedMs, NOW_MS + elapsedMs];
+    let probes = 0;
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [binding(async request => ({
+        observedAt: ++probes === 1
+          ? new Date(NOW_MS - 29_999).toISOString()
+          : request.asOf,
+        providerStates: [state()],
+      }))],
+      now: () => {
+        assert.ok(ticks.length, 'admission cannot observe an unbounded fake clock');
+        return ticks.shift();
+      },
+    });
+    const original = await resolver.resolve(selection());
+    assert.equal(original.ageMs, 29_999);
+    return { resolver, original, getProbes: () => probes };
+  };
+
+  const atBoundary = await exercise(1);
+  assert.equal(await atBoundary.resolver.assertCurrent(atBoundary.original), true);
+  assert.equal(atBoundary.getProbes(), 2);
+
+  const expired = await exercise(2);
+  await assert.rejects(
+    expired.resolver.assertCurrent(expired.original),
+    /readiness observation expired before admission/u,
+  );
+  assert.equal(expired.getProbes(), 2);
+  assert.equal(expired.original.authority.capacityReserved, false);
+});
