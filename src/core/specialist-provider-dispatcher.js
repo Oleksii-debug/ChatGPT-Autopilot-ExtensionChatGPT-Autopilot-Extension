@@ -369,6 +369,13 @@ export class SpecialistProviderDispatcherV1 {
     try {
       const completedAtMs = clock(this.#now);
       if (completedAtMs < providerEdgeMs) throw new Error('Specialist dispatcher clock moved backwards after provider effect');
+      // The owner lease is a hard completion boundary, not merely a gate at
+      // invocation. An expired in-flight operation is UNKNOWN until the
+      // canonical effect ledger reconciles it; this dispatcher must not
+      // certify a late receipt under an owner whose lease has elapsed.
+      if (completedAtMs >= Date.parse(ownership.leaseUntil)) {
+        throw new Error('Specialist execution lease expired before provider receipt validation');
+      }
       const result = record(rawResult, RESULT_KEYS, 'Specialist provider result');
       // A provider-owned receipt cannot predate the actual effect boundary.
       // Historical pre-dispatch receipts are not fresh completion evidence.
