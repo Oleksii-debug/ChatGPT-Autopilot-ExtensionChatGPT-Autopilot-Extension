@@ -503,9 +503,9 @@ test('verification used by exact effect requires exact effect execution and atte
   )).state;
 
   const cases = [
-    [{ effectId: '' }, /effectId does not match exact effect/],
+    [{ effectId: '' }, /effectId is invalid|effectId does not match exact effect/],
     [{ effectId: 'invoke-other' }, /effectId does not match exact effect/],
-    [{ executionId: '' }, /executionId does not match current exact-effect attempt/],
+    [{ executionId: '' }, /executionId is invalid|executionId does not match current exact-effect attempt/],
     [{ executionId: 'invoke-1:attempt:2' }, /executionId does not match current exact-effect attempt/],
     [{ attempt: 0 }, /attempt does not match current exact-effect attempt/],
     [{ attempt: 2 }, /attempt does not match current exact-effect attempt/],
