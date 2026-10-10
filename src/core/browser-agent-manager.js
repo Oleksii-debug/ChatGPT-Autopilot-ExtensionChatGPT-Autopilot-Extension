@@ -210,6 +210,20 @@ function trustedOrchestrationAuthorityFence(dependencies) {
   return raw.withProjectHierarchyAuthority;
 }
 
+const BOUND_LIFECYCLE_DEPENDENCY_KEYS = new Set([
+  'withBrowserAgentBoundLifecycleAuthority',
+]);
+function boundLifecycleFence(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies, BOUND_LIFECYCLE_DEPENDENCY_KEYS,
+    'Browser Agent bound lifecycle dependencies',
+  );
+  if (typeof raw.withBrowserAgentBoundLifecycleAuthority !== 'function') {
+    throw new Error('Canonical Browser Agent bound lifecycle authority is required');
+  }
+  return raw.withBrowserAgentBoundLifecycleAuthority;
+}
+
 const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
   'PROJECT_UNOWNED',
   'PROJECT_NON_UNIQUE',
@@ -2973,13 +2987,19 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async pause(id) {
+  async pause(id, dependencies = {}) {
     const now = this.now();
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING) throw new Error('Only a running Browser Agent can be paused');
-      job.runtime.controlEpoch += 1;
+      const nextEpoch = job.runtime.controlEpoch + 1;
+      if (job.orchestrationNodeBinding) {
+        const withAuthority = boundLifecycleFence(dependencies);
+        await withAuthority(job.orchestrationNodeBinding, apply =>
+          apply('PAUSE', { browserControlEpoch: nextEpoch, nowMs: now }));
+      }
+      job.runtime.controlEpoch = nextEpoch;
       job.runtime.runState = BrowserAgentRunState.PAUSED;
       job.runtime.nextWakeAt = 0;
       job.runtime.updatedAt = now;
@@ -2990,7 +3010,7 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async resume(id, { runInitial = true } = {}) {
+  async resume(id, { runInitial = true } = {}, dependencies = {}) {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return this.get(id);
@@ -3000,11 +3020,17 @@ export class BrowserAgentManager {
       return this.get(id);
     }
     const now = this.now();
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (![BrowserAgentRunState.PAUSED, BrowserAgentRunState.STOPPED, BrowserAgentRunState.WAITING_PERMISSION, BrowserAgentRunState.WAITING_CAPABILITY, BrowserAgentRunState.WAITING_SCHEDULE].includes(job.runtime.runState)) throw new Error('Browser Agent cannot be resumed from its current state');
-      job.runtime.controlEpoch += 1;
+      const nextEpoch = job.runtime.controlEpoch + 1;
+      if (job.orchestrationNodeBinding) {
+        const withAuthority = boundLifecycleFence(dependencies);
+        await withAuthority(job.orchestrationNodeBinding, apply =>
+          apply('RESUME', { browserControlEpoch: nextEpoch, nowMs: now }));
+      }
+      job.runtime.controlEpoch = nextEpoch;
       job.runtime.runState = BrowserAgentRunState.RUNNING;
       job.runtime.lastError = '';
       job.runtime.permissionOrigin = '';
@@ -3022,13 +3048,19 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async stop(id) {
+  async stop(id, dependencies = {}) {
     const now = this.now();
     let closeTabs = false;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
-      job.runtime.controlEpoch += 1;
+      const nextEpoch = job.runtime.controlEpoch + 1;
+      if (job.orchestrationNodeBinding) {
+        const withAuthority = boundLifecycleFence(dependencies);
+        await withAuthority(job.orchestrationNodeBinding, apply =>
+          apply('STOP', { browserControlEpoch: nextEpoch, nowMs: now }));
+      }
+      job.runtime.controlEpoch = nextEpoch;
       job.runtime.runState = BrowserAgentRunState.STOPPED;
       job.runtime.pendingApproval = null;
       job.runtime.nextWakeAt = 0;
