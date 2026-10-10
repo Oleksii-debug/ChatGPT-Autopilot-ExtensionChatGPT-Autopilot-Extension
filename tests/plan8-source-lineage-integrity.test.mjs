@@ -32,11 +32,16 @@ function fixture() {
   git('add', '.');
   git('commit', '-m', '11.0.13 source baseline');
   const baseline = git('rev-parse', 'HEAD');
+  // The real predecessor has a distinct main-only send-recovery source blob.
+  put('src/interaction/chatgpt-live-send-recovery.js', '/* predecessor-only recovery */\n');
+  git('add', '.');
+  git('commit', '-m', 'Preserve previous main-only recovery source');
+  const mainAncestor = git('rev-parse', 'HEAD');
   put('integration-marker.txt', 'safe main-only integration\n');
   git('add', '.');
   git('commit', '-m', 'Converge source into candidate');
   return {
-    root, git, put, baseline,
+    root, git, put, baseline, mainAncestor,
     close: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -47,8 +52,10 @@ function withFixture(run) {
 }
 
 test('canonical source ancestor, 11.0.13 manifests and audited provenance pass', () => withFixture(f => {
-  const result = verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline });
+  const result = verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor });
   assert.equal(result.sourceAncestry, 'verified');
+  assert.equal(result.mainAncestry, 'verified');
+  assert.equal(result.mainAncestorCommit, f.mainAncestor);
   assert.equal(result.version, PLAN8_SOURCE_VERSION);
   assert.equal(result.archivedSha256, PLAN8_ARCHIVE_SHA256);
   assert.equal(result.driveArchiveBytesRehashed, false);
@@ -59,26 +66,26 @@ test('JSON-compatible cold restart preserves legitimate source lineage', () => w
   for (const path of ['manifest.json', 'package.json']) {
     f.put(path, JSON.stringify(JSON.parse(readFileSync(join(f.root, path), 'utf8'))));
   }
-  assert.equal(verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }).sourceAncestry, 'verified');
+  assert.equal(verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }).sourceAncestry, 'verified');
 }));
 
 test('0.9.x downgrade or package/manifest drift fails closed', () => withFixture(f => {
   f.put('manifest.json', JSON.stringify({ version: '0.9.19' }));
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }), /manifest.json version/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }), /manifest.json version/u);
   f.put('manifest.json', JSON.stringify({ version: PLAN8_SOURCE_VERSION }));
   f.put('package.json', JSON.stringify({ version: '11.0.12' }));
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }), /package.json version/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }), /package.json version/u);
 }));
 
 test('forged digest, missing integration paths and malformed JSON reject', () => withFixture(f => {
   f.put('PLAN8_11_0_13_SOURCE_CONVERGENCE.md', 'Unverified archive!');
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }), /archive digest/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }), /archive digest/u);
   f.put('PLAN8_11_0_13_SOURCE_CONVERGENCE.md', PLAN8_ARCHIVE_SHA256);
   rmSync(join(f.root, 'src/core/browser-agent-manager.js'));
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }), /source path missing/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }), /source path missing/u);
   f.put('src/core/browser-agent-manager.js', 'restored');
   f.put('manifest.json', '{broken');
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }), /not valid JSON/u);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }), /not valid JSON/u);
 }));
 
 test('unrelated or unknown commit cannot impersonate reachable 11.x baseline', () => withFixture(f => {
@@ -109,7 +116,7 @@ test('an untracked replacement cannot impersonate a source blob deleted from can
   f.git('rm', path);
   f.git('commit', '-m', 'Remove canonical source blob');
   f.put(path, '/* untracked file impersonating canonical source */\n');
-  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline }),
+  assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }),
     /candidate HEAD missing regular tracked 11\.x source path/u);
 }));
 
@@ -123,4 +130,30 @@ test('candidate recovery cannot retroactively invent a missing source-ancestor b
   f.git('commit', '-m', 'Restore candidate path');
   assert.throws(() => verifyPlan8Lineage({ root: f.root, sourceCommit: incompleteAncestor }),
     /source ancestor missing regular tracked 11\.x source path/u);
+}));
+
+
+test('source-only candidate cannot impersonate the preserved predecessor history', () => withFixture(f => {
+  f.git('checkout', '-b', 'source-only-candidate', f.baseline);
+  assert.throws(() => verifyPlan8Lineage({ root: f.root,
+    sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }),
+  /canonical main ancestor .* is not an ancestor/u);
+}));
+
+test('deleted main-only recovery source cannot be replaced by an untracked file', () => withFixture(f => {
+  const path = 'src/interaction/chatgpt-live-send-recovery.js';
+  f.git('rm', path);
+  f.git('commit', '-m', 'Accidentally erase main-only recovery');
+  f.put(path, '/* untracked forged recovery */\n');
+  assert.throws(() => verifyPlan8Lineage({ root: f.root,
+    sourceCommit: f.baseline, mainAncestorCommit: f.mainAncestor }),
+  /candidate HEAD missing regular tracked 11\.x source path/u);
+}));
+
+test('unrelated main predecessor cannot substitute identical candidate tree contents', () => withFixture(f => {
+  const stranger = f.git('commit-tree', f.git('rev-parse', 'HEAD^{tree}'),
+    '-m', 'forged predecessor with identical tree');
+  assert.throws(() => verifyPlan8Lineage({ root: f.root,
+    sourceCommit: f.baseline, mainAncestorCommit: stranger }),
+  /canonical main ancestor .* is not an ancestor/u);
 }));
