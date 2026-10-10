@@ -6,6 +6,7 @@
  * NEVER place a token on the command line or in a checked-in file.
  */
 import { createAutopilotLocalClientV1 } from './client.mjs';
+import { parseStrictControlJsonV1 } from './control-json.mjs';
 
 const help = `ChatGPT Автопілот — локальний CLI, API v1
   node companion/local-api/cli.mjs < request.json
@@ -32,7 +33,9 @@ async function main() {
     if (length > 65_536) throw new Error('Вхідний JSON завеликий.');
     chunks.push(chunk);
   }
-  const raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  // Same strict UTF-8 / duplicate-identity fence as the authenticated HTTP endpoint.
+  // A CLI must not silently choose the last duplicate requestId or projectId.
+  const raw = parseStrictControlJsonV1(Buffer.concat(chunks));
   const result = await client.control(raw);
   // Output is structured text, accessible to NVDA and shell scripts.
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
