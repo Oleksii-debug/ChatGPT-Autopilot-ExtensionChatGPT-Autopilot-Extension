@@ -128,8 +128,14 @@ function integer(value, label, min, max, { optional = false, fallback = 0 } = {}
   return value;
 }
 
-function bool(value, label, fallback = false) {
-  if (value == null) return fallback;
+function bool(value, label, fallback = false, { present = false } = {}) {
+  // Omitted legacy metadata may use a default. An explicitly present null
+  // or undefined must not silently change a privacy or execution permission
+  // flag during a durable JSON round-trip.
+  if (value == null) {
+    if (present) throw new Error(`${label} must be boolean`);
+    return fallback;
+  }
   if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
   return value;
 }
@@ -280,7 +286,7 @@ export function normalizeToolDescriptorV1(input) {
     capabilityIds: idList(raw.capabilityIds, 'capabilityIds', { optional: false }),
     inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true }),
     outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true }),
-    readOnly: bool(raw.readOnly, 'readOnly', false),
+    readOnly: bool(raw.readOnly, 'readOnly', false, { present: Object.hasOwn(raw, 'readOnly') }),
   });
 }
 
@@ -355,7 +361,7 @@ export function normalizeArtifactRefV1(input) {
     sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, { optional: true, fallback: 0 }),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     producerInvocationId: id(raw.producerInvocationId, 'producerInvocationId', { optional: true }),
-    sensitive: bool(raw.sensitive, 'sensitive', false),
+    sensitive: bool(raw.sensitive, 'sensitive', false, { present: Object.hasOwn(raw, 'sensitive') }),
   });
 }
 
