@@ -295,7 +295,16 @@ export function createSpecialistProviderExecutionV1(input = {}) {
 
 export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcomeInput) {
   const current = normalizeSpecialistProviderExecutionV1(currentInput);
-  if (current.status === SpecialistProviderExecutionStatus.RECONCILE) return current;
+  // A terminal provider outcome is immutable evidence for this exact lease and
+  // conversation. Late or duplicate observations (including after JSON restart)
+  // cannot turn a success/failure into a retryable or contradictory outcome.
+  // Reconciliation or a genuinely new attempt belongs to the existing canonical
+  // effect/lease authority, never an overwrite of this historical record.
+  if (current.status === SpecialistProviderExecutionStatus.RECONCILE
+      || current.status === SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED
+      || current.status === SpecialistProviderExecutionStatus.PROVIDER_FAILED) {
+    return current;
+  }
   const raw = record(outcomeInput, OUTCOME_KEYS, 'Specialist provider execution outcome');
   for (const key of OUTCOME_KEYS) {
     if (!OPTIONAL_OUTCOME_KEYS.has(key) && !Object.hasOwn(raw, key)) {
