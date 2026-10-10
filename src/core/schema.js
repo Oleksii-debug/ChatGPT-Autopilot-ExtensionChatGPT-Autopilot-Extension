@@ -4,6 +4,10 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import {
+  createTrustedOutcomeVerificationLedgerV1,
+  validateTrustedOutcomeVerificationLedgerStateV1,
+} from './trusted-outcome-verification-ledger.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -69,6 +73,7 @@ export function createEmptyState(now = Date.now()) {
     logs: {},
     diagnostics: [],
     migrationHistory: [],
+    trustedOutcomeVerificationLedger: structuredClone(createTrustedOutcomeVerificationLedgerV1()),
   };
 }
 
@@ -241,6 +246,9 @@ function validateSession(session, id) {
 
 export function validateState(state) {
   requireRecord(state, 'state envelope');
+  // Reuse the canonical append-only verification ledger validator. Preserve
+  // absent legacy schema-v2 ledgers, but never accept present corrupt state.
+  validateTrustedOutcomeVerificationLedgerStateV1(state);
   if (state.schemaVersion !== SCHEMA_VERSION) throw new Error('Unsupported schema version');
   if (!Number.isInteger(state.revision) || state.revision < 0) throw new Error('Invalid revision');
 
