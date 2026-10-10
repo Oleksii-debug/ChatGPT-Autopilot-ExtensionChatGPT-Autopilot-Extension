@@ -2153,3 +2153,48 @@ test('Plan-1 S1: oversized but byte-small JSON evidence fails bounded traversal 
   assert.ok(Object.isFrozen(valid.data));
   assert.ok(Object.isFrozen(valid.data[1]));
 });
+
+
+test('Plan-1 S1: unsupported capability risk classes fail closed before durable grant admission', () => {
+  const base = Object.freeze({ schemaVersion: 1, capabilityId: 'fs.read',
+    description: 'Risk boundary', attributes: Object.freeze({ ownerApproved: false }) });
+  const supported = ['R0', 'R1', 'R2', 'R3', 'R4'];
+  for (const riskClass of supported) {
+    const normalized = normalizeCapabilityV1({ ...base, riskClass });
+    assert.equal(normalized.riskClass, riskClass);
+    assert.ok(Object.isFrozen(normalized));
+    assert.deepEqual(normalizeCapabilityV1(JSON.parse(JSON.stringify(normalized))),
+      normalized, 'legitimate risk classes must survive JSON cold restart');
+  }
+  const legacy = normalizeCapabilityV1(base);
+  assert.equal(legacy.riskClass, 'R0',
+    'genuinely missing legacy risk class must preserve V1 compatibility');
+  assert.deepEqual(normalizeCapabilityV1(JSON.parse(JSON.stringify(legacy))), legacy);
+
+  // Arbitrary IDs previously passed the universal ID regex, even though
+  // canonical policy only understands R0-R4. Never silently grant a future,
+  // typoed, or owner-forged class.
+  for (const riskClass of ['R5', 'R99', 'UNKNOWN', 'r1', 'R1 ', 'R-1', 'ALLOW', 'R00']) {
+    const input = Object.freeze({ ...base, riskClass });
+    assert.throws(() => normalizeCapabilityV1(input),
+      /riskClass must be a supported R0-R4 class|riskClass is invalid/,
+      'unknown durable risk must be rejected before policy use');
+    assert.equal(input.riskClass, riskClass, 'rejection must not mutate the input');
+    assert.throws(() => normalizeCapabilityV1(JSON.parse(JSON.stringify(input))),
+      /riskClass must be a supported R0-R4 class|riskClass is invalid/,
+      'unknown risk must remain rejected after JSON cold restart');
+  }
+
+  const secret = 'PRIVATE_RISK_GETTER_MUST_NOT_RUN';
+  let getterCalls = 0;
+  const accessor = { ...base };
+  Object.defineProperty(accessor, 'riskClass', { enumerable: true, get() {
+    getterCalls += 1;
+    throw new Error(secret);
+  } });
+  assert.throws(() => normalizeCapabilityV1(accessor), error => {
+    assert.doesNotMatch(error.message, /PRIVATE_RISK_GETTER_MUST_NOT_RUN/);
+    return true;
+  });
+  assert.equal(getterCalls, 0, 'untrusted accessor must not execute during admission');
+});
