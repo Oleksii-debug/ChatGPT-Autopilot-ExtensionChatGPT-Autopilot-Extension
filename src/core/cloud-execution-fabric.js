@@ -684,7 +684,8 @@ export function assessCloudExecutionFabricV1(input) {
       // Multiple slot identities for one existing workspace are ambiguous;
       // do not select one based on temperature, provider or cost ordering.
       reasonCode = 'AMBIGUOUS_WORKSPACE_SLOT';
-    } else if (slot.workspaceId && !bindingByWorkspace.has(slot.workspaceId)) {
+    } else if (slot.workspaceId && !bindingByWorkspace.has(slot.workspaceId)
+        && !existingBinding) {
       // A warm workspace ID advertised by an untrusted capacity feed is not
       // proof that this tenant/effect owns it or that prior resources were
       // scrubbed. Only an exact persisted canonical binding can admit reuse.
