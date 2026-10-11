@@ -424,12 +424,20 @@ function criterionResult({
     criterionId: criterion.criterionId,
     trustedRecordId: trustedRecord.recordId,
     verificationId: verification.verificationId,
+    // Expose only identities and evidence already admitted through the trusted
+    // canonical verification record, never caller-provided verification fields.
+    invocationId: verification.invocationId,
+    observationId: verification.observationId,
+    trustedReasonCode: verification.reasonCode,
     verificationStatus: verification.status,
     verifierId: trustedRecord.verifierId,
     verificationAuthorityId: trustedRecord.verificationAuthorityId,
     accepted,
     reasonCode,
     evidenceArtifactIds: [...verification.evidenceArtifactIds].sort(compareCodeUnit),
+    trustedEvidenceArtifactRefs: [...verification.evidenceArtifactIds]
+      .sort(compareCodeUnit)
+      .map(artifactId => artifactsById.get(artifactId)),
     evidenceKinds: [...evidenceKinds].sort(compareCodeUnit),
     missingEvidenceKinds: missingKinds,
     missingEvidenceArtifactCount: missingArtifactCount,
