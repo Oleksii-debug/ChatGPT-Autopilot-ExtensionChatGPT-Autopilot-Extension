@@ -56,15 +56,15 @@ test('startup and canonical alarm invoke the event-driven execution cycle', () =
 test('orchestration V2 uses read-only assistant reports and startup reconciles before Core sends', () => {
   assert.match(source, /async function probeAssistantConversation\(job\)/);
   assert.match(source, /collectAssistantReport: probeAssistantConversation/);
-  assert.match(source, /mode: 'READ_ASSISTANT_REPORT'/);
-  assert.match(source, /sameChatConversationUrl\(tab\.url, conversationUrl\)/, 'completion probe should reuse an existing conversation tab when possible');
-  assert.match(source, /if \(temporaryTab && tabId != null\)/, 'only a temporary probe tab may be auto-closed');
+  assert.match(fs.readFileSync(new URL('../../src/core/assistant-report-probe.js', import.meta.url), 'utf8'), /mode: 'READ_ASSISTANT_REPORT'/);
+  assert.match(source, /probeAssistantConversationCore/, 'completion probe uses the shared conversation reader');
+  assert.match(fs.readFileSync(new URL('../../src/core/assistant-report-probe.js', import.meta.url), 'utf8'), /if \(temporaryTab && tabId != null\)/, 'only a temporary probe tab may be auto-closed');
   assert.match(source, /await orchestrationV2\.reconcileAlarm\(\);/);
   assert.match(source, /await browserAgent\.reconcileAlarm\(\);/, 'cold start must restore Browser Agent wake alarms from durable jobs');
   assert.doesNotMatch(source, /await orchestrationV2\.enqueueRecoveryEvent\(\);/, 'ordinary MV3 worker restart must not manufacture a reasoning tick');
   assert.match(source, /const orchestrationSync = await orchestrationV2\.syncAfterCoreCycle\(\);/);
   assert.match(source, /export function runOrchestrationV2Cycle/);
-  assert.match(source, /const orchestration = await orchestrationV2\.cycleAll\(\);\s*const scenario = await scenarioWork\.cycleAll\(\);\s*const agent = await runBrowserAgentAutomationCycle\(\);\s*const execution = await runExecutionCycle\(\);/, 'startup must reconcile orchestration, scenario work and the canonical Browser Agent automation cycle before resuming Core sends');
+  assert.match(source, /const orchestration = await orchestrationV2\.cycleAll\(\);\s*const scenario = await scenarioWork\.cycleAll\(\);\s*const agent = await browserAgent\.cycleAll\(\);\s*const execution = await runExecutionCycle\(\);/, 'startup must reconcile orchestration, scenario work and Browser Agent before resuming Core sends');
 });
 
 test('overlapping wake events share one in-flight execution cycle', () => {
@@ -128,11 +128,18 @@ test('Browser Agent uses a dedicated durable manager with fast-burst and owner-i
   assert.match(source, /browserAgent\.addInstruction\(/);
   assert.match(source, /message\.command === 'RUN_BROWSER_AGENT_BURST'/);
   assert.match(source, /browserAgent\.runBurst\(/);
+  assert.match(source, /message\.command === 'GET_BROWSER_AGENT_EXECUTION_POLICY'/);
+  assert.match(source, /browserAgent\.getExecutionPolicy\(\)/);
+  assert.match(source, /message\.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY'/);
+  assert.match(source, /browserAgent\.updateExecutionPolicy\(message\.payload \|\| \{\}\)/);
+  const readOnlyCommands = source.match(/const READ_ONLY_UI_COMMANDS = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '';
+  assert.match(readOnlyCommands, /'GET_BROWSER_AGENT_EXECUTION_POLICY'/, 'Agent policy reads must stay read-only');
+  assert.doesNotMatch(readOnlyCommands, /'UPDATE_BROWSER_AGENT_EXECUTION_POLICY'/, 'Agent policy writes must run mutation reconciliation');
   assert.match(source, /message\.command === 'APPROVE_BROWSER_AGENT_ACTION'/);
   assert.match(source, /browserAgent\.approvePendingAction\(/);
   assert.match(source, /message\.command === 'REJECT_BROWSER_AGENT_ACTION'/);
   assert.match(source, /browserAgent\.rejectPendingAction\(/);
-  assert.match(source, /alarm\.name === BROWSER_AGENT_ALARM\) runSafely\(runBrowserAgentAutomationCycle\(\)\)/);
+  assert.match(source, /alarm\.name === BROWSER_AGENT_ALARM\) runSafely\(browserAgent\.cycleAll\(\)\)/);
 });
 
 

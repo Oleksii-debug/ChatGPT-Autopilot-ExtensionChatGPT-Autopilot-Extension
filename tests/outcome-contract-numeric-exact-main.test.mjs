@@ -66,3 +66,34 @@ test('OutcomeContract preserves canonical positive zero budget values', () => {
   assert.equal(Object.is(contract.budgetBoundaries.maxCostUsdMicros, 0), true);
   assert.equal(Object.is(contract.budgetBoundaries.maxCostUsdMicros, -0), false);
 });
+
+test('SourceTruth SHA-256 survives JSON restart without widening OutcomeContract authority', () => {
+  const digest = 'a'.repeat(64);
+  const input = buildInput();
+  input.sourceTruth[0].contentSha256 = digest;
+
+  const first = createOutcomeContractV1(input);
+  const restarted = createOutcomeContractV1(JSON.parse(JSON.stringify(input)));
+  assert.equal(first.sourceTruth[0].contentSha256, digest);
+  assert.equal(restarted.sourceTruth[0].contentSha256, digest);
+  assert.equal(first.executionAuthorized, false);
+  assert.equal(restarted.executionAuthorized, false);
+
+  for (const invalid of ['A'.repeat(64), 'a'.repeat(63), 'a'.repeat(65), ' a'.repeat(64)]) {
+    const poisoned = buildInput();
+    poisoned.sourceTruth[0].contentSha256 = invalid;
+    assert.throws(() => createOutcomeContractV1(poisoned), /contentSha256 must be an exact lowercase SHA-256 digest/);
+  }
+
+  let getterCalls = 0;
+  const accessor = buildInput();
+  Object.defineProperty(accessor.sourceTruth[0], 'contentSha256', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('Untrusted source accessor must not execute');
+    },
+  });
+  assert.throws(() => createOutcomeContractV1(accessor), /data property/);
+  assert.equal(getterCalls, 0);
+});

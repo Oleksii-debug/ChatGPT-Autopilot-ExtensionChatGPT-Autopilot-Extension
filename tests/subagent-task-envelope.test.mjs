@@ -10,8 +10,8 @@ import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import {
   SUBAGENT_TASK_ENVELOPE_VERSION,
   createSubagentTaskEnvelopeV1,
-  deriveSubagentTaskDispatchIdentityV1,
   normalizeSubagentTaskEnvelopeV1,
+  deriveSubagentTaskDispatchIdentityV1,
 } from '../src/core/subagent-task-envelope.js';
 
 const T0 = '2026-09-27T10:00:00.000Z';
@@ -69,7 +69,6 @@ function outcome(overrides = {}) {
       sourceId: 'source-1',
       location: 'project://source-1',
       revisionId: 'rev-1',
-      contentSha256: overrides.contentSha256 ?? '4'.repeat(64),
       purpose: 'Authoritative child input.',
     }],
     allowedAuthority: [],
@@ -156,7 +155,6 @@ test('binds exact child task, immutable input refs, budget, conflicts and outcom
     sourceId: 'source-1',
     location: 'project://source-1',
     revisionId: 'rev-1',
-    contentSha256: '4'.repeat(64),
   }]);
   assert.deepEqual(
     value.inputArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
@@ -336,7 +334,7 @@ test('envelope chronology cannot predate plan/outcome and cannot bind a future A
       }),
       createdAt: T1,
     })),
-    /AgentPlan node updatedAt is outside the plan causal window|outside plan chronology/,
+    /cannot predate AgentPlan node state/,
   );
 
   assert.throws(
@@ -438,31 +436,98 @@ test('caller-owned arrays and canonical inputs cannot mutate the frozen derived 
     sourceId: 'source-1',
     location: 'project://source-1',
     revisionId: 'rev-1',
-    contentSha256: '4'.repeat(64),
   }]);
 });
 
+test('Plan8 convergence dispatch identity is stable after canonical JSON restart and fails before hidden authority reads', () => {
+  const canonical = createSubagentTaskEnvelopeV1(request());
+  const first = deriveSubagentTaskDispatchIdentityV1(canonical);
+  assert.match(first, /^subagent-task:[a-f0-9]+$/u);
+  assert.equal(deriveSubagentTaskDispatchIdentityV1(JSON.parse(JSON.stringify(canonical))), first);
+  const drift = structuredClone(canonical);
+  drift.envelopeId = 'envelope-changed';
+  assert.notEqual(deriveSubagentTaskDispatchIdentityV1(drift), first,
+    'same task under changed immutable handoff identity must never replay as the original');
+  let getterReads = 0;
+  const forged = structuredClone(canonical);
+  Object.defineProperty(forged, 'executionAuthority', {
+    enumerable: true, get() { getterReads++; return false; },
+  });
+  assert.throws(() => deriveSubagentTaskDispatchIdentityV1(forged), /enumerable own data property/u);
+  assert.equal(getterReads, 0);
+  assert.throws(() => deriveSubagentTaskDispatchIdentityV1({
+    ...structuredClone(canonical), executionAuthority: true,
+  }), /cannot grant executionAuthority/u);
+});
 
-test('source byte identity is required and participates in the durable task dispatch fingerprint', () => {
-  const first = createSubagentTaskEnvelopeV1(request());
-  const second = createSubagentTaskEnvelopeV1(request({
-    outcomeContract: outcome({ contentSha256: '5'.repeat(64) }),
-  }));
+test('Plan8 exact optional parent authority identity survives JSON recovery and rejects forged identities', () => {
+  const identity = 'subagent-authority:' + 'a'.repeat(64);
+  const canonical = createSubagentTaskEnvelopeV1(request({ authorityEnvelopeIdentity: identity }));
+  assert.equal(canonical.authorityEnvelopeIdentity, identity);
+  assert.equal(normalizeSubagentTaskEnvelopeV1(JSON.parse(JSON.stringify(canonical))).authorityEnvelopeIdentity, identity);
+  assert.notEqual(deriveSubagentTaskDispatchIdentityV1(canonical),
+    deriveSubagentTaskDispatchIdentityV1(createSubagentTaskEnvelopeV1(request())),
+    'changing parent authority identity must produce a different replay fence');
+  assert.throws(() => createSubagentTaskEnvelopeV1(request({
+    authorityEnvelopeIdentity: 'subagent-authority:' + 'A'.repeat(64),
+  })), /exact subagent authority-envelope identity/u);
+  assert.throws(() => createSubagentTaskEnvelopeV1(request({
+    authorityEnvelopeIdentity: 'authority-escalated',
+  })), /exact subagent authority-envelope identity/u);
+  let getterReads = 0;
+  const forged = request();
+  Object.defineProperty(forged, 'authorityEnvelopeIdentity', {
+    enumerable: true, get() { getterReads++; return identity; },
+  });
+  assert.throws(() => createSubagentTaskEnvelopeV1(forged), /enumerable own data property/u);
+  assert.equal(getterReads, 0);
+});
+
+test('Plan8 source-hash lineage compatibility preserves immutable child input through JSON recovery', () => {
+  const legacy = createSubagentTaskEnvelopeV1(request());
+  assert.equal(Object.hasOwn(legacy.inputSourceRefs[0], 'contentSha256'), false);
+  const hashed = structuredClone(legacy);
+  hashed.inputSourceRefs[0].contentSha256 = 'a'.repeat(64);
+  const canonical = normalizeSubagentTaskEnvelopeV1(hashed);
+  assert.equal(canonical.inputSourceRefs[0].contentSha256, 'a'.repeat(64));
+  assert.deepEqual(
+    normalizeSubagentTaskEnvelopeV1(JSON.parse(JSON.stringify(canonical))),
+    canonical,
+  );
+  assert.equal(Object.isFrozen(canonical.inputSourceRefs[0]), true);
   assert.notEqual(
-    deriveSubagentTaskDispatchIdentityV1(first),
-    deriveSubagentTaskDispatchIdentityV1(second),
+    deriveSubagentTaskDispatchIdentityV1(canonical),
+    deriveSubagentTaskDispatchIdentityV1(legacy),
+    'adding immutable source bytes must change exact dispatch/replay identity',
   );
-  assert.equal(first.inputSourceRefs[0].contentSha256, '4'.repeat(64));
-  assert.equal(second.inputSourceRefs[0].contentSha256, '5'.repeat(64));
+  const tampered = structuredClone(canonical);
+  tampered.inputSourceRefs[0].contentSha256 = 'b'.repeat(64);
+  assert.notEqual(
+    deriveSubagentTaskDispatchIdentityV1(tampered),
+    deriveSubagentTaskDispatchIdentityV1(canonical),
+    'substituted source bytes must not reuse the original dispatch identity',
+  );
+});
 
-  const missingHash = structuredClone(outcome());
-  delete missingHash.sourceTruth[0].contentSha256;
+test('Plan8 source-hash lineage compatibility rejects noncanonical and accessor bytes without executing getters', () => {
+  const canonical = createSubagentTaskEnvelopeV1(request());
+  for (const invalid of [undefined, null, 1, 'a'.repeat(63), 'A'.repeat(64), 'z'.repeat(64)]) {
+    const malformed = structuredClone(canonical);
+    malformed.inputSourceRefs[0].contentSha256 = invalid;
+    assert.throws(
+      () => normalizeSubagentTaskEnvelopeV1(malformed),
+      /contentSha256 must be canonical lowercase SHA-256/u,
+    );
+  }
+  let getterCalls = 0;
+  const hostile = structuredClone(canonical);
+  Object.defineProperty(hostile.inputSourceRefs[0], 'contentSha256', {
+    enumerable: true,
+    get() { getterCalls += 1; return 'a'.repeat(64); },
+  });
   assert.throws(
-    () => createSubagentTaskEnvelopeV1(request({ outcomeContract: missingHash })),
-    /must carry contentSha256 immutable identity/,
+    () => normalizeSubagentTaskEnvelopeV1(hostile),
+    /contentSha256 must be an enumerable own data property/u,
   );
-  assert.throws(
-    () => outcome({ contentSha256: 'A'.repeat(64) }),
-    /contentSha256 must be an exact lowercase SHA-256 digest/,
-  );
+  assert.equal(getterCalls, 0);
 });

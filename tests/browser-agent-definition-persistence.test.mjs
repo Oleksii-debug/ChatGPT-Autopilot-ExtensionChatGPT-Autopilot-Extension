@@ -57,7 +57,6 @@ test('Agent definition registries persist through the existing Browser Agent sto
   const mutation = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition(),
   });
@@ -75,19 +74,17 @@ test('Agent definition registries persist through the existing Browser Agent sto
 test('persisted definition mutations enforce registry CAS at the actual serialized write boundary', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
-  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
 
   const first = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition({ agentDefinitionId: 'agent.a', label: 'Agent A', tags: ['a'] }),
   });
   const second = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition({ agentDefinitionId: 'agent.b', label: 'Agent B', tags: ['b'] }),
   });
@@ -104,18 +101,16 @@ test('persisted definition mutations enforce registry CAS at the actual serializ
 test('definition revision CAS survives persistence and rejects stale updates', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
-  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
-  const inserted = await manager.mutateAgentDefinitionRegistry({
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition(),
   });
   const updated = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
-    expectedRegistryBindingKey: inserted.nextRegistry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -126,7 +121,6 @@ test('definition revision CAS survives persistence and rejects stale updates', a
   await assert.rejects(() => manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
-    expectedRegistryBindingKey: updated.nextRegistry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -146,11 +140,10 @@ test('definition persistence boundaries are descriptor-safe, exact-shape and zer
   await assert.rejects(() => manager.createAgentDefinitionRegistry(hostile), /enumerable data property/);
   assert.equal(reads, 0);
 
-  const canonical = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await assert.rejects(() => manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: canonical.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition(),
     registry: { forged: true },
@@ -161,33 +154,6 @@ test('definition persistence boundaries are descriptor-safe, exact-shape and zer
   const created = await manager.createAgentDefinitionRegistry(portable);
   assert.equal(created.registry.registryId, 'agents:project-2');
 });
-
-test('legacy persisted V1 registries without bindingKey migrate at the storage boundary', async () => {
-  const { data, chrome } = makeChromeStorage();
-  const manager = managerFor(chrome);
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:legacy' });
-
-  delete data.autopilotBrowserAgentV1.definitionRegistriesById['agents:legacy'].bindingKey;
-
-  const restarted = managerFor(chrome);
-  const loaded = await restarted.getAgentDefinitionRegistry('agents:legacy');
-  assert.equal(loaded.quarantined, false);
-  assert.equal(loaded.registry.registryId, 'agents:legacy');
-  assert.equal(typeof loaded.registry.bindingKey, 'string');
-  assert.ok(loaded.registry.bindingKey.length > 0);
-
-  await restarted.create({
-    id: 'agent-migration-save',
-    name: 'Migration save',
-    goal: 'Persist canonical migrated registry bytes.',
-  });
-  assert.equal(
-    typeof data.autopilotBrowserAgentV1.definitionRegistriesById['agents:legacy'].bindingKey,
-    'string',
-    'the next canonical store save must persist the migrated bindingKey',
-  );
-});
-
 
 test('one corrupt persisted definition registry does not poison jobs or other valid registries', async () => {
   const { data, chrome } = makeChromeStorage();
@@ -206,17 +172,13 @@ test('one corrupt persisted definition registry does not poison jobs or other va
   const bad = await restarted.getAgentDefinitionRegistry('agents:bad');
   assert.equal(bad.registry, null);
   assert.equal(bad.quarantined, true);
-  assert.deepEqual((await restarted.list()).jobs, []);
+  assert.deepEqual(await restarted.getExecutionPolicy(), { maxConcurrentAgents: 1 });
 
   await assert.rejects(
     () => restarted.createAgentDefinitionRegistry({ registryId: 'agents:bad' }),
     /quarantined as corrupt/,
   );
-  await restarted.create({
-    id: 'agent-unrelated-save',
-    name: 'Unrelated durable Agent',
-    goal: 'Exercise an unrelated Browser Agent save without touching definition authority.',
-  });
+  await restarted.updateExecutionPolicy({ maxConcurrentAgents: 2 });
   assert.ok(data.autopilotBrowserAgentV1.definitionRegistryQuarantineById['agents:bad']);
   const afterUnrelatedSave = managerFor(chrome);
   assert.deepEqual(
@@ -253,7 +215,6 @@ test('Agent definition registry identity is prototype-safe for valid Object prot
   const mutation = await manager.mutateAgentDefinitionRegistry({
     registryId: 'constructor',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: definition({ agentDefinitionId: 'agent.prototype-safe', label: 'Prototype Safe', tags: ['safe'] }),
   });

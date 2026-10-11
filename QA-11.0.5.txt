@@ -1,0 +1,31 @@
+Пілот 11.0.5 High — перевірка
+
+UI: 106/106, включно з 16 новими поведінковими перевірками actual options.js handlers та helper. Канонічний Agent subset: 67/67. Core: 429/429. Interaction: 162/162. Release: 22/22.
+Набори перетинаються, тому числа не підсумовуємо як унікальні тести.
+
+Нові поведінкові перевірки:
+- пізній SELECT A не перекриває новіший B;
+- Stop під час незавершеного Run; пізній Run не перекриває Stop;
+- пізні lifecycle acknowledgements не відновлюють стару вибірку;
+- старий LIST не відновлює видаленого агента;
+- 100 фонових timer ticks мають один незавершений LIST message;
+- прогрес оновлюється під час довгого Run;
+- UI timeout не дозволяє накопичувати Chrome requests;
+- Create acknowledgement переживає Start failure;
+- Definition Create acknowledgement переживає List failure й не запускає агента;
+- подвійний Create створює один job;
+- дозвіл для A не запускає новіший B;
+- подвійний Approval надсилає одну команду точному job;
+- старе підтвердження follow-up не стирає новий текст;
+- 100 незмінених list render зберігають native option identity;
+- provider acknowledgement не синтезує trusted Specialist success;
+- VERIFIED потребує обох durable states, RECONCILE/manual/wait/failure/cancel відображаються окремо.
+
+Додатковий Agent subset: scoped delegation, trusted verification, draft import/export, concurrent top-level jobs, дерево й parent-runtime fencing. Наявний parent-runtime тест виправляє лише застарілий очікуваний текст помилки definitionScope; production Core не змінювався.
+
+Старі qualification gaps: tests/agent-definition-model-defaults-ui.test.mjs (3 FAIL) та tests/browser-agent-auto-delegation-runtime.test.mjs (30 FAIL). Вони окремо запущені на незміненій 11.0.4 та відтворюють ті самі 33 FAIL: model-default controls і очікувані APIs autoPrepareSpecialistHandoff/setSpecialistProviderConfig не відповідають release lineage. Не оголошено PASS і не додано обхід authority чи альтернативний runtime заради тестів.
+
+Фізичний Windows/Chrome/NVDA, реальне provider I/O та вся Agent-платформа тут не кваліфіковані. Chromium відсутній. Цей випуск завершує керування Agent owner view; ширші модельні/provider/runtime роботи залишаються окремими.
+
+Зафіксовано: 2026-10-01T01:33:55+02:00
+Архів: CRC, локальні імпорти та синтаксис усіх 227 упакованих JavaScript-файлів перевірені.

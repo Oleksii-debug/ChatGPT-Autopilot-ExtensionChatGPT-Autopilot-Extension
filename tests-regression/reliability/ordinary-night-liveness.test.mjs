@@ -132,6 +132,7 @@ test('six ordinary open-close Sessions retain hundreds of cycles over eight virt
         }
         return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
       }
+      if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'INSERT_ONLY') {
         return {
           status: InteractionResult.INSERTED_NOT_SENT,

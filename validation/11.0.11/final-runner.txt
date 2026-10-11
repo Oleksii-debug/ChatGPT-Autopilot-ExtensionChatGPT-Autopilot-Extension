@@ -1,0 +1,23 @@
+(node:12) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/core/runner.test.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prompt fingerprint is deterministic and binds generation (6.926198ms)
+✔ durable phases reach PRE_SEND_WAIT with persisted deadline (3.313479ms)
+✔ submit effect observes durable SUBMITTING checkpoint without a profile-wide lease (3.155531ms)
+✔ submit exception becomes ambiguous recovery without cooldown and without a profile-wide lease (2.236648ms)
+✔ tab activation denied before any input permits bounded retry without recording Send (2.200863ms)
+✔ pre-effect claim cannot downgrade a persisted native click to a safe retry (2.54386ms)
+✔ a lost DOM checkpoint acknowledgement cannot authorize replay or increment the sent counter (2.560936ms)
+✔ pre-send deadline prevents premature submit before any side effect (2.347895ms)
+✔ PAUSED committed before durable submit transaction prevents lease and send (1.914443ms)
+✔ STOPPED committed before durable submit transaction prevents lease and send (2.433924ms)
+✔ managed fresh-root uncertain submit durably binds observed conversation for exact recovery (2.571291ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 144.16852

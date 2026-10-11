@@ -208,6 +208,37 @@ async function runBrowserSmoke({ verbose = true } = {}) {
     const exception = cdp.events.find(event => event.method === 'Runtime.exceptionThrown');
     assert.equal(exception, undefined, `Browser JS exception: ${JSON.stringify(exception?.params || {})}`);
 
+    // Native Chromium contract for the post-Send setting: one actual second
+    // resolution, accurate conversions, and keyboard-accessible selectors.
+    const postSendUi = await evaluate(`(() => {
+      const checks = [];
+      for (const prefix of ['simplified', 'scenario-work']) {
+        const amount = document.getElementById(prefix + '-post-send');
+        const unit = document.getElementById(prefix + '-post-send-unit');
+        const get = () => ({unit: unit.value, amount: Number(amount.value), maximum: Number(amount.max),
+          label: document.querySelector('label[for="' + unit.id + '"]')?.textContent.trim() || ''});
+        unit.value = 'seconds';
+        unit.dispatchEvent(new Event('change', {bubbles: true}));
+        amount.value = '90';
+        unit.value = 'minutes';
+        unit.dispatchEvent(new Event('change', {bubbles: true}));
+        const minutes = get();
+        unit.value = 'seconds';
+        unit.dispatchEvent(new Event('change', {bubbles: true}));
+        const seconds = get();
+        amount.value = '5';
+        checks.push({prefix, minutes, seconds});
+      }
+      return checks;
+    })()`);
+    for (const result of postSendUi) {
+      assert.deepEqual({unit:result.minutes.unit, amount:result.minutes.amount,
+        maximum:result.minutes.maximum}, {unit:'minutes', amount:1.5, maximum:60});
+      assert.deepEqual({unit:result.seconds.unit, amount:result.seconds.amount,
+        maximum:result.seconds.maximum}, {unit:'seconds', amount:90, maximum:3600});
+      assert.match(result.minutes.label, /одиниця очікування після надсилання/i);
+    }
+
     const initial = await evaluate(`(() => ({
       selected:[...document.querySelectorAll('#mode-tabs [role=tab]')].find(x=>x.getAttribute('aria-selected')==='true')?.id,
       sessionsVisible:[...document.querySelectorAll('[data-app-mode="sessions"]')].some(x=>!x.hidden),

@@ -1,0 +1,7 @@
+11.0.9, 2026-10-02T00:54+02:00
+
+Focused send/frozen-window response regression: 52 PASS, 0 FAIL.
+Full production-code Core/Scenario/integration/interaction/UI/release suite: 799 PASS, 0 FAIL.
+The strict negative test rejects a fresh /c/ URL and generation without an operation-bound user turn. Managed hidden form activates before one physical requestSubmit; failed activation sends nothing. Frozen bound response tab wakes once, is read, restores previous selection, and repeated reads respect a cooldown. The 15-chat and window-bound suites remain in the full suite.
+
+No physical Windows Chrome/ChatGPT/NVDA test was possible. A browser DOM acknowledgement does not prove server delivery. Private diagnostic attachments are not included in release artifacts.

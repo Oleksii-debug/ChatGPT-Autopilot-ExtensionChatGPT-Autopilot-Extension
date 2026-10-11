@@ -8,7 +8,7 @@ import {
 } from '../src/core/coding-specialist-provider.js';
 import { SpecialistProviderConfigKind } from '../src/core/specialist-provider-config.js';
 
-const T0 = Date.parse('2026-09-29T04:05:00.000Z');
+const T0 = Date.parse('2026-09-27T14:20:00.000Z');
 
 function makeChromeStorage() {
   const data = Object.create(null);
@@ -23,7 +23,10 @@ function makeChromeStorage() {
           },
         },
       },
-      alarms: { async create() {}, async clear() { return true; } },
+      alarms: {
+        async create() {},
+        async clear() { return true; },
+      },
     },
   };
 }
@@ -65,7 +68,7 @@ function setRequest(expectedRevision, overrides = {}) {
   };
 }
 
-test('owner-qualified provider config persists in the existing BrowserAgent store across restart', async () => {
+test('provider config persists in the existing Browser Agent storage key across restart', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   const created = await manager.setSpecialistProviderConfig(setRequest(0));
@@ -85,12 +88,10 @@ test('owner-qualified provider config persists in the existing BrowserAgent stor
   assert.deepEqual(listed.quarantinedProviderIds, []);
 });
 
-test('provider config CAS is serialized and only one concurrent same-revision update commits', async () => {
+test('provider config CAS is enforced at the serialized write boundary', async () => {
   const { chrome } = makeChromeStorage();
-  const clock = { value: T0 };
-  const manager = managerFor(chrome, () => clock.value);
+  const manager = managerFor(chrome);
   await manager.setSpecialistProviderConfig(setRequest(0));
-  clock.value += 1000;
 
   const first = manager.setSpecialistProviderConfig(setRequest(1, {
     config: config({ agentProfileRevision: 3 }),
@@ -112,7 +113,7 @@ test('provider config CAS is serialized and only one concurrent same-revision up
   );
 });
 
-test('nested provider config is canonicalized before asynchronous store access', async () => {
+test('nested provider config is descriptor-snapshotted before serialized enqueue', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   const mutable = config();
@@ -126,7 +127,7 @@ test('nested provider config is canonicalized before asynchronous store access',
   assert.deepEqual(committed.config.config.qualifiedCapabilityIds, ['code.write']);
 });
 
-test('provider config rejects nested accessors without executing getters', async () => {
+test('provider config rejects nested accessors without getter execution', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   let reads = 0;
@@ -144,13 +145,9 @@ test('provider config rejects nested accessors without executing getters', async
     /data property/,
   );
   assert.equal(reads, 0);
-  assert.equal(
-    (await manager.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID)).config,
-    null,
-  );
 });
 
-test('corrupt persisted provider config is quarantined and cannot regain runtime authority', async () => {
+test('corrupt persisted provider config is quarantined and cannot silently become runtime authority', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await manager.setSpecialistProviderConfig(setRequest(0));
@@ -169,13 +166,13 @@ test('corrupt persisted provider config is quarantined and cannot regain runtime
     /quarantined as corrupt/,
   );
 
-  await restarted.update(store => store);
+  await restarted.updateExecutionPolicy({ maxConcurrentAgents: 2 });
   assert.ok(
     data.autopilotBrowserAgentV1.specialistProviderConfigQuarantineById[OPENHANDS_CODING_PROVIDER_ID],
   );
 });
 
-test('clear is exact-revision fenced and restart durable', async () => {
+test('clear is revision-fenced and restart durable', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await manager.setSpecialistProviderConfig(setRequest(0));
@@ -192,76 +189,8 @@ test('clear is exact-revision fenced and restart durable', async () => {
     expectedRevision: 1,
   });
   assert.equal(cleared.cleared, true);
-  assert.equal(cleared.revision, 2);
-  const restartedState = await managerFor(chrome).getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
-  assert.equal(restartedState.config, null);
-  assert.equal(restartedState.revision, 2);
-
-  await assert.rejects(
-    () => managerFor(chrome).setSpecialistProviderConfig(setRequest(0)),
-    /revision drifted/,
-  );
-  const recreated = await managerFor(chrome).setSpecialistProviderConfig(setRequest(2));
-  assert.equal(recreated.config.revision, 3);
-});
-
-
-test('provider config revision tombstone survives a normalized save and blocks ABA recreation', async () => {
-  const { data, chrome } = makeChromeStorage();
-  const manager = managerFor(chrome);
-  await manager.setSpecialistProviderConfig(setRequest(0));
-  await manager.clearSpecialistProviderConfig({
-    providerId: OPENHANDS_CODING_PROVIDER_ID,
-    expectedRevision: 1,
-  });
-  await manager.update(store => store);
-
   assert.equal(
-    data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById[OPENHANDS_CODING_PROVIDER_ID],
-    2,
+    (await managerFor(chrome).getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID)).config,
+    null,
   );
-  const restarted = managerFor(chrome);
-  const state = await restarted.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
-  assert.equal(state.config, null);
-  assert.equal(state.revision, 2);
-  await assert.rejects(
-    () => restarted.setSpecialistProviderConfig(setRequest(0)),
-    /revision drifted/,
-  );
-});
-
-
-test('provider config rejects clock rollback without advancing durable revision', async () => {
-  const { chrome } = makeChromeStorage();
-  const clock = { value: T0 };
-  const manager = managerFor(chrome, () => clock.value);
-  await manager.setSpecialistProviderConfig(setRequest(0));
-
-  clock.value = T0 - 1;
-  await assert.rejects(
-    () => manager.setSpecialistProviderConfig(setRequest(1, {
-      config: config({ agentProfileRevision: 2 }),
-    })),
-    /updatedAt cannot move backwards or repeat/,
-  );
-  const state = await manager.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
-  assert.equal(state.config.revision, 1);
-  assert.equal(state.revision, 1);
-});
-
-
-test('provider revision tombstone history above active-config capacity survives restart normalization', async () => {
-  const { data, chrome } = makeChromeStorage();
-  const manager = managerFor(chrome);
-  await manager.setSpecialistProviderConfig(setRequest(0));
-  const revisions = data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById;
-  for (let index = 0; index < 40; index += 1) {
-    revisions[`provider.history.${index}`] = index + 1;
-  }
-
-  await managerFor(chrome).update(store => store);
-  const persisted = data.autopilotBrowserAgentV1.specialistProviderConfigRevisionById;
-  assert.equal(Object.keys(persisted).length, 41);
-  assert.equal(persisted[OPENHANDS_CODING_PROVIDER_ID], 1);
-  assert.equal(persisted['provider.history.39'], 40);
 });

@@ -1,0 +1,134 @@
+✖ a proven no-effect activation failure leaves the same request eligible for its first Send (10.382408ms)
+✖ native scenario Send uses the current button and history after activation rerenders the document (1.132692ms)
+(node:16) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/src/core/tabs.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c1ce26d7ec90/autopilot-agent/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ all fifteen frozen slots receive a turn instead of waking the first slot forever (18.256919ms)
+✖ a response probe cannot steal focus from a Send awaiting acknowledgement or dwell (0.735663ms)
+✖ a frozen tab may thaw asynchronously after activation, with a bounded wait (0.50909ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 177.514315
+
+✖ failing tests:
+
+test at tests-regression/interaction/__recheck-before.test.cjs:191:1
+✖ a proven no-effect activation failure leaves the same request eligible for its first Send (10.382408ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'SUBMISSION_UNCERTAIN'
+  - 'SENT_VERIFIED'
+  
+      at TestContext.<anonymous> (/workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/interaction/__recheck-before.test.cjs:198:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'SUBMISSION_UNCERTAIN',
+    expected: 'SENT_VERIFIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests-regression/interaction/__recheck-before.test.cjs:204:1
+✖ native scenario Send uses the current button and history after activation rerenders the document (1.132692ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'MANUAL_REVIEW_REQUIRED'
+  - 'SENT_VERIFIED'
+  
+      at TestContext.<anonymous> (/workspace/scratch/c1ce26d7ec90/autopilot-agent/tests-regression/interaction/__recheck-before.test.cjs:217:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'MANUAL_REVIEW_REQUIRED',
+    expected: 'SENT_VERIFIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/__recheck-before.test.mjs:208:1
+✖ all fifteen frozen slots receive a turn instead of waking the first slot forever (18.256919ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      10,
+  -   11,
+  -   12,
+  -   13,
+  -   14,
+  -   15,
+  -   16,
+  -   17,
+  -   18,
+  -   19,
+  -   20,
+  -   21,
+  -   22,
+  -   23,
+  -   24
+    ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests/__recheck-before.test.mjs:215:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 10 ],
+    expected: [
+      10, 11, 12, 13, 14, 15,
+      16, 17, 18, 19, 20, 21,
+      22, 23, 24
+    ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/__recheck-before.test.mjs:219:1
+✖ a response probe cannot steal focus from a Send awaiting acknowledgement or dwell (0.735663ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'ASSISTANT_RESPONSE_FOCUS_BUSY'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests/__recheck-before.test.mjs:224:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'ASSISTANT_RESPONSE_FOCUS_BUSY',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/__recheck-before.test.mjs:231:1
+✖ a frozen tab may thaw asynchronously after activation, with a bounded wait (0.50909ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/c1ce26d7ec90/autopilot-agent/tests/__recheck-before.test.mjs:243:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

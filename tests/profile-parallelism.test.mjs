@@ -413,6 +413,17 @@ test('tab creation runs outside the serialized repository update queue', async (
         return [];
       },
       async get() { throw new Error('not expected'); },
+      async update(id, { url, active }) {
+        assert.equal(repo.insideUpdate, false, 'Chrome navigation must not run inside repository.update');
+        assert.equal(id, 1);
+        assert.equal(url, 'https://chatgpt.com/');
+        assert.equal(active, false);
+        const persisted = await repo.load();
+        assert.equal(persisted.tabHintsByTaskId.t1.tabId, id,
+          'the owned tab must be durably recorded before real ChatGPT navigation');
+        assert.equal(persisted.tabHintsByTaskId.t1.opening, true);
+        return { id, url, active, status: 'complete' };
+      },
     },
   };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, { execute: async () => ({ status: InteractionResult.READY }) }, { now: () => 1000 });
@@ -486,8 +497,12 @@ function makeHappyTransport({ failInsertOnceFor = '' } = {}) {
   return {
     async execute(tabId, request) {
       const sessionId = String(request.requestId || '').split(':')[0];
-      if (request.mode === 'CHECK_ONLY' || request.mode === 'PREPARE_SEND') {
-        return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
+      if (request.mode === 'CHECK_ONLY' || request.mode === 'ENSURE_HIGH_EFFORT' || request.mode === 'PREPARE_SEND') {
+        return {
+          status: InteractionResult.READY,
+          safeDiagnosticCode: request.mode === 'ENSURE_HIGH_EFFORT' ? 'EFFORT_HIGH_VERIFIED' : 'READY',
+          normalizedObservedUrl: request.expectedUrl,
+        };
       }
       if (request.mode === 'INSERT_ONLY') {
         if (sessionId === failInsertOnceFor && !failed.has(sessionId)) {
@@ -769,12 +784,15 @@ test('scenario ambiguous Send is verification-only while nine mixed-load peers k
   now = Number(after.sessionsById.s6.operation.verificationDeadline || 0) + 1;
   const verifyCycle = await runRuntimeCycle({ repository: repo, chromeApi, executor, executionAvailable: true, now: () => now });
   const held = verifyCycle.outcomes.find(item => item.sessionId === 's6');
-  assert.equal(held.result.kind, 'UNCERTAIN_VERIFY_HOLD');
+  assert.equal(held.result.kind, 'MANAGED_UNCERTAIN_SETTLED_NO_RESEND');
   after = await repo.load();
-  assert.equal(after.sessionsById.s6.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(after.sessionsById.s6.operation.phase, OperationPhase.FAILED_SAFE);
+  assert.equal(after.sessionsById.s6.runState, RunState.STOPPED);
+  assert.equal(after.sessionsById.s6.tasksById.t6.manualReviewReason, 'MANAGED_SEND_ACK_TIMEOUT_NO_RESEND');
   assert.equal(after.sessionsById.s6.successfulSendCount, 0);
   assert.equal(modesForScenario.filter(mode => mode === 'SUBMIT_EXISTING').length, 1, 'scenario Send must never be replayed after uncertainty');
-  assert.ok(modesForScenario.includes('VERIFY_AFTER_UNCERTAIN_SUBMIT'));
+  assert.equal(modesForScenario.includes('VERIFY_AFTER_UNCERTAIN_SUBMIT'), false,
+    'expired managed Send must settle locally before new browser I/O');
 });
 
 

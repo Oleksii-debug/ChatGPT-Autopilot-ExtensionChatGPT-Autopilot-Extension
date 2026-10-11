@@ -1,0 +1,42 @@
+name: Plan 8 canonical 11.x source lineage integrity
+
+on:
+  push:
+    branches:
+      - main
+      - plan8/11-0-13-source-convergence-20261010
+      - plan8/s1-11x-lineage-integrity-20261010
+    paths:
+      - 'scripts/verify-plan8-lineage.mjs'
+      - 'tests/plan8-source-lineage-integrity.test.mjs'
+      - 'PLAN8_11_0_13_SOURCE_CONVERGENCE.md'
+      - 'manifest.json'
+      - 'package.json'
+      - '.github/workflows/plan8-source-lineage-integrity.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify-plan8-lineage.mjs'
+      - 'tests/plan8-source-lineage-integrity.test.mjs'
+      - 'PLAN8_11_0_13_SOURCE_CONVERGENCE.md'
+      - 'manifest.json'
+      - 'package.json'
+      - '.github/workflows/plan8-source-lineage-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify negative, recovery and provenance fixtures
+        run: node --test tests/plan8-source-lineage-integrity.test.mjs
+      - name: Verify real 11.x ancestor and exact integrated manifests
+        run: node scripts/verify-plan8-lineage.mjs

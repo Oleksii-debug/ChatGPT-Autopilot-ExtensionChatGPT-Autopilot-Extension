@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../../src/core/native-input.js';
+import { performNativeInput, checkpointDomSubmit, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../../src/core/native-input.js';
 import { createEmptyState,createSession,createTask } from '../../src/core/schema.js';
 import { StorageRepository } from '../../src/core/storage.js';
 import { reconcileStateForStartup } from '../../src/core/recovery.js';
+import { probeAssistantConversation } from '../../src/core/assistant-report-probe.js';
 function setup(kind='submit'){
  const state=createEmptyState(1); const task=createTask({id:'t',url:'https://chatgpt.com/c/native'});
  const session=createSession({id:'s',name:'Native',tasks:[task],sharedPrompt:'canonical prompt',now:1});
@@ -23,6 +24,41 @@ test('native click persists effect checkpoint, presses and releases once, detach
  await assert.rejects(f.run(),/NATIVE_SUBMIT_ALREADY_DISPATCHED/);assert.equal(f.calls.length,4);
 });
 
+test('DOM submit checkpoint works without debugger, fences replay and survives restart', async()=>{
+ const f=setup();delete f.chrome.debugger;delete f.chrome.scripting;
+ await f.repo.update(state=>{state.sessionsById.s.operation.previousSendTabId=3;state.sessionsById.s.operation.previousSendWindowId=9;return state;});
+ await checkpointDomSubmit(f.chrome,f.repo,f.message,f.sender);
+ const state=await f.repo.load();
+ assert.equal(state.sessionsById.s.operation.domSubmitDispatched,true);
+ assert.notEqual(state.sessionsById.s.operation.nativeSubmitDispatched,true);
+ reconcileStateForStartup(state,100);
+ assert.equal(state.sessionsById.s.operation.phase,'AMBIGUOUS','a real DOM Send never becomes proven-no-effect on restart');
+ await assert.rejects(checkpointDomSubmit(f.chrome,f.repo,f.message,f.sender),/DOM_SUBMIT_ALREADY_DISPATCHED/);
+ await assert.rejects(f.run(),/DOM_SUBMIT_ALREADY_DISPATCHED/);
+ assert.deepEqual(f.calls,[]);
+});
+
+test('DOM checkpoint refuses a paused session and an unrelated sender tab', async()=>{
+ const f=setup();
+ await assert.rejects(checkpointDomSubmit(f.chrome,f.repo,f.message,{...f.sender,tab:{id:8}}),/NATIVE_INPUT_TAB_NOT_OWNED/);
+ await f.repo.update(state=>{state.sessionsById.s.runState='PAUSED';return state;});
+ await assert.rejects(checkpointDomSubmit(f.chrome,f.repo,f.message,f.sender),/NATIVE_INPUT_SESSION_PAUSED/);
+ assert.notEqual((await f.repo.load()).sessionsById.s.operation.domSubmitDispatched,true);
+});
+
+test('observation-only activation after a DOM Send cannot authorize another submit', async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return f.chrome.tabs.get(id);};
+ await checkpointDomSubmit(f.chrome,f.repo,f.message,f.sender);
+ await activateOwnedSendTab(f.chrome,f.repo,{...f.message,observationOnly:true},f.sender);
+ assert.equal(activeTabId,7);
+ await assert.rejects(checkpointDomSubmit(f.chrome,f.repo,f.message,f.sender),/DOM_SUBMIT_ALREADY_DISPATCHED/);
+ await restoreOwnedSendTab(f.chrome,f.repo,{...f.message,previousTabId:3},f.sender);
+ assert.equal(activeTabId,3);
+});
+
 test('owned tab activation occurs before Send and restores the prior tab after durable dispatch',async()=>{
  const f=setup();let activeTabId=3;
  f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
@@ -31,6 +67,31 @@ test('owned tab activation occurs before Send and restores the prior tab after d
  assert.deepEqual(await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender),{previousTabId:3});
  assert.equal(activeTabId,7);
  await f.run();
+ await restoreOwnedSendTab(f.chrome,f.repo,{...f.message,previousTabId:3},f.sender);
+ assert.equal(activeTabId,3);
+});
+
+test('a Send starting during a response read waits for restoration and records the original active tab', async()=>{
+ const f=setup();let activeTabId=3;
+ f.sender.tab.windowId=9;
+ await f.repo.update(state=>{state.sessionsById.s.tabWindowId=9;state.sessionsById.s.operation.phase='INSERTING';return state;});
+ const urls={3:'https://example.com/',7:'https://chatgpt.com/c/native',10:'https://chatgpt.com/c/response'};
+ f.chrome.tabs.get=async id=>({id,url:urls[id],active:id===activeTabId,windowId:9,frozen:id===10&&activeTabId!==10});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return f.chrome.tabs.get(id);};
+ let entered;const reading=new Promise(resolve=>{entered=resolve;});
+ let finish;const hold=new Promise(resolve=>{finish=resolve;});
+ const probing=probeAssistantConversation(f.chrome,{async execute(){entered();await hold;return {status:'READY',assistantComplete:true};}}, {
+   conversationUrl:urls[10],persistentManagedTab:true,managedTabId:10,managedTabOwned:true,preferredWindowId:9,
+ },{repository:f.repo});
+ await reading;
+ await f.repo.update(state=>{state.sessionsById.s.operation.phase='SUBMITTING';return state;});
+ const activating=activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(activeTabId,10,'physical Send activation waits while the response read owns focus');
+ finish();await probing;
+ assert.deepEqual(await activating,{previousTabId:3});
+ assert.equal(activeTabId,7);
  await restoreOwnedSendTab(f.chrome,f.repo,{...f.message,previousTabId:3},f.sender);
  assert.equal(activeTabId,3);
 });

@@ -16,10 +16,10 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     ? [String(fields.url || '').trim()]
     : String(fields.urls || '').split(/\r?\n/u).map(url => url.trim()).filter(Boolean);
   const prompts = promptMode === 'shared'
-    ? [String(fields.prompt || '').trim()]
-    : String(fields.prompts || '').split(/^\s*---\s*$/mu).map(prompt => prompt.trim()).filter(Boolean);
+    ? [String(fields.prompt ?? '')]
+    : String(fields.prompts ?? '').split(/^[ \t]*---[ \t]*$/mu).filter(prompt => prompt.trim());
   if (!urls.length || urls.some(url => !url)) throw new Error('Укажіть посилання ChatGPT.');
-  if (!prompts.length || prompts.some(prompt => !prompt)) throw new Error('Укажіть промпт.');
+  if (!prompts.length || prompts.some(prompt => !prompt.trim())) throw new Error('Укажіть промпт.');
   if (urlMode === 'unique' && promptMode === 'unique' && urls.length !== prompts.length) {
     throw new Error('Кількість посилань і промптів повинна збігатися.');
   }
@@ -30,8 +30,26 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
   const intervalUnit = fields.intervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const interval = exactInteger(fields.interval, 1, intervalUnit === 'seconds' ? 86400 : 1440, 'Інтервал');
   const preSendDelaySeconds = exactInteger(fields.delay, 1, 30, 'Пауза перед Send');
+  const tabReadyDelaySeconds = exactInteger(fields.tabReady ?? 0, 0, 60, 'Пауза після відкриття вкладки');
+  const postSendUnit = fields.postSendUnit === 'minutes' ? 'minutes' : 'seconds';
+  const postSendValue = Number(fields.postSend ?? 5);
+  const postSendFactor = postSendUnit === 'minutes' ? 60 : 1;
+  const postSendDelaySeconds = Math.round(postSendValue * postSendFactor);
+  if (!String(fields.postSend ?? 5).trim()
+      || !Number.isFinite(postSendValue) || postSendValue < 0
+      || postSendValue > (postSendUnit === 'minutes' ? 60 : 3600)
+      || Math.abs(postSendValue * postSendFactor - postSendDelaySeconds) > 1e-7) {
+    throw new Error('Очікування після надсилання: вкажіть час до 60 хвилин із точністю до секунди.');
+  }
   const busyCheckDelaySeconds = exactInteger(fields.busy, 1, 30, 'Перевірка зайнятого чату');
-  const retryBackoffSeconds = exactInteger(fields.retry, 5, 3600, 'Технічний повтор');
+  const retryUnit = fields.retryUnit === 'minutes' ? 'minutes' : 'seconds';
+  const retryValue = exactInteger(
+    fields.retry,
+    retryUnit === 'minutes' ? 1 : 5,
+    retryUnit === 'minutes' ? 60 : 3600,
+    'Повторна спроба',
+  );
+  const retryBackoffSeconds = retryValue * (retryUnit === 'minutes' ? 60 : 1);
   const tasks = Array.from({ length: compact ? 1 : physicalCount }, (_, index) => ({
     id: previous?.tasks?.[index]?.id || createId(), enabled: true,
     label: `Крок ${index + 1}`,
@@ -48,9 +66,9 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     tasks, configuredTaskCount,
     runMode: fields.runMode === 'one-pass' ? 'one-pass' : 'continuous',
     minimumSendIntervalValue: interval, minimumSendIntervalUnit: intervalUnit,
-    preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
+    tabReadyDelaySeconds, postSendDelaySeconds, postSendDelayUnit: postSendUnit, preSendDelaySeconds, busyCheckDelaySeconds, retryBackoffSeconds,
     retryPolicy: fields.retryPolicy === 'manual' ? 'manual' : 'safe',
-    busyChatBehavior: 'skip-next',
+    busyChatBehavior: fields.busyBehavior === 'skip-next' ? 'skip-next' : 'skip-next',
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',
   };
 }

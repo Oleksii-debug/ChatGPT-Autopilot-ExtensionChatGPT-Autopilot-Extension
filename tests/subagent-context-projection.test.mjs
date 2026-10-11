@@ -824,3 +824,73 @@ test('task-bound child context rejects same logical source revision with substit
     /source identity is stale or mismatched: source\.allowed/,
   );
 });
+
+test('Plan8 workspace resolver fails closed on stale revisions and missing capsules without granting authority', async () => {
+  const chrome = durableFakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  const exact = await repository.resolveContext({
+    projectId: 'project.alpha',
+    expectedProjectRevisionId: 'project-r2',
+    capsuleId: 'capsule.parent',
+  });
+  assert.equal(exact.workspaceRevision, 1);
+  assert.equal(exact.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+  for (const key of [
+    'sourceAuthorityAuthenticated', 'retrievalAuthorized', 'executionAuthorized',
+    'mutationAuthorized', 'policyAuthority',
+  ]) {
+    assert.equal(exact[key], false);
+  }
+  assert.equal(exact.capsule.capsuleId, 'capsule.parent');
+
+  await assert.rejects(
+    repository.resolveContext({
+      projectId: 'project.alpha',
+      expectedProjectRevisionId: 'project-r1',
+    }),
+    /revision is stale or mismatched/u,
+  );
+  await assert.rejects(
+    repository.resolveContext({
+      projectId: 'project.alpha',
+      expectedProjectRevisionId: 'project-r2',
+      capsuleId: 'capsule.missing',
+    }),
+    /capsule not found/u,
+  );
+  const restarted = new ProjectWorkspaceRepository(chrome);
+  assert.deepEqual(
+    await restarted.resolveContext({
+      projectId: 'project.alpha', expectedProjectRevisionId: 'project-r2',
+      capsuleId: 'capsule.parent',
+    }),
+    exact,
+  );
+});
+
+test('Plan8 workspace resolver rejects hostile request getters, unknown authority and explicit undefined', async () => {
+  const repo = new ProjectWorkspaceRepository(durableFakeChrome());
+  let reads = 0;
+  const hostile = { projectId: 'project.alpha', expectedProjectRevisionId: 'project-r2' };
+  Object.defineProperty(hostile, 'capsuleId', {
+    enumerable: true,
+    get() { reads += 1; return 'capsule.parent'; },
+  });
+  await assert.rejects(repo.resolveContext(hostile), /enumerable own data properties/u);
+  assert.equal(reads, 0);
+  await assert.rejects(repo.resolveContext({
+    projectId: 'project.alpha',
+    expectedProjectRevisionId: 'project-r2',
+    executionAuthorized: true,
+  }), /unknown field/u);
+  await assert.rejects(repo.resolveContext({
+    projectId: 'project.alpha',
+    expectedProjectRevisionId: undefined,
+  }), /Invalid expectedProjectRevisionId/u);
+});

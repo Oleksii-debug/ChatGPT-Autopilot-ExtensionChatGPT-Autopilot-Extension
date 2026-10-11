@@ -14,13 +14,9 @@ import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
-import { normalizeAiRoutePolicy, selectAiRouteCandidates } from './ai-route-pool.js';
+import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeBoundAgentModelOrchestratorEnvelopeV1 } from './agent-model-orchestrator-envelope.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
-import { createStoredOutcomeContractV1, deleteStoredOutcomeContractV1, listStoredOutcomeContractsV1, resolveStoredOutcomeContractV1, updateStoredOutcomeContractV1 } from './outcome-contract-control.js';
-import { normalizeOutcomeContractV1 } from './outcome-contract.js';
-import {
-  normalizeBoundAgentModelOrchestratorEnvelopeV1,
-} from './agent-model-orchestrator-envelope.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -31,35 +27,6 @@ const DELETABLE_STATES = new Set([RunState.STOPPED, RunState.PAUSED, RunState.ER
 const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns one of these ChatGPT conversations';
 
-const OUTCOME_LIST_PAYLOAD_KEYS = new Set(['projectId']);
-const OUTCOME_GET_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
-const OUTCOME_CREATE_PAYLOAD_KEYS = new Set(['contract']);
-const OUTCOME_UPDATE_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision', 'contract']);
-const OUTCOME_DELETE_PAYLOAD_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
-
-function snapshotExactOutcomeCommandPayload(payload, allowedKeys, label) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error(`${label} must be a plain object`);
-  }
-  const prototype = Object.getPrototypeOf(payload);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error(`${label} must be a plain object`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(payload);
-  const out = Object.create(null);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowedKeys.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
-    }
-    out[key] = descriptor.value;
-  }
-  return out;
-}
-
 const AI_ROUTER_OVERRIDE_MODES = new Set(['primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
 const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
@@ -67,108 +34,10 @@ const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
   'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
-const AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS = new Set([
-  'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
-]);
 function minimumNullable(left, right) {
   if (left == null) return right;
   if (right == null) return left;
   return Math.min(left, right);
-}
-function snapshotAiRoutePolicyOverride(rawPolicy) {
-  if (!rawPolicy || typeof rawPolicy !== 'object' || Array.isArray(rawPolicy)) {
-    throw new Error('Selected Agent AI route policy must be a plain object');
-  }
-  const proto = Object.getPrototypeOf(rawPolicy);
-  if (proto !== Object.prototype && proto !== null) {
-    throw new Error('Selected Agent AI route policy must be a plain object');
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(rawPolicy);
-  const out = {};
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS.has(key)) {
-      throw new Error('Selected Agent AI route policy contains unsupported field');
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
-      throw new Error('Selected Agent AI route policy must contain data-only fields');
-    }
-    const value = descriptor.value;
-    if (AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS.has(key)) {
-      if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
-        throw new Error('Selected Agent AI route policy.' + key + ' must be a canonical array');
-      }
-      const arrayDescriptors = Object.getOwnPropertyDescriptors(value);
-      const length = arrayDescriptors.length?.value;
-      if (!Number.isSafeInteger(length) || length < 0 || length > 32) {
-        throw new Error('Selected Agent AI route policy.' + key + ' has invalid length');
-      }
-      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
-      for (const arrayKey of Reflect.ownKeys(arrayDescriptors)) {
-        if (typeof arrayKey !== 'string' || !expected.has(arrayKey)) {
-          throw new Error('Selected Agent AI route policy.' + key + ' contains non-canonical fields');
-        }
-      }
-      const copy = new Array(length);
-      for (let index = 0; index < length; index += 1) {
-        const itemDescriptor = arrayDescriptors[String(index)];
-        if (!itemDescriptor || !Object.hasOwn(itemDescriptor, 'value') || itemDescriptor.enumerable !== true) {
-          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be an enumerable data property');
-        }
-        const item = itemDescriptor.value;
-        if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
-          throw new Error('Selected Agent AI route policy.' + key + '[' + index + '] must be scalar data');
-        }
-        copy[index] = item;
-      }
-      out[key] = copy;
-      continue;
-    }
-    if (value !== null && (typeof value === 'object' || typeof value === 'function')) {
-      throw new Error('Selected Agent AI route policy.' + key + ' must be scalar data');
-    }
-    out[key] = value;
-  }
-  return out;
-}
-function normalizeInternalAgentProviderBudgetContext(value, expectedJobId) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Agent model invocation requires canonical provider budget context');
-  }
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) {
-    throw new Error('Agent model invocation provider budget context must be a plain object');
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
-  const out = Object.create(null);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error('Agent model invocation provider budget context contains unsupported field');
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error('Agent model invocation provider budget context must contain data-only fields');
-    }
-    out[key] = descriptor.value;
-  }
-  if (out.kind !== 'browser-agent') {
-    throw new Error('Agent model invocation requires an existing durable provider budget lifecycle');
-  }
-  if (typeof out.jobId !== 'string' || out.jobId !== expectedJobId) {
-    throw new Error('Agent model invocation budget owner does not match envelope job identity');
-  }
-  if (typeof out.controlEpoch !== 'number'
-      || !Number.isSafeInteger(out.controlEpoch)
-      || Object.is(out.controlEpoch, -0)
-      || out.controlEpoch < 1) {
-    throw new Error('Agent model invocation budget controlEpoch is invalid');
-  }
-  return Object.freeze({
-    kind: out.kind,
-    jobId: out.jobId,
-    controlEpoch: out.controlEpoch,
-  });
 }
 function narrowAiRoutePolicy(baseSettings, rawRequested) {
   if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
@@ -190,10 +59,18 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
   }
   const requested = normalizeAiRoutePolicy(rawRequested);
   for (const key of ['autoSwitch', 'freeOnly', 'pinnedRouteId', 'locality',
-    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
     if (Object.hasOwn(rawRequested, key)
         && (Object.is(rawRequested[key], -0) || !Object.is(rawRequested[key], requested[key]))) {
+      throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
+    }
+  }
+  for (const key of ['retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    if (Object.hasOwn(rawRequested, key)
+        && (typeof rawRequested[key] !== 'number'
+          || !Number.isSafeInteger(rawRequested[key])
+          || Object.is(rawRequested[key], -0)
+          || !Object.is(rawRequested[key], requested[key]))) {
       throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
     }
   }
@@ -239,14 +116,11 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
     maxInputPricePerMillionUsd: minimumNullable(base.maxInputPricePerMillionUsd, requested.maxInputPricePerMillionUsd),
     maxOutputPricePerMillionUsd: minimumNullable(base.maxOutputPricePerMillionUsd, requested.maxOutputPricePerMillionUsd),
     retryBackoffSeconds: Object.hasOwn(rawRequested, 'retryBackoffSeconds')
-      ? Math.max(base.retryBackoffSeconds, requested.retryBackoffSeconds)
-      : base.retryBackoffSeconds,
+      ? Math.max(base.retryBackoffSeconds, requested.retryBackoffSeconds) : base.retryBackoffSeconds,
     circuitBreakerFailures: Object.hasOwn(rawRequested, 'circuitBreakerFailures')
-      ? Math.min(base.circuitBreakerFailures, requested.circuitBreakerFailures)
-      : base.circuitBreakerFailures,
+      ? Math.min(base.circuitBreakerFailures, requested.circuitBreakerFailures) : base.circuitBreakerFailures,
     circuitBreakerSeconds: Object.hasOwn(rawRequested, 'circuitBreakerSeconds')
-      ? Math.max(base.circuitBreakerSeconds, requested.circuitBreakerSeconds)
-      : base.circuitBreakerSeconds,
+      ? Math.max(base.circuitBreakerSeconds, requested.circuitBreakerSeconds) : base.circuitBreakerSeconds,
   };
   if (policy.pinnedRouteId) {
     if (policy.allowRouteIds.length && !policy.allowRouteIds.includes(policy.pinnedRouteId)) {
@@ -279,9 +153,6 @@ function snapshotAiRouterOverride(rawOverride) {
       throw new Error('Selected Agent AI router override must contain data-only fields');
     }
     out[key] = descriptor.value;
-  }
-  if (Object.hasOwn(out, 'routePolicy')) {
-    out.routePolicy = snapshotAiRoutePolicyOverride(out.routePolicy);
   }
   for (const slotName of ['primary', 'strong']) {
     if (!Object.hasOwn(out, slotName) || out[slotName] == null) continue;
@@ -409,7 +280,7 @@ function requireSession(state, sessionId) {
 
 function taskFromUi(raw) {
   const id = raw?.id || crypto.randomUUID();
-  if (!raw?.url) return { id, enabled: raw?.enabled !== false, label: raw?.label || '', url: '', normalizedUrl: '', promptOverride: raw?.promptOverride || '', status:'IDLE', lastCheckedAt:0, lastVerifiedSendAt:0, lastVerifiedFingerprint:'', retryAfterAt:0, manualReviewReason:'', lastConversationUrl:'', lastAssistantReport:'', lastAssistantReportAt:0, lastAssistantBaselineCount:0, lastAssistantBaselineKnown:false };
+  if (!raw?.url) return { id, enabled: raw?.enabled !== false, label: raw?.label || '', url: '', normalizedUrl: '', promptOverride: raw?.promptOverride || '', status:'IDLE', lastCheckedAt:0, lastVerifiedSendAt:0, lastVerifiedFingerprint:'', retryAfterAt:0, manualReviewReason:'', lastConversationUrl:'', lastAssistantReport:'', lastAssistantReportAt:0, lastAssistantBaselineCount:0, lastAssistantBaselineKnown:false, lastFreshConversationGenerationVerified:false };
   return createTask({ id, enabled: raw.enabled !== false, label: raw.label || '', url: raw.url, promptOverride: raw.promptOverride || '' });
 }
 
@@ -432,11 +303,14 @@ export function sessionFromUi(config, now = Date.now()) {
     id: config.id || crypto.randomUUID(), name: config.name || 'New session', tasks,
     promptMode: normalizedPromptMode, sharedPrompt: config.sharedPrompt || '', runMode: runModeFromUi(config.runMode), configuredTaskCount: logicalCount,
     minimumSendIntervalMs: minimumSendIntervalMsFromUi(config),
+    tabReadyDelayMs: Math.min(60000, Math.max(0, Number(config.tabReadyDelaySeconds ?? 0) * 1000)),
+    postSendDelayMs: Math.min(3600000, Math.max(0, Number(config.postSendDelaySeconds ?? 0) * 1000)),
     preSendDelayMs: Math.min(30000, Math.max(1000, Number(config.preSendDelaySeconds || 20) * 1000)),
     busyCheckDelayMs: Math.max(500, Number(config.busyCheckDelaySeconds || 2) * 1000),
     retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds || 30) * 1000),
     tabStrategy: tabStrategyFromUi(config.tabStrategy), now
   });
+  session.postSendDelayUnit = config.postSendDelayUnit === 'minutes' ? 'minutes' : 'seconds';
   session.version = Math.max(1, Number(config.version) || 1);
   session.promptCadence = normalizeSessionPromptCadence(config.promptCadence);
   session.drivePromptSources = normalizeSessionDrivePromptSources(config.drivePromptSources);
@@ -522,6 +396,7 @@ function tabHintKeysRemovedByUpdatedSession(state, oldSession, replacement) {
   const removed = [];
   for (const [key, hint] of Object.entries(state.tabHintsByTaskId || {})) {
     if (hint?.sessionId !== oldSession.id) continue;
+    if (oldSession.tabStrategy !== replacement.tabStrategy) { removed.push(key); continue; }
     if (key === workerHintKey) {
       if (!workerMode) removed.push(key);
       continue;
@@ -550,8 +425,9 @@ function hintIsExtensionOwnedForPhysicalClose(session, hint) {
   // Worker mode can adopt an existing concrete conversation, so only close a
   // worker tab when provenance explicitly says the extension created it.
   if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) return hint.ownedByExtension === true;
-  // KEEP_TASK_TABS_OPEN intentionally keeps tabs and may point at user tabs.
-  return false;
+  // Stop/update/delete release every explicitly created tab, including KEEP.
+  // Adopted user tabs never carry this provenance bit.
+  return hint.ownedByExtension === true;
 }
 
 function unresolvedEvidenceHintKey(session) {
@@ -646,6 +522,7 @@ function calendarStatusForUi(session, now = Date.now()) {
 export function sessionToUi(session, state, now = Date.now()) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
   const currentTask = tasks[session.currentTaskIndex] || null;
+  const simplifiedWait = simplifiedWaitState(session, state, currentTask, now);
   const log = state.logs[session.id] || [];
   const lastLog = log.at(-1);
   const progress = sessionProgress(session);
@@ -660,6 +537,8 @@ export function sessionToUi(session, state, now = Date.now()) {
     minimumSendIntervalSeconds: session.minimumSendIntervalMs / 1000,
     minimumSendIntervalUnit: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? 'minutes' : 'seconds',
     minimumSendIntervalValue: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? session.minimumSendIntervalMs / 60000 : session.minimumSendIntervalMs / 1000,
+    tabReadyDelaySeconds: (session.tabReadyDelayMs || 0) / 1000,
+    postSendDelaySeconds: (session.postSendDelayMs || 0) / 1000,
     preSendDelaySeconds: session.preSendDelayMs / 1000,
     busyCheckDelaySeconds: session.busyCheckDelayMs / 1000, retryBackoffSeconds: session.retryBackoffMs / 1000,
     retryBackoffUnit: session.retryBackoffMs >= 60000 && session.retryBackoffMs % 60000 === 0 ? 'minutes' : 'seconds',
@@ -684,11 +563,41 @@ export function sessionToUi(session, state, now = Date.now()) {
       lastActionAt: lastLog?.at || session.lastActionAt || 0,
       lastSuccessfulSendAt: session.lastSuccessfulSendAt,
       nextAllowedSendAt: progress.isCompleted ? 0 : session.nextAllowedSendAt,
+      simplifiedWaitReason: simplifiedWait.reason,
+      simplifiedWaitUntil: simplifiedWait.until,
       enabledTaskCount: progress.enabledTaskCount,
       lastError: session.lastError
     },
     log
   };
+}
+
+function simplifiedWaitState(session, state, task, now) {
+  if (session.simplifiedSession !== true || session.taskOrder.length !== 1) {
+    return { reason: '', until: 0 };
+  }
+  if (!ACTIVE_STATES.has(session.runState)) {
+    return { reason: 'SESSION_INACTIVE', until: 0 };
+  }
+  if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
+    return { reason: 'VERIFY_UNCERTAIN_SEND', until: Math.max(now, Number(task?.retryAfterAt || 0)) };
+  }
+  if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
+    return { reason: 'PRE_SEND_DELAY', until: Math.max(now, Number(session.operation.preSendDeadline || 0), Number(task?.retryAfterAt || 0)) };
+  }
+  if ([
+    OperationPhase.CHECKING, OperationPhase.READY, OperationPhase.INSERTING,
+    OperationPhase.INSERTED, OperationPhase.SUBMITTING,
+  ].includes(session.operation?.phase)) {
+    return { reason: 'OPERATION_IN_PROGRESS', until: 0 };
+  }
+  const gates = [
+    { reason: 'PROFILE_RATE_LIMIT', until: Number(state.profile?.rateLimitUntil || 0) },
+    { reason: 'SEND_INTERVAL', until: Number(session.nextAllowedSendAt || 0) },
+    { reason: task?.status === 'BUSY' ? 'CHAT_BUSY' : 'RETRY_BACKOFF', until: Number(task?.retryAfterAt || 0) },
+  ].filter(gate => Number.isFinite(gate.until) && gate.until > now)
+    .sort((left, right) => right.until - left.until);
+  return gates[0] || { reason: 'READY', until: 0 };
 }
 
 export class CoreCommandDispatcher {
@@ -756,84 +665,6 @@ export class CoreCommandDispatcher {
     }
   }
   async execute(command, payload = {}, internal = {}) {
-    if (command === CoreCommand.LIST_OUTCOME_CONTRACTS) {
-      const exactPayload = snapshotExactOutcomeCommandPayload(
-        payload,
-        OUTCOME_LIST_PAYLOAD_KEYS,
-        'OutcomeContract LIST command payload',
-      );
-      const state = await this.repo.load();
-      return { contracts: structuredClone(listStoredOutcomeContractsV1(state, { projectId: exactPayload.projectId })) };
-    }
-    if (command === CoreCommand.GET_OUTCOME_CONTRACT) {
-      const exactPayload = snapshotExactOutcomeCommandPayload(
-        payload,
-        OUTCOME_GET_PAYLOAD_KEYS,
-        'OutcomeContract GET command payload',
-      );
-      const state = await this.repo.load();
-      return { contract: structuredClone(resolveStoredOutcomeContractV1(state, {
-        projectId: exactPayload.projectId,
-        contractId: exactPayload.contractId,
-        expectedRevision: exactPayload.expectedRevision,
-      })) };
-    }
-    if (command === CoreCommand.CREATE_OUTCOME_CONTRACT) {
-      const exactPayload = snapshotExactOutcomeCommandPayload(
-        payload,
-        OUTCOME_CREATE_PAYLOAD_KEYS,
-        'OutcomeContract CREATE command payload',
-      );
-      const canonicalContract = normalizeOutcomeContractV1(exactPayload.contract);
-      let created;
-      await this.repo.update(draft => {
-        created = createStoredOutcomeContractV1(draft, canonicalContract);
-        return draft;
-      });
-      return { contract: structuredClone(created) };
-    }
-    if (command === CoreCommand.UPDATE_OUTCOME_CONTRACT) {
-      const exactPayload = snapshotExactOutcomeCommandPayload(
-        payload,
-        OUTCOME_UPDATE_PAYLOAD_KEYS,
-        'OutcomeContract UPDATE command payload',
-      );
-      const canonicalContract = normalizeOutcomeContractV1(exactPayload.contract);
-      let updated;
-      await this.repo.update(draft => {
-        updated = updateStoredOutcomeContractV1(draft, {
-          projectId: exactPayload.projectId,
-          contractId: exactPayload.contractId,
-          expectedRevision: exactPayload.expectedRevision,
-          contract: canonicalContract,
-        });
-        return draft;
-      });
-      return { contract: structuredClone(updated) };
-    }
-    if (command === CoreCommand.DELETE_OUTCOME_CONTRACT) {
-      const exactPayload = snapshotExactOutcomeCommandPayload(
-        payload,
-        OUTCOME_DELETE_PAYLOAD_KEYS,
-        'OutcomeContract DELETE command payload',
-      );
-      let deleted;
-      await this.repo.update(draft => {
-        deleted = deleteStoredOutcomeContractV1(draft, {
-          projectId: exactPayload.projectId,
-          contractId: exactPayload.contractId,
-          expectedRevision: exactPayload.expectedRevision,
-        });
-        return draft;
-      });
-      return {
-        deleted: {
-          projectId: deleted.projectId,
-          contractId: deleted.contractId,
-          revision: deleted.revision,
-        },
-      };
-    }
     if (command === CoreCommand.RESOLVE_UNCERTAIN) {
       const state = await this.repo.update(draft => {
         const session = requireSession(draft, payload.sessionId);
@@ -890,21 +721,39 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
       const ms = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
-      return { rateLimitCooldownMinutes: Math.round(ms / 60000) };
+      const concurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
+      return {
+        rateLimitCooldownMinutes: Math.round(ms / 60000),
+        maxConcurrentSessionOperations: Number.isInteger(concurrency) ? Math.max(1, Math.min(1000, concurrency)) : 10,
+      };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
-      const minutes = Number(payload.rateLimitCooldownMinutes);
-      const ms = minutes * 60000;
-      if (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS) {
+      const hasCooldown = payload.rateLimitCooldownMinutes !== undefined;
+      const hasConcurrency = payload.maxConcurrentSessionOperations !== undefined;
+      const minutes = hasCooldown ? Number(payload.rateLimitCooldownMinutes) : null;
+      const ms = hasCooldown ? minutes * 60000 : null;
+      const concurrency = hasConcurrency ? Number(payload.maxConcurrentSessionOperations) : null;
+      if (hasCooldown && (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS)) {
         throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
-      await this.repo.update(draft => {
-        draft.profile.rateLimitCooldownMs = ms;
-        draft.profile.rateLimitReservePolicyVersion = 1;
-        if (ms === 0) draft.profile.rateLimitUntil = 0;
+      if (hasConcurrency && (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 1000)) {
+        throw new Error('Maximum concurrent Session operations must be a whole number from 1 to 1000');
+      }
+      const state = await this.repo.update(draft => {
+        if (hasCooldown) {
+          draft.profile.rateLimitCooldownMs = ms;
+          draft.profile.rateLimitReservePolicyVersion = 1;
+          if (ms === 0) draft.profile.rateLimitUntil = 0;
+        }
+        if (hasConcurrency) draft.profile.maxConcurrentSessionOperations = concurrency;
         return draft;
       });
-      return { rateLimitCooldownMinutes: minutes };
+      const storedMs = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
+      const storedConcurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
+      return {
+        rateLimitCooldownMinutes: Math.round(storedMs / 60000),
+        maxConcurrentSessionOperations: Number.isInteger(storedConcurrency) ? Math.max(1, Math.min(1000, storedConcurrency)) : 10,
+      };
     }
     if (command === CoreCommand.GET_LOCAL_AI_SETTINGS) {
       const state = await this.repo.load();
@@ -964,202 +813,55 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
-      if (Object.hasOwn(payload, 'agentModelOrchestratorEnvelope')) {
-        throw new Error('Agent model orchestrator envelope is internal-only');
-      }
-      const internalEnvelopeDescriptor = internal == null
-        ? undefined
-        : Object.getOwnPropertyDescriptor(Object(internal), 'agentModelOrchestratorEnvelope');
-      if (internalEnvelopeDescriptor
-          && (internalEnvelopeDescriptor.enumerable !== true
-            || !Object.hasOwn(internalEnvelopeDescriptor, 'value'))) {
-        throw new Error('Agent model orchestrator envelope must be an enumerable own data property');
-      }
-      const internalEnvelopeValue = internalEnvelopeDescriptor?.value;
-      const internalEnvelope = internalEnvelopeValue === undefined
-        ? null
-        : normalizeBoundAgentModelOrchestratorEnvelopeV1(internalEnvelopeValue);
-      let internalImageDataUrl = '';
-      let internalPrompt = '';
-      let internalSystemPrompt = '';
-      let internalMaxOutputTokens = 0;
-      let internalMaxModelCallsForRequest = 0;
-      if (internalEnvelope) {
-        for (const alias of [
-          'settings','routerOverride','routerRuntime','isolatedRuntime',
-          'forceStrong','taskRole','strongTaskRole','capabilityIds',
-        ]) {
-          if (Object.hasOwn(payload, alias)) {
-            throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
-          }
-        }
-        const promptDescriptor = Object.getOwnPropertyDescriptor(payload, 'prompt');
-        if (!promptDescriptor
-            || promptDescriptor.enumerable !== true
-            || !Object.hasOwn(promptDescriptor, 'value')
-            || typeof promptDescriptor.value !== 'string') {
-          throw new Error('Agent model invocation prompt must be an enumerable own text data property');
-        }
-        if (promptDescriptor.value.length > 100_000) {
-          throw new Error('Agent model invocation prompt exceeds the durable Browser Agent input-budget bound');
-        }
-        const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
-        if (systemPromptDescriptor
-            && (systemPromptDescriptor.enumerable !== true
-              || !Object.hasOwn(systemPromptDescriptor, 'value')
-              || typeof systemPromptDescriptor.value !== 'string')) {
-          throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
-        }
-        if ((systemPromptDescriptor?.value ?? '').length > 50_000) {
-          throw new Error('Agent model invocation systemPrompt exceeds the durable Browser Agent input-budget bound');
-        }
-        const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
-        const boundedOutputTokens = maxOutputTokensDescriptor?.value;
-        if (!maxOutputTokensDescriptor
-            || maxOutputTokensDescriptor.enumerable !== true
-            || !Object.hasOwn(maxOutputTokensDescriptor, 'value')
-            || typeof boundedOutputTokens !== 'number'
-            || !Number.isSafeInteger(boundedOutputTokens)
-            || Object.is(boundedOutputTokens, -0)
-            || boundedOutputTokens < 1) {
-          throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
-        }
-        const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
-        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
-        if (maxModelCallsDescriptor
-            && (maxModelCallsDescriptor.enumerable !== true
-              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
-              || typeof maxModelCallsForRequest !== 'number'
-              || !Number.isSafeInteger(maxModelCallsForRequest)
-              || Object.is(maxModelCallsForRequest, -0)
-              || maxModelCallsForRequest < 0)) {
-          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
-        }
-        internalPrompt = promptDescriptor.value;
-        internalSystemPrompt = systemPromptDescriptor?.value ?? '';
-        internalMaxOutputTokens = boundedOutputTokens;
-        internalMaxModelCallsForRequest = maxModelCallsForRequest;
-        const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
-        if (imageDescriptor
-            && (imageDescriptor.enumerable !== true
-              || !Object.hasOwn(imageDescriptor, 'value'))) {
-          throw new Error('Agent model invocation imageDataUrl must be an enumerable own data property');
-        }
-        const imageDataUrl = imageDescriptor?.value ?? '';
-        if (typeof imageDataUrl !== 'string' || imageDataUrl !== imageDataUrl.trim()) {
-          throw new Error('Agent model invocation imageDataUrl must already be canonical text');
-        }
-        if ((imageDataUrl.length > 0) !== internalEnvelope.requiresVision) {
-          throw new Error('Agent model image input does not match durable requiresVision intent');
-        }
-        internalImageDataUrl = imageDataUrl;
-      }
-      let internalProviderBudgetContext = null;
-      if (internalEnvelope) {
-        const budgetDescriptor = internal == null
-          ? undefined
-          : Object.getOwnPropertyDescriptor(Object(internal), 'providerCallBudgetContext');
-        if (!budgetDescriptor
-            || budgetDescriptor.enumerable !== true
-            || !Object.hasOwn(budgetDescriptor, 'value')) {
-          throw new Error('Agent model provider budget context must be an enumerable own data property');
-        }
-        internalProviderBudgetContext = budgetDescriptor.value;
-      }
-      const providerCallBudgetContext = internalEnvelope
-        ? normalizeInternalAgentProviderBudgetContext(
-          internalProviderBudgetContext,
-          internalEnvelope.jobId,
-        )
-        : internal?.providerCallBudgetContext || null;
-
-      const routerOverride = internalEnvelope
-        ? null
-        : Object.hasOwn(payload, 'routerOverride') && payload.routerOverride != null
-          ? snapshotAiRouterOverride(payload.routerOverride)
-          : null;
       const state = await this.repo.load();
-      if (internalEnvelope) {
-        const invocationNow = this.now();
-        if (typeof invocationNow !== 'number'
-            || !Number.isSafeInteger(invocationNow)
-            || Object.is(invocationNow, -0)
-            || invocationNow < internalEnvelope.revalidatedAt) {
-          throw new Error('Agent model invocation time is stale or invalid');
+      // The bound Agent envelope is advisory, not an alternative provider
+      // authority. Only an internal owner-budget context may admit it, and the
+      // canonical AiOrchestrator still validates the durable reservation.
+      const envelope = internal?.agentModelOrchestratorEnvelope
+        ? normalizeBoundAgentModelOrchestratorEnvelopeV1(internal.agentModelOrchestratorEnvelope)
+        : null;
+      if (envelope) {
+        if (internal?.providerCallBudgetContext?.kind !== 'browser-agent'
+            || internal.providerCallBudgetContext.jobId !== envelope.jobId
+            || !this.aiOrchestrator.providerCallLifecycle) {
+          throw new Error('Bound Agent model envelope requires an exact owner-budget provider lifecycle');
         }
-        const currentSettings = normalizeAiRouterSettings(
-          state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
-        );
-        if (currentSettings.enabled !== true) {
-          throw new Error('Current canonical AI Router is disabled before Agent model invocation');
-        }
-        const currentRoute = currentSettings.routes.find(
-          route => route.routeId === internalEnvelope.routeId,
-        );
-        const envelopeRoute = internalEnvelope.settings.routes[0];
-        if (currentSettings.gatewayUrl !== internalEnvelope.settings.gatewayUrl) {
-          throw new Error('Agent model Gateway identity drifted before provider invocation');
-        }
-        if (!currentRoute
-            || currentRoute.provider !== envelopeRoute.provider
-            || currentRoute.model !== envelopeRoute.model
-            || currentRoute.endpointId !== envelopeRoute.endpointId) {
-          throw new Error('Agent model route identity drifted before provider invocation');
-        }
-        const currentRuntime = normalizeAiRouterRuntime(
-          state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
-        );
-        const currentCandidates = selectAiRouteCandidates({
-          routes: currentSettings.routes,
-          policy: currentSettings.routePolicy,
-          routeStates: currentRuntime.routeStates,
-          role: internalEnvelope.role,
-          capabilityIds: internalEnvelope.capabilityIds,
-          requiresVision: internalEnvelope.requiresVision,
-          now: invocationNow,
-        });
-        if (!currentCandidates.candidates.some(
-          route => route.routeId === internalEnvelope.routeId,
-        )) {
-          throw new Error('Agent model route is no longer authorized by current canonical Router');
+        if (payload.settings || payload.routerOverride || payload.routerRuntime
+            || payload.forceStrong === true
+            || (payload.taskRole && payload.taskRole !== envelope.role)
+            || (Array.isArray(payload.capabilityIds)
+                && JSON.stringify(payload.capabilityIds) !== JSON.stringify(envelope.capabilityIds))
+            || (payload.imageDataUrl && envelope.requiresVision !== true)) {
+          throw new Error('Bound Agent model envelope cannot widen the admitted route, role or capability scope');
         }
       }
-      const baseSettings = internalEnvelope
-        ? internalEnvelope.settings
-        : normalizeAiRouterSettings(
-          payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
-        );
-      const settings = internalEnvelope
+      const baseSettings = envelope
+        ? envelope.settings
+        : normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+      const settings = envelope
         ? baseSettings
-        : routerOverride
-          ? mergeAiRouterSettingsOverride(baseSettings, routerOverride)
+        : payload.routerOverride
+          ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
           : baseSettings;
-      const isolatedRuntime = internalEnvelope ? true : payload.isolatedRuntime === true;
-      const runtime = internalEnvelope
-        ? internalEnvelope.runtime
+      const isolatedRuntime = envelope ? true : payload.isolatedRuntime === true;
+      const runtime = envelope
+        ? envelope.runtime
         : isolatedRuntime
           ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
           : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
-        result = await this.aiOrchestrator.run(
-          settings,
-          runtime,
-          internalEnvelope ? internalPrompt : payload.prompt,
-          {
-          systemPrompt: internalEnvelope ? internalSystemPrompt : payload.systemPrompt || '',
-          forceStrong: internalEnvelope ? false : payload.forceStrong === true,
-          maxOutputTokens: internalEnvelope ? internalMaxOutputTokens : Number(payload.maxOutputTokens || 0),
-          maxModelCallsForRequest: internalEnvelope
-            ? internalMaxModelCallsForRequest
-            : Number(payload.maxModelCallsForRequest || 0),
-          imageDataUrl: internalEnvelope ? internalImageDataUrl : payload.imageDataUrl || '',
-          taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
-          strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
-          capabilityIds: internalEnvelope
-            ? [...internalEnvelope.capabilityIds]
+        result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
+          systemPrompt: payload.systemPrompt || '',
+          forceStrong: payload.forceStrong === true,
+          maxOutputTokens: Number(payload.maxOutputTokens || 0),
+          maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
+          imageDataUrl: payload.imageDataUrl || '',
+          taskRole: envelope?.role || payload.taskRole || 'planner',
+          strongTaskRole: payload.strongTaskRole || 'verifier',
+          capabilityIds: envelope ? envelope.capabilityIds
             : Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
-          providerCallBudgetContext,
+          providerCallBudgetContext: internal?.providerCallBudgetContext || null,
         });
       } catch (error) {
         if (!isolatedRuntime && error?.routerRuntime) {
@@ -1168,6 +870,9 @@ export class CoreCommandDispatcher {
             const failureRuntime = normalizeAiRouterRuntime(error.routerRuntime);
             current.routeStates = failureRuntime.routeStates;
             current.lastRouteId = failureRuntime.lastRouteId;
+            current.lastProvider = failureRuntime.lastProvider;
+            current.lastModel = failureRuntime.lastModel;
+            current.lastEndpointId = failureRuntime.lastEndpointId;
             current.lastFailoverChain = failureRuntime.lastFailoverChain;
             draft.profile.aiRouterRuntime = current;
             return draft;
@@ -1198,8 +903,12 @@ export class CoreCommandDispatcher {
         }
         current.lastRoute = result.route || current.lastRoute;
         current.routeStates = normalizeAiRouterRuntime(result.runtime).routeStates;
-        current.lastRouteId = result.runtime?.lastRouteId || current.lastRouteId;
-        current.lastFailoverChain = normalizeAiRouterRuntime(result.runtime).lastFailoverChain;
+        const resultRuntime = normalizeAiRouterRuntime(result.runtime);
+        current.lastRouteId = resultRuntime.lastRouteId;
+        current.lastProvider = resultRuntime.lastProvider;
+        current.lastModel = resultRuntime.lastModel;
+        current.lastEndpointId = resultRuntime.lastEndpointId;
+        current.lastFailoverChain = resultRuntime.lastFailoverChain;
         draft.profile.aiRouterRuntime = current;
         result.runtime = structuredClone(current);
         return draft;
@@ -1339,6 +1048,7 @@ export class CoreCommandDispatcher {
         replacement.successfulSendCount=old.successfulSendCount||0;
         replacement.completedAt=old.completedAt||0;
         replacement.createdAt=old.createdAt;
+        replacement.tabWindowId=old.tabWindowId;
         replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
         replacement.onePassCompletedCount=Math.min(logicalTaskCount(replacement), Number(old.onePassCompletedCount ?? old.onePassCompletedTaskIds?.length ?? 0));
         for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}

@@ -1,0 +1,20 @@
+Пілот 11.0.7 High — QA, 2026-10-01T16:25:46+02:00
+
+PASS: 703 Scenario/Core/Interaction/UI/Release regression checks. Після додаткового login guard окремо PASS49 focused checks. Integration68/68 PASS. Набори перетинаються; це не сума унікальних тестів.
+
+Нові поведінкові перевірки:
+- Scenario optimistic user bubble без generation не дає SENT_VERIFIED навіть під час VERIFY_AFTER_UNCERTAIN_SUBMIT.
+- URL-only generation із відсутнім поточним повідомленням не дає Scenario SENT_VERIFIED.
+- One physical submit переходить із provisional URL на canonical URL і підтверджується після стабільної адреси та generation.
+- Production probe + production DOM adapter читають поточну own tab за точним APSTEP marker після зміни URL; wrong marker не підтверджує відповідь; stale SAME_URL_RELOAD не навігує, не перезавантажує й не створює вкладок.
+- Manager/Core integration:5 verified scenario tabs змінюють URL після Send;5 markers дозволяють зберегти фактичні task/operation/hint identities та completed turn, фізичні tab IDs зберігаються.
+- Correlated read login guard повідомляє AUTH_REQUIRED і не виконує recovery navigation.
+- Response diagnostics включають actual tab ID та скорочений observed URL.
+
+Retained proof:15 slots ×3 messages =45 verified Sends/45 completedResponses, concurrency3, restart і чужий focused window.5×17×2=170 sends. Ordinary open-close35+ sends, failed close/restart, queue deadlines іhard35/45-minute timeout перевірені.
+
+Live report11.0.6:196 events;6 SEND_VERIFIED_OPERATION_LOCAL_APPEND;0 confirmed assistant responses;4 REPORT_URL_MISMATCH;41 CONVERSATION_IDENTITY_LOST;5 SAME_URL_RELOAD_STARTED;1 physical timeout/replacement. Latest replacement has STEP_MARKER/userCount1, earlier reads lose identity. Звіт не містить фактичних observed URLs для response probes, тому неможливо довести конкретну причину зміни адреси або доставку всіх6 повідомлень серверу. Відтворено й усунуто code path, що навігував живу вкладку на непідтверджений старий URL. Це не доказ, що сервер завжди змінює optimistic ID.
+
+Тести використовують model Chrome/DOM і production code. Фізичний Windows/Chrome/NVDA, real ChatGPT/server delivery не кваліфіковано. Independent generation signal — DOM evidence, not a server/network receipt. Старі positive counters11.0.6 не переписуються навмання. Whole Agent qualification gaps залишаються зафіксованими.
+
+Archive verification: CRC, all 227 JS syntax, import closure and byte equality to source PASS. Rebuild is byte-identical.

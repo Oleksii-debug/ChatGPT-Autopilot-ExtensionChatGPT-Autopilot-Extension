@@ -9,7 +9,9 @@
   const existing = root[listenerKey];
   if (existing?.runtime === runtime) {
     try {
-      if (!runtime.onMessage.hasListener || runtime.onMessage.hasListener(existing.listener)) return;
+      if (existing.adapter === adapter
+          && (!runtime.onMessage.hasListener || runtime.onMessage.hasListener(existing.listener))) return;
+      runtime.onMessage.removeListener?.(existing.listener);
     } catch (_) {
       // A stale extension runtime can throw after an unpacked extension reload.
       // Continue and install one listener through the current runtime object.
@@ -354,6 +356,16 @@
           return await adapter.execute(request, {
             insert: () => nativeInput('insert'),
             submit: point => nativeInput('submit', point),
+            checkpointSubmit: async () => {
+              const response = await runtime.sendMessage({
+                channel: 'autopilot-dom-submit-checkpoint', requestId: request.requestId, taskId: request.taskId,
+              });
+              if (!response?.ok) {
+                const error = new Error('DOM Send checkpoint failed');
+                error.safeDiagnosticCode = response?.error?.safeDiagnosticCode || 'DOM_SUBMIT_CHECKPOINT_FAILED';
+                throw error;
+              }
+            },
             activate: async ({ observationOnly = false } = {}) => {
               const response = await runtime.sendMessage({
                 channel:'autopilot-send-tab-activation',
@@ -386,5 +398,5 @@
   };
 
   runtime.onMessage.addListener(listener);
-  root[listenerKey] = { runtime, listener };
+  root[listenerKey] = { runtime, adapter, listener };
 })(globalThis);

@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  createAgentDefinitionRegistryV1,
   materializeAgentDefinitionV1,
   selectAgentDefinitionV1,
 } from '../src/core/agent-definition-registry.js';
@@ -84,12 +83,12 @@ function definition(overrides = {}) {
 }
 
 function registry(definitionOverrides = {}) {
-  return createAgentDefinitionRegistryV1({
+  return {
     schemaVersion: 1,
     registryId: 'agents:project.alpha',
     revision: 6,
     definitions: [definition(definitionOverrides)],
-  });
+  };
 }
 
 function selection(definitionOverrides = {}) {
@@ -437,26 +436,6 @@ test('same-revision authority route ordering drift fails closed', () => {
     })),
     /authority route order drifted/u,
   );
-});
-
-test('bound readiness supports verifier-only work without requiring planner eligibility', () => {
-  const verifierOnlyRoutes = pool().map(item => (
-    item.routeId === 'route.a' || item.routeId === 'route.b'
-      ? { ...item, roles: ['verifier'] }
-      : item
-  ));
-  const result = inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
-    routes: verifierOnlyRoutes,
-    requiresPlanner: false,
-    requiresVerifier: true,
-    verifierCapabilityIds: ['cap.reason'],
-  }));
-
-  assert.equal(result.readiness.state, AgentRouteReadinessState.READY);
-  assert.equal(result.readiness.requiresPlanner, false);
-  assert.equal(result.readiness.requiresVerifier, true);
-  assert.deepEqual(result.readiness.planner.availableRouteIds, []);
-  assert.deepEqual(result.readiness.verifier.availableRouteIds, ['route.b', 'route.a']);
 });
 
 test('routes outside durable effectiveRouteIds cannot make an otherwise unavailable Agent ready', () => {

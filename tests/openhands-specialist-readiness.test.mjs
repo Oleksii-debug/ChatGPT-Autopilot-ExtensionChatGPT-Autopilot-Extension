@@ -41,7 +41,6 @@ function selection(overrides = {}) {
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 4,
-    registryBindingKey: 'registry-binding:openhands-test',
     specialistId: 'openhands-coding',
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     definitionRevision: 2,
@@ -384,7 +383,6 @@ test('binding rejects another provider identity and caller authority fields befo
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 1,
-    registryBindingKey: 'registry-binding:openhands-direct',
     specialistId: 'openhands-coding',
     providerId: 'provider.other',
     definitionRevision: 1,
@@ -394,10 +392,6 @@ test('binding rejects another provider identity and caller authority fields befo
     asOf: '2026-09-27T13:00:00.025Z',
   };
   await assert.rejects(binding.resolveReadiness(request), /targets another provider/u);
-  await assert.rejects(
-    binding.resolveReadiness({ ...request, registryBindingKey: '' }),
-    /registryBindingKey is invalid/u,
-  );
   assert.equal(probes, 0);
 
   await assert.rejects(
@@ -456,7 +450,6 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     schemaVersion: 1,
     registryId: 'registry:openhands',
     registryRevision: 1,
-    registryBindingKey: 'registry-binding:openhands-direct',
     specialistId: 'openhands-coding',
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     definitionRevision: 1,
@@ -482,4 +475,51 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     }),
     /maxAgeMs is invalid/u,
   );
+});
+
+test('Plan 8 integration: OpenHands readiness admits absent legacy binding, rejects present corrupt binding', async () => {
+  const observations = [];
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client: {
+      async probe() { observations.push('read-only probe'); },
+    },
+    now: monotonicNow([T0, T1]),
+  });
+  const request = {
+    schemaVersion: 1,
+    registryId: 'registry:openhands',
+    registryRevision: 4,
+    specialistId: 'openhands-coding',
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    definitionRevision: 2,
+    executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
+    requestedToolIds: [],
+    asOf: new Date(T0).toISOString(),
+  };
+  const legacy = await binding.resolveReadiness(request);
+  assert.equal(legacy.providerStates[0].health, 'READY');
+  const rebound = await binding.resolveReadiness({
+    ...JSON.parse(JSON.stringify(request)),
+    registryBindingKey: 'registry-binding:v1',
+  });
+  assert.equal(rebound.providerStates[0].health, 'READY');
+  assert.deepEqual(observations, ['read-only probe', 'read-only probe']);
+
+  for (const registryBindingKey of [undefined, null, '', false, 0, ' bad']) {
+    await assert.rejects(
+      binding.resolveReadiness({ ...request, registryBindingKey }),
+      /registryBindingKey/u,
+    );
+  }
+  let getterCalls = 0;
+  const hostile = { ...request };
+  Object.defineProperty(hostile, 'registryBindingKey', {
+    enumerable: true,
+    get() { getterCalls += 1; throw new Error('secret getter'); },
+  });
+  await assert.rejects(binding.resolveReadiness(hostile), /data property/u);
+  assert.equal(getterCalls, 0);
+  assert.equal(observations.length, 2, 'rejected bindings cannot trigger provider probes');
 });

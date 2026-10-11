@@ -34,5 +34,39 @@ test('interaction BUSY advances fairly without cooldown', () => { const s=sessio
 test('temporary and rate-limited interaction results use the configured backoff without send success', () => { const s=session(1,{retryBackoffMs:30000}); s.runState=RunState.RUNNING; assert.equal(applyInteractionResult(s,0,{status:InteractionResult.TEMPORARY_ERROR},{now:100}).retryAt,30100); assert.equal(applyInteractionResult(s,0,{status:InteractionResult.RATE_LIMITED},{now:200}).retryAt,300200); assert.equal(s.lastSuccessfulSendAt,0); });
 test('uncertain submit enters recovery and never advances cursor/cooldown', () => { const s=session(2); s.runState=RunState.RUNNING; beginOperation(s,{operationId:'op',taskId:'t1',promptFingerprint:'fp',targetUrl:s.tasksById.t1.url,now:10}); markSubmitting(s,20); const out=applyInteractionResult(s,0,{status:InteractionResult.SUBMISSION_UNCERTAIN},{now:30}); assert.equal(out.action,'RECOVER_BEFORE_RESEND'); assert.equal(s.runState,RunState.RECOVERING); assert.equal(s.operation.phase,OperationPhase.AMBIGUOUS); assert.equal(s.currentTaskIndex,0); assert.equal(s.nextAllowedSendAt,0); });
 test('verified interaction result advances once and records fingerprint', () => { const s=session(2,{minimumSendIntervalMs:1000}); s.runState=RunState.RUNNING; beginOperation(s,{operationId:'op',taskId:'t1',promptFingerprint:'fp',targetUrl:s.tasksById.t1.url,now:10}); applyInteractionResult(s,0,{status:InteractionResult.SENT_VERIFIED},{now:50,promptFingerprint:'fp'}); assert.equal(s.currentTaskIndex,1); assert.equal(s.nextAllowedSendAt,1050); assert.equal(s.tasksById.t1.lastVerifiedFingerprint,'fp'); assert.equal(s.operation.phase,OperationPhase.SENT_VERIFIED); });
+test('fresh launch generation proof is cleared when another prompt begins', () => { const s=session(2); s.runState=RunState.RUNNING; applyInteractionResult(s,0,{status:InteractionResult.SENT_VERIFIED,submissionEvidence:'FRESH_CONVERSATION_GENERATION_STARTED',assistantBaselineCount:0},{now:50}); assert.equal(s.tasksById.t1.lastFreshConversationGenerationVerified,true); applyInteractionResult(s,0,{status:InteractionResult.INSERTED_NOT_SENT},{now:60}); assert.equal(s.tasksById.t1.lastFreshConversationGenerationVerified,false); });
 test('production dispatcher fails closed before durable runner is available', async () => { let db={}; const chrome={storage:{local:{get:async k=>({[k]:db[k]}),set:async rec=>Object.assign(db,rec)}}}; const repo=new StorageRepository(chrome); const core=new CoreCommandDispatcher(repo,()=>1000,{executionAvailable:false}); const created=await core.execute(CoreCommand.CREATE_SESSION,{config:{id:'blocked',name:'Blocked',tasks:[{id:'t',url:'https://chatgpt.com/c/blocked'}],sharedPrompt:'continue'}}); await assert.rejects(()=>core.execute(CoreCommand.START_SESSION,{sessionId:created.session.id}),new RegExp(EXECUTION_UNAVAILABLE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'))); assert.equal((await core.execute(CoreCommand.GET_SESSION,{sessionId:'blocked'})).session.runState,RunState.STOPPED); });
 test('cold start pauses persisted active state when runner is unavailable', () => { const state=createEmptyState(0); const active=session(1); active.runState=RunState.RUNNING; const stopped=createSession({id:'stopped',name:'Stopped',tasks:[createTask({id:'st',url:'https://chatgpt.com/c/st'})],now:0}); state.sessionsById={s:active,stopped}; state.sessionOrder=['s','stopped']; suspendActiveSessionsWhenExecutionUnavailable(state,100); assert.equal(active.runState,RunState.PAUSED); assert.equal(active.lastError,EXECUTION_UNAVAILABLE_MESSAGE); assert.equal(stopped.runState,RunState.STOPPED); assert.equal(computeNextWake(state,100),null); });
+
+
+test('profile settings preserve concurrency independently from rate-limit cooldown', async () => {
+  let db = {};
+  const chrome = { storage: { local: {
+    get: async key => ({ [key]: db[key] }),
+    set: async record => Object.assign(db, record),
+  } } };
+  const core = new CoreCommandDispatcher(new StorageRepository(chrome), () => 1000);
+
+  const initial = await core.execute(CoreCommand.GET_PROFILE_SETTINGS);
+  assert.equal(initial.maxConcurrentSessionOperations, 10);
+
+  const changed = await core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, {
+    maxConcurrentSessionOperations: 17,
+  });
+  assert.equal(changed.maxConcurrentSessionOperations, 17);
+  assert.equal((await core.execute(CoreCommand.GET_PROFILE_SETTINGS)).maxConcurrentSessionOperations, 17);
+
+  await core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { rateLimitCooldownMinutes: 6 });
+  const afterCooldown = await core.execute(CoreCommand.GET_PROFILE_SETTINGS);
+  assert.equal(afterCooldown.rateLimitCooldownMinutes, 6);
+  assert.equal(afterCooldown.maxConcurrentSessionOperations, 17);
+
+  await assert.rejects(
+    () => core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { maxConcurrentSessionOperations: 0 }),
+    /1 to 1000/,
+  );
+  await assert.rejects(
+    () => core.execute(CoreCommand.UPDATE_PROFILE_SETTINGS, { maxConcurrentSessionOperations: 1001 }),
+    /1 to 1000/,
+  );
+});

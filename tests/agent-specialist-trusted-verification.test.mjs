@@ -200,51 +200,6 @@ test('completed specialist becomes AgentPlan VERIFIED only through trusted canon
   assert.equal(lookup.expectedOutcome, 'EFFECT_VERIFIED');
 });
 
-test('trusted EFFECT_VERIFIED record cannot complete an expired owned specialist lease', async () => {
-  const { assignment, ownership } = initial();
-  const claimed = claimAgentPlanSpecialistHandoffsV1(
-    plan(),
-    [assignment],
-    { executionOwnerships: [ownership], availableSlots: 1, leaseSeconds: 90, at: T0 },
-  );
-  const agentId = claimed.claimed[0];
-  const leaseId = claimed.assignments[0].leaseId;
-  const completed = completeAgentPlanSpecialistHandoffV1(
-    claimed.plan,
-    claimed.assignments,
-    {
-      executionOwnerships: claimed.executionOwnerships,
-      agentId,
-      leaseId,
-      resultArtifactIds: ['artifact:archive'],
-      at: T1,
-    },
-  );
-
-  let resolverCalls = 0;
-  await assert.rejects(
-    verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
-      completed.plan,
-      completed.assignments,
-      {
-        executionOwnerships: completed.executionOwnerships,
-        agentId,
-        leaseId,
-        verificationId: 'verification-specialist-1',
-        at: T3,
-      },
-      {
-        resolveTrustedExecutionVerificationRecord: async () => {
-          resolverCalls += 1;
-          return trustedRecord({ executionId: leaseId });
-        },
-      },
-    ),
-    /lease has expired and requires reconciliation/,
-  );
-  assert.equal(resolverCalls, 0);
-});
-
 test('trusted completion must hash-cover every reported specialist result artifact', async () => {
   const { assignment, ownership } = initial();
   const claimed = claimAgentPlanSpecialistHandoffsV1(

@@ -15,24 +15,31 @@ export const SpecialistRegistryMutationKind = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const PLANES = new Set(Object.values(AgentExecutionPlane));
 const DEF_KEYS = new Set(['schemaVersion','specialistId','providerId','label','description','executionPlane','capabilityIds','toolIds','resultContractId','enabled','definitionRevision']);
-const REG_KEYS = new Set(['schemaVersion','registryId','revision','bindingKey','definitions']);
+const REG_KEYS = new Set(['schemaVersion','registryId','revision','definitions']);
 const DISC_KEYS = new Set(['registry','requiredCapabilityIds','requiredToolIds','parentCapabilityIds','parentToolIds','executionPlanes']);
 const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','registryBindingKey','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
-const BIND_KEYS = new Set(['registry','expectedRegistryBindingKey','selection','handoff','parentCapabilityIds','parentToolIds']);
+const BIND_KEYS = new Set(['registry','selection','handoff','parentCapabilityIds','parentToolIds']);
 const MUTATION_KEYS = new Set([
-  'registry', 'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
+  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
 const MUTATION_KINDS = new Set(Object.values(SpecialistRegistryMutationKind));
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' must be a plain data object');
-  const proto = Object.getPrototypeOf(value);
+  let proto;
+  let descriptors;
+  try {
+    proto = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    // Lower-trust Proxy reflection errors may contain account data or secrets.
+    throw new Error(label + ' cannot be inspected safely');
+  }
   if (proto !== Object.prototype && proto !== null) throw new Error(label + ' must be a plain data object');
-  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(label + ' contains unknown field: ' + String(key));
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(label + ' contains unknown field');
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + '.' + key + ' must be an enumerable own data property');
@@ -43,10 +50,19 @@ function record(value, allowed, label) {
 }
 
 function denseArray(value, label, max, min = 0) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error(label + ' must be a canonical array');
-  const descriptors = Object.getOwnPropertyDescriptors(value);
+  let isArray;
+  let proto;
+  let descriptors;
+  try {
+    isArray = Array.isArray(value);
+    proto = isArray ? Object.getPrototypeOf(value) : null;
+    descriptors = isArray ? Object.getOwnPropertyDescriptors(value) : null;
+  } catch {
+    throw new Error(label + ' cannot be inspected safely');
+  }
+  if (!isArray || proto !== Array.prototype) throw new Error(label + ' must be a canonical array');
   const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < min || length > max) throw new Error(label + ' has invalid length');
+  if (!Number.isSafeInteger(length) || Object.is(length, -0) || length < min || length > max) throw new Error(label + ' has invalid length');
   const expected = new Set(['length', ...Array.from({length}, (_, index) => String(index))]);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !expected.has(key)) throw new Error(label + ' contains non-canonical array fields');
@@ -66,9 +82,33 @@ function id(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(label + ' must use exact canonical identity representation');
   return value;
 }
+// Labels/descriptions cross both persisted JSON and accessible owner-facing UI.
+// Bidi controls, hidden separators and unpaired UTF-16 code units can change
+// their appearance or identity after serialization; never publish them.
+// Additional visually empty Unicode characters can spoof specialist identity
+// without appearing as an ASCII control or a bidi formatting character.
+// Preserve legitimate Arabic/Hangul script, ordinary spaces and emoji.
+const UNSAFE_SPECIALIST_TEXT = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F-\u1160\u180E\u200B-\u200F\u2028-\u202E\u2060-\u206F\u3164\uFEFF\uFFA0]/u;
+function hasUnpairedSurrogate(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xD800 && unit <= 0xDBFF) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xDC00 && next <= 0xDFFF)) return true;
+      index += 1;
+    } else if (unit >= 0xDC00 && unit <= 0xDFFF) {
+      return true;
+    }
+  }
+  return false;
+}
 function text(value, label, max, optional = false) {
   if ((value === undefined || value === '') && optional) return '';
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max || value.includes('\0')) throw new Error(label + ' must be exact bounded text');
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max
+      || UNSAFE_SPECIALIST_TEXT.test(value) || hasUnpairedSurrogate(value)
+      || (label === 'label' && /[\t\n]/u.test(value))) {
+    throw new Error(label + ' must be exact bounded text');
+  }
   return value;
 }
 function integer(value, label) {
@@ -100,30 +140,11 @@ function planes(value) {
 function subset(requested, allowed, label) {
   const set = new Set(allowed);
   const missing = requested.filter(item => !set.has(item));
-  if (missing.length) throw new Error(label + ' exceeds parent or specialist authority: ' + missing.join(', '));
+  // Capability/tool identities are lower-trust input. Deny without echoing caller-supplied IDs.
+  if (missing.length) throw new Error(label + ' exceeds parent or specialist authority');
 }
 function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
-function exactBindingKey(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) throw new Error(label + ' is invalid');
-  return value;
-}
-function definitionProjection(definition) {
-  return [
-    definition.schemaVersion, definition.specialistId, definition.providerId,
-    definition.label, definition.description, definition.executionPlane,
-    definition.capabilityIds, definition.toolIds, definition.resultContractId,
-    definition.enabled, definition.definitionRevision,
-  ];
-}
-function registryBindingKey(registryId, revision, definitions) {
-  return JSON.stringify([
-    SPECIALIST_REGISTRY_VERSION,
-    registryId,
-    revision,
-    definitions.map(definitionProjection),
-  ]);
-}
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freeze(child);
@@ -148,38 +169,13 @@ export function normalizeSpecialistDefinitionV1(input) {
   });
 }
 
-export function createSpecialistRegistryV1(input) {
-  const raw = record(input, new Set(['schemaVersion','registryId','revision','definitions']), 'SpecialistRegistryV1 creation');
+export function normalizeSpecialistRegistryV1(input) {
+  const raw = record(input, REG_KEYS, 'SpecialistRegistryV1');
   if (raw.schemaVersion !== SPECIALIST_REGISTRY_VERSION) throw new Error('SpecialistRegistryV1.schemaVersion must be numeric 1');
-  const registryId = id(raw.registryId, 'registryId');
-  const revision = integer(raw.revision, 'registry revision');
   const definitions = denseArray(raw.definitions, 'definitions', 128).map(normalizeSpecialistDefinitionV1)
     .sort((left, right) => compareId(left.specialistId, right.specialistId));
   if (new Set(definitions.map(item => item.specialistId)).size !== definitions.length) throw new Error('SpecialistRegistryV1 contains duplicate specialistId');
-  const bindingKey = exactBindingKey(
-    registryBindingKey(registryId, revision, definitions),
-    'SpecialistRegistryV1.bindingKey',
-  );
-  return freeze({
-    schemaVersion: 1,
-    registryId,
-    revision,
-    bindingKey,
-    definitions,
-  });
-}
-
-export function normalizeSpecialistRegistryV1(input) {
-  const raw = record(input, REG_KEYS, 'SpecialistRegistryV1');
-  const normalized = createSpecialistRegistryV1({
-    schemaVersion: raw.schemaVersion,
-    registryId: raw.registryId,
-    revision: raw.revision,
-    definitions: raw.definitions,
-  });
-  const suppliedBindingKey = exactBindingKey(raw.bindingKey, 'SpecialistRegistryV1.bindingKey');
-  if (suppliedBindingKey !== normalized.bindingKey) throw new Error('SpecialistRegistryV1 bindingKey is inconsistent with canonical registry content');
-  return normalized;
+  return freeze({schemaVersion:1, registryId:id(raw.registryId,'registryId'), revision:integer(raw.revision,'registry revision'), definitions});
 }
 
 export function normalizeSpecialistSelectionV1(input) {
@@ -189,7 +185,9 @@ export function normalizeSpecialistSelectionV1(input) {
     schemaVersion:1,
     registryId:id(raw.registryId,'registryId'),
     registryRevision:integer(raw.registryRevision,'registryRevision'),
-    registryBindingKey:exactBindingKey(raw.registryBindingKey,'registryBindingKey'),
+    ...(Object.hasOwn(raw, 'registryBindingKey')
+      ? { registryBindingKey: id(raw.registryBindingKey, 'registryBindingKey') }
+      : {}),
     specialistId:id(raw.specialistId,'specialistId'),
     providerId:id(raw.providerId,'providerId'),
     definitionRevision:integer(raw.definitionRevision,'definitionRevision'),
@@ -203,7 +201,6 @@ export function normalizeSpecialistSelectionV1(input) {
 function selection(registry, definition, requestedCapabilities, requestedTools) {
   return normalizeSpecialistSelectionV1({
     schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
-    registryBindingKey:registry.bindingKey,
     specialistId:definition.specialistId, providerId:definition.providerId,
     definitionRevision:definition.definitionRevision, executionPlane:definition.executionPlane,
     requestedCapabilityIds:requestedCapabilities, grantedToolIds:requestedTools,
@@ -220,26 +217,26 @@ export function discoverSpecialistsV1(input = {}) {
   const parentTools = ids(raw.parentToolIds, 'parentToolIds', 128);
   subset(required, parentCapabilities, 'Requested specialist capabilities');
   subset(requiredTools, parentTools, 'Requested specialist tools');
-  const allowedPlanes = new Set(raw.executionPlanes === undefined ? [...PLANES] : planes(raw.executionPlanes));
+  // Only an ABSENT field means unrestricted discovery. A present but undefined
+  // executionPlanes field must fail closed instead of widening child placement.
+  const allowedPlanes = new Set(Object.hasOwn(raw, 'executionPlanes') ? planes(raw.executionPlanes) : [...PLANES]);
   const specialists = registry.definitions
     .filter(item => item.enabled && allowedPlanes.has(item.executionPlane))
     .filter(item => required.every(capabilityId => item.capabilityIds.includes(capabilityId)))
     .filter(item => requiredTools.every(toolId => item.toolIds.includes(toolId)))
     .map(item => selection(registry, item, required, requiredTools));
-  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, registryBindingKey:registry.bindingKey, requestedCapabilityIds:required, requestedToolIds:requiredTools, specialists});
+  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, requestedCapabilityIds:required, requestedToolIds:requiredTools, specialists});
 }
 
 export function bindSpecialistHandoffToRegistryV1(input = {}) {
   const raw = record(input, BIND_KEYS, 'Specialist handoff registry binding request');
   const registry = normalizeSpecialistRegistryV1(raw.registry);
-  const expectedRegistryBindingKey = exactBindingKey(raw.expectedRegistryBindingKey, 'expectedRegistryBindingKey');
-  if (expectedRegistryBindingKey !== registry.bindingKey) throw new Error('Specialist registry bindingKey drifted before handoff');
   const selected = normalizeSpecialistSelectionV1(raw.selection);
   const handoff = normalizeSpecialistHandoffV1(raw.handoff);
   const parentCapabilities = ids(raw.parentCapabilityIds, 'parentCapabilityIds', 64);
   const parentTools = ids(raw.parentToolIds, 'parentToolIds', 128);
   const definition = registry.definitions.find(item => item.specialistId === selected.specialistId);
-  if (selected.registryId !== registry.registryId || selected.registryRevision !== registry.revision || selected.registryBindingKey !== registry.bindingKey) throw new Error('Specialist selection registry identity, revision or bindingKey drifted');
+  if (selected.registryId !== registry.registryId || selected.registryRevision !== registry.revision) throw new Error('Specialist selection registry identity or revision drifted');
   if (!definition || !definition.enabled) throw new Error('Selected specialist is missing or disabled');
   if (selected.providerId !== definition.providerId || selected.definitionRevision !== definition.definitionRevision || selected.executionPlane !== definition.executionPlane || selected.resultContractId !== definition.resultContractId) {
     throw new Error('Specialist selection drifted from current registry definition');
@@ -251,7 +248,7 @@ export function bindSpecialistHandoffToRegistryV1(input = {}) {
   subset(handoff.requestedCapabilityIds, definition.capabilityIds, 'Specialist handoff capabilities');
   if (!same(Object.freeze([...handoff.requestedCapabilityIds].sort(compareId)), selected.requestedCapabilityIds)) throw new Error('Specialist handoff capability scope changed after selection');
   return freeze({
-    schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, registryBindingKey:registry.bindingKey,
+    schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
     selection:selected, handoff,
     childContext:{goal:handoff.goal, artifactRefs:handoff.artifactRefs, credentialRefs:handoff.credentialRefs, parentInvocationId:handoff.parentInvocationId},
     childScope:{capabilityIds:selected.requestedCapabilityIds, toolIds:selected.grantedToolIds},
@@ -272,8 +269,6 @@ export function proposeSpecialistRegistryMutationV1(input = {}) {
   if (registryId !== registry.registryId) throw new Error('Specialist registry identity does not match mutation target');
   const expectedRegistryRevision = integer(raw.expectedRegistryRevision, 'expectedRegistryRevision');
   if (expectedRegistryRevision !== registry.revision) throw new Error('Specialist registry revision drifted before mutation');
-  const expectedRegistryBindingKey = exactBindingKey(raw.expectedRegistryBindingKey, 'expectedRegistryBindingKey');
-  if (expectedRegistryBindingKey !== registry.bindingKey) throw new Error('Specialist registry bindingKey drifted before mutation');
   if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
     throw new Error('Specialist registry mutation kind is invalid');
   }
@@ -336,7 +331,7 @@ export function proposeSpecialistRegistryMutationV1(input = {}) {
     nextDefinitions = registry.definitions.filter(item => item.specialistId !== specialistId);
   }
 
-  const nextRegistry = createSpecialistRegistryV1({
+  const nextRegistry = normalizeSpecialistRegistryV1({
     schemaVersion: SPECIALIST_REGISTRY_VERSION,
     registryId: registry.registryId,
     revision: nextRegistryRevision,

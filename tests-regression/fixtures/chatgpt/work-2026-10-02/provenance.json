@@ -1,0 +1,26 @@
+[
+  {
+    "snapshot": 1,
+    "original_sha256": "f196b8ebe8bfd18339da0c509f9fbf4a93a3640ba9b8c16116f79b17c35416f4",
+    "fixture": "empty.html",
+    "composer_text_length": 0
+  },
+  {
+    "snapshot": 2,
+    "original_sha256": "095d4bf78c4ff19a1b7d58ab6a371ce05ad2c1d222a55c53a6b1732ce7ebb6d5",
+    "fixture": "pending.html",
+    "composer_text_length": 0
+  },
+  {
+    "snapshot": 3,
+    "original_sha256": "14f288a86fb76cb6993136c005868ce38367026c3248f762ac8fd5cdc28e3769",
+    "fixture": "generating-empty.html",
+    "composer_text_length": 0
+  },
+  {
+    "snapshot": 4,
+    "original_sha256": "c2377dc3e128ef2f59ad020ddd5a1ea1878541366a0335aec76c02f8bdca3435",
+    "fixture": "generating-draft.html",
+    "composer_text_length": 0
+  }
+]

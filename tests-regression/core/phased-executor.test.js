@@ -61,7 +61,7 @@ test('executor persists pre-send wait after verified insertion', async () => {
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
     return { status: InteractionResult.INSERTED_NOT_SENT, composerState: 'VISIBLE_NONEMPTY', safeDiagnosticCode: 'INSERTION_TEXT_PROVEN' };
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => clock.value, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => clock.value, cryptoApi: webcrypto, forceHighEffort: false });
   const result = await executor.runSessionOnce('s1');
   assert.equal(result.kind, 'WAIT_PRE_SEND');
   assert.deepEqual(modes, ['CHECK_ONLY', 'INSERT_ONLY']);
@@ -72,7 +72,7 @@ test('executor verifies ambiguous operation before any new insertion', async () 
   const repo = new Repo(setupAmbiguous());
   const modes = [];
   const transport = { async execute(_tab, request) { modes.push(request.mode); return { status: InteractionResult.SENT_VERIFIED }; } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
   const result = await executor.runSessionOnce('s1');
   assert.equal(result.kind, 'RECOVERED_SENT');
   assert.deepEqual(modes, ['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
@@ -93,7 +93,7 @@ test('pause committed during CHECK_ONLY prevents INSERT_ONLY and new operation c
     }
     throw new Error('INSERT_ONLY must not run after pause');
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
   const result = await executor.runSessionOnce('s1');
   const after = await repo.load();
   assert.equal(result.kind, 'QUIESCED');
@@ -117,7 +117,7 @@ test('stop committed during PREPARE_SEND prevents SUBMITTING lease and SUBMIT_EX
     }
     throw new Error('SUBMIT_EXISTING must not run after stop');
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => now, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => now, cryptoApi: webcrypto, forceHighEffort: false });
   const result = await executor.runSessionOnce('s1');
   const after = await repo.load();
   assert.equal(result.kind, 'QUIESCED');
@@ -137,7 +137,7 @@ test('pause during ambiguous verification preserves PAUSED while reconciling SEN
     });
     return { status: InteractionResult.SENT_VERIFIED };
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
   await executor.runSessionOnce('s1');
   const after = await repo.load();
   assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
@@ -154,7 +154,7 @@ test('stop during ambiguous verification preserves STOPPED while retaining pendi
     });
     return { status: InteractionResult.INSERTED_NOT_SENT };
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
   await executor.runSessionOnce('s1');
   const after = await repo.load();
   assert.equal(after.sessionsById.s1.runState, RunState.STOPPED);
@@ -181,7 +181,7 @@ test('stale ambiguous verification cannot reconcile a replacement operation', as
     });
     return { status: InteractionResult.SENT_VERIFIED };
   } };
-  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
   const result = await executor.runSessionOnce('s1');
   const after = await repo.load();
   assert.equal(result.kind, 'OPERATION_CHANGED');
@@ -189,4 +189,21 @@ test('stale ambiguous verification cannot reconcile a replacement operation', as
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
   assert.equal(after.sessionsById.s1.tasksById.t1.status, 'SUBMISSION_UNCERTAIN');
   assert.equal(after.sendArbiter.lease.operationId, 'op1');
+});
+
+
+test('executor does not inspect or change reasoning effort before insertion', async () => {
+  const repo = new Repo(setup());
+  const modes = [];
+  const transport = { async execute(_tab, request) {
+    modes.push(request.mode);
+    if (request.mode === 'ENSURE_HIGH_EFFORT') throw new Error('reasoning-effort control is deferred');
+    if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+    return { status: InteractionResult.INSERTED_NOT_SENT, composerState: 'VISIBLE_NONEMPTY', safeDiagnosticCode: 'INSERTION_TEXT_PROVEN' };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto, forceHighEffort: false });
+  const result = await executor.runSessionOnce('s1');
+  assert.equal(result.kind, 'WAIT_PRE_SEND');
+  assert.deepEqual(modes, ['CHECK_ONLY', 'INSERT_ONLY']);
+  assert.equal((await repo.load()).sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
 });

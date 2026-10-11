@@ -1,0 +1,11 @@
+QA 11.0.12 — 2026-10-03
+
+Offline Chromium fixture qualification: 13/13 passed against four sanitized user-provided Work HTML snapshots; modeled acknowledgements only, no live ChatGPT request.
+
+Focused Node regression suite: 205/205 passed (interaction, send bridge, runner, reinjection, diagnostics). One fixture was corrected to model a genuinely new browser context on restart; production retry/ownership guards were preserved.
+
+Release package verification: ZIP CRC/member parity and manifest version checked by scripts/package-high-hotfix.py. Windows Chrome/NVDA and live account server receipt are not verified. Do not interpret a displayed Send count as proof of server receipt unless the operation has a recorded acknowledgement.
+
+Cross-mode audit: 108/108 passed across CHAT_CYCLE, PAIRS, AUDITOR_GROUP, AUDITOR_PIPELINE planning/manager, window liveness, response pipeline, semantics, JSON profile round-trip/import UI, portable profile, and completion delay. 205/205 focused send/bridge/runner/reinjection/diagnostic cases passed. Git comparison traces the managed hidden-tab activation prerequisite to 11.0.9 (`requireGenerationAcknowledgement` condition); all managed scenario modes use that shared path.
+
+Scenario JSON import/export accepts all four modes. The optional parallel cycle pool is intentionally limited to CHAT_CYCLE; pair count, worker count, and pipeline first/second counts are in the scenario config itself. Import creates a new stopped scenario without runtime/counters/old identity.

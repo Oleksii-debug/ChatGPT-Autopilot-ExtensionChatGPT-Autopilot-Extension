@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { prepareAutomaticAgentSpecialistDelegationV1 } from '../src/core/agent-specialist-delegation.js';
-import { createSpecialistRegistryV1 } from '../src/core/specialist-registry.js';
 
 const T0 = '2026-09-27T03:00:00.000Z';
 const T1 = '2026-09-27T04:00:00.000Z';
@@ -57,12 +56,12 @@ function definition(specialistId, capabilityIds, toolIds, overrides = {}) {
 }
 
 function registry(definitions) {
-  return createSpecialistRegistryV1({
+  return {
     schemaVersion: 1,
     registryId: 'registry:default',
     revision: 4,
     definitions,
-  });
+  };
 }
 
 function request(overrides = {}) {
@@ -97,7 +96,6 @@ test('automatic delegation selects least-authority eligible specialist with dete
     toolSurplus: 0,
   });
   assert.equal(result.preview.assignment.specialistId, 'narrow-a');
-  assert.equal(result.selection.registryBindingKey, result.binding.registryBindingKey);
   assert.equal(result.preview.assignment.parentAgentId, 'browser-agent:job-auto-delegation');
   assert.equal(result.preview.executionOwnership.effectId, 'specialist-effect:plan-auto-delegation:local-analysis');
   assert.equal(result.authority.executionAuthorized, false);

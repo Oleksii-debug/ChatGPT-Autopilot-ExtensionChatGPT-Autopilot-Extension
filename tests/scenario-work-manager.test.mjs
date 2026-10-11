@@ -271,7 +271,7 @@ test('manager materializes scenario turns only as canonical one-pass core sessio
   assert.equal(session.runMode, 'ONE_PASS');
   assert.equal(session.scenarioWork.managed, true);
   assert.equal(session.sharedPrompt, '');
-  assert.equal(session.tasksById[session.taskOrder[0]].promptOverride, 'ONE');
+  assert.equal(session.tasksById[session.taskOrder[0]].promptOverride.split('\n')[0], 'ONE');
 });
 
 test('manager waits for assistant completion, preserves conversation URL, and launches next prompt in same chat', async () => {
@@ -294,7 +294,7 @@ test('manager waits for assistant completion, preserves conversation URL, and la
   assert.equal(live.successfulSendCount, 1, 'cumulative send proof survives the new turn');
   assert.equal(liveTask.lastVerifiedSendAt, 0, 'old send proof must not complete the new turn');
   assert.equal(liveTask.normalizedUrl, 'https://chatgpt.com/c/abc');
-  assert.equal(liveTask.promptOverride, 'TWO');
+  assert.equal(liveTask.promptOverride.split('\n')[0], 'TWO');
 });
 
 test('five independent chats each keep one Core Session and tab for 17 completed turns across restart', async () => {
@@ -335,7 +335,7 @@ test('five independent chats each keep one Core Session and tab for 17 completed
       const sid = sessionIds.get(id);
       const taskId = core.state.sessionsById[sid].taskOrder[0];
       const expectedPrompt = turn === 1 ? 'BOOT' : turn === 17 ? 'FINAL' : 'CONT';
-      assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, expectedPrompt);
+      assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride.split('\n')[0], expectedPrompt);
       const url = `https://chatgpt.com/c/slot-${slot + 1}`;
       const session = core.state.sessionsById[sid];
       session.tasksById[taskId].lastVerifiedSendAt = now + 1;
@@ -359,12 +359,13 @@ test('five independent chats each keep one Core Session and tab for 17 completed
         assert.equal(retired.length, 0, 'no physical tab may be retired before turn 17');
       } else {
         const state = await core.load();
-        assert.equal(runtime.generation, 2);
+        assert.equal(runtime.runState, 'COMPLETED');
+        assert.equal(runtime.generation, 1, 'standalone CHAT_CYCLE never manufactures a second physical chat');
         assert.equal(runtime.retiredVerifiedSends, 17);
-        assert.equal(runtime.generationRetiredVerifiedSends, 0);
+        assert.equal(runtime.generationRetiredVerifiedSends, 17);
         assert.equal(runtime.verifiedSendHistoryComplete, true);
         assert.equal(state.sessionsById[sid], undefined);
-        assert.equal(state.sessionOrder.filter(candidate => state.sessionsById[candidate]?.scenarioWork?.scenarioId === id).length, 1);
+        assert.equal(state.sessionOrder.filter(candidate => state.sessionsById[candidate]?.scenarioWork?.scenarioId === id).length, 0);
       }
     }
   }
@@ -445,7 +446,7 @@ test('restart between rearming a turn and its manager checkpoint reuses the same
   manager = build();
   await manager.materializeLaunch(scenario, next, 10_001);
   assert.equal(core.state.sessionsById[sid].successfulSendCount, 1);
-  assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, 'SECOND');
+  assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride.split('\n')[0], 'SECOND');
   core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt = 10_002;
   core.state.sessionsById[sid].onePassCompletedCount = 1;
   core.state.sessionsById[sid].onePassCompletedTaskIds = [taskId];
@@ -682,7 +683,7 @@ test('owner Pause racing assistant observation cannot be overwritten by stale Sc
   assert.equal(state.sessionsById[sid].runState, 'PAUSED');
 });
 
-test('generation completion checkpoint survives tab-close failure and blocks next launch until restart cleanup succeeds', async () => {
+test('standalone CHAT_CYCLE completes one physical chat while retired tab cleanup is retried', async () => {
   let now = 30_000;
   const chrome = chromeFake();
   const liveTabs = new Set([55]);
@@ -705,26 +706,27 @@ test('generation completion checkpoint survives tab-close failure and blocks nex
   ready = true;
   now += 100;
   const first = await manager.cycleOne('cleanup1');
-  assert.equal(first.kind, 'CLEANUP_PENDING');
+  assert.equal(first.kind, 'COMPLETED');
   let scenario = (await manager.get('cleanup1')).scenario;
   assert.deepEqual(scenario.runtime.cleanupPendingSessionIds, [sid]);
-  assert.equal(scenario.runtime.generation, 2, 'generation transition must be durable before physical cleanup');
+  assert.equal(scenario.runtime.runState, 'COMPLETED');
+  assert.equal(scenario.runtime.generation, 1, 'standalone CHAT_CYCLE remains one physical chat');
   state = await core.load();
   assert.ok(state.sessionsById[sid]);
+  assert.equal(state.sessionsById[sid].enabled, false);
+  assert.equal(state.sessionsById[sid].runState, 'STOPPED');
   assert.equal(state.tabHintsByTaskId[taskId].retirePending, true);
-  assert.equal(state.sessionOrder.filter(id => state.sessionsById[id]?.scenarioWork?.managed && id !== sid).length, 0, 'next turn must not launch while cleanup is pending');
+  assert.equal(state.sessionOrder.filter(id => state.sessionsById[id]?.scenarioWork?.managed && id !== sid).length, 0, 'standalone CHAT_CYCLE must not launch a replacement generation');
 
   manager = build();
   failClose = false;
   now += 100;
-  const second = await manager.cycleOne('cleanup1');
+  const second = await manager.cycleAll();
   assert.equal(second.kind, 'CYCLED');
   state = await core.load();
   assert.equal(state.sessionsById[sid], undefined, 'old managed Session is retired after restart');
   const active = state.sessionOrder.map(id => state.sessionsById[id]).filter(item => item?.scenarioWork?.managed && item.runState === 'RUNNING');
-  assert.equal(active.length, 1);
-  assert.equal(active[0].tasksById[active[0].taskOrder[0]].promptOverride, 'ONE');
-  assert.notEqual(active[0].id, sid, 'only the new generation gets a new Session');
+  assert.equal(active.length, 0, 'completed standalone CHAT_CYCLE has no replacement Session');
 });
 
 test('deterministic managed Session replay fails closed on identity collision', async () => {

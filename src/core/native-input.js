@@ -1,5 +1,7 @@
+import { assertSessionWindow } from './window-binding.js';
 import { normalizeChatUrl, OperationPhase, RunState, TabStrategy } from './schema.js';
 import { sameChatConversationUrl, expectedPostSendConversationUrl } from './tabs.js';
+import { withWindowFocus } from './window-focus.js';
 
 function fail(code) {
   const error = new Error(code);
@@ -23,8 +25,26 @@ function authorizedOperation(state, message, sender, chromeApi, { allowSubmitted
   const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
     ? `__session_worker__:${session.id}` : operation.taskId;
   if (state.tabHintsByTaskId[hintKey]?.tabId !== sender.tab.id) fail('NATIVE_INPUT_TAB_NOT_OWNED');
+  assertSessionWindow(session, sender.tab);
   if (message.kind === 'submit' && operation.nativeSubmitDispatched && !allowSubmitted) fail('NATIVE_SUBMIT_ALREADY_DISPATCHED');
+  if (message.kind === 'submit' && operation.domSubmitDispatched && !allowSubmitted) fail('DOM_SUBMIT_ALREADY_DISPATCHED');
   return { session, operation };
+}
+
+// Authorize and persist the DOM Send boundary without attaching a debugger.
+// The content script still validates the exact prompt and physical control.
+export async function checkpointDomSubmit(chromeApi, repository, message, sender) {
+  const request = { ...message, kind: 'submit' };
+  const { session, operation } = authorizedOperation(await repository.load(), request, sender, chromeApi);
+  const tab = await chromeApi.tabs.get(sender.tab.id);
+  assertSessionWindow(session, tab);
+  if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('DOM_SUBMIT_URL_MISMATCH');
+  await repository.update(state => {
+    const live = authorizedOperation(state, request, sender, chromeApi);
+    live.operation.domSubmitDispatched = true;
+    live.operation.postSendHoldUntil = Date.now() + Math.min(3600000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+    return state;
+  });
 }
 
 // This function is serialized into Chrome's isolated world. No page-owned JS,
@@ -62,9 +82,10 @@ function targetProof(requestId, kind) {
 
 export async function performNativeInput(chromeApi, repository, message, sender) {
   const initial = await repository.load();
-  const { operation } = authorizedOperation(initial, message, sender, chromeApi);
+  const { session, operation } = authorizedOperation(initial, message, sender, chromeApi);
   const tabId = sender.tab.id;
   const tab = await chromeApi.tabs.get(tabId);
+  assertSessionWindow(session, tab);
   if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
   // A service-worker restart can restore owner focus after activation but before
   // the content script's native-submit message reaches the new worker. Never
@@ -94,9 +115,13 @@ export async function performNativeInput(chromeApi, repository, message, sender)
     await repository.update(state => {
       const live = authorizedOperation(state, message, sender, chromeApi);
       text = live.operation.promptText;
-      if (message.kind === 'submit') live.operation.nativeSubmitDispatched = true;
+      if (message.kind === 'submit') {
+        live.operation.nativeSubmitDispatched = true;
+        live.operation.postSendHoldUntil = Date.now() + Math.min(3600000, Math.max(0, Number(live.session.postSendDelayMs || 0)));
+      }
       return state;
     });
+    assertSessionWindow(session, await chromeApi.tabs.get(tabId));
     const finalProof = (await inspectTarget())?.[0]?.result;
     if (!finalProof?.url || !sameChatConversationUrl(normalizeChatUrl(finalProof.url), operation.targetUrl)) {
       fail('NATIVE_INPUT_TARGET_CHANGED');
@@ -148,9 +173,16 @@ function hasOtherWindowFocusLease(state, windowId, operationId) {
 }
 
 export async function activateOwnedSendTab(chromeApi, repository, message, sender) {
+  const tab = await chromeApi.tabs.get(sender?.tab?.id);
+  return withWindowFocus(repository, tab.windowId, () => activateOwnedSendTabImpl(chromeApi, repository, message, sender));
+}
+
+async function activateOwnedSendTabImpl(chromeApi, repository, message, sender) {
   const state = await repository.load();
-  const { operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
+  const { session, operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi,
+    { allowSubmitted: message.observationOnly === true });
   const tab = await chromeApi.tabs.get(sender.tab.id);
+  assertSessionWindow(session, tab);
   const observedUrl = normalizeChatUrl(tab.url);
   if (!sameChatConversationUrl(observedUrl, operation.targetUrl)
     && !(message.observationOnly === true && expectedPostSendConversationUrl(observedUrl, operation.targetUrl))) {
@@ -170,7 +202,8 @@ export async function activateOwnedSendTab(chromeApi, repository, message, sende
   if (!previous || previous.id === tab.id || previous.windowId !== tab.windowId) fail('SEND_TAB_ACTIVATION_UNAVAILABLE');
 
   await repository.update(draft => {
-    const live = authorizedOperation(draft, { ...message, kind:'submit' }, sender, chromeApi);
+    const live = authorizedOperation(draft, { ...message, kind:'submit' }, sender, chromeApi,
+      { allowSubmitted: message.observationOnly === true });
     const priorTabId = Number(live.operation.previousSendTabId || 0);
     const priorWindowId = Number(live.operation.previousSendWindowId || 0);
     if (priorTabId > 0) {
@@ -184,6 +217,9 @@ export async function activateOwnedSendTab(chromeApi, repository, message, sende
     }
     live.operation.previousSendTabId = previous.id;
     live.operation.previousSendWindowId = tab.windowId;
+    // An observation wake may happen AFTER a legacy DOM Send. Its focus lease
+    // cannot prove zero effect on restart. Only a pre-Send activation can.
+    if (message.observationOnly !== true) live.operation.activationBeforeSubmit = true;
     return draft;
   });
 
@@ -225,6 +261,13 @@ export async function restorePendingSendTabs(chromeApi, repository, { sessionId 
     const previousTabId = Number(operation?.previousSendTabId || 0);
     const previousWindowId = Number(operation?.previousSendWindowId || 0);
     if (!Number.isInteger(previousTabId) || previousTabId <= 0) continue;
+    // The dwell protects the *physical tab*, not browser focus. During an
+    // unresolved SUBMITTING effect do not restore early (native input needs an
+    // active tab); after Core commits verification/uncertainty, restore focus
+    // immediately while the tab itself remains held open.
+    if (['RUNNING', 'RECOVERING'].includes(session.runState)
+        && operation?.phase === OperationPhase.SUBMITTING
+        && Number(operation?.postSendHoldUntil || 0) > Date.now()) continue;
 
     const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       ? `__session_worker__:${session.id}` : operation.taskId;

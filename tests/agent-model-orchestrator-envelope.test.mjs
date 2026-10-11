@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createBoundAgentModelOrchestratorEnvelopeV1,
-  normalizeBoundAgentModelOrchestratorEnvelopeV1,
 } from '../src/core/agent-model-orchestrator-envelope.js';
 import {
   AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY,
@@ -338,64 +337,4 @@ test('bounded envelope collapses hybrid Router mode to one selected-route call',
   assert.equal(result.settings.strongEveryMinutes,0);
   assert.equal(result.settings.fallbackToStrongOnPrimaryError,false);
   assert.equal(result.settings.carryStrongResultToPrimary,false);
-});
-
-
-test('bounded envelope pins both model slots and disables every extra-call trigger', () => {
-  const current=settings();
-  current.mode='hybrid-rules';
-  current.primary={provider:'ollama',model:'legacy'};
-  current.strong={provider:'openai',model:'strong'};
-  current.strongEveryNRequests=1;
-  current.strongEveryMinutes=1;
-  current.strongMinGapMinutes=3;
-  current.strongMaxPerHour=9;
-  current.carryStrongResultToPrimary=true;
-  current.fallbackToStrongOnPrimaryError=true;
-  current.keepPrimaryIfStrongFails=false;
-  const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
-    currentRouterSettings:current,
-  }));
-  assert.equal(result.settings.mode,'primary');
-  assert.deepEqual(result.settings.primary,{provider:'openai',model:'m-route.b'});
-  assert.deepEqual(result.settings.strong,{provider:'openai',model:'m-route.b'});
-  assert.equal(result.settings.strongEveryNRequests,0);
-  assert.equal(result.settings.strongEveryMinutes,0);
-  assert.equal(result.settings.strongMinGapMinutes,0);
-  assert.equal(result.settings.strongMaxPerHour,0);
-  assert.equal(result.settings.carryStrongResultToPrimary,false);
-  assert.equal(result.settings.fallbackToStrongOnPrimaryError,false);
-  assert.equal(result.settings.keepPrimaryIfStrongFails,true);
-});
-
-test('normalizer rejects widened hybrid or fallback call semantics', () => {
-  const base=createBoundAgentModelOrchestratorEnvelopeV1(request());
-
-  const hybrid=structuredClone(base);
-  hybrid.settings.mode='hybrid-rules';
-  assert.throws(
-    ()=>normalizeBoundAgentModelOrchestratorEnvelopeV1(hybrid),
-    /provider-call scope is invalid/u,
-  );
-
-  const scheduled=structuredClone(base);
-  scheduled.settings.strongEveryNRequests=1;
-  assert.throws(
-    ()=>normalizeBoundAgentModelOrchestratorEnvelopeV1(scheduled),
-    /provider-call scope is invalid/u,
-  );
-
-  const fallback=structuredClone(base);
-  fallback.settings.fallbackToStrongOnPrimaryError=true;
-  assert.throws(
-    ()=>normalizeBoundAgentModelOrchestratorEnvelopeV1(fallback),
-    /provider-call scope is invalid/u,
-  );
-
-  const driftedStrong=structuredClone(base);
-  driftedStrong.settings.strong={provider:'openai',model:'other-model'};
-  assert.throws(
-    ()=>normalizeBoundAgentModelOrchestratorEnvelopeV1(driftedStrong),
-    /provider-call scope is invalid/u,
-  );
 });

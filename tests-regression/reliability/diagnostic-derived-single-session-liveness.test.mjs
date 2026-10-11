@@ -102,6 +102,7 @@ test('one ordinary fresh-chat Session survives diagnostic-derived submit, receiv
         }
         return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
       }
+      if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'INSERT_ONLY') {
         insertCalls += 1;
         if (insertCalls % 41 === 0) {

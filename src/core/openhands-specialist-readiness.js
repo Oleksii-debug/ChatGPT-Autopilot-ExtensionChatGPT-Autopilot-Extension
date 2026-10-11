@@ -271,7 +271,11 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
     }
     id(request.registryId, 'registryId');
     integer(request.registryRevision, 'registryRevision', 1, Number.MAX_SAFE_INTEGER);
-    bindingKey(request.registryBindingKey, 'registryBindingKey');
+    // Legacy selections have no registry binding. Absence is valid; a
+    // present malformed/undefined binding must still fail closed.
+    if (Object.hasOwn(request, 'registryBindingKey')) {
+      bindingKey(request.registryBindingKey, 'registryBindingKey');
+    }
     if (id(request.specialistId, 'specialistId') !== OPENHANDS_CODING_SPECIALIST_ID) {
       throw new Error('OpenHands readiness request targets another specialist');
     }

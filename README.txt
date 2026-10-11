@@ -1,296 +1,97 @@
-CHATGPT АВТОПІЛОТ 0.9.19 — DIAGNOSTIC-DERIVED ORDINARY SESSION LIVENESS / POST-SEND EVIDENCE PRESERVATION
+11 ПІЛОТ HIGH — 11.0.13 — ВИПРАВЛЕННЯ СЦЕНАРНОГО ОБЛІКУ
 
-ЗАХИЩЕНІ ПОСТАЧАЛЬНИКИ МОДЕЛЕЙ
-- У Windows папці companion/ai-gateway запустіть «НАЛАШТУВАТИ MISTRAL API.ps1» або «НАЛАШТУВАТИ OPENROUTER API.ps1». Ключ вводиться через SecureString і зберігається локально через DPAPI; JSON Gateway та експорт розширення зберігають лише посилання на ключ.
-- У вкладці «Моделі» додайте відповідний маршрут. Після запуску Gateway натисніть «Отримати моделі цього постачальника», оберіть модель, перевірте вартість і збережіть конфігурацію. Нові маршрути вимкнені, доки їх явно не дозволено.
-- Безкоштовність віддаленої моделі не визначається за її назвою: до підтвердження умов вона має стан «вартість невідома» й не допускається до автоматичного виконання.
+11 ПІЛОТ HIGH — 11.0.11 — 2026-10-02T15:31:00+02:00
 
-СТАТУС 0.9.19
-- Реальні 0.9.13 diagnostics із TAB_NAVIGATION_URL_MISMATCH / receiver restore faults привели до нового bounded-recovery hardening: safe Ordinary AMBIGUOUS deadline перевіряється ДО нового browser bind/transport round-trip.
-- Після deadline той самий фізичний Send не повторюється; operation fail-safe завершується, Session продовжує наступний цикл за user-selected cadence.
-- Post-submit evidence tab не retire-иться лише через navigation/receiver fault, тому recovery не churn-ить exact conversation ownership.
-- Fresh launch / -> /c/<conversation> може бути verified за concrete conversation + empty composer + active generation ще до появи semantic user-message history; non-fresh recovery лишається fail-closed.
-- Permanent diagnostic-derived reliability gate проганяє одну Ordinary fresh-chat Session понад 230 verified sends із submit/receiver/navigation/composer/rate-limit/tab-close faults і перевіряє at-most-once Send + max one owned open-close tab.
-- 0.9.18 Trusted Script, Browser Agent, Scenario Work та Orchestration V2 збережені.
-- Вкладка «Спрощені сесії» використовує той самий Core: один ChatGPT URL та один промпт, або чотири комбінації спільних/різних URL і промптів. Підтримує один прохід або роботу по колу, керування запуском/паузою/продовженням/зупинкою, JSON імпорт/експорт і діагностику. Спільний URL+промпт дозволяє до 1 000 000 логічних циклів з одним фізичним task object. Ознака спрощеної сесії зберігається в Core й переносному JSON.
-- Exact automated qualification: 947/947 Node tests PASS, 27/27 reliability PASS, Chromium gates PASS; physical Windows/NVDA/real UKF AIS acceptance still not claimed.
+Зміна після повідомлення користувача: 11.0.10 не надсилала на жодному акаунті, а 10.0 працювала вночі з недостатньою кількістю запусків. Нічних звітів 11.0.10 не знайдено; точна причина на його ПК не підтверджена.
 
-CHATGPT АВТОПІЛОТ 0.9.18 — TRUSTED SCRIPT APPROVAL / NETWORK-GUARDED DOM FALLBACK
+1. Штатний Send повернуто до способу 10.0: requestSubmit для справжньої кнопки форми, і click для точно розпізнаної кнопки Send. Активація вкладки більше не переводить Send на Chrome debugger. Це усуває відтворену залежність, яка могла зупиняти готову форму.
+2. Перед фізичним DOM Send Core перевіряє сесію, операцію, власну вкладку, вікно та URL, і зберігає межу надсилання. Цей запис не збільшує лічильник успіхів. Перезапуск після нього веде до перевірки результату, а не повторного Send.
+3. Повторне завантаження коду у вкладку замінює старий обробник команд новим. Одна поточна версія обробника лишається одна, без дублювання слухачів.
+4. Старий запис про активацію для читання відповіді більше не є доказом, що Send не відбувся. Це захищає старі дані 10.0 від автоматичного дублювання після оновлення.
 
-СТАТУС 0.9.18
-- Browser Agent отримує opt-in Trusted Script fallback для legacy/нестандартних UI, які не піддаються DOM/ARIA/native/vision tools.
-- AI-authored JavaScript ніколи не виконується тихо: кожен script потребує окремого owner approval навіть при Agent approvalMode=ALLOW_ALL.
-- Approval прив'язаний до exact tab URL/origin; перед execution live origin перевіряється повторно після debugger attach.
-- Trusted Script source показується в доступній approval-панелі, але після виконання redacted із durable history; audit зберігає purpose/origin/evidence без raw code.
-- Network/storage/credential/dynamic-code/extension/navigation та persistent callback primitives блокуються parser policy; під час CDP Runtime.evaluate всі network requests вкладки тимчасово блокуються fail-closed.
-- Trusted Script лишається DOM/UI fallback, а не загальним arbitrary-code або network execution channel.
-- Exact automated qualification: 941/941 Node tests PASS, reliability PASS, real Chromium network-guarded Trusted Script E2E PASS; physical Windows/NVDA/real UKF AIS acceptance still not claimed.
+Збережено прив’язку кожного пулу до його вікна, повну тривалість сценарних чатів, налаштований timeout, очікування до/після Send, advisory High максимум 3 спроби, прості лічильники та вже виправлене допущення 15 паралельних чатів. Native insertion для активного редактора лишилась окремою функцією; весь debugger з розширення не видалено.
 
-CHATGPT АВТОПІЛОТ 0.9.17 — VISUAL DRAG/TYPE + PER-AGENT AI ROUTING
+Оновлення тієї самої встановленої копії: розпакувати поверх її папки та натиснути «Оновити» на картці chrome://extensions. Коли поточні відповіді закінчилися, перезавантажити відкриті вкладки ChatGPT, щоб вони отримали новий код. Старі неоднозначні операції залишаються для перевірки, а не для сліпого повторного надсилання.
 
-СТАТУС 0.9.17
-- Browser Agent visual computer-use тепер має click_at + drag_at + type_at поверх screenshot-turn observation.
-- Coordinate targets fail-closed на stale/viewport shift і повторно перевіряються після debugger attach перед native input.
-- Agent може окремо успадкувати або override-нути primary/strong/hybrid provider/model без зміни глобального Router runtime.
-- Prompt-first Agent UX лишається основним; model/provider, budgets, schedule і approval є optional policy.
-- Real Chromium qualification включає canvas click, drag-and-drop і coordinate editor typing.
-- 0.9.17 не заявляється фізично перевіреним на Windows/NVDA/real UKF AIS; exact QA у QA-0.9.17.txt.
-
-CHATGPT АВТОПІЛОТ 0.9.16 — VISION COMPUTER-USE / COORDINATE NATIVE INPUT
-
-СТАТУС 0.9.16
-- Browser Agent vision тепер має `click_at`: screenshot-turn → bounded viewport coordinates → live target proof → native Chrome mouse input.
-- Default consequential approval поширено на coordinate target; pure visual/canvas target потребує approval, якщо owner явно не вибрав ALLOW_ALL.
-- Real Chromium smoke перевіряє visual-only canvas coordinate click.
-- Розробка продовжує 0.9.14 без нового runtime: Browser Agent отримує ширші browser capabilities поверх того самого AI Router/Gateway і durable job manager.
-- Додані consequential-action approval boundary, TOCTOU-safe form identity, targeted Enter/Space, multi-tab tools, tracked download/upload, on-demand vision, effect verification, deterministic wait_for_change та owner notifications capability.
-- Download wait і wait_for_change не витрачають model calls під час детермінованого очікування: обидва є durable runtime work і переживають manager restart; нова owner instruction перериває очікування й одразу змушує AI перепланувати.
-- 0.9.16 ще не заявляється фізично перевіреним на Windows/NVDA/real UKF AIS; exact QA фіксується у QA-0.9.16.txt.
-
-CHATGPT АВТОПІЛОТ 0.9.14 — AGENT PLATFORM MVP / SECONDS + MILLION CYCLES / SCENARIO HARDENING
-
-СТАТУС 0.9.14
-- Prompt-first Browser Agent: користувач описує задачу природною мовою; AI є planner/operator, Autopilot надає browser tools, durable runtime, budgets, permissions, scheduling, recovery та kill switch.
-- Agent підтримує fast multi-step burst, follow-up owner instructions, DOM/ARIA observation, click/fill/select/check/batch/key/scroll/navigation/back/reload/wait/done і native CDP click fallback.
-- Optional policy: token/model-call/time/action/cost budgets; ONCE / CONTINUOUS / INTERVAL, absolute start/end, daily active window, cold-restart alarms.
-- Generic site permissions є optional і origin-scoped; adopted user tabs не закриваються як agent-owned.
-- Ordinary Session minimum interval тепер може бути у секундах або хвилинах; старі minute values зберігають той самий cadence.
-- Shared URL + shared prompt підтримує до 1 000 000 logical cycles без матеріалізації мільйона Task objects.
-- Scenario Work / «Двійки» / «Аудитор + група» отримали write-ahead cleanup, owner lifecycle epoch, dependency validation і timeout/replacement stall fixes.
-- Orchestration V2 managed-tab cleanup став transactional: tabs.remove failure не губить ownership.
-- Mixed-load gate одночасно перевіряє Ordinary + Agent + Scenario + Orchestration; Stop останньої Session має alarm-driven physical tab retirement із backoff, тому transient close failure не створює безстрокову orphan-вкладку.
-- Exact automated qualification фіксується у QA-0.9.14.txt після фінального freeze. Physical Windows/Chrome/NVDA owner run не підміняється автоматизованими тестами.
-
-CHATGPT АВТОПІЛОТ 0.9.13 — SESSION LIVENESS / PHYSICAL TAB RETIREMENT HARDENING
-
-СТАТУС 0.9.13
-- Hotfix після реального нічного Ordinary-session інциденту 0.9.10. Користувацький інтервал запуску не змінюється: хвилини/каденс повністю лишаються під контролем користувача.
-- Ordinary SUBMISSION_UNCERTAIN більше не може нескінченно тримати всю Session в AMBIGUOUS. Перевірка bounded; після вичерпання доказового вікна старий фізичний Send НЕ повторюється, операція fail-safe завершується, а Session переходить до наступного нормального циклу.
-- Fresh-root / -> /c/<conversation> recovery зберігає точну ownership вкладки; open-close не створює orphan duplicate tab. TAB_NAVIGATION_TIMEOUT/TAB_NAVIGATION_URL_MISMATCH скидають мертву extension-owned вкладку, щоб retry міг створити чисту.
-- Lifecycle уніфіковано: Pause -> Continue, Pause -> Start, Stop -> Start і Stop -> Continue/Resume дозволені. Невизначений Send при Pause/Stop не стирається; продовження входить у recovery замість blind resend.
-- Busy-check залишається user-configured. Значення 3 означає повторну перевірку busy/generating chat приблизно через 3 секунди; це не cadence Session і не обмеження тривалості відповіді ChatGPT.
-- Exact automated qualification наведено у QA-0.9.13.txt. Фізичний owner Windows/Chrome/NVDA run не підміняється автоматизованими тестами.
-
-AUTOMATED EVIDENCE 0.9.13
-- Final counts recorded in QA-0.9.13.txt after package qualification.
-- Includes dedicated 6-Ordinary-Session virtual-night liveness regression with injected ambiguous Send and dead-tab timeout faults.
-- Native Chromium phased interaction and keyboard/accessibility gates are required before release packaging is accepted.
-
---- ІСТОРИЧНИЙ СТАН 0.9.10 НИЖЧЕ ---
-
-CHATGPT АВТОПІЛОТ 0.9.10 — НІЧНИЙ MIXED-LOAD HARDENING / ПАРАЛЕЛЬНІ ORDINARY + SCENARIO
-
-СТАТУС 0.9.10
-- Це installable candidate зовнішнього multi-agent orchestration harness поверх перевіреного Autopilot Core.
-- Autopilot лишається deterministic runtime/control plane. Reasoning виконує Coordinator ChatGPT; одноразові Worker ChatGPT chats виконують окремі задачі; GitHub є зовнішньою технічною правдою та machine-readable control plane.
-- 0.9.10 продовжує 0.9.8 і спеціально harden-ить нічний mixed-load: кілька Ordinary Sessions + кілька Scenario-managed Sessions в одному Chrome-профілі без старого profile-wide starvation/barrier. Будь-яка unattended Session після SEND_CLICK_UNCERTAIN/SUBMISSION_UNCERTAIN тепер verification-only: blind resend заборонено як для Scenario/Orchestration, так і для Ordinary. Exact observed /c/<conversation> identity зберігається для recovery.
-- Перероблено профільне виконання: до 10 незалежних Session operations працюють паралельно за замовчуванням (технічна межа 32); 5 ordinary + 5 scenario-managed окремо протестовано. Chrome tab I/O не тримає serialized state-update queue; стартові / та /g/<slug> отримують окремі owned tabs, а збій однієї вкладки не блокує інші.
-- Старий 90-секундний cross-session barrier і profile-wide Send lock прибрані з сучасного submit path. Exact-once/restart safety належать durable operation кожної Session; глобальна пауза лишається тільки для підтвердженого ChatGPT rate limit і має один незсувний profile.rateLimitUntil — паралельні повторні детекції не продовжують її.
-- Exact 0.9.10 qualification наведено у QA-0.9.10.txt; окремо перевіряються same-conversation ownership conflict, Ordinary ambiguous-send verification-only та bounded scenario recovery. Фізичний owner Windows/Chrome/NVDA/API-key run все ще не можна підміняти автоматизованими тестами.
-- Physical owner-Chrome/Windows multi-day acceptance ще НЕ заявлено як PASS.
-
-MULTI-AGENT ORCHESTRATION V2
-- Coordinator chat живе bounded window і має durable generation/turn identity. За замовчуванням maxCoordinatorTurns = 10, але policy конфігурована.
-- Кожен coordinator turn зобов'язаний заново перевіряти live GitHub; chat history не є authoritative project state.
-- Coordinator single-flight: один project/profile не має двох reasoning turns одночасно. Completion/watchdog/recovery events durable і coalesce-яться.
-- Coordinator prompt не надсилається повторно, якщо exact turnId уже має positively verified Send. Ambiguous/unresolved Core operation лишається fail-safe authority.
-- Після вичерпання turn limit створюється fresh coordinator generation; старий chat стає historical, новий отримує master prompt + bounded machine handoff, а не весь transcript.
-
-COMPLETION-DRIVEN ROLLING WORKER POOL
-- Нові production workers за замовчуванням запускаються у fresh ChatGPT chats: одна independent task -> один disposable chat.
-- Worker lifecycle durable: QUEUED, LAUNCHING, ACTIVE/BUSY, COMPLETED, FAILED/BLOCKED, RATE_LIMITED, STALE/CANDIDATE, CANCELLED, SUPERSEDED, MANUAL_REVIEW.
-- Завершення будь-якого worker створює WORKER_TERMINAL event і якнайшвидше будить coordinator; система не чекає найповільнішого worker і не працює фіксованими batch waves.
-- Coordinator може повернути zero tasks / NO_ACTION. Новий coordinator tick не означає нові workers.
-- desiredActiveWorkers адаптивний, але ніколи не перевищує user-configured absoluteMaxWorkers.
-- Dependencies, exact-once task identity, not-before/expiry та exclusive conflict_key блокують небезпечний duplicate/conflicting launch.
-- CONTINUE_EXISTING_WORKER дозволений лише як explicit task mode; default — FRESH_CHAT.
-
-5-ХВИЛИННИЙ WATCHDOG = RECONCILE, НЕ SPAWN
-- Watchdog за замовчуванням ~5 хвилин і служить self-healing/reconciliation.
-- Він перевіряє durable coordinator/worker state, pending events, rate-limit/backoff, stale-probe evidence і scheduling deadlines.
-- Watchdog може wake coordinator, але не створює work сам і не зобов'язує coordinator створити work.
-- Нормальна відповідь coordinator: NO_ACTION / KEEP_RUNNING / tasks=[].
-- Completion event має operational priority; якщо completion і watchdog збігаються, вони входять в один single-flight turn.
-
-SELF-HEALING / BACKPRESSURE
-- Worker не вважається dead лише через довгий runtime. Healthy BUSY probe продовжує резервувати slot.
-- Повторні probe failures після stale threshold створюють лише WORKER_STALE_CANDIDATE event; Autopilot не запускає blind replacement. Coordinator мусить перевірити live GitHub.
-- Worker/coordinator RATE_LIMITED створює project-level backpressure і bounded retry; queued workers не fan-out-яться у гарантований rate limit.
-- Watchdog під час coordinator backoff coalesce-иться і не створює секундний hot-loop.
-- Lost tab hint не стирає durable coordinator/worker chat URL; completion probe може відкрити/перевикористати conversation URL без duplicate Send.
-
-CONTROL V2 — DIRECT CHAT PRIMARY + GITHUB FALLBACK
-- Основний канал: завершена відповідь ChatGPT coordinator закінчується strict CHATGPT_AUTOPILOT_CONTROL_V2 JSON block, який Autopilot застосовує напряму. GitHub є durable mirror/fallback; extension читає його read-only через https://api.github.com/*.
-- GitHub write token у Chrome-розширенні не потрібен і не зберігається.
-- Exact marker: <!-- CHATGPT_AUTOPILOT_CONTROL_V2 -->; schema_version = 2.
-- Control містить project_id, monotonic revision, coordinator_generation, generated_at/expires_at, mode та validated actions.
-- Allowlisted actions: NO_ACTION, SET_DESIRED_CONCURRENCY, ADD_TASKS, CANCEL_QUEUED_TASKS, SUPERSEDE_TASKS, PAUSE, RESUME, ROTATE_COORDINATOR, CONTROL_NOTE.
-- Remote control integers/IDs/schema fail closed; malformed control не породжує tasks.
-- Read-only «Перевірити GitHub control» працює до запуску coordinator і не мутує runtime/Sessions.
-
-CANONICAL CORE / RECOVERY
-- Другого scheduler немає. V2 materializes лише canonical one-task Sessions/Tasks; існуючий scheduler/executor є єдиною browser Send authority.
-- Cold start: спочатку Core recovery + deterministic alarms + orchestration reconciliation, потім тільки дозволяються sends.
-- Restart між worker completion event і coordinator turn не губить event.
-- Restart під coordinator/worker rate-limit зберігає той самий lease/worker і retry deadline.
-- Duplicate control revision, exact_once_key та already-delivered coordinator turn не виконуються вдруге після restart.
-- SUBMITTING/AMBIGUOUS та інші unresolved operations не стираються disable/rotation/control changes.
-- Дві активні Session не можуть одночасно володіти тією самою concrete /c/<conversation> identity: same-conversation bind serialized вузько по conversation key; друга Session fail-safe блокується без глобального profile lock.
-- Emergency STOP відкликає future orchestration authority, але не фальсифікує recovery evidence.
-
-OBSERVABILITY / ACCESSIBILITY
-- Options містить keyboard/NVDA-friendly V2 section: enable, project/control identity, master coordinator prompt, desired/max workers, watchdog, max coordinator turns, stale threshold, timings, Test control, Apply now, Emergency STOP.
-- Status показує coordinator generation/URL/turns/lease, desired/effective/max workers, worker counts, pending events, control revision, watchdog/provider/backoff state.
-- Raw secrets та величезні transcripts у status не показуються.
-
-СЦЕНАРНА РОБОТА
-- Окрема верхня вкладка з форматами «Цикли в чаті», «Двійки», «Аудитор + група», «Стан».
-- Кожен сценарний хід виконується через canonical Core Session/Task; окремого Send engine немає.
-- Крок промпта може повторюватися задану кількість разів; кілька кроків утворюють коло; після заданої кількості кіл можна створити нове покоління чатів.
-- У двійках зберігається точне партнерство. У режимі «Аудитор + група» аудитор не переходить далі, поки не завершилися всі працівники поточного кола.
-- Тайм-аут відповіді, заміна одного учасника або всієї команди, спеціальний аварійний промпт аудитору та bootstrap нового учасника є частиною durable state machine.
-- Роль, conversation URL, покоління, коло, крок, повтор і recovery state зберігаються після service-worker restart.
-- Scenario-managed Session не має окремого Send-двигуна і не отримує пріоритет над ordinary: обидва класи входять у спільний паралельний runtime; окремо перевірено 5+5 одночасно.
-- Dependency-blocked slot не матеріалізує Core Session/tab. Auditor first_audit snapshot незмінний через correction/replacement; worker/auditor correction+replacement мають bounded budget і fail-safe STOP замість нескінченного churn.
-
-LEGACY REMOTE DISPATCH V1
-- Попередній Remote Dispatch V1 код лишено як compatibility path, але його не можна enable одночасно з Orchestration V2.
-- Новий development authority — V2. Не будувати нові orchestration features поверх legacy sessions[] dispatch waves.
-
-КАНОНІЧНА КООРДИНАЦІЯ
-- GitHub Issue #121: active Orchestration V2 / GitHub control checkpoints.
-- Drive: 08_MULTI_AGENT_ORCHESTRATION_V2 — ChatGPT Autopilot Extension.
-- Drive 07_REMOTE_DISPATCH_V1 позначено SUPERSEDED.
-- Paused AI/model integration: GitHub Issue #120.
-
-AUTOMATED EVIDENCE 0.9.10
-- AI + Orchestration + Scenario + Parallelism: 340/340 PASS.
-- Legacy AI Manager: 18/18 PASS.
-- Core + integration: 248/248 PASS.
-- ChatGPT interaction: 112/112 PASS.
-- UI: 61/61 PASS.
-- Release gates: 14/14 PASS.
-- Reliability: 22/22 PASS in six isolated Node processes.
-- TOTAL: 815/815 PASS.
-- Native Chromium phased-interaction smoke: PASS.
-- Chromium keyboard/mode/accessibility smoke: PASS.
-- Multi-orchestra manager includes create/select/rename/pause/resume/delete/zero-state, namespaced runtime/config/alarms and duplicate-project isolation.
-- Physical-repair lineage retained: strict fresh-root Send proof, uncertain-send conversation rebinding, compatibility control parser and corruption-safe emergency STOP.
-- Chrome Web Store package gate now verifies root manifest, icons, MV3 CSP, no remote script/eval/new Function, deterministic packaging and Store-specific asset presence.
-- UI visual/accessibility gate now covers responsive layout, visible focus, forced-colors, reduced-motion, WCAG-AA light-palette contrast and per-orchestra action availability.
-- Final syntax/JSON/privacy scans and deterministic 0.9.10 packaging are release gates; точні результати фіксуються в QA-0.9.10.txt.
-
-НЕ ЗАЯВЛЕНО ЯК PHYSICAL PASS
-- реальний owner Chrome -> GitHub API V2 control -> coordinator Send -> worker Send end-to-end;
-- coordinator GitHub write action у конкретному ChatGPT account без ручної confirmation;
-- багатогодинний/багатоденний Windows + Chrome multi-profile run;
-- physical NVDA acceptance.
-
---- ІСТОРІЯ 0.7.0 ---
-
-ЩО ЦЕ
-0.7.0 зберігає перевірений multi-session автопілот, автономний AI Manager і AI Router та додає явну локальну привязку Chrome-розширення до Windows AI Gateway. Gateway більше не довіряє будь-якому chrome-extension:// origin.
-Система може збирати результат web-worker після конкретного Send, передавати його локальній/слабшій моделі,
-за правилами або AUTO підключати сильнішу модель, а потім передати короткий handoff у наступний web-prompt.
-
-AI-КОНТУР
-Chrome extension -> paired AI Gateway на 127.0.0.1:17621 -> Ollama / OpenAI-compatible local або remote HTTPS / OpenAI API.
-API key OpenAI не зберігається у Chrome-розширенні.
-
-ЦЕНТРАЛЬНА ЧЕРГА AI INFERENCE
-Один Gateway може обслуговувати кілька Chrome-профілів. Усі /complete проходять через одну FIFO-чергу:
-перший запит виконується, наступні чекають у порядку надходження. Це не дозволяє трьом профілям
-одночасно забити локальну модель RAM/VRAM. Черга bounded: за замовчуванням максимум 32 pending;
-AUTOPILOT_AI_MAX_PENDING дозволяє задати 1-256. При переповненні Gateway повертає HTTP 429
-AI_INFERENCE_QUEUE_FULL, не гублячи вже прийняті запити. /health та /status показують active/pending/maxPending.
-
-РЕЖИМИ AI ROUTER
-1. PRIMARY — завжди основна модель.
-2. STRONG — завжди сильна модель.
-3. HYBRID AUTO — primary сама ставить [[ESCALATE]], коли потрібна strong.
-4. HYBRID RULES — strong робить один review кожні N AI-запитів та/або N хвилин, потім повернення до primary.
-
-HYBRID COST GUARDS
-За бажанням можна задати:
-- мінімум N хвилин між автоматичними strong-pass;
-- максимум N автоматичних strong-pass за годину.
-0 означає «без обмеження». Ручний одноразовий strong-pass лишається явною ручною дією.
-
-AUTONOMOUS AI MANAGER
-Manager реагує на verified Send, COMPLETE, repeated errors, recovery і нові web-worker reports.
-Allowlisted actions: CONTINUE, HANDOFF_NEXT, safe RETRY_NOW, PAUSE_SESSION, RESUME_SESSION,
-опційний RESTART_COMPLETED_SESSION тільки після normal one-pass COMPLETE. Manual Stop не перезапускається.
-
-AI-КЕРУВАННЯ ТАЙМІНГАМИ СЕСІЇ
-Окремий перемикач «Дозволити AI Manager змінювати тільки безпечні таймінги сесії» відкриває TUNE_SESSION.
-Модель може змінити лише: minimum Send interval 1-1440 хв, pre-send 1-30 с, busy-check 1-30 с,
-retry backoff 5-3600 с. Prompt, URL, task list, run mode, retry policy і rate-limit hold через TUNE_SESSION не змінюються.
-SUBMITTING/AMBIGUOUS не тюняться. Зменшення інтервалу не скорочує вже встановлений nextAllowedSendAt.
-
-DECISION HISTORY
-У панелі зберігаються останні 50 рішень AI Manager; показуються останні 20.
-Видно час, причину запуску, primary/strong route, summary та applied/skipped actions.
-
-WINDOWS AI GATEWAY — НАЙПРОСТІШИЙ ЗАПУСК
-Gateway постачається окремим ZIP. Найпростіше:
-1. Розпакувати ZIP Gateway.
-2. Запустити «ВСТАНОВИТИ AI GATEWAY.cmd».
-3. Він копіює Gateway у %LOCALAPPDATA%\ChatGPT-Autopilot\AI-Gateway.
-4. Якщо Node.js 20+ відсутній, скрипт завантажує pinned official portable Node.js v24.15.0 Windows x64
-   з nodejs.org і перевіряє SHA256 ДО розпакування.
-5. За бажанням увімкнути автозапуск.
-6. Запустити «ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ.ps1».
-7. Протягом 5 хвилин у потрібному Chrome-профілі натиснути «Перевірити локальний Gateway».
+Збірка є кандидатом для перевірки на Windows Chrome. Перевірки зі змодельованим DOM не доводять серверне прийняття промптів чи нічну працездатність. Подробиці та точні результати: INCIDENT-11.0.11.md, QA-11.0.11.txt.
 
 
-ПРИВЯЗКА CHROME ДО GATEWAY
-- Без Origin локальні CLI/PowerShell diagnostics залишаються доступними.
-- Звичайний web-origin блокується.
-- Непривязане Chrome-розширення отримує GATEWAY_PAIRING_REQUIRED.
-- Локальний скрипт відкриває pairing-вікно лише на 5 хвилин.
-- OPTIONS/preflight не створює привязку; привязує тільки перший реальний request від валідного 32-char Chrome extension ID.
-- Після привязки інші extension IDs отримують GATEWAY_EXTENSION_NOT_PAIRED.
-- Pairing state лежить у config і переживає оновлення Gateway; пошкоджений state fail-closed.
-- Для іншого Chrome installation/profile є явний reset script.
+11 ПІЛОТ HIGH — 11.0.10 — ПОВТОРНА ПЕРЕВІРКА СЦЕНАРІЇВ
 
-OPENAI API KEY
-Для unattended OpenAI API:
-- у встановленій папці запустіть «НАЛАШТУВАТИ OPENAI API КЛЮЧ.ps1»;
-- ключ зберігається як Windows DPAPI ciphertext для поточного Windows-користувача;
-- plaintext передається тільки процесу Gateway при запуску;
-- Chrome extension, JSON session profiles і diagnostics ключ не отримують.
+11.0.10, 2026-10-02T01:17:36+02:00: Виправлено чергу пробудження 15 сценарних вкладок, конфлікт спостереження з Send, очікування розмороження Chrome та вибір актуальної кнопки після активації. Відмова до фізичного Send не блокує перше надсилання. Захист від повторного Send і хибних лічильників збережено. Подробиці: CHANGES-11.0.10.txt, INCIDENT-11.0.10.md, QA-11.0.10.txt.
 
-OPENAI-COMPATIBLE API KEY
-Для generic OpenAI-compatible API (не лише локального LM Studio) можна окремо запустити
-«НАЛАШТУВАТИ OPENAI-COMPATIBLE API КЛЮЧ.ps1». Ключ зберігається як Windows DPAPI ciphertext
-у config\compatible-key.dpapi, автоматично підхоплюється one-click та Windows autostart Gateway і видаляється
-із environment батьківського PowerShell після запуску. Окремий скрипт видаляє збережений compatible key.
+Оновлення: розпакуйте 11.0.10 поверх тієї самої папки, натисніть «Оновити» на наявній картці chrome://extensions. Дані залишаються в тій самій встановленій копії. Не створюйте другу копію розширення.
 
-OLLAMA / LM STUDIO
-Ollama default: http://127.0.0.1:11434.
-LM Studio/OpenAI-compatible default: http://127.0.0.1:1234/v1.
-Адресу compatible server змінюйте через «НАЛАШТУВАТИ OPENAI-COMPATIBLE АДРЕСУ.ps1». Для remote API дозволено лише HTTPS; HTTP дозволений тільки localhost/loopback. Старий LM Studio script лишено як alias для сумісності.
+11 ПІЛОТ HIGH — 11.0.9 — ВІДНОВЛЕННЯ СПОСТЕРЕЖЕННЯ ЗА СЦЕНАРІЯМИ
 
-AUTOSTART / STOP / RESTART
-- «УВІМКНУТИ АВТОЗАПУСК GATEWAY.ps1» створює shortcut у Windows Startup.
-- «ВИМКНУТИ АВТОЗАПУСК GATEWAY.ps1» прибирає його.
-- «ЗУПИНИТИ GATEWAY.cmd» використовує PID-файл і не завершує process, якщо command line не схожий на gateway.mjs.
-- «ПЕРЕЗАПУСТИТИ GATEWAY.cmd» робить safe stop/start.
+11.0.9, 2026-10-02: Сценарний Send у фоновій вкладці спершу активує власну вкладку у прив’язаному вікні. Якщо Chrome заморозив вкладку з відповіддю, Пілот обмежено активує її, читає відповідь і повертає попередню активну вкладку, якщо користувач її не змінив. Жодного другого Send під час перевірки. Старий захист від хибного «надіслано» для одного лише переходу URL збережений. Повний запис: CHANGES-11.0.9.txt, INCIDENT-11.0.9.md, QA-11.0.9.txt.
 
-WEB-WORKER REPORTS / RECOVERY
-- Report прив'язаний до assistant-message baseline конкретного verified Send.
-- Старий assistant response не приймається як новий report.
-- Streaming response poll-иться bounded time.
-- Pending report jobs і AI events durable у chrome.storage та survive Chrome restart.
-- Gateway/model failure не губить queue; retry має bounded exponential backoff.
+Оновлення: розпакуйте 11.0.9 поверх наявної папки розширення та натисніть «Оновити» на тій самій картці chrome://extensions. Не встановлюйте другу копію, щоб зберегти поточні дані та запуски.
 
-RATE LIMIT
-Benign «Забагато запитів» -> «Зрозуміло»: якщо модалка зникла, SAME request/SAME tab продовжується одразу.
-Налаштовуваний cooldown застосовується тільки як fallback, якщо блокування не зникло або повернулось.
+11 ПІЛОТ HIGH — 11.0.8 — ВІКНО КОЖНОГО ПУЛУ ТА КЕРУВАННЯ ЗАПУСКАМИ
 
-ВАЖЛИВА МЕЖА
-Автоматизовані тести не є фізичним Windows/Chrome/Ollama/OpenAI acceptance на конкретному ПК.
-Gateway installer/DPAPI/Startup scripts статично перевірені, але фізичний Windows PASS потребує запуску користувачем.
+11 ПІЛОТ HIGH — 11.0.8 — 2026-10-01T20:31:02+02:00
+
+1. Кожен сценарний пул закріплено за точним вікном вкладки Пілота, з якої натиснуто «Запустити». Всі учасники та заміни успадковують одне вікно. Не використовуються фокус браузера чи кількість чатів для вибору іншого вікна. При втраті прив’язаного вікна немає fallback-створення вкладок.
+2. Два пули одного Chrome-профілю працюють у різних вікнах. Кнопка розширення відкриває Пілот саме у своєму вікні. Перенесена вкладка блокується до вставлення/Send. Перевіряються source tab, sender, window, ownership у transport/native/probe.
+3. Прогрес пулу: «Надіслано промптів» та «Отримано відповідей» — сукупно за всі паралельні чати, включно з завершеними поколіннями. Спроби, заміни і технічні проекції залишені у діагностичному звіті.
+4. Завершена відповідь з точною поточною APSTEP-міткою може підтвердити неоднозначне або FAILED_SAFE надсилання. Це read-only перевірка власної вкладки без повторного Send. Зарахування через той самий durable scheduler/counter, один раз. Старий текст або невідправлений редактор не є доказом.
+5. Крутілки 0–60 секунд: пауза після відкриття вкладки та очікування після натискання «Надіслати». Є у спрощених, звичайних і сценарних налаштуваннях, збереженні та JSON імпорті/експорті. Пауза перед Send збережена. Focus restoration виконується після dwell/ack, не одразу після кліку. Deadline зберігається для restart/timeout і не дає почати інший цикл/закрити вкладку раніше.
+6. У «Сеансах» два окремі керовані списки: спрощені сесії і сценарні пули. Для кожного є «Відкрити та редагувати» й «Зупинити». Оновлення лічильників зберігає DOM кнопок і клавіатурний фокус.
+7. На першому оновленні старі сценарні запуски призупиняються зі збереженням чатів і прогресу: їх старе автоматично вивчене вікно не доводить місце запуску. Відкрийте Пілот у потрібному вікні, виберіть пул і натисніть «Запустити». Власні вкладки саме цього пулу, якщо потрібно, переміщуються у це вікно; чужі вкладки не рухаються. Resume без прив’язки відхиляється. Непідтверджений FAILED_SAFE фізичний Send не повторюється після Start/Resume.
+8. У звіті додано випадковий локальний ідентифікатор профілю. Звіти доводять змішування вікон. Міжпрофільний/міжакаунтний механізм і кібератака не доведені; credentials/account-session/network contents не читаються.
+
+Збережено: High до 3 дорадчих спроб без блокування Send; конфігуровані 5/15 паралельних чатів; один сценарний чат відкритий до всієї послідовності або hard 35/45-minute timeout; звичайний open-close лише після verified Send; state не скидається; попередні історії збережені.
+
+Оновлення: розпакуйте у папку поточної версії та «Оновити» на тій самій картці chrome://extensions. Не встановлюйте другу копію й не видаляйте дані. Час очікування не означає підтвердження надсилання. Windows/Chrome/NVDA і фактична доставка ChatGPT потребують live перевірки; mock DOM/Chrome не є server receipt.
+
+Попередні інструкції та історія:
+
+11 ПІЛОТ HIGH — 11.0.7 — ВІДПОВІДЬ У ФАКТИЧНІЙ ВКЛАДЦІ
+
+Agent: запізнілі відповіді команд не перемикають вибране завдання. Stop працює під час довгої команди; фоновий список має тільки один незавершений запит. Підтверджене створення зберігає ID навіть після помилки запуску/читання. Результат Specialist показується як перевірений лише за збереженим VERIFIED станом плану та execution ownership.
+
+У сценарній роботі одна вкладка залишається відкритою протягом усіх налаштованих промптів і відповідей. Перевірка відповіді не закриває та не відкриває чат заново.
+Вкладка закривається після завершення циклу або налаштованого таймауту очікування відповіді. Якщо задано 35 чи 45 хвилин, ознака streaming не продовжує цей таймаут. Новий чат відкривається після підтвердженого закриття старого, у збереженому робочому вікні, згідно з бюджетом замін.
+Після паузи сценарій продовжує ту саму послідовність. Явний Stop або видалення сценарію залишається окремою командою завершення.
+
+Кожен новий сценарний промпт має унікальну службову мітку кроку. Вона допомагає зіставити відповідь після зміни ідентифікаторів у ChatGPT. Прогрес змінюється тільки після підтвердженої, стабільної відповіді за поточним повідомленням. При зміні адреси Пілот читає ту саму власну вкладку й приймає конкретну нову адресу тільки за поточною службовою міткою. На старий непідтверджений URL живий чат не переводиться. Сценарний Send потребує появи саме цього повідомлення, ознаки генерації/нової відповіді та стабільної конкретної адреси; клієнтська поява повідомлення сама по собі більше не зараховується. Остання отримана відповідь зберігається локально разом із прогресом.
+Помилка відповіді може пройти один Retry і одне перезавантаження тієї самої вкладки лише за незмінної підтвердженої адреси; її фізична заміна до таймауту не виконується. Заморожена вкладка очікується без перемикання фокусу та частих перезавантажень. Якщо Chrome вивантажив документ, застосовується одне обмежене відновлення; якщо вкладка справді зникла, відновлюється точний збережений URL.
+Кожен запущений сценарний учасник має одну власну робочу вкладку: пул 15 чатів може тримати 15 вкладок. Ліміт одночасних операцій регулює запити Core, а не кількість відкритих сценаріїв. Тимчасові вкладки спрощених сеансів мають окремий бюджет. Черга без фізичної вкладки не витрачає replacement budget; відкритий чат із непідтвердженим Send завершується за налаштованим тайм-аутом. Chrome може сам звільняти пам'ять вкладок.
+
+Спрощені сеанси з open-close зберігають правило закриття після підтвердженого Send. High збережено: три спроби вибрати високий рівень, потім попередня поведінка продовження з поточним рівнем, якщо High недоступний.
+
+Оновлення зі збереженням стану:
+1. Зупиніть або призупиніть старий Пілот.
+2. Розпакуйте архів і замініть файли в тій самій папці, з якої Chrome уже завантажує розширення High.
+3. У chrome://extensions натисніть «Оновити» на тій самій картці. Не встановлюйте другу копію як окреме розширення.
+4. Повторіть для кожного профілю Chrome. Якщо акаунт вийшов із ChatGPT, увійдіть вручну.
+
+Датована історія, докази зі звітів і відомі межі перевірки: HISTORY-2026-09-30.md, CHANGES-11.0.5.txt, QA-11.0.5.txt.
+
+ІСТОРИЧНІ НОТАТКИ 11.0.0
+
+ПРИЗНАЧЕННЯ
+- Один поточний продукт ChatGPT Автопілот без паралельних user-facing версій.
+- Технічна версія Chrome/package цього оновлення: 11.0.2.
+- User-facing номер дня: 10.
+- Архів для користувача: «10 Пілот HHMM DDMM.zip».
+- У межах 2026-09-26 номер 10 не змінюється; нові виправлення змінюють тільки часову мітку архіву.
+- Наступний календарний день розвитку використовує наступний цілий номер.
+
+ПОТОЧНА КОНВЕРГЕНЦІЯ
+- ChatGPT Work acknowledgement/recovery після реального SUBMISSION_UNCERTAIN.
+- Scenario ChatGPT recovery: семантичний Retry -> bounded same-URL reload -> bounded same-URL reopen; browser unknown не є response timeout.
+- CHAT_CYCLE: одна послідовність промптів = один фізичний чат.
+- Scenario Work JSON: шаблон / імпорт / експорт.
+- Спрощені сесії: звична компактна форма поверх чинного Core.
+- Інтерфейс очищено від tutorial-пояснень; залишено runtime/status та критичні safety-попередження.
+- Release packaging формує окреме дружнє ім'я архіву без старих user-facing номерів.
+
+СТАН
+- Це candidate, доки exact-head CI та installed Chrome acceptance не завершені.
+- HUMAN_TESTED=false.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.
 
 BINDING ACCESSIBILITY ARCHITECTURE LAW
 

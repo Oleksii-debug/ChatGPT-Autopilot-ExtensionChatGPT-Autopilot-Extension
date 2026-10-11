@@ -1,0 +1,420 @@
+# ChatGPT Autopilot — development history
+
+## 2026-10-01T01:31:00+02:00 — 11.0.5 Agent owner view
+
+Agent selection/read/command races, durable Create acknowledgements and verified Specialist progress repaired over 11.0.4. See HISTORY-2026-09-30.md, CHANGES-11.0.5.txt and QA-11.0.5.txt. Broader baseline Agent API/model-default qualification gaps remain explicitly recorded.
+
+
+## 2026-10-01T01:01:46+02:00 — 11.0.4 High incident repair
+
+See HISTORY-2026-09-30.md for the dated incident, rejected alternatives, preserved prior history, and CHANGES-11.0.4.txt / QA-11.0.4.txt for changes and qualification. Agent owner-view WIP remains checkpointed separately and is excluded from this incident release.
+
+
+## 2026-09-26 — Pool-level Scenario Work control and response-observation diagnostics
+- Follow-up truth defect from owner live UI: “current step 1/12; confirmed Send 3/12; completed responses 1/12”. The projection had mixed physical transport attempts with logical sequence progress. New invariant: sequenceVerifiedSends = completedResponses + at most one current in-flight verified Send. A row may therefore truthfully show logical 2/12, completed responses 1/12, physical Send attempts 3, retry/replacement attempts 1.
+- CHAT_CYCLE timeout/replacement never rewinds already completed logical steps. The planner reconstructs the next cursor from durable confirmed completions. If an old corrupted runtime already resent START after progress, the eventual duplicate-stage response is observable but non-advancing. Exhausted timeout replacement budget yields ERROR instead of a false COMPLETED state.
+
+
+- Owner live testing showed that physical CHAT_CYCLE members were manageable only one-by-one even though the user thinks of a launched 3/8/10/15-chat pool as one scenario. The Scenario Work tab could display individual slots but had no pool-level pause/resume/stop/edit path; pool member Save was deliberately disabled.
+- Product direction: Scenario Work is the aggregate control surface. One pool is one list item. Physical chats remain execution/detail objects visible in Sessions/global status/diagnostics.
+- Added pool-wide lifecycle authority for Start, Pause, Resume and Stop. Transitions update every member under one durable manager update, bump owner epochs to cancel stale in-flight work, synchronize managed Core sessions, and reconcile alarms.
+- Added safe in-place pool editing while PAUSED/STOPPED. Runtime timing/recovery controls, replacement budget and first-prompt stagger propagate to all members without resetting step/repeat/launch counters. Waiting-response deadlines are renewed from the edit point using the new configured timeout.
+- Existing pool program structure is fail-closed: launch URL, step identities, prompt bodies and repeat counts cannot be changed in place. This prevents a partially advanced pool from silently switching programs.
+- Scenario Work list now collapses physical members into one pool item and places lifecycle controls directly beneath the list for NVDA/keyboard discoverability. Structural prompt controls are read-only for created pools; aggregate runtime state explains what can be edited.
+- Added bounded assistant-response telemetry to Core diagnostics. It records observation state/code, completion flag, wait duration, timeout remaining, baseline evidence, probe errors, streaming-based timeout extension, and actual timeout. No prompt or assistant body is logged. State changes log immediately; stable waits heartbeat every five minutes, with at most one-minute cadence near deadline.
+- Regression coverage added for whole-pool pause/edit/resume without progress loss, structural mutation rejection, aggregate pool retrieval, response-observation diagnostics, command routing, and aggregate UI contracts.
+- Branch authority while under qualification: `hotfix/pilot10-scenario-pool-control-diagnostics-20260926` based on release head `5a3595716a3c450c6aba55d638bada2b16c06a8e`. Exact merge SHA and archive hash must be recorded after terminal qualification.
+
+## 2026-09-26 — Scenario pool starts survive closing the options page
+
+- Found a separate real launch defect: the Scenario UI previously started pool members in a JavaScript loop with setTimeout between START commands. Closing the options page partway through could strand the remaining slots STOPPED; delayed Core execution could bunch physical first sends after that UI timer.
+- Replaced this with one CREATE_SCENARIO_CHAT_POOL command using autoStart=true and staggerSeconds=0..60. The manager persists all slots as RUNNING in one store update, records each slot's initialStartAt, and schedules starts through its existing background alarm. The first launch time and pool-specific spacing survive service-worker restart. A delayed wake releases one overdue initial slot, then waits the requested gap before the next, avoiding a catch-up burst. Explicit physical Send timing still depends on Core and Chrome; installed-browser confirmation remains outstanding.
+- Added a seven-chat regression: options page closes after one command, manager restarts, at t+30s only two chats have launched, repeated wake at the same time launches no duplicate, then one more launches at each 10s boundary until seven active chats. Existing five-slot 17-turn, three-slot 10-turn/50-replacement and shared budget regressions remain green; Work interaction 11/11 and current UI 32/32 were also verified locally on relevant source.
+- No Orchestration changes. This source-level checkpoint is not a claimed installed Chrome PASS.
+
+## 2026-09-26 — Seven-chat Scenario first-send stall: diagnostic-to-code analysis
+
+- Owner's 0.9.19 report at 23:19:55 UTC: seven Scenario CHAT_CYCLE sessions all RECOVERING with zero confirmed sends; repeated RECOVERY_TEXT_ACK_PENDING. Safe diagnostics said messagesBefore=0, messagesAfter=1, composer empty, mainExactMatches=0, hidden tab. The first physical Send appeared, but exact operation-bound user-message acknowledgement failed. Core therefore never entered response observation and Scenario could not advance to prompt two.
+- The attached 0.9.19 adapter searched historical author-role/test-id/article nodes. The supplied ChatGPT Work HTML represents user messages with data-user-message-bubble="true" inside keyed units and has none of those old role/article markers. A cleared composer and new chat URL alone are insufficient to confirm the exact Send.
+- Pilot 10 already introduced Work-bubble acknowledgement. This repair chooses Work bubbles as the sole message units when present, reads the precise whitespace-pre-wrap prompt body to exclude surrounding controls, and recognizes a keyed assistant unit ending :assistant when it contains the semantic assistant markdown body. This strengthens Send confirmation and assistant completion before the second prompt.
+- Scenario manager code review: completed assistant response marks the same CHAT_CYCLE participant READY, increments the step, preserves chat URL/Core Session, and schedules each pool slot independently. Completed sequence retires that chat and consumes one replacement from the shared budget; there is no all-seven completion barrier.
+- Evidence boundary: old diagnostic proves the installed 0.9.19 stall, not an installed Pilot 10 success. Supplied HTML captures thinking but no completed assistant reply; keyed-assistant fallback remains to be verified in installed Chrome. At the owner's explicit request no tests were run for this checkpoint. No orchestration code was changed; ambiguous effects never trigger blind resend.
+
+Additional evidence on this Work-UI repair: user and assistant Work units are restricted to the main conversation surface. The user bubble text is extracted from its prompt body; sidebar copies and action controls are ignored. Focused interaction regressions: 11/11 passed including second/third Send, sidebar exclusion and keyed assistant reply. Scenario Core: five chats ×17 and three uneven chats ×10 with 50 replacements plus shared budget 3/3 passed. Scenario UI/profile: 17/17 passed. These are deterministic source-level checks; installed Pilot 10 Chrome acceptance remains unverified. One copied historical UI options-contract test still expects deleted tutorial prose and orchestration-specific copy (29/32); the current exact-head GitHub UI gate is authoritative for that obsolete fixture.
+
+This file is the repository-local handoff ledger for material product repairs and release checkpoints. It supplements Git history and the Drive documents `09_ІСТОРІЯ_ЗМІН` and `01_CURRENT_STATUS`. Never treat a status line as acceptance unless the listed evidence gate is actually complete.
+
+## 2026-09-26 — Scenario Work real-run recovery and version integrity
+
+### User evidence
+- Supplied installable archive reports version 0.9.19.
+- Supplied diagnostic report came from a real 7-chat Scenario Work pool.
+- Intended per-chat sequence: startup prompt ×1, continuation ×10, final prompt ×1 = 12 messages.
+- Observed: each real ChatGPT Work chat accepted the first prompt, but the extension did not send the second prompt.
+- Durable diagnostic state: 0 confirmed sends; SUBMISSION_UNCERTAIN / AMBIGUOUS; repeated RECOVERY_TEXT_ACK_PENDING.
+- UI also displayed 1/60 because the 12-message sequence was multiplied by legacy rounds=5.
+
+### Canonical source at start
+- Repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+- main: 372cf294eec087fa7c355d14885140af1ad9f13d
+- Last frozen canonical release metadata: 0.9.19.
+- The user-supplied 0.9.19 ZIP hash did not match the frozen canonical 0.9.19 installable hash in SOURCE_TRUTH.json, so it is evidence/input rather than source authority.
+
+### Root causes
+1. Current ChatGPT Work uses semantic message surfaces not counted by the older acknowledgement selector set. A real Send could consume the composer and create a conversation while verification still saw no canonical user turn, holding the operation in ambiguous recovery.
+2. CHAT_CYCLE reused generic rounds-per-generation semantics. That multiplied the prompt sequence even though the product intent is one configured sequence per physical chat.
+3. Version identity was duplicated across manifest.json, package.json, package-release.mjs, package-source.mjs, and hardcoded GitHub Actions artifact paths. That allowed materially later development bytes to keep the old 0.9.19 label.
+
+### Repair lanes
+- PR #418 / `fix/work-ui-ack-and-five-chat-cycle`
+  - previous inspected head: 3fc4dd9303281b9f40480eab7ad2b1e003e04f6c
+  - repaired head: fc10ac376255f174e35f5e44b0a5834df746e41a
+  - owns Work acknowledgement, shared persistent pool, one-sequence CHAT_CYCLE semantics, migrated persisted pool config, status clarity and regressions.
+- PR #420 / `feat/scenario-profile-import-20260925`
+  - pre-rebase head: 059c462b7211d9e5d459600eef1f9320ffa6b164
+  - rollback branch: `backup/scenario-profile-import-20260926-059c462`
+  - reconverged head before release prep: 91097879c3757e753d1484a7407414926f27e9a0
+  - owns portable Scenario Work JSON, downloadable 12-message template, import/export and related UI/profile tests.
+- Release-prep lane: `release/0.10.0-candidate`
+  - stacked on #420.
+  - owns unique version identity, release/source packager version authority, dynamic CI artifact naming, candidate changelog/QA and this history ledger.
+
+### Verification state
+- #418 exact-head Core / Interaction / UI / Release workflows were queued when last checked.
+- #420 exact-head UI / Release workflows were queued when last checked.
+- No green result is inferred from queue state.
+- No installed-extension Windows/Chrome acceptance has been run from this release-prep lane yet.
+- HUMAN_TESTED=false.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.
+
+### Secrets and rollback
+- No API keys, OAuth credentials, token.json, cookies, browser profiles, private conversation bodies or private diagnostic text are committed.
+- #420 pre-rebase bytes remain recoverable through the backup branch above.
+- Frozen 0.9.19 SOURCE_TRUTH.json is intentionally left unchanged until a Pilot 10 candidate is actually built and its hashes/qualification are known.
+
+### Next gate
+Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-test assumptions that still hardcode 0.9.19; build deterministic Ubuntu and Windows candidates; only then update SOURCE_TRUTH.json with measured 0.10.0 artifact hashes and run the real installed-extension multi-chat acceptance.
+
+## 2026-09-26 — Daily Pilot identity policy
+
+- User-facing builds use one whole-number Pilot identity per development day.
+- 2026-09-26 is Pilot 10. Same-day fixes do not create 10.1/10.2/etc.; only the archive timestamp changes.
+- Friendly archive format: `10 Пілот HHMM DDMM.zip`, timestamped from the exact source commit in Europe/Bratislava.
+- The next development day advances to the next whole Pilot number.
+- Chrome/npm technical constraints use `10.0.0`; manifest `version_name` exposes `10` as the human-facing release number.
+- This file is the concise English technical handoff ledger; append material changes with date/time, exact SHA, problem, repair and verification state.
+- Drive history mirrors material checkpoints; user-facing archives do not carry parallel historical release names.
+
+## 2026-09-26 — High-effort pre-insert gate and interaction regression repair
+
+### Requirement
+- Every automatic ChatGPT prompt must run with reasoning effort High or higher.
+- The extension must verify/select effort before it inserts the prompt, not after Send.
+- Extra High satisfies the policy and must not be downgraded.
+
+### Implementation
+- Added replay-safe `ENSURE_HIGH_EFFORT` between `CHECK_ONLY` and `INSERT_ONLY`.
+- Added semantic detection for direct thinking/reasoning controls and model-picker layouts.
+- High selection is re-verified; missing/ambiguous/unproven controls fail closed with zero prompt insertion and zero Send.
+- Picker cleanup runs on failed proof paths.
+- Fixed inherited #418 nested-user-message acknowledgement regression by keeping the established body selector query separate from the new Work user-bubble query.
+
+### Verification checkpoint
+- Implementation/test checkpoint before this ledger commit: `4c6d654314731c8f13c3c363a5b84145aa77b09d`.
+- The first #422 Interaction CI exposed two failures: Ukrainian `Середній` normalization and inherited #418 nested-body acknowledgement.
+- Ukrainian normalization now uses NFKC so Cyrillic `й` is preserved.
+- Nested-body acknowledgement selector compatibility is repaired.
+- Exact post-repair CI remains authoritative; no PASS is claimed until terminal success.
+
+### Integration authority
+- PR #422 is the only final Pilot 10 integration/package target.
+- Source PRs #418/#420 and closed #421 are provenance only.
+
+
+## 2026-09-26 03:54 Europe/Bratislava — Pilot 10 CI repair and live-main convergence
+
+### Problem
+- High-effort enforcement changed the intentional executor sequence, while older deterministic fixtures still modeled CHECK_ONLY -> INSERT_ONLY.
+- Owner-requested concise UI removed tutorial/help prose, while older UI tests still required those paragraphs and aria-describedby targets.
+- Release tests still contained stale 0.9.19/version-boundary assumptions.
+- Standalone CHAT_CYCLE tests still expected a manufactured second generation, contrary to the one-sequence-per-physical-chat contract.
+- Pilot 10 was 13 commits behind live main because parallel workers had landed native filesystem/companion work.
+
+### Repair
+- Updated Core/reliability/parallel fake transports to model CHECK_ONLY -> ENSURE_HIGH_EFFORT -> INSERT_ONLY without weakening product fail-closed behavior.
+- Updated UI contracts to require native controls and concise status while forbidding field-help/notice/tutorial prose.
+- Scenario import reports a short per-chat message count dynamically.
+- Version tests derive technical identity from package.json / manifest.version_name; Unicode Pilot README boundary fixed.
+- Release security fixture now carries daily Pilot version_name so the forbidden gateway runtime-state check reaches its intended assertion.
+- Standalone CHAT_CYCLE manager tests now assert one physical sequence and no automatic replacement generation.
+- Copied exact current-main blobs for the six disjoint native filesystem/companion files and tests, then merged current-main ancestry without force-push.
+
+### Verification
+- Pre-main-convergence repair head 27e6e92d82161e5c36581889e43c2d8f6c1badf1: Core deterministic tests SUCCESS.
+- Interaction High-effort suite had already passed on the preceding canonical Pilot 10 implementation.
+- Main convergence head 42fb45f03cd074937c35625a6460669b06e688a2: behind current main = 0, merge-base = b7cf6dd3e505a574b52d3409aa79f48a64953c59.
+- Full exact-head UI / Interaction / Linux+Windows release qualification remains authoritative; queued is not PASS.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.
+
+
+## 2026-09-26 04:20 Europe/Bratislava — Pilot 10 release-gate reliability harness repair
+
+### Problem
+- Exact head `ccb4e27a0f5608bc54e0b1925dffef22ebc5788d` had Core, Interaction and UI workflows green.
+- Release package qualification had one remaining failure in `agentic-multisession-matrix.test.js`.
+- The product executor correctly required `CHECK_ONLY -> ENSURE_HIGH_EFFORT -> INSERT_ONLY`, but this reliability fake transport still implemented the older sequence and rejected `ENSURE_HIGH_EFFORT`, preventing four one-pass Sessions from terminating.
+
+### Repair
+- Added explicit `ENSURE_HIGH_EFFORT` support to the reliability transport fixture.
+- Fixture returns deterministic READY evidence with `effortLevel=high` and `EFFORT_HIGH_CONFIRMED`.
+- No product bypass or downgrade of the High-effort gate was introduced.
+
+### Verification
+- Repair commit: `18aa6f0e6231fcb424ecba027e6e88c7a65180e8`.
+- Previous exact-head evidence: Core SUCCESS; Interaction SUCCESS; UI SUCCESS; Windows release package gate SUCCESS; Linux/package job blocked only by this reliability harness failure.
+- Exact post-repair Actions remain authoritative; no final release PASS or installed-Chrome claim until terminal CI and owner acceptance.
+
+
+## 2026-09-26 04:43 Europe/Bratislava — High-effort reliability assertion repair
+
+### Problem
+- Exact head `9125a84c59718ad27f565bb50c94bb5443fa93f1` had Core, Interaction and UI workflows PASS, and the Windows release package gate PASS.
+- Linux/package reliability still failed in `agentic-multisession-matrix.test.js`.
+- The fixture had learned the new `ENSURE_HIGH_EFFORT` mode, but a legacy pre-branch assertion still required every mode except `CHECK_ONLY` to carry the task prompt.
+- `ENSURE_HIGH_EFFORT` intentionally carries an empty prompt because effort is proven before insertion, so the fixture threw before reaching its High-effort handler.
+
+### Repair
+- Commit `f30e8f45bcc2aaa5675ecfc70001acda1524f9be` excludes both `CHECK_ONLY` and `ENSURE_HIGH_EFFORT` from the prompt-payload assertion.
+- Product runtime and fail-closed High enforcement are unchanged.
+
+### Verification state
+- Previous head evidence remains: Core PASS; Interaction PASS; UI PASS; Windows release gate PASS.
+- Exact post-repair CI on the current head is authoritative and must be checked before final release delivery.
+
+## 2026-09-26 05:05 Europe/Bratislava — Scenario Work five-slot truth and lifecycle
+
+### Owner report and source
+- Owner's installed 0.9.19 diagnostic recorded seven Scenario chat sessions in RECOVERING / AMBIGUOUS with zero confirmed sends after their first visible message; subsequent prompts never launched. This evidence predates Pilot 10 and does not prove the same defect in current source.
+- Based on canonical Pilot 10 PR #422 head `05f103814fdadfe17ee250326700415f192a396a`; no orchestration code changed.
+
+### Repair and verification
+- Scenario state now obtains confirmed Send counts from the Core session and durable retired counts. The UI labels confirmed sends separately from the next prompt position; an ambiguous click does not advance the confirmed count.
+- Added a Core-gated five-slot 17-turn regression: independent initial slots, turns 2–17 in the same conversation URL, service-worker restart, single-slot retirement and replacement, old-session disabling despite a temporary tab-close failure, and other slots unchanged. Replaced the stale legacy direct test entry point with this current contract.
+- Focused tests: 12/12 passed, including Work second/third prompt recognition, shared replacement budget after restart, three-slot 50-replacement load, and the new five-slot lifecycle. These are simulated deterministic tests, not installed-extension E2E.
+- REAL_EXTENSION_E2E=BLOCKED: local Chrome/Chromium with MV3 load-unpacked is unavailable in this execution environment; cloud browser does not expose local extension installation. OWNER_WINDOWS_CHROME_VERIFIED=false.
+- GitHub commit/CI/ZIP identity to be filled by the succeeding material checkpoint; do not claim release PASS from an in-progress run.
+
+## 2026-09-26 13:50 Europe/Bratislava — Current model-picker slider blocker
+
+- Read live chatgpt.com model picker in user's secondary profile. Medium status 2/3 and High status 3/3 were observed after ArrowRight. No prompt sent. Adapter now verifies that semantic slider before insertion; 22/22 focused tests passed. Commit 22ccec3dc0d15b5e45088e786c225dc3ecfa74c9.
+
+## 2026-09-26 14:00 Europe/Bratislava — Simplified Sessions insertion stall
+
+- Owner provided two fresh 0.9.19 reports at 11:47 UTC. `трейд.` has cumulative confirmed send count 74; recent 1,000 event slice has 109 INSERTION_NOT_PROVEN retry events and one confirmed Send. `спорт.` has cumulative 112; recent slice has 107 retries and three confirmed Sends. These are old installed-version observations; they do not prove behavior of Pilot 10.
+- For both, CHECK_ONLY frequently returns READY, then INSERT_ONLY reports observedLength > expectedLength, equal normalized lengths, normalizedMatch=no. Thus the configured two-minute schedule is not the current bottleneck in the supplied slice; repeated failed exact insertion prevents Send. Logs omit prompt text, so the exact differing character(s) cannot be determined.
+- Pilot 10 now attempts one alternate DOM paragraph/input replacement after a failed insertion proof, waits for two consecutive exact editor observations, then allows the normal PREPARE_SEND gate. If editor model remains different, it still fails closed. Safe diagnostic adds compactMatch/nonWhitespaceMatch to separate whitespace reflow and changed characters next time.
+- Focused 28/28 tests PASS, including malformed long prompt recovered and model mismatch never sent; physical MV3 E2E remains blocked. This is a candidate repair pending installed Chrome verification.
+- Integration correction: the Core accepts insertion proof only under its existing `INSERTION_TEXT_PROVEN` contract. The repaired path now returns that code with `repair=alternate` in safe diagnostics; otherwise Core would have retried forever despite Interaction proving the draft.
+
+## 2026-09-26 14:10 Europe/Bratislava — Long-run test models aligned with Pilot 10
+
+- Four older long-run transport fixtures omitted the new ENSURE_HIGH_EFFORT phase. The two-hour ordinary test therefore reported zero sends despite no evidence of a production failure. The fake transport now confirms High as a real adapter would.
+- Two-hour cadence regression passes: approximately 60 verified sends in two virtual hours, including an ambiguous Send near turn 30. Diagnostic-derived single-session (>200 sends) and eight-hour six-session regressions also pass.
+- The mixed-runtime fixture still described a one-step Scenario Work chat but expected four completed turns; Pilot 10's CHAT_CYCLE correctly executes each configured step once. The fixture now defines eight distinct steps and preserves the same /c/ URL after first Send. Mixed 20-minute run passes across Ordinary Sessions, Scenario Work, Browser Agent and Orchestration simulation, including manager restart and tab-close faults. No production Orchestration code was edited.
+- The 12-combination exhaustive fixture also treated ENSURE_HIGH_EFFORT like a prompt-bearing Send phase and held all 36 tasks at zero progress for many simulated retries. It now exempts the pre-insertion phase from prompt equality and confirms High. The matrix passes in 13 seconds; this repaired test harness is a prerequisite for meaningful full-suite CI evidence.
+
+## 2026-09-26 14:20 Europe/Bratislava — Qualification and Mistral Agent handoff
+
+- Full local `npm test` on the current source tree: 3,225/3,225 PASS across 16 groups, zero failures. Deterministic release candidate ZIP built locally; installed Chromium test blocked because /usr/bin/chromium is absent. GitHub exact-head Core PASS; other workflows queued at checkpoint.
+- The owner’s Drive Mistral provider document records an active Free workspace and an API key. The secret was neither copied into the repository nor sent to any provider during this work. Windows Gateway already supports a Mistral preset, per-provider DPAPI key file, origin binding, model discovery, and AI Router routes for Browser Agent.
+- Fixed the Models page Gateway status to show each named endpoint (Mistral included) and whether its key is loaded; previously only an aggregate compatible-key flag and indistinguishable provider names were displayed. Added a concise Windows setup sequence to the Gateway README. UI 81/81 and Mistral/router focused 29/29 PASS. Live owner Windows Gateway and API acceptance remain unverified.
+
+## 2026-09-26 14:28 Europe/Budapest — First archive delivered; Agent draft work continues
+
+- Owner explicitly requested the archive now and continued Agent work afterward. Delivered the existing deterministic `ChatGPT-Autopilot-10.0.0.zip`, SHA256 `168920e99d1e966e3b88c40b61e3464429f93e3809dc42dbf4ea7d7b95918054`, 4.1 MB, from the Pilot 10 candidate with Simplified Sessions insertion recovery and Scenario Work follow-up fixes. ZIP integrity passed. Saved the same bytes to Drive file `1bxYc28q5PT3RVda_ehx2pcb0U9mqFRNb`. Installed Chrome behavior is not yet proven; this is a candidate for owner testing.
+- Subsequently added versioned Agent draft JSON import/export. The importer rejects extra state/credential fields and only fills the goal/policy form, without Core creation or auto-start. The periodic Agent status refresh preserves imported draft policy until a job is selected or launched. The originally delivered archive remains unchanged; these later Agent changes require a future build.
+- New draft parser tests 2/2, UI 81/81 and release 22/22 PASS. No production Orchestration changes. Windows Mistral Gateway/API readiness still needs owner machine verification.
+- Agent routing audit: Core merges per-job provider/model overrides into legacy slots, but with any configured AI route pool the orchestrator selects route candidates from that pool and passes their endpointId to Gateway. The Agent page now states this precedence next to its fields; Mistral must be configured as a global route with endpoint ID `mistral`. This UI note follows the first delivered ZIP.
+
+## 2026-09-26 17:42 Europe/Budapest — Agent-specific route binding
+
+- Continued from the live #422 head after the simplified-session hotfix #425 merge. Added a native keyboard-select control listing saved AI routes for the Agent. `aiPinnedRouteId` persists through Browser Agent config and the versioned draft JSON; the background request passes it to Core. Core pins only an existing enabled route for that isolated request, rejects a conflicting global pin, and leaves the global settings/runtime intact. Normal route filtering still enforces global allow/deny, price/locality/free policy, role and backoff. Inherited route selection retains automatic failover.
+- Focused route test proves Mistral `endpointId` reaches Gateway even when a higher-priority Ollama route exists; missing/conflicting route fails before provider I/O. Browser Agent persistence/config, draft parser, UI contracts and release package tests pass. No production Orchestration change. Installed owner Chrome and Windows Gateway still require physical verification; no API secret in source or archive.
+- Follow-up Agent UI defect: its two-second status poll used to refill the entire policy form, discarding unsaved edits. New dirty/epoch guard preserves edits during polling and while a save is in flight; a later save response cannot clear newer typing. Selection of another job resets the guard and loads that job's saved policy. A native status element announces unsaved/saved state without repeating on every keystroke. The PR #426 initial archive predates this follow-up fix.
+
+
+## 11.0.6 — 2026-10-01T08:36:06+02:00
+
+Усі чотири отримані звіти — 11.0.4. Для нового15-chat профілю збережений стан:11 сценаріїв без вкладки з TAB_RESOURCE_CAPACITY_WAIT;2 сценарії з verified Send очікують завершення відповіді;2 STOPPED сценарії утримують вкладки. У1000-event зрізі523 згадки capacity error. Знімок має4 bound IDs; повний історичний максимум5 з цього зрізу не доведений.
+
+## Причини та рішення
+
+1. У11.0.4 був прихований resident cap3, прив'язаний до executor concurrency. Це суперечить15 одночасним чатам з вкладкою на всю послідовність. Resident Scenario identity тепер обмежена durable participant bindings, а profile concurrency регулює лише одночасні операції. Ordinary transient budget рахується окремо. Duplicate binding та write-before-navigation збережено.
+2. Запланований logical launch запускав45-minute deadline, ще до фізичної вкладки. Нова черга має deadline0; відкритий, але не підтверджений Send має durable hard deadline. Verified Send, як раніше, прив'язує response deadline до доказового Send.
+3. cleanupManagedSession приймав forceSafe, але не використовував його. При PRE_SEND_WAIT/SUBMITTING/AMBIGUOUS він закривав вкладку, лишав unsafe sessionSTOPPED і не міг завершити очищення. Authorized timeout/owner retirement тепер persistently fences session, settles effect FAILED_SAFE без успішного лічильника, звільняє її lease й закриває точну власну вкладку. Retired cleanup obligations відновлюються після restart.
+4. Semantic selector визначавdata-turn role лише середarticle абоlegacyauthor candidates. Додано окреміdata-turn selectors, deduplication та correlation збережені. ЖивийDOM у звітах відсутній, тому це не доведена єдина причина response misses.
+5. Завершення за вичерпаного replacement budget залишало generation+1 без створеного нового чату і показувало0 completedResponses. Завершення тепер зберігає фактичне generation.
+
+## Перевірено
+
+699 regression checks PASS; final Scenario/Core409 PASS; integration67 PASS.15×3 simple prompts =45 verified Sends/45 completedResponses in simulated Chrome, restart, another focused window; no excess tracked tabs. Full17-turn cycles і35/45-minute policies пройшли регресії. Приватні prompts/URLs та сирі reports не публікуються.
+
+## Межі
+
+Report counters distinguish verified Send from assistant completion. Ordinary67 verified counter supported by37 retained Send outcomes; older events rotated out. Live ChatGPT latency, account/model throttling та фізичнийWindows/NVDA не перевірені. Немає твердження, що весь Agent runtime або ПК freeze повністю кваліфіковано. Новий live report11.0.6 потрібний для перевірки поведінки у профілях користувача.
+
+Archive: releases/11.0.6/ChatGPT-Autopilot-11.0.6-HIGH-2026-10-01.zip. Source branch release/11.0.6-scenario-admission, based on11.0.5. Version, source, installer and chronological history retained; raw diagnostics stay local.
+
+
+## 11.0.7 — 2026-10-01T16:25:46+02:00
+
+Новий звіт від14:09:54 UTC — версія11.0.6,5 сценарних чатів.196 retained events дають6 local append acknowledgements, але0 підтверджених відповідей.4 immediate REPORT_URL_MISMATCH і41 identity-loss observations;5 stale-address reload actions. Перший чат після45-minute timeout фізично замінено; останній replacement read бачить1 user/current STEP_MARKER. Користувач повідомляє4 порожніх вкладки і1 чат із повідомленням. Ці спостереження не дозволяють стверджувати, що всі5 реальних надсилань підтверджені.
+
+## Знайдено та змінено
+
+1. Probe обирав bound document тільки за збереженим conversation URL. При іншій адресі він повертав recoverable identity loss. SAME_URL_RELOAD міг виконати tabs.update на старий URL, прибравши фактичний sending document. Для living mismatch цей destructive fallback вимкнено навіть для старих recovery ledgers.
+2. Current owned tab тепер читається без навігації. Adapter дозволяє зміну конкретного conversation identity тільки з поточним унікальним APSTEP marker. Manager перевіряє exact tab ownership, task marker, verifiedSendAt та durable binding, потім атомарно оновлює task URL, operation target іhint. Ні Send count, ні completed turn не підвищуються від самої URL зміни. Wrong marker/root/auth не приймаються.
+3. Раніше Scenario local user append міг дати SENT_VERIFIED без independent generation. Scenario-specific request flag тепер вимагає operation append, generation/new assistant таstable exclusive URL. URL-only fallback іrecovery empty-composer proof відключені для Scenario. Ordinary behavior збережена.
+4. У старому diagnostics response read не мав observed URL/tab; додано безпечно скорочену фактичну адресу таtab ID, без prompt content.
+
+## Межі доказів
+
+Code hazard іsafe correction відтворені; причина drift на live ChatGPT не доведена, бо старий звіт не зберігав observed URL. DOM generation є сильнішим сигналом, але не server receipt. Старі positive Send acknowledgements з11.0.6 не перетворюються на proven server delivery й не переписуються без негативного доказу. Підтвердження assistant completion збережене окремо від Send.
+
+## Перевірки
+
+Regression703 PASS, integration68 PASS, final focus49 PASS.5 changed-URL tabs не перестворюються; wrong marker/auth відхиляються; optimistic/no-generation і URL-onlyScenario відхиляються.15×3 workflow і35/45-minute full-tab policy збережені. Windows/Chrome/NVDA іreal provider тут недоступні.
+
+Release archive: releases/11.0.7/ChatGPT-Autopilot-11.0.7-HIGH-2026-10-01.zip. Source branch: release/11.0.7-scenario-response-identity, based on11.0.6. Private diagnostic attachment remains local, only aggregated findings are published.
+
+
+# 11.0.8 — incident and implementation — 2026-10-01T20:31:02+02:00
+
+Four user-supplied 11.0.7 reports at 17:12:45, 17:14:17, 17:19:21 and 17:26:56 UTC on 2026-10-01 were inspected locally. The 17:12 report splits one pool across windows 1747062009/1747062622; 17:19 splits another across 1747062511/1747062587. The 17:14 report concentrates distinct projects in one window. 17:26 records frozen tabs and held unverified sends. Private attachments/prompts/conversation contents are not published.
+
+## Reproduced causes
+
+createChatTab queried all ChatGPT tabs and chose the most-populated window; failure of a saved window dropped authority and created in the focused window. Per-member preferredWindowId was learned after creation and then overwritten by bound-tab reads. chrome.runtime.openOptionsPage could focus an existing Pilot panel rather than create one per owner window. The same profile could therefore converge different projects into that panel/window. Cross-profile API transfer or attack is not established by those reports, which have no stable profile identity.
+
+observeCompletedTurns skipped every task without lastVerifiedSendAt, including sends whose assistant response was already available after the 45-second ack ledger expired. Core had deliberately disabled FAILED_SAFE sends. A strict read-only current-marker paired-completed-response reconciliation now uses applyInteractionResult, operation identity and exact owned tab/window to count once without replay. Core also fences those physical submissions when reenabled by Start/Resume.
+
+Native adapter restored selection immediately after native input, before acknowledgement; configurable dwell now precedes restoration. Focus remains protected by the existing per-window operation lease. New dwell uses async timers and bounded DOM observations; no memory residency override or unbounded MutationObserver scan was introduced.
+
+## Design decisions
+
+Explicit options source tab → verified local Chrome window → persisted per-pool/per-participant authority. No bound-window fallback. Two independent panels/pools per profile are supported. Migrated old running scenarios pause instead of guessing launch provenance; explicit Start binds/re-homes only positively owned tabs. Missing/moved documents fail closed. Post-Send holds and opening delay persist across restarts. Ordinary positive send and response counts remain distinct.
+
+Simple UI receives cumulative actual sent/received totals; technical retry/replacement/generation metrics remain in exported diagnostics. Two accessible launch lists retain buttons during updates and dispatch exact IDs. Local diagnostic scope ID is storage.local only and exported for future report comparison; it is not account authentication proof.
+
+## Alternatives rejected
+
+Choosing last focused/most-populated window; following a moved tab; using URL alone as Send proof; repeating an unknown physical Send; resetting counters to optimistic click totals; disabling Chrome reclamation on every tab; bulk activating/focusing windows during report polling. No live ChatGPT account operations performed here.
+
+## Remaining limits
+
+Real Windows Chrome/NVDA not available here. Frozen pages can still defer reading until Chrome resumes them; the hard configured chat timeout remains the sole replacement policy. DOM proof is not a server network receipt. Historical incorrect counts cannot be reconstructed from redacted reports alone. Previously documented broader Agent/API qualification gaps remain separate. Browser profile/ChatGPT account isolation must be checked with new locally scoped live reports; no cyberattack attribution is made.
+
+11 ПІЛОТ HIGH — 11.0.8 — 2026-10-01T20:31:02+02:00
+
+1. Кожен сценарний пул закріплено за точним вікном вкладки Пілота, з якої натиснуто «Запустити». Всі учасники та заміни успадковують одне вікно. Не використовуються фокус браузера чи кількість чатів для вибору іншого вікна. При втраті прив’язаного вікна немає fallback-створення вкладок.
+2. Два пули одного Chrome-профілю працюють у різних вікнах. Кнопка розширення відкриває Пілот саме у своєму вікні. Перенесена вкладка блокується до вставлення/Send. Перевіряються source tab, sender, window, ownership у transport/native/probe.
+3. Прогрес пулу: «Надіслано промптів» та «Отримано відповідей» — сукупно за всі паралельні чати, включно з завершеними поколіннями. Спроби, заміни і технічні проекції залишені у діагностичному звіті.
+4. Завершена відповідь з точною поточною APSTEP-міткою може підтвердити неоднозначне або FAILED_SAFE надсилання. Це read-only перевірка власної вкладки без повторного Send. Зарахування через той самий durable scheduler/counter, один раз. Старий текст або невідправлений редактор не є доказом.
+5. Крутілки 0–60 секунд: пауза після відкриття вкладки та очікування після натискання «Надіслати». Є у спрощених, звичайних і сценарних налаштуваннях, збереженні та JSON імпорті/експорті. Пауза перед Send збережена. Focus restoration виконується після dwell/ack, не одразу після кліку. Deadline зберігається для restart/timeout і не дає почати інший цикл/закрити вкладку раніше.
+6. У «Сеансах» два окремі керовані списки: спрощені сесії і сценарні пули. Для кожного є «Відкрити та редагувати» й «Зупинити». Оновлення лічильників зберігає DOM кнопок і клавіатурний фокус.
+7. На першому оновленні старі сценарні запуски призупиняються зі збереженням чатів і прогресу: їх старе автоматично вивчене вікно не доводить місце запуску. Відкрийте Пілот у потрібному вікні, виберіть пул і натисніть «Запустити». Власні вкладки саме цього пулу, якщо потрібно, переміщуються у це вікно; чужі вкладки не рухаються. Resume без прив’язки відхиляється. Непідтверджений FAILED_SAFE фізичний Send не повторюється після Start/Resume.
+8. У звіті додано випадковий локальний ідентифікатор профілю. Звіти доводять змішування вікон. Міжпрофільний/міжакаунтний механізм і кібератака не доведені; credentials/account-session/network contents не читаються.
+
+Збережено: High до 3 дорадчих спроб без блокування Send; конфігуровані 5/15 паралельних чатів; один сценарний чат відкритий до всієї послідовності або hard 35/45-minute timeout; звичайний open-close лише після verified Send; state не скидається; попередні історії збережені.
+
+Оновлення: розпакуйте у папку поточної версії та «Оновити» на тій самій картці chrome://extensions. Не встановлюйте другу копію й не видаляйте дані. Час очікування не означає підтвердження надсилання. Windows/Chrome/NVDA і фактична доставка ChatGPT потребують live перевірки; mock DOM/Chrome не є server receipt.
+
+
+Final profile isolation checkpoint — 2026-10-01T20:39:24+02:00
+The local scope ID is also persisted as launch authority, not merely printed. A copied foreign runtime is paused before any operation; explicit restart in a different local scope is rejected even if numeric Chrome tab/window IDs coincide. Startup also fences orphan managed sessions. Scope creation is single-flight per Chrome API instance. Config-only JSON imports stay portable; runtime ownership is not portable. Import-and-start ordinary/simplified launches are pinned before Core execution. Standalone completed scenario restart preserves binding/scope.
+
+Final validation: full Core/Scenario/global/interaction/UI/release suite797 PASS; final targeted window/profile/UI/runtime wiring126 PASS. Counts concern automated models only. Installer archive byte/CRC/import/syntax validation is documented in QA-11.0.8.txt.
+
+## 11.0.9 — 2026-10-02T00:54+02:00
+
+Three 11.0.8 live reports at 22:38–22:39 UTC show five-chat pools with ambiguous hidden form submits and frozen/busy response reads. One pool confirmed six sends but no completed responses in its snapshot; another recorded zero verified sends after five physical attempts. Exact counts, evidence and limitations: INCIDENT-11.0.9.md.
+
+The hidden scenario form now activates its own tab before Send even with 0-second dwell. Read-only response probes can wake an owned frozen tab or refresh one stale background tab, at most once per 15 seconds per window, then restore the previous selection safely. Strict send and APSTEP correlation remain: an unsafe URL-only acknowledgement idea was rejected by an existing negative test and removed. 799 automated regression checks passed. No claim of live server delivery or physical Windows qualification. Installer and full source are versioned independently; private reports are omitted.
+
+
+## 11.0.10 — 2026-10-02T01:17:36+02:00 — critical recheck
+
+11 ПІЛОТ HIGH — 11.0.10 — 2026-10-02T01:17:36+02:00
+
+Повторна критична перевірка виявила п’ять відтворюваних дефектів у 11.0.9:
+1. Перша заморожена вкладка могла забирати кожне наступне пробудження; решта 15 чатів не отримувала своєї черги. Тепер черга справедлива в межах конкретного вікна, максимум одне пробудження за 15 секунд.
+2. Перегляд відповіді міг забирати фокус під час надсилання чи очікування після Send. Тепер він перевіряє durable стан Send; зміни фокусу ділять одну чергу з активацією надсилання у цьому вікні. Звичайне фонове читання не утримує цю чергу.
+3. Chrome може підтверджувати активацію до фактичного розмороження документа. Тепер є обмежене асинхронне очікування до однієї секунди.
+4. Активація може замінити кнопку Send та проявити історію. Тепер кнопка, промпт і базова історія перевіряються заново після активації.
+5. Невдала активація до Send створювала хибний запис «спроба вже була». Тепер відмова до ефекту залишає перший Send доступним. Доведена втрата фокусу до native dispatch теж очищає цей запис.
+
+Сценарні вкладки зберігаються протягом заданої послідовності. Немає масового відкривання, перезавантаження чи повторного Send для читання відповіді. High залишається advisory: обмежені спроби вибору не забороняють відправлення. Ізоляція вікон та прості лічильники не змінені.
+
+Оновлюйте ту саму встановлену копію, розпакувавши поверх її папки та натиснувши «Оновити» у chrome://extensions. Перевірка на фізичних Windows Chrome та акаунтах користувача тут недоступна; автоматичні тести не доводять серверну доставку.
+
+Evidence and limitations: INCIDENT-11.0.10.md; QA-11.0.10.txt. Five newly added cases fail on unchanged 11.0.9 and pass after the fix. This supersedes broad confidence from the earlier 799 passing tests.
+
+Validation completed 2026-10-02T01:20:33+02:00: 784 production checks passed; 22 release checks passed after aligning version_name; 806 distinct final checks. Focused 66 passed. Five failures reproduced on unchanged 11.0.9. Full intermediate TAP and final reruns retained under validation/11.0.10. Physical Windows/server qualification remains unavailable.
+
+
+## 11.0.11 — 2026-10-02T15:31:00+02:00 — user-reported 11.0.10 failure / Pilot 10 parity
+
+11 ПІЛОТ HIGH — 11.0.11 — 2026-10-02T15:31:00+02:00
+
+Зміна після повідомлення користувача: 11.0.10 не надсилала на жодному акаунті, а 10.0 працювала вночі з недостатньою кількістю запусків. Нічних звітів 11.0.10 не знайдено; точна причина на його ПК не підтверджена.
+
+1. Штатний Send повернуто до способу 10.0: requestSubmit для справжньої кнопки форми, і click для точно розпізнаної кнопки Send. Активація вкладки більше не переводить Send на Chrome debugger. Це усуває відтворену залежність, яка могла зупиняти готову форму.
+2. Перед фізичним DOM Send Core перевіряє сесію, операцію, власну вкладку, вікно та URL, і зберігає межу надсилання. Цей запис не збільшує лічильник успіхів. Перезапуск після нього веде до перевірки результату, а не повторного Send.
+3. Повторне завантаження коду у вкладку замінює старий обробник команд новим. Одна поточна версія обробника лишається одна, без дублювання слухачів.
+4. Старий запис про активацію для читання відповіді більше не є доказом, що Send не відбувся. Це захищає старі дані 10.0 від автоматичного дублювання після оновлення.
+
+Збережено прив’язку кожного пулу до його вікна, повну тривалість сценарних чатів, налаштований timeout, очікування до/після Send, advisory High максимум 3 спроби, прості лічильники та вже виправлене допущення 15 паралельних чатів. Native insertion для активного редактора лишилась окремою функцією; весь debugger з розширення не видалено.
+
+Оновлення тієї самої встановленої копії: розпакувати поверх її папки та натиснути «Оновити» на картці chrome://extensions. Коли поточні відповіді закінчилися, перезавантажити відкриті вкладки ChatGPT, щоб вони отримали новий код. Старі неоднозначні операції залишаються для перевірки, а не для сліпого повторного надсилання.
+
+Збірка є кандидатом для перевірки на Windows Chrome. Перевірки зі змодельованим DOM не доводять серверне прийняття промптів чи нічну працездатність. Подробиці та точні результати: INCIDENT-11.0.11.md, QA-11.0.11.txt.
+
+# 11.0.11 — Pilot 10 Send parity — 2026-10-02T15:31:00+02:00
+
+## User evidence and search scope
+
+User reports 11.0.10 sent nothing in all accounts; reinstalling 10.0 worked overnight but admitted too few chats. No nightly diagnostics are available. Connected Drive searches for Autopilot/Автопілот/Пілот and recent files in the known project folder returned our history through 11.0.10. The later Work conversation was not found in personal context. GitHub's latest updated PR was our #650; searches of 11.0 release branches found no later release. Library searches after the release found no later artifact or diagnostic. These search results do not prove that another Work did no local or unsaved work; binary-file search coverage is limited. No such work was overwritten.
+
+## A reproduced regression, not an inferred live root cause
+
+The unchanged Pilot 10 adapter from a4436cf3097c2a8faa6f99a04ad558837a746acd submits a hidden real form via requestSubmit while a supplied native mouse callback is unavailable. The same mock ready form with 11.0.10's scenario activation calls the supplied Chrome native callback and throws NATIVE_INPUT_ATTACH_FAILED before any submit. Prior positive tests omitted that production callback. The corrected adapter uses the form's submission semantics even after activation, or one exact DOM Send click for a non-form control. This does not claim that debugger failure was observed in the deleted nightly reports.
+
+A second deterministic test shows that content-script reinjection kept an old adapter listener even after the adapter object changed. The fix replaces that listener and preserves idempotence. Both before-fix outputs are retained under validation/11.0.11.
+
+## Correctness of the simpler path
+
+The real shipped content-script bridge, real Core StorageRepository, activation/restore functions, and DOM checkpoint function are exercised together with a modeled DOM and unavailable debugger. The form checks that Core persisted the checkpoint before its single requestSubmit; duplicate request delivery produces no second physical Send. A checkpoint itself is never successful delivery. Server-side success still requires the existing operation-bound appended user turn and scenario generation proof. Answer correlation is unchanged.
+
+DOM effect checkpoints survive restart, block native/DOM replay, refuse paused or wrongly owned sessions, and allow observation-only activation of the already submitted conversation. A new explicit pre-Send activation marker prevents a legacy post-Send observation focus lease from being treated as proof of zero effect. Ambiguous old attempts are preserved. These durable markers are necessary to reuse the 10.0 DOM dispatch path without blind retry.
+
+## Quantity and alternatives
+
+The resident-tab/window binding and 15-chat admission fixes remain. We have no nightly 10.0 report to quantify why it admitted fewer launches; actual counts and provider limits are not guessed. A wholesale rollback would reintroduce earlier tab leaks/window mixing and hidden admission caps, so only the known-working dispatch mechanism is restored. No service-limit bypass, broad reload loop, bulk activation or second execution architecture is introduced. Native editor insertion remains, while Send no longer uses debugger coordinates.
+
+## Qualification limits
+
+No Chrome binary is installed in this workspace; no physical Windows Chrome/NVDA/account qualification was performed. Mocked bridge/DOM and pool tests do not prove live server delivery or PC responsiveness. This archive is a field-verification candidate, not a certified night run. Historical counter 46 remains unprovable as 46 server receipts from old reports. See QA-11.0.11.txt for exact results, and dated development history for alternatives and remaining limits.
+
+Validation completed 2026-10-02T15:36:25+02:00: full suite 813 PASS; final runner suite 11 PASS, including one additional unique lost-DOM-checkpoint-acknowledgement case. Aggregate distinct final cases: 814 PASS. Focused 201 PASS overlaps the full suite. Before-fix failures and final outputs retained under validation/11.0.11. Physical Windows/server qualification remains unavailable.
+
+Installer qualification: all 231 shipped JavaScript files pass syntax checks; 309 files with incident report, CRC and source-byte identity checks passed. Final checksum is recorded in releases/11.0.11/SHA256SUMS.txt.
+
+## 2026-10-03 — 11.0.12 Work DOM and hidden-tab Send
+
+Restored the exact published 11.0.11 baseline and addressed the supplied Work DOM reports. Busy response status in the active conversation now blocks another prompt even when the composer shows Send; authorized same-tab DOM submission no longer waits for OS foreground visibility. The configured post-Send dwell remains. Diagnosis reports whether Core persisted the DOM/native submit boundary. See `INCIDENT-11.0.12.md`, `CHANGES-11.0.12.txt`, and `QA-11.0.12.txt`. Offline Chromium fixture run was recorded as 13/13 pass; focused Node regression is being rerun after correcting a reset fixture. Live delivery/Windows qualification remains outstanding.
+
+Cross-mode follow-up: 11.0.9 introduced a visibility-activation prerequisite for every managed scenario because its send request requires generation acknowledgement. Git comparison showed that this gate was not present in 11.0.8. Since cycle, pair, auditor-group, and auditor-pipeline participants all use the same automatic-executor send path, it could strand each mode. 11.0.12 removes that prerequisite while preserving Core authorization and exact window ownership. Audit passed 108/108 scenario/import suites; JSON import/export round-trips all four modes (cycle pool presets apply only to CHAT_CYCLE). See incident report.
+
+## 2026-10-03 — 11.0.13 scenario proof ordering and response anchor
+
+The four new 11.0.12 diagnostics exposed a reachable proof path placed after an earlier scenario gate that required a mounted user bubble. In Work hidden tabs, a new conversation could have an exclusive `/c/<id>`, empty submitted composer, and active generation while reporting zero bubbles. Managed scenarios rejected this operation before the fresh-chat proof could run. Moved that strict operation-local proof ahead of the generic bubble requirement; persisted a narrow first-send flag for response association only at zero baseline; cleared it on insertion/uncertainty; added positive and negative tests. Removed repeated display of the same pool count from the global summary. Tests: Core/integration 81/81, interaction 20/20, UI 15/15. The repository-wide suite currently has unrelated agent/AI failures and did not complete. Server receipt and Windows behavior remain unqualified. See `INCIDENT-11.0.13.md`, `CHANGES-11.0.13.txt`, and `QA-11.0.13.txt`.

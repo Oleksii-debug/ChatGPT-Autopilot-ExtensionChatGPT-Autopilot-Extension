@@ -84,7 +84,6 @@ function taskEnvelope(overrides = {}) {
       sourceId: 'source-1',
       location: 'project://source-1',
       revisionId: 'rev-1',
-      contentSha256: '4'.repeat(64),
       purpose: 'Canonical task source.',
     }],
     allowedAuthority: [],

@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { AgentExecutionPlane } from '../src/core/agent-plan.js';
 import {
   bindSpecialistHandoffToRegistryV1,
-  createSpecialistRegistryV1,
   discoverSpecialistsV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
@@ -50,13 +49,13 @@ function researchDefinition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return createSpecialistRegistryV1({
+  return {
     schemaVersion: 1,
     registryId: 'specialists:project-1',
     revision: 3,
     definitions: [researchDefinition(), definition()],
     ...overrides,
-  });
+  };
 }
 
 function discovery(overrides = {}) {
@@ -92,8 +91,6 @@ function handoff(overrides = {}) {
 test('portable registry normalizes deterministically and interoperates with the existing OpenHands specialist identity', () => {
   const normalized = normalizeSpecialistRegistryV1(registry());
   assert.equal(normalized.registryId, 'specialists:project-1');
-  assert.equal(typeof normalized.bindingKey, 'string');
-  assert.ok(normalized.bindingKey.length > 0);
   assert.deepEqual(normalized.definitions.map(item => item.specialistId), [OPENHANDS_CODING_SPECIALIST_ID, 'research-local']);
   const coding = normalized.definitions[0];
   assert.equal(coding.providerId, OPENHANDS_CODING_PROVIDER_ID);
@@ -103,68 +100,8 @@ test('portable registry normalizes deterministically and interoperates with the 
   assert.ok(Object.isFrozen(coding.capabilityIds));
 });
 
-
-test('registry creation rejects snapshots whose canonical bindingKey exceeds the existing transport bound', () => {
-  const definitions = Array.from({ length: 26 }, (_, index) => definition({
-    specialistId: `oversize-specialist-${index + 1}`,
-    description: 'x'.repeat(4000),
-    definitionRevision: 1,
-  }));
-  assert.throws(() => createSpecialistRegistryV1({
-    schemaVersion: 1,
-    registryId: 'specialists:oversize',
-    revision: 1,
-    definitions,
-  }), /SpecialistRegistryV1\.bindingKey is invalid/);
-});
-
-test('same-revision registry content substitution is rejected by canonical bindingKey', () => {
-  const current = registry();
-  const forged = {
-    ...current,
-    definitions: [
-      researchDefinition(),
-      definition({
-        providerId: 'provider.substituted',
-        capabilityIds: ['coding.read', 'coding.workspace', 'coding.admin'],
-      }),
-    ],
-  };
-  assert.throws(
-    () => normalizeSpecialistRegistryV1(forged),
-    /bindingKey is inconsistent with canonical registry content/,
-  );
-});
-
-test('handoff and mutation require the exact current registry bindingKey', () => {
-  const request = discovery();
-  const selected = discoverSpecialistsV1(request).specialists[0];
-  assert.equal(selected.registryBindingKey, request.registry.bindingKey);
-
-  assert.throws(() => bindSpecialistHandoffToRegistryV1({
-    registry: request.registry,
-    expectedRegistryBindingKey: 'forged-binding',
-    selection: selected,
-    handoff: handoff(),
-    parentCapabilityIds: request.parentCapabilityIds,
-    parentToolIds: request.parentToolIds,
-  }), /bindingKey drifted before handoff/);
-
-  assert.throws(() => proposeSpecialistRegistryMutationV1({
-    registry: request.registry,
-    registryId: request.registry.registryId,
-    expectedRegistryRevision: request.registry.revision,
-    expectedRegistryBindingKey: 'forged-binding',
-    kind: SpecialistRegistryMutationKind.DELETE,
-    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
-    expectedDefinitionRevision: 7,
-  }), /bindingKey drifted before mutation/);
-});
-
 test('discovery grants only requested parent capabilities and explicitly requested tools', () => {
-  const request = discovery();
-  const result = discoverSpecialistsV1(request);
-  assert.equal(result.registryBindingKey, request.registry.bindingKey);
+  const result = discoverSpecialistsV1(discovery());
   assert.equal(result.specialists.length, 1);
   const selected = result.specialists[0];
   assert.equal(selected.specialistId, OPENHANDS_CODING_SPECIALIST_ID);
@@ -190,7 +127,6 @@ test('binding preserves exact selection provenance and never mints execution or 
   const selected = discoverSpecialistsV1(request).specialists[0];
   const bound = bindSpecialistHandoffToRegistryV1({
     registry: request.registry,
-    expectedRegistryBindingKey: request.registry.bindingKey,
     selection: selected,
     handoff: handoff(),
     parentCapabilityIds: request.parentCapabilityIds,
@@ -224,7 +160,6 @@ test('disabled, removed or revision-drifted specialist definitions fail closed a
   const selected = discoverSpecialistsV1(request).specialists[0];
   const bind = nextRegistry => bindSpecialistHandoffToRegistryV1({
     registry: nextRegistry,
-    expectedRegistryBindingKey: nextRegistry.bindingKey,
     selection: selected,
     handoff: handoff(),
     parentCapabilityIds: request.parentCapabilityIds,
@@ -233,14 +168,14 @@ test('disabled, removed or revision-drifted specialist definitions fail closed a
 
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ enabled: false })],
-  })), /registry identity, revision or bindingKey drifted/);
+  })), /missing or disabled/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition()],
-  })), /registry identity, revision or bindingKey drifted/);
+  })), /missing or disabled/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ definitionRevision: 8 })],
-  })), /registry identity, revision or bindingKey drifted/);
-  assert.throws(() => bind(registry({ revision: 4 })), /registry identity, revision or bindingKey drifted/);
+  })), /drifted from current registry definition/);
+  assert.throws(() => bind(registry({ revision: 4 })), /registry identity or revision drifted/);
 });
 
 test('parent capability or tool-scope drift requires rediscovery instead of widening or silently changing child authority', () => {
@@ -248,7 +183,6 @@ test('parent capability or tool-scope drift requires rediscovery instead of wide
   const selected = discoverSpecialistsV1(request).specialists[0];
   const base = {
     registry: request.registry,
-    expectedRegistryBindingKey: request.registry.bindingKey,
     selection: selected,
     handoff: handoff(),
   };
@@ -319,7 +253,7 @@ test('null-prototype records are accepted and caller-owned registry inputs remai
 
 
 test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions without persistence authority', () => {
-  const empty = createSpecialistRegistryV1({
+  const empty = normalizeSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:mutations',
     revision: 1,
@@ -329,12 +263,10 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
     registry: empty,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: empty.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition({ definitionRevision: 1 }),
   });
   assert.equal(created.nextRegistryRevision, 2);
-  assert.notEqual(created.nextRegistry.bindingKey, empty.bindingKey);
   assert.equal(created.nextDefinitionRevision, 1);
   assert.equal(created.nextRegistry.definitions[0].definitionRevision, 1);
   assert.equal(created.authority.persistenceAuthorized, false);
@@ -344,7 +276,6 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
     registry: created.nextRegistry,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 2,
-    expectedRegistryBindingKey: created.nextRegistry.bindingKey,
     kind: SpecialistRegistryMutationKind.UPDATE,
     specialistId: OPENHANDS_CODING_SPECIALIST_ID,
     expectedDefinitionRevision: 1,
@@ -360,7 +291,6 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
     registry: updated.nextRegistry,
     registryId: 'specialists:mutations',
     expectedRegistryRevision: 3,
-    expectedRegistryBindingKey: updated.nextRegistry.bindingKey,
     kind: SpecialistRegistryMutationKind.DELETE,
     specialistId: OPENHANDS_CODING_SPECIALIST_ID,
     expectedDefinitionRevision: 2,
@@ -371,7 +301,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
 });
 
 test('registry mutation proposals fail closed on stale or non-monotonic revisions', () => {
-  const current = createSpecialistRegistryV1({
+  const current = normalizeSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:cas',
     revision: 9,
@@ -381,7 +311,6 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
     registry: current,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 8,
-    expectedRegistryBindingKey: current.bindingKey,
     kind: SpecialistRegistryMutationKind.DELETE,
     specialistId: OPENHANDS_CODING_SPECIALIST_ID,
     expectedDefinitionRevision: 4,
@@ -391,7 +320,6 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
     registry: current,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 9,
-    expectedRegistryBindingKey: current.bindingKey,
     kind: SpecialistRegistryMutationKind.UPDATE,
     specialistId: OPENHANDS_CODING_SPECIALIST_ID,
     expectedDefinitionRevision: 3,
@@ -402,7 +330,6 @@ test('registry mutation proposals fail closed on stale or non-monotonic revision
     registry: current,
     registryId: 'specialists:cas',
     expectedRegistryRevision: 9,
-    expectedRegistryBindingKey: current.bindingKey,
     kind: SpecialistRegistryMutationKind.UPDATE,
     specialistId: OPENHANDS_CODING_SPECIALIST_ID,
     expectedDefinitionRevision: 4,
@@ -421,7 +348,7 @@ test('registry mutation snapshots nested definitions without executing accessors
       return ['filesystem.read'];
     },
   });
-  const current = createSpecialistRegistryV1({
+  const current = normalizeSpecialistRegistryV1({
     schemaVersion: 1,
     registryId: 'specialists:hostile',
     revision: 1,
@@ -431,7 +358,6 @@ test('registry mutation snapshots nested definitions without executing accessors
     registry: current,
     registryId: 'specialists:hostile',
     expectedRegistryRevision: 1,
-    expectedRegistryBindingKey: current.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: hostile,
   }), /toolIds must be an enumerable own data property/);

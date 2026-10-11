@@ -1,0 +1,8 @@
+11.0.13 — 2026-10-03
+
+- A managed scenario's first Send from a new-chat launch surface can now be confirmed when ChatGPT Work starts generation and clears the exact composer before mounting a user-message bubble.
+- The corresponding response can be tracked by the scenario's persisted fresh-generation proof and a new assistant message. This fallback is limited to a zero-message baseline from that verified first Send; existing conversations still require the operation's own user-turn evidence.
+- An uncertain Send is still never replayed automatically.
+- The global scenario-pool progress line no longer repeats the same sent/received counts already shown in the clickable pool row.
+
+See INCIDENT-11.0.13.md and QA-11.0.13.txt for evidence, coverage, and qualification limits.

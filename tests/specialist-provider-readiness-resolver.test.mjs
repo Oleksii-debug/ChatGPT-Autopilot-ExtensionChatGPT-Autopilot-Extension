@@ -11,7 +11,6 @@ function selection(overrides = {}) {
     schemaVersion: 1,
     registryId: 'registry:agents',
     registryRevision: 7,
-    registryBindingKey: 'registry-binding:resolver-test',
     specialistId: 'coding.local',
     providerId: 'provider.local',
     definitionRevision: 3,
@@ -95,7 +94,6 @@ test('owner-injected resolver is invoked at admission time and #450 readiness re
     'definitionRevision',
     'executionPlane',
     'providerId',
-    'registryBindingKey',
     'registryId',
     'registryRevision',
     'requestedCapabilityIds',
@@ -104,8 +102,6 @@ test('owner-injected resolver is invoked at admission time and #450 readiness re
     'specialistId',
   ]);
   assert.equal(seenRequest.providerId, 'provider.local');
-  assert.equal(seenRequest.registryBindingKey, 'registry-binding:resolver-test');
-  assert.equal(result.registryBindingKey, 'registry-binding:resolver-test');
   assert.deepEqual(seenRequest.requestedCapabilityIds, ['code.write']);
   assert.deepEqual(seenRequest.requestedToolIds, ['fs.read', 'fs.write']);
   assert.equal(Object.isFrozen(seenRequest), true);

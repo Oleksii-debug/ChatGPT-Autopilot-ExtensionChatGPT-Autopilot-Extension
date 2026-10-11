@@ -351,7 +351,7 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
   const aiPrimaryModel = clean(raw.aiPrimaryModel, 300);
   const aiStrongModel = clean(raw.aiStrongModel, 300);
   const aiPinnedRouteId = clean(raw.aiPinnedRouteId, 180);
-  if (aiPinnedRouteId && !BROWSER_AGENT_ID.test(aiPinnedRouteId)) {
+  if (aiPinnedRouteId && !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(aiPinnedRouteId)) {
     throw new Error('Browser Agent route ID is invalid');
   }
   if (aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT && !aiPrimaryModel) {
@@ -842,7 +842,7 @@ export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
       : 'Trusted Script fallback is disabled by owner policy. Do not request trusted_script.',
     'Use new_tab with an explicit http(s) URL when parallel browsing or preserving the current page materially helps the owner goal.',
     'Use batch to fill/select/check up to 8 stable controls from the SAME current snapshot when that safely reduces model round-trips. Do not put click/navigation/key/wait/done inside batch.',
-    `Use plan before complex multi-step work to propose a bounded durable DAG. Planning is not a browser effect. The plan must use jobId ${config.id}, contain schemaVersion 1, and contain only BROWSER, LOCAL, CLOUD, or REMOTE executionPlane values.`,
+    `Use plan before complex multi-step work to propose a bounded durable DAG. Planning is not a browser effect. The plan must use jobId ${config.id}, contain schemaVersion 1, and contain only BROWSER, LOCAL, CLOUD, or REMOTE executionPlane values. Every node must include requiredCapabilityIds and requiredToolIds arrays. BROWSER nodes normally use empty arrays. Every LOCAL, CLOUD or REMOTE node must declare at least one exact required capability and only the exact tools needed, so Autopilot can select a least-authority specialist without guessing.`,
     'When a durable plan is present, every effectful Browser action (click/fill/select/check/navigation/tab/download/upload/key/scroll/trusted script/batch) MUST include planNodeId of a READY/RUNNING BROWSER node. Autopilot atomically claims READY nodes before execution. Use verify_plan_node only for a READY/RUNNING BROWSER node after its acceptance criteria are directly observable. Return nodeId and evidence exactly like done; Autopilot independently verifies it before marking that node VERIFIED. Do not use done until every plan node is VERIFIED.',
     'Examples:',
     '{"type":"fill","frameId":0,"ref":"r1","text":"..."}',

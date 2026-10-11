@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js';
 
 const html = await readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8');
 const options = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
@@ -75,4 +76,216 @@ test('orchestra selection rejects stale async responses before status or Agent t
     select.slice(catchIndex),
     /if \(epoch !== orchestrationV2ActionEpoch\) return;[\s\S]*?Не вдалося вибрати оркестр/u,
   );
+});
+
+
+test('read-only Agent tree rejects inherited and hostile orchestra IDs, then recovers after JSON restart', async () => {
+  // Exercise the actual manager method, not a replacement status/projection
+  // authority: invalid selection may not reach runtime storage or execute a
+  // coercing toString getter. A legitimate persisted ID remains readable.
+  const persisted = JSON.parse(JSON.stringify({
+    selectedId: 'orch-1',
+    byId: { 'orch-1': { id: 'orch-1' } },
+  }));
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.loadMeta = async () => persisted;
+  const reads = [];
+  manager.controllerFor = id => {
+    reads.push(id);
+    return { runtimeRepository: { load: async () => ({ hierarchy: null }) } };
+  };
+  let coercionCalls = 0;
+  const forgedId = {
+    toString() {
+      coercionCalls += 1;
+      throw new Error('untrusted id coercion executed');
+    },
+  };
+  for (const invalidId of ['__proto__', 'constructor', 'toString', forgedId, 7, true]) {
+    assert.deepEqual(await manager.getAgentTreeProjection(invalidId), {
+      selectedId: '',
+      projection: null,
+    });
+  }
+  assert.equal(coercionCalls, 0, 'untrusted ID must never be coerced');
+  assert.deepEqual(reads, [], 'invalid IDs must not open a runtime repository');
+  assert.deepEqual(await manager.getAgentTreeProjection('orch-1'), {
+    selectedId: 'orch-1',
+    projection: null,
+  });
+  assert.deepEqual(await manager.getAgentTreeProjection(), {
+    selectedId: 'orch-1',
+    projection: null,
+  });
+  assert.deepEqual(reads, ['orch-1', 'orch-1']);
+});
+
+
+test('persisted orchestra metadata cannot select inherited identities or malformed entries after restart', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  const valid = { id: 'orch-1', name: 'Recovered orchestra', subagentPolicy: {} };
+  let persisted = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    order: ['__proto__', 'constructor', 'toString', 'bad', 'orch-1', 'orch-1'],
+    selectedId: '__proto__',
+    byId: { 'orch-1': valid, bad: false },
+  }));
+  manager.chrome = { storage: { local: { get: async () => ({
+    autopilotOrchestrationV2Manager: persisted,
+  }) } } };
+  const first = await manager.loadMeta();
+  assert.deepEqual(first.order, ['orch-1']);
+  assert.equal(first.selectedId, 'orch-1');
+  assert.equal(Object.hasOwn(first.byId, '__proto__'), false);
+  assert.equal(Object.hasOwn(first.byId, 'constructor'), false);
+  assert.equal(Object.hasOwn(first.byId, 'toString'), false);
+  assert.equal(first.byId['orch-1'].id, 'orch-1');
+
+  // A forged own __proto__ record must not modify the normalized object's
+  // prototype or steal selectedId; immutable readback remains recoverable.
+  persisted = JSON.parse('{"schemaVersion":1,"order":["__proto__","orch-1"],'
+    + '"selectedId":"__proto__","byId":{"__proto__":{"id":"__proto__"},'
+    + '"orch-1":{"id":"orch-1","name":"Recovered orchestra"}}}');
+  const second = await manager.loadMeta();
+  assert.deepEqual(second.order, ['orch-1']);
+  assert.equal(second.selectedId, 'orch-1');
+  assert.equal(Object.getPrototypeOf(second.byId), Object.prototype);
+  assert.equal(Object.hasOwn(second.byId, '__proto__'), false);
+
+  // Corrupt persisted metadata is reset, not interpreted as authority.
+  for (const invalid of [null, [], 'bad']) {
+    persisted = { schemaVersion: 1, order: ['constructor'], selectedId: 'constructor', byId: invalid };
+    const recovered = await manager.loadMeta();
+    assert.deepEqual(recovered.order, []);
+    assert.equal(recovered.selectedId, '');
+  }
+  persisted = JSON.parse(JSON.stringify({
+    schemaVersion: 1, order: ['orch-1'], selectedId: 'orch-1',
+    byId: { 'orch-1': valid },
+  }));
+  assert.equal((await manager.loadMeta()).selectedId, 'orch-1');
+});
+
+
+test('metadata cold restart isolates corrupt owner policies and rejects accessor records without evaluating them', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  let getterCalls = 0;
+  const healthy = {
+    id: 'healthy',
+    name: 'Healthy',
+    subagentPolicy: {
+      schemaVersion: 1,
+      allowAgentCreatedChildren: false,
+      maxDepth: 2,
+      maxChildrenPerAgent: 1,
+    },
+  };
+  let stored = {
+    schemaVersion: 1,
+    selectedId: 'bad-policy',
+    order: ['bad-policy', 'getter-record', 'getter-policy', 'hidden-record', 'healthy'],
+    byId: {
+      'bad-policy': { id: 'bad-policy', subagentPolicy: { allowAgentCreatedChildren: 'true' } },
+      'getter-policy': { id: 'getter-policy' },
+      healthy,
+    },
+  };
+  Object.defineProperty(stored.byId, 'getter-record', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('untrusted entry getter should not run');
+    },
+  });
+  Object.defineProperty(stored.byId['getter-policy'], 'subagentPolicy', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('untrusted owner policy getter should not run');
+    },
+  });
+  Object.defineProperty(stored.byId, 'hidden-record', {
+    enumerable: false,
+    value: { id: 'hidden-record', subagentPolicy: {} },
+  });
+  manager.chrome = { storage: { local: {
+    get: async () => ({ autopilotOrchestrationV2Manager: stored }),
+  } } };
+
+  const recovered = await manager.loadMeta();
+  assert.equal(getterCalls, 0);
+  assert.deepEqual(recovered.order, ['healthy']);
+  assert.equal(recovered.selectedId, 'healthy');
+  assert.equal(Object.hasOwn(recovered.byId, 'bad-policy'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'getter-record'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'getter-policy'), false);
+  assert.equal(Object.hasOwn(recovered.byId, 'hidden-record'), false);
+  assert.equal(recovered.byId.healthy.subagentPolicy.allowAgentCreatedChildren, false);
+
+  // Cold JSON recovery still selects the same owned, valid policy. The
+  // unavailable corrupt entries cannot be treated as runnable authorities.
+  stored = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    selectedId: 'healthy',
+    order: ['healthy'],
+    byId: { healthy },
+  }));
+  const clean = await manager.loadMeta();
+  assert.deepEqual(clean.order, ['healthy']);
+  assert.equal(clean.selectedId, 'healthy');
+  assert.deepEqual(clean.byId.healthy.subagentPolicy, recovered.byId.healthy.subagentPolicy);
+});
+
+
+test('accessor-backed orchestra envelope and metadata fail closed without getter execution and recover from JSON', async () => {
+  const manager = Object.create(OrchestrationV2Manager.prototype);
+  manager.ensureMigrated = async () => {};
+  const healthy = { id: 'healthy', name: 'Recovered', createdAt: 7, updatedAt: 9 };
+  let stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+  manager.chrome = { storage: { local: {
+    get: async () => ({ autopilotOrchestrationV2Manager: stored }),
+  } } };
+  let getterCalls = 0;
+  const poison = () => {
+    getterCalls += 1;
+    throw new Error('persisted accessor executed');
+  };
+  for (const key of ['schemaVersion', 'order', 'byId']) {
+    stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+    Object.defineProperty(stored, key, { enumerable: true, get: poison });
+    const result = await manager.loadMeta();
+    assert.deepEqual(result.order, [], `accessor-backed envelope ${key} must fail closed`);
+  }
+  stored = { schemaVersion: 1, order: ['healthy'], selectedId: 'healthy', byId: { healthy } };
+  Object.defineProperty(stored, 'selectedId', { enumerable: true, get: poison });
+  assert.equal((await manager.loadMeta()).selectedId, 'healthy', 'selectedId getter must not run');
+
+  for (const key of ['id', 'name', 'ownerPaused', 'pausedSessionIds', 'createdAt', 'updatedAt', 'subagentPolicy']) {
+    const forged = { id: 'forged', name: 'Forged' };
+    Object.defineProperty(forged, key, { enumerable: true, get: poison });
+    stored = {
+      schemaVersion: 1,
+      order: ['forged', 'healthy'],
+      selectedId: 'forged',
+      byId: { forged, healthy },
+    };
+    const result = await manager.loadMeta();
+    assert.deepEqual(result.order, ['healthy'], `accessor-backed entry ${key} must be isolated`);
+    assert.equal(result.selectedId, 'healthy');
+  }
+  assert.equal(getterCalls, 0, 'no untrusted getters may be executed during metadata recovery');
+
+  stored = JSON.parse(JSON.stringify({
+    schemaVersion: 1,
+    order: ['healthy'],
+    selectedId: 'healthy',
+    byId: { healthy },
+  }));
+  const recovered = await manager.loadMeta();
+  assert.deepEqual(recovered.order, ['healthy']);
+  assert.equal(recovered.byId.healthy.name, 'Recovered');
+  assert.equal(recovered.byId.healthy.createdAt, 7);
+  assert.equal(recovered.byId.healthy.updatedAt, 9);
 });

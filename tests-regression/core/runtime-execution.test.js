@@ -421,3 +421,36 @@ test('execution-unavailable suspension preserves Drive prompt bindings without t
   assert.equal(state.sessionsById['drive-gated'].drivePromptSources.bindings[0].lastAcceptedVersion, '7');
   assert.equal(state.sessionsById['drive-gated'].drivePromptSources.bindings[0].nextCheckAt, 181000);
 });
+
+
+test('runtime cycle honors profile max concurrent Session operations', async () => {
+  const state = stateWith(
+    session('c1', RunState.RUNNING),
+    session('c2', RunState.RUNNING),
+    session('c3', RunState.RUNNING),
+    session('c4', RunState.RUNNING),
+  );
+  state.profile.maxConcurrentSessionOperations = 2;
+  const repo = new Repo(state);
+  let active = 0;
+  let peak = 0;
+  const executor = {
+    async runSessionOnce() {
+      active += 1;
+      peak = Math.max(peak, active);
+      await Promise.resolve();
+      active -= 1;
+      return { kind: 'IDLE' };
+    },
+  };
+
+  await runRuntimeCycle({
+    repository: repo,
+    chromeApi: fakeChrome(),
+    executor,
+    executionAvailable: true,
+    now: () => 1000,
+  });
+
+  assert.equal(peak, 2);
+});
