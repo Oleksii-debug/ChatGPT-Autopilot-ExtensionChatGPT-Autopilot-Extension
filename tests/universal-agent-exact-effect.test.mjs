@@ -503,9 +503,9 @@ test('verification used by exact effect requires exact effect execution and atte
   )).state;
 
   const cases = [
-    [{ effectId: '' }, /effectId does not match exact effect/],
+    [{ effectId: '' }, /effectId is invalid|effectId does not match exact effect/],
     [{ effectId: 'invoke-other' }, /effectId does not match exact effect/],
-    [{ executionId: '' }, /executionId does not match current exact-effect attempt/],
+    [{ executionId: '' }, /executionId is invalid|executionId does not match current exact-effect attempt/],
     [{ executionId: 'invoke-1:attempt:2' }, /executionId does not match current exact-effect attempt/],
     [{ attempt: 0 }, /attempt does not match current exact-effect attempt/],
     [{ attempt: 2 }, /attempt does not match current exact-effect attempt/],
@@ -706,7 +706,7 @@ test('state envelope rejects hidden, symbol and inherited authority aliases', ()
   });
   assert.throws(
     () => normalizeExactEffectStateV1(hidden),
-    /unknown field: authorityGranted/,
+    /contains unknown field/,
   );
 
   const symbolic = { ...state };
@@ -866,4 +866,265 @@ test('null-prototype durable state and event records remain supported', () => {
   ));
   const result = reduceExactEffectV1(normalized, rawEvent);
   assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
+});
+
+
+test('Plan-1 S1: persisted exact-effect phase cannot forge verification, safe retry or commit', () => {
+  const prepared = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const bogusVerified = { ...prepared, phase: ExactEffectPhase.VERIFIED };
+  const bogusRetry = { ...prepared, phase: ExactEffectPhase.SAFE_RETRY };
+  for (const candidate of [bogusVerified, bogusRetry]) {
+    const before = JSON.stringify(candidate);
+    const re = candidate.phase === ExactEffectPhase.VERIFIED
+      ? /requires bound positive verification/ : /requires bound failed verification and reconciliation/;
+    assert.throws(() => normalizeExactEffectStateV1(candidate), re);
+    assert.throws(() => normalizeExactEffectStateV1(JSON.parse(before)), re);
+    assert.equal(JSON.stringify(candidate), before, 'failed recovery cannot mutate evidence');
+  }
+  assert.throws(
+    () => exactEffectCanExecuteV1(bogusRetry),
+    /requires bound failed verification and reconciliation/,
+    'forged SAFE_RETRY cannot authorize another physical execution',
+  );
+  assert.throws(
+    () => reduceExactEffectV1(bogusVerified, event(
+      ExactEffectEventType.COMMIT, 'bogus-commit', '2026-09-19T12:00:05Z',
+      { commitId: 'fake-commit' },
+    )),
+    /requires bound positive verification/,
+    'forged VERIFIED cannot generate a commit event',
+  );
+
+  let state = reduceExactEffectV1(prepared, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'start-integrity-1', '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION, 'observed-integrity-1',
+    '2026-09-19T12:00:03Z', { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION, 'verified-integrity-1',
+    '2026-09-19T12:00:04Z', { verification: verification() },
+  )).state;
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(state))), state);
+  const committed = reduceExactEffectV1(state, event(
+    ExactEffectEventType.COMMIT, 'commit-integrity-1', '2026-09-19T12:00:05Z',
+    { commitId: 'real-commit-1' },
+  )).state;
+  assert.equal(committed.phase, ExactEffectPhase.COMMITTED);
+  assert.equal(committed.commitId, 'real-commit-1');
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(committed))), committed);
+  for (const commitId of ['', null, undefined]) {
+    const corrupted = { ...committed, commitId };
+    assert.throws(() => normalizeExactEffectStateV1(corrupted),
+      /COMMITTED exact-effect state requires an exact commitId receipt|commitId cannot be explicitly undefined/,
+      'persisted committed phase without exact receipt must not count as complete');
+    assert.equal(corrupted.commitId, commitId);
+  }
+  const fabricated = { ...prepared, phase: ExactEffectPhase.COMMITTED };
+  assert.throws(() => normalizeExactEffectStateV1(fabricated),
+    /requires bound positive verification/,
+    'a fake COMMITTED label alone cannot mark an external effect as done');
+});
+
+test('Plan-1 S1: authenticated SAFE_RETRY survives cold restart without permission amplification', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'safe-start-1', '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY, 'safe-ambiguity-1',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT', summary: 'Read after write required.' },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RESOLVE_RECONCILIATION, 'safe-reconcile-1',
+    '2026-09-19T12:00:04Z', {
+      outcome: ReconciliationOutcome.SAFE_RETRY,
+      reasonCode: 'POSTCONDITION_PROVES_NO_EFFECT',
+      observation: observation({ observationId: 'safe-obs-1', status: 'ERROR' }),
+      verification: verification({
+        verificationId: 'safe-verify-1', observationId: 'safe-obs-1',
+        status: 'FAILED', reasonCode: 'POSTCONDITION_ABSENT',
+      }),
+    },
+  )).state;
+  assert.equal(state.phase, ExactEffectPhase.SAFE_RETRY);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(state))), state);
+  assert.equal(exactEffectCanExecuteV1(state), true);
+
+  for (const malformed of [
+    { ...state, verification: null },
+    { ...state, observation: null },
+    { ...state, reconciliation: { ...state.reconciliation, outcome: ReconciliationOutcome.MANUAL_REVIEW } },
+    { ...state, verification: { ...state.verification, status: 'VERIFIED' } },
+  ]) {
+    // The lower-level verifier-to-observation binding may reject first.
+    const denial = /requires bound failed verification and reconciliation|Verification requires observation/;
+    assert.throws(() => normalizeExactEffectStateV1(malformed), denial,
+      'tampered replay authority must fail closed');
+    assert.throws(() => exactEffectCanExecuteV1(malformed), denial);
+  }
+  const continued = reduceExactEffectV1(
+    JSON.parse(JSON.stringify(state)),
+    event(ExactEffectEventType.BEGIN_EXECUTION, 'safe-start-2', '2026-09-19T12:00:05Z'),
+  );
+  assert.equal(continued.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(continued.state.attempt, 2);
+  assert.equal(continued.action, 'EXECUTE');
+});
+
+
+test('Plan-1 S1: hostile exact-effect reflection cannot leak secrets or publish retry authority', () => {
+  const secret = 'OWNER_PRIVATE_EXACT_EFFECT_SECRET';
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  let traps = 0;
+  for (const operation of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const proxy = target => new Proxy(target, {
+      [operation]() { traps += 1; throw new Error(secret); },
+    });
+    const assertDenied = fn => assert.throws(fn, error => {
+      assert.match(error.message, /cannot be safely inspected/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+    assertDenied(() => normalizeExactEffectStateV1(proxy({ ...state })));
+    assertDenied(() => normalizeExactEffectStateV1({
+      ...state, ambiguity: proxy({ ...state.ambiguity }),
+    }));
+    assertDenied(() => normalizeExactEffectStateV1({
+      ...state, reconciliation: proxy({ ...state.reconciliation }),
+    }));
+    assertDenied(() => reduceExactEffectV1(state, proxy(event(
+      ExactEffectEventType.BEGIN_EXECUTION, 'proxy-event', '2026-09-19T12:00:01Z',
+    ))));
+  }
+  assert.equal(traps, 12);
+
+  const unknown = { ...state };
+  Object.defineProperty(unknown, secret, { value: 'FORGED_PERMISSION', enumerable: true });
+  assert.throws(() => normalizeExactEffectStateV1(unknown), error => {
+    assert.match(error.message, /contains unknown field/);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+  let unsafeLengthReads = 0;
+  const wrappedIds = new Proxy(['completed-event-1'], {
+    get(target, key, receiver) {
+      if (key === 'length') {
+        unsafeLengthReads += 1;
+        throw new Error(secret);
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const safe = normalizeExactEffectStateV1({ ...state, processedEventIds: wrappedIds });
+  assert.deepEqual(safe.processedEventIds, ['completed-event-1']);
+  assert.equal(unsafeLengthReads, 0, 'descriptor-only array copy never executes length getter');
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(safe))), safe);
+
+  const corrupt = ['existing-event'];
+  Object.defineProperty(corrupt, secret, { enumerable: true, value: 'AUTHORIZE' });
+  assert.throws(() => normalizeExactEffectStateV1({ ...state, processedEventIds: corrupt }),
+    error => {
+      assert.match(error.message, /non-index fields/);
+      assert.equal(error.message.includes(secret), false);
+      return true;
+    });
+  assert.equal(exactEffectCanExecuteV1(state), true,
+    'rejected hostile state may not poison canonical PREPARED path');
+  const began = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'valid-after-rejection',
+    '2026-09-19T12:00:01Z',
+  ));
+  assert.equal(began.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(began.state.attempt, 1);
+});
+
+
+test('Plan-1 S1: exact-effect chronology and negative-zero attempt survive cold restart unchanged', () => {
+  const initial = createExactEffectStateV1(invocation(), { createdAt: AT });
+  assert.equal(initial.attempt, 0);
+  const invalidTimes = [
+    '0', '2026-09-19', '2026-09-19T12:00:00',
+    '2026-02-30T12:00:00Z', '2026-13-01T12:00:00Z',
+    '2026-09-19T24:00:00Z', '2026-09-19T12:00:00.1234Z',
+    '2026-09-19T12:00:00+25:00',
+  ];
+  for (const instant of invalidTimes) {
+    const corrupt = { ...initial, updatedAt: instant };
+    assert.throws(() => normalizeExactEffectStateV1(corrupt),
+      /timestamp|calendar date/i, 'persisted effect timestamp is never rolled on recovery');
+    assert.equal(corrupt.updatedAt, instant);
+    assert.throws(() => reduceExactEffectV1(initial, event(
+      ExactEffectEventType.BEGIN_EXECUTION, 'invalid-clock-event',
+      instant,
+    )), /timestamp|calendar date/i,
+    'invalid event cannot execute before a durable exact timestamp');
+    assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(initial))), initial);
+  }
+  const bogusAttempt = { ...initial, attempt: -0 };
+  assert.equal(Object.is(bogusAttempt.attempt, -0), true);
+  assert.throws(() => normalizeExactEffectStateV1(bogusAttempt), /attempt is invalid/,
+    'negative-zero attempt would be silently rewritten to zero by JSON');
+  assert.throws(() => exactEffectCanExecuteV1(bogusAttempt), /attempt is invalid/);
+  assert.equal(Object.is(bogusAttempt.attempt, -0), true);
+
+  const validAt = '2026-09-19T13:00:01+01:00';
+  const started = reduceExactEffectV1(initial, event(
+    ExactEffectEventType.BEGIN_EXECUTION, 'canonical-time-event', validAt,
+  )).state;
+  assert.equal(started.updatedAt, '2026-09-19T12:00:01.000Z');
+  assert.equal(started.attempt, 1);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(started))), started);
+  assert.equal(initial.phase, ExactEffectPhase.PREPARED,
+    'failed and positive normalization never mutate the input ledger');
+});
+
+test('exact-effect optional identity presence survives JSON cold restart without laundering undefined', () => {
+  const original = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const durable = JSON.parse(JSON.stringify(original));
+  assert.deepEqual(normalizeExactEffectStateV1(durable), original);
+
+  // A present-but-undefined durable identity is lost by JSON.stringify and
+  // could otherwise be reinterpreted as a genuinely omitted legacy field.
+  for (const key of ['executionId', 'commitId']) {
+    const corrupt = { ...durable, [key]: undefined };
+    assert.throws(() => normalizeExactEffectStateV1(corrupt), new RegExp(key));
+  }
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...durable,
+      ambiguity: { ...durable.ambiguity, reasonCode: undefined },
+    }),
+    /ambiguity.reasonCode/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...durable,
+      reconciliation: { ...durable.reconciliation, reasonCode: undefined },
+    }),
+    /reconciliation.reasonCode/,
+  );
+
+  const invalidBegin = event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'begin-undefined-execution-id',
+    '2026-09-19T12:00:01Z',
+    { executionId: undefined },
+  );
+  assert.throws(() => reduceExactEffectV1(durable, invalidBegin), /event.executionId/);
+
+  // Truly absent legacy executionId remains valid for BEGIN_EXECUTION, and
+  // does not mutate the snapshot that was previously read from durable storage.
+  const validBegin = { ...invalidBegin };
+  delete validBegin.executionId;
+  const admitted = reduceExactEffectV1(durable, validBegin);
+  assert.equal(admitted.accepted, true);
+  assert.equal(admitted.state.phase, ExactEffectPhase.EXECUTING);
+  assert.equal(admitted.state.attempt, 1);
+  assert.equal(exactEffectCanExecuteV1(admitted.state), false);
+  assert.equal(durable.phase, ExactEffectPhase.PREPARED);
+  assert.equal(durable.attempt, 0);
+  assert.deepEqual(normalizeExactEffectStateV1(JSON.parse(JSON.stringify(admitted.state))), admitted.state);
 });

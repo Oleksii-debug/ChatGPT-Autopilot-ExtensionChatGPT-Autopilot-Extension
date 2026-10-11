@@ -482,3 +482,117 @@ test('AgentPlan live evolution rejects stale, shrinking or mutating replacement 
   mutating.nodes.push(node('later', ['discover']));
   assert.throws(() => evolveAgentPlanV1(current, mutating, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /cannot replace existing nodes/);
 });
+
+
+test('Plan-1 S1: plan schema reflection stays data-only and budget signed zero never survives recovery', () => {
+  const original = plan([node('discover')]);
+  const canonical = normalizeAgentPlanV1(original);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(canonical))), canonical);
+
+  const secret = 'OWNER_PRIVATE_PLAN_REFLECTION_SECRET';
+  let traps = 0;
+  for (const operation of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const hostile = raw => new Proxy(raw, {
+      [operation]() { traps += 1; throw new Error(secret); },
+    });
+    for (const input of [
+      hostile(original),
+      plan([hostile(node('discover'))]),
+      plan([node('discover', [], [], hostile({ maxCostUsdMicros: 1 }))]),
+    ]) {
+      assert.throws(() => normalizeAgentPlanV1(input), error => {
+        assert.equal(error.message.includes(secret), false);
+        assert.equal(error.message.includes('cannot be safely inspected'), true);
+        return true;
+      }, 'hostile input must never disclose trapped private provider data');
+    }
+  }
+  assert.equal(traps, 9);
+
+  const hostileField = { ...original };
+  Object.defineProperty(hostileField, secret, { enumerable: true, value: 'GRANT_ALL' });
+  assert.throws(() => normalizeAgentPlanV1(hostileField), error => {
+    assert.equal(error.message.includes(secret), false);
+    assert.equal(error.message.includes('contains unknown field'), true);
+    return true;
+  });
+
+  let lengthReads = 0;
+  const array = new Proxy([node('discover')], {
+    get(target, property, receiver) {
+      if (property === 'length') { lengthReads += 1; throw new Error(secret); }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  assert.equal(normalizeAgentPlanV1(plan(array)).nodes.length, 1);
+  assert.equal(lengthReads, 0, 'array descriptor snapshot avoids untrusted length getter');
+
+  for (const key of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    const corruptBudget = { [key]: -0 };
+    assert.equal(Object.is(corruptBudget[key], -0), true);
+    assert.throws(() => normalizeAgentPlanV1(plan([
+      node('discover', [], [], corruptBudget),
+    ])), /invalid/, 'budget negative zero cannot become a new canonical zero');
+    assert.equal(Object.is(corruptBudget[key], -0), true);
+  }
+  assert.throws(() => normalizeAgentPlanV1({
+    ...original, revision: -0,
+  }), /revision is invalid/);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(canonical))), canonical,
+    'denied hostile and lossy inputs never poison original durable plan');
+});
+
+
+test('Plan-1 S1: explicit undefined owner budgets, dependencies and evidence fail before cold restart', () => {
+  const fields = [
+    'state', 'ownerId', 'evidence', 'dependsOn', 'conflictKeys',
+    'requiredCapabilityIds', 'requiredToolIds', 'acceptanceCriteria', 'budget',
+  ];
+  for (const field of fields) {
+    const base = node('intake');
+    const corrupted = { ...base, [field]: undefined };
+    assert.equal(Object.hasOwn(corrupted, field), true);
+    assert.throws(() => normalizeAgentPlanV1(plan([corrupted])),
+      /cannot be explicit undefined/,
+      'persisted node ' + field + ' cannot disappear after JSON recovery');
+    assert.equal(corrupted[field], undefined, 'normalization must not change source');
+    const omitted = { ...base };
+    delete omitted[field];
+    const legacy = normalizeAgentPlanV1(plan([omitted]));
+    assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(legacy))), legacy,
+      'truly absent V1 field retains canonical legacy default');
+  }
+
+  for (const field of ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']) {
+    const corruptBudget = { [field]: undefined };
+    assert.throws(() => normalizeAgentPlanV1(plan([
+      node('intake', [], [], corruptBudget),
+    ])), /cannot be explicit undefined/,
+    'explicitly corrupted persisted ceiling must not become zero');
+    const accepted = normalizeAgentPlanV1(plan([
+      node('intake', [], [], { [field]: 3 }),
+    ]));
+    assert.equal(accepted.nodes[0].budget[field], 3);
+    assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(accepted))), accepted);
+  }
+  const original = plan([node('intake')]);
+  const malformedCriteria = { ...original, successCriteria: undefined };
+  assert.throws(() => normalizeAgentPlanV1(malformedCriteria),
+    /cannot be explicit undefined/,
+    'plan-wide successCriteria may not be erased before recovery');
+  const legacy = { ...original };
+  delete legacy.successCriteria;
+  const normalized = normalizeAgentPlanV1(legacy);
+  assert.deepEqual(normalized.successCriteria, []);
+  assert.deepEqual(normalizeAgentPlanV1(JSON.parse(JSON.stringify(normalized))), normalized);
+
+  // Unknown dependencies may encode private owner keys: diagnostics must not
+  // disclose these attacker-controlled IDs even when the plan is denied.
+  const privateReference = 'OWNER_PRIVATE_PLAN_DEPENDENCY';
+  const denied = plan([node('intake', [privateReference])]);
+  assert.throws(() => normalizeAgentPlanV1(denied), error => {
+    assert.equal(error.message.includes(privateReference), false);
+    assert.equal(error.message.includes('depends on unknown node'), true);
+    return true;
+  });
+});

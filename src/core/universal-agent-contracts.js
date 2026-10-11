@@ -114,8 +114,14 @@ function capabilityRiskClass(value, present) {
   return normalized;
 }
 
-function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
-  if ((value == null || value === '') && optional) return '';
+function text(value, label, { optional = false, max = MAX_TEXT, present = false } = {}) {
+  // Missing V1 display metadata may default to empty. An explicitly stored
+  // null/undefined is not an omission: silently rewriting it would erase the
+  // original evidence/policy metadata before JSON cold-restart reconciliation.
+  if ((value == null || value === '') && optional) {
+    if (value == null && present) throw new Error(`${label} must be canonical optional text`);
+    return '';
+  }
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   const out = value.trim();
   if (!out || out.length > max) throw new Error(`${label} is invalid`);
@@ -355,7 +361,7 @@ export function normalizeCapabilityV1(input) {
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'CapabilityV1'),
     capabilityId: id(raw.capabilityId, 'capabilityId'),
-    description: text(raw.description, 'description', { optional: true, max: 2000 }),
+    description: text(raw.description, 'description', { optional: true, max: 2000, present: Object.hasOwn(raw, 'description') }),
     // Absent legacy metadata has documented defaults; explicitly persisted
     // null/undefined is corruption and must never downgrade the risk class.
     riskClass: capabilityRiskClass(raw.riskClass, Object.hasOwn(raw, 'riskClass')),
@@ -375,7 +381,7 @@ export function normalizeToolDescriptorV1(input) {
     toolId: id(raw.toolId, 'toolId'),
     providerId: id(raw.providerId, 'providerId'),
     label: text(raw.label, 'label', { max: 300 }),
-    description: text(raw.description, 'description', { optional: true, max: 4000 }),
+    description: text(raw.description, 'description', { optional: true, max: 4000, present: Object.hasOwn(raw, 'description') }),
     capabilityIds: idList(raw.capabilityIds, 'capabilityIds', { optional: false }),
     inputSchemaRef: id(raw.inputSchemaRef, 'inputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'inputSchemaRef') }),
     outputSchemaRef: id(raw.outputSchemaRef, 'outputSchemaRef', { optional: true, present: Object.hasOwn(raw, 'outputSchemaRef') }),
@@ -408,7 +414,7 @@ export function normalizePolicyDecisionV1(input) {
     invocationId: id(raw.invocationId, 'invocationId'),
     decision,
     reasonCode: id(raw.reasonCode, 'reasonCode'),
-    reason: text(raw.reason, 'reason', { optional: true, max: 4000 }),
+    reason: text(raw.reason, 'reason', { optional: true, max: 4000, present: Object.hasOwn(raw, 'reason') }),
     approvalId,
     decidedAt: timestamp(raw.decidedAt, 'decidedAt'),
   });
@@ -457,7 +463,7 @@ export function normalizeArtifactRefV1(input) {
     artifactId: id(raw.artifactId, 'artifactId'),
     kind: id(raw.kind, 'kind'),
     uri: artifactUri(raw.uri),
-    mediaType: text(raw.mediaType, 'mediaType', { optional: true, max: 300 }),
+    mediaType: text(raw.mediaType, 'mediaType', { optional: true, max: 300, present: Object.hasOwn(raw, 'mediaType') }),
     sha256: digest,
     sizeBytes: integer(raw.sizeBytes, 'sizeBytes', 0, Number.MAX_SAFE_INTEGER, {
       optional: true, fallback: 0, present: Object.hasOwn(raw, 'sizeBytes'),
@@ -485,7 +491,7 @@ export function normalizeObservationV1(input) {
     observationId: id(raw.observationId, 'observationId'),
     invocationId: id(raw.invocationId, 'invocationId'),
     status,
-    summary: text(raw.summary, 'summary', { optional: true, max: 8000 }),
+    summary: text(raw.summary, 'summary', { optional: true, max: 8000, present: Object.hasOwn(raw, 'summary') }),
     data: jsonData(raw.data, 'data', { present: Object.hasOwn(raw, 'data') }),
     artifactRefs,
     observedAt: timestamp(raw.observedAt, 'observedAt'),
@@ -511,7 +517,7 @@ export function normalizeVerificationV1(input) {
     observationId: id(raw.observationId, 'observationId', { optional: status === VerificationStatus.NOT_APPLICABLE, present: Object.hasOwn(raw, 'observationId') }),
     status,
     reasonCode: id(raw.reasonCode, 'reasonCode'),
-    summary: text(raw.summary, 'summary', { optional: true, max: 8000 }),
+    summary: text(raw.summary, 'summary', { optional: true, max: 8000, present: Object.hasOwn(raw, 'summary') }),
     evidenceArtifactIds: idList(raw.evidenceArtifactIds, 'evidenceArtifactIds', { present: Object.hasOwn(raw, 'evidenceArtifactIds') }),
     verifiedAt: timestamp(raw.verifiedAt, 'verifiedAt'),
     verifierId: id(raw.verifierId, 'verifierId', { optional: true, present: Object.hasOwn(raw, 'verifierId') }),

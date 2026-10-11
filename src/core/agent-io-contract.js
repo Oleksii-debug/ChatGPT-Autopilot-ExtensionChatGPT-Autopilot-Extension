@@ -109,8 +109,13 @@ function requireId(value, label) {
   return value;
 }
 
-function optionalId(value, label) {
-  // Empty optional IDs are corrupt identities, not absent references.
+function optionalId(value, label, { present = false } = {}) {
+  // Only omitted optional references or explicit null are canonical absence.
+  // An own undefined value vanishes from persisted JSON, erasing the original
+  // action/effect identity evidence across a cold restart.
+  if (value === undefined && present) {
+    throw new Error(`${label} must be an exact ID or canonical null`);
+  }
   if (value == null) return null;
   return requireId(value, label);
 }
@@ -209,8 +214,8 @@ export function normalizeAgentAction(input) {
     actionId: requireId(action.actionId, 'actionId'),
     type,
     providerId,
-    sessionId: optionalId(action.sessionId, 'sessionId'),
-    taskId: optionalId(action.taskId, 'taskId'),
+    sessionId: optionalId(action.sessionId, 'sessionId', { present: Object.hasOwn(action, 'sessionId') }),
+    taskId: optionalId(action.taskId, 'taskId', { present: Object.hasOwn(action, 'taskId') }),
     createdAt: normalizeTimestamp(action.createdAt, 'createdAt'),
     data: cloneData(action.data, 'action data', { present: Object.hasOwn(action, 'data') }),
   };
@@ -229,9 +234,9 @@ export function normalizeAgentEvent(input) {
     eventId: requireId(event.eventId, 'eventId'),
     type,
     providerId,
-    actionId: optionalId(event.actionId, 'actionId'),
-    sessionId: optionalId(event.sessionId, 'sessionId'),
-    taskId: optionalId(event.taskId, 'taskId'),
+    actionId: optionalId(event.actionId, 'actionId', { present: Object.hasOwn(event, 'actionId') }),
+    sessionId: optionalId(event.sessionId, 'sessionId', { present: Object.hasOwn(event, 'sessionId') }),
+    taskId: optionalId(event.taskId, 'taskId', { present: Object.hasOwn(event, 'taskId') }),
     occurredAt: normalizeTimestamp(event.occurredAt, 'occurredAt'),
     data: cloneData(event.data, 'event data', { present: Object.hasOwn(event, 'data') }),
   };

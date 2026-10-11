@@ -51,15 +51,29 @@ function id(value, label) {
   return value;
 }
 
-function optionalId(value, label) {
+function optionalId(value, label, present = false) {
+  // An explicitly persisted undefined identity disappears through JSON, so it
+  // must never be silently treated as an omitted legacy field after restart.
+  if (present && value === undefined) throw new Error(`${label} cannot be explicitly undefined`);
   return value == null || value === '' ? '' : id(value, label);
 }
 
 function timestamp(value, label) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
-  const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  // Exact-effect chronology is part of the persisted ledger identity.
+  // Date.parse accepts calendar rollovers, timezone-free times and shorthand;
+  // a restart must never rewrite an ambiguous timestamp into a new authority.
+  const format = /^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  if (typeof value !== 'string' || !format.test(value)) {
+    throw new Error(`${label} must be a canonical zone-bound timestamp`);
+  }
+  const wallClock = value.match(/^(?:\d{4}|\+\d{6})-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/u)[0];
+  const calendar = new Date(wallClock + 'Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, wallClock.length) !== wallClock) {
+    throw new Error(`${label} contains invalid calendar date`);
+  }
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error(`${label} must be a valid timestamp`);
+  return date.toISOString();
 }
 
 function optionalText(value, label, max = 8000) {
@@ -70,21 +84,30 @@ function optionalText(value, label, max = 8000) {
   return out;
 }
 
+// Persisted effect receipts are security-critical. Hostile Proxy reflection
+// traps can contain private provider tokens in their errors; diagnostics must
+// never echo untrusted keys or exception messages.
+function safeEffectReflection(label, inspect) {
+  try { return inspect(); }
+  catch { throw new Error(`${label} cannot be safely inspected`); }
+}
+
 function dataRecord(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object'
+      || safeEffectReflection(label, () => Array.isArray(value))) {
     throw new Error(`${label} must be a plain data object`);
   }
-  const prototype = Object.getPrototypeOf(value);
+  const prototype = safeEffectReflection(label, () => Object.getPrototypeOf(value));
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
   const output = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeEffectReflection(label, () => Reflect.ownKeys(value))) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol fields`);
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
-      throw new Error(`${label}.${key} must be an enumerable own data property`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field`);
+    const descriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, key));
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} requires an enumerable own data property`);
     }
     output[key] = descriptor.value;
   }
@@ -92,24 +115,31 @@ function dataRecord(value, allowed, label) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!safeEffectReflection(label, () => Array.isArray(value)
+      && Object.getPrototypeOf(value) === Array.prototype)) {
     throw new Error(`${label} must be a plain dense array`);
   }
-  if (value.length > max) throw new Error(`${label} is invalid`);
+  // Read own descriptors instead of attacker-controlled array length getters.
+  const lengthDescriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, 'length'));
+  const length = lengthDescriptor?.value;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(length) || length < 0 || length > max) {
+    throw new Error(`${label} is invalid`);
+  }
   const output = [];
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of safeEffectReflection(label, () => Reflect.ownKeys(value))) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains non-index fields`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index >= value.length) {
+    if (!Number.isSafeInteger(index) || index >= length) {
       throw new Error(`${label} contains invalid indices`);
     }
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = safeEffectReflection(label, () => Object.getOwnPropertyDescriptor(value, String(index)));
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label}[${index}] must be an enumerable own data item`);
     }
     output.push(descriptor.value);
@@ -180,11 +210,12 @@ function normalizedState(input) {
   }
   const phase = raw.phase;
   const attempt = raw.attempt;
-  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
+  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || Object.is(attempt, -0)
+      || attempt < 0 || attempt > MAX_ATTEMPTS) {
     throw new Error('Exact effect attempt is invalid');
   }
   const expectedExecutionId = attempt > 0 ? executionId(effectId, attempt) : '';
-  if (optionalId(raw.executionId, 'executionId') !== expectedExecutionId) {
+  if (optionalId(raw.executionId, 'executionId', Object.hasOwn(raw, 'executionId')) !== expectedExecutionId) {
     throw new Error('Exact effect executionId is inconsistent');
   }
   const observation = raw.observation == null ? null : normalizeObservationV1(raw.observation);
@@ -214,7 +245,7 @@ function normalizedState(input) {
       'ambiguity',
     );
     ambiguity = {
-      reasonCode: optionalId(value.reasonCode, 'ambiguity.reasonCode'),
+      reasonCode: optionalId(value.reasonCode, 'ambiguity.reasonCode', Object.hasOwn(value, 'reasonCode')),
       summary: optionalText(value.summary, 'ambiguity.summary'),
       declaredAt: value.declaredAt == null || value.declaredAt === ''
         ? ''
@@ -235,12 +266,33 @@ function normalizedState(input) {
     }
     reconciliation = {
       outcome,
-      reasonCode: optionalId(value.reasonCode, 'reconciliation.reasonCode'),
+      reasonCode: optionalId(value.reasonCode, 'reconciliation.reasonCode', Object.hasOwn(value, 'reasonCode')),
       summary: optionalText(value.summary, 'reconciliation.summary'),
       resolvedAt: value.resolvedAt == null || value.resolvedAt === ''
         ? ''
         : timestamp(value.resolvedAt, 'reconciliation.resolvedAt'),
     };
+  }
+
+  const commitId = optionalId(raw.commitId, 'commitId', Object.hasOwn(raw, 'commitId'));
+  // A cold-restarted ledger may be stale or corrupt. The persisted phase
+  // alone cannot grant COMMIT or SAFE_RETRY: these transitions require the
+  // same bound verifier/reconciliation receipts as the event reducer.
+  // Otherwise a forged VERIFIED state could be committed without evidence,
+  // or a forged SAFE_RETRY could blindly repeat a consequential effect.
+  const independentlyVerified = !!verification
+    && [VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status);
+  if ((phase === ExactEffectPhase.VERIFIED || phase === ExactEffectPhase.COMMITTED)
+      && !independentlyVerified) {
+    throw new Error('Verified exact-effect state requires bound positive verification evidence');
+  }
+  if (phase === ExactEffectPhase.SAFE_RETRY
+      && (!observation || verification?.status !== VerificationStatus.FAILED
+          || reconciliation.outcome !== ReconciliationOutcome.SAFE_RETRY)) {
+    throw new Error('SAFE_RETRY state requires bound failed verification and reconciliation evidence');
+  }
+  if (phase === ExactEffectPhase.COMMITTED && !commitId) {
+    throw new Error('COMMITTED exact-effect state requires an exact commitId receipt');
   }
 
   return freeze({
@@ -254,7 +306,7 @@ function normalizedState(input) {
     verification,
     ambiguity,
     reconciliation,
-    commitId: optionalId(raw.commitId, 'commitId'),
+    commitId,
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
     processedEventIds,
@@ -312,7 +364,7 @@ function normalizeEvent(input) {
     summary: raw.summary,
     outcome: raw.outcome,
     commitId: raw.commitId,
-    executionId: optionalId(raw.executionId, 'event.executionId'),
+    executionId: optionalId(raw.executionId, 'event.executionId', Object.hasOwn(raw, 'executionId')),
   };
 }
 
