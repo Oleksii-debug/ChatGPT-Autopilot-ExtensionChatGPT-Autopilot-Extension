@@ -917,7 +917,7 @@ test('Plan-1 S1: persisted exact-effect phase cannot forge verification, safe re
   for (const commitId of ['', null, undefined]) {
     const corrupted = { ...committed, commitId };
     assert.throws(() => normalizeExactEffectStateV1(corrupted),
-      /COMMITTED exact-effect state requires an exact commitId receipt/,
+      /COMMITTED exact-effect state requires an exact commitId receipt|commitId cannot be explicitly undefined/,
       'persisted committed phase without exact receipt must not count as complete');
     assert.equal(corrupted.commitId, commitId);
   }
