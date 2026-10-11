@@ -1,14 +1,10 @@
-# 2026-10-11 Closure-first convergence directive — binding worker selection
+# OWNER FINAL RELEASE AUTHORITY — 2026-10-11 (SUPERSEDES OLD VERSION PREFERENCES)
 
-This is a coordination clarification only. It does not waive CI, source integrity, privacy/security, release, real-account or NVDA requirements. Reuse all accepted 11.0.13 High source and existing feature branches; do not reconstruct or downgrade to the old main 0.9.19 manifest.
+The **single current final distribution target** is **ChatGPT-Autopilot 11.0.15 HIGH Simplified Batch VERIFIED**, owner-supplied local ZIP, 314 entries, all CRC valid, SHA-256 `9ea2dd75e314daa8ae7d25b084563cf1615c9e4f025994c2a0368690a323e10a`, Chrome manifest 11.0.15. Simplified Batch isolated tests: 11/11 PASS. This is an installable extension package, NOT by itself a complete developer checkout or evidence of full product release. Superseded artifacts/releases remain audit history ONLY, not an alternative final product target. Preserve their valid source and completed work until the 11.0.15 delta is safely integrated and fully qualified; NEVER erase historical attestations or pretend a source branch already contains the 11.0.15 delta.
 
-1. First critical integration track is canonical Plan 8 source-convergence PR #716, with traceable exact 11.0.13 High source and current main lineage. Repair its *proven* merge/release/CI failures on the existing PR. Keep older main-only tests/source; after qualification, integrate safely and read back main. Parallel component work can continue against existing 11.x branches but must not manufacture a second baseline.
-2. Assigned Plan 1–4,6–7 workers take first actionable NOT-DONE Section and its *existing* owner PR/child only. Prefer closing one section over creating another nested PR or new hardening checklist. Plan 5 remains owner-deferred unless explicitly resumed.
-3. Read actual failed GitHub Action **job steps and decoded log lines** for the current exact head. Fix only the demonstrated behavioral/contract/CI failure, then rerun exact-head gates. Preserve fail-closed behavior, authoritative receipts and negative/restart checks; never blanket-ignore a broken check or call queued/skipped tests PASS.
-4. Treat source-complete, scoped-PASS, integrated-PASS, and terminal-DONE as different states. A feature branch never earns DONE while required 11.x→main integration/readback is absent. As soon as required gates pass, stop speculative expansions: integrate via the current canonical owner, confirm main exact bytes, and update only that section in GitHub/assigned Drive plan.
-5. Track per-plan `terminal_done/total`, first actionable section, existing canonical PR/SHA, exact blocker and responsible repair. Duplicated worker efforts should converge on the same PR without changing an unrelated plan. Whole-product physical Windows/NVDA/real-provider evidence remains Plan 8.
+**CRITICAL INDEPENDENCE RULE:** The user-assigned Agent and Models development Plans 1–4,6–7 have independent source/code/tests/DONE criteria; DO NOT block their section progress merely because the current deployed Chrome extension/ZIP, main manifest, or Plan8 source branch version differs. Version migration/packaging/go-live is a separate Plan8 integration lane. The user's existing chat prompts and worker sessions MUST NOT be changed.
 
-This directive narrows older open-ended worker-autonomy wording: useful independent work is allowed, but endless PR layering/polish never outranks evidence-correct convergence and closure.
+**SHORT CLOSURE PROCESS:** Keep original numbered sections and all accepted work. Split the first actionable section into A (reuse + prove existing SHA/test), B (first proven error + negative/recovery tests in EXISTING owner PR), C (scoped/full qualification + ordered integration/readback). Record independently verified checkpoints A_VERIFIED/B_VERIFIED/C_VERIFIED in the assigned Drive plan and live registry, but do not mark the original section terminal DONE until inherited acceptance passes. Avoid speculative additional hardening, nested PR proliferation or irrelevant whole-product device evidence as blockers for independent source work. Plan 5 remains owner-deferred. Keep safe non-replay, security, source rights and accessibility barriers intact.
 
 ## Canonical project-plan naming invariant — owner directive 2026-10-08
 
@@ -20,9 +16,8 @@ Do not append subsystem/theme text to Drive filenames. The thematic scope belong
 
 This directive governs the new Agent/Models project-plan architecture.
 
-## CRITICAL 11.x SOURCE RULE
-The exact Drive archive **ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip** has been located and inspected as the 11.0.13 High source baseline. Audit SHA-256: `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329`. Current GitHub main manifest is still **0.9.19** and is stale.
-Workers MUST NOT use the old main tree to downgrade scope or rebuild 11.x from scratch. The first source bootstrap action is to import/synchronize the exact 11.0.13 archive (or a proven newer direct successor) into canonical Git and run current qualification. See `AUTOPILOT_11_0_13_SOURCE_BASELINE.md`.
+## Current final distribution and historical source note
+The only current owner-designated final Chrome extension distribution is 11.0.15 HIGH Simplified Batch VERIFIED (exact owner ZIP SHA-256 `9ea2dd75e314daa8ae7d25b084563cf1615c9e4f025994c2a0368690a323e10a`). Source archived from prior development versions is historical baseline material only, not a competing current final release. Integrate the real feature delta into existing canonical PR #716 and qualify all developer tests; never overwrite unfinished Agent/Models branches with the installable distribution ZIP. Agent/Models work has independent acceptance and is not waiting on an extension version bump.
 
 ## Multi-plan work selection
 Read PROJECT_PLAN_INDEX.md, MULTI_PLAN_PARALLELISM_CONTRACT.md, MULTI_PLAN_CLOSURE_STATE.md, the assigned Drive plan and live source lineage.
