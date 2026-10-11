@@ -1,3 +1,13 @@
+# OWNER CURRENT VERSION + SECTION CLOSURE AUTHORITY — 2026-10-11
+
+**ONLY owner-designated final distribution**: 11.0.15 HIGH Simplified Batch VERIFIED owner ZIP, SHA-256 `9ea2dd75e314daa8ae7d25b084563cf1615c9e4f025994c2a0368690a323e10a`, 314 entries, CRC intact, manifest v11.0.15, 11/11 isolated bundled tests passed. Not yet a fully integrated GitHub source/release; prior ZIP/source versions mentioned below are dated *historical checkpoints*, not current competing product targets. Do not erase their accepted commits or attestations. Owner asks no prompt/session changes.
+
+**Independent Plan1–4/6/7 Agent/Models progress is not version-blocked**: their Sections close on their own accepted source contracts/tests/owner merges, not on version reported by the local installed extension or standalone ZIP. Plan8 owns cross-feature final convergence/go-live; Plan5 remains owner-deferred. Plans 1–8 current numbered Sections remain unchanged.
+
+2026-10-11 Drive instructions now decompose the FIRST actionable original Section of ALL 8 plans into A (reuse verified existing tests), B (one proven job failure repair plus negative/recovery), C (exact full acceptance/integration/readback). Independently persist A_VERIFIED/B_VERIFIED/C_VERIFIED only upon evidence; never infer terminal section DONE from milestone and don't reopen past DONE. No duplicate PRs or speculative hardening. Preserve all older checkpoint log below.
+
+Canonical source integration PR #716 history now includes two-parent latest-main reconciliation; at verified exact head `cc3263d21354b6c8bf945ea0861a276fbf260146` Plan8 provenance/Core/UI/Chrome/Interaction/Windows packaging SUCCESS, Linux aggregate Release FAILURE (204 fail, 3432 pass). Since head evolved for version-directive reconciliation, these gates are **HISTORICAL**, not claimed current-head PASS. Failed suite clusters include missing canonical Specialist BrowserAgentManager methods and provider/registry contract drift: integrate existing owner components rather than reimplement or blindly overwrite source from ZIP.
+
 ### PLAN5_S1_STORE_AMBIGUITY_AND_OWNER_CHRONOLOGY_PR830_68F9E309_20261010 — NONTERMINAL 0/2
 - Scope EXCLUSIVELY canonical Drive Plan5 Section 1 FIRST ACTIONABLE / IN_PROGRESS / NOT TERMINAL DONE. Section2 ACTIONABLE / NOT ADVANCED / NOT DONE. Other plans untouched.
 - Reuse existing 11.0.13 High Plan5 PR #714 and child #827, compatibility DRAFT PR #830 exact SHA 68f9e309a1074bb3613d567a1ce7c0a379a9e62e, child base 9daae87683f97c871ce7f13a5b4d6cbd62a47886. Upstream untouched.
