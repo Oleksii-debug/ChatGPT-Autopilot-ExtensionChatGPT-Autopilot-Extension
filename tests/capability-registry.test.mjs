@@ -27,7 +27,7 @@ test('provider descriptors are copied and cannot mutate registry truth', () => {
 
 test('unknown or under-capable providers fail closed', () => {
   assert.throws(() => getAgentProvider('future-provider'), /Unsupported agent provider/);
-  assert.throws(() => requireAgentProviderCapabilities(AgentProviderId.CHATGPT_BROWSER, ['not-yet-supported']), /lacks capabilities/);
+  assert.throws(() => requireAgentProviderCapabilities(AgentProviderId.CHATGPT_BROWSER, ['not-yet-supported']), /lacks (?:required )?capabilities/);
 });
 
 test('provider identities are exact text and never trimmed or coerced', () => {
