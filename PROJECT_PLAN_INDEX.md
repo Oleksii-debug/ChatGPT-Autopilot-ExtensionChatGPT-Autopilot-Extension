@@ -1,9 +1,12 @@
 # ChatGPT Autopilot — Canonical Multi-Plan Index
 
-## CRITICAL SOURCE-LINEAGE NOTE
+## CURRENT OWNER-FINAL DISTRIBUTION: 11.0.15 HIGH
 
-The exact Drive source archive **ChatGPT-Autopilot-11.0.13-HIGH-PostSend-Background-FIXED.zip** has been located and inspected. It contains 308 entries, a full `src/` + `companion/` source tree, and manifest **11.0.13 High**. Audit SHA-256: `ddf0527d03ca5b68c3b50e96dd3413e2d26afb0b7737ae3f502a3f960ae3c329`.
-The current GitHub `main` manifest still reports **0.9.19** and is stale. The missing source problem is resolved; the remaining bootstrap task is to import/synchronize this exact 11.0.13 source archive (or a proven newer direct successor) into canonical Git, then qualify it. Do not reconstruct 11.x from 0.9.19. See `AUTOPILOT_11_0_13_SOURCE_BASELINE.md`.
+**Only accepted final product target:** ChatGPT-Autopilot 11.0.15 HIGH Simplified Batch VERIFIED. Owner ZIP: SHA-256 `9ea2dd75e314daa8ae7d25b084563cf1615c9e4f025994c2a0368690a323e10a`; 314 members; CRC valid; manifest 11.0.15; 11/11 bundled isolated tests PASS. **Not yet integrated / not full developer CI.** Any older source version is an immutable historical implementation/evidence checkpoint, not a selectable current final release; do not present it as a valid substitute or delete already implemented features.
+
+**Agent and Models independence:** Plans 1–4,6–7 can implement, test, integrate and close their own Sections against the actual source/contract acceptance. Their progress is NOT gated on the version of the owner's currently installed Chrome extension, nor on Plan8 whole-product packaging. Plan8 owns distribution and cross-feature final release. Plan5 owner-deferred.
+
+**Short bounded stages:** For each first open Section in each existing plan, record separately (A) reuse/prove, (B) fix first real CI blocker + negative/recovery, (C) owner integration/exact SHA + DONE. Do not add new outer sections, discard work or force workers to restart/changeprompt. Historical entries remain history.
 
 Canonical Drive folder:
 https://drive.google.com/drive/folders/11g-e0-mv_vaKlTg7uYYKh8iTak6YfP_u
