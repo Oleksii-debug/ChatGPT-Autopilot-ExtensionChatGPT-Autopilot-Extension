@@ -232,3 +232,374 @@ test('execution record rejects identity drift, malformed outcome and accessor fi
   );
   assert.equal(reads, 0);
 });
+
+test('Section 1: hostile provider execution records never leak Proxy errors or caller field names, while JSON restart survives', () => {
+  const secret = 'PRIVATE_PROVIDER_TOKEN_CANARY_7e2a';
+  const legitimate = JSON.parse(JSON.stringify(prepared()));
+  for (const trapName of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const input = new Proxy({ ...legitimate }, {
+      [trapName]() { throw new Error(secret); },
+    });
+    assert.throws(
+      () => normalizeSpecialistProviderExecutionV1(input),
+      error => error instanceof Error
+        && /cannot be inspected safely/u.test(error.message)
+        && !error.message.includes(secret)
+        && !('cause' in error),
+      trapName + ' must be redacted',
+    );
+  }
+
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1({ ...legitimate, [secret]: 'ignored' }),
+    error => error instanceof Error
+      && /contains unknown field/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  let accessorCalls = 0;
+  const accessorRecord = { ...legitimate };
+  Object.defineProperty(accessorRecord, 'status', {
+    enumerable: true,
+    get() { accessorCalls += 1; throw new Error(secret); },
+  });
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(accessorRecord),
+    error => error instanceof Error
+      && /data property/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  assert.equal(accessorCalls, 0);
+
+  // The rejected input must not corrupt the durable good execution snapshot.
+  const restarted = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(legitimate)),
+  );
+  assert.equal(restarted.leaseId, legitimate.leaseId);
+  assert.equal(restarted.providerId, legitimate.providerId);
+  assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.deepEqual(JSON.parse(JSON.stringify(restarted)), legitimate);
+});
+
+test('Section 1: preparation request is descriptor-safe before any execution/lease binding', () => {
+  const canonical = prepared();
+  const request = {
+    planId: canonical.planId,
+    nodeId: canonical.nodeId,
+    agentId: canonical.agentId,
+    handoffId: canonical.handoffId,
+    providerId: canonical.providerId,
+    leaseId: canonical.leaseId,
+    leaseUntil: canonical.leaseUntil,
+    conversationId: canonical.conversationId,
+    providerConfig: canonical.providerConfig,
+    at: canonical.preparedAt,
+  };
+  const secret = 'PRIVATE_PREPARATION_CREDENTIAL_CANARY_8121';
+  for (const trapName of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const proxy = new Proxy({ ...request }, {
+      [trapName]() { throw new Error(secret); },
+    });
+    assert.throws(
+      () => createSpecialistProviderExecutionV1(proxy),
+      error => error instanceof Error
+        && /cannot be inspected safely/u.test(error.message)
+        && !error.message.includes(secret)
+        && !('cause' in error),
+    );
+  }
+  let reads = 0;
+  const getterRequest = { ...request };
+  Object.defineProperty(getterRequest, 'leaseId', {
+    enumerable: true,
+    get() { reads += 1; throw new Error(secret); },
+  });
+  assert.throws(
+    () => createSpecialistProviderExecutionV1(getterRequest),
+    error => error instanceof Error
+      && /data property/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+  assert.equal(reads, 0);
+  assert.throws(
+    () => createSpecialistProviderExecutionV1({ ...request, [secret]: 'x' }),
+    error => error instanceof Error
+      && /unknown field/u.test(error.message)
+      && !error.message.includes(secret),
+  );
+
+  const restarted = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(createSpecialistProviderExecutionV1(request))),
+  );
+  assert.equal(restarted.leaseId, canonical.leaseId);
+  assert.equal(restarted.conversationId, canonical.conversationId);
+  assert.equal(restarted.status, SpecialistProviderExecutionStatus.PREPARED);
+});
+
+
+test('terminal Specialist provider success is immutable across durable replay and contradictory late outcome', () => {
+  const terminal = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'VERIFIED_TERMINAL_EFFECT_RECEIPT',
+    errorCode: '',
+    at: T1,
+  });
+  const cold = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(terminal)));
+  const lateContradiction = {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: true,
+    effectEvidence: '',
+    errorCode: 'LATE_TRANSPORT_RETRY',
+    at: T2,
+  };
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(cold, lateContradiction), cold);
+  assert.equal(cold.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.equal(cold.effectEvidence, 'VERIFIED_TERMINAL_EFFECT_RECEIPT');
+  assert.equal(cold.safeToRetry, false);
+  assert.equal(cold.updatedAt, T1, 'late retries must not replace terminal provenance');
+});
+
+test('terminal provider failure cannot be rewritten as success or execute hostile replay getters', () => {
+  const failed = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: 'error',
+    providerSucceeded: false,
+    manualReviewRequired: true,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'VERIFIED_FAILURE_RECEIPT',
+    errorCode: '',
+    at: T1,
+  });
+  const restored = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(failed)));
+  let getterCalls = 0;
+  const replay = { at: T2 };
+  Object.defineProperty(replay, 'providerStatus', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw Error('SECRET_MUST_NOT_BE_READ');
+    },
+  });
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(restored, replay), restored);
+  assert.equal(getterCalls, 0);
+  assert.equal(restored.status, SpecialistProviderExecutionStatus.PROVIDER_FAILED);
+  assert.equal(restored.effectEvidence, 'VERIFIED_FAILURE_RECEIPT');
+  assert.equal(restored.safeToRetry, false);
+});
+
+test('Section 1: provider update must not occur after its observation, including cold JSON restart', () => {
+  const preEffect = prepared();
+  const terminal = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_PROVIDER_TERMINAL_RECEIPT',
+    errorCode: '',
+    providerUpdatedAt: T2,
+    providerObservedAt: T1,
+    at: T1,
+  };
+  assert.throws(
+    () => recordSpecialistProviderExecutionOutcomeV1(preEffect, terminal),
+    /update cannot postdate its observation/,
+  );
+  // Invalid lower-trust observation cannot mutate a previously valid record.
+  assert.equal(preEffect.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(preEffect.updatedAt, T0);
+  const valid = recordSpecialistProviderExecutionOutcomeV1(preEffect, {
+    ...terminal,
+    providerUpdatedAt: T0,
+  });
+  assert.equal(valid.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  const restarted = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(valid)));
+  assert.deepEqual(restarted, valid);
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify({
+      ...restarted,
+      providerUpdatedAt: T2,
+    }))),
+    /update cannot postdate its observation/,
+  );
+});
+
+
+test('Section 1: pre-preparation provider observation cannot certify the current handoff after cold restart', () => {
+  const current = prepared();
+  const outcome = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_TERMINAL_PROVIDER_RECEIPT',
+    errorCode: '',
+    // The provider may have been updated before this attempt, but its
+    // observation must not predate the prepared exact handoff.
+    providerUpdatedAt: '2026-09-25T08:00:00.000Z',
+    providerObservedAt: '2026-09-27T14:39:59.999Z',
+    at: T1,
+  };
+  assert.throws(
+    () => recordSpecialistProviderExecutionOutcomeV1(current, outcome),
+    /observation predates exact preparation/,
+  );
+  assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(current.updatedAt, T0);
+  const legitimate = recordSpecialistProviderExecutionOutcomeV1(current, {
+    ...outcome,
+    providerObservedAt: T1,
+  });
+  assert.equal(legitimate.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.deepEqual(
+    normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(legitimate))),
+    legitimate,
+  );
+  assert.throws(
+    () => normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify({
+      ...legitimate,
+      providerObservedAt: '2026-09-27T14:39:59.999Z',
+    }))),
+    /observation predates exact preparation/,
+  );
+});
+
+test('Section 1: ambiguous reconciliation cannot certify a terminal effect, including cold restart', () => {
+  const current = prepared();
+  const ambiguous = {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: true,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_REQUEST_OUTCOME_UNKNOWN',
+    at: T1,
+  };
+  for (const conflicting of [
+    { providerSucceeded: true },
+    { manualReviewRequired: true },
+    { effectEvidence: 'FORGED_TERMINAL_RECEIPT' },
+    { providerStatus: 'finished' },
+  ]) {
+    assert.throws(
+      () => recordSpecialistProviderExecutionOutcomeV1(current, { ...ambiguous, ...conflicting }),
+      /Reconciliation outcome requires non-retryable, non-terminal canonical evidence/,
+    );
+    assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  }
+  const valid = recordSpecialistProviderExecutionOutcomeV1(current, ambiguous);
+  assert.equal(valid.status, SpecialistProviderExecutionStatus.RECONCILE);
+  const recovered = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(valid)));
+  assert.deepEqual(recovered, valid);
+  assert.equal(recovered.providerSucceeded, false);
+  assert.equal(recovered.effectEvidence, '');
+});
+
+test('Section 1: blocked provider execution cannot become success after restart or hostile late replay', () => {
+  const blocked = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_CONFIGURATION_BLOCKED',
+    at: T1,
+  });
+  assert.equal(blocked.status, SpecialistProviderExecutionStatus.BLOCKED_FAILURE);
+  const recovered = normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(blocked)));
+  let hostileReads = 0;
+  const later = { at: T2 };
+  Object.defineProperty(later, 'providerStatus', {
+    enumerable: true,
+    get() { hostileReads += 1; throw Error('PRIVATE_PROVIDER_CANARY_NEVER_READ'); },
+  });
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(recovered, later), recovered);
+  assert.equal(hostileReads, 0);
+  assert.deepEqual(recordSpecialistProviderExecutionOutcomeV1(recovered, {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'FORGED_LATE_SUCCESS',
+    errorCode: '',
+    at: T2,
+  }), recovered);
+  assert.equal(recovered.errorCode, 'OPENHANDS_CONFIGURATION_BLOCKED');
+  assert.equal(recovered.updatedAt, T1);
+});
+
+
+test('Section 1: explicit null or undefined provider chronology cannot erase durable effect provenance', () => {
+  const current = prepared();
+  const legitimateOutcome = {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'EXACT_PROVIDER_TERMINAL_RECEIPT',
+    errorCode: '',
+    providerUpdatedAt: T0,
+    providerObservedAt: T1,
+    at: T1,
+  };
+  const accepted = recordSpecialistProviderExecutionOutcomeV1(current, legitimateOutcome);
+  assert.equal(accepted.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.deepEqual(
+    normalizeSpecialistProviderExecutionV1(JSON.parse(JSON.stringify(accepted))),
+    accepted,
+  );
+
+  for (const field of ['providerUpdatedAt', 'providerObservedAt']) {
+    for (const invalid of [null, undefined]) {
+      assert.throws(
+        () => recordSpecialistProviderExecutionOutcomeV1(current, {
+          ...legitimateOutcome,
+          [field]: invalid,
+        }),
+        /must use canonical UTC/,
+        field + ' must fail before outcome admission',
+      );
+      assert.throws(
+        () => normalizeSpecialistProviderExecutionV1({
+          ...accepted,
+          [field]: invalid,
+        }),
+        /must use canonical UTC/,
+        field + ' must fail when a caller corrupts a durable record',
+      );
+      // null persists across JSON cold restart; undefined must be rejected
+      // before serialization can silently remove its field.
+      if (invalid === null) {
+        assert.throws(
+          () => normalizeSpecialistProviderExecutionV1(
+            JSON.parse(JSON.stringify({ ...accepted, [field]: invalid })),
+          ),
+          /must use canonical UTC/,
+          field + ' must remain invalid after JSON cold restart',
+        );
+      }
+    }
+  }
+  assert.equal(current.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(current.updatedAt, T0);
+
+  // Legitimate legacy omission still carries exactly the historical
+  // no-chronology semantics; do not require provider accounts for it.
+  const { providerUpdatedAt: _updated, providerObservedAt: _observed, ...legacy } = accepted;
+  const restoredLegacy = normalizeSpecialistProviderExecutionV1(
+    JSON.parse(JSON.stringify(legacy)),
+  );
+  assert.equal(restoredLegacy.providerUpdatedAt, '');
+  assert.equal(restoredLegacy.providerObservedAt, '');
+});

@@ -383,3 +383,86 @@ test('null-prototype request is accepted but unknown authority fields fail close
     /unknown field/u,
   );
 });
+
+
+test('hostile readiness request Proxy reflection errors are redacted before provider inspection', () => {
+  const secret = 'PRIVATE_REQUEST_REFLECTION_TOKEN';
+  const request = new Proxy({
+    selection: selection(),
+    providerStates: [readiness()],
+  }, {
+    getPrototypeOf() { throw new Error(secret); },
+  });
+  assert.throws(() => inspectSpecialistProviderReadinessV1(request), error => {
+    assert.match(error.message, /cannot be inspected safely/u);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+});
+
+test('revoked or hostile providerStates arrays fail closed without leaking Proxy trap errors', () => {
+  const secret = 'PRIVATE_ARRAY_REFLECTION_TOKEN';
+  const states = new Proxy([readiness()], {
+    ownKeys() { throw new Error(secret); },
+  });
+  assert.throws(() => inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: states,
+  }), error => {
+    assert.match(error.message, /cannot be inspected safely/u);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+  const revoked = Proxy.revocable([readiness()], {});
+  revoked.revoke();
+  assert.throws(() => inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: revoked.proxy,
+  }), /cannot be inspected safely/u);
+});
+
+test('provider fact Proxy reflection, hostile field names and getters never escape the readiness edge', () => {
+  const secret = 'PRIVATE_PROVIDER_FACT_REFLECTION_TOKEN';
+  const badFact = new Proxy(readiness(), {
+    getOwnPropertyDescriptor() { throw new Error(secret); },
+  });
+  assert.throws(() => inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: [badFact],
+  }), error => {
+    assert.match(error.message, /cannot be inspected safely/u);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+  assert.throws(() => inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: [{ ...readiness(), [secret]: 'hidden' }],
+  }), error => {
+    assert.match(error.message, /unknown field/u);
+    assert.equal(error.message.includes(secret), false);
+    return true;
+  });
+  let getterCalls = 0;
+  const getterFact = readiness();
+  Object.defineProperty(getterFact, 'health', {
+    enumerable: true,
+    get() { getterCalls += 1; throw new Error(secret); },
+  });
+  assert.throws(() => inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: [getterFact],
+  }), /enumerable own data property/u);
+  assert.equal(getterCalls, 0);
+});
+
+test('readiness snapshot still accepts cold-restarted valid provider facts without authority amplification', () => {
+  const snapshot = JSON.parse(JSON.stringify({
+    selection: selection(),
+    providerStates: [readiness()],
+  }));
+  const result = inspectSpecialistProviderReadinessV1(snapshot);
+  assert.equal(result.readiness, 'READY');
+  assert.equal(result.executable, true);
+  assert.equal(result.authority.providerExecutionAuthorized, false);
+  assert.equal(result.authority.capacityReserved, false);
+});

@@ -121,3 +121,60 @@ test('rejects accessor-backed wrapper fields without invoking them', () => {
   assert.throws(() => normalizeSpecialistProviderConfigV1(raw), /data property/);
   assert.equal(invoked, false);
 });
+
+
+test('provider config wrapper rejects hostile Proxy reflection without leaking secrets or invoking getters', () => {
+  const secret = 'secret-credential-do-not-echo';
+  const input = {
+    schemaVersion: 1,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    revision: 1,
+    config: openHandsConfig(),
+    updatedAt: UPDATED_AT,
+  };
+  let accesses = 0;
+  for (const trap of ['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor']) {
+    const proxy = new Proxy(input, {
+      [trap]() {
+        accesses += 1;
+        throw new Error(secret);
+      },
+    });
+    assert.throws(
+      () => normalizeSpecialistProviderConfigV1(proxy),
+      error => error.message.includes('cannot be inspected safely')
+        && !error.message.includes(secret),
+    );
+  }
+  assert.equal(accesses, 3);
+});
+
+test('provider config wrapper denies attacker-named and hidden fields without echoing names', () => {
+  const secret = 'private-token-from-untrusted-key';
+  const input = {
+    schemaVersion: 1,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    revision: 1,
+    config: openHandsConfig(),
+    updatedAt: UPDATED_AT,
+  };
+  const malicious = { ...input, [secret]: true };
+  assert.throws(
+    () => normalizeSpecialistProviderConfigV1(malicious),
+    error => error.message.includes('unknown field') && !error.message.includes(secret),
+  );
+  const hidden = { ...input };
+  Object.defineProperty(hidden, 'revision', { enumerable: false, value: 1 });
+  assert.throws(() => normalizeSpecialistProviderConfigV1(hidden), /enumerable own data property/);
+  const symbolInput = { ...input, [Symbol(secret)]: true };
+  assert.throws(
+    () => normalizeSpecialistProviderConfigV1(symbolInput),
+    error => error.message.includes('unknown field') && !error.message.includes(secret),
+  );
+  const recovered = normalizeSpecialistProviderConfigV1(JSON.parse(JSON.stringify(input)));
+  assert.equal(recovered.providerId, OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(recovered.revision, 1);
+  assert.ok(Object.isFrozen(recovered));
+});
