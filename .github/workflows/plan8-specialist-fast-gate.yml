@@ -1,0 +1,56 @@
+name: Plan 8 Specialist fast source gate
+
+on:
+  pull_request:
+    paths:
+      - "src/core/browser-agent-manager.js"
+      - "src/core/specialist-*.js"
+      - "src/core/openhands-specialist-readiness.js"
+      - "src/core/subagent-topology-mutation.js"
+      - "src/background/service-worker.js"
+      - "src/ui/options.js"
+      - "src/ui/options.html"
+      - "tests/*specialist*.test.mjs"
+      - ".github/workflows/plan8-specialist-fast-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source-and-focused-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify exact PR source
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --exit-code HEAD --
+      - name: Parse canonical core and service-worker
+        run: |
+          node --check src/core/browser-agent-manager.js
+          node --check src/background/service-worker.js
+      - name: Test Specialist durable registry, provider admission, execution and recovery
+        run: |
+          node --test \
+            tests/browser-agent-specialist-durable-admission.test.mjs \
+            tests/specialist-provider-config.test.mjs \
+            tests/specialist-provider-dispatch-chronology.test.mjs \
+            tests/specialist-provider-execution.test.mjs \
+            tests/specialist-provider-readiness.test.mjs
