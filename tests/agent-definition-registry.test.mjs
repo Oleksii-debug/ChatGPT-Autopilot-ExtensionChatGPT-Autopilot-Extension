@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AgentDefinitionRegistryMutationKind,
+  createAgentDefinitionRegistryV1,
   discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
@@ -40,7 +41,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return {
+  const input = {
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
@@ -50,7 +51,28 @@ function registry(overrides = {}) {
     ],
     ...overrides,
   };
+  // A valid fixture must carry the canonical content-bound CAS key.
+  // Preserve deliberately malformed inputs for negative validation tests.
+  try {
+    return { ...input, bindingKey: createAgentDefinitionRegistryV1(input).bindingKey };
+  } catch {
+    return input;
+  }
 }
+
+test('fixture registry binding survives JSON recovery and rejects forged or omitted keys', () => {
+  const reg = registry();
+  const recovered = JSON.parse(JSON.stringify(reg));
+  assert.equal(normalizeAgentDefinitionRegistryV1(recovered).bindingKey, reg.bindingKey);
+  assert.throws(
+    () => normalizeAgentDefinitionRegistryV1({ ...recovered, bindingKey: undefined }),
+    /bindingKey is invalid/u,
+  );
+  assert.throws(
+    () => normalizeAgentDefinitionRegistryV1({ ...recovered, bindingKey: recovered.bindingKey + 'forged' }),
+    /bindingKey is inconsistent/u,
+  );
+});
 
 function materialization(overrides = {}) {
   const reg = registry();
@@ -224,7 +246,7 @@ test('selection carries a full immutable definition snapshot so same-revision by
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted|drifted from current registry definition/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -546,17 +568,17 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ revision: 4 }),
-  }), /registry identity or revision drifted/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('selection envelope cannot substitute a different definition identity or revision', () => {

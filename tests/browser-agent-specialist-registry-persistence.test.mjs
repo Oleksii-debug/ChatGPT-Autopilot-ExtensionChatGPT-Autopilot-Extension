@@ -57,6 +57,7 @@ test('Specialist registries persist through the existing Browser Agent store and
   const mutation = await manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition(),
   });
@@ -73,17 +74,19 @@ test('Specialist registries persist through the existing Browser Agent store and
 test('Specialist registry CAS is enforced at the actual serialized write boundary', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
-  await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
+  const created = await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
 
   const first = manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition({ specialistId: 'specialist.a', label: 'A' }),
   });
   const second = manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition({ specialistId: 'specialist.b', label: 'B' }),
   });
@@ -100,16 +103,18 @@ test('Specialist registry CAS is enforced at the actual serialized write boundar
 test('Specialist definition revision CAS persists and rejects stale edits', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
-  await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
-  await manager.mutateSpecialistRegistry({
+  const created = await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
+  const initial = await manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition(),
   });
   const updated = await manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: initial.nextRegistry.bindingKey,
     kind: SpecialistRegistryMutationKind.UPDATE,
     specialistId: 'research-local',
     expectedDefinitionRevision: 1,
@@ -121,6 +126,7 @@ test('Specialist definition revision CAS persists and rejects stale edits', asyn
   await assert.rejects(() => manager.mutateSpecialistRegistry({
     registryId: 'specialists:project-1',
     expectedRegistryRevision: 3,
+    expectedRegistryBindingKey: updated.nextRegistry.bindingKey,
     kind: SpecialistRegistryMutationKind.UPDATE,
     specialistId: 'research-local',
     expectedDefinitionRevision: 1,
@@ -131,12 +137,13 @@ test('Specialist definition revision CAS persists and rejects stale edits', asyn
 test('nested Specialist definition is snapshotted before serialized enqueue', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
-  await manager.createSpecialistRegistry({ registryId: 'specialists:snapshot' });
+  const created = await manager.createSpecialistRegistry({ registryId: 'specialists:snapshot' });
 
   const mutable = definition();
   const pending = manager.mutateSpecialistRegistry({
     registryId: 'specialists:snapshot',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: mutable,
   });
@@ -163,7 +170,7 @@ test('Specialist persistence boundaries reject accessors and unknown authority f
   await assert.rejects(() => manager.createSpecialistRegistry(hostile), /enumerable data property/);
   assert.equal(reads, 0);
 
-  await manager.createSpecialistRegistry({ registryId: 'specialists:hostile' });
+  const created = await manager.createSpecialistRegistry({ registryId: 'specialists:hostile' });
   const nested = definition();
   Object.defineProperty(nested, 'toolIds', {
     enumerable: true,
@@ -176,6 +183,7 @@ test('Specialist persistence boundaries reject accessors and unknown authority f
   await assert.rejects(() => manager.mutateSpecialistRegistry({
     registryId: 'specialists:hostile',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: nested,
   }), /toolIds must be an enumerable own data property/);
@@ -184,6 +192,7 @@ test('Specialist persistence boundaries reject accessors and unknown authority f
   await assert.rejects(() => manager.mutateSpecialistRegistry({
     registryId: 'specialists:hostile',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: SpecialistRegistryMutationKind.CREATE,
     definition: definition(),
     executionAuthorized: true,

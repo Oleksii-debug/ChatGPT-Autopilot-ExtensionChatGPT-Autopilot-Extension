@@ -6,6 +6,7 @@ import {
   inspectSpecialistProviderReadinessV1,
 } from '../src/core/specialist-provider-readiness.js';
 import { prepareAutomaticAgentSpecialistDelegationV1 } from '../src/core/agent-specialist-delegation.js';
+import { createSpecialistRegistryV1 } from '../src/core/specialist-registry.js';
 
 function selection(overrides = {}) {
   return {
@@ -106,7 +107,7 @@ test('canonical automatic-delegation proposal selection feeds the readiness bind
     },
     expectedPlanRevision: 1,
     nodeId: 'local-read',
-    registry: {
+    registry: createSpecialistRegistryV1({
       schemaVersion: 1,
       registryId: 'registry:readiness',
       revision: 1,
@@ -123,7 +124,7 @@ test('canonical automatic-delegation proposal selection feeds the readiness bind
         enabled: true,
         definitionRevision: 1,
       }],
-    },
+    }),
     parentCapabilityIds: ['data.read'],
     parentToolIds: ['fs.read'],
     requiredCapabilityIds: ['data.read'],

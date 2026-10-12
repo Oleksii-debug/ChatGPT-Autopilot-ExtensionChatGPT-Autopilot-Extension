@@ -54,6 +54,7 @@ import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execut
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1, normalizeResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
+  createAgentDefinitionRegistryV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
@@ -63,6 +64,7 @@ import {
 } from './agent-definition-registry.js';
 import {
   SPECIALIST_REGISTRY_VERSION,
+  createSpecialistRegistryV1,
   bindSpecialistHandoffToRegistryV1,
   normalizeSpecialistSelectionV1,
   normalizeSpecialistDefinitionV1,
@@ -89,18 +91,18 @@ const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'agentDefinitionId', 'expectedDefinitionRevision',
   'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
-  'registryId', 'expectedRegistryRevision', 'kind',
+  'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
 const AUTOMATIC_SPECIALIST_DELEGATION_KEYS = new Set([
@@ -220,7 +222,7 @@ function inspectUnavailableOrchestrationAuthority(binding, error) {
 }
 
 function canonicalAgentDefinitionRegistryId(value) {
-  return normalizeAgentDefinitionRegistryV1({
+  return createAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
@@ -228,7 +230,7 @@ function canonicalAgentDefinitionRegistryId(value) {
   }).registryId;
 }
 function canonicalSpecialistRegistryId(value) {
-  return normalizeSpecialistRegistryV1({
+  return createSpecialistRegistryV1({
     schemaVersion: SPECIALIST_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
@@ -1043,7 +1045,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
-      created = normalizeAgentDefinitionRegistryV1({
+      created = createAgentDefinitionRegistryV1({
         schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
         registryId,
         revision: 1,
@@ -1064,6 +1066,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent definition registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent definition registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let committed = null;
     await this.update(store => {
@@ -1078,6 +1083,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
@@ -1186,7 +1192,7 @@ export class BrowserAgentManager {
       if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
         throw new Error('Specialist registry capacity is exhausted');
       }
-      created = normalizeSpecialistRegistryV1({
+      created = createSpecialistRegistryV1({
         schemaVersion: SPECIALIST_REGISTRY_VERSION,
         registryId,
         revision: 1,
@@ -1207,6 +1213,9 @@ export class BrowserAgentManager {
     if (!Object.hasOwn(request, 'registryId')) {
       throw new Error('Browser Agent Specialist registry mutation request requires registryId');
     }
+    if (!Object.hasOwn(request, 'expectedRegistryBindingKey')) {
+      throw new Error('Browser Agent Specialist registry mutation request requires expectedRegistryBindingKey');
+    }
     const registryId = canonicalSpecialistRegistryId(request.registryId);
     if (Object.hasOwn(request, 'definition')) {
       request.definition = normalizeSpecialistDefinitionV1(request.definition);
@@ -1224,6 +1233,7 @@ export class BrowserAgentManager {
         registry: current,
         registryId,
         expectedRegistryRevision: request.expectedRegistryRevision,
+        expectedRegistryBindingKey: request.expectedRegistryBindingKey,
         kind: request.kind,
       };
       for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
@@ -2254,6 +2264,13 @@ export class BrowserAgentManager {
       if (!registry) throw new Error('Agent definition registry not found');
       if (registry.revision !== request.expectedRegistryRevision) {
         throw new Error('Agent definition registry revision drifted before launch');
+      }
+      // An explicit caller-side content CAS fence must match the exact durable
+      // registry snapshot at serialized launch. Older launch callers without
+      // that field retain their existing revision+definition checks.
+      if (Object.hasOwn(request, 'expectedRegistryBindingKey')
+          && request.expectedRegistryBindingKey !== registry.bindingKey) {
+        throw new Error('Agent definition registry bindingKey drifted before launch');
       }
 
       const selection = selectAgentDefinitionV1({

@@ -30,6 +30,25 @@ test('Plan 8 integration: optional durable registry binding survives exact selec
     'legacy selection must not invent a registry binding authority');
 });
 
+
+test('Plan 8 integration: canonical durable JSON binding retains human-readable spaces after restart', () => {
+  const canonicalBinding = JSON.stringify([
+    1, 'registry:plan8', 1, [['Specialist readable label', 'Contains human readable spaces']],
+  ]);
+  const durable = normalizeSpecialistSelectionV1({ ...base, registryBindingKey: canonicalBinding });
+  const restarted = normalizeSpecialistSelectionV1(JSON.parse(JSON.stringify(durable)));
+  assert.equal(restarted.registryBindingKey, canonicalBinding);
+  assert.equal(Object.isFrozen(restarted), true);
+  for (const forged of [
+    '[ 1]', '[1, 2]', '[1,]', '["unterminated]', '[1]extra',
+    'bad key', 'registry-binding:v1\\n',
+  ]) {
+    assert.throws(() => normalizeSpecialistSelectionV1({
+      ...base, registryBindingKey: forged,
+    }), /registryBindingKey/u);
+  }
+});
+
 test('Plan 8 integration: forged registry binding values and getters fail closed', () => {
   for (const registryBindingKey of [null, undefined, false, 0, '', '  registry-binding:v1', {}, 'bad key']) {
     assert.throws(() => normalizeSpecialistSelectionV1({

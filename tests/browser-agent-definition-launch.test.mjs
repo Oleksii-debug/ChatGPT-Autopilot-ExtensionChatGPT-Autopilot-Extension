@@ -87,10 +87,11 @@ function ownerBudget(overrides = {}) {
 }
 
 async function seedRegistry(manager, def = definition()) {
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
@@ -113,6 +114,31 @@ function launchRequest(overrides = {}) {
     ...overrides,
   };
 }
+
+test('Plan8: supplied definition launch registry binding CAS is checked at durable commit and JSON restart', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const registry = (await manager.getAgentDefinitionRegistry('agents:project-1')).registry;
+  const current = registry.bindingKey;
+  assert.equal(typeof current, 'string');
+
+  await assert.rejects(
+    manager.createFromAgentDefinition(launchRequest({
+      jobId: 'job.forged',
+      expectedRegistryBindingKey: current + ':forged',
+    })),
+    /registry bindingKey drifted before launch/u,
+  );
+  assert.equal((await manager.get('job.forged')).job, null);
+
+  const created = await manager.createFromAgentDefinition(launchRequest({
+    expectedRegistryBindingKey: current,
+  }));
+  assert.equal(created.job.definitionSelection.registryBindingKey, current);
+  const restarted = managerFor(chrome);
+  assert.equal((await restarted.get('job.research-1')).job.definitionSelection.registryBindingKey, current);
+});
 
 test('persisted Agent definition launches atomically into the canonical Browser Agent store', async () => {
   const { data, chrome } = makeChromeStorage();
@@ -184,10 +210,12 @@ test('launch requires exact live registry and definition revisions at the serial
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
+  const currentBindingKey = (await manager.getAgentDefinitionRegistry('agents:project-1')).registry.bindingKey;
 
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: currentBindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -222,10 +250,12 @@ test('a registry mutation queued before launch cannot be bypassed by stale launc
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
+  const currentBindingKey = (await manager.getAgentDefinitionRegistry('agents:project-1')).registry.bindingKey;
 
   const mutation = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: currentBindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
