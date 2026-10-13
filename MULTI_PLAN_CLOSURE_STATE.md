@@ -1,3 +1,7 @@
+## Перебудова незакритих розділів — 2026-10-13
+
+Власник замінив незакриті розділи в Google Docs на окремі верхньорівневі NА/NБ/NВ (NГ, якщо було 4 завдання). Карта: [ATOMIC_OPEN_SECTIONS_2026-10-13.md](ATOMIC_OPEN_SECTIONS_2026-10-13.md). Старий розділ N тепер агрегат нових; DONE лише після приймання кожного нового розділу та спільної інтеграції. Статуси WAITING/PARKED, чинні PR та історичні DONE збережені. Воркери зобов’язані виконувати нові самостійні одиниці, не починати старий код заново й не підміняти реальні підтвердження тестовими.
+
 # OWNER CURRENT VERSION + SECTION CLOSURE AUTHORITY — 2026-10-11
 
 **ONLY owner-designated final distribution**: 11.0.15 HIGH Simplified Batch VERIFIED owner ZIP, SHA-256 `9ea2dd75e314daa8ae7d25b084563cf1615c9e4f025994c2a0368690a323e10a`, 314 entries, CRC intact, manifest v11.0.15, 11/11 isolated bundled tests passed. Not yet a fully integrated GitHub source/release; prior ZIP/source versions mentioned below are dated *historical checkpoints*, not current competing product targets. Do not erase their accepted commits or attestations. Owner asks no prompt/session changes.
