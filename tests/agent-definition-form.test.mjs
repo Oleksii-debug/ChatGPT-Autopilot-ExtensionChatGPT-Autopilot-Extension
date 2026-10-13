@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { normalizeAgentDefinitionV1 } from '../src/core/agent-definition-registry.js';
 import {
   buildAgentDefinitionFromFormV1,
+  mergeAgentDefinitionModelDefaultsV1,
   parseCanonicalAgentIdentity,
 } from '../src/ui/agent-definition-form.js';
 
@@ -22,7 +24,7 @@ function form(overrides = {}) {
 }
 
 test('Agent definition form builds canonical portable data and preserves config/model defaults', () => {
-  const defaults = { maxSteps: 50, aiPinnedRouteId: 'route.research', visionOnDemand: false };
+  const defaults = { maxSteps: 50, visionOnDemand: false };
   const routePolicy = { autoSwitch: false, pinnedRouteId: 'route.research', orderedRouteIds: [], allowRouteIds: ['route.research'], denyRouteIds: [], freeOnly: true, locality: 'any', maxInputPricePerMillionUsd: 0, maxOutputPricePerMillionUsd: 0 };
   const definition = buildAgentDefinitionFromFormV1(form(), { definitionRevision: 7, configDefaults: defaults, modelRoutePolicy: routePolicy });
   assert.equal(definition.schemaVersion, 1);
@@ -112,4 +114,112 @@ test('config defaults are copied through a data-only zero-getter boundary', () =
 test('registry and definition identities share the exact canonical ID syntax', () => {
   assert.equal(parseCanonicalAgentIdentity('agents:project-1','Registry ID'),'agents:project-1');
   assert.throws(() => parseCanonicalAgentIdentity('agents project','Registry ID'), /канонічним ID/);
+});
+
+
+test('Agent model defaults drop the historical configDefaults route pin alias', () => {
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    configDefaults: {
+      maxSteps: 50,
+      aiPinnedRouteId: 'route.legacy',
+      visionOnDemand: false,
+    },
+    modelRoutePolicy: {
+      autoSwitch: false,
+      pinnedRouteId: 'route.current',
+      orderedRouteIds: [],
+      allowRouteIds: ['route.current'],
+      denyRouteIds: [],
+      freeOnly: false,
+      locality: 'any',
+      maxInputPricePerMillionUsd: null,
+      maxOutputPricePerMillionUsd: null,
+    },
+  });
+  assert.equal(Object.hasOwn(definition.configDefaults, 'aiPinnedRouteId'), false);
+  assert.equal(definition.modelRoutePolicy.pinnedRouteId, 'route.current');
+  assert.doesNotThrow(() => normalizeAgentDefinitionV1(definition));
+});
+
+test('Agent model defaults edit provider/model fields while route pin remains separate policy authority', () => {
+  const definition = buildAgentDefinitionFromFormV1(form({
+    aiRoutingMode: 'hybrid-auto',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-5.6',
+    aiStrongProvider: 'ollama',
+    aiStrongModel: 'qwen3:32b',
+  }), {
+    configDefaults: { maxSteps: 75, visionOnDemand: false },
+    modelRoutePolicy: {
+      autoSwitch: false,
+      pinnedRouteId: 'route.research',
+      orderedRouteIds: [],
+      allowRouteIds: ['route.research'],
+      denyRouteIds: [],
+      freeOnly: false,
+      locality: 'any',
+      maxInputPricePerMillionUsd: null,
+      maxOutputPricePerMillionUsd: null,
+    },
+  });
+  assert.deepEqual(definition.configDefaults, {
+    maxSteps: 75,
+    visionOnDemand: false,
+    aiRoutingMode: 'hybrid-auto',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-5.6',
+    aiStrongProvider: 'ollama',
+    aiStrongModel: 'qwen3:32b',
+  });
+  assert.equal(Object.hasOwn(definition.configDefaults, 'aiPinnedRouteId'), false);
+  assert.equal(definition.modelRoutePolicy.pinnedRouteId, 'route.research');
+  const canonical = normalizeAgentDefinitionV1(definition);
+  assert.deepEqual(canonical.configDefaults, definition.configDefaults);
+});
+
+test('empty model-default controls remove only edited provider/model defaults and preserve unrelated defaults', () => {
+  const existing = {
+    maxSteps: 90,
+    maxModelCalls: 12,
+    aiRoutingMode: 'strong',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-old',
+    aiStrongProvider: 'openai',
+    aiStrongModel: 'gpt-strong',
+  };
+  const merged = mergeAgentDefinitionModelDefaultsV1({
+    aiRoutingMode: '',
+    aiPrimaryProvider: 'inherit',
+    aiPrimaryModel: '',
+    aiStrongProvider: '',
+    aiStrongModel: '',
+  }, existing);
+  assert.deepEqual(merged, {
+    maxSteps: 90,
+    maxModelCalls: 12,
+    aiPrimaryProvider: 'inherit',
+  });
+  assert.equal(existing.aiStrongModel, 'gpt-strong');
+});
+
+test('absent model-default fields preserve persisted canonical defaults', () => {
+  const existing = {
+    maxSteps: 42,
+    aiRoutingMode: 'primary',
+    aiPrimaryProvider: 'openai-compatible',
+    aiPrimaryModel: 'model.saved',
+  };
+  assert.deepEqual(mergeAgentDefinitionModelDefaultsV1({}, existing), existing);
+});
+
+test('model-default fields fail closed on aliases, incomplete explicit providers and accessors', () => {
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1({ aiRoutingMode: 'AUTO' }, {}), /routing mode не підтримується/);
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1({ aiPrimaryProvider: 'openai', aiPrimaryModel: '' }, {}), /Primary provider override/);
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1({ aiStrongProvider: 'ollama', aiStrongModel: '' }, {}), /Strong provider override/);
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1({ aiPrimaryModel: ' model' }, {}), /канонічним текстом/);
+  let reads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'aiRoutingMode', { enumerable: true, get() { reads += 1; return 'strong'; } });
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1(hostile, {}), /data property/);
+  assert.equal(reads, 0);
 });

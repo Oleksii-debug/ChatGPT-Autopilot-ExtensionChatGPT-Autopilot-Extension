@@ -282,7 +282,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
     'agent-definition-details','agent-definition-registry-list','agent-definition-create-registry-id','agent-definition-create-registry-button','agent-definition-quarantine-status',
     'agent-definition-list','agent-definition-new-button','agent-definition-form-group','agent-definition-id','agent-definition-label','agent-definition-description','agent-definition-instructions',
-    'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance','agent-definition-enabled','agent-definition-revision',
+    'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance',
+    'agent-definition-model-defaults-group','agent-definition-ai-routing-mode','agent-definition-ai-primary-provider','agent-definition-ai-primary-model','agent-definition-ai-strong-provider','agent-definition-ai-strong-model',
+    'agent-definition-enabled','agent-definition-revision',
     'agent-definition-save-button','agent-definition-toggle-enabled-button','agent-definition-delete-button','agent-definition-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
@@ -321,6 +323,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.doesNotMatch(js, /quarantinedRegistryIds\[[^\]]+\]/, 'UI must not render raw quarantined registry identities');
   assert.match(html, /<label for="agent-definition-registry-list">/, 'definition registry selector needs a persistent native label');
   assert.match(html, /<label for="agent-definition-list">/, 'definition selector needs a persistent native label');
+  for (const id of ['agent-definition-ai-routing-mode','agent-definition-ai-primary-provider','agent-definition-ai-primary-model','agent-definition-ai-strong-provider','agent-definition-ai-strong-model']) {
+    assert.match(html, new RegExp(`<label for=["']${id}["']>`), 'model defaults need persistent native labels: ' + id);
+  }
   assert.match(html, /id="agent-definition-status" role="status"/, 'definition CRUD outcomes must be announced');
   assert.match(html, /id="agent-definition-quarantine-status" tabindex="0"/, 'definition quarantine summary must be keyboard readable without a noisy live region');
   assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadAgentDefinitionRegistries\(\);/, 'Agent runtime and reusable-definition state must load through the canonical startup sequence');
