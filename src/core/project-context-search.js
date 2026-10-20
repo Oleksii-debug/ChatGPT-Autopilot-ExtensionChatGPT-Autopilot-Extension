@@ -181,7 +181,7 @@ function searchableText(snapshot, capsule, admittedSources) {
   const sourceText = admittedSources.map(source => [
     source.sourceId, source.kind, source.uri, source.revisionId, source.authority,
   ].join(' ')).join(' ');
-  return `${snapshot.title} ${snapshot.projectId} ${snapshot.revisionId} ${capsule.capsuleId} ${sourceText}`.toLocaleLowerCase('en-US');
+  return `${snapshot.projectId} ${snapshot.revisionId} ${capsule.capsuleId} ${sourceText}`.toLocaleLowerCase('en-US');
 }
 
 function candidateScore(text, tokens) {
