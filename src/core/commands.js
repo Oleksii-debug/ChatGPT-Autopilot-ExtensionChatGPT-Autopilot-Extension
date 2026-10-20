@@ -934,17 +934,37 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       return {
         settings: normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS),
+        routePoolRevision: Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+          && state.profile.aiRoutePoolRevision > 0
+          ? state.profile.aiRoutePoolRevision
+          : 1,
         runtime: normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
       };
     }
     if (command === CoreCommand.UPDATE_AI_ROUTER_SETTINGS) {
       const settings = validateAiRouterReadiness(payload.settings || {});
+      let routePoolRevision = 1;
       await this.repo.update(draft => {
+        const previousSettings = normalizeAiRouterSettings(
+          draft.profile.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+        const previousRoutePoolRevision = Number.isSafeInteger(draft.profile.aiRoutePoolRevision)
+          && draft.profile.aiRoutePoolRevision > 0
+          ? draft.profile.aiRoutePoolRevision
+          : 1;
+        const routePoolChanged = JSON.stringify(previousSettings.routes) !== JSON.stringify(settings.routes);
+        if (routePoolChanged && previousRoutePoolRevision >= Number.MAX_SAFE_INTEGER) {
+          throw new Error('AI route-pool revision exhausted');
+        }
+        routePoolRevision = routePoolChanged
+          ? previousRoutePoolRevision + 1
+          : previousRoutePoolRevision;
         draft.profile.aiRouter = structuredClone(settings);
+        draft.profile.aiRoutePoolRevision = routePoolRevision;
         draft.profile.aiRouterRuntime = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
         return draft;
       });
-      return { settings };
+      return { settings, routePoolRevision };
     }
     if (command === CoreCommand.TEST_AI_GATEWAY) {
       if (!this.aiGatewayClient) throw new Error('AI Gateway runtime is unavailable');
@@ -1025,15 +1045,15 @@ export class CoreCommandDispatcher {
           throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
         const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
-        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
-        if (maxModelCallsDescriptor
-            && (maxModelCallsDescriptor.enumerable !== true
-              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
-              || typeof maxModelCallsForRequest !== 'number'
-              || !Number.isSafeInteger(maxModelCallsForRequest)
-              || Object.is(maxModelCallsForRequest, -0)
-              || maxModelCallsForRequest < 0)) {
-          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
+        const maxModelCallsForRequest = maxModelCallsDescriptor?.value;
+        if (!maxModelCallsDescriptor
+            || maxModelCallsDescriptor.enumerable !== true
+            || !Object.hasOwn(maxModelCallsDescriptor, 'value')
+            || typeof maxModelCallsForRequest !== 'number'
+            || !Number.isSafeInteger(maxModelCallsForRequest)
+            || Object.is(maxModelCallsForRequest, -0)
+            || maxModelCallsForRequest < 1) {
+          throw new Error('Agent model invocation requires canonical bounded maxModelCallsForRequest');
         }
         internalPrompt = promptDescriptor.value;
         internalSystemPrompt = systemPromptDescriptor?.value ?? '';
@@ -1093,6 +1113,13 @@ export class CoreCommandDispatcher {
         if (currentSettings.enabled !== true) {
           throw new Error('Current canonical AI Router is disabled before Agent model invocation');
         }
+        const currentRoutePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+          && state.profile.aiRoutePoolRevision > 0
+          ? state.profile.aiRoutePoolRevision
+          : 1;
+        if (currentRoutePoolRevision !== internalEnvelope.routePoolRevision) {
+          throw new Error('Agent model route-pool revision drifted before provider invocation');
+        }
         const currentRoute = currentSettings.routes.find(
           route => route.routeId === internalEnvelope.routeId,
         );
@@ -1134,7 +1161,11 @@ export class CoreCommandDispatcher {
         : routerOverride
           ? mergeAiRouterSettingsOverride(baseSettings, routerOverride)
           : baseSettings;
-      const isolatedRuntime = internalEnvelope ? true : payload.isolatedRuntime === true;
+      const hasOneShotRouterConfiguration = !internalEnvelope
+        && (Object.hasOwn(payload, 'settings') || routerOverride !== null);
+      const isolatedRuntime = internalEnvelope
+        ? true
+        : payload.isolatedRuntime === true || hasOneShotRouterConfiguration;
       const runtime = internalEnvelope
         ? internalEnvelope.runtime
         : isolatedRuntime
@@ -1180,7 +1211,10 @@ export class CoreCommandDispatcher {
         return { result };
       }
       await this.repo.update(draft => {
-        draft.profile.aiRouter = structuredClone(settings);
+        // Routed invocation is execution, not Router configuration authority.
+        // Ad-hoc payload.settings/routerOverride are one-shot inputs; only
+        // UPDATE_AI_ROUTER_SETTINGS may mutate durable Router settings and the
+        // authoritative route-pool revision.
         const current = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
         current.requestCount += 1;
         current.startedAt = current.startedAt || result.runtime.startedAt || this.now();
