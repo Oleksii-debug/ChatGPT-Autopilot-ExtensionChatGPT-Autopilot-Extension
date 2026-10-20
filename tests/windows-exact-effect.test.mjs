@@ -26,7 +26,7 @@ test('SAFE_RETRY requires independent FAILED verification proving no committed e
   const durable=store();let dispatches=0;
   const provider={authorize,async invoke(){dispatches++;if(dispatches===1)throw Object.assign(new Error('disconnect'),{code:'NATIVE_TRANSPORT_ERROR'});return {result:{exitCode:0}};}};
   const now=clock();
-  const executor=new WindowsExactEffectExecutorV1({provider,store:durable,verify:async({observation})=>({schemaVersion:1,verificationId:'verified-2',invocationId:'win-effect-1',observationId:observation.observationId,status:'VERIFIED',reasonCode:'POSTCONDITION_MATCH',summary:'Effect independently verified.',evidenceArtifactIds:[],verifiedAt:new Date(now()).toISOString()}),reconcileVerify:async context=>noEffectProof(context),now});
+  const executor=new WindowsExactEffectExecutorV1({provider,store:durable,verify:async({observation,effectId,executionId,attempt,policyDecisionId})=>({schemaVersion:1,verificationId:'verified-2',invocationId:'win-effect-1',observationId:observation.observationId,status:'VERIFIED',reasonCode:'POSTCONDITION_MATCH',summary:'Effect independently verified.',evidenceArtifactIds:[],verifiedAt:new Date(now()).toISOString(),verifierId:'windows-verifier-1',verificationAuthorityId:policyDecisionId,effectId,executionId,attempt}),reconcileVerify:async context=>noEffectProof(context),now});
   await assert.rejects(()=>executor.invoke({invocation,policyDecision}),e=>e.reconcileRequired===true);
   const reconciled=await executor.reconcile({invocationId:'win-effect-1',outcome:'SAFE_RETRY',reasonCode:'NO_EFFECT_PROVEN',summary:'Independent probe proves no effect.'});
   assert.equal(reconciled.phase,'SAFE_RETRY');

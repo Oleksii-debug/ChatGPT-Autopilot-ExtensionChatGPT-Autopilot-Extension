@@ -415,7 +415,7 @@ test('structurally valid fabricated COMMITTED state cannot unlock a dependency',
       transaction(),
       resolverForEntries([[INV_RELEASE.invocationId, forged]]),
     ),
-    /lacks reducer-reachable commit evidence/,
+    /positive VERIFIED evidence/,
   );
 });
 
@@ -426,8 +426,8 @@ test('COMMITTED state requires exact verification provenance and causal chronolo
   });
 
   for (const [label, mutate, expected] of [
-    ['missing verifier', state => { state.verification.verifierId = null; }, /exact verification provenance/],
-    ['wrong authority', state => { state.verification.verificationAuthorityId = 'policy-other'; }, /exact verification provenance/],
+    ['missing verifier', state => { state.verification.verifierId = null; }, /requires independent verifierId/],
+    ['wrong authority', state => { state.verification.verificationAuthorityId = 'policy-other'; }, /authority must match invocation policy decision/],
     ['wrong execution', state => { state.verification.executionId = 'invoke-release:attempt:2'; }, /executionId does not match|exact verification provenance/],
     ['short event history', state => { state.processedEventIds = ['only-one']; }, /reducer-reachable commit evidence/],
     ['observation before state', state => { state.observation.observedAt = '2026-09-24T23:20:09.999Z'; }, /invalid commit chronology/],

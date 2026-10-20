@@ -178,7 +178,7 @@ function committedEffect({
       evidenceArtifactIds: [artifactRef.artifactId],
       verifiedAt,
       verifierId: 'effect-verifier-1',
-      verificationAuthorityId: 'effect-verification-authority-1',
+      verificationAuthorityId: state.invocation.policyDecisionId,
       effectId,
       executionId,
       attempt: 1,

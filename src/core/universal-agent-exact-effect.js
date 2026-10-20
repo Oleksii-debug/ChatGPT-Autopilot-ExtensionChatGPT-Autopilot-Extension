@@ -39,6 +39,7 @@ const RECONCILE_OUTCOMES = new Set(Object.values(ReconciliationOutcome));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_PROCESSED_EVENTS = 1024;
 const MAX_ATTEMPTS = 64;
+const MAX_CLOCK_SKEW_MS = 60 * 1000;
 
 function clone(value) {
   return structuredClone(value);
@@ -157,6 +158,16 @@ function assertVerificationBinding(verification, state) {
   if (verification.attempt !== state.attempt) {
     throw new Error('Verification attempt does not match current exact-effect attempt');
   }
+  if (!verification.verifierId) {
+    throw new Error('Exact-effect verification requires independent verifierId');
+  }
+  if (verification.verifierId === state.invocation.providerId) {
+    throw new Error('Exact-effect verifier must be independent from effect provider');
+  }
+  if (!verification.verificationAuthorityId
+      || verification.verificationAuthorityId !== state.invocation.policyDecisionId) {
+    throw new Error('Exact-effect verification authority must match invocation policy decision');
+  }
 }
 
 function normalizedState(input) {
@@ -179,6 +190,11 @@ function normalizedState(input) {
     throw new Error('Exact effect phase is invalid');
   }
   const phase = raw.phase;
+  const createdAt = timestamp(raw.createdAt, 'createdAt');
+  const updatedAt = timestamp(raw.updatedAt, 'updatedAt');
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error('Exact-effect durable time cannot predate creation');
+  }
   const attempt = raw.attempt;
   if (typeof attempt !== 'number'
       || !Number.isInteger(attempt)
@@ -192,7 +208,13 @@ function normalizedState(input) {
     throw new Error('Exact effect executionId is inconsistent');
   }
   const observation = raw.observation == null ? null : normalizeObservationV1(raw.observation);
-  if (observation) assertObservationBinding(observation, { invocation });
+  if (observation) {
+    assertObservationBinding(observation, { invocation });
+    if (Date.parse(observation.observedAt) < Date.parse(createdAt)
+        || Date.parse(observation.observedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS) {
+      throw new Error('Exact-effect observation chronology is invalid');
+    }
+  }
   const verification = raw.verification == null ? null : normalizeVerificationV1(raw.verification);
   if (verification) {
     if (!observation) throw new Error('Verification requires observation');
@@ -203,6 +225,10 @@ function normalizedState(input) {
       executionId: expectedExecutionId,
       attempt,
     });
+    if (Date.parse(verification.verifiedAt) < Date.parse(observation.observedAt)
+        || Date.parse(verification.verifiedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS) {
+      throw new Error('Exact-effect verification chronology is invalid');
+    }
   }
   const processedEventIds = dataArray(raw.processedEventIds, 'processedEventIds', MAX_PROCESSED_EVENTS)
     .map((value, index) => id(value, `processedEventIds[${index}]`));
@@ -224,6 +250,17 @@ function normalizedState(input) {
         ? ''
         : timestamp(value.declaredAt, 'ambiguity.declaredAt'),
     };
+    const hasAmbiguityMetadata = Boolean(
+      ambiguity.reasonCode || ambiguity.summary || ambiguity.declaredAt,
+    );
+    if (hasAmbiguityMetadata && (!ambiguity.reasonCode || !ambiguity.declaredAt)) {
+      throw new Error('Exact-effect ambiguity metadata is incomplete');
+    }
+    if (ambiguity.declaredAt
+        && (Date.parse(ambiguity.declaredAt) < Date.parse(createdAt)
+          || Date.parse(ambiguity.declaredAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS)) {
+      throw new Error('Exact-effect ambiguity chronology is invalid');
+    }
   }
 
   let reconciliation = freshReconciliation();
@@ -245,6 +282,54 @@ function normalizedState(input) {
         ? ''
         : timestamp(value.resolvedAt, 'reconciliation.resolvedAt'),
     };
+    const hasReconciliationMetadata = Boolean(
+      reconciliation.outcome
+      || reconciliation.reasonCode
+      || reconciliation.summary
+      || reconciliation.resolvedAt
+    );
+    if (hasReconciliationMetadata
+        && (!reconciliation.outcome
+          || !reconciliation.reasonCode
+          || !reconciliation.resolvedAt)) {
+      throw new Error('Exact-effect reconciliation metadata is incomplete');
+    }
+    if (reconciliation.resolvedAt
+        && (Date.parse(reconciliation.resolvedAt) < Date.parse(createdAt)
+          || Date.parse(reconciliation.resolvedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS)) {
+      throw new Error('Exact-effect reconciliation chronology is invalid');
+    }
+    if (reconciliation.resolvedAt
+        && verification
+        && Date.parse(reconciliation.resolvedAt) + MAX_CLOCK_SKEW_MS < Date.parse(verification.verifiedAt)) {
+      throw new Error('Exact-effect reconciliation cannot predate verification');
+    }
+  }
+
+  const commitId = optionalId(raw.commitId, 'commitId');
+  if (phase === ExactEffectPhase.PREPARED
+      && (attempt !== 0 || observation || verification || commitId)) {
+    throw new Error('PREPARED exact-effect phase must be pristine and unattempted');
+  }
+  if (phase === ExactEffectPhase.SAFE_RETRY
+      && (attempt < 1
+        || !observation
+        || observation.data?.committed !== false
+        || verification?.status !== VerificationStatus.FAILED
+        || verification.reasonCode !== 'NO_COMMITTED_EFFECT'
+        || reconciliation.outcome !== ReconciliationOutcome.SAFE_RETRY
+        || commitId)) {
+    throw new Error('SAFE_RETRY exact-effect phase requires canonical no-effect verification');
+  }
+  if ([ExactEffectPhase.VERIFIED, ExactEffectPhase.COMMITTED].includes(phase)
+      && verification?.status !== VerificationStatus.VERIFIED) {
+    throw new Error('Verified exact-effect phase requires positive VERIFIED evidence');
+  }
+  if (phase === ExactEffectPhase.COMMITTED && !commitId) {
+    throw new Error('COMMITTED exact-effect phase requires commitId');
+  }
+  if (phase !== ExactEffectPhase.COMMITTED && commitId) {
+    throw new Error('commitId is only valid for COMMITTED exact-effect phase');
   }
 
   return freeze({
@@ -258,9 +343,9 @@ function normalizedState(input) {
     verification,
     ambiguity,
     reconciliation,
-    commitId: optionalId(raw.commitId, 'commitId'),
-    createdAt: timestamp(raw.createdAt, 'createdAt'),
-    updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
+    commitId,
+    createdAt,
+    updatedAt,
     processedEventIds,
   });
 }
@@ -429,7 +514,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     const verification = normalizeVerificationV1(event.verification);
     assertVerificationBinding(verification, current);
     state.verification = verification;
-    if ([VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)) {
+    if (verification.status === VerificationStatus.VERIFIED) {
       state.phase = ExactEffectPhase.VERIFIED;
       return acceptEvent(state, event, { reason: 'EFFECT_VERIFIED', action: 'COMMIT' });
     }
@@ -475,7 +560,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       if (!reconciliationObservation) throw new Error('VERIFIED reconciliation requires observation evidence');
       const verification = normalizeVerificationV1(event.verification);
       assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
-      if (![VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)) {
+      if (verification.status !== VerificationStatus.VERIFIED) {
         throw new Error('VERIFIED reconciliation requires a verified verification');
       }
       state.verification = verification;
@@ -490,8 +575,10 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       }
       const verification = normalizeVerificationV1(event.verification);
       assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
-      if (verification.status !== VerificationStatus.FAILED) {
-        throw new Error('SAFE_RETRY reconciliation requires FAILED verification proving no committed effect');
+      if (reconciliationObservation.data?.committed !== false
+          || verification.status !== VerificationStatus.FAILED
+          || verification.reasonCode !== 'NO_COMMITTED_EFFECT') {
+        throw new Error('SAFE_RETRY reconciliation requires canonical no-effect verification');
       }
       state.verification = verification;
       state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
