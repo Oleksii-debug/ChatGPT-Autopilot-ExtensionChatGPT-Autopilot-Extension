@@ -440,3 +440,13 @@ test('Specialist automation policy owner surface is native, bounded and Core-aut
   assert.match(js, /enabled\.disabled = quarantined/);
   assert.match(js, /save\.disabled = quarantined/);
 });
+
+test('reusable Agent launch exposes Project identity as an accessible required model-authority field', () => {
+  has(/<label for="agent-definition-launch-project-id">Project ID — обов’язково для model authority<\/label>/);
+  has(/id="agent-definition-launch-project-id"[^>]*required[^>]*aria-required="true"/s);
+  assert.doesNotMatch(
+    html,
+    /<label for="agent-definition-launch-project-id">Project ID — необов’язково<\/label>/,
+  );
+});
+

@@ -38,6 +38,7 @@ import {
   normalizeBrowserAgentAcceptanceCriteria,
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
+import { normalizeAiRoutePool, selectAiRouteCandidates } from './ai-route-pool.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
@@ -76,6 +77,10 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import {
+  createAgentDefinitionModelPolicyBindingV1,
+  normalizeAgentDefinitionModelPolicyBindingV1,
+} from './agent-definition-model-policy-binding.js';
 import {
   materializeBoundAgentSpecialistDelegationIntentV1,
   normalizeAgentSpecialistDelegationBindingV1,
@@ -831,6 +836,25 @@ function normalizePersistedDefinitionRouterOverride(raw, selection) {
   }
   return Object.freeze({ routePolicy });
 }
+function normalizePersistedDefinitionModelPolicyBinding(raw, selection, config) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition model policy binding requires persisted selection provenance');
+  }
+  if (raw == null) throw new Error('Browser Agent reusable definition requires persisted model policy binding');
+  const binding = normalizeAgentDefinitionModelPolicyBindingV1(raw);
+  if (binding.jobId !== config.id || binding.projectId !== config.projectId) {
+    throw new Error('Browser Agent definition model policy binding identity drifted from persisted job');
+  }
+  const provenance = binding.definitionBinding;
+  if (provenance.registryId !== selection.registryId
+      || provenance.registryRevision !== selection.registryRevision
+      || provenance.agentDefinitionId !== selection.agentDefinitionId
+      || provenance.definitionRevision !== selection.definitionRevision) {
+    throw new Error('Browser Agent definition model policy binding drifted from persisted definition selection');
+  }
+  return binding;
+}
 function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
   const out = definitionRouterOverride?.routePolicy
     ? { routePolicy: definitionRouterOverride.routePolicy }
@@ -1253,6 +1277,11 @@ function normalizeStore(raw, now) {
         definitionSelection,
         config,
       );
+      const definitionModelPolicyBinding = normalizePersistedDefinitionModelPolicyBinding(
+        raw.byId[id].definitionModelPolicyBinding,
+        definitionSelection,
+        config,
+      );
       const specialistDelegationBinding = normalizePersistedAgentSpecialistDelegationBinding(
         raw.byId[id].specialistDelegationBinding,
         definitionSelection,
@@ -1267,6 +1296,7 @@ function normalizeStore(raw, now) {
         definitionScope,
         definitionRouterOverride,
         definitionConfigBindingKey: definitionConfigBindingKeyValue,
+        definitionModelPolicyBinding,
         specialistDelegationBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
@@ -1323,6 +1353,7 @@ export class BrowserAgentManager {
   constructor({
     chromeApi,
     routePrompt,
+    readModelRouteContext = null,
     now = () => Date.now(),
     createId = createIdFallback,
     nativeCompanionClient = undefined,
@@ -1337,6 +1368,7 @@ export class BrowserAgentManager {
     if (typeof routePrompt !== 'function') throw new Error('Browser Agent routePrompt is required');
     this.chrome = chromeApi;
     this.routePrompt = routePrompt;
+    this.readModelRouteContext = typeof readModelRouteContext === 'function' ? readModelRouteContext : null;
     this.now = now;
     this.createId = createId;
     this.nativeCompanion = nativeCompanionClient === undefined
@@ -3220,7 +3252,7 @@ export class BrowserAgentManager {
       throw new Error('Browser Agent definition launch jobId must be exact bounded text');
     }
 
-    await this.update(store => {
+    await this.update(async store => {
       const now = this.now();
       if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
       const registries = store.definitionRegistriesById || Object.create(null);
@@ -3256,6 +3288,25 @@ export class BrowserAgentManager {
       if (materialized.config.id !== jobId) {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
+      if (!materialized.config.projectId) {
+        throw new Error('Reusable Agent definition launch requires Project ID for durable model authority');
+      }
+      if (!this.readModelRouteContext) {
+        throw new Error('Reusable Agent launch requires canonical AI route-pool context');
+      }
+      const modelRouteContext = await this.readModelRouteContext();
+      if (!modelRouteContext || typeof modelRouteContext !== 'object' || Array.isArray(modelRouteContext)) {
+        throw new Error('Canonical AI route-pool context is unavailable');
+      }
+      const definitionModelPolicyBinding = createAgentDefinitionModelPolicyBindingV1({
+        materializedAgent: materialized,
+        currentDefinitionSelection: selection,
+        currentJobId: jobId,
+        currentProjectId: materialized.config.projectId,
+        routePool: modelRouteContext.routePool,
+        routePoolRevision: modelRouteContext.routePoolRevision,
+        ownerAllowedRouteIds: modelRouteContext.ownerAllowedRouteIds,
+      });
 
       store.byId[jobId] = {
         id: jobId,
@@ -3265,6 +3316,7 @@ export class BrowserAgentManager {
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
+        definitionModelPolicyBinding: clone(definitionModelPolicyBinding),
         specialistDelegationBinding: materialized.specialistDelegationBinding
           ? clone(materialized.specialistDelegationBinding)
           : null,
@@ -3330,6 +3382,7 @@ export class BrowserAgentManager {
         definitionScope: null,
         definitionRouterOverride: null,
         definitionConfigBindingKey: null,
+        definitionModelPolicyBinding: null,
         specialistDelegationBinding: null,
         createdAt: now,
         updatedAt: now,
@@ -3495,7 +3548,97 @@ export class BrowserAgentManager {
     return Math.max(0, Math.floor(limit));
   }
 
-  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+  async assertDefinitionBoundProviderRouteCurrent(
+    store,
+    job,
+    route = {},
+    gatewayUrl = '',
+    { taskRole = 'planner', capabilityIds = [], requiresVision = false } = {},
+  ) {
+    if (!job?.definitionModelPolicyBinding) return;
+    if (!this.readModelRouteContext) {
+      throw new Error('Reusable Agent provider admission requires canonical AI route-pool context');
+    }
+    const binding = normalizeAgentDefinitionModelPolicyBindingV1(job.definitionModelPolicyBinding);
+    const context = await this.readModelRouteContext();
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new Error('Canonical AI route-pool context is unavailable before provider admission');
+    }
+    const routePoolRevision = context.routePoolRevision;
+    if (!Number.isSafeInteger(routePoolRevision)
+        || Object.is(routePoolRevision, -0)
+        || routePoolRevision < 1
+        || routePoolRevision !== binding.modelPolicyBinding.routePoolRevision) {
+      throw new Error('Reusable Agent route-pool revision drifted before provider admission');
+    }
+
+    const expectedGatewayUrl = clean(gatewayUrl, 4096);
+    const currentGatewayUrl = clean(context.gatewayUrl, 4096);
+    if (expectedGatewayUrl && currentGatewayUrl !== expectedGatewayUrl) {
+      throw new Error('Reusable Agent Gateway identity drifted before provider admission');
+    }
+
+    const routeId = clean(route?.routeId, 180);
+    const provider = clean(route?.provider, 80);
+    const model = clean(route?.model, 300);
+    const endpointId = clean(route?.endpointId, 180);
+    if (!routeId || !binding.modelPolicyBinding.effectiveRouteIds.includes(routeId)) {
+      throw new Error('Reusable Agent provider route exceeds durable model-policy authority');
+    }
+    const currentRoutes = normalizeAiRoutePool(context.routePool);
+    const currentRoute = currentRoutes.find(candidate => candidate.routeId === routeId);
+    if (!currentRoute
+        || currentRoute.provider !== provider
+        || currentRoute.model !== model
+        || currentRoute.endpointId !== endpointId) {
+      throw new Error('Reusable Agent provider route identity drifted before provider admission');
+    }
+    if (!Array.isArray(context.ownerAllowedRouteIds)
+        || !context.ownerAllowedRouteIds.includes(routeId)) {
+      throw new Error('Reusable Agent provider route is no longer allowed by current owner Router policy');
+    }
+    const liveCandidates = selectAiRouteCandidates({
+      routes: currentRoutes,
+      policy: context.routePolicy || {},
+      routeStates: context.routeStates || {},
+      role: taskRole,
+      capabilityIds,
+      requiresVision,
+      now: this.now(),
+    });
+    if (!liveCandidates.candidates.some(candidate => candidate.routeId === routeId)) {
+      throw new Error('Reusable Agent provider route is no longer dispatchable by current Router policy/state');
+    }
+
+    const definitionBinding = binding.definitionBinding;
+    const registry = store.definitionRegistriesById?.[definitionBinding.registryId];
+    if (!registry) {
+      throw new Error('Reusable Agent definition registry is unavailable before provider admission');
+    }
+    const selection = selectAgentDefinitionV1({
+      registry,
+      agentDefinitionId: definitionBinding.agentDefinitionId,
+    });
+    if (selection.registryRevision !== definitionBinding.registryRevision
+        || selection.definitionRevision !== definitionBinding.definitionRevision
+        || selection.definition.enabled !== true) {
+      throw new Error('Reusable Agent definition authority drifted before provider admission');
+    }
+  }
+
+  async reserveProviderModelBudget({
+    jobId,
+    controlEpoch,
+    prompt = '',
+    systemPrompt = '',
+    maxOutputTokens = 0,
+    route = {},
+    gatewayUrl = '',
+    taskRole = 'planner',
+    capabilityIds = [],
+    requiresVision = false,
+    callNumber = 1,
+  } = {}) {
     const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
     const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
     if (pendingOutputTokens < 1) {
@@ -3504,7 +3647,7 @@ export class BrowserAgentManager {
       throw error;
     }
     let reservation = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[jobId];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
@@ -3512,6 +3655,13 @@ export class BrowserAgentManager {
         error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
         throw error;
       }
+      await this.assertDefinitionBoundProviderRouteCurrent(
+        store,
+        job,
+        route,
+        gatewayUrl,
+        { taskRole, capabilityIds, requiresVision },
+      );
       if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
         const error = new Error('Browser Agent already has an unsettled model budget reservation');
         error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';

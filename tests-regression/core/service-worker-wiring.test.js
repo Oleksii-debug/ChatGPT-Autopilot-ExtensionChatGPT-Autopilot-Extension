@@ -147,3 +147,66 @@ test('Drive scalar hierarchy provider uses the existing orchestra cycle and expl
   assert.doesNotMatch(source, /DRIVE_SCALAR_ALARM|drive-scalar-wake/, 'Drive scalar must not create a second scheduler/alarm');
   assert.doesNotMatch(source, /authorized:\s*true[\s\S]{0,120}token\s*:/i, 'access token must never be returned to the UI');
 });
+
+test('reusable Agent model dispatch preserves canonical fail-closed request bounds', () => {
+  assert.match(source, /const requestedCallCeilingPresent = Object\.hasOwn\(sanitizedPayload, 'maxModelCallsForRequest'\);/);
+  assert.match(
+    source,
+    /requestedCallCeilingPresent[\s\S]*?Number\.isSafeInteger\(requestedCallCeiling\)[\s\S]*?Object\.is\(requestedCallCeiling, -0\)[\s\S]*?requestedCallCeiling < 1[\s\S]*?Reusable Agent model dispatch requires canonical bounded maxModelCallsForRequest/s,
+  );
+  assert.match(
+    source,
+    /sanitizedPayload\.maxModelCallsForRequest = requestedCallCeilingPresent\s*\? Math\.min\(requestedCallCeiling, boundRouteCallCeiling\)\s*:\s*boundRouteCallCeiling;/s,
+  );
+  assert.match(source, /const explicitRole = Object\.hasOwn\(safePayload, 'taskRole'\);/);
+  assert.match(
+    source,
+    /explicitRole && typeof safePayload\.taskRole !== 'string'[\s\S]*?Reusable Agent model dispatch taskRole must be canonical text/s,
+  );
+  assert.match(source, /const role = explicitRole \? safePayload\.taskRole : 'planner';/);
+  assert.doesNotMatch(source, /safePayload\.taskRole \|\| 'planner'/);
+});
+
+test('reusable Agent strict preflight does not leak onto ordinary Browser Agent dispatch', () => {
+  const functionStart = source.indexOf('async function prepareDefinitionBoundAgentInvocation');
+  assert.notEqual(functionStart, -1);
+  const functionEnd = source.indexOf('\n}\n\nfunction dispatchSerializedAiRoute', functionStart);
+  assert.notEqual(functionEnd, -1);
+  const preflight = source.slice(functionStart, functionEnd);
+  const bindingGate = preflight.indexOf('if (!job?.definitionModelPolicyBinding) return null;');
+  const contextFence = preflight.indexOf('snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext)');
+  const payloadFence = preflight.indexOf('snapshotDefinitionBoundAgentRoutePayload(payload)');
+  const epochFence = preflight.indexOf('Reusable Agent model dispatch requires a canonical positive controlEpoch');
+  assert.ok(bindingGate >= 0 && contextFence > bindingGate, 'strict context admission must start only after durable reusable-Agent binding is known');
+  assert.ok(payloadFence > bindingGate, 'strict payload admission must start only after durable reusable-Agent binding is known');
+  assert.ok(epochFence > bindingGate, 'strict reusable controlEpoch admission must not alter ordinary Browser Agent dispatch');
+});
+
+test('Browser Agent provider-context identity cannot fall through reusable envelope admission', () => {
+  const functionStart = source.indexOf('async function prepareDefinitionBoundAgentInvocation');
+  const functionEnd = source.indexOf('\n}\n\nfunction dispatchSerializedAiRoute', functionStart);
+  assert.ok(functionStart >= 0 && functionEnd > functionStart);
+  const preflight = source.slice(functionStart, functionEnd);
+  assert.match(preflight, /Agent provider budget context must be a plain object/);
+  assert.match(preflight, /kind must be an enumerable own data property/);
+  assert.match(preflight, /if \(kindDescriptor\.value !== 'browser-agent'\) return null;/);
+  assert.match(preflight, /Browser Agent provider budget context jobId must be an enumerable own text data property/);
+  assert.doesNotMatch(
+    preflight,
+    /kindDescriptor\.value !== 'browser-agent'[\s\S]*?typeof jobIdDescriptor\.value !== 'string'\) return null/s,
+    'invalid Browser Agent job identity must fail closed instead of falling through to generic routing',
+  );
+});
+
+test('reusable Agent route-pool revision reads fail closed on malformed persisted identity', () => {
+  assert.match(source, /function canonicalAgentRoutePoolRevision\(state\)/);
+  assert.match(source, /if \(value == null\) return 1;/);
+  assert.match(source, /!Number\.isSafeInteger\(value\) \|\| Object\.is\(value, -0\) \|\| value < 1/);
+  assert.match(source, /Canonical AI route-pool revision is invalid for reusable Agent authority/);
+  assert.equal(
+    (source.match(/canonicalAgentRoutePoolRevision\(state\)/g) || []).length,
+    3,
+    'helper declaration plus launch-context and dispatch reads must share one canonical revision boundary',
+  );
+});
+

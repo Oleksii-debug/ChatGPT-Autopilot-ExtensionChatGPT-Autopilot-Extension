@@ -14,7 +14,7 @@ import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
-import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, normalizeAiRouterSettings } from '../core/ai-orchestrator.js';
+import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime } from '../core/ai-orchestrator.js';
 import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
@@ -29,7 +29,10 @@ import {
   probeOpenHandsSpecialistProviderConfigV1,
 } from '../core/openhands-specialist-readiness.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
-import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
+import { BROWSER_AGENT_ALARM, BrowserAgentRunState } from '../core/browser-agent.js';
+import { selectAgentDefinitionV1 } from '../core/agent-definition-registry.js';
+import { createBoundAgentModelRouteDispatchIntentV1 } from '../core/agent-model-route-dispatch-intent.js';
+import { createBoundAgentModelOrchestratorEnvelopeV1 } from '../core/agent-model-orchestrator-envelope.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
@@ -104,12 +107,16 @@ const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
-    beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
+    beforeProviderCall: async ({ context, route, gatewayUrl, taskRole, capabilityIds, requiresVision, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
       if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
       return browserAgentLifecycle.current.reserveProviderModelBudget({
         jobId: context.jobId,
         controlEpoch: context.controlEpoch,
         route,
+        gatewayUrl,
+        taskRole,
+        capabilityIds,
+        requiresVision,
         prompt,
         systemPrompt,
         maxOutputTokens,
@@ -229,20 +236,52 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+function canonicalAgentRoutePoolRevision(state) {
+  const value = state?.profile?.aiRoutePoolRevision;
+  if (value == null) return 1;
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+    throw new Error('Canonical AI route-pool revision is invalid for reusable Agent authority');
+  }
+  return value;
+}
+
+function ownerAllowedRouteIdsForSettings(settings) {
+  const policy = settings.routePolicy;
+  const explicitAllow = policy.allowRouteIds.length
+    ? new Set(policy.allowRouteIds)
+    : null;
+  const deny = new Set(policy.denyRouteIds);
+  return settings.routes
+    .filter(route => route.enabled !== false)
+    .filter(route => !explicitAllow || explicitAllow.has(route.routeId))
+    .filter(route => !deny.has(route.routeId))
+    .filter(route => !policy.pinnedRouteId || route.routeId === policy.pinnedRouteId)
+    .filter(route => !policy.freeOnly || route.costClass === 'free')
+    .filter(route => policy.locality === 'any' || route.locality === policy.locality)
+    .filter(route => policy.maxInputPricePerMillionUsd == null
+      || (route.inputPriceKnown && route.inputPricePerMillionUsd <= policy.maxInputPricePerMillionUsd))
+    .filter(route => policy.maxOutputPricePerMillionUsd == null
+      || (route.outputPriceKnown && route.outputPricePerMillionUsd <= policy.maxOutputPricePerMillionUsd))
+    .map(route => route.routeId);
+}
+
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
   readModelRouteContext: async () => {
     const state = await repo.load();
     const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-    const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
-      && state.profile.aiRoutePoolRevision > 0
-      ? state.profile.aiRoutePoolRevision
-      : 1;
+    const routePoolRevision = canonicalAgentRoutePoolRevision(state);
+    const runtime = normalizeAiRouterRuntime(
+      state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
+    );
     return {
       routePool: structuredClone(settings.routes),
       routePoolRevision,
-      ownerAllowedRouteIds: settings.routes.map(route => route.routeId),
+      gatewayUrl: settings.gatewayUrl,
+      routePolicy: structuredClone(settings.routePolicy),
+      routeStates: structuredClone(runtime.routeStates),
+      ownerAllowedRouteIds: ownerAllowedRouteIdsForSettings(settings),
     };
   },
   specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient]]),
@@ -625,12 +664,185 @@ export async function reconcileRuntime() {
 }
 
 let aiRouteQueue = Promise.resolve();
+
+function snapshotDefinitionBoundAgentRoutePayload(rawPayload) {
+  if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+    throw new Error('Reusable Agent model payload must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(rawPayload);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Reusable Agent model payload must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawPayload);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') {
+      throw new Error('Reusable Agent model payload may contain only string fields');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Reusable Agent model payload fields must be enumerable own data properties');
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+
+function snapshotBrowserAgentProviderBudgetContext(rawContext) {
+  if (rawContext == null) return null;
+  if (typeof rawContext !== 'object' || Array.isArray(rawContext)) {
+    throw new Error('Reusable Agent provider budget context must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(rawContext);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Reusable Agent provider budget context must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawContext);
+  const allowed = new Set(['kind', 'jobId', 'controlEpoch']);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error('Reusable Agent provider budget context contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Reusable Agent provider budget context fields must be enumerable own data properties');
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+
+async function prepareDefinitionBoundAgentInvocation(payload, providerCallBudgetContext) {
+  if (providerCallBudgetContext == null) return null;
+  if (typeof providerCallBudgetContext !== 'object'
+      || Array.isArray(providerCallBudgetContext)) {
+    throw new Error('Agent provider budget context must be a plain object');
+  }
+  const contextPrototype = Object.getPrototypeOf(providerCallBudgetContext);
+  if (contextPrototype !== Object.prototype && contextPrototype !== null) {
+    throw new Error('Agent provider budget context must be a plain object');
+  }
+  const contextDescriptors = Object.getOwnPropertyDescriptors(providerCallBudgetContext);
+  const kindDescriptor = contextDescriptors.kind;
+  if (!kindDescriptor) return null;
+  if (kindDescriptor.enumerable !== true || !Object.hasOwn(kindDescriptor, 'value')) {
+    throw new Error('Agent provider budget context kind must be an enumerable own data property');
+  }
+  if (kindDescriptor.value !== 'browser-agent') return null;
+  const jobIdDescriptor = contextDescriptors.jobId;
+  if (!jobIdDescriptor
+      || jobIdDescriptor.enumerable !== true
+      || !Object.hasOwn(jobIdDescriptor, 'value')
+      || typeof jobIdDescriptor.value !== 'string') {
+    throw new Error('Browser Agent provider budget context jobId must be an enumerable own text data property');
+  }
+  const current = await browserAgent.get(jobIdDescriptor.value);
+  const job = current.job;
+  if (!job?.definitionModelPolicyBinding) return null;
+  const budgetContext = snapshotBrowserAgentProviderBudgetContext(providerCallBudgetContext);
+  const safePayload = snapshotDefinitionBoundAgentRoutePayload(payload);
+  if (!Number.isSafeInteger(budgetContext.controlEpoch)
+      || Object.is(budgetContext.controlEpoch, -0)
+      || budgetContext.controlEpoch < 1) {
+    throw new Error('Reusable Agent model dispatch requires a canonical positive controlEpoch');
+  }
+  if (job.runtime?.controlEpoch !== budgetContext.controlEpoch) {
+    throw new Error('Reusable Agent controlEpoch drifted before model dispatch');
+  }
+  if (job.runtime?.runState !== BrowserAgentRunState.RUNNING) {
+    throw new Error('Reusable Agent is not running before model dispatch');
+  }
+
+  const binding = job.definitionModelPolicyBinding;
+  const registryState = await browserAgent.getAgentDefinitionRegistry(binding.definitionBinding.registryId);
+  if (!registryState.registry) {
+    throw new Error('Reusable Agent definition registry is unavailable before model dispatch');
+  }
+  const currentDefinitionSelection = selectAgentDefinitionV1({
+    registry: registryState.registry,
+    agentDefinitionId: binding.definitionBinding.agentDefinitionId,
+  });
+
+  const state = await repo.load();
+  const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+  const routePoolRevision = canonicalAgentRoutePoolRevision(state);
+  const now = Date.now();
+  const explicitRole = Object.hasOwn(safePayload, 'taskRole');
+  if (explicitRole && typeof safePayload.taskRole !== 'string') {
+    throw new Error('Reusable Agent model dispatch taskRole must be canonical text');
+  }
+  const role = explicitRole ? safePayload.taskRole : 'planner';
+  const capabilityIds = job.definitionScope?.capabilityIds || [];
+  const requiresVision = Boolean(safePayload.imageDataUrl);
+  const agentRuntime = job.runtime?.aiRouterRuntime || state.profile?.aiRouterRuntime;
+
+  const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1({
+    definitionModelPolicyBinding: binding,
+    currentDefinitionModelPolicyBindingKey: binding.bindingKey,
+    currentDefinitionSelection,
+    currentJobId: job.id,
+    currentProjectId: job.config.projectId,
+    currentRoutePoolRevision: routePoolRevision,
+    routes: settings.routes,
+    routeStates: agentRuntime?.routeStates || {},
+    role,
+    capabilityIds,
+    requiresVision,
+    now,
+  });
+  const envelope = createBoundAgentModelOrchestratorEnvelopeV1({
+    dispatchIntent,
+    currentDefinitionModelPolicyBindingKey: binding.bindingKey,
+    currentJobId: job.id,
+    currentProjectId: job.config.projectId,
+    currentRoutePoolRevision: routePoolRevision,
+    currentRouterSettings: settings,
+    currentRouterRuntime: agentRuntime || state.profile?.aiRouterRuntime || {},
+    currentNow: now,
+  });
+
+  const sanitizedPayload = safePayload;
+  for (const key of [
+    'settings','routerOverride','routerRuntime','isolatedRuntime',
+    'forceStrong','taskRole','strongTaskRole','capabilityIds',
+  ]) delete sanitizedPayload[key];
+
+  // A reusable Agent may intentionally have maxModelCalls=0, meaning no
+  // whole-job call ceiling. Internal Agent envelopes are still required to be
+  // bounded per dispatcher request. Bound that request by the exact durable
+  // model-policy route authority, while preserving any stricter positive
+  // remaining whole-job ceiling supplied by BrowserAgentManager.
+  const boundRouteCallCeiling = binding.modelPolicyBinding?.effectiveRouteIds?.length;
+  if (!Number.isSafeInteger(boundRouteCallCeiling) || boundRouteCallCeiling < 1) {
+    throw new Error('Reusable Agent model-policy binding has no bounded route-call authority');
+  }
+  const requestedCallCeilingPresent = Object.hasOwn(sanitizedPayload, 'maxModelCallsForRequest');
+  const requestedCallCeiling = sanitizedPayload.maxModelCallsForRequest;
+  if (requestedCallCeilingPresent
+      && (!Number.isSafeInteger(requestedCallCeiling)
+        || Object.is(requestedCallCeiling, -0)
+        || requestedCallCeiling < 1)) {
+    throw new Error('Reusable Agent model dispatch requires canonical bounded maxModelCallsForRequest');
+  }
+  sanitizedPayload.maxModelCallsForRequest = requestedCallCeilingPresent
+    ? Math.min(requestedCallCeiling, boundRouteCallCeiling)
+    : boundRouteCallCeiling;
+  return { payload:sanitizedPayload, envelope, providerCallBudgetContext:budgetContext };
+}
+
 function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
-  const run = aiRouteQueue.then(() => dispatcher.execute(
-    'RUN_AI_ROUTED_PROMPT',
-    payload || {},
-    { providerCallBudgetContext },
-  ));
+  const run = aiRouteQueue.then(async () => {
+    const bound = await prepareDefinitionBoundAgentInvocation(payload || {}, providerCallBudgetContext);
+    return dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      bound ? bound.payload : payload || {},
+      {
+        providerCallBudgetContext: bound ? bound.providerCallBudgetContext : providerCallBudgetContext,
+        ...(bound ? { agentModelOrchestratorEnvelope:bound.envelope } : {}),
+      },
+    );
+  });
   aiRouteQueue = run.catch(() => undefined);
   return run;
 }
