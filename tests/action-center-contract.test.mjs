@@ -366,3 +366,24 @@ test('closed blocking history cannot inflate live blocking count', () => {
   assert.equal(projection.summary.blockingOpenCount, 0);
   assert.equal(projection.summary.ownerActionOpenCount, 1);
 });
+
+
+test('Action Center orders canonical extended-year timestamps by epoch instead of lexical text', () => {
+  const earlier = item('year-9999', {
+    createdAt: '9999-12-31T23:59:59.999Z',
+    updatedAt: '9999-12-31T23:59:59.999Z',
+  });
+  const later = item('year-10000', {
+    createdAt: '+010000-01-01T00:00:00.000Z',
+    updatedAt: '+010000-01-01T00:00:00.000Z',
+  });
+
+  const forward = buildActionCenterProjectionV1([later, earlier]);
+  const reverse = buildActionCenterProjectionV1([earlier, later]);
+
+  assert.deepEqual(
+    forward.items.map(entry => entry.itemId),
+    ['year-9999', 'year-10000'],
+  );
+  assert.deepEqual(reverse, forward);
+});

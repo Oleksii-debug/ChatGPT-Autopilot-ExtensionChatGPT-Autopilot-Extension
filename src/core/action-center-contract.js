@@ -185,6 +185,12 @@ function compare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function compareCanonicalTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -309,7 +315,7 @@ export function buildActionCenterProjectionV1(rawItems) {
     const rightOpen = right.status === ActionCenterItemStatus.OPEN ? 0 : 1;
     return leftOpen - rightOpen
       || SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity]
-      || compare(left.createdAt, right.createdAt)
+      || compareCanonicalTimestamp(left.createdAt, right.createdAt)
       || compare(left.itemId, right.itemId);
   });
 
