@@ -282,7 +282,7 @@ export function normalizeBrowserAgentAcceptanceCriteria(raw = []) {
   return raw.map((value, index) => {
     const criterion = clean(value, 1000);
     if (!criterion) throw new Error(`Browser Agent acceptance criterion ${index + 1} is required`);
-    const key = criterion.toLocaleLowerCase();
+    const key = criterion.toLowerCase();
     if (seen.has(key)) throw new Error(`Duplicate Browser Agent acceptance criterion: ${criterion}`);
     seen.add(key);
     return criterion;
