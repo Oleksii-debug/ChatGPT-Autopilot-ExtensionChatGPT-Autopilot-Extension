@@ -113,7 +113,7 @@ function text(value, label, max, { optional = false } = {}) {
 
 function integer(value, label, { fallback = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const candidate = value == null ? fallback : value;
-  if (typeof candidate !== 'number' || !Number.isSafeInteger(candidate) || candidate < 0 || candidate > max) {
+  if (typeof candidate !== 'number' || !Number.isSafeInteger(candidate) || Object.is(candidate, -0) || candidate < 0 || candidate > max) {
     throw new Error(`${label} must be a non-negative safe integer`);
   }
   return candidate;
@@ -125,7 +125,7 @@ function requiredInteger(value, label, { max = Number.MAX_SAFE_INTEGER } = {}) {
 }
 
 function price(value, label) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || Object.is(value, -0) || value < 0 || value > 1_000_000) {
     throw new Error(`${label} is invalid`);
   }
   return value;
@@ -207,8 +207,8 @@ function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillion
 function normalizeRouteForMetering(route) {
   const raw = plainObject(route, 'AI route for metering');
   for (const key of ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']) {
-    if (Object.hasOwn(raw, key) && typeof raw[key] !== 'number') {
-      throw new Error(`AI route ${key} must be a number for cost metering`);
+    if (Object.hasOwn(raw, key) && (typeof raw[key] !== 'number' || Object.is(raw[key], -0))) {
+      throw new Error(`AI route ${key} must be a canonical number for cost metering`);
     }
   }
 
