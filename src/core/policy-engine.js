@@ -328,10 +328,17 @@ function canonicalFingerprintValue(value) {
   return out;
 }
 
+const POLICY_FINGERPRINT_OPTION_KEYS = new Set(['cryptoApi']);
+
 export async function createPolicyInvocationFingerprintV1(
   invocationInput,
-  { cryptoApi = globalThis.crypto } = {},
+  options = {},
 ) {
+  const rawOptions = plainRecord(options, 'Policy fingerprint options');
+  exactKeys(rawOptions, POLICY_FINGERPRINT_OPTION_KEYS, 'Policy fingerprint options');
+  const cryptoApi = Object.prototype.hasOwnProperty.call(rawOptions, 'cryptoApi')
+    ? rawOptions.cryptoApi
+    : globalThis.crypto;
   const invocation = strictInvocation(invocationInput);
   const canonical = JSON.stringify([
     'chatgpt-autopilot-policy-invocation-v1',
@@ -459,17 +466,33 @@ function denyResult(context, reasonCode, reason) {
  * may raise risk, but cannot lower a requested capability below its declared
  * CapabilityV1.riskClass.
  */
-export async function evaluateOwnerPolicyV1({
-  profile,
-  classification,
-  invocation,
-  toolDescriptor,
-  capabilityDescriptors,
-  grantedCapabilityIds,
-  decisionId,
-  decidedAt,
-  cryptoApi = globalThis.crypto,
-} = {}) {
+const POLICY_EVALUATION_KEYS = new Set([
+  'profile',
+  'classification',
+  'invocation',
+  'toolDescriptor',
+  'capabilityDescriptors',
+  'grantedCapabilityIds',
+  'decisionId',
+  'decidedAt',
+  'cryptoApi',
+]);
+
+export async function evaluateOwnerPolicyV1(input = {}) {
+  const raw = plainRecord(input, 'Policy evaluation request');
+  exactKeys(raw, POLICY_EVALUATION_KEYS, 'Policy evaluation request');
+  const profile = raw.profile;
+  const classification = raw.classification;
+  const invocation = raw.invocation;
+  const toolDescriptor = raw.toolDescriptor;
+  const capabilityDescriptors = raw.capabilityDescriptors;
+  const grantedCapabilityIds = raw.grantedCapabilityIds;
+  const decisionId = raw.decisionId;
+  const decidedAt = raw.decidedAt;
+  const cryptoApi = Object.prototype.hasOwnProperty.call(raw, 'cryptoApi')
+    ? raw.cryptoApi
+    : globalThis.crypto;
+
   const normalizedProfile = normalizeOwnerPolicyProfileV1(profile);
   const normalizedClassification = normalizePolicyClassificationV1(classification);
   const normalizedInvocation = strictInvocation(invocation);

@@ -572,3 +572,125 @@ test('strict wrappers preserve canonical empty optional identity fields', async 
   });
   assert.equal(result.policyDecision.decision, PolicyDecisionKind.REQUIRE_APPROVAL);
 });
+
+test('public policy evaluation envelope rejects unsafe caller representations before authority reads', async () => {
+  const base = {
+    profile: profile(),
+    classification: classification(),
+    invocation: invocation(),
+    toolDescriptor: tool(),
+    capabilityDescriptors: [capability()],
+    grantedCapabilityIds: ['filesystem.read'],
+    decisionId: 'decision-1',
+    decidedAt: AT,
+  };
+
+  let profileReads = 0;
+  const accessor = { ...base };
+  Object.defineProperty(accessor, 'profile', {
+    enumerable: true,
+    get() {
+      profileReads += 1;
+      return profile();
+    },
+  });
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1(accessor),
+    /Policy evaluation request\.profile must be an enumerable data property/u,
+  );
+  assert.equal(profileReads, 0);
+
+  let cryptoReads = 0;
+  const cryptoAccessor = { ...base };
+  Object.defineProperty(cryptoAccessor, 'cryptoApi', {
+    enumerable: true,
+    get() {
+      cryptoReads += 1;
+      return globalThis.crypto;
+    },
+  });
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1(cryptoAccessor),
+    /Policy evaluation request\.cryptoApi must be an enumerable data property/u,
+  );
+  assert.equal(cryptoReads, 0);
+
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1({ ...base, unexpected: true }),
+    /Policy evaluation request contains unknown field: unexpected/u,
+  );
+
+  const symbolic = { ...base };
+  symbolic[Symbol('policy-shadow')] = true;
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1(symbolic),
+    /Policy evaluation request must not contain symbol fields/u,
+  );
+
+  const hidden = { ...base };
+  Object.defineProperty(hidden, 'shadow', { value: true, enumerable: false });
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1(hidden),
+    /Policy evaluation request\.shadow must be an enumerable data property/u,
+  );
+
+  const exotic = Object.assign(Object.create({ inherited: true }), base);
+  await assert.rejects(
+    () => evaluateOwnerPolicyV1(exotic),
+    /Policy evaluation request must be a plain object/u,
+  );
+
+  const nullPrototype = Object.assign(Object.create(null), base);
+  const result = await evaluateOwnerPolicyV1(nullPrototype);
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.REQUIRE_APPROVAL);
+});
+
+test('policy fingerprint dependency options are descriptor-safe and exact', async () => {
+  let reads = 0;
+  const accessor = {};
+  Object.defineProperty(accessor, 'cryptoApi', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return globalThis.crypto;
+    },
+  });
+  await assert.rejects(
+    () => createPolicyInvocationFingerprintV1(invocation(), accessor),
+    /Policy fingerprint options\.cryptoApi must be an enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+
+  await assert.rejects(
+    () => createPolicyInvocationFingerprintV1(invocation(), { cryptoApi: globalThis.crypto, extra: true }),
+    /Policy fingerprint options contains unknown field: extra/u,
+  );
+
+  const symbolic = { cryptoApi: globalThis.crypto };
+  symbolic[Symbol('shadow')] = true;
+  await assert.rejects(
+    () => createPolicyInvocationFingerprintV1(invocation(), symbolic),
+    /Policy fingerprint options must not contain symbol fields/u,
+  );
+
+  const hidden = {};
+  Object.defineProperty(hidden, 'cryptoApi', { value: globalThis.crypto, enumerable: false });
+  await assert.rejects(
+    () => createPolicyInvocationFingerprintV1(invocation(), hidden),
+    /Policy fingerprint options\.cryptoApi must be an enumerable data property/u,
+  );
+
+  const exotic = Object.assign(Object.create({ inherited: true }), { cryptoApi: globalThis.crypto });
+  await assert.rejects(
+    () => createPolicyInvocationFingerprintV1(invocation(), exotic),
+    /Policy fingerprint options must be a plain object/u,
+  );
+
+  const nullPrototype = Object.create(null);
+  nullPrototype.cryptoApi = globalThis.crypto;
+  assert.equal(
+    await createPolicyInvocationFingerprintV1(invocation(), nullPrototype),
+    await createPolicyInvocationFingerprintV1(invocation()),
+  );
+});
+
