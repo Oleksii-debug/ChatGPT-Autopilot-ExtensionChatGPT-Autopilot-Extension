@@ -42,6 +42,7 @@ function client(overrides = {}) {
     getDriveFile: async args => ({ operation: 'getDriveFile', args }),
     readDriveText: async args => ({ operation: 'readDriveText', args }),
     updateDriveFile: async args => ({ operation: 'updateDriveFile', args }),
+    readSheetsValues: async args => ({ operation: 'readSheetsValues', args }),
     searchGmail: async args => ({ operation: 'searchGmail', args }),
     getGmailMessage: async args => ({ operation: 'getGmailMessage', args }),
     modifyGmailMessage: async args => ({ operation: 'modifyGmailMessage', args }),
@@ -55,11 +56,11 @@ function client(overrides = {}) {
 
 const allCapabilities = Object.values(GoogleWorkspaceCapabilityId);
 
-test('Google Workspace V1 advertises seven reads plus Drive-update, Gmail-label, draft-create, and draft-send mutations', () => {
+test('Google Workspace V1 advertises eight reads plus Drive-update, Gmail-label, draft-create, and draft-send mutations', () => {
   const provider = new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: allCapabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 11);
-  assert.equal(tools.filter(tool => tool.readOnly === true).length, 7);
+  assert.equal(tools.length, 12);
+  assert.equal(tools.filter(tool => tool.readOnly === true).length, 8);
   const effectful = tools.filter(tool => tool.readOnly === false);
   assert.deepEqual(effectful.map(tool => tool.toolId), [
     GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
@@ -103,6 +104,7 @@ test('each tool dispatches through the single workspace client without creating 
     [GoogleWorkspaceToolId.DRIVE_FILE_GET, GoogleWorkspaceCapabilityId.DRIVE_FILE_READ, 'getDriveFile', { fileId: 'file_1' }],
     [GoogleWorkspaceToolId.DRIVE_FILE_READ_TEXT, GoogleWorkspaceCapabilityId.DRIVE_FILE_READ, 'readDriveText', { fileId: 'file_1' }],
     [GoogleWorkspaceToolId.DRIVE_FILE_UPDATE, GoogleWorkspaceCapabilityId.DRIVE_FILE_UPDATE, 'updateDriveFile', { fileId: 'file_1', name: 'renamed.txt' }],
+    [GoogleWorkspaceToolId.SHEETS_VALUES_GET, GoogleWorkspaceCapabilityId.SHEETS_VALUES_READ, 'readSheetsValues', { spreadsheetId: 'sheet_1', range: 'Data!A1:B2' }],
     [GoogleWorkspaceToolId.GMAIL_SEARCH, GoogleWorkspaceCapabilityId.GMAIL_SEARCH, 'searchGmail', { userId: 'me' }],
     [GoogleWorkspaceToolId.GMAIL_MESSAGE_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailMessage', { userId: 'me', messageId: 'msg_1' }],
     [GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_MODIFY, 'modifyGmailMessage', { userId: 'owner@example.com', messageId: 'msg_1', removeLabelIds: ['INBOX'] }],
