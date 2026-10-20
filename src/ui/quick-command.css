@@ -1,0 +1,39 @@
+html {
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  min-width: 28rem;
+}
+main {
+  padding: 1rem;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+select,
+textarea,
+input,
+button {
+  box-sizing: border-box;
+  font: inherit;
+}
+select,
+textarea,
+input {
+  width: 100%;
+}
+button {
+  margin-top: 0.75rem;
+  min-height: 2.5rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+#status {
+  min-height: 1.5rem;
+}

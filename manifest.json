@@ -9,6 +9,7 @@
     "alarms",
     "tabs",
     "scripting",
+    "activeTab",
     "debugger",
     "identity",
     "nativeMessaging"
@@ -27,19 +28,20 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Відкрити ChatGPT Автопілот",
+    "default_title": "Швидкі дії ChatGPT Автопілот",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
       "48": "icons/icon48.png"
-    }
+    },
+    "default_popup": "src/ui/quick-command.html"
   },
   "commands": {
     "_execute_action": {
       "suggested_key": {
         "default": "Ctrl+Shift+Y"
       },
-      "description": "Відкрити панель ChatGPT Автопілот"
+      "description": "Відкрити швидкі дії ChatGPT Автопілот"
     }
   },
   "options_ui": {
