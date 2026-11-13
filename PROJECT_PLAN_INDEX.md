@@ -6,7 +6,7 @@
 
 **Agent and Models independence:** Plans 1–4,6–7 can implement, test, integrate and close their own Sections against the actual source/contract acceptance. Their progress is NOT gated on the version of the owner's currently installed Chrome extension, nor on Plan8 whole-product packaging. Plan8 owns distribution and cross-feature final release. Plan5 owner-deferred.
 
-**Short bounded stages:** For each first open Section in each existing plan, record separately (A) reuse/prove, (B) fix first real CI blocker + negative/recovery, (C) owner integration/exact SHA + DONE. Do not add new outer sections, discard work or force workers to restart/changeprompt. Historical entries remain history.
+**Short bounded stages:** For each first open Section in each existing plan, record separately (A) reuse/prove, (B) fix first real CI blocker + negative/recovery, (C) owner integration/exact SHA + DONE. Keep existing section numbering, completed work, and active sessions intact. Historical entries remain history.
 
 Canonical Drive folder:
 https://drive.google.com/drive/folders/11g-e0-mv_vaKlTg7uYYKh8iTak6YfP_u
@@ -25,7 +25,7 @@ The plan file names are deliberately identical across projects and contain **no 
 7. `7. Сьомий план`
 8. `8. Восьмий план`
 
-The thematic scope lives **inside** each document and in this index. Workers MUST NOT rename the Drive files to include subsystem names.
+The thematic scope lives **inside** each document and in this index. Keep subsystem names out of Drive filenames.
 
 ## Plans
 
@@ -63,7 +63,7 @@ https://docs.google.com/document/d/1usWSVOrznz7nqWfIGq0zGgUhZeQ9KVEFh9Jxh1MykQM/
 
 ## Dependency model
 
-Plans 1–4, 6 and 7 are independent engineering plans and may finish in any order after the 11.x source lineage is available to the worker.
+Plans 1–4, 6 and 7 are independent engineering plans and may finish in any order once contributors have access to the 11.x source lineage.
 Plan 5 remains the binding owner-deferred cloud/remote later wave from the existing roadmap; do not redirect active capacity there without owner resume or a proven dependency.
 Plan 8 is final convergence. It ultimately requires terminal outputs from Plans 1–7. Plan 5 stays deferred in priority until explicit owner resume, but it remains mandatory final North-Star scope before terminal whole-product go-live.
 
