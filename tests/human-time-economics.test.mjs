@@ -13,6 +13,10 @@ function readiness(providerId = 'provider-a', overrides = {}) {
     schemaVersion: 1,
     providerId,
     toolId: 'tool-' + providerId,
+    sourceId: 'test.human-time-health',
+    sourceRevision: 1,
+    observedAt: '2026-09-25T07:50:00.000Z',
+    validThrough: '2026-09-25T23:59:59.999Z',
     health: 'READY',
     installationRequired: false,
     installed: true,
@@ -428,4 +432,31 @@ test('output is deterministic and advisory-only', () => {
   assert.equal(result.requiresCanonicalPolicyDecision, true);
   assert.equal(result.requiresTrustedOutcomeEvidenceBinding, true);
   assert.equal(Object.isFrozen(result), true);
+});
+
+test('stale or future provider readiness is never economically comparable', () => {
+  const stale = alternative('stale', {
+    providerReadiness: readiness('provider-stale', {
+      observedAt: '2026-09-25T07:00:00.000Z',
+      validThrough: '2026-09-25T07:59:59.999Z',
+    }),
+  });
+  const future = alternative('future', {
+    providerReadiness: readiness('provider-future', {
+      observedAt: '2026-09-25T08:00:00.001Z',
+      validThrough: '2026-09-25T09:00:00.000Z',
+    }),
+  });
+  const result = assessHumanTimeEconomicsV1(request([stale, future]));
+  assert.equal(result.status, HumanTimeEconomicsStatus.NO_COMPARABLE_ALTERNATIVES);
+  assert.deepEqual(
+    result.alternatives.find(item => item.alternativeId === 'stale').blockers,
+    ['PROVIDER_STATE_STALE'],
+  );
+  assert.deepEqual(
+    result.alternatives.find(item => item.alternativeId === 'future').blockers,
+    ['PROVIDER_STATE_FUTURE'],
+  );
+  assert.equal(result.routingAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
 });

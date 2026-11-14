@@ -28,6 +28,12 @@ export const CapabilityPathKind = Object.freeze({
   OCR: 'OCR',
 });
 
+export const ProviderReadinessFreshness = Object.freeze({
+  FRESH: 'FRESH',
+  FUTURE: 'FUTURE',
+  STALE: 'STALE',
+});
+
 const HEALTH = new Set(Object.values(ProviderHealthStatus));
 const PATH_KINDS = new Set(Object.values(CapabilityPathKind));
 const EXECUTABLE = new Set([CapabilityPathReadiness.READY, CapabilityPathReadiness.DEGRADED]);
@@ -92,6 +98,24 @@ function optionalInteger(value, label, max) {
   return value;
 }
 
+function positiveInteger(value, label) {
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  return value;
+}
+
+function canonicalTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) {
+    throw new Error(`${label} must use canonical UTC`);
+  }
+  return value;
+}
+
 function boundedArray(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
@@ -143,6 +167,10 @@ const PROVIDER_STATE_KEYS = new Set([
   'schemaVersion',
   'providerId',
   'toolId',
+  'sourceId',
+  'sourceRevision',
+  'observedAt',
+  'validThrough',
   'health',
   'installationRequired',
   'installed',
@@ -158,10 +186,21 @@ export function normalizeProviderReadinessV1(input) {
   exact(raw, PROVIDER_STATE_KEYS, 'ProviderReadinessV1');
   if (raw.schemaVersion !== 1) throw new Error('ProviderReadinessV1 schemaVersion is invalid');
   const health = exactEnum(raw.health, HEALTH, 'health');
+  const observedAt = canonicalTimestamp(raw.observedAt, 'observedAt');
+  const validThrough = canonicalTimestamp(raw.validThrough, 'validThrough');
+  const observedMs = Date.parse(observedAt);
+  const validThroughMs = Date.parse(validThrough);
+  if (validThroughMs < observedMs) {
+    throw new Error('ProviderReadinessV1 validThrough cannot predate observedAt');
+  }
   return frozen({
     schemaVersion: 1,
     providerId: exactId(raw.providerId, 'providerId'),
     toolId: raw.toolId == null || raw.toolId === '' ? '' : exactId(raw.toolId, 'toolId'),
+    sourceId: exactId(raw.sourceId, 'sourceId'),
+    sourceRevision: positiveInteger(raw.sourceRevision, 'sourceRevision'),
+    observedAt,
+    validThrough,
     health,
     installationRequired: bool(raw.installationRequired, 'installationRequired'),
     installed: bool(raw.installed, 'installed'),
@@ -173,14 +212,50 @@ export function normalizeProviderReadinessV1(input) {
   });
 }
 
-function readinessFor(state) {
-  if (!state) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+export function assessProviderReadinessFreshnessV1(input, asOf) {
+  const state = normalizeProviderReadinessV1(input);
+  const canonicalAsOf = canonicalTimestamp(asOf, 'ProviderReadinessFreshnessV1.asOf');
+  const asOfMs = Date.parse(canonicalAsOf);
+  const observedMs = Date.parse(state.observedAt);
+  const validThroughMs = Date.parse(state.validThrough);
+  const status = observedMs > asOfMs
+    ? ProviderReadinessFreshness.FUTURE
+    : validThroughMs < asOfMs
+      ? ProviderReadinessFreshness.STALE
+      : ProviderReadinessFreshness.FRESH;
+  return frozen({
+    schemaVersion: 1,
+    status,
+    fresh: status === ProviderReadinessFreshness.FRESH,
+    reasonCode: status === ProviderReadinessFreshness.FUTURE
+      ? 'PROVIDER_STATE_FUTURE'
+      : status === ProviderReadinessFreshness.STALE
+        ? 'PROVIDER_STATE_STALE'
+        : '',
+    asOf: canonicalAsOf,
+    sourceId: state.sourceId,
+    sourceRevision: state.sourceRevision,
+    observedAt: state.observedAt,
+    validThrough: state.validThrough,
+  });
+}
+
+function readinessFor(state, asOf) {
+  if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
+  if (!assessProviderReadinessFreshnessV1(state, asOf).fresh) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
   if (state.health === ProviderHealthStatus.UNAVAILABLE) return CapabilityPathReadiness.UNAVAILABLE;
   if (state.installationRequired && !state.installed) return CapabilityPathReadiness.NEEDS_INSTALL;
   if (state.authenticationRequired && !state.authenticated) return CapabilityPathReadiness.NEEDS_AUTH;
   if (state.health === ProviderHealthStatus.UNKNOWN) return CapabilityPathReadiness.NEEDS_HEALTH_CHECK;
   if (state.health === ProviderHealthStatus.DEGRADED) return CapabilityPathReadiness.DEGRADED;
   return CapabilityPathReadiness.READY;
+}
+
+function readinessReasonCode(state, asOf) {
+  if (!state || state.reasonCode === 'PROVIDER_STATE_MISSING') return 'PROVIDER_STATE_MISSING';
+  const freshness = assessProviderReadinessFreshnessV1(state, asOf);
+  if (!freshness.fresh) return freshness.reasonCode;
+  return state.reasonCode;
 }
 
 function normalizeCapabilityIdentityExact(input) {
@@ -274,8 +349,15 @@ function asciiCompare(a, b) {
 }
 
 function compareCandidate(a, b) {
-  return readinessRank(a.readiness) - readinessRank(b.readiness)
-    || pathRank(a.pathKind) - pathRank(b.pathKind)
+  const aExecutable = EXECUTABLE.has(a.readiness);
+  const bExecutable = EXECUTABLE.has(b.readiness);
+  if (aExecutable !== bExecutable) return aExecutable ? -1 : 1;
+  const priority = aExecutable
+    ? pathRank(a.pathKind) - pathRank(b.pathKind)
+      || readinessRank(a.readiness) - readinessRank(b.readiness)
+    : readinessRank(a.readiness) - readinessRank(b.readiness)
+      || pathRank(a.pathKind) - pathRank(b.pathKind);
+  return priority
     || b.matchingCapabilityIds.length - a.matchingCapabilityIds.length
     || latencyRank(a.latencyMs) - latencyRank(b.latencyMs)
     || asciiCompare(a.providerId, b.providerId)
@@ -283,8 +365,8 @@ function compareCandidate(a, b) {
 }
 
 function comparePlanCandidate(a, b) {
-  return readinessRank(a.candidate.readiness) - readinessRank(b.candidate.readiness)
-    || pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
+  return pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
+    || readinessRank(a.candidate.readiness) - readinessRank(b.candidate.readiness)
     || b.uncoveredIds.length - a.uncoveredIds.length
     || latencyRank(a.candidate.latencyMs) - latencyRank(b.candidate.latencyMs)
     || asciiCompare(a.candidate.providerId, b.candidate.providerId)
@@ -305,6 +387,10 @@ function providerFacts(providerId, toolId, statesByProviderTool) {
     installed: false,
     authenticationRequired: false,
     authenticated: false,
+    sourceId: '',
+    sourceRevision: 0,
+    observedAt: '',
+    validThrough: '',
     pathKind: CapabilityPathKind.OCR,
     latencyMs: 0,
     reasonCode: 'PROVIDER_STATE_MISSING',
@@ -334,6 +420,10 @@ function buildPlan(candidates, knownRequestedIds) {
       capabilityIds,
       readiness: selected.candidate.readiness,
       pathKind: selected.candidate.pathKind,
+      readinessSourceId: selected.candidate.readinessSourceId,
+      readinessSourceRevision: selected.candidate.readinessSourceRevision,
+      readinessObservedAt: selected.candidate.readinessObservedAt,
+      readinessValidThrough: selected.candidate.readinessValidThrough,
       requiresPolicyDecision: true,
       permissionGranted: false,
     }));
@@ -342,6 +432,7 @@ function buildPlan(candidates, knownRequestedIds) {
 }
 
 const DISCOVERY_REQUEST_KEYS = new Set([
+  'asOf',
   'capabilities',
   'tools',
   'providerStates',
@@ -351,6 +442,7 @@ const DISCOVERY_REQUEST_KEYS = new Set([
 export function discoverCapabilityPathsV1(input = {}) {
   const request = plain(input, 'CapabilityDiscoveryRequestV1');
   exact(request, DISCOVERY_REQUEST_KEYS, 'CapabilityDiscoveryRequestV1');
+  const asOf = canonicalTimestamp(request.asOf, 'asOf');
   const capabilities = request.capabilities ?? [];
   const tools = request.tools ?? [];
   const providerStates = request.providerStates ?? [];
@@ -369,12 +461,16 @@ export function discoverCapabilityPathsV1(input = {}) {
         providerId: tool.providerId,
         toolId: tool.toolId,
         matchingCapabilityIds,
-        readiness: readinessFor(state),
+        readiness: readinessFor(state, asOf),
         health: state.health,
         pathKind: state.pathKind,
         readOnly: tool.readOnly,
         latencyMs: state.latencyMs,
-        reasonCode: state.reasonCode,
+        reasonCode: readinessReasonCode(state, asOf),
+        readinessSourceId: state.sourceId,
+        readinessSourceRevision: state.sourceRevision,
+        readinessObservedAt: state.observedAt,
+        readinessValidThrough: state.validThrough,
         requiresPolicyDecision: true,
         permissionGranted: false,
       });
@@ -388,6 +484,7 @@ export function discoverCapabilityPathsV1(input = {}) {
 
   return frozen({
     schemaVersion: 1,
+    asOf,
     requestedCapabilityIds: [...requested],
     candidates,
     plan: steps,

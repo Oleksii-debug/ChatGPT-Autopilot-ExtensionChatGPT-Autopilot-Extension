@@ -6,6 +6,7 @@ import {
 import { normalizeCloudWorkspaceBindingV1 } from './cloud-workspace-contract.js';
 import {
   ProviderHealthStatus,
+  assessProviderReadinessFreshnessV1,
   normalizeProviderReadinessV1,
 } from './capability-discovery.js';
 import {
@@ -588,11 +589,16 @@ export function assessCloudExecutionFabricV1(input) {
   for (const slot of slots) {
     let reasonCode = 'ELIGIBLE';
     const provider = providerById.get(slot.providerId);
+    const providerFreshness = provider
+      ? assessProviderReadinessFreshnessV1(provider, request.assessedAt)
+      : null;
     if (Date.parse(slot.observedAt) > Date.parse(request.assessedAt)
         || Date.parse(request.assessedAt) >= Date.parse(slot.expiresAt)) {
       reasonCode = 'STALE_SLOT_OBSERVATION';
     } else if (slot.health === CloudSlotHealth.UNAVAILABLE) {
       reasonCode = 'SLOT_UNAVAILABLE';
+    } else if (providerFreshness && !providerFreshness.fresh) {
+      reasonCode = providerFreshness.reasonCode;
     } else if (!providerExecutable(provider)) {
       reasonCode = 'PROVIDER_NOT_READY';
     } else if (!capabilitySubset(request.requiredCapabilities, slot.capabilities)) {

@@ -53,6 +53,10 @@ function currentReadiness(overrides = {}) {
     schemaVersion:1,
     providerId:'github/main',
     toolId:'github.fetch',
+    sourceId:'test.provider-canary-health',
+    sourceRevision:1,
+    observedAt:'2026-09-25T05:55:00.000Z',
+    validThrough:'2026-09-25T23:59:59.999Z',
     health:ProviderHealthStatus.READY,
     installationRequired:false,
     installed:true,
@@ -120,6 +124,10 @@ test('enough fresh successful observations produce READY and preserve canonical 
   assert.equal(result.recommendedProviderReadiness.authenticationRequired, true);
   assert.equal(result.recommendedProviderReadiness.authenticated, true);
   assert.equal(result.recommendedProviderReadiness.pathKind, CapabilityPathKind.API);
+  assert.equal(result.recommendedProviderReadiness.sourceId, 'test.provider-canary-health');
+  assert.equal(result.recommendedProviderReadiness.sourceRevision, 1);
+  assert.equal(result.recommendedProviderReadiness.observedAt, '2026-09-25T05:55:00.000Z');
+  assert.equal(result.recommendedProviderReadiness.validThrough, '2026-09-25T23:59:59.999Z');
   assert.equal(result.recommendations.actionAuthorized, false);
   assert.equal(result.readinessUpdateAuthorized, false);
 });
@@ -364,4 +372,44 @@ test('canary result never grants routing, repair, readiness-update, task, policy
   assert.equal('taskId' in result, false);
   assert.equal('effectId' in result, false);
   assert.equal('policyDecision' in result, false);
+});
+
+test('fresh canaries cannot re-authorize stale or future base readiness facts', () => {
+  const def = definition('github.read', 'github.read', { requiredPasses:1 });
+  const observations = [observation('fresh.pass', 'github.read', 'github.read', 'PASS')];
+
+  const stale = evaluate([def], observations, {
+    currentReadiness: currentReadiness({
+      observedAt:'2026-09-25T05:54:00.000Z',
+      validThrough:'2026-09-25T05:55:29.999Z',
+    }),
+  });
+  assert.equal(stale.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(stale.recommendedProviderReadiness.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(stale.recommendedProviderReadiness.reasonCode, 'PROVIDER_STATE_STALE');
+  assert.equal(stale.recommendations.blockConsequentialWorkSuggested, true);
+  assert.equal(stale.readinessUpdateAuthorized, false);
+  assert.equal(stale.executionAuthorized, false);
+
+  const future = evaluate([def], observations, {
+    currentReadiness: currentReadiness({
+      observedAt:'2026-09-25T05:55:30.001Z',
+      validThrough:'2026-09-25T06:10:00.000Z',
+    }),
+  });
+  assert.equal(future.health, ProviderHealthStatus.UNKNOWN);
+  assert.equal(future.recommendedProviderReadiness.reasonCode, 'PROVIDER_STATE_FUTURE');
+  assert.equal(future.recommendations.blockConsequentialWorkSuggested, true);
+});
+
+test('zero latency uses one canonical numeric representation', () => {
+  const canonical = normalizeProviderCanaryObservationV1(
+    observation('zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:0 }),
+  );
+  assert.equal(canonical.latencyMs, 0);
+  assert.equal(Object.is(canonical.latencyMs, -0), false);
+
+  assert.throws(() => normalizeProviderCanaryObservationV1(
+    observation('negative.zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:-0 }),
+  ), /latencyMs is invalid/);
 });
