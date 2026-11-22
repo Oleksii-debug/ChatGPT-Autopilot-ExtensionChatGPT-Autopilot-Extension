@@ -1,0 +1,100 @@
+{
+  "format": "dordiai-arabic-delivery-comparison-contract",
+  "format_version": 1,
+  "status": "actual-1305-comparison-completed-activation-unaccepted",
+  "source": {
+    "immutable_development_version": "0.13.1-dev.13",
+    "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+    "policy": "source/0.12.2/kx47Runtime/voice_delivery.py",
+    "policy_sha256": "2d5a1877622f6d7e95babc12685f88f69999263fa0a6fd32748f2093cda2ea93",
+    "original_raw_archive": "downloads/ar-raw1305.zip",
+    "original_raw_bytes": 101748675,
+    "original_raw_sha256": "14b6838daff3621a67f71d443610787467cc5e9f007930d7aa244f3d9bc6a6f4",
+    "original_report_sha256": "5a46e99b41c87e7970cd8c000c0ddd3b5668622fffc12e08e957cb0065dac91c",
+    "original_archive_index_sha256": "4f85288544604cd59d6a524b7cf8c8917ea23d19165f29a4e6e847844650a92f"
+  },
+  "measurement": {
+    "comparison": "Actual pinned prepare_letter called on a copy of each full original int16 clip. A forwarding-only clean_onset observer records the real input slice.",
+    "activity": "Whole original and derived clips at 10ms RMS bins, relative levels .1%, .5%, 2%, and 5.5%. Activity thresholds never decide crop boundaries in this tool.",
+    "sample_preservation": "The original archive, all1430 member hashes, individual bank/index/range/clip hashes and PCM decoding roundtrips are verified. Originals remain in the unchanged raw ZIP.",
+    "quiet_names": [
+      "ح",
+      "ه",
+      "ف"
+    ],
+    "safety": "Any removed nonzero sample is reported. It may be noise or speech. The signal measurement does not prove phonetic silence or preservation of quiet consonants/natural tails.",
+    "derived_conversion": "np.rint(clip(float32,-1,32767/32768)*32768), little-endian int16 mono24000Hz",
+    "candidate_scope": "Fresh research output only; no manifest, install, active hook, model inference or rerender of source recordings."
+  },
+  "actual": {
+    "date": "2026-11-22",
+    "profiles": 45,
+    "ordinary_names": 29,
+    "clips": 1305,
+    "quiet_name_clips": 135,
+    "original_archive_members_verified": 1430,
+    "original_archive_unchanged": true,
+    "old3330_regenerated": false,
+    "production_source_changed": false,
+    "derived_waves": 1305,
+    "total_raw_frames": 41930415,
+    "total_derived_frames": 14260320,
+    "clips_with_removed_nonzero_samples": 1305,
+    "quiet_clips_with_removed_nonzero_samples": 135,
+    "mini4_low_energy_ms": {
+      "oksana_alif": {
+        "raw": 430,
+        "derived": 10
+      },
+      "oksana_hamza": {
+        "raw": 370,
+        "derived": 0
+      },
+      "viktoriia_alif": {
+        "raw": 430,
+        "derived": 10
+      },
+      "viktoriia_hamza": {
+        "raw": 410,
+        "derived": 10
+      }
+    },
+    "interpretation": "The existing policy shortens the heuristic low-energy lead, but removes nonzero original samples in every tested clip. No actual phoneme-alignment or native-listener proof is available, so raw and derived banks remain inactive."
+  },
+  "results": {
+    "full_report": "windows-evidence/ar-delivery-source13-20261122/comparison.json",
+    "bytes": 4942551,
+    "sha256": "1abd0af8e051c5b54dbe25d4140a9ab35abba7770215a7af867542ca7e481b0c",
+    "derived_directory": "windows-evidence/ar-delivery-source13-20261122/derived"
+  },
+  "tests": {
+    "synthetic_tests": 21,
+    "passed": 21,
+    "skipped": 0,
+    "windows": true,
+    "python": "3.13.9",
+    "numpy": "2.3.5",
+    "specific_regressions": [
+      "Quiet fricative attack and natural tail are flagged when the existing policy drops nonzero samples.",
+      "Original PCM roundtrip and actual observed policy crop window are preserved.",
+      "Observer always restores the original cleaner, including exceptional paths.",
+      "ZIP original names are checked before Windows ZipInfo slash normalization can hide a backslash.",
+      "Per-profile bank filenames, actual flat index, clip ranges and checksums are enforced.",
+      "All8excluded identities are rejected before bank access.",
+      "No acceptance or activation is inferred from candidate timing or nonzero PCM."
+    ]
+  },
+  "run": "python -B tools/research/compare_arabic_delivery.py --raw-archive downloads/ar-raw1305.zip --output windows-evidence/ar-delivery-source13-20261122 --write-candidates",
+  "open": [
+    "Native phonetic onset/tail review for all quiet Arabic consonant names.",
+    "Independent acoustic alignment against complete original samples.",
+    "Actual NVDA keyboard echo and audible-onset validation.",
+    "A reviewed future14 activation hook bound to installed package, names, vector, index/audio and resource epoch."
+  ],
+  "activation_allowed": false,
+  "phonetic_boundaries_verified": false,
+  "native_pronunciation_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

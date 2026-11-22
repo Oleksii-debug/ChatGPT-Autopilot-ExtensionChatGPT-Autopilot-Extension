@@ -1,0 +1,152 @@
+{
+  "format": "dordiai-cnr-primary-resource-recheck",
+  "format_version": 1,
+  "checked_at_utc": "2026-11-22T19:41:20Z",
+  "scope": "Only cnr, the first European missing native acoustic resource; no expansion of the other language gaps",
+  "status": "no-verified-native-local-checkpoint-established",
+  "native_resource_registered": false,
+  "native_audio_verified": false,
+  "catalogue_coverage_increment": 0,
+  "runtime_modified": false,
+  "model_binaries_downloaded": false,
+  "training_started": false,
+  "prior_evidence_read": [
+    "AGENTS.md",
+    "evidence/resource_candidates.json:languages[selected_id=cnr]",
+    "evidence/cnr_resource_research.json",
+    "evidence/remaining_native_gap_next_20261122.json",
+    "evidence/remaining_gap_pretrained_candidates_20261122.json",
+    "evidence/word_lid_remaining_sources_20261122.json:classla-web-cnr-2.0"
+  ],
+  "bounded_registry_rechecks": [
+    {
+      "url": "https://huggingface.co/api/models?search=Montenegrin&filter=text-to-speech&limit=50",
+      "http_status": 200,
+      "response": [],
+      "observation": "No returned publicly indexed matching TTS model in this name search"
+    },
+    {
+      "url": "https://huggingface.co/api/models?search=crnogorski&limit=50",
+      "http_status": 200,
+      "response": []
+    },
+    {
+      "url": "https://huggingface.co/api/models?search=cnr&filter=text-to-speech&limit=50",
+      "http_status": 200,
+      "response": []
+    },
+    {
+      "url": "https://api.github.com/search/repositories?q=Montenegrin+TTS&per_page=20",
+      "http_status": 200,
+      "total_count": 0,
+      "observation": "Bounded repository search, not proof that no privately held or differently named native model exists"
+    }
+  ],
+  "new_primary_leads": [
+    {
+      "id": "culafic-cultural-heritage-tts-2025",
+      "publication_url": "https://zenodo.org/records/15108169",
+      "doi": "10.1109/IT64745.2025.10930262",
+      "metadata_api": "https://zenodo.org/api/records/15108169",
+      "metadata_http_status": 200,
+      "publisher": "Igor Culafic, Tomo Popovic, Stevan Cakic / University of Donja Gorica",
+      "record_file_inventory": [
+        {
+          "path": "IT2025_ICulafic_Draft18.pdf",
+          "bytes": 703906,
+          "publisher_checksum": "md5:2670033ece73cdb3d1464ed18cc10252"
+        }
+      ],
+      "license_observation": "Zenodo metadata says cc-by-4.0; the record also includes an IEEE personal-use/permission notice. Neither grants an absent checkpoint a redistribution license.",
+      "observation": "A genuine Montenegrin cultural-heritage TTS research paper was located. The public record contains one PDF and no model weights. The abstract compares voice-cloning systems; it does not establish a released standard-cnr acoustic checkpoint.",
+      "pdf_content_retrieved": false,
+      "retrieval_limit": "IEEE page required JavaScript verification; web PDF opens failed. Conclusions above rely on author/record metadata and the actual file inventory, not an invented full-paper reading.",
+      "qualifies_as_ready_cnr_tts": false
+    },
+    {
+      "id": "culafic-psychology-vr-local-tts",
+      "repository": "IgorCulafic/psychology-vr",
+      "url": "https://github.com/IgorCulafic/psychology-vr/tree/6d0086d3f0d432ac4a32ca91fe5941053930f4a0",
+      "revision": "6d0086d3f0d432ac4a32ca91fe5941053930f4a0",
+      "revision_committer_date": "2026-11-10T12:38:59Z",
+      "inspected_paths": [
+        "README.md",
+        "docs/SPEECH_RESEARCH.md",
+        "docs/ALTERNATIVE_TTS_AUDITIONS.md",
+        "docs/LIVE_EXPRESSIVE_SPEECH.md",
+        "services/higgs_service.py",
+        "tools/audition_alternative_tts.py"
+      ],
+      "source_blob_ids": {
+        "services/higgs_service.py": "b2cefecb9e6a4ec7fffea6be8a2af45ea2a588eb",
+        "tools/audition_alternative_tts.py": "b98a923d8dcf226bcb0075b0b048ecdb45c5fee4",
+        "experiments/tts/requirements-alternative-lock.txt": "c39bac5ed3da63c8f6b8e9e1bd9b799d6056a7e1"
+      },
+      "windows_runtime_evidence": "Publisher documents local Windows Python 3.12/CUDA inference with a Transformers Higgs port, resident model/reference, and offline local paths. This is upstream implementation evidence, not a test on our Windows/NVDA installation.",
+      "actual_model": "multimodalart/higgs-audio-v3-tts-4b-transformers",
+      "actual_model_revision_from_publisher": "30f01593ee6a12efa586c92455afe4b76e45095d",
+      "observation": "Useful actual local Windows implementation was found, but no native cnr checkpoint was established: OmniVoice trials explicitly select sr/hr/bs; Higgs comparison has no explicit language parameter. Author leaves native pronunciation and voice identity for listening validation. A conversation_language=cnr text setting is not proof of cnr acoustic training or correct Ś/Ź.",
+      "license": "No root LICENSE/COPYING file was returned by the pinned root inventory. Source reuse needs file-level permission review; Higgs model has a separate restrictive research/noncommercial license.",
+      "latency_or_native_acceptance_transferred_to_dordiai": false,
+      "qualifies_as_ready_cnr_tts": false
+    },
+    {
+      "id": "higgs-tts-3-primary-model-check",
+      "repository": "bosonai/higgs-tts-3-4b",
+      "url": "https://huggingface.co/bosonai/higgs-tts-3-4b",
+      "metadata_url": "https://huggingface.co/api/models/bosonai/higgs-tts-3-4b?blobs=true",
+      "revision": "239f63fb7b02b1aa085f98d9efae5e35cc5523e8",
+      "gated": false,
+      "architecture": "Approximately 4B autoregressive decoder, Higgs audio codec, 24 kHz output",
+      "weight_files": [
+        {
+          "path": "model.safetensors",
+          "bytes": 9309834930,
+          "sha256": "2f7965264c360b38180885006944aa16bd1de20f4e6cff79f6473bfcf8ae3d5a"
+        }
+      ],
+      "download_bytes_interpretation": "One official backbone weight file only, excluding tokenizer/runtime. No installed-size or RAM measurement; no download performed. This file alone exceeds the 3 GB main-installer maximum.",
+      "license": "Boson Higgs TTS 3 Research and Non-Commercial License; product embedding/production/hosted APIs require a separate commercial license according to the primary card. Digital-creator grant does not automatically permit packaging a synthesizer.",
+      "language_evidence": "The primary 102-language WER/CER list includes Serbian, Croatian and Bosnian but does not list Montenegrin. Neither generic multilingual capability nor readable Unicode establishes correct native cnr ś/ź phonemes and prosody.",
+      "qualifies_as_ready_cnr_tts": false
+    },
+    {
+      "id": "culafic-mne-stt-unicode-review",
+      "repository": "IgorCulafic/MNE_STT",
+      "url": "https://github.com/IgorCulafic/MNE_STT/tree/991285d4c29a17a3fa97a8e93f3b9c9f7ee93425",
+      "revision": "991285d4c29a17a3fa97a8e93f3b9c9f7ee93425",
+      "readme_blob": "4d03fea1647ad8d0f385680bd913b6959e6b569a",
+      "readme_bytes": 17504,
+      "role": "Transcript/time-boundary review and export tool, not acoustic TTS weights",
+      "windows_runtime_evidence": "Publisher provides Windows startup/release instructions with Python 3.11/3.12, local faster-whisper and FFmpeg dependencies.",
+      "unicode_evidence": "README explicitly preserves ś, ź and Cyrillic without regional normalization. Sample timing audio is synthetic tones. UTF-8 preservation is a useful preparation property but no proof of pronunciation.",
+      "license": "No root LICENSE/COPYING file was returned in the pinned root inventory; do not copy its source until file-level permission is established.",
+      "potential_use": "Reference for a future human-validated cnr corpus-preparation workflow. Current export is 16 kHz mono and cannot silently replace original lossless/high-sample-rate audio for TTS training.",
+      "qualifies_as_ready_cnr_tts": false
+    }
+  ],
+  "prior_rejections_preserved": [
+    "Balkansmedia/tts-ai- and nikolab/speecht5_tts_hr: prior evidence established Croatian training and future Montenegrin collection. Do not retry as if regional project naming proved native cnr.",
+    "AlfaNum: prior genuine commercial/local-service lead still has no established downloadable redistributable native weights in our evidence. No demo harvesting or paid contact performed.",
+    "SIL-AI mlv-mntnt identifier is not ISO cnr evidence; no download or relabeling.",
+    "WorldSpeech cnr_me is a real previously identified ASR-data candidate, not a trained TTS checkpoint. Its source terms, speaker/recording quality and standard Ś/Ź coverage remain unverified.",
+    "CLASSLA-web.cnr.2.0 is a previously identified text corpus. It may inform lexical language detection but does not provide acoustic synthesis or pronunciation acceptance."
+  ],
+  "exact_remaining_blocker": {
+    "availability": "No inspected public primary release establishes a downloadable, appropriately licensed cnr acoustic checkpoint with documented standard Montenegrin distinctions, a compatible local runtime and validated output. Bounded searches cannot prove nonexistence elsewhere.",
+    "required_before_integration": [
+      "A publisher-native cnr release or a separately authorized native training/adaptation project with resolved source terms",
+      "Pinned checkpoint, tokenizer/phoneme inventory and runtime dependencies, byte sizes and license",
+      "Native listening assessment of Ś/Ź, ijekavian forms, character names, stress and prosody; related-language or ASR tests alone are insufficient",
+      "Local Windows/NVDA cancellation, typing, routing and audible latency validation against the unchanged product targets"
+    ],
+    "no_silent_scope_expansion": "No base-model training budget, paid license or new large GPU runtime was assumed. cnr remains missing; other independent product work can continue."
+  },
+  "actions_not_taken": [
+    "No Serbian/Croatian substitution or hidden fallback registered as cnr",
+    "No gated/private model access, paid service calls or contact with publishers",
+    "No weight, audio corpus, full repository or large document download",
+    "No copying third-party implementation code",
+    "No live NVDA, audio driver, user settings, packages or acceptance-gate changes"
+  ]
+}

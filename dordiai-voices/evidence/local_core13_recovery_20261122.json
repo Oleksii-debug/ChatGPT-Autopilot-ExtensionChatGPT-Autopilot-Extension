@@ -1,0 +1,10 @@
+{
+  "format": "dordiai-local-core13-recovery",
+  "source_parts_run": 45059951003,
+  "archive": "packages\\0.13.1-dev.13\\dordiai-voices-0.13.1-dev.13.nvda-addon",
+  "bytes": 1992990314,
+  "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "zip_crc_verified": true,
+  "version": "0.13.1-dev.13",
+  "product_ready": false
+}

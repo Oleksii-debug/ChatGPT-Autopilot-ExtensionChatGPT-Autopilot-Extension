@@ -1,0 +1,18 @@
+{
+  "format": "dordiai-local-Windows-regression",
+  "date": "2026-11-22",
+  "tests": 1863,
+  "passed": 1784,
+  "skipped": 79,
+  "failures": 0,
+  "errors": 0,
+  "elapsed_seconds": 59.621,
+  "host_python": "3.13.9",
+  "numpy": "2.3.5",
+  "temporary_directory": "D:\\DordiaiTestTemp",
+  "log_bytes": 328163,
+  "log_sha256": "b811d09869f97f9000474ce31661cc6933d789b0a5e5cabec2bd7f543b606f5a",
+  "exact_log_backup": "evidence/local_regression_final_20261122.log.gz.b64",
+  "scope": "Host regressions including existing Windows fixtures; not native-language, actual NVDA or acoustic timing acceptance.",
+  "product_ready": false
+}

@@ -1,0 +1,11 @@
+{
+  "format": "dordiai-exact-evidence-backup",
+  "original": "windows-evidence\\ar-delivery-source13-20261122\\comparison.json",
+  "original_bytes": 4942551,
+  "original_sha256": "1abd0af8e051c5b54dbe25d4140a9ab35abba7770215a7af867542ca7e481b0c",
+  "gzip_bytes": 650406,
+  "gzip_sha256": "f4f06b97c28ed62267c3807402cf24aff01bbede152c04526a503944abf2d4ab",
+  "backup": "evidence\\ar_delivery_comparison_20261122.json.gz.b64",
+  "readback_verified": true,
+  "product_ready": false
+}

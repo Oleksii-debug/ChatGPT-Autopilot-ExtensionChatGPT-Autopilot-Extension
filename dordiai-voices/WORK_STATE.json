@@ -58,7 +58,7 @@
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
-    "local_executor_status": "available: /bin/bash with explicit existing workdir; verified tracked snapshot restored locally",
+    "local_executor_status": "Actual Windows 11 build26200, PowerShell login:false, isolated D checkout, official embedded host Python3.13.9 with pinned numpy2.3.5.",
     "windows_nvda_available": "Actual official NVDA2026.3.1 in isolated Windows CI",
     "physical_audio_endpoint_count": 0,
     "virtual_render_endpoint": "Actual12 owned process loopback and full phrase waveform match verified; exact temporary device removed. Physical output unavailable."
@@ -588,7 +588,7 @@
       "layout_diagnostic": {
         "run": 45029834046,
         "both_speakers_proved_original_layout_exact": true,
-        "unchanged_values_contiguous_layout_max_mel_difference": 0.000003814697265625,
+        "unchanged_values_contiguous_layout_max_mel_difference": 3.814697265625e-06,
         "evidence": "evidence/mni_layout_45029834046.json"
       },
       "corrected_export": {
@@ -596,8 +596,8 @@
         "all405_onnx_initializers_exact_original_fp32": true,
         "native8_bit_identical": true,
         "status": "rejected; fixed_float_gate_failed_and_dynamic_attention_shape_error",
-        "float_gate": 0.00001,
-        "first_audio_max_abs": 0.000011764,
+        "float_gate": 1e-05,
+        "first_audio_max_abs": 1.1764e-05,
         "first_audio_max_pcm_lsb": 1,
         "dynamic_shape_valid": false,
         "product_integrated": false,
@@ -1679,7 +1679,7 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Paused for transfer; immutable13actual functional9 and real-wx10 verified. Runtime14not built. Read CODEX_HANDOFF_UK.md; product_ready remainsfalse.",
+  "working_source_target_version": "Immutable13 retained. Runtime14 not built; actual Windows research and acceptance work resumed on D.",
   "handoff": {
     "date": "2026-11-22",
     "entrypoint": "CODEX_HANDOFF_UK.md",
@@ -1699,11 +1699,20 @@
     "owned_checkout": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій",
     "immutable_baseline": "0.13.1-dev.13",
     "next_tasks": [
-      "Actual source13 keyboard save and restart on owned Windows CI",
-      "Six paired actual full-word prefetch/capture trials without a production change",
-      "Recover pinned development resources in bounded transport parts"
+      "Read six actual source13 prefetch comparisons run45061544904; no acceptance threshold changes",
+      "Read actual settings retry run45062114303 with exact native menu highlight check",
+      "Actual imported-profile to PCM proof in isolated local worker",
+      "Diagnose cold/warm fresh utterance latency before a separately versioned runtime14 change"
     ],
-    "resource_transfer_limitation": "Connector binary downloads limited to 512 MiB. Core13 is 1,992,990,314 bytes; verified CI transport parts are being prepared.",
-    "product_ready": false
+    "resource_transfer_limitation": "Resolved with five verified bounded Actions transport parts; exact original whole ZIP SHA/CRC verified on D.",
+    "product_ready": false,
+    "recovered_core": "evidence/local_core13_recovery_20261122.json",
+    "local_worker_pcm": [
+      "evidence/local_core13_default3_20261122.json",
+      "evidence/local_core13_repeat3_20261122.json"
+    ],
+    "local_regression": "evidence/local_regression_final_20261122.json",
+    "arabic_delivery": "evidence/ar_delivery_comparison_contract.json",
+    "historical_handoff_fields": "handoff and original transfer-policy fields describe the completed earlier save, not current inactivity"
   }
 }

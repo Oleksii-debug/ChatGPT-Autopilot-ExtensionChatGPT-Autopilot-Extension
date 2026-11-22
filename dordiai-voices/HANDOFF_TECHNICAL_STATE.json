@@ -282,5 +282,11 @@
   "external_resource_retention": {
     "legacy_MMS29_packages": "Actions run45014461158, artifacts/inner receipts in evidence/mms_resource_artifacts_45014461158.json; initial artifact expiry2027-02-20. Do not claim all optional binaries were additionally copied to permanent storage during handoff. Reproduction/provenance/recipes are tracked in Git.",
     "Drive": "Original link retained; no claim of upload of current work back to Drive."
+  },
+  "resume_20261122": {
+    "status": "active_on_actual_Windows_D",
+    "current_state": "WORK_STATE.json",
+    "original_transfer_preserved": true,
+    "product_ready": false
   }
 }

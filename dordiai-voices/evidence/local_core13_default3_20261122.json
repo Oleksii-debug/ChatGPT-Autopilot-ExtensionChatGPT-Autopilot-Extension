@@ -1,0 +1,746 @@
+{
+  "format": "dordiai-windows-engine-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T19:34:53.538159+00:00",
+  "platform": "win32",
+  "host_python": "3.13.9 (tags/v3.13.9:8183fa5, Oct 14 2025, 14:09:13) [MSC v.1944 64 bit (AMD64)]",
+  "system": "Windows-11-10.0.26200-SP0",
+  "machine": "AMD64",
+  "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "logical_cpu_count": 12,
+  "package_root": "D:\\DordiaiTestTemp\\core13-audit-20261122",
+  "status": "passed",
+  "tests": [
+    {
+      "python_version": "3.14.5",
+      "bootstrap_mode": "inherited",
+      "extension_basename": "marisa_trie.cp314-win_amd64.pyd",
+      "dictionary_constructed": true,
+      "nonoverride_word_checked": true,
+      "status": "passed",
+      "kind": "native-extension-preflight",
+      "exit_code": 0
+    },
+    {
+      "python_version": "3.14.5",
+      "bootstrap_mode": "reset",
+      "bootstrap": {
+        "status": "reset",
+        "reset_to_default": true,
+        "inherited_directory_present": false,
+        "directory_present_after_reset": false
+      },
+      "extension_basename": "marisa_trie.cp314-win_amd64.pyd",
+      "dictionary_constructed": true,
+      "nonoverride_word_checked": true,
+      "status": "passed",
+      "kind": "native-extension-preflight",
+      "exit_code": 0
+    },
+    {
+      "kind": "language-engine",
+      "language": "uk",
+      "runs": [
+        {
+          "first_pcm_ms": 5711.6826999990735,
+          "completed_ms": 7643.723099987255,
+          "real_time_factor": 1.2835807052875323,
+          "audio": {
+            "frames": 142920,
+            "duration_seconds": 5.955,
+            "peak": 0.3504638671875,
+            "rms": 0.07854057297837017,
+            "nonzero_samples": 139240
+          },
+          "chunks": [
+            {
+              "time_ms": 5711.6826999990735,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 5923.322099988582,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 6077.05919998989,
+              "bytes": 32400
+            },
+            {
+              "time_ms": 6319.323499992606,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 6531.45609999774,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 6765.905699998257,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 6853.424799992354,
+              "bytes": 3600
+            },
+            {
+              "time_ms": 7095.0978999899235,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 7321.080499998061,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 7530.379299991182,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 7616.860099995392,
+              "bytes": 1200
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "baseline",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "uk-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Перевірка синтезатора. Кнопка перемикач натиснуто. Голос читає український текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 5711.6826999990735,
+        "median_ms": 5711.6826999990735,
+        "maximum_ms": 5711.6826999990735
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "en",
+      "runs": [
+        {
+          "first_pcm_ms": 1958.5359000047902,
+          "completed_ms": 2893.4062000043923,
+          "real_time_factor": 0.6795556068786187,
+          "audio": {
+            "frames": 102187,
+            "duration_seconds": 4.257791666666667,
+            "peak": 0.52313232421875,
+            "rms": 0.07400473750061645,
+            "nonzero_samples": 99011
+          },
+          "chunks": [
+            {
+              "time_ms": 1958.5359000047902,
+              "bytes": 2400
+            },
+            {
+              "time_ms": 1994.2996000027051,
+              "bytes": 7320
+            },
+            {
+              "time_ms": 2054.4389999995474,
+              "bytes": 17520
+            },
+            {
+              "time_ms": 2107.227200001944,
+              "bytes": 11520
+            },
+            {
+              "time_ms": 2158.3587000059197,
+              "bytes": 5548
+            },
+            {
+              "time_ms": 2343.083400002797,
+              "bytes": 53070
+            },
+            {
+              "time_ms": 2406.0919000039576,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 2473.8522000116063,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 2539.2621000064537,
+              "bytes": 15870
+            },
+            {
+              "time_ms": 2610.1429000118515,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 2683.4146000037435,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 2761.19020000624,
+              "bytes": 15766
+            },
+            {
+              "time_ms": 2841.6564000071958,
+              "bytes": 6240
+            },
+            {
+              "time_ms": 2867.5312000123085,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "en-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Speech engine check. The selected voice is reading an English sentence.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 1958.5359000047902,
+        "median_ms": 1958.5359000047902,
+        "maximum_ms": 1958.5359000047902
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "ru",
+      "runs": [
+        {
+          "first_pcm_ms": 3434.5098000048893,
+          "completed_ms": 4890.083400008734,
+          "real_time_factor": 1.3718527364139057,
+          "audio": {
+            "frames": 85550,
+            "duration_seconds": 3.564583333333333,
+            "peak": 0.423065185546875,
+            "rms": 0.08953439387654517,
+            "nonzero_samples": 83984
+          },
+          "chunks": [
+            {
+              "time_ms": 3434.5098000048893,
+              "bytes": 6718
+            },
+            {
+              "time_ms": 3512.016799999401,
+              "bytes": 11552
+            },
+            {
+              "time_ms": 3600.3018000046723,
+              "bytes": 10364
+            },
+            {
+              "time_ms": 3681.612700005644,
+              "bytes": 7064
+            },
+            {
+              "time_ms": 3793.0157000082545,
+              "bytes": 9596
+            },
+            {
+              "time_ms": 3949.2534000019077,
+              "bytes": 8160
+            },
+            {
+              "time_ms": 4213.07580001303,
+              "bytes": 33980
+            },
+            {
+              "time_ms": 4332.794100002502,
+              "bytes": 13386
+            },
+            {
+              "time_ms": 4445.991500004311,
+              "bytes": 15136
+            },
+            {
+              "time_ms": 4562.223000000813,
+              "bytes": 12480
+            },
+            {
+              "time_ms": 4679.945600000792,
+              "bytes": 15278
+            },
+            {
+              "time_ms": 4766.875600005733,
+              "bytes": 13946
+            },
+            {
+              "time_ms": 4835.448900004849,
+              "bytes": 5760
+            },
+            {
+              "time_ms": 4866.460400007782,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "ru-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Проверка синтезатора. Выбранный голос читает русский текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 3434.5098000048893,
+        "median_ms": 3434.5098000048893,
+        "maximum_ms": 3434.5098000048893
+      }
+    },
+    {
+      "voice": "kostia",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "inna",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "dina",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "vira",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "innesa",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika_classmate",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "anatolii",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError",
+        "diagnostics": {
+          "type": "ValueError",
+          "frames": [
+            {
+              "module": "__main__",
+              "function": "main",
+              "line": 200
+            },
+            {
+              "module": "voice_policy",
+              "function": "require_voice_allowed",
+              "line": 28
+            }
+          ],
+          "bootstrap": {
+            "status": "reset",
+            "reset_to_default": true,
+            "inherited_directory_present": false,
+            "directory_present_after_reset": false,
+            "paths": {
+              "status": "extended-paths",
+              "extended_import_paths": true,
+              "sys_path_entries": 4,
+              "long_sys_path_entries": 0
+            }
+          }
+        }
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "kind": "uk-dictionary-regression",
+      "language": "uk",
+      "voice": "sara",
+      "status": "passed",
+      "nonoverride_word": "лексикографічний",
+      "segments": true,
+      "observations": {
+        "first_pcm_ms": 409.88500000094064,
+        "completed_ms": 2140.5066000006627,
+        "real_time_factor": 0.4293894884655291,
+        "audio": {
+          "frames": 119640,
+          "duration_seconds": 4.985,
+          "peak": 0.427154541015625,
+          "rms": 0.0770411810297064,
+          "nonzero_samples": 117840
+        },
+        "chunks": [
+          {
+            "time_ms": 409.88500000094064,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 649.8263999965275,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 1035.213900002418,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 1337.168300000485,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 1882.5858000054723,
+            "bytes": 48000
+          },
+          {
+            "time_ms": 2105.6941999995615,
+            "bytes": 44400
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "sara"
+          }
+        ]
+      },
+      "wave_file": "uk-dictionary-regression.wav"
+    },
+    {
+      "kind": "cancel-and-recover",
+      "language": "uk",
+      "voice": "sara",
+      "status": "passed",
+      "cancel_delay_after_request_ms": 20,
+      "cancel_and_drop_ack_ms": 1.293599998462014,
+      "first_reply_was_already_buffered_audio": false,
+      "scope": "worker protocol only; not NVDA audible stop latency",
+      "recovery": {
+        "first_pcm_ms": 295.4068999970332,
+        "completed_ms": 1456.286700005876,
+        "real_time_factor": 0.39952995884934867,
+        "audio": {
+          "frames": 87480,
+          "duration_seconds": 3.645,
+          "peak": 0.34442138671875,
+          "rms": 0.08184978162913908,
+          "nonzero_samples": 85088
+        },
+        "chunks": [
+          {
+            "time_ms": 295.4068999970332,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 564.9321000091732,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 774.4899000099394,
+            "bytes": 42000
+          },
+          {
+            "time_ms": 1016.8253000010736,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 1250.9189999982482,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 1432.0390000066254,
+            "bytes": 31200
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "sara"
+          }
+        ],
+        "wave_file": "cancel-recovery.wav"
+      }
+    }
+  ],
+  "scope": "actual packaged worker/model smoke; no NVDA audio device",
+  "nvda_verified": false,
+  "pronunciation_verified": false,
+  "all_selected_languages_verified": false,
+  "prepared_letter_latency_verified": false,
+  "warnings": [
+    "First-PCM time is a pipe measurement, not audible onset.",
+    "Generated WAV files require pronunciation and listening review."
+  ],
+  "runtime_root": "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime",
+  "requested_languages": [
+    "uk",
+    "en",
+    "ru"
+  ],
+  "installed_language_count": 3,
+  "voice_count": 45,
+  "worker_script_sha256": "8fb4303098489bc8ad255696895a05f3daf731e60c4dbb8b271c16fdc31d121a",
+  "embedded_python_sha256": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+  "package_version": "0.13.1-dev.13",
+  "worker_command": [
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\python\\python.exe",
+    "-I",
+    "-B",
+    "-u",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\nvda_worker.py",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models",
+    "--reference-model",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\Holos",
+    "--references",
+    "D:\\DordiaiTestTemp\\core13-audit-20261122\\kx47Runtime\\models\\voices",
+    "--reference-engine",
+    "holos",
+    "--preload-language",
+    "mixed"
+  ],
+  "failed_or_blocked_checks": 0,
+  "worker_shutdown": {
+    "exit_code": 0,
+    "forced_termination": false
+  },
+  "completed_utc": "2026-11-22T19:35:15.039112+00:00"
+}
