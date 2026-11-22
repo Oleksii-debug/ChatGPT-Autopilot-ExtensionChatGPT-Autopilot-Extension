@@ -1,0 +1,2365 @@
+{
+  "selected_by_user": true,
+  "recorded_date": "2026-11-22",
+  "implementation_authorized": false,
+  "start_condition": "Explicit user message: старт",
+  "work_order": [
+    "Європа",
+    "Америка: Північна, Центральна, Кариби, Південна",
+    "Азія",
+    "Африка",
+    "Австралія та Океанія"
+  ],
+  "regions": [
+    {
+      "name_uk": "Європа",
+      "priority": 1,
+      "languages_in_user_order": [
+        "en",
+        "ru",
+        "de",
+        "fr",
+        "it",
+        "es",
+        "pl",
+        "uk",
+        "ro",
+        "nl",
+        "pt",
+        "el",
+        "cs",
+        "hu",
+        "sv",
+        "sr",
+        "bg",
+        "sq",
+        "hr",
+        "ca",
+        "da",
+        "fi",
+        "sk",
+        "no",
+        "lt",
+        "bs",
+        "sl",
+        "mk",
+        "lv",
+        "et",
+        "ga",
+        "cnr",
+        "lb",
+        "mt",
+        "is",
+        "rm",
+        "la"
+      ]
+    },
+    {
+      "name_uk": "Північна Америка, Центральна Америка та Кариби",
+      "priority": 2,
+      "languages_in_user_order": [
+        "en",
+        "es",
+        "fr",
+        "ht"
+      ]
+    },
+    {
+      "name_uk": "Південна Америка",
+      "priority": 3,
+      "languages_in_user_order": [
+        "es",
+        "pt",
+        "qu",
+        "gn",
+        "en",
+        "ay",
+        "nl",
+        "ito"
+      ]
+    },
+    {
+      "name_uk": "Азія",
+      "priority": 4,
+      "languages_in_user_order": [
+        "cmn",
+        "hi",
+        "en",
+        "ar",
+        "bn",
+        "ur",
+        "id",
+        "ja",
+        "pa",
+        "mr",
+        "te",
+        "tr",
+        "ta",
+        "vi",
+        "ko",
+        "fa",
+        "th",
+        "gu",
+        "kn",
+        "ms",
+        "my",
+        "ml",
+        "fil",
+        "or",
+        "ps",
+        "uz",
+        "sd",
+        "ne",
+        "ku",
+        "si",
+        "as",
+        "az",
+        "kk",
+        "km",
+        "tg",
+        "he",
+        "lo",
+        "mai",
+        "sat",
+        "ks",
+        "hy",
+        "tk",
+        "ky",
+        "ka",
+        "mn",
+        "kok",
+        "doi",
+        "mni",
+        "brx",
+        "dv",
+        "dz",
+        "tet",
+        "pt",
+        "ru"
+      ]
+    },
+    {
+      "name_uk": "Африка",
+      "priority": 5,
+      "languages_in_user_order": [
+        "en",
+        "ar",
+        "fr",
+        "sw",
+        "ha",
+        "am",
+        "om",
+        "yo",
+        "ff",
+        "ig",
+        "pt",
+        "mg",
+        "so",
+        "ln",
+        "zu",
+        "sn",
+        "rw",
+        "rn",
+        "ny",
+        "xh",
+        "ak",
+        "bm",
+        "dyu",
+        "mos",
+        "wo",
+        "af",
+        "ti",
+        "tamazight",
+        "st",
+        "tn",
+        "nso",
+        "ts",
+        "ss",
+        "ve",
+        "nd",
+        "nr",
+        "aa",
+        "sg",
+        "comorian"
+      ]
+    },
+    {
+      "name_uk": "Австралія та Океанія",
+      "priority": 6,
+      "languages_in_user_order": [
+        "en",
+        "tpi",
+        "fr",
+        "sm",
+        "fj",
+        "to",
+        "mi",
+        "gil",
+        "ho"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "id": "en",
+      "name_uk": "Англійська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка",
+        "Азія",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Велика Британія",
+          "Ірландія",
+          "Мальта"
+        ],
+        "Північна Америка, Центральна Америка та Кариби": [
+          "США",
+          "Канада",
+          "Беліз",
+          "Багами",
+          "Ямайка",
+          "Барбадос",
+          "Антигуа і Барбуда",
+          "Домініка",
+          "Гренада",
+          "Сент-Кіттс і Невіс",
+          "Сент-Люсія",
+          "Сент-Вінсент і Гренадини",
+          "Тринідад і Тобаго"
+        ],
+        "Південна Америка": [
+          "Гаяна"
+        ],
+        "Азія": [
+          "Індія",
+          "Пакистан",
+          "Філіппіни",
+          "Сінгапур"
+        ],
+        "Африка": [
+          "Нігерія",
+          "Гана",
+          "Кенія",
+          "Уганда",
+          "Танзанія",
+          "ПАР",
+          "Замбія",
+          "Зімбабве",
+          "Малаві",
+          "Ботсвана",
+          "Намібія",
+          "Лесото",
+          "Есватіні",
+          "Гамбія",
+          "Ліберія",
+          "Сьєрра-Леоне",
+          "Камерун",
+          "Руанда",
+          "Бурунді",
+          "Південний Судан",
+          "Судан",
+          "Маврикій",
+          "Сейшели"
+        ],
+        "Австралія та Океанія": [
+          "Австралія",
+          "Нова Зеландія",
+          "Папуа Нова Гвінея",
+          "Фіджі",
+          "Соломонові Острови",
+          "Вануату",
+          "Самоа",
+          "Тонга",
+          "Кірибаті",
+          "Тувалу",
+          "Науру",
+          "Маршаллові Острови",
+          "Федеративні Штати Мікронезії",
+          "Палау"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ru",
+      "name_uk": "Російська",
+      "regions": [
+        "Європа",
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Росія",
+          "Білорусь"
+        ],
+        "Азія": [
+          "Росія",
+          "Казахстан",
+          "Киргизстан"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "de",
+      "name_uk": "Німецька",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Німеччина",
+          "Австрія",
+          "Швейцарія",
+          "Ліхтенштейн",
+          "Люксембург",
+          "Бельгія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "fr",
+      "name_uk": "Французька",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Африка",
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Франція",
+          "Бельгія",
+          "Швейцарія",
+          "Люксембург",
+          "Монако"
+        ],
+        "Північна Америка, Центральна Америка та Кариби": [
+          "Канада",
+          "Гаїті"
+        ],
+        "Африка": [
+          "ДР Конго",
+          "Республіка Конго",
+          "Камерун",
+          "Кот-д’Івуар",
+          "Бенін",
+          "Того",
+          "Габон",
+          "Гвінея",
+          "Сенегал",
+          "Чад",
+          "ЦАР",
+          "Джибуті",
+          "Комори",
+          "Мадагаскар",
+          "Руанда",
+          "Бурунді",
+          "Сейшели",
+          "Екваторіальна Гвінея"
+        ],
+        "Австралія та Океанія": [
+          "Вануату",
+          "французькі території Океанії"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "it",
+      "name_uk": "Італійська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Італія",
+          "Сан-Марино",
+          "Швейцарія",
+          "Ватикан"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "es",
+      "name_uk": "Іспанська",
+      "regions": [
+        "Європа",
+        "Північна Америка, Центральна Америка та Кариби",
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Іспанія"
+        ],
+        "Північна Америка, Центральна Америка та Кариби": [
+          "Мексика",
+          "Гватемала",
+          "Гондурас",
+          "Сальвадор",
+          "Нікарагуа",
+          "Коста-Рика",
+          "Панама",
+          "Куба",
+          "Домініканська Республіка"
+        ],
+        "Південна Америка": [
+          "Аргентина",
+          "Болівія",
+          "Чилі",
+          "Колумбія",
+          "Еквадор",
+          "Парагвай",
+          "Перу",
+          "Уругвай",
+          "Венесуела"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "pl",
+      "name_uk": "Польська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Польща"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "uk",
+      "name_uk": "Українська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Україна"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ro",
+      "name_uk": "Румунська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Румунія",
+          "Молдова"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "nl",
+      "name_uk": "Нідерландська",
+      "regions": [
+        "Європа",
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Нідерланди",
+          "Бельгія"
+        ],
+        "Південна Америка": [
+          "Суринам"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "pt",
+      "name_uk": "Португальська",
+      "regions": [
+        "Європа",
+        "Південна Америка",
+        "Азія",
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Португалія"
+        ],
+        "Південна Америка": [
+          "Бразилія"
+        ],
+        "Азія": [
+          "Східний Тимор"
+        ],
+        "Африка": [
+          "Ангола",
+          "Мозамбік",
+          "Гвінея-Бісау",
+          "Кабо-Верде",
+          "Сан-Томе і Принсіпі",
+          "Екваторіальна Гвінея"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "el",
+      "name_uk": "Грецька",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Греція",
+          "Кіпр"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "cs",
+      "name_uk": "Чеська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Чехія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "hu",
+      "name_uk": "Угорська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Угорщина"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sv",
+      "name_uk": "Шведська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Швеція",
+          "Фінляндія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sr",
+      "name_uk": "Сербська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Сербія",
+          "Боснія і Герцеговина",
+          "Косово",
+          "Чорногорія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "bg",
+      "name_uk": "Болгарська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Болгарія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sq",
+      "name_uk": "Албанська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Албанія",
+          "Косово",
+          "Північна Македонія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "hr",
+      "name_uk": "Хорватська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Хорватія",
+          "Боснія і Герцеговина"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ca",
+      "name_uk": "Каталонська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Андорра",
+          "Іспанія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "da",
+      "name_uk": "Данська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Данія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "fi",
+      "name_uk": "Фінська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Фінляндія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sk",
+      "name_uk": "Словацька",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Словаччина"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "no",
+      "name_uk": "Норвезька",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Норвегія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "lt",
+      "name_uk": "Литовська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Литва"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "bs",
+      "name_uk": "Боснійська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Боснія і Герцеговина"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sl",
+      "name_uk": "Словенська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Словенія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mk",
+      "name_uk": "Македонська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Північна Македонія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "lv",
+      "name_uk": "Латиська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Латвія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "et",
+      "name_uk": "Естонська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Естонія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ga",
+      "name_uk": "Ірландська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Ірландія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "cnr",
+      "name_uk": "Чорногорська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Чорногорія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "lb",
+      "name_uk": "Люксембурзька",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Люксембург"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mt",
+      "name_uk": "Мальтійська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Мальта"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "is",
+      "name_uk": "Ісландська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Ісландія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "rm",
+      "name_uk": "Ретороманська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Швейцарія"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "la",
+      "name_uk": "Латинська",
+      "regions": [
+        "Європа"
+      ],
+      "countries_by_region": {
+        "Європа": [
+          "Святий Престол"
+        ]
+      },
+      "first_priority_region": "Європа",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ht",
+      "name_uk": "Гаїтянська креольська",
+      "regions": [
+        "Північна Америка, Центральна Америка та Кариби"
+      ],
+      "countries_by_region": {
+        "Північна Америка, Центральна Америка та Кариби": [
+          "Гаїті"
+        ]
+      },
+      "first_priority_region": "Північна Америка, Центральна Америка та Кариби",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "qu",
+      "name_uk": "Кечуа",
+      "regions": [
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Південна Америка": [
+          "Перу",
+          "Болівія",
+          "Еквадор"
+        ]
+      },
+      "first_priority_region": "Південна Америка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "gn",
+      "name_uk": "Гуарані",
+      "regions": [
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Південна Америка": [
+          "Парагвай",
+          "Болівія"
+        ]
+      },
+      "first_priority_region": "Південна Америка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ay",
+      "name_uk": "Аймара",
+      "regions": [
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Південна Америка": [
+          "Болівія",
+          "Перу"
+        ]
+      },
+      "first_priority_region": "Південна Америка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ito",
+      "name_uk": "Ітонама",
+      "regions": [
+        "Південна Америка"
+      ],
+      "countries_by_region": {
+        "Південна Америка": [
+          "Болівія"
+        ]
+      },
+      "first_priority_region": "Південна Америка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "cmn",
+      "name_uk": "Китайська — стандартна мандаринська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Китай",
+          "Тайвань",
+          "Сінгапур"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "hi",
+      "name_uk": "Гінді",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ar",
+      "name_uk": "Арабська",
+      "regions": [
+        "Азія",
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Саудівська Аравія",
+          "Ємен",
+          "Ірак",
+          "Сирія",
+          "Йорданія",
+          "Ліван",
+          "Палестина",
+          "Оман",
+          "ОАЕ",
+          "Катар",
+          "Кувейт",
+          "Бахрейн"
+        ],
+        "Африка": [
+          "Єгипет",
+          "Алжир",
+          "Марокко",
+          "Туніс",
+          "Лівія",
+          "Судан",
+          "Мавританія",
+          "Чад",
+          "Джибуті",
+          "Сомалі",
+          "Комори"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "bn",
+      "name_uk": "Бенгальська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Бангладеш",
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ur",
+      "name_uk": "Урду",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Пакистан",
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "id",
+      "name_uk": "Індонезійська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індонезія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ja",
+      "name_uk": "Японська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Японія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "pa",
+      "name_uk": "Панджабі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія",
+          "Пакистан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mr",
+      "name_uk": "Маратхі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "te",
+      "name_uk": "Телугу",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tr",
+      "name_uk": "Турецька",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Туреччина",
+          "Кіпр"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ta",
+      "name_uk": "Тамільська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія",
+          "Шрі-Ланка",
+          "Сінгапур"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "vi",
+      "name_uk": "В’єтнамська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "В’єтнам"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ko",
+      "name_uk": "Корейська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Південна Корея",
+          "Північна Корея"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "fa",
+      "name_uk": "Перська, включно з дарі без окремого підрахунку",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Іран",
+          "Афганістан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "th",
+      "name_uk": "Тайська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Таїланд"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "gu",
+      "name_uk": "Гуджараті",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "kn",
+      "name_uk": "Каннада",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ms",
+      "name_uk": "Малайська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Малайзія",
+          "Бруней",
+          "Сінгапур"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "my",
+      "name_uk": "Бірманська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "М’янма"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ml",
+      "name_uk": "Малаялам",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "fil",
+      "name_uk": "Філіппінська — стандарт на тагальській основі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Філіппіни"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "or",
+      "name_uk": "Одія",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ps",
+      "name_uk": "Пушту",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Афганістан",
+          "Пакистан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "uz",
+      "name_uk": "Узбецька",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Узбекистан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sd",
+      "name_uk": "Синдхі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Пакистан",
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ne",
+      "name_uk": "Непальська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Непал",
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ku",
+      "name_uk": "Курдська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Ірак",
+          "Туреччина",
+          "Іран",
+          "Сирія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "si",
+      "name_uk": "Сингальська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Шрі-Ланка"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "as",
+      "name_uk": "Асамська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "az",
+      "name_uk": "Азербайджанська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Азербайджан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "kk",
+      "name_uk": "Казахська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Казахстан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "km",
+      "name_uk": "Кхмерська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Камбоджа"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tg",
+      "name_uk": "Таджицька",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Таджикистан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "he",
+      "name_uk": "Іврит",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Ізраїль"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "lo",
+      "name_uk": "Лаоська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Лаос"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mai",
+      "name_uk": "Майтілі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія",
+          "Непал"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sat",
+      "name_uk": "Санталі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ks",
+      "name_uk": "Кашмірська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія",
+          "Пакистан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "hy",
+      "name_uk": "Вірменська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Вірменія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tk",
+      "name_uk": "Туркменська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Туркменістан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ky",
+      "name_uk": "Киргизька",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Киргизстан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ka",
+      "name_uk": "Грузинська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Грузія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mn",
+      "name_uk": "Монгольська",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Монголія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "kok",
+      "name_uk": "Конкані",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "doi",
+      "name_uk": "Догрі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mni",
+      "name_uk": "Маніпурі, або мейтей",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "brx",
+      "name_uk": "Бодо",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Індія"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "dv",
+      "name_uk": "Дівехі",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Мальдіви"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "dz",
+      "name_uk": "Дзонг-кха",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Бутан"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tet",
+      "name_uk": "Тетум",
+      "regions": [
+        "Азія"
+      ],
+      "countries_by_region": {
+        "Азія": [
+          "Східний Тимор"
+        ]
+      },
+      "first_priority_region": "Азія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sw",
+      "name_uk": "Суахілі",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Танзанія",
+          "Кенія",
+          "Уганда",
+          "Руанда",
+          "ДР Конго"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ha",
+      "name_uk": "Хауса",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Нігер",
+          "Нігерія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "am",
+      "name_uk": "Амхарська",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Ефіопія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "om",
+      "name_uk": "Оромо",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Ефіопія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "yo",
+      "name_uk": "Йоруба",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Нігерія",
+          "Бенін"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ff",
+      "name_uk": "Фула, або фульфульде",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Сенегал",
+          "Гвінея",
+          "Малі",
+          "Нігер",
+          "Нігерія",
+          "Камерун",
+          "Буркіна-Фасо"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ig",
+      "name_uk": "Ігбо",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Нігерія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mg",
+      "name_uk": "Малагасійська",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Мадагаскар"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "so",
+      "name_uk": "Сомалійська",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Сомалі",
+          "Ефіопія",
+          "Джибуті"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ln",
+      "name_uk": "Лінгала",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ДР Конго",
+          "Республіка Конго"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "zu",
+      "name_uk": "Зулу",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sn",
+      "name_uk": "Шона",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "rw",
+      "name_uk": "Кіньяруанда",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Руанда"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "rn",
+      "name_uk": "Кірунді",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Бурунді"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ny",
+      "name_uk": "Чичева, або чева",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Малаві",
+          "Замбія",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "xh",
+      "name_uk": "Коса",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ak",
+      "name_uk": "Акан",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Гана"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "bm",
+      "name_uk": "Бамбара",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Малі"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "dyu",
+      "name_uk": "Діула",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Буркіна-Фасо",
+          "Кот-д’Івуар"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mos",
+      "name_uk": "Мооре, або моссі",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Буркіна-Фасо"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "wo",
+      "name_uk": "Волоф",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Сенегал",
+          "Гамбія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "af",
+      "name_uk": "Африкаанс",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР",
+          "Намібія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ti",
+      "name_uk": "Тигринья",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Еритрея",
+          "Ефіопія"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tamazight",
+      "name_uk": "Тамазигхт",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Марокко",
+          "Алжир"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "st",
+      "name_uk": "Сесото",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Лесото",
+          "ПАР",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tn",
+      "name_uk": "Тсвана",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Ботсвана",
+          "ПАР",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "nso",
+      "name_uk": "Північна сото, або сепеді",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ts",
+      "name_uk": "Тсонга",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР",
+          "Мозамбік",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ss",
+      "name_uk": "Сісваті",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Есватіні",
+          "ПАР"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ve",
+      "name_uk": "Венда",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР",
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "nd",
+      "name_uk": "Північна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Зімбабве"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "nr",
+      "name_uk": "Південна ндебеле",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "ПАР"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "aa",
+      "name_uk": "Афарська",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Ефіопія",
+          "Джибуті",
+          "Еритрея"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sg",
+      "name_uk": "Санго",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Центральноафриканська Республіка"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "comorian",
+      "name_uk": "Коморська",
+      "regions": [
+        "Африка"
+      ],
+      "countries_by_region": {
+        "Африка": [
+          "Комори"
+        ]
+      },
+      "first_priority_region": "Африка",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "tpi",
+      "name_uk": "Ток-пісін",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Папуа Нова Гвінея"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "sm",
+      "name_uk": "Самоанська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Самоа"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "fj",
+      "name_uk": "Фіджійська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Фіджі"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "to",
+      "name_uk": "Тонганська",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Тонга"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "mi",
+      "name_uk": "Маорі",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Нова Зеландія"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "gil",
+      "name_uk": "Гілбертська, або кірибаті",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Кірибаті"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    },
+    {
+      "id": "ho",
+      "name_uk": "Хірі-моту",
+      "regions": [
+        "Австралія та Океанія"
+      ],
+      "countries_by_region": {
+        "Австралія та Океанія": [
+          "Папуа Нова Гвінея"
+        ]
+      },
+      "first_priority_region": "Австралія та Океанія",
+      "implementation_status": "not_assessed_for_selected_scope"
+    }
+  ],
+  "unique_catalogue_entries": 135,
+  "notes_uk": [
+    "Повторення тієї самої мови на континентах не збільшує кількість мов.",
+    "Країни збережено за вибором користувача; це не окремий аудит юридичного статусу кожної мови.",
+    "Північна та південна ндебеле — два записи: користувач явно зазначив їхню окремість.",
+    "Позначення Коморська і Тамазигхт збережено; точні мовні стандарти потребують перевірки при підборі ресурсів. swb не є загальним кодом усіх коморських мов.",
+    "Норвезька обліковується як один пункт; письмові стандарти не додаються до кількості мов.",
+    "Дарі включено до перської, як зазначив користувач.",
+    "Національні варіанти вимови не є новими мовами каталогу; їхній обов’язковий набір поки не затверджений.",
+    "Ітонама і латинська збережені як явно вибрані користувачем; готові звукові ресурси не припускаються."
+  ]
+}
