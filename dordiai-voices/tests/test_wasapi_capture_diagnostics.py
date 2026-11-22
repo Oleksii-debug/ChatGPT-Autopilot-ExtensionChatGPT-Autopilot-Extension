@@ -48,7 +48,7 @@ class Contracts(unittest.TestCase):
         # Deterministic simulation of an8.3alias path resolving to the long
         # owned root. This is a namespace-unit contract, not a launch proof.
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp)/"Long Owned Root";root.mkdir()
+            root=Path(tmp).resolve()/"Long Owned Root";root.mkdir()
             alias=Path(tmp)/"SHORT~1"/"diag-123"/"wasapi.json"
             canonical=root/"diag-123"/"wasapi.json"
             args=SimpleNamespace(owned_instance_id="ROOT\\DORDIAI_VBCABLE_"+32*"A"+"\\0000",

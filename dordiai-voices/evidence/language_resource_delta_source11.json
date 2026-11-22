@@ -1,0 +1,41 @@
+{
+  "format": "dordiai-language-resource-coverage-delta-v1",
+  "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
+  "core_version": "0.13.1-dev.11",
+  "actual_worker_run_id": 45029834209,
+  "core_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+  "scope": "Delta against prior125-entry implemented-resource inventory. This job actually installed5optional native languages onto core11; it did not install or revalidate every older optional package.",
+  "prior_implemented_selected_groups": 125,
+  "new_resource_groups": [
+    "ss",
+    "ve"
+  ],
+  "replaced_existing_group_backends": [
+    "zu",
+    "wo",
+    "nso"
+  ],
+  "implemented_selected_groups_after_delta": 127,
+  "selected_target_groups": 135,
+  "remaining_missing_native_resource_groups": [
+    "cnr",
+    "ito",
+    "tet",
+    "nr",
+    "aa",
+    "comorian",
+    "to",
+    "ho"
+  ],
+  "tamazight_group_variant_caution": "Existing Kabyle carrier remains an explicit partial variant; no Standard Moroccan Tamazight native-reference proof or registration is added by this delta.",
+  "new_resources_installed_via_actual_package_manager": true,
+  "all5_resolved_preferred_afri_six_onnx": true,
+  "selected_voice_profile_cases": 225,
+  "voice_profiles": 45,
+  "native_pronunciation_verified": false,
+  "character_names_verified": false,
+  "typing_verified": false,
+  "nvda_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false
+}

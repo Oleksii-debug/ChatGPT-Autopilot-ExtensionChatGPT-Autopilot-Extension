@@ -1,0 +1,272 @@
+{
+  "format": "dordiai-genuine-native-rule-frontends-assessment-v1",
+  "checked_at": "2026-11-22",
+  "product_runtime_modified": false,
+  "language_inventory_increment": 0,
+  "scope": [
+    "to",
+    "ho",
+    "tet",
+    "aa"
+  ],
+  "spec": {
+    "path": "dordiai-voices/FINAL_PRODUCT_SPEC_UK.md",
+    "git_blob": "6bbc302b36afe42d70aa59d292e34b7501fbda2e",
+    "engine_agnostic": true,
+    "native_trained_neural_weights_mandatory": false,
+    "interpretation": "Own language-specific orthography/lexicon/prosody on an explicitly disclosed shared phoneme/formant engine is permitted in principle. Actual native phonetic fidelity, same-profile conversion, symbols and Windows/NVDA acceptance remain mandatory. A related-language voice alias cannot count as support."
+  },
+  "implementation_boundary": {
+    "backend_proposal": "native-rules-formant",
+    "runtime_registered": false,
+    "pipeline": [
+      "NFC native orthography validation and explicit language standard",
+      "Native lexical exceptions plus syllable/mora-aware G2P/prosody with structured unresolved cases",
+      "Own versioned phoneme map/voice configuration, using shared eSpeakNG acoustic primitives without foreign text/dictionary fallback",
+      "Actual generated calibration audio through the unchanged FP32 source encoder",
+      "Existing OpenVoice selected-profile conversion and normal cancellation/chunk queue",
+      "Prepared letter/command banks only from reviewed native names, with actual language/profile resource identity"
+    ],
+    "reject": [
+      "Unsupported characters, malformed diacritics, unknown orthographic systems",
+      "Unresolved lexical stress/hiatus/loanword cases advertised as certain",
+      "Foreign spellings sent through a neighboring-language spelling engine",
+      "Unvalidated numeric/cardinal/abbreviation grammar",
+      "Phonetic example words misrepresented as ordinary alphabet names",
+      "Missing phone inventory replaced by approximate neighboring phone",
+      "Random source vectors or reusing another carrier's source identity"
+    ],
+    "resource_layout": [
+      "NativeRuleLanguages/<code>/frontend.json",
+      "NativeRuleLanguages/<code>/exceptions.json",
+      "NativeRuleLanguages/<code>/phone-map.json",
+      "NativeRuleLanguages/<code>/own-voice-config",
+      "NativeRuleLanguages/<code>/source.npy",
+      "NativeRuleLanguages/<code>/source-calibration.json",
+      "NativeRuleLanguages/<code>/NOTICE.txt"
+    ],
+    "lifecycle": "Bind rule version, voice config, phoneme-table hash, calibration source, imported target profile and active package/resource epoch; fail closed on mutation. Shared formant data once, no per-profile model duplication.",
+    "acceptance": [
+      "Verified native phoneme, stress, length and syllable golden cases plus explicit unsupported cases",
+      "Actual bundled Windows formant engine, calibration and selected-profile conversion; no loss of native contrasts",
+      "Independent source/reference/native-listener pronunciation validation",
+      "Literal native letter/digit/punctuation names, keyboard/navigation/cancel and package replacement regressions",
+      "Measured first/cold/warm PCM, RAM/disk and real NVDA output; numerical waveform generation alone is not pronunciation approval"
+    ]
+  },
+  "languages": [
+    {
+      "code": "to",
+      "iso3": "ton",
+      "priority": "first-concrete-repair",
+      "native_rules_feasible": true,
+      "ready": false,
+      "target_standard": "Standard written Lea Faka-Tonga, with source-declared lexical/prosodic ambiguity.",
+      "existing_work": {
+        "frontend_blob": "084ba9a1ff19e85be541fb1377ad905d5aee7172",
+        "probe_blob": "16d85334ab918e870f3ece8feb697e5ad9606d65",
+        "actual_cases": 27,
+        "actual_same_carrier_calibration": true,
+        "selected_profile_projection_exercised": true,
+        "carrier": "Explicit phonemes on Spanish acoustic table; not native Tongan-trained weights",
+        "native_listener_verified": false,
+        "windows_nvda_verified": false
+      },
+      "concrete_defect": {
+        "description": "Current word() maps a macron vowel to two identical vowel segments, exactly as written double vowels. The mora/stress encoder then collapses long-vowel versus two-nucleus distinctions.",
+        "unexecuted_source_counterexample": [
+          "māma",
+          "maama"
+        ],
+        "counterexample_status": "Source-dataflow deduction, not an executed new audio test.",
+        "required_fix": "Represent one long-vowel phone carrying two moras separately from two syllabic vowel nuclei; map stress to syllable head and preserve the contrast acoustically."
+      },
+      "limits": [
+        "Unwritten diphthong versus hiatus can need lexical/native evidence, even in 2024 official guidance.",
+        "Definitive/enclitic stress and compounds require explicit lexical/prosodic rules, not invented universal article heuristics.",
+        "No claim that standard orthography alone determines every intended pronunciation."
+      ],
+      "sources": [
+        {
+          "url": "https://mpia.govt.nz/assets/Resources/Orthography-guidelines/lea-faka-tonga-orthography-guidelines.pdf",
+          "title": "Lea Faka-Tonga Orthography Guidelines",
+          "publisher": "NZ Ministry for Pacific Peoples",
+          "year": 2024,
+          "pdf_pages": 14,
+          "relevant_pages": [
+            7,
+            8,
+            9
+          ],
+          "raw_sha256": null,
+          "raw_pin_status": "Stable official URL, exact raw bytes still to acquire/hash; not falsely pinned.",
+          "source_rights": "Website default CC-BY-4.0 except third-party material/logos/images; attributed Churchward quotations excluded from blanket rights.",
+          "rights_url": "https://mpia.govt.nz/about-us/about-this-site/"
+        },
+        {
+          "url": "https://www.cambridge.org/core/journals/journal-of-the-international-phonetic-association/article/tongan/FEE50E3523F8844E0617DB290EA0516A",
+          "title": "Tongan",
+          "authors": "Marc Garellek and Marija Tabain",
+          "year": 2019,
+          "doi": "10.1017/S0025100318000397",
+          "source_rights": "Primary field phonetic reference; no blanket redistribution permission inferred."
+        },
+        {
+          "url": "https://www.tepapa.govt.nz/assets/76067/1692747224-final_final_version-tongan_resource_2016.pdf",
+          "title": "Tongan Language Week Education Resource",
+          "year": 2016,
+          "relevant_pdf_page": 6,
+          "role": "Explicit ordinary letter names already recorded in project research; separate from phonetic examples.",
+          "raw_sha256": null,
+          "source_rights": "Research reference; reusable raw-document rights not verified here."
+        }
+      ]
+    },
+    {
+      "code": "ho",
+      "iso3": "hmo",
+      "priority": "second-source-acquisition",
+      "native_rules_feasible": "plausible after confirming pedagogical variety and native G2P golden data",
+      "ready": false,
+      "target_standard": "A specifically documented Hiri Motu pedagogical pronunciation; do not relabel full Motu/meu or pretend all regional forms are identical.",
+      "sources": [
+        {
+          "url": "https://openresearch-repository.anu.edu.au/items/000a6b42-aa99-4c9f-b7bc-07835183db48",
+          "title": "Beginning Hiri Motu",
+          "authors": "T. E. Dutton and C. L. Voorhoeve",
+          "year": 1974,
+          "doi": "10.15144/PL-D24",
+          "pdf_url": "https://openresearch-repository.anu.edu.au/bitstreams/94168cbc-c9e2-4fd0-8541-c764c9385444/download",
+          "pdf_pages": 276,
+          "raw_sha256": null,
+          "rights": "PDF running footer expressly online edition CC-BY-SA-4.0; repository metadata inconsistently also says BY4, so conservatively retain SA4 pending acquisition review.",
+          "access": "Primary repository bytes returned403 in this session; indexed primary text and metadata available."
+        },
+        {
+          "url": "https://openresearch-repository.anu.edu.au/bitstreams/cab8a789-737f-438a-a16e-9b2940f81ff1/download",
+          "title": "Police Motu: Iena Sivarai (Its Story)",
+          "author": "Tom Dutton",
+          "role": "Primary field account distinguishes Hiri Motu pronunciation variation and vowel mergers.",
+          "rights": "No reusable raw-document licence verified here.",
+          "raw_sha256": null
+        },
+        {
+          "url": "https://openresearch-repository.anu.edu.au/items/ff25bae1-cade-4e34-989c-574090cbad98",
+          "title": "Beginning Hiri Motu: Unit1 recordings",
+          "role": "Potential research listening reference, not voice cloning or distributable training audio.",
+          "rights": "Explicit research-only, reproduction requires ANU permission; do not bundle or use as freely reusable voice data."
+        }
+      ],
+      "source_bounded_facts": [
+        "Primary instructional material treats written lao and lau as homophonous; simple Motu letter-for-letter spelling would be wrong.",
+        "Dutton explicitly documents variation; course variety and appropriate consonant realizations must be fixed from primary descriptions."
+      ],
+      "open_requirements": [
+        "Confirm exact course phonology, stress and orthographic scope from whole primary PDF.",
+        "Locate actual ordinary letter/digit/punctuation names; never synthesize guessed English names.",
+        "Source-pin factual exceptions and golden cases; reject foreign loans outside prepared rules."
+      ]
+    },
+    {
+      "code": "tet",
+      "iso3": "tet",
+      "priority": "third-recover-native-orthography-source",
+      "native_rules_feasible": "plausible, but lexical stress and Portuguese loans prevent a trivial character map",
+      "ready": false,
+      "target_standard": "Official Tetun, based on Tetun-Praça; not automatically Tetun-Terik/Fehan.",
+      "sources": [
+        {
+          "url": "https://www.mj.gov.tl/jornal/lawsTL/RDTL-Law/RDTL-Gov-Decrees/Gov-Decree-2004-01.pdf",
+          "title": "Government Decree1/2004: Standard Orthography of the Tetun Language",
+          "relevant_article": 2,
+          "role": "Primary official standard/variety selection; not a phoneme/letter-name table.",
+          "raw_sha256": null,
+          "rights": "No raw-document redistribution licence assumed."
+        },
+        {
+          "url": "https://www.tetundit.tl/Publications/CWvK%20Publications%202019.pdf",
+          "role": "Author's primary publications list identifies actual Tetun courses and vocabulary recordings.",
+          "access": "Publisher site502 in this session; not silently replaced by a third-party course mirror.",
+          "raw_sha256": null,
+          "rights": "No reusable data licence verified."
+        },
+        {
+          "url": "https://www.lafaek.tl/wp-content/uploads/2023/03/LBM-Ed_1_2017.pdf",
+          "title": "Lafaek Ba Manorin Sira1/2017",
+          "publisher": "CARE International Timor-Leste with Ministry of Education participation",
+          "role": "Actual Letra/Naran alphabet names, not A=example-word phonetic descriptions.",
+          "raw_sha256": null,
+          "rights": "Page2 explicitly prohibits copying magazine content without CARE permission; no bulk table/song/PDF import or redistribution."
+        }
+      ],
+      "open_requirements": [
+        "Recover authoritative native pronunciation/orthography manual; distinguish stress-marked pedagogical spelling from ordinary spelling.",
+        "Retain learned palatal/digraph/loanword contrasts rather than reading Portuguese text with a Portuguese voice.",
+        "Separate true alphabet names from letter example words; currently discovered source has explicit reuse restriction.",
+        "Native number styles and lexical exceptions remain to establish."
+      ]
+    },
+    {
+      "code": "aa",
+      "iso3": "aar",
+      "priority": "fourth-prosody-and-phone-inventory-audit",
+      "native_rules_feasible": "segmental rules feasible; complete native pronunciation not established by current map",
+      "ready": false,
+      "existing_work": {
+        "evidence_blob": "cc908ae5a93b7208c1b040ca30176d60c82e1d04",
+        "map_repository": "dmort27/epitran",
+        "map_revision": "2387d95820d6d9b8f459c35141e6239f4de5dbfb",
+        "map_path": "epitran/data/map/aar-Latn.csv",
+        "map_bytes": 166,
+        "map_sha256": "b7b6d723ad421d3e3eb85700fb90befeb2cbbecad424d5730bcd2d2f00d0b09e",
+        "map_licence": "MIT",
+        "known_bug": "Upstream b maps to d; distinct b must not be merged.",
+        "map_has_complete_prosody": false
+      },
+      "sources": [
+        {
+          "url": "https://www.cambridge.org/core/journals/bulletin-of-the-school-of-oriental-and-african-studies/article/abs/segmental-phonemes-of-afar/4A7D3BF2519F3DE4252A1600FB503D3A",
+          "title": "The Segmental Phonemes of Afar",
+          "author": "R. J. Hayward",
+          "year": 1974,
+          "doi": "10.1017/S0041977X00136304",
+          "role": "Primary phonetic field research; distinguishes segmental/grammatical issues, not just an orthographic substitution list.",
+          "rights": "No reusable full-text licence inferred."
+        },
+        {
+          "title": "A Generative Grammar of Afar",
+          "author": "Loren F. Bliese",
+          "year": 1981,
+          "publisher": "Summer Institute of Linguistics and University of Texas at Arlington",
+          "role": "Primary phonology/morphology source to acquire from publisher/authoritative institutional archive, not an unverified mirror.",
+          "raw_sha256": null,
+          "rights": "Exact publisher access/licence still to verify."
+        }
+      ],
+      "open_requirements": [
+        "Correct b→d against primary evidence, then validate all retroflex/pharyngeal phones against actual shared formant inventory; do not approximate missing phones.",
+        "Resolve lexical/grammatical stress, long vowels and gemination before broad regular-text support.",
+        "Acquire sourced letter names and numbers; existing segmental map alone does not provide them."
+      ]
+    }
+  ],
+  "second_priority": [
+    {
+      "code": "cnr",
+      "assessment": "Own standard Montenegrin phonology could use shared phonetic primitives, but ś/ź, native stress/pitch and standard selection must be real; Serbian renaming is not a solution. No new primary-source audit claimed here."
+    },
+    {
+      "code": "ito",
+      "assessment": "Requires primary native Itonama phonology and appropriate lexical/stress resources; not a defensible quick substitution. No new source acquisition claimed."
+    },
+    {
+      "code": "comorian",
+      "assessment": "Must select one genuine named variety and mark partial group coverage; Swahili phonology/voice alias cannot count as all Comorian varieties. No new source acquisition claimed."
+    },
+    {
+      "code": "nr",
+      "assessment": "Southern Ndebele requires its own pronunciation/tone/orthography resources; Northern Ndebele alias remains invalid. No new source acquisition claimed."
+    }
+  ],
+  "conclusion": "Pursue corrected Tongan own-phonemic route first, then licensed primary Hiri Motu resource acquisition. Keep Tetun/Afar as explicit native-rule candidates with identified data/prosody/rights gaps. This assessment adds no runtime language and closes no pronunciation/NVDA requirement."
+}
