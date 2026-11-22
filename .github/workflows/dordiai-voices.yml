@@ -137,7 +137,7 @@ jobs:
               print(text.encode("ascii", errors="backslashreplace").decode("ascii"), flush=True)
           for path in root.rglob("nvda-probe.json"):
               report = json.loads(path.read_text(encoding="utf-8"))
-              print("NVDA SUMMARY " + json.dumps({key: report.get(key) for key in ("status", "worker_bootstrap", "native_import_diagnostics", "initial_smoke_predevice_latency", "api_latency")}, ensure_ascii=True), flush=True)
+              print("NVDA SUMMARY " + json.dumps({key: report.get(key) for key in ("status", "worker_bootstrap", "native_import_diagnostics", "initial_smoke_predevice_latency", "api_latency", "injected_fatal_recovery", "pcm_metrics")}, ensure_ascii=True), flush=True)
       - name: Encode bounded original JSON evidence for durable checkpoint
         if: always()
         shell: python
