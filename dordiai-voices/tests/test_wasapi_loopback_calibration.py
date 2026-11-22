@@ -61,7 +61,7 @@ class FormatAndIdentity(unittest.TestCase):
 
 class FakeLoop(m.LoopbackCalibration):
     def __init__(self):
-        self.calls_report=[];self.call_counts={};self.calls=[]
+        self.calls_report=[];self.call_counts={};self.calls=[];self.reset_buffer_diagnostics()
         self.buffer=C.create_string_buffer(128);self.capture_data=C.create_string_buffer(b"abcdefgh"*8)
         self.capture_frames=4;self.capture_flags=0;self.capture_null=False
     def invoke(self,pointer,index,args,*values):
@@ -121,5 +121,75 @@ class BufferOwnership(unittest.TestCase):
         fake=FakeLoop();fake.capture_frames=0
         self.assertIsNone(fake.drain(C.c_void_p(200),4,4))
         self.assertFalse(any(row[:2]==(200,4) for row in fake.calls))
+
+class DiagnosticReadback(unittest.TestCase):
+    def test_native_marker_bytes_observed_before_release_across_chunks(self):
+        fake=FakeLoop();reference=struct.pack("<hhhhhhhh",100,-75,200,-150,300,-225,400,-300)
+        offset=fake.feed(C.c_void_p(100),2,reference,0,4)
+        offset=fake.feed(C.c_void_p(100),4,reference,offset,4)
+        self.assertEqual(offset,len(reference));self.assertEqual(fake.marker_readback,reference)
+        self.assertEqual([row["marker_byte_offset"] for row in fake.render_buffer_proofs],[0,8])
+        self.assertTrue(all(row["bytes_exact_before_release"] for row in fake.render_buffer_proofs))
+        facts=m.pcm_facts(bytes(fake.marker_readback),m.describe_format(format_bytes(tag=1,bits=16)))
+        self.assertEqual(facts["nonzero_samples"],8)
+        self.assertGreater(facts["channel_rms"][0],facts["channel_rms"][1])
+        self.assertEqual(facts["sha256"],m.sha256(reference).hexdigest())
+
+    def test_actual_pointer_readback_mismatch_releases_silent_not_unverified_bytes(self):
+        fake=FakeLoop()
+        with patch.object(m.C,"string_at",return_value=bytes(16)):
+            with self.assertRaisesRegex(RuntimeError,"readback differs"):
+                fake.feed(C.c_void_p(100),4,b"abcdefgh",0,4)
+        self.assertEqual(fake.marker_readback,b"")
+        self.assertEqual([row for row in fake.calls if row[:2]==(100,4)][0][2],(4,m.SILENT))
+
+    def test_padding_trace_is_bounded_but_full_range_and_count_retained(self):
+        fake=FakeLoop()
+        for value in range(300):fake.observe_padding(value,400)
+        self.assertEqual(len(fake.padding_trace),128)
+        self.assertEqual(fake.padding_observations,300)
+        self.assertEqual((fake.padding_min,fake.padding_max),(0,299))
+
+class VolumeFake(FakeLoop):
+    def __init__(self,fail_endpoint=False):
+        super().__init__();self.releases=[];self.fail_endpoint=fail_endpoint
+    def invoke(self,pointer,index,args,*values):
+        self.calls.append((pointer.value,index,values))
+        if (pointer.value,index)==(10,3):
+            self.endpoint_guid=m.C.string_at(values[0],16)
+            C.cast(values[-1],C.POINTER(C.c_void_p))[0]=C.c_void_p(300)
+        elif (pointer.value,index)==(20,14):
+            self.session_guid=m.C.string_at(values[0],16)
+            C.cast(values[-1],C.POINTER(C.c_void_p))[0]=C.c_void_p(400)
+        elif (pointer.value,index) in ((300,9),(400,4)):
+            if pointer.value==300 and self.fail_endpoint:return -2147467259
+            C.cast(values[0],C.POINTER(C.c_float))[0]=.625 if pointer.value==300 else .75
+        elif (pointer.value,index) in ((300,15),(400,6)):
+            C.cast(values[0],C.POINTER(C.c_int))[0]=1 if pointer.value==300 else 0
+        else:raise AssertionError("Unexpected COM method or a volume SETTER")
+        return 0
+    def release(self,pointer):
+        if pointer.value:self.releases.append(pointer.value)
+
+class ReadOnlyVolume(unittest.TestCase):
+    def test_queries_exact_interfaces_getter_slots_and_releases_both(self):
+        fake=VolumeFake();doc=fake.readonly_volume(C.c_void_p(10),C.c_void_p(20))
+        self.assertEqual(fake.endpoint_guid,uuid.UUID(m.IID_ENDPOINT_VOLUME).bytes_le)
+        self.assertEqual(fake.session_guid,uuid.UUID(m.IID_SIMPLE_VOLUME).bytes_le)
+        self.assertTrue(doc["read_only"]);self.assertFalse(doc["setters_called"])
+        self.assertEqual(doc["endpoint"]["master_volume_scalar"],.625)
+        self.assertTrue(doc["endpoint"]["muted"])
+        self.assertEqual(doc["render_session"]["master_volume_scalar"],.75)
+        self.assertFalse(doc["render_session"]["muted"])
+        self.assertEqual(fake.releases,[300,400])
+        self.assertEqual([(p,i) for p,i,v in fake.calls],[(10,3),(300,9),(300,15),(20,14),(400,4),(400,6)])
+
+    def test_failed_optional_query_records_hresult_then_releases_and_queries_session(self):
+        fake=VolumeFake(fail_endpoint=True)
+        doc=fake.readonly_volume(C.c_void_p(10),C.c_void_p(20))
+        self.assertEqual(doc["endpoint"]["status"],"query-failed")
+        self.assertEqual(doc["endpoint"]["get_master_volume_hresult"],"0x80004005")
+        self.assertEqual(doc["render_session"]["status"],"queried")
+        self.assertEqual(fake.releases,[300,400])
 
 if __name__=="__main__":unittest.main()

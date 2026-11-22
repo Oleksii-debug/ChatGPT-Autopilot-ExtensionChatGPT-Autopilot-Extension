@@ -27,6 +27,8 @@ SILENT=2
 IID_AUDIO="1cb9ad4c-dbfa-4c32-b178-c2f568a703b2"
 IID_CAPTURE="c8adbd64-e71e-48a0-a4de-185c395cd317"
 IID_RENDER="f294acfc-3146-4483-a7bf-addca7c260e2"
+IID_ENDPOINT_VOLUME="5cdf2c82-841e-4546-9722-0cf74078229a"
+IID_SIMPLE_VOLUME="87ce5498-68d6-44e5-9215-6da47ef883d8"
 BUFFER_EMPTY=0x08890001
 CAPTURE_SECONDS=3.
 MARKER_SECONDS=1.
@@ -95,13 +97,68 @@ def known_marker(format):
             result.append(sample if result.typecode=="f" else int(round(sample*32767)))
     return result.tobytes()
 
+def pcm_facts(raw,format):
+    values=array("f" if format["native_encoding"]=="float32le" else "h")
+    values.frombytes(raw)
+    channels=format["channels"];scale=1. if values.typecode=="f" else 32768.
+    if any(not math.isfinite(value) for value in values):raise ValueError("Nonfinite actual PCM readback")
+    return {"size_bytes":len(raw),"sha256":sha256(raw).hexdigest(),
+            "nonzero_samples":sum(value!=0 for value in values),
+            "channel_rms":[math.sqrt(sum((value/scale)**2 for value in values[channel::channels])/
+                                    max(1,len(values[channel::channels]))) for channel in range(channels)]}
+
 def publish_raw(path,raw):
     with path.open("xb") as output:output.write(raw)
     return {"filename":path.name,"size_bytes":len(raw),"sha256":sha256(raw).hexdigest()}
 
 class LoopbackCalibration(Wasapi):
     def __init__(self):
-        super().__init__();self.calls_report=[];self.call_counts={}
+        super().__init__();self.calls_report=[];self.call_counts={};self.reset_buffer_diagnostics()
+
+    def reset_buffer_diagnostics(self):
+        self.marker_readback=bytearray();self.render_buffer_proofs=[]
+        self.padding_trace=[];self.padding_observations=0;self.padding_min=None;self.padding_max=None
+
+    def readonly_volume(self,device,render_client):
+        result={"read_only":True,"setters_called":False}
+        for kind,guid_text,source,get_scalar,get_mute in (
+            ("endpoint",IID_ENDPOINT_VOLUME,device,9,15),
+            ("render_session",IID_SIMPLE_VOLUME,render_client,4,6)):
+            pointer=C.c_void_p();row={};result[kind]=row
+            try:
+                guid=GUID.parse(guid_text)
+                if kind=="endpoint":
+                    hr=self.invoke(source,3,[C.POINTER(GUID),DWORD,C.c_void_p,C.POINTER(C.c_void_p)],
+                                   C.byref(guid),1,None,C.byref(pointer))
+                else:
+                    hr=self.invoke(source,14,[C.POINTER(GUID),C.POINTER(C.c_void_p)],
+                                   C.byref(guid),C.byref(pointer))
+                row["interface_hresult"]=hex_hr(hr);self.require(hr,"Read-only "+kind+" volume interface")
+                if not pointer.value:raise RuntimeError("Missing read-only volume interface")
+                scalar=C.c_float();mute=C.c_int()
+                hr=self.invoke(pointer,get_scalar,[C.POINTER(C.c_float)],C.byref(scalar))
+                row["get_master_volume_hresult"]=hex_hr(hr)
+                self.require(hr,"Get "+kind+" volume scalar")
+                if not math.isfinite(scalar.value) or not 0.<=scalar.value<=1.:
+                    raise ValueError("Invalid read-only master volume")
+                row["master_volume_scalar"]=float(scalar.value)
+                hr=self.invoke(pointer,get_mute,[C.POINTER(C.c_int)],C.byref(mute))
+                row["get_mute_hresult"]=hex_hr(hr);self.require(hr,"Get "+kind+" mute")
+                row["muted"]=bool(mute.value)
+                row["status"]="queried"
+            except Exception as error:
+                row.update(status="query-failed",error=type(error).__name__+": "+str(error))
+            finally:
+                self.release(pointer)
+        return result
+
+    def observe_padding(self,padding,capacity):
+        self.padding_observations+=1
+        self.padding_min=padding if self.padding_min is None else min(self.padding_min,padding)
+        self.padding_max=padding if self.padding_max is None else max(self.padding_max,padding)
+        if len(self.padding_trace)<128:
+            self.padding_trace.append({"padding_frames":padding,"capacity_frames":capacity,
+                                       "observed_perf_counter_ns":time.perf_counter_ns()})
 
     def hr(self,pointer,index,args,operation,*values):
         value=self.invoke(pointer,index,args,*values)
@@ -146,7 +203,18 @@ class LoopbackCalibration(Wasapi):
             remaining=max(0,len(reference)-offset)
             amount=min(frames*align,remaining)
             raw=reference[offset:offset+amount]+bytes(frames*align-amount)
-            C.memmove(pointer,raw,len(raw));filled=True
+            C.memmove(pointer,raw,len(raw))
+            readback=C.string_at(pointer,len(raw))
+            if readback!=raw:raise RuntimeError("Actual native render buffer readback differs before ReleaseBuffer")
+            # Capture only our one-second marker, never unbounded padding or a
+            # third-party stream. Native pointer bytes are observed BEFORE release.
+            self.marker_readback.extend(readback[:amount])
+            if len(self.render_buffer_proofs)<128:
+                self.render_buffer_proofs.append({"frames":frames,"marker_bytes":amount,
+                    "marker_byte_offset":offset,"native_buffer_sha256":sha256(readback).hexdigest(),
+                    "expected_buffer_sha256":sha256(raw).hexdigest(),"bytes_exact_before_release":True,
+                    "nonzero_bytes":sum(value!=0 for value in readback)})
+            filled=True
             return offset+amount
         finally:
             # Even host exceptions release the acquired native buffer. SILENT
@@ -190,7 +258,7 @@ class LoopbackCalibration(Wasapi):
                 "format_changed":False,"service_restart_performed":False,"reboot_performed":False,
                 "scope":"Exact newly owned render endpoint shared-mode loopback; own marker only; no NVDA or physical recording",
                 "endpoints":[],"packets":[],"cleanup_errors":[]}
-        captured=bytearray();reference=b""
+        captured=bytearray();reference=b"";self.reset_buffer_diagnostics()
         hr=int(self.ole.CoInitializeEx(None,2));report["CoInitializeEx_STA"]=hex_hr(hr)
         if hr<0:return dict(report,status="failed",reason="CoInitializeEx failed "+hex_hr(hr)),reference,bytes(captured)
         initialized_com=True
@@ -223,6 +291,7 @@ class LoopbackCalibration(Wasapi):
             self.initialize(render_client,raw,0,"Initialize shared render same native format")
             self.service(loop_client,IID_CAPTURE,capture,"Get loopback IAudioCaptureClient")
             self.service(render_client,IID_RENDER,render,"Get IAudioRenderClient")
+            report["readonly_volume_before_start"]=self.readonly_volume(target,render_client)
             capacity=C.c_uint()
             self.hr(render_client,4,[C.POINTER(C.c_uint)],"Get native render buffer size",C.byref(capacity))
             rate=format["sample_rate"];align=format["block_align"]
@@ -246,9 +315,15 @@ class LoopbackCalibration(Wasapi):
                 padding=C.c_uint()
                 self.hr(render_client,6,[C.POINTER(C.c_uint)],"Get render padding",C.byref(padding))
                 if padding.value>capacity.value:raise ValueError("Invalid render padding")
+                self.observe_padding(int(padding.value),int(capacity.value))
                 available=capacity.value-padding.value
                 if available:offset=self.feed(render,available,reference,offset,align)
                 time.sleep(.002)
+            report["readonly_volume_after_capture"]=self.readonly_volume(target,render_client)
+            report["actual_render_marker_readback"]=pcm_facts(bytes(self.marker_readback),format)
+            report["actual_render_marker_readback"]["exact_reference_bytes"]=bytes(self.marker_readback)==reference
+            if bytes(self.marker_readback)!=reference:raise RuntimeError("Actual native render marker readback incomplete")
+            report["actual_captured_pcm_facts"]=pcm_facts(bytes(captured),format)
             report.update(status="technical-loopback-capture-complete",capture_wall_seconds=time.perf_counter()-started,
                           captured_frames=total,reference_frames_submitted=offset//align,
                           reference_all_submitted=offset==len(reference),native_capture_nonempty=bool(captured),
@@ -271,6 +346,9 @@ class LoopbackCalibration(Wasapi):
                 except Exception as error:report["cleanup_errors"].append("COM release "+repr(error))
             if initialized_com:self.ole.CoUninitialize()
             report["all_own_com_interfaces_released"]=not report["cleanup_errors"]
+            report["render_buffer_readback_proofs"]=self.render_buffer_proofs
+            report["render_padding_observations"]={"count":self.padding_observations,"minimum_frames":self.padding_min,
+                "maximum_frames":self.padding_max,"first128":self.padding_trace}
             report["native_call_hresult_log"]=self.calls_report
             report["native_call_counts"]=self.call_counts
             report["native_call_log_scope"]="First256 observed synchronous calls; per-operation counts retained; errors additionally preserved in reason"
