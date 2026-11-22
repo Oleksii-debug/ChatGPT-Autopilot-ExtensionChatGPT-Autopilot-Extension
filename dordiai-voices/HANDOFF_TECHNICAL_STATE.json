@@ -2,7 +2,7 @@
   "format": "dordiai-codex-handoff",
   "format_version": 1,
   "date": "2026-11-22",
-  "status": "paused_by_user_for_transfer",
+  "status": "active_resumed_Codex_Windows",
   "product_ready": false,
   "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
   "branch": "dordiai-voices/audit-20261122",
@@ -284,7 +284,7 @@
     "Drive": "Original link retained; no claim of upload of current work back to Drive."
   },
   "resume_20261122": {
-    "status": "active_on_actual_Windows_D",
+    "status": "active_source14_candidate_assembly",
     "current_state": "WORK_STATE.json",
     "original_transfer_preserved": true,
     "product_ready": false

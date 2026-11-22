@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 from threading import Lock
+from contextlib import nullcontext, contextmanager
 
 import numpy as np
 
@@ -18,6 +19,7 @@ from speech_text import english_text, number_parts, speak_numbers, split_mixed
 from voice_delivery import compact_padding, condition_shared
 from voice_assets import asset_path, native_settings, discover_voices, supports_language
 from voice_policy import require_voice_allowed
+from wide_warmup import foreground_priority
 
 
 class RussianPipe:
@@ -43,7 +45,7 @@ class RussianPipe:
         self.process.stdin.write(data)
         self.process.stdin.flush()
 
-    def start(self):
+    def start(self, *, foreground=False):
         if self.process is not None and self.process.poll() is None:
             return
         self.close()
@@ -59,8 +61,10 @@ class RussianPipe:
             creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
         )
         try:
-            if self._size() != 24000:
-                raise ValueError("Unexpected Russian synthesis sample rate.")
+            scope=(foreground_priority(process=int(self.process._handle)) if foreground else nullcontext())
+            with scope:
+                if self._size() != 24000:
+                    raise ValueError("Unexpected Russian synthesis sample rate.")
         except (OSError, RuntimeError, ValueError):
             self.close()
             raise
@@ -80,42 +84,48 @@ class RussianPipe:
                 process.stdout.close()
 
     def stream(self, profile, text, cancelled=lambda: False, *, seed=None):
-        self.start()
+        self.start(foreground=True)
         awaiting_ack = False
         completed = False
         try:
             request = {"profile": profile, "text": text}
             if seed is not None:
                 request["seed"] = seed
-            self._send((json.dumps(request, ensure_ascii=False) + "\n").encode("utf-8"))
+            command=(json.dumps(request, ensure_ascii=False) + "\n").encode("utf-8")
             while True:
-                size = self._size()
-                if size == 0:
-                    completed = True
-                    return
-                if size == 0xFFFFFFFF:
-                    length = self._size()
-                    if length > 16384:
-                        raise ValueError("Invalid Russian synthesis error packet.")
-                    message = self._read(length).decode("utf-8", errors="replace")
-                    completed = True
-                    raise RuntimeError(message)
-                if size > 24000 * 6 or size % 2:
-                    raise ValueError("Invalid Russian synthesis PCM packet.")
-                chunk = self._read(size)
+                # The child is deliberately created BELOW_NORMAL even when
+                # its parent is foreground. Use its held Popen handle only;
+                # never scan/reopen PIDs or affect another application.
+                with foreground_priority(process=int(self.process._handle)):
+                    self._send(command)
+                    awaiting_ack = False
+                    size = self._size()
+                    if size == 0:
+                        completed = True
+                        return
+                    if size == 0xFFFFFFFF:
+                        length = self._size()
+                        if length > 16384:
+                            raise ValueError("Invalid Russian synthesis error packet.")
+                        message = self._read(length).decode("utf-8", errors="replace")
+                        completed = True
+                        raise RuntimeError(message)
+                    if size > 24000 * 6 or size % 2:
+                        raise ValueError("Invalid Russian synthesis PCM packet.")
+                    chunk = self._read(size)
                 awaiting_ack = True
                 if cancelled():
                     raise SynthesisCancelled()
                 yield np.frombuffer(chunk, dtype="<i2").astype(np.float32) / 32768
                 if cancelled():
                     raise SynthesisCancelled()
-                self._send(b"next\n")
-                awaiting_ack = False
+                command = b"next\n"
         finally:
             if awaiting_ack:
                 try:
-                    self._send(b"stop\n")
-                    completed = self._size() == 0
+                    with foreground_priority(process=int(self.process._handle)):
+                        self._send(b"stop\n")
+                        completed = self._size() == 0
                 except (OSError, RuntimeError):
                     pass
             if not completed:
@@ -270,13 +280,44 @@ class NativeMultilingual:
             self._package_russian[directory] = RussianPipe(self.models / "ru", managed.parent)
         return self._package_russian[directory]
 
+    @contextmanager
+    def _russian_foreground(self, cancelled):
+        acquired = False
+        try:
+            while not acquired:
+                if cancelled():
+                    raise SynthesisCancelled()
+                acquired = self._russian_lock.acquire(timeout=.01)
+                if acquired:
+                    break
+                pipe = self.__dict__.get("russian")
+                held = getattr(pipe, "process", None)
+                if held is None or held.poll() is not None:
+                    continue
+                held_handle = held._handle
+                with foreground_priority(process=int(held_handle)):
+                    while not acquired:
+                        if cancelled():
+                            raise SynthesisCancelled()
+                        acquired = self._russian_lock.acquire(timeout=.01)
+                        if pipe.process is not held or held.poll() is not None:
+                            break
+            # The cold child's temporary boost is gone before normal stream
+            # work/yielding; RussianPipe applies its own per-packet scope.
+            if cancelled():
+                raise SynthesisCancelled()
+            yield
+        finally:
+            if acquired:
+                self._russian_lock.release()
+
     def stream(self, profile, language, text, speed=1.0, cancelled=lambda: False):
         require_voice_allowed(profile)
         key = "ru" if language.startswith("ru") else "en"
         settings = self.settings.get(profile, {}).get(key, {})
         if key == "ru":
             def russian_chunks():
-                with self._russian_lock:
+                with self._russian_foreground(cancelled):
                     if cancelled():
                         raise SynthesisCancelled()
                     marked = self.russian_text(text)

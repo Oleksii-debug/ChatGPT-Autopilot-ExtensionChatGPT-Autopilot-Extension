@@ -1,0 +1,90 @@
+{
+  "format": "dordiai-core13-latency-independent-review",
+  "format_version": 1,
+  "package_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "software_pcm_only": true,
+  "acceptance_pass_claimed": false,
+  "production_runtime_edited": false,
+  "live_nvda_edited": false,
+  "priority_controlled_comparison": {
+    "uk": {
+      "below_normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 1699.791400002141,
+        "completed_median_ms": 6698.432249999314,
+        "all_load_controlled": true
+      },
+      "normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 795.863699997426,
+        "completed_median_ms": 3162.0475000017905,
+        "all_load_controlled": true
+      },
+      "combined_pcm_unique_hashes": 1,
+      "combined_pcm_lengths_frames": [
+        65040
+      ]
+    },
+    "en": {
+      "below_normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 117.25835000106599,
+        "completed_median_ms": 1455.8174000048894,
+        "all_load_controlled": true
+      },
+      "normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 58.67150000267429,
+        "completed_median_ms": 651.8814500013832,
+        "all_load_controlled": true
+      },
+      "combined_pcm_unique_hashes": 1,
+      "combined_pcm_lengths_frames": [
+        42849
+      ]
+    },
+    "ru": {
+      "below_normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 1171.5519999997923,
+        "completed_median_ms": 7853.493549999257,
+        "all_load_controlled": true
+      },
+      "normal": {
+        "requests": 4,
+        "first_pcm_median_ms": 610.5698500032304,
+        "completed_median_ms": 3929.183899999771,
+        "all_load_controlled": true
+      },
+      "combined_pcm_unique_hashes": 8,
+      "combined_pcm_lengths_frames": [
+        46254
+      ]
+    }
+  },
+  "load_preload_synthesis_cancel": {
+    "load": "SpeechWorker constructor stores command only; Popen happens on first _send. Cold direct-worker render includes imports and lazy sessions.",
+    "preload": "NVDA _run asynchronously sends preload(runtimeOnly=True) with native profiles. ready is sent after native_loader.start, before warm_models finishes. _render_parts only waits for the IPC preload thread, not all native model preparation.",
+    "synthesis": "UK navigation_windows already emits first20/24 then40 frames with20 context. Encoder, full utterance prosody and full utterance source run before first decoder yield. Native EN/RU use different prepared-profile backends.",
+    "cancel": "NVDA generation/player.stop determines output cancellation. UK GuardedSession publishes interruptible ORT RunOptions; EN checks after native chunk; RussianPipe blocks in _read before cancellation can be checked. Pipe cancel/drop acknowledgment is not audible output stop."
+  },
+  "findings": [
+    {
+      "id": "core-below-normal-contention",
+      "status": "measured-reproducible-under-declared-synthetic-load",
+      "proposal": "Prototype foreground NORMAL scope around core synthesis next(), including only known owned Russian child handle; preserve BELOW_NORMAL preparation; restore previous priority before yielding, on cancellation, and on failure. Never use HIGH or REALTIME.",
+      "limitations": "One constrained owned logical CPU and60%duty synthetic load; four observations per cell, not P95/P99 or real NVDA/audio acceptance. UK/EN PCM bit-identical, RU already non-bit-deterministic with existing seed42 despite identical length; do not claim RU waveform equivalence."
+    },
+    {
+      "id": "uniform-smaller-holos-windows",
+      "status": "rejected-as-latency-fix",
+      "evidence": "All18 renders preserve full lengths62040/95640/351840 and final100ms. Repeated40 control is exact; window variants have tiny waveform deviations. Uniform10/20 incurs more decoder context work and substantially worse total synthesis; long phrase firstPCM remains encoder/prosody dominated. Boundary sample-step metrics are raw waveform diagnostics, not listening acceptance."
+    },
+    {
+      "id": "native-cancel-stage-blocking",
+      "status": "static-source-finding-not-fixed",
+      "proposal": "Separately instrument native EN ORT stages and Russian pipe response polling/owned abort; retain speaker/state and prevent stale playback, without claiming protocol ACK equals audible cancellation."
+    }
+  ],
+  "next_required": "Parent review before dev14 runtime patch; actual Windows NVDA/audio-output regressions, per-profile/multilingual quality and acceptance targets remain open."
+}

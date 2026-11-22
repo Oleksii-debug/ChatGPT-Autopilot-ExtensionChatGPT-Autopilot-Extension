@@ -1,0 +1,317 @@
+{
+  "format": "dordiai-isolated-core-latency-diagnosis",
+  "format_version": 1,
+  "created_utc": "2026-11-22T19:57:54.558793+00:00",
+  "package_root": "D:\\DordiaiTestTemp\\core13-audit-20261122",
+  "profile": "sara_archive",
+  "experiment": "owned-priority",
+  "probe_driver_sha256": "d4c8a34607e285c9f9ecb8c97d185c89a70606968de78ee52a4bac634ea8b180",
+  "probe_driver_copy": "D:\\DordiaiTestTemp\\latency-priority-controlled-20261122\\probe-driver.py",
+  "scope": "software PCM delivery only; no NVDA or audio-output acceptance",
+  "runtime_before": {
+    "dordiai-release.json": "839f781a417d30da0af4cfa15aefefd8d3dc26629dd00c04c6ff0277a479b035",
+    "kx47Runtime/nvda_worker.py": "8fb4303098489bc8ad255696895a05f3daf731e60c4dbb8b271c16fdc31d121a",
+    "kx47Runtime/ukrainian_voices.py": "ace27177938aef3e9a5b5fc958a412b64f4c8b1e9548c0cc9c25285a5a3d696b",
+    "kx47Runtime/ukrainian_stress.py": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "kx47Runtime/python/Lib/site-packages/holos_onnx/inference.py": "758d10ad78445586d983bb4d7c6a4dc6d751a924b2eb9e24f0eac722c9c48439"
+  },
+  "runtime_after": {
+    "dordiai-release.json": "839f781a417d30da0af4cfa15aefefd8d3dc26629dd00c04c6ff0277a479b035",
+    "kx47Runtime/nvda_worker.py": "8fb4303098489bc8ad255696895a05f3daf731e60c4dbb8b271c16fdc31d121a",
+    "kx47Runtime/ukrainian_voices.py": "ace27177938aef3e9a5b5fc958a412b64f4c8b1e9548c0cc9c25285a5a3d696b",
+    "kx47Runtime/ukrainian_stress.py": "fb67255807c1ad42ea551db212fe6d7e9feee9d97895ede0700eaaf0d8d4c933",
+    "kx47Runtime/python/Lib/site-packages/holos_onnx/inference.py": "758d10ad78445586d983bb4d7c6a4dc6d751a924b2eb9e24f0eac722c9c48439"
+  },
+  "code_unchanged": true,
+  "phrases": [
+    "Виберіть наступний доступний документ.",
+    "Синій перемикач розташований біля правого краю вікна.",
+    "Збережені налаштування залишаються доступними після повторного запуску програми, а вибрана основна мова визначає вимову повідомлень і коротких слів під час переміщення між елементами інтерфейсу за допомогою клавіатури."
+  ],
+  "exit_code": 0,
+  "run_error": null,
+  "owned_process_cleanup": {
+    "active_before_cleanup": 0,
+    "active_after_cleanup": 0,
+    "forced_tree_termination": false,
+    "all_owned_workers_reaped": true
+  },
+  "stderr": "",
+  "observations": {
+    "synthetic_cpu_load": true,
+    "logical_cpu_affinity_mask": 1,
+    "comparison_scope": "both owned UK/EN process and owned RU child; one synthetic same-core competitor",
+    "competitor_requested_duty_cycle": 0.6,
+    "competitor_maximum_seconds": 150,
+    "priority_restored": [
+      32,
+      16384
+    ],
+    "runs": [
+      {
+        "round": 0,
+        "language": "uk",
+        "priority": 16384,
+        "first_pcm_ms": 1686.2875999941025,
+        "completed_ms": 6888.186299998779,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 0,
+        "language": "uk",
+        "priority": 32,
+        "first_pcm_ms": 845.4657999973278,
+        "completed_ms": 3404.920300003141,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 0,
+        "language": "en",
+        "priority": 16384,
+        "first_pcm_ms": 124.77610001224093,
+        "completed_ms": 1204.178400003002,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 0,
+        "language": "en",
+        "priority": 32,
+        "first_pcm_ms": 47.98200000368524,
+        "completed_ms": 620.8737000124529,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 0,
+        "language": "ru",
+        "priority": 16384,
+        "first_pcm_ms": 1206.1799999937648,
+        "completed_ms": 7436.4952000032645,
+        "frames": 46254,
+        "pcm_sha256": "9f8a340996fb467b53ecb285c217a6c3d56baf1f0fe50eb3d4326bddc983a3a1",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 0,
+        "language": "ru",
+        "priority": 32,
+        "first_pcm_ms": 676.2042000045767,
+        "completed_ms": 3963.417400009348,
+        "frames": 46254,
+        "pcm_sha256": "15d3268e4ac62e023ab15f0d87af873aa5061d663fb6e35d8a9adac9ef5ece7c",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "uk",
+        "priority": 32,
+        "first_pcm_ms": 746.2615999975242,
+        "completed_ms": 2919.1747000004398,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "uk",
+        "priority": 16384,
+        "first_pcm_ms": 1713.2952000101795,
+        "completed_ms": 6508.678199999849,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "en",
+        "priority": 32,
+        "first_pcm_ms": 53.974700000253506,
+        "completed_ms": 637.697099999059,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "en",
+        "priority": 16384,
+        "first_pcm_ms": 103.83449999790173,
+        "completed_ms": 1300.153500007582,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "ru",
+        "priority": 32,
+        "first_pcm_ms": 583.6095999984536,
+        "completed_ms": 3894.9503999901935,
+        "frames": 46254,
+        "pcm_sha256": "5237e8a0a4f49b37fa17df9db2d66575840b757b1fb5a2a5dc8fd03a7cdb3943",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 1,
+        "language": "ru",
+        "priority": 16384,
+        "first_pcm_ms": 1136.9240000058198,
+        "completed_ms": 7870.1219000067795,
+        "frames": 46254,
+        "pcm_sha256": "9127e75f389749ba7212cba65fa610d7f9fa32d1d5605a27a9c773eef0fe647e",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "uk",
+        "priority": 16384,
+        "first_pcm_ms": 2013.3097000070848,
+        "completed_ms": 8433.55590000283,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "uk",
+        "priority": 32,
+        "first_pcm_ms": 965.0987999921199,
+        "completed_ms": 3688.043000001926,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "en",
+        "priority": 16384,
+        "first_pcm_ms": 128.97559998964425,
+        "completed_ms": 1634.123499999987,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "en",
+        "priority": 32,
+        "first_pcm_ms": 90.38979999604635,
+        "completed_ms": 666.0658000037074,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "ru",
+        "priority": 16384,
+        "first_pcm_ms": 1081.409699996584,
+        "completed_ms": 7836.865199991735,
+        "frames": 46254,
+        "pcm_sha256": "54ee9c4ce2c0612d00a37162f811960c60ac3654163f1e6972e5129934167428",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 2,
+        "language": "ru",
+        "priority": 32,
+        "first_pcm_ms": 611.8309000012232,
+        "completed_ms": 4220.7346000068355,
+        "frames": 46254,
+        "pcm_sha256": "0a7e7653dbaf82f2fa054cbdd1d8cfac51076403efe73680ec3ef5c553491314",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "uk",
+        "priority": 32,
+        "first_pcm_ms": 671.1052000027848,
+        "completed_ms": 2648.016200007987,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "uk",
+        "priority": 16384,
+        "first_pcm_ms": 1490.1229000097374,
+        "completed_ms": 5746.261599997524,
+        "frames": 65040,
+        "pcm_sha256": "90f99b759ba866dece5fb7162d02f997c3ea4efce0e77f95ddb66e6d506c46f6",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "en",
+        "priority": 32,
+        "first_pcm_ms": 63.36830000509508,
+        "completed_ms": 756.2961999938125,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "en",
+        "priority": 16384,
+        "first_pcm_ms": 109.74059998989105,
+        "completed_ms": 1611.4813000021968,
+        "frames": 42849,
+        "pcm_sha256": "7159874ebf7b9ab7a25bfa331e16bfcbe7bb7719166044f6fa21c24e52eb38b2",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "ru",
+        "priority": 32,
+        "first_pcm_ms": 609.3088000052376,
+        "completed_ms": 3753.9761000080034,
+        "frames": 46254,
+        "pcm_sha256": "5fa9cc4413aabccb0f226c5583bcc82d3eae94ed0938381928e3dcdee0743772",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      },
+      {
+        "round": 3,
+        "language": "ru",
+        "priority": 16384,
+        "first_pcm_ms": 1268.9903999998933,
+        "completed_ms": 8416.372599996976,
+        "frames": 46254,
+        "pcm_sha256": "379710112f8594d6f45a7b262ffae94e1897b54fd3f4d3abdf6434a61d66241a",
+        "synthetic_load_active_before": true,
+        "synthetic_load_active_after": true
+      }
+    ]
+  }
+}

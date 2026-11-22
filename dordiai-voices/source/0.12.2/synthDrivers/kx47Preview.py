@@ -1799,7 +1799,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                         short_reserve = bool(re.search("[А-Яа-яІіЇїЄєҐґЁё]", words) and
                                              re.search("[a-zA-Z]", words))
                 flow = buffered_items(produce, lambda: generation != self._generation,
-                                      short_reserve=short_reserve, cancelling_threads=cancelling_threads)
+                                      pending_count=64, short_reserve=short_reserve, cancelling_threads=cancelling_threads)
                 try:
                     with closing(flow):
                         for kind, value in flow:

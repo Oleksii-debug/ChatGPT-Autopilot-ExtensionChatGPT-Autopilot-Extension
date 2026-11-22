@@ -1,0 +1,190 @@
+{
+  "format": "dordiai-core14-priority-candidate-review",
+  "format_version": 1,
+  "source13_archive_unchanged": true,
+  "live_nvda_edited": false,
+  "actual_windows_worker_comparison": true,
+  "nvda_audio_output_acceptance": false,
+  "product_ready": false,
+  "patch_sha256": {
+    "wide_warmup.py": "a5c51ce277842c148ff956f934ca758e4519f58592a8b7cf9ddb10241426a478",
+    "nvda_worker.py": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b",
+    "native_multilingual.py": "5d02545ebd1e5102babd68e242c36a70d69a5d4b90a1ac2fdb58bdfa2882a2da"
+  },
+  "tests_passed": {
+    "runtime_priority": 12,
+    "actual_worker_probe_parser": 4,
+    "audio_pipeline": 30,
+    "latency_probe": 5
+  },
+  "comparison": {
+    "uk": {
+      "baseline": {
+        "first_pcm_median_ms": 1446.3899999973364,
+        "completed_median_ms": 5498.268549992645,
+        "requests": 4
+      },
+      "candidate": {
+        "first_pcm_median_ms": 719.2649999997229,
+        "completed_median_ms": 2771.6868499992415,
+        "requests": 4
+      },
+      "combined_pcm_hashes": 1
+    },
+    "en": {
+      "baseline": {
+        "first_pcm_median_ms": 102.17465000459924,
+        "completed_median_ms": 1043.3864500082564,
+        "requests": 4
+      },
+      "candidate": {
+        "first_pcm_median_ms": 51.68759999651229,
+        "completed_median_ms": 578.9351499988697,
+        "requests": 4
+      },
+      "combined_pcm_hashes": 1
+    },
+    "ru": {
+      "baseline": {
+        "first_pcm_median_ms": 985.5231999972602,
+        "completed_median_ms": 7003.04944999516,
+        "requests": 4
+      },
+      "candidate": {
+        "first_pcm_median_ms": 517.0894999973825,
+        "completed_median_ms": 3544.8804500119877,
+        "requests": 4
+      },
+      "combined_pcm_hashes": 8
+    }
+  },
+  "all24_requests_load_controlled": true,
+  "ab_priority_trace_restored": true,
+  "actual_error_cancel_drop_recovery": true,
+  "ab_cleanup_original": {
+    "active_before_cleanup": 1,
+    "active_after_cleanup": 0,
+    "forced_tree_termination": true,
+    "all_owned_workers_reaped": true
+  },
+  "cleanup_repeat": {
+    "natural_exit_grace_samples": [
+      {
+        "time": 112779.3838589,
+        "active": 1
+      },
+      {
+        "time": 112779.4043649,
+        "active": 0
+      }
+    ],
+    "job": {
+      "active_before_cleanup": 0,
+      "active_after_cleanup": 0,
+      "forced_tree_termination": false,
+      "all_owned_workers_reaped": true
+    },
+    "candidate_priority_trace": {
+      "calls": 82,
+      "handles": 2,
+      "final_priorities": [
+        16384,
+        16384
+      ],
+      "all_observed_restored_below_normal": true,
+      "errors": [],
+      "phases": [
+        {
+          "phase": "warm-uk",
+          "mode": "reference"
+        },
+        {
+          "phase": "warm-en",
+          "mode": "reference"
+        },
+        {
+          "phase": "warm-ru",
+          "mode": "reference"
+        },
+        {
+          "phase": "error",
+          "mode": "reference"
+        },
+        {
+          "phase": "cancel-ru",
+          "mode": "reference"
+        },
+        {
+          "phase": "cancel-signal",
+          "mode": "cancel"
+        },
+        {
+          "phase": "cancel-drop",
+          "mode": "drop"
+        }
+      ],
+      "native_child_closes": [
+        {
+          "pid": 22940,
+          "held_handle": 948,
+          "exit_code": 1,
+          "process_cleared": true,
+          "stdin_closed": true,
+          "stdout_closed": true
+        }
+      ],
+      "all_known_native_children_reaped": true
+    },
+    "baseline_native_closes": [
+      {
+        "pid": 14648,
+        "held_handle": 948,
+        "exit_code": 1,
+        "process_cleared": true,
+        "stdin_closed": true,
+        "stdout_closed": true
+      }
+    ]
+  },
+  "diagnosis": "The original immediate job cleanup observed one transient active process. The dedicated repeat observed1 then0 after20.5ms without force; both known Russian child handles were polled reaped and their stdio closed. Original forced-teardown evidence is preserved.",
+  "limitations": [
+    "Synthetic requested60%duty load on one owned logicalCPU;4 observations per cell do not establish P95/P99.",
+    "Software PCM only; no actual NVDA or audio-device onset/stop acceptance.",
+    "UK/EN complete PCM bit-identical across baseline/candidate. RU has existing nondeterminism with seed42, including slight length variation; do not claim RU waveform identity.",
+    "Cold imports/model readiness and native blocking cancellation remain distinct open concerns."
+  ],
+  "raw_bundle": {
+    "path": "local_core14_priority_candidate_20261122.json.gz",
+    "size_bytes": 59486,
+    "sha256": "d3bae1f765f03eba84ae83899cf0a9cc272143ba9d3144d3775cce57c1edcb68"
+  },
+  "frozen_code_and_test_sha256": {
+    "source/0.12.2/kx47Runtime/wide_warmup.py": "a5c51ce277842c148ff956f934ca758e4519f58592a8b7cf9ddb10241426a478",
+    "source/0.12.2/kx47Runtime/nvda_worker.py": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b",
+    "source/0.12.2/kx47Runtime/native_multilingual.py": "5d02545ebd1e5102babd68e242c36a70d69a5d4b90a1ac2fdb58bdfa2882a2da",
+    "tests/test_runtime_priority.py": "d64b776969b95541a5018b3780df0621968ce9a7e04b594df4a628e46e6a93a9",
+    "tests/test_audio_pipeline.py": "bc76bcd3c9ca9d8fbff894ba32e42da7f8d3f087db77c18e0b9e151c96fbfa24",
+    "tests/test_windows_core_worker_priority_probe.py": "2804fda03c73a84e27ac4e9a840167255e569ca42028853db81ec7b94c20033f",
+    "tests/test_windows_core_latency_probe.py": "29018c2444a194725426a2fc9b0125da9819d968747b337633e16b84841c6109",
+    "tools/windows_core_worker_priority_probe.py": "81321f61647de12d746907a4ff4ab04efa327304ea4290a8ef2532721bf1dc3d",
+    "tools/windows_core_latency_probe.py": "5651d06e808e6ca7fa22fcf3295c1e8bbb2bd63ca6b66aed46d15a015dd250ea"
+  },
+  "line_endings": "Keep tested runtime bytes exactly; native_multilingual.py CRLF is intentional for byte-identical assembly. CRLF is valid Python; use cr-at-eol for diff whitespace validation.",
+  "commit_files": [
+    "source/0.12.2/kx47Runtime/wide_warmup.py",
+    "source/0.12.2/kx47Runtime/nvda_worker.py",
+    "source/0.12.2/kx47Runtime/native_multilingual.py",
+    "tests/test_runtime_priority.py",
+    "tests/test_audio_pipeline.py",
+    "tests/test_windows_core_worker_priority_probe.py",
+    "tests/test_windows_core_latency_probe.py",
+    "tools/windows_core_worker_priority_probe.py",
+    "tools/windows_core_latency_probe.py",
+    "evidence/local_core_latency_diagnosis_20261122.json",
+    "evidence/local_core_priority_diagnosis_20261122.json",
+    "evidence/local_core_latency_probe_sources_20261122.json.gz",
+    "evidence/local_core_latency_review_20261122.json",
+    "evidence/local_core14_priority_candidate_20261122.json.gz",
+    "evidence/local_core14_priority_candidate_review_20261122.json"
+  ]
+}

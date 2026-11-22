@@ -1,10 +1,10 @@
 {
   "product": "dordiai-voices",
   "authorization": "User authorized start, subagents and automatic decisions without additional questions on 2026-11-22",
-  "status": "active_resumed_in_Codex_Windows",
+  "status": "active_source14_candidate_assembly",
   "product_ready": false,
   "base_version": "0.12.2",
-  "target_version": "0.13.1-dev.13",
+  "target_version": "0.13.1-dev.14",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -43,7 +43,10 @@
     "Same immutable13 passed9functional NVDA scenarios across original8pass and isolated100/102plain retry; exact first failure retained.",
     "Actual13 real-wx voice package pipeline10operations passed inclWinError32 retained ownership/retry and final cleanup.",
     "Arabic45x29raw1305 and130500warm lookups actually completed; original ZIP durably saved separately without runtime activation.",
-    "User-requested final transfer: original product contract, tester feedback, complete available user context, current/open proof indexes and two new-Codex prompts preserved."
+    "User-requested final transfer: original product contract, tester feedback, complete available user context, current/open proof indexes and two new-Codex prompts preserved.",
+    "Actual immutable13 keyboard settings save, real menu selection, same-profile restart and genuine saved-synth startup passed run45064826893; exact runtime bytes retained.",
+    "Actual isolated managed Holos uk profile reaches encoder/prosody/decoder and PCM; replacement/rollback/missing-file checks passed five cases.",
+    "Actual own-marker USB hardware render clock and process-specific tap recorded locally; no NVDA/system audio settings changed. Physical audible latency remains unverified."
   ],
   "open_requirements": [
     "8 selected entries have no integrated resources; Tamazight remains partial. Combined older optionals plus actual11 Afri six resources cover127 entries,126 complete; this is resource presence, not native pronunciation.",
@@ -52,9 +55,10 @@
     "Native-listener pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source.",
     "All135 language word identification and homograph abstention need broader quality evaluation; current installed classifier has45 trained labels.",
     "Exact final release reconstruction must retain newly generated bank bytes and matching source/package evidence.",
-    "Actual full keyboard settings save/restart and imported-profile PCM remain open; source-reviewed research candidates preserved without launching.",
-    "Arabic raw1305 prepared and durably backed up, not activated; derived delivery trimming and quiet-phoneme verification not yet implemented.",
-    "Strict longread source12 full-waveform gate remains failed with3added pauses totaling69.0417ms. Future prefetch prototype is not a completed runtime fix."
+    "Strict longread source12 full-waveform gate remains failed with3added pauses totaling69.0417ms. Future prefetch prototype is not a completed runtime fix.",
+    "Base-profile keyboard restart and Holos uk imported PCM now proven for13. Named-profile switching, chooser paths, all-engine imported profiles and same14 acceptance remain open.",
+    "Arabic1305 delivery comparison performed: all proposed crops remove nonzero original samples. Phoneme/listener safety unverified; bank remains inactive.",
+    "Source14 priority/cold-lock/outer64 candidate requires exact assembly and same14 actual Windows/NVDA validation. Cold model/accent loading and native pronunciation remain open."
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
@@ -98,8 +102,11 @@
       "nvda_scope": "RecordingSink functional proof across2ownedruns; no physical audio/latency/pronunciation claim",
       "package_gui_run": 45053476915,
       "package_gui_functional_operations": 10,
-      "full_keyboard_restart_verified": false,
-      "imported_profile_pcm_verified": false
+      "full_keyboard_restart_verified": true,
+      "imported_profile_pcm_verified": true,
+      "verification_updates_scope": "Actual immutable13 base-profile injected-key save/menu/restart run45064826893; isolated imported Holos uk ONNX/PCM five cases. Not named profile switching/file chooser/all-engine/physical/native pronunciation acceptance.",
+      "settings_restart_evidence": "evidence/source13_settings_keyboard_45064826893.exact.json",
+      "imported_profile_evidence": "evidence/local_imported_profile_pcm_20261122.json"
     },
     "main_build_suite": {
       "status": "matching-source Windows suite passed",
@@ -1522,6 +1529,14 @@
       "workspace_bytes_sha_verified": true,
       "report_evidence": "evidence/AR_FULL1305_HANDOFF.json",
       "known_lead_low_energy_ms": "~370–430 in mini set by heuristic, not proved phonetic silence; preserve raw and quiet consonants"
+    },
+    "codex_local_source14_suite": {
+      "evidence": "evidence/local_source14_final_regression_20261122.json",
+      "tests": 2010,
+      "passed": 1931,
+      "skipped": 79,
+      "errors": 0,
+      "scope": "Windows host regression; not physical/native acceptance"
     }
   },
   "pending_decisions": [],
@@ -1679,7 +1694,7 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Immutable13 retained. Runtime14 not built; actual Windows research and acceptance work resumed on D.",
+  "working_source_target_version": "Source14 candidate: scoped foreground priority, cancellable cold Russian lock and exact outer64 queue. Build/actual same14 NVDA acceptance pending. Immutable13 retained.",
   "handoff": {
     "date": "2026-11-22",
     "entrypoint": "CODEX_HANDOFF_UK.md",
@@ -1699,10 +1714,10 @@
     "owned_checkout": "D:\\Синтезатор мовлення KX-47\\Розробка 0.13\\Репозиторій",
     "immutable_baseline": "0.13.1-dev.13",
     "next_tasks": [
-      "Read six actual source13 prefetch comparisons run45061544904; no acceptance threshold changes",
-      "Read actual settings retry run45062114303 with exact native menu highlight check",
-      "Actual imported-profile to PCM proof in isolated local worker",
-      "Diagnose cold/warm fresh utterance latency before a separately versioned runtime14 change"
+      "Commit frozen14 source and assemble from exact13 resources with no model/bank changes",
+      "Actual same14 packaged-worker and NVDA core/typing checks",
+      "Actual worker/NVDA memory observations with held handles",
+      "Native QPC cancel diagnostics remain separate from physical audible acceptance"
     ],
     "resource_transfer_limitation": "Resolved with five verified bounded Actions transport parts; exact original whole ZIP SHA/CRC verified on D.",
     "product_ready": false,
@@ -1713,6 +1728,13 @@
     ],
     "local_regression": "evidence/local_regression_final_20261122.json",
     "arabic_delivery": "evidence/ar_delivery_comparison_contract.json",
-    "historical_handoff_fields": "handoff and original transfer-policy fields describe the completed earlier save, not current inactivity"
+    "historical_handoff_fields": "handoff and original transfer-policy fields describe the completed earlier save, not current inactivity",
+    "current_candidate_evidence": [
+      "evidence/local_core14_priority_candidate_review_20261122.json",
+      "evidence/local_core14_cold_cancel_addendum_review_20261122.json",
+      "evidence/local_source14_final_regression_20261122.json"
+    ],
+    "source13_settings_restart": "evidence/source13_settings_keyboard_45064826893.exact.json",
+    "local_hardware_clock": "evidence/local_hardware_clock_actual_20261122.json"
   }
 }

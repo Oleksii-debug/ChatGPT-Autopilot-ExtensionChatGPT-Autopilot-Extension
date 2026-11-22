@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.13",
+  "target_version": "0.13.1-dev.14",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -244,14 +244,13 @@
       "optional_resources_recovered": false
     },
     "main_unit_suite": {
-      "status": "matching-source Windows suite passed",
-      "windows_tests": 1058,
-      "windows_tests_total": 1058,
-      "windows_passed": 1022,
-      "windows_skipped": 36,
-      "run": 45029834209,
-      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
-      "linux_tests_tracked_separately": true
+      "status": "passed-local-Windows-host",
+      "tests": 2010,
+      "passed": 1931,
+      "skipped": 79,
+      "errors": 0,
+      "evidence": "evidence/local_source14_final_regression_20261122.json",
+      "scope": "Exact snapshot before committed14 build; not model/native/audio acceptance"
     },
     "windows_character_structure": {
       "status": "passed_limited_structural_smoke",
@@ -932,6 +931,41 @@
       "full_keyboard_restart_verified": false,
       "imported_profile_pcm_verified": false,
       "evidence": "evidence/source13_package_gui_actual_45053476915.json"
+    },
+    "source13_keyboard_save_restart": {
+      "status": "passed-functional-only",
+      "run": 45064826893,
+      "evidence": "evidence/source13_settings_keyboard_45064826893.exact.json",
+      "genuine_saved_synth_startup": true,
+      "same_profile_keyboard_save_reload": true,
+      "runtime_files_exact_after_restart": 10220,
+      "scope": "Real injected keys, wx menu, base profile. No named-profile switching/file chooser/physical keyboard/native pronunciation/acoustic latency acceptance."
+    },
+    "managed_voice_profile_to_pcm": {
+      "status": "passed-isolated-Holos-uk-functional",
+      "evidence": "evidence/local_imported_profile_pcm_20261122.json",
+      "cases": 5,
+      "same_input_exact_PCM_and_rollback": true,
+      "changed_profile_changed_PCM": true,
+      "missing_asset_failed_before_PCM": true,
+      "scope": "Actual packaged Windows worker; technical copy, not new human training. No live NVDA/hot reload/all-language acceptance."
+    },
+    "source14_priority_cold_cancel_candidate": {
+      "status": "actual-isolated-worker-candidate-not-final-package",
+      "evidence": [
+        "evidence/local_core14_priority_candidate_review_20261122.json",
+        "evidence/local_core14_cold_cancel_addendum_review_20261122.json"
+      ],
+      "native_models_changed": false,
+      "physical_audio_verified": false,
+      "P95_P99_acceptance_verified": false
+    },
+    "local_hardware_stream_clock": {
+      "status": "own-marker-transport-and-render-clock-observed",
+      "evidence": "evidence/local_hardware_clock_actual_20261122.json",
+      "actual_NVDA_verified": false,
+      "physical_audio_verified": false,
+      "capture_position_timeline_available": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -985,11 +1019,14 @@
     "nvda_scope": "RecordingSink functional proof across2ownedruns; no physical audio/latency/pronunciation claim",
     "package_gui_run": 45053476915,
     "package_gui_functional_operations": 10,
-    "full_keyboard_restart_verified": false,
-    "imported_profile_pcm_verified": false
+    "full_keyboard_restart_verified": true,
+    "imported_profile_pcm_verified": true,
+    "verification_updates_scope": "Actual immutable13 base-profile injected-key save/menu/restart run45064826893; isolated imported Holos uk ONNX/PCM five cases. Not named profile switching/file chooser/all-engine/physical/native pronunciation acceptance.",
+    "settings_restart_evidence": "evidence/source13_settings_keyboard_45064826893.exact.json",
+    "imported_profile_evidence": "evidence/local_imported_profile_pcm_20261122.json"
   },
-  "current_environment_blocker": "Local executor available; actual12 owned virtual WavePlayer phrase capture verified. Physical speaker/microphone and acoustic latency validation unavailable in hosted CI.",
-  "working_source_target_version": "Paused for transfer; immutable13actual functional9 and real-wx10 verified. Runtime14not built. Read CODEX_HANDOFF_UK.md; product_ready remainsfalse.",
+  "current_environment_blocker": "Actual local Windows host and two active hardware endpoints available. Owned-marker USB render/tap observed without changing user NVDA; process-tap positions remain zero. Final physical audible, same14 NVDA and native-listener acceptance remain open.",
+  "working_source_target_version": "Source14 candidate: scoped foreground priority, cancellable cold Russian lock and exact outer64 queue. Build/actual same14 NVDA acceptance pending. Immutable13 retained.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,
@@ -1004,33 +1041,10 @@
     "sha256": "b475cfa9f54a81c184b644a285b5b1220dcd2e14ba2410f534efe85862fb3885"
   },
   "current_build_attempt": {
-    "failed_prebuild": {
-      "run": 45020511872,
-      "tests": 810,
-      "errors": 4,
-      "skipped": 29,
-      "reason": "Tool-only SQLite connection remained open before owned temporary DB removal on Windows; explicit close fix committed.",
-      "evidence": "evidence/windows_banks10_prebuild_45020511872.json",
-      "artifact_built": false
-    },
-    "active_retry": {
-      "run": 45021069771,
-      "job": 137203875694,
-      "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
-      "windows_suite_passed": true,
-      "actual_build_passed": true,
-      "output_180_sha256_passed": true,
-      "identity_inputs_verified": 9939,
-      "static_coverage": {
-        "profiles": 45,
-        "requests_each": 176,
-        "prepared": 7920,
-        "live": 0
-      },
-      "core3_engine_smoke_passed": true,
-      "status": "completed_success",
-      "windows_suite_tests": 812
-    }
+    "version": "0.13.1-dev.14",
+    "status": "frozen_candidate_waiting_commit_and_build",
+    "artifact_built": false,
+    "product_ready": false
   },
   "durable_binary_backups": {
     "core9": {
@@ -1159,8 +1173,11 @@
     "nvda_scope": "RecordingSink functional proof across2ownedruns; no physical audio/latency/pronunciation claim",
     "package_gui_run": 45053476915,
     "package_gui_functional_operations": 10,
-    "full_keyboard_restart_verified": false,
-    "imported_profile_pcm_verified": false
+    "full_keyboard_restart_verified": true,
+    "imported_profile_pcm_verified": true,
+    "verification_updates_scope": "Actual immutable13 base-profile injected-key save/menu/restart run45064826893; isolated imported Holos uk ONNX/PCM five cases. Not named profile switching/file chooser/all-engine/physical/native pronunciation acceptance.",
+    "settings_restart_evidence": "evidence/source13_settings_keyboard_45064826893.exact.json",
+    "imported_profile_evidence": "evidence/local_imported_profile_pcm_20261122.json"
   },
   "current_frozen_core_historical10": {
     "version": "0.13.1-dev.10",
@@ -1276,5 +1293,34 @@
     "feature_development_stopped": true,
     "new_experiments_launched_during_save": false,
     "product_ready": false
+  },
+  "current_build_attempt_historical10": {
+    "failed_prebuild": {
+      "run": 45020511872,
+      "tests": 810,
+      "errors": 4,
+      "skipped": 29,
+      "reason": "Tool-only SQLite connection remained open before owned temporary DB removal on Windows; explicit close fix committed.",
+      "evidence": "evidence/windows_banks10_prebuild_45020511872.json",
+      "artifact_built": false
+    },
+    "active_retry": {
+      "run": 45021069771,
+      "job": 137203875694,
+      "source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
+      "windows_suite_passed": true,
+      "actual_build_passed": true,
+      "output_180_sha256_passed": true,
+      "identity_inputs_verified": 9939,
+      "static_coverage": {
+        "profiles": 45,
+        "requests_each": 176,
+        "prepared": 7920,
+        "live": 0
+      },
+      "core3_engine_smoke_passed": true,
+      "status": "completed_success",
+      "windows_suite_tests": 812
+    }
   }
 }

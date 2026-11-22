@@ -1,0 +1,83 @@
+{
+  "format": "dordiai-owned-clock-parent-code-review",
+  "format_version": 1,
+  "created_utc": "2026-11-22T20:41:29.291892+00:00",
+  "status": "parent-controller-and-tests-ready-for-root-review; artifact independently read-only verified",
+  "local_EXE_execution_performed": false,
+  "read_only_describe_executed": false,
+  "actual_marker_run_executed": false,
+  "capture_performed": false,
+  "live_NVDA_touched": false,
+  "controller_files": [
+    {
+      "path": "tools\\windows_owned_audio_clock_probe.py",
+      "bytes": 24923,
+      "sha256": "8fdaf1c7a4ae2cbf25cfa7ec3d82b9959142d8b7eeba7d64e4aec7c6b1db4d5b"
+    },
+    {
+      "path": "tests\\test_windows_owned_audio_clock_probe.py",
+      "bytes": 14957,
+      "sha256": "c35c24e1835b38ad7f3d1e9a3e9df524101b38f8443d31ce6d521d99b91ef259"
+    }
+  ],
+  "actual_artifact_verification": {
+    "pins": {
+      "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+      "commit": "c2fb3b9c3336e62acb3c6400f133115e55fbb928",
+      "run_id": "45066502844",
+      "artifact_id": 14771417822,
+      "artifact_bytes": 250008,
+      "artifact_sha256": "9c4f17d96b128c1ea1998e920170388a4d1207193a1f342f3868882631900fbd",
+      "source_sha256": "dea9c3c9e54b09ec9622400f8448ec9b2ee478c7cdc366109cd5e8d878edbbac",
+      "frozen_source_sha256": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012"
+    },
+    "complete_exact_six_members": [
+      "build-receipt.json",
+      "build.log",
+      "owned-clock.exe",
+      "self-test.json",
+      "windows_owned_audio_clock.cpp",
+      "windows_process_loopback.cpp"
+    ],
+    "all_member_size_sha_verified": true,
+    "compiler_linker_vswhere_signature_metadata_checked": true,
+    "actual_and_frozen_source_against_repository": true,
+    "executed_native_CI_no_device_selftest_receipt_checked": true,
+    "executable_bytes": 469504,
+    "executable_sha256": "f963428e2037656f55e41686f03a957773a8c9b1d56a5691f09a4bb92ef97b60",
+    "Popen_called_during_verification": false
+  },
+  "guards": [
+    "Only reviewed USB endpoint literal; no arbitrary PID/endpoint/system-capture arguments.",
+    "All ZIP/receipt/source/provenance checks before nonce directory/Popen; no extraction of arbitrary paths.",
+    "Fresh cryptographic32hex nonce directory on exact D:/DordiaiTestTemp, no symlink/junction/any Windows reparse ancestor. Only verified own EXE copied.",
+    "Ready JSON schema strict, actual held Popen PID compared, GetProcessTimes reads held childHANDLE and reconstructs exact64bit FILETIME usingPythonint. No JS/float roundtrip or PID reopen.",
+    "Immediate ASCII permit nonce|pid|exactFILETIME|exeSHA plusLF on inherited stdin pipe; native1s permit window respected.",
+    "Parent8s watchdog and finite ownPopen.kill/wait/reap only, no taskkill tree or process enumeration. Bounded stdout/stderr readers preserve malformed-output failures.",
+    "Read-only IMMDevice default render-role snapshot before/after; external changes are reported as failures, never restored. No default/volume/session/device/registry setters.",
+    "Separate describe-only and run+reviewed native-format modes; new fresh nonce for each. Native clock/PCM source/identity/hash/session bounds reverified afterrun.",
+    "Full100ms marker stereoNCC and five ordinary20ms windows at one full-marker chosen offset. No independently selected window offsets, interpolation, time/framewarp, polarity flip or silence cherry-picking.",
+    "Two axes assessed independently: render IAudioClock position/frequency+QPC versus process-tap packet frame positions/QPC/flags. Zero positions stayzero; S_FALSE/TIMESTAMP_ERROR/discontinuity never promoted to precise readings."
+  ],
+  "local_tests": {
+    "count": 21,
+    "passed": true,
+    "command": "python -B -m unittest discover -s tests -p test_windows_owned_audio_clock_probe.py -v",
+    "scope": "No real child/exe/audio execution. Synthetic ZIP/hash/signature/staleness/unsafe members; exact FILETIME beyond2^53; fakePopen timeout/ownkill/reap/wrongready/malformedJSON; unchanged defaults bound; fullmarker/windowNCC; valid marker withzero render/capture clocks remains unaccepted."
+  },
+  "root_next_commands_after_review": {
+    "describe": "python -B tools/windows_owned_audio_clock_probe.py --artifact downloads/owned-clock-build-45066502844.zip --describe-only",
+    "actual_only_after_reviewed_describe": "python -B tools/windows_owned_audio_clock_probe.py --artifact downloads/owned-clock-build-45066502844.zip --run --expected-format-hex <EXACT_lowercase_raw_format_hex_from_describe>",
+    "results": "Each own nonceDdirectory keeps parent-report.json and verified own EXE; native run additionally reference.pcm, captured.pcm, clock.json. No pre-existing files are deleted."
+  },
+  "limits": [
+    "FakePopen tests prove controller error logic; actual held process handshake and native format/marker transport are not yet exercised locally.",
+    "Cold process startup/OS scheduling may consume deadline; rejected/timeout cases retain own output and kill/reap only ownchild. Native8s watchdog is independently present in pinned source.",
+    "Direct GetMixFormat describe opens an IAudioClient without Initialize/Start, so it is read-only endpoint interrogation, not an acoustic test.",
+    "Default snapshots detect observed role changes but cannot attribute them to the helper versus simultaneous external user activity. Controller never restores another actor’s changes.",
+    "NCC uses retained software PCM array offset, never measured or inferred physical latency. Render clock availability does not substitute for a missing capture device-position axis.",
+    "Artifact verification trusts root-supplied authenticated exact ZIP pins and recorded CI compiler signatures; the locally generated project EXE itself is not claimed Microsoft-signed.",
+    "No product/native pronunciation/realNVDA/physical audible onset/stop or targetP95/P99 acceptance is claimed."
+  ],
+  "product_ready": false
+}

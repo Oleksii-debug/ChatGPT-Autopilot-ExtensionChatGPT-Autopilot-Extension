@@ -2,6 +2,7 @@
 from threading import Condition
 from time import monotonic
 from functools import lru_cache
+from contextlib import contextmanager
 
 
 @lru_cache(maxsize=1)
@@ -24,24 +25,34 @@ def background_setup_thread():
         kernel.SetThreadPriority(kernel.GetCurrentThread(),-1)
 
 
-def foreground_blocks(source,kernel=None):
-    # Windows priority is restored before yielding to playback. Only the
-    # isolated speech worker moves from below-normal to the normal class.
+@contextmanager
+def foreground_priority(kernel=None,process=None):
+    """Temporarily serve real work at NORMAL on a known owned process handle."""
     if kernel is None:kernel=_scheduling()
     if kernel is None:
-        yield from source
+        yield
         return
-    process=kernel.GetCurrentProcess()
+    if process is None:process=kernel.GetCurrentProcess()
+    previous=kernel.GetPriorityClass(process)
+    changed=(previous==0x4000 and kernel.SetPriorityClass(process,0x20))
+    try:
+        yield
+    finally:
+        if changed and kernel.GetPriorityClass(process)==0x20:
+            kernel.SetPriorityClass(process,previous)
+
+
+def foreground_blocks(source,kernel=None):
+    # No reserve or acoustic changes. Restore priority before yielding PCM,
+    # including cached/tuple iterables and native generator failures/cancels.
+    source=iter(source)
     try:
         while True:
-            changed=(kernel.GetPriorityClass(process)==0x4000 and kernel.SetPriorityClass(process,0x20))
             try:
-                value=next(source)
+                with foreground_priority(kernel):
+                    value=next(source)
             except StopIteration:
                 return
-            finally:
-                if changed and kernel.GetPriorityClass(process)==0x20:
-                    kernel.SetPriorityClass(process,0x4000)
             yield value
     finally:
         close=getattr(source,'close',None)

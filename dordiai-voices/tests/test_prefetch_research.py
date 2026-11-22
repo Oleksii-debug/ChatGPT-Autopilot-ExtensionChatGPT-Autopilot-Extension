@@ -23,6 +23,24 @@ def patch(raw=None,count=24):
     raw=SOURCE.encode() if raw is None else raw
     return p.overlay(raw,source_sha256=hashlib.sha256(raw).hexdigest(),pending_count=count)
 
+def frozen13_driver(raw):
+    """Recover historical bytes only from either of the two exact known files.
+
+    The buffering helper is still tested from live production below. Historical
+    overlay tests need the immutable13 call rather than applying an overlay
+    twice to the new14 explicit64 call.
+    """
+    original='17eeda6106858c4eb14ede91dd2a698cae0abaa9894d3df3e3d445d374a042ee'
+    candidate='72d4526804111d66e5786da60542e9effbb91a84a7c00a2d785e6e30bbf0acf7'
+    actual=hashlib.sha256(raw).hexdigest()
+    if actual==candidate:
+        raw=raw.replace(b'pending_count=64, short_reserve=',b'short_reserve=',1)
+    elif actual!=original:
+        raise ValueError('Unknown driver cannot stand in for immutable source13')
+    if len(raw)!=93785 or hashlib.sha256(raw).hexdigest()!=original:
+        raise ValueError('Historical source13 fixture identity differs')
+    return raw
+
 class Overlay(unittest.TestCase):
     def test_exact_one_outer_keyword_and_unchanged_inner2_for_all_variants(self):
         raw=SOURCE.encode()
@@ -137,7 +155,10 @@ class ActualBufferingHelper(unittest.TestCase):
         node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='buffered_items')
         namespace={'Queue':Queue,'Empty':Empty,'Full':Full,'Thread':threading.Thread}
         exec(compile(ast.Module(body=[node],type_ignores=[]),str(source),'exec'),namespace)
-        cls.buffer=staticmethod(namespace['buffered_items']);cls.source_raw=raw
+        cls.buffer=staticmethod(namespace['buffered_items']);cls.source_raw=frozen13_driver(raw)
+    def test_historical_overlay_fixture_rejects_any_unreviewed_driver_edit(self):
+        self.assertEqual(frozen13_driver(self.source_raw),self.source_raw)
+        with self.assertRaises(ValueError):frozen13_driver(self.source_raw+b'\n')
     def test_actual_source_overlay_changes_only_outer_count(self):
         for count in (12,24,32,64,128):
             _,r=p.overlay(self.source_raw,source_sha256=hashlib.sha256(self.source_raw).hexdigest(),pending_count=count,

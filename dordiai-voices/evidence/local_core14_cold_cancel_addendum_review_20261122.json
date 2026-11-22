@@ -1,0 +1,202 @@
+{
+  "format": "dordiai-source14-cold-cancel-addendum-review",
+  "format_version": 1,
+  "authoritative_after_prior_priority_review": true,
+  "historical_warm_ab_bundle_unchanged": true,
+  "base_native_sha256": "5d02545ebd1e5102babd68e242c36a70d69a5d4b90a1ac2fdb58bdfa2882a2da",
+  "authoritative_current_runtime_sha256": {
+    "wide_warmup.py": "a5c51ce277842c148ff956f934ca758e4519f58592a8b7cf9ddb10241426a478",
+    "nvda_worker.py": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b",
+    "native_multilingual.py": "f86ef71491b0a8ad3292c7a7a5061b284bdb0d70c2b197cba7cc68901319fa99"
+  },
+  "exact_actual_prototype_bytes_promoted": true,
+  "ast_diff_scope": "contextlib contextmanager import, _russian_foreground helper, one russian_chunks lock context; inverse-normalized AST is identical to frozen14 base",
+  "acoustic_and_language_logic_unchanged": true,
+  "prototype_cancel_waiting_ack_ms": 23.872100005974062,
+  "base_cancel_waiting_ack_ms": 3281.095300000743,
+  "cancel_measurement_scope": "actual local worker protocol while waiting for real cold preload; one observation each, not audible stop or tail percentile acceptance",
+  "prepared_stream_ab_repeated": false,
+  "cold_loading_fixed": false,
+  "cold_remaining_evidence": "Full12logicalCPU/no competitor, initial candidate firstPCM5398.6ms and lockwait5043.8ms. The child start plus lazy RuAccent load remain separate cold preparation costs.",
+  "direct_actual_runtime_unit_tests": {
+    "test_russian_cold_lock": 10,
+    "test_runtime_priority": 12,
+    "test_audio_pipeline": 30
+  },
+  "additional_probe_tests": {
+    "test_windows_cold_preload_probe": 10
+  },
+  "actual_three_language_error_cancel_recovery_smoke": {
+    "status": "measured",
+    "candidate_cleanup": {
+      "exit_code": 0,
+      "forced_termination": false
+    },
+    "owned_job_cleanup": {
+      "active_before_cleanup": 0,
+      "active_after_cleanup": 0,
+      "forced_tree_termination": false,
+      "all_owned_workers_reaped": true
+    },
+    "priority_trace": {
+      "calls": 86,
+      "handles": 2,
+      "final_priorities": [
+        16384,
+        16384
+      ],
+      "all_observed_restored_below_normal": true,
+      "errors": [],
+      "phases": [
+        {
+          "phase": "warm-uk",
+          "mode": "reference"
+        },
+        {
+          "phase": "warm-en",
+          "mode": "reference"
+        },
+        {
+          "phase": "warm-ru",
+          "mode": "reference"
+        },
+        {
+          "phase": "error",
+          "mode": "reference"
+        },
+        {
+          "phase": "cancel-ru",
+          "mode": "reference"
+        },
+        {
+          "phase": "cancel-signal",
+          "mode": "cancel"
+        },
+        {
+          "phase": "cancel-drop",
+          "mode": "drop"
+        }
+      ],
+      "native_child_closes": [
+        {
+          "pid": 27792,
+          "held_handle": 940,
+          "exit_code": 1,
+          "process_cleared": true,
+          "stdin_closed": true,
+          "stdout_closed": true
+        }
+      ],
+      "all_known_native_children_reaped": true
+    }
+  },
+  "actual_pcm_engine_smoke": {
+    "status": "passed",
+    "worker_script_sha256": "8b8860c97f2fdd87bf42b476e803a7f4ac756718afc5e70816268bcd5085123b",
+    "worker_shutdown": {
+      "exit_code": 0,
+      "forced_termination": false
+    },
+    "checks": [
+      {
+        "kind": "native-extension-preflight",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "native-extension-preflight",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "language-engine",
+        "language": "uk",
+        "status": "passed"
+      },
+      {
+        "kind": "language-engine",
+        "language": "en",
+        "status": "passed"
+      },
+      {
+        "kind": "language-engine",
+        "language": "ru",
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "excluded-voice",
+        "language": null,
+        "status": "passed"
+      },
+      {
+        "kind": "uk-dictionary-regression",
+        "language": "uk",
+        "status": "passed"
+      },
+      {
+        "kind": "cancel-and-recover",
+        "language": "uk",
+        "status": "passed"
+      }
+    ]
+  },
+  "installer_acceptance_claimed": false,
+  "product_ready": false,
+  "source13_archive_unchanged": true,
+  "live_nvda_edited": false,
+  "raw_addendum": {
+    "path": "local_core14_cold_cancel_addendum_20261122.json.gz",
+    "size_bytes": 1058697,
+    "sha256": "d208f9d270b0d0bb0a29dba10a0990a6a1056fde6b6741e53ba8739c5ba8c4f6"
+  },
+  "additional_code_and_test_sha256": {
+    "tests/test_russian_cold_lock.py": "662dc7572934eba4b521823564a830754baa8f4fa1741029087623a66987c8b2",
+    "tests/test_windows_cold_preload_probe.py": "05c98ec53786dbd884ff127e7797dfbd670053fdb731c9ed00632d838a6749d6",
+    "tools/windows_cold_preload_probe.py": "2af356daaee66b01f60194faf6bbd27f70018c66e2e1fb1d2e74fc8b1e1309f1"
+  },
+  "commit_files_addendum": [
+    "source/0.12.2/kx47Runtime/native_multilingual.py",
+    "tests/test_russian_cold_lock.py",
+    "tests/test_windows_cold_preload_probe.py",
+    "tools/windows_cold_preload_probe.py",
+    "evidence/local_core_cold_preload_20261122.json",
+    "evidence/local_core_cold_preload_raw_20261122.json.gz",
+    "evidence/local_core14_cold_cancel_addendum_20261122.json.gz",
+    "evidence/local_core14_cold_cancel_addendum_review_20261122.json"
+  ]
+}

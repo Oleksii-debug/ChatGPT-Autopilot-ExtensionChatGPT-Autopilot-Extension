@@ -128,7 +128,7 @@ def main():
                 atexit.register(native_profiles.close)
             return native_profiles
 
-        from wide_warmup import WideWarmupGate,memory_headroom,background_setup_thread
+        from wide_warmup import WideWarmupGate,memory_headroom,background_setup_thread,foreground_blocks
         warmup_gate = WideWarmupGate()
 
         def warm_models(profiles):
@@ -274,9 +274,6 @@ def main():
                         renderer["speaker"] = request["profile"]
                         blocks = wide_voices.blocks(request["profile"],wide_code,request["text"],request["speed"],
                                                    character=bool(request.get("character")))
-                        if request.get("reportLoading"):
-                            from wide_warmup import foreground_blocks
-                            blocks = foreground_blocks(blocks)
                     elif args.reference_engine == "holos" and not segments and is_locale:
                         get_classmate_locales()
                         renderer["engine"] = ("classmate-locale:" if request["profile"] == CLASSMATE_PROFILE else "native-locale:") + locale
@@ -317,8 +314,9 @@ def main():
                                 blocks, renderer,
                             )
                     rate = getattr(reference_voices, "output_rate", reference_voices.sampling_rate)
-                    stream = delivered_audio(blocks, rate, args.references, request, controls,
-                                             condition=cached is None and args.reference_engine == "holos")
+                    stream = foreground_blocks(delivered_audio(
+                        blocks, rate, args.references, request, controls,
+                        condition=cached is None and args.reference_engine == "holos"))
                     stream_cancellation = cancellation
                 elif request["mode"] == "drop":
                     warmup_gate.finished()

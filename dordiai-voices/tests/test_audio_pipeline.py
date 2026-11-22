@@ -204,7 +204,8 @@ class Gate:
     def close(self): pass
 sys.modules["ukrainian_voices"] = types.SimpleNamespace(UkrainianVoices=Voice)
 sys.modules["wide_warmup"] = types.SimpleNamespace(
-    WideWarmupGate=Gate, memory_headroom=lambda: None, background_setup_thread=lambda: None)
+    WideWarmupGate=Gate, memory_headroom=lambda: None, background_setup_thread=lambda: None,
+    foreground_blocks=iter)
 sys.modules["voice_delivery"] = types.SimpleNamespace(
     clean_onset=lambda source, **kw: source,
     equalize_voice=lambda source, *a: source)

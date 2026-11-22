@@ -1,0 +1,176 @@
+{
+  "format": "dordiai-owned-memory-sampler-validation",
+  "format_version": 1,
+  "date": "2026-11-22",
+  "status": "actual-owned-child-memory-validation-passed",
+  "python_full_version": "3.13.9 (tags/v3.13.9:8183fa5, Oct 14 2025, 14:09:13) [MSC v.1944 64 bit (AMD64)]",
+  "tests": {
+    "run": 15,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source_files": {
+    "tools\\windows_owned_memory.py": {
+      "size_bytes": 13391,
+      "sha256": "178e39b280ea6f394d15129c0a320cc941a8290d35ef6841879ccf3bdbf9b5e8"
+    },
+    "tests\\test_windows_owned_memory.py": {
+      "size_bytes": 13158,
+      "sha256": "24e2a33c0a17ffa6b0685ce5393626a76594fcf78b37d4f64e2ad4682dbe3690"
+    }
+  },
+  "native_struct_sizes": {
+    "PROCESS_MEMORY_COUNTERS_EX": 80,
+    "JOBOBJECT_EXTENDED_LIMIT_INFORMATION": 144
+  },
+  "actual_validation": {
+    "allocated_child_bytes": 33554432,
+    "parent_pid": 23688,
+    "child_returncode": 0,
+    "actual_memory_api_samples": {
+      "format": "dordiai-owned-process-memory-samples",
+      "format_version": 1,
+      "status": "stopped",
+      "parent_pid_label_only": 23688,
+      "handle_source": "Existing exact Popen handle; optional explicitly owned containing job handle",
+      "interval_seconds": 0.02,
+      "max_samples": 3,
+      "sample_count": 3,
+      "sample_quota_reached": true,
+      "started_monotonic_ns": 114373021191500,
+      "finished_monotonic_ns": 114373078206300,
+      "stop_reason": "sample-quota-reached",
+      "sampler_thread_joined": true,
+      "handles_observed_held_at_stop": true,
+      "control_errors": [],
+      "snapshots": [
+        {
+          "monotonic_ns": 114373021378500,
+          "parent_pid_label_only": 23688,
+          "process_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "working_set_bytes": 46374912,
+            "os_peak_working_set_bytes": 46374912,
+            "private_commit_bytes": 40718336,
+            "os_peak_pagefile_commit_bytes": 40730624
+          },
+          "job_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "os_peak_job_commit_bytes": 40730624
+          },
+          "children_resident_ram_bytes": null,
+          "sampling_duration_ns": 123700,
+          "sample_index": 0
+        },
+        {
+          "monotonic_ns": 114373046530300,
+          "parent_pid_label_only": 23688,
+          "process_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "working_set_bytes": 46374912,
+            "os_peak_working_set_bytes": 46374912,
+            "private_commit_bytes": 40718336,
+            "os_peak_pagefile_commit_bytes": 40730624
+          },
+          "job_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "os_peak_job_commit_bytes": 40730624
+          },
+          "children_resident_ram_bytes": null,
+          "sampling_duration_ns": 83700,
+          "sample_index": 1
+        },
+        {
+          "monotonic_ns": 114373078108200,
+          "parent_pid_label_only": 23688,
+          "process_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "working_set_bytes": 46374912,
+            "os_peak_working_set_bytes": 46374912,
+            "private_commit_bytes": 40718336,
+            "os_peak_pagefile_commit_bytes": 40730624
+          },
+          "job_memory": {
+            "status": "measured",
+            "units": "bytes",
+            "os_peak_job_commit_bytes": 40730624
+          },
+          "children_resident_ram_bytes": null,
+          "sampling_duration_ns": 76400,
+          "sample_index": 2
+        }
+      ],
+      "parent_ram_bytes": {
+        "maximum_observed_working_set": 46374912,
+        "maximum_observed_os_peak_working_set": 46374912
+      },
+      "parent_commit_bytes": {
+        "maximum_observed_private_usage": 40718336,
+        "maximum_observed_os_peak_pagefile_usage": 40730624
+      },
+      "owned_job_commit_bytes": {
+        "maximum_observed_os_peak_job_memory_used": 40730624
+      },
+      "children_resident_ram_bytes": null,
+      "family_resident_ram_bytes": null,
+      "semantics": {
+        "working_set": "Resident pages of the held parent process, including shared pages; OS peak is process-lifetime peak",
+        "private_usage_and_peak_pagefile": "Process COMMIT counters, not RAM",
+        "peak_job_memory_used": "OS peak aggregate job COMMIT, not resident working set; not current RAM",
+        "children_rss": "Not measured. Never infer it from job commit or add overlapping shared working sets.",
+        "sampling_overhead": "Periodic observer API time is recorded separately; these observations are not a CPU or acoustic latency benchmark",
+        "units": "All memory counters are integer bytes; no MiB/MB conversion is applied to raw values"
+      },
+      "physical_audio_verified": false,
+      "acoustic_latency_verified": false,
+      "product_ready": false
+    },
+    "actual_owned_job_cleanup": {
+      "active_before_cleanup": 0,
+      "active_after_cleanup": 0,
+      "forced_tree_termination": false,
+      "all_owned_workers_reaped": true
+    },
+    "scope": "Only a newly created Python child; not a source14 worker/NVDA/model memory result",
+    "physical_audio_verified": false,
+    "acoustic_latency_verified": false,
+    "product_ready": false
+  },
+  "primary_sources": [
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex",
+      "supports": "WorkingSetSize/PeakWorkingSetSize are resident byte counters; PrivateUsage and PeakPagefileUsage are process commit counters."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information",
+      "supports": "Job memory limit/peak usage describes committed memory for the job; it is not aggregate resident working set."
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo",
+      "supports": "K32GetProcessMemoryInfo uses an existing process handle and returns failure via zero plus GetLastError."
+    }
+  ],
+  "constraints": {
+    "pid_scan_or_process_reopen": false,
+    "handle_close_or_process_control_by_sampler": false,
+    "job_membership_checked_with_held_handles": true,
+    "snapshot_count_bounded": true,
+    "finite_stop_join_before_job_close": true,
+    "api_errors_replaced_with_zero": false,
+    "parent_ram_measured": true,
+    "children_resident_ram_measured": false,
+    "family_commit_is_not_ram": true,
+    "source14_worker_or_nvda_ram_measured": false,
+    "production_or_source14_files_changed": false,
+    "new_models_drivers_or_sdk": false
+  },
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false
+}
