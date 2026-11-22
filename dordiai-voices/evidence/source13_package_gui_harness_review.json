@@ -1,0 +1,50 @@
+{
+  "format": "dordiai-source13-actual-nvda-package-lifecycle-scaffold",
+  "format_version": 1,
+  "files": [
+    {
+      "path": "dordiai-voices/tools/windows_nvda_voice_packages_probe.py",
+      "bytes": 17810,
+      "sha256": "7aeb86e395815501e1a9857209780b8e7a1b300c3089b6e8259f31ff5e9b1d99",
+      "git_sha": "efec0a54f2ddf9d2a4a56fa283456feec285cc2e"
+    },
+    {
+      "path": "dordiai-voices/tests/test_windows_nvda_voice_packages_probe.py",
+      "bytes": 5418,
+      "sha256": "c69b80a05da778ee195953783c15536a71c4e2ef7e199c8555e762f022011e0c",
+      "git_sha": "02ede8be43a88c1fd7bbd9d3a90af8a2db32c313"
+    }
+  ],
+  "production_files_modified": false,
+  "archive_downloaded": false,
+  "run_performed": false,
+  "actual_nvda_gui_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "tests": {
+    "total": 8,
+    "passed": 8,
+    "scope": "Controller pin/ownership/fixture/compile guards; not actual NVDA execution"
+  },
+  "required": "Future actual tools/data/source13_build_pin.json; verifies version13 archive size/SHA/45ids before loading NVDA controller or downloading official NVDA",
+  "launch_example": "python dordiai-voices/tools/windows_nvda_voice_packages_probe.py --addon <exact13.nvda-addon> --build-pin dordiai-voices/tools/data/source13_build_pin.json --output <new-owned-output> --headless-ui-probe --long-installed-config --timeout 1800",
+  "actual_probe_plan": [
+    "Real wx settings dialog and actual async _run_package_operation pipeline; no fake message boxes or wx object replacements",
+    "Exact copy of a permitted existing installed Holos profile, internal fixtureversions1/2 only; no synthesis/cloning/new source voice",
+    "install-v1;install-v2;rollback-v1;corrupt-rejected;locked-remove;retry-remove;install-again;retain-files;activate-retained;final-remove",
+    "Owned PID+exacttitle+native#32770+IDOK guard auto-acknowledges actual completion/error native message boxes",
+    "Observe eSpeak selected before async mutation, olddriverclosed/oldthreadstopped/maintenance release, newdriver+reopened dialog, expected active/inactive ownership and visible inactive rows, managed profile/copy hashes, exact original coreprofile preservation"
+  ],
+  "boundaries": {
+    "operation_dispatch": "Actual dialog maintenance pipeline API; native file chooser/button keyboard path still separate",
+    "native_file_chooser_interaction_verified": false,
+    "full_keyboard_accessibility_verified": false,
+    "actual_restart_upgrade_verified": false,
+    "imported_profile_model_pcm_verified": false,
+    "human_pronunciation_verified": false
+  },
+  "notes": [
+    "If any actualWindows GUI behavior differs, stop with failed receipt, retain diagnostics and fix probe/correct product from evidence; do not infer full UI acceptance from scaffold guards.",
+    "Historical source12 remains untouched."
+  ]
+}

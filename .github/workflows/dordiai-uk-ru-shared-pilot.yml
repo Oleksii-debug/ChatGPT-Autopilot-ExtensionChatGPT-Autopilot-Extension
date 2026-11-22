@@ -1,0 +1,161 @@
+name: Dordiai future14 isolated UKRU existing Shared carrier pilot
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - '.github/workflows/dordiai-uk-ru-shared-pilot.yml'
+      - 'dordiai-voices/tools/research/probe_uk_ru_shared_carrier.py'
+      - 'dordiai-voices/tools/research/uk_ru_shared_contract.py'
+      - 'dordiai-voices/tools/research/uk_ru_shared_carrier_words.json'
+      - 'dordiai-voices/tools/research/shared_capabilities_original.json'
+      - 'dordiai-voices/tests/test_uk_ru_shared_contract.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-ukru-carrier-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  existing-carrier-pilot:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[uk-ru-shared-pilot]')
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      DO_NOT_TRACK: '1'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - name: Preserve exact source byte identities
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Host-only NumPy for finite research contracts
+        run: python -m pip install --disable-pip-version-check numpy==1.26.4
+      - name: Verify literal20word no-drop IDs and original31language support controls
+        run: python -m unittest discover -s dordiai-voices/tests -p test_uk_ru_shared_contract.py -v
+      - name: Create fresh owned research roots
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $stage=Join-Path $env:RUNNER_TEMP ('dordiai-ukru-pilot-'+$env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $stage) { throw 'Use a fresh owned research root' }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          New-Item -ItemType Directory -Path dordiai-voices/uk-ru-shared-results | Out-Null
+          "UKRU_STAGE=$stage" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Acquire exact immutable source12 private runtime and converter
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: '14761553443'
+          run-id: 45040668513
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ukru-original-core12
+      - name: Download exact owned wide artifact without forwarding repository credentials
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $handler=[System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect=$false
+          $client=[System.Net.Http.HttpClient]::new($handler)
+          $request=[System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get,"https://api.github.com/repos/$env:REPOSITORY/actions/artifacts/14754247478/zip")
+          $request.Headers.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$env:GH_TOKEN)
+          $request.Headers.UserAgent.ParseAdd('dordiai-own-ukru-carrier-research')
+          $response=$client.SendAsync($request).GetAwaiter().GetResult()
+          if ([int]$response.StatusCode -ne 302 -or $response.Headers.Location.Scheme -ne 'https') { throw 'Unexpected artifact redirect' }
+          $anonymous=[System.Net.Http.HttpClient]::new()
+          $stream=$anonymous.GetStreamAsync($response.Headers.Location).GetAwaiter().GetResult()
+          $zip=Join-Path $env:UKRU_STAGE 'wide-artifact.zip'
+          $file=[System.IO.File]::Open($zip,[System.IO.FileMode]::CreateNew)
+          try { $stream.CopyTo($file) } finally { $file.Dispose();$stream.Dispose();$anonymous.Dispose();$response.Dispose();$request.Dispose();$client.Dispose();$handler.Dispose() }
+          if ((Get-Item $zip).Length -ne 552777798) { throw 'Wide wrapper byte count changed' }
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262') { throw 'Wide wrapper SHA changed' }
+      - name: Stage exact core12 and unchanged original Shared subset
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $core=@(Get-ChildItem -Path "$env:RUNNER_TEMP/ukru-original-core12" -Recurse -Filter '*.nvda-addon')
+          if ($core.Count -ne 1) { throw 'Expected exactly one immutable12 addon' }
+          python dordiai-voices/tools/research/probe_uk_ru_shared_carrier.py stage --core ($core[0].FullName) --wide "$env:UKRU_STAGE/wide-artifact.zip" --fixture dordiai-voices/tools/research/uk_ru_shared_carrier_words.json --output "$env:UKRU_STAGE/core12"
+          if ($LASTEXITCODE -ne 0) { throw 'Exact isolated UKRU source-carrier stage failed' }
+          python -c "import json,pathlib; p=pathlib.Path(r'$env:UKRU_STAGE/core12/ar29-stage.json'); d=json.loads(p.read_text(encoding='utf-8')); d.pop('existing_payload_hashes'); pathlib.Path('dordiai-voices/uk-ru-shared-results/stage-receipt.json').write_text(json.dumps(d,indent=2),encoding='utf-8')"
+          if ($LASTEXITCODE -ne 0) { throw 'Stage receipt failed' }
+      - name: Two reverse-order fresh-process comparisons through unchanged private runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $private=[IO.Path]::GetFullPath("$env:UKRU_STAGE/core12/kx47Runtime/python/python.exe")
+          $russian=[IO.Path]::GetFullPath("$env:UKRU_STAGE/core12/kx47Runtime/models/PocketTTS/ru/pocket-ru.exe")
+          if (@(Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -ne 0) { throw 'Firewall profiles must remain enabled' }
+          $rules=@()
+          try {
+            foreach ($program in @($private,$russian)) {
+              if (Test-Path -LiteralPath $program) {
+                $rule='Dordiai-UKRU-'+[guid]::NewGuid().ToString('N')
+                New-NetFirewallRule -Name $rule -DisplayName $rule -Direction Outbound -Action Block -Enabled True -Profile Any -Program $program | Out-Null
+                $rules+=$rule
+              }
+            }
+            @{scope='owned ephemeral CI VM and exact private Python/local Russian child only';network='outbound blocked before ML imports';physical_audio_verified=$false;production_registered=$false} | ConvertTo-Json | Set-Content -Encoding utf8 dordiai-voices/uk-ru-shared-results/network-policy.json
+            for ($round=1;$round -le 2;$round++) {
+              $order=if ($round -eq 1) { @('core','shared') } else { @('shared','core') }
+              foreach ($backend in $order) {
+                $result="dordiai-voices/uk-ru-shared-results/round-$round-$backend"
+                & $private -X utf8 -B (Resolve-Path dordiai-voices/tools/research/probe_uk_ru_shared_carrier.py).Path probe --runtime "$env:UKRU_STAGE/core12/kx47Runtime" --fixture (Resolve-Path dordiai-voices/tools/research/uk_ru_shared_carrier_words.json).Path --backend $backend --output $result
+                if ($LASTEXITCODE -ne 0) { throw "Actual20word $backend pilot failed in round$round" }
+              }
+            }
+          } finally {
+            foreach ($rule in $rules) { Remove-NetFirewallRule -Name $rule -ErrorAction Continue }
+          }
+      - name: Preserve stage/source receipts and exact bounded results
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib,shutil,statistics
+          root=pathlib.Path('dordiai-voices/uk-ru-shared-results')
+          if os.environ.get('UKRU_STAGE'):
+              stage=pathlib.Path(os.environ['UKRU_STAGE'])/'core12'
+              for name in ('ar29-shared-resource-inventory.json','uk-ru-pilot-stage.json'):
+                  path=stage/name
+                  if path.is_file():shutil.copyfile(path,root/name)
+          reports=[]
+          for path in sorted(root.glob('round-*/report.json')):
+              raw=path.read_bytes()
+              if len(raw)>512*1024:raise ValueError('Unexpected carrier report size')
+              report=json.loads(raw)
+              rows=report.get('cases',[])
+              summary={'case':path.parent.name,'backend':report.get('backend'),'status':report.get('status'),'count':len(rows),'profile':report.get('profile'),'model_open_seconds':report.get('model_open_seconds')}
+              if rows:
+                  total=sum(row['generation_wall_seconds'] for row in rows)
+                  audio=sum(row['delivered_pcm']['audio_seconds'] for row in rows)
+                  summary.update(generation_wall_total_seconds=total,delivered_audio_total_seconds=audio,aggregate_real_time_factor=total/audio,median_first_software_block_seconds=statistics.median(row['first_software_block_seconds'] for row in rows))
+              reports.append(summary)
+              doc={'format':'dordiai-exact-ukru-unprepared-carrier-report','format_version':1,'run_id':os.environ['GITHUB_RUN_ID'],'commit':os.environ['GITHUB_SHA'],'case':path.parent.name,'file':{'name':'report.json','size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'source_base64':base64.b64encode(raw).decode()}}
+              encoded=json.dumps(doc,sort_keys=True,separators=(',',':')).encode()
+              payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode()
+              print('UKRU_PILOT_JSON_SHA256 '+path.parent.name+' '+hashlib.sha256(encoded).hexdigest(),flush=True)
+              for index in range(0,len(payload),24000):print('UKRU_PILOT_GZIP_B64 '+path.parent.name+' %03d '%(index//24000)+payload[index:index+24000],flush=True)
+          result={'format':'dordiai-ukru-existing-shared-matched-pilot-summary','format_version':1,'scope':'Two reverse-order rounds, each fresh private Python process and the SAME20literalinputs. Original core family conditioning versus Shared plus original Viktoriia projection. No NVDA/physical/pronunciation/default readiness claim. Timings are generation to array, excluding saving. Model opening reported separately.','comparisons':reports,'production_changed':False,'native_pronunciation_verified':False,'windows_nvda_verified':False,'physical_audio_verified':False,'product_ready':False}
+          (root/'summary.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('UKRU_PILOT_SUMMARY '+json.dumps(result,ensure_ascii=False),flush=True)
+          if sum(p.stat().st_size for p in root.rglob('*') if p.is_file())>96*1024*1024:raise ValueError('Proof artifact exceeds bounded PCM/report size')
+      - name: Preserve bounded pilot reports and original delivered/native/projected word WAVs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-ukru-existing-shared-pilot-${{ github.run_id }}
+          path: dordiai-voices/uk-ru-shared-results
+          if-no-files-found: warn
+          retention-days: 90

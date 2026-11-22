@@ -1,0 +1,73 @@
+{
+  "format": "dordiai-future14-ukru-existing-shared-carrier-pilot-plan",
+  "format_version": 1,
+  "status": "ready-for-root-review-before-model-downloads",
+  "support": {
+    "actual_packed_capabilities_sha256": "159a7f418ae089a2a47bd32017f5465a5ec31235d479731121f85dc5a97bcbe1",
+    "actual_packed_language_count": 31,
+    "actual_requested_model_ids": [
+      "uk",
+      "ru"
+    ],
+    "primary_model": "Supertone/supertonic-3",
+    "primary_url": "https://huggingface.co/Supertone/supertonic-3",
+    "original_packed_readme_sha256": "d414e4b085fb9989ebfd2b64f868ff861694022b4bdb805b09e702386dbdc7d5",
+    "neutral_na_or_untrained_alias_used": false
+  },
+  "immutable_inputs": {
+    "core_bytes": 1992944744,
+    "core_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "wide_outer_bytes": 552777798,
+    "wide_outer_sha256": "5e500e6f5a217a39023835352c8b59761cf6d1aff5063376ca96b24fbb8df262",
+    "original_ar_recipe_blob": "13c17787a6e8f1ca42d94638a5923f4bafa805ae",
+    "fixture_sha256": "f974e1062293b6f6ab4e873803a6deb722fc32d3bdb256f66096d474f8959f52",
+    "selected_profile": "viktoriia",
+    "projection_target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+  },
+  "workload": {
+    "distinct_literal_words": 20,
+    "uk": 10,
+    "ru": 10,
+    "order": "alternating",
+    "exact_driver_rate80_tempo": 1.515716566510398,
+    "fresh_processes": 4,
+    "rounds": "core/shared then shared/core",
+    "per_process_input_repetition": false,
+    "whole_workload_warmup": false
+  },
+  "core_path": {
+    "uk": "Original UkrainianVoices.chunks/Holos selected-profile style, not unsupported NativeLocaleVoices(uk).",
+    "ru": "Original default-source NativeMultilingual.plan/phrase/preferred_speech with original UkrainianVoices fallback; actual plan and renderer recorded.",
+    "request_flag_evidence": "Source inference, not directly observed NVDA requests.",
+    "conditioning": "Original core family-specific Viktoriia conditioning, not an invented replacement source vector."
+  },
+  "shared_path": {
+    "carrier": "Original CommonSpeech/CommonCarrier F1 internal style, original .ort/.onnx selection and existing static-q8 asset;8steps unchanged.",
+    "native_conditions": "Actual uk/ru tags through actual UnicodeProcessor; NFKD letters/marks and full IDs/mask must survive, numeric frontend must leave literal words unchanged.",
+    "source": "Original calibrated shared source.npy SHA643fd8c683786aa4af6619ac59f2227588034b214db05ef94137e5743b598447",
+    "rates": "Actual model44100 → original carrier24000 → CommonSpeech22050 → unchanged OpenVoice projection22050 → existing delivery24000.",
+    "tempo": "Controlled source_tempo1.0 with exact requested1.515716566510398 applied after projection through existing tempo. This differs from the production wide-route native_factor optimization and is disclosed.",
+    "projection": "Original encoder-flow831fe… and decoder9d578… with unchanged Viktoriia target; no graph rewrite or own quantization."
+  },
+  "measurements": [
+    "Model opening without rendering fixture words, separately from first unprepared word.",
+    "Full generation-to-array wall time and first software block time; no WAV-save/device time.",
+    "Shared native generation and original projection components separately.",
+    "Actual native, projected and delivered finite/nonzero PCM WAV receipts; original source/target/profile pins.",
+    "Shared cache must show20misses/0hits per process; full staged payload snapshot unchanged; owned Russian subprocesses reaped."
+  ],
+  "local_checks": {
+    "tests": 13,
+    "passed": 13,
+    "python_and_yaml_and_inline_python_syntax_passed": true,
+    "actual_private_inference_executed": false
+  },
+  "limits": [
+    "Different original family conditioning is preserved and disclosed; output durations and first-block latency can differ even if total wall time improves.",
+    "Prior plain100 diagnostic usedadam, notViktoriia, and is not substituted for this pilot's measured baseline.",
+    "No native pronunciation/listening/NVDA/typing/physical/audio-gap acceptance from finite PCM or frontend checks.",
+    "No production13/14/default selection change, old-model pruning, new languageID or model rewriting."
+  ],
+  "production_changed": false,
+  "model_downloads_performed_for_this_pilot": false
+}

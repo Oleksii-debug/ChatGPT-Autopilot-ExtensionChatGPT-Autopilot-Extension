@@ -38,7 +38,8 @@
     "Immutable source12 passes all five actual NVDA modes: unchanged100 words/102 pieces route with zero mismatches; seven plain/metadata/compound cases, nine actual typed cases and two genuine resource faults pass.",
     "Exact source12 core and receipt durably stored in separate unpublished backup; both full readback hashes verified.",
     "Actual immutable12 unchanged WavePlayer complete53041-frame phrase captured from owned NVDA process; full-window NCC0.9999301895 independently reproduced. Own processes/device cleanup verified.",
-    "All five keyboard scenarios on exact immutable12 pass actual NVDA; configuration/layout/speech and forced/disabled preferences restored."
+    "All five keyboard scenarios on exact immutable12 pass actual NVDA; configuration/layout/speech and forced/disabled preferences restored.",
+    "Actual immutable13 core built: all8510 old model files/180banks/1596private/45identities preserved; exactlyone new Arabic29datafile. Packaged225/default3/recovery/30actualWindowsownership cases pass."
   ],
   "open_requirements": [
     "8 selected entries have no integrated resources; Tamazight remains partial. Combined older optionals plus actual11 Afri six resources cover127 entries,126 complete; this is resource presence, not native pronunciation.",
@@ -743,43 +744,32 @@
       }
     },
     "latest_built_core": {
-      "version": "0.13.1-dev.12",
-      "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
-      "run": 45040668513,
-      "job": 137264162762,
-      "archive_name": "dordiai-voices-0.13.1-dev.12.nvda-addon",
-      "archive_bytes": 1992944744,
-      "archive_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
-      "core_artifact": 14761553443,
-      "evidence_artifact": 14761533502,
-      "windows_tests_total": 1330,
-      "windows_passed": 1280,
-      "windows_skipped": 50,
+      "version": "0.13.1-dev.13",
+      "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+      "run": 45049806570,
+      "job": 137292209768,
+      "archive_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+      "archive_bytes": 1992990314,
+      "archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+      "installed_bytes": 2408769533,
+      "payload_files": 10260,
+      "core_artifact": 14765535864,
+      "evidence_artifact": 14765103202,
+      "windows_tests_total": 1682,
+      "windows_passed": 1627,
+      "windows_skipped": 55,
       "worker_native_profile_requests": 225,
-      "default3_passed": true,
       "banks_byte_identical": 180,
       "private_files_byte_identical": 1596,
-      "other_models_identity_files_byte_identical": 8508,
-      "reviewed_character_data_exceptions": 2,
+      "old_models_identity_byte_identical": 8510,
+      "new_ar_character_data_files": 1,
       "voice_ids_unchanged": 45,
-      "native_dictionary_descriptor_notice_unchanged": true,
-      "actual_nvda_pipeline_verified": true,
-      "typing_verified": true,
+      "actual_nvda_pipeline_verified": false,
+      "typing_verified": false,
       "physical_audio_verified": false,
       "native_pronunciation_verified": false,
       "product_ready": false,
-      "evidence": "evidence/source12_worker_45040668513.json",
-      "nvda_functional_run": 45041853551,
-      "nvda_evidence": "evidence/source12_nvda_five_mode_result.json",
-      "plain100_lexical_pieces": 102,
-      "plain100_route_mismatches": 0,
-      "actual_typing_cases": 9,
-      "typing_scenario": "standard",
-      "required_resource_recovery_verified": true,
-      "native_dictionary_recovery_verified": true,
-      "wave_player_verified": true,
-      "virtual_waveform_transport_verified": true,
-      "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
+      "evidence": "evidence/source13-worker-45049806570.json"
     },
     "current_working_source_suite": {
       "source_commit": "c9e727a9d684a4af2bd56b76ae6ab9bfb0b47b2d",
@@ -1292,7 +1282,7 @@
       "scope": "Static explicit table audit; missing table is not equivalent to unsupported native spelling. Full135 typing/pronunciation unverified."
     },
     "source13_candidate": {
-      "status": "integrated_for_actual_build_not_product_ready",
+      "status": "actual_windows_build_worker_pass; awaiting_matching_NVDA_and_GUI",
       "baseline_source12": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
       "runtime_blobs": {
         "word_leaf": "7fadc20d6bd735db2b7cc08f0b694422ed27ea2e",
@@ -1313,10 +1303,12 @@
       "actual_personal_config_host_run": 45046562415,
       "actual_ar29_native_projection_run": 45046562273,
       "updated_voice_ownership_focused_tests": 29,
-      "updated_voice_ownership_actual_windows_verified": false,
-      "archive_exists": false,
+      "updated_voice_ownership_actual_windows_verified": true,
+      "archive_exists": true,
       "actual_nvda_verified": false,
-      "product_ready": false
+      "product_ready": false,
+      "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+      "updated_voice_ownership_windows_cases": 30
     },
     "longread_source12": {
       "run": 45045436146,
@@ -1345,7 +1337,34 @@
         ],
         "production_runtime_changed_for_retry": false
       }
-    ]
+    ],
+    "source13_longread_control": {
+      "version": "0.13.1-dev.12",
+      "run": 45049366545,
+      "source_words": 100,
+      "lexical_pieces": 102,
+      "all_structurally_preserved_and_routed": true,
+      "reference_frames": 1405050,
+      "reference_seconds": 58.54375,
+      "full_reference_ncc": 0.5856072658391752,
+      "strict_full_reference_passed": false,
+      "added_intervals_frames": [
+        895,
+        550,
+        212
+      ],
+      "added_intervals_ms": [
+        37.2917,
+        22.9167,
+        8.8333
+      ],
+      "total_added_interval_ms": 69.0417,
+      "underlying_cause_proven": false,
+      "capture_device_positions_supported": false,
+      "cancel_tail_accepted": false,
+      "evidence": "evidence/source12_longread_45049366545.json",
+      "scope": "Frozen12 control, not13 acceptance; local aligned segments are diagnostic only, never a replacement for failed full-reference gate."
+    }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
@@ -1502,5 +1521,5 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Source13 integration: reviewed V2 leaf/bounded path manager, profile-language policy, durable voice ownership, new Arabic29 data. Actual13 archive/build/NVDA verification pending; immutable actual12 remains available."
+  "working_source_target_version": "Immutable13 built at2d70515a4c49413efcb23198491bbc675a55db0a; Windows1682total/1627pass/55skip, worker225/default3/recovery pass. Matching nine-mode actual NVDA and real-wx package pipeline now authorized with independently checked actual pin; no product-ready claim."
 }

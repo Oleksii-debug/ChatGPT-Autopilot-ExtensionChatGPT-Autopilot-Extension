@@ -1,0 +1,1090 @@
+{
+  "fixed_full_reference_ncc_gate_still_failed": true,
+  "format": "dordiai-diagnostic-local-offsets-not-a-pass",
+  "hop_frames": 1200,
+  "rows": [
+    {
+      "capture_start_frame": 76865,
+      "competing_ncc": 0.4418370910923633,
+      "confident": true,
+      "ncc": 0.9996293542772046,
+      "offset_frames": 76865,
+      "reference_end_frame": 6000,
+      "reference_start_frame": 0
+    },
+    {
+      "capture_start_frame": 78065,
+      "competing_ncc": 0.4728627689678946,
+      "confident": true,
+      "ncc": 0.9994367630200938,
+      "offset_frames": 76865,
+      "reference_end_frame": 7200,
+      "reference_start_frame": 1200
+    },
+    {
+      "capture_start_frame": 79265,
+      "competing_ncc": 0.3802450912398733,
+      "confident": true,
+      "ncc": 0.9994228159940555,
+      "offset_frames": 76865,
+      "reference_end_frame": 8400,
+      "reference_start_frame": 2400
+    },
+    {
+      "capture_start_frame": 80465,
+      "competing_ncc": 0.23409178799514146,
+      "confident": true,
+      "ncc": 0.9992995158147635,
+      "offset_frames": 76865,
+      "reference_end_frame": 9600,
+      "reference_start_frame": 3600
+    },
+    {
+      "capture_start_frame": 81665,
+      "competing_ncc": 0.29950279665263163,
+      "confident": true,
+      "ncc": 0.9992057767229139,
+      "offset_frames": 76865,
+      "reference_end_frame": 10800,
+      "reference_start_frame": 4800
+    },
+    {
+      "capture_start_frame": 82865,
+      "competing_ncc": 0.31070473620674155,
+      "confident": true,
+      "ncc": 0.9997084727689913,
+      "offset_frames": 76865,
+      "reference_end_frame": 12000,
+      "reference_start_frame": 6000
+    },
+    {
+      "capture_start_frame": 84065,
+      "competing_ncc": 0.35474389000935463,
+      "confident": true,
+      "ncc": 0.9999839803047667,
+      "offset_frames": 76865,
+      "reference_end_frame": 13200,
+      "reference_start_frame": 7200
+    },
+    {
+      "capture_start_frame": 85265,
+      "competing_ncc": 0.2193483130243591,
+      "confident": true,
+      "ncc": 0.999985267473714,
+      "offset_frames": 76865,
+      "reference_end_frame": 14400,
+      "reference_start_frame": 8400
+    },
+    {
+      "capture_start_frame": 86465,
+      "competing_ncc": 0.4196689284709337,
+      "confident": true,
+      "ncc": 0.9999942290814523,
+      "offset_frames": 76865,
+      "reference_end_frame": 15600,
+      "reference_start_frame": 9600
+    },
+    {
+      "capture_start_frame": 87665,
+      "competing_ncc": 0.3858248754140161,
+      "confident": true,
+      "ncc": 0.9999956525962035,
+      "offset_frames": 76865,
+      "reference_end_frame": 16800,
+      "reference_start_frame": 10800
+    },
+    {
+      "capture_start_frame": 89760,
+      "competing_ncc": 0.5769400508590413,
+      "confident": false,
+      "ncc": 0.9383177649524738,
+      "offset_frames": 77760,
+      "reference_end_frame": 18000,
+      "reference_start_frame": 12000
+    },
+    {
+      "capture_start_frame": 90960,
+      "competing_ncc": 0.6977409525019371,
+      "confident": true,
+      "ncc": 0.9990657252733393,
+      "offset_frames": 77760,
+      "reference_end_frame": 19200,
+      "reference_start_frame": 13200
+    },
+    {
+      "capture_start_frame": 92160,
+      "competing_ncc": 0.6928879554448311,
+      "confident": true,
+      "ncc": 0.9998167035804595,
+      "offset_frames": 77760,
+      "reference_end_frame": 20400,
+      "reference_start_frame": 14400
+    },
+    {
+      "capture_start_frame": 93360,
+      "competing_ncc": 0.8378583372296057,
+      "confident": true,
+      "ncc": 0.9999196345373188,
+      "offset_frames": 77760,
+      "reference_end_frame": 21600,
+      "reference_start_frame": 15600
+    },
+    {
+      "capture_start_frame": 94560,
+      "competing_ncc": 0.752648395531797,
+      "confident": true,
+      "ncc": 0.9999430320285525,
+      "offset_frames": 77760,
+      "reference_end_frame": 22800,
+      "reference_start_frame": 16800
+    },
+    {
+      "capture_start_frame": 95760,
+      "competing_ncc": 0.4078064681408115,
+      "confident": true,
+      "ncc": 0.9999591889532352,
+      "offset_frames": 77760,
+      "reference_end_frame": 24000,
+      "reference_start_frame": 18000
+    },
+    {
+      "capture_start_frame": 96960,
+      "competing_ncc": 0.3615422745875532,
+      "confident": true,
+      "ncc": 0.9999780567552007,
+      "offset_frames": 77760,
+      "reference_end_frame": 25200,
+      "reference_start_frame": 19200
+    },
+    {
+      "capture_start_frame": 98160,
+      "competing_ncc": 0.3594742321604808,
+      "confident": true,
+      "ncc": 0.9999962681329265,
+      "offset_frames": 77760,
+      "reference_end_frame": 26400,
+      "reference_start_frame": 20400
+    },
+    {
+      "capture_start_frame": 99360,
+      "competing_ncc": 0.40585909876674203,
+      "confident": true,
+      "ncc": 0.9999953620673199,
+      "offset_frames": 77760,
+      "reference_end_frame": 27600,
+      "reference_start_frame": 21600
+    },
+    {
+      "capture_start_frame": 100560,
+      "competing_ncc": 0.4699733172869379,
+      "confident": true,
+      "ncc": 0.9999957280575895,
+      "offset_frames": 77760,
+      "reference_end_frame": 28800,
+      "reference_start_frame": 22800
+    },
+    {
+      "capture_start_frame": 101760,
+      "competing_ncc": 0.3732493469061214,
+      "confident": true,
+      "ncc": 0.9999942754977544,
+      "offset_frames": 77760,
+      "reference_end_frame": 30000,
+      "reference_start_frame": 24000
+    },
+    {
+      "capture_start_frame": 102960,
+      "competing_ncc": 0.45180195152027264,
+      "confident": true,
+      "ncc": 0.9999935364930461,
+      "offset_frames": 77760,
+      "reference_end_frame": 31200,
+      "reference_start_frame": 25200
+    },
+    {
+      "capture_start_frame": 104160,
+      "competing_ncc": 0.4223430372674333,
+      "confident": true,
+      "ncc": 0.9999924998166291,
+      "offset_frames": 77760,
+      "reference_end_frame": 32400,
+      "reference_start_frame": 26400
+    },
+    {
+      "capture_start_frame": 105360,
+      "competing_ncc": 0.3064274856347792,
+      "confident": true,
+      "ncc": 0.9999929519116212,
+      "offset_frames": 77760,
+      "reference_end_frame": 33600,
+      "reference_start_frame": 27600
+    },
+    {
+      "capture_start_frame": 106560,
+      "competing_ncc": 0.4496321866071265,
+      "confident": true,
+      "ncc": 0.99999204657725,
+      "offset_frames": 77760,
+      "reference_end_frame": 34800,
+      "reference_start_frame": 28800
+    },
+    {
+      "capture_start_frame": 107760,
+      "competing_ncc": 0.28836457626252854,
+      "confident": true,
+      "ncc": 0.9999949931323824,
+      "offset_frames": 77760,
+      "reference_end_frame": 36000,
+      "reference_start_frame": 30000
+    },
+    {
+      "capture_start_frame": 108960,
+      "competing_ncc": 0.28441286884863765,
+      "confident": true,
+      "ncc": 0.9999955864144932,
+      "offset_frames": 77760,
+      "reference_end_frame": 37200,
+      "reference_start_frame": 31200
+    },
+    {
+      "capture_start_frame": 110160,
+      "competing_ncc": 0.32051602700322024,
+      "confident": true,
+      "ncc": 0.9999974779742293,
+      "offset_frames": 77760,
+      "reference_end_frame": 38400,
+      "reference_start_frame": 32400
+    },
+    {
+      "capture_start_frame": 111360,
+      "competing_ncc": 0.3094621302152903,
+      "confident": true,
+      "ncc": 0.9999976078535002,
+      "offset_frames": 77760,
+      "reference_end_frame": 39600,
+      "reference_start_frame": 33600
+    },
+    {
+      "capture_start_frame": 112560,
+      "competing_ncc": 0.7741897434628083,
+      "confident": true,
+      "ncc": 0.999985512940481,
+      "offset_frames": 77760,
+      "reference_end_frame": 40800,
+      "reference_start_frame": 34800
+    },
+    {
+      "capture_start_frame": 113760,
+      "competing_ncc": 0.5098287572985166,
+      "confident": true,
+      "ncc": 0.9999536914440317,
+      "offset_frames": 77760,
+      "reference_end_frame": 42000,
+      "reference_start_frame": 36000
+    },
+    {
+      "capture_start_frame": 114960,
+      "competing_ncc": 0.5497284251361592,
+      "confident": true,
+      "ncc": 0.9999696465852678,
+      "offset_frames": 77760,
+      "reference_end_frame": 43200,
+      "reference_start_frame": 37200
+    },
+    {
+      "capture_start_frame": 116160,
+      "competing_ncc": 0.37008749433073646,
+      "confident": true,
+      "ncc": 0.9999767950342421,
+      "offset_frames": 77760,
+      "reference_end_frame": 44400,
+      "reference_start_frame": 38400
+    },
+    {
+      "capture_start_frame": 117360,
+      "competing_ncc": 0.27235562657176715,
+      "confident": true,
+      "ncc": 0.999979235963201,
+      "offset_frames": 77760,
+      "reference_end_frame": 45600,
+      "reference_start_frame": 39600
+    },
+    {
+      "capture_start_frame": 118560,
+      "competing_ncc": 0.2628121730206063,
+      "confident": true,
+      "ncc": 0.9999795580204852,
+      "offset_frames": 77760,
+      "reference_end_frame": 46800,
+      "reference_start_frame": 40800
+    },
+    {
+      "capture_start_frame": 119760,
+      "competing_ncc": 0.3746692071905518,
+      "confident": true,
+      "ncc": 0.9999922254445031,
+      "offset_frames": 77760,
+      "reference_end_frame": 48000,
+      "reference_start_frame": 42000
+    },
+    {
+      "capture_start_frame": 120960,
+      "competing_ncc": 0.38135997343361483,
+      "confident": true,
+      "ncc": 0.9999920919343808,
+      "offset_frames": 77760,
+      "reference_end_frame": 49200,
+      "reference_start_frame": 43200
+    },
+    {
+      "capture_start_frame": 122160,
+      "competing_ncc": 0.37798503689050134,
+      "confident": true,
+      "ncc": 0.9999912431121617,
+      "offset_frames": 77760,
+      "reference_end_frame": 50400,
+      "reference_start_frame": 44400
+    },
+    {
+      "capture_start_frame": 123360,
+      "competing_ncc": 0.3441526103434464,
+      "confident": true,
+      "ncc": 0.9999926118197994,
+      "offset_frames": 77760,
+      "reference_end_frame": 51600,
+      "reference_start_frame": 45600
+    },
+    {
+      "capture_start_frame": 124560,
+      "competing_ncc": 0.3701761400637966,
+      "confident": true,
+      "ncc": 0.9996576407825223,
+      "offset_frames": 77760,
+      "reference_end_frame": 52800,
+      "reference_start_frame": 46800
+    },
+    {
+      "capture_start_frame": 341760,
+      "competing_ncc": 0.47335974284839905,
+      "confident": true,
+      "ncc": 0.9999630070867664,
+      "offset_frames": 77760,
+      "reference_end_frame": 270000,
+      "reference_start_frame": 264000
+    },
+    {
+      "capture_start_frame": 342960,
+      "competing_ncc": 0.4411810679274216,
+      "confident": true,
+      "ncc": 0.9995395331028833,
+      "offset_frames": 77760,
+      "reference_end_frame": 271200,
+      "reference_start_frame": 265200
+    },
+    {
+      "capture_start_frame": 344160,
+      "competing_ncc": 0.31866807428322835,
+      "confident": true,
+      "ncc": 0.9995873343496993,
+      "offset_frames": 77760,
+      "reference_end_frame": 272400,
+      "reference_start_frame": 266400
+    },
+    {
+      "capture_start_frame": 345360,
+      "competing_ncc": 0.2661451492095545,
+      "confident": true,
+      "ncc": 0.9996488631172945,
+      "offset_frames": 77760,
+      "reference_end_frame": 273600,
+      "reference_start_frame": 267600
+    },
+    {
+      "capture_start_frame": 346560,
+      "competing_ncc": 0.2583824424802162,
+      "confident": true,
+      "ncc": 0.9996597789249002,
+      "offset_frames": 77760,
+      "reference_end_frame": 274800,
+      "reference_start_frame": 268800
+    },
+    {
+      "capture_start_frame": 347760,
+      "competing_ncc": 0.343262115155748,
+      "confident": true,
+      "ncc": 0.9993026545128287,
+      "offset_frames": 77760,
+      "reference_end_frame": 276000,
+      "reference_start_frame": 270000
+    },
+    {
+      "capture_start_frame": 348960,
+      "competing_ncc": 0.3225615895450473,
+      "confident": true,
+      "ncc": 0.9995593599370979,
+      "offset_frames": 77760,
+      "reference_end_frame": 277200,
+      "reference_start_frame": 271200
+    },
+    {
+      "capture_start_frame": 350160,
+      "competing_ncc": 0.3210071335578937,
+      "confident": true,
+      "ncc": 0.9996016045100627,
+      "offset_frames": 77760,
+      "reference_end_frame": 278400,
+      "reference_start_frame": 272400
+    },
+    {
+      "capture_start_frame": 351360,
+      "competing_ncc": 0.2604800857949442,
+      "confident": true,
+      "ncc": 0.9994670858922804,
+      "offset_frames": 77760,
+      "reference_end_frame": 279600,
+      "reference_start_frame": 273600
+    },
+    {
+      "capture_start_frame": 352560,
+      "competing_ncc": 0.3193222443983707,
+      "confident": true,
+      "ncc": 0.9992270676654588,
+      "offset_frames": 77760,
+      "reference_end_frame": 280800,
+      "reference_start_frame": 274800
+    },
+    {
+      "capture_start_frame": 353760,
+      "competing_ncc": 0.3231152693414552,
+      "confident": true,
+      "ncc": 0.9997283351672951,
+      "offset_frames": 77760,
+      "reference_end_frame": 282000,
+      "reference_start_frame": 276000
+    },
+    {
+      "capture_start_frame": 354960,
+      "competing_ncc": 0.4020860735650405,
+      "confident": true,
+      "ncc": 0.9999900064435912,
+      "offset_frames": 77760,
+      "reference_end_frame": 283200,
+      "reference_start_frame": 277200
+    },
+    {
+      "capture_start_frame": 356160,
+      "competing_ncc": 0.25607286107294763,
+      "confident": true,
+      "ncc": 0.9999856798321396,
+      "offset_frames": 77760,
+      "reference_end_frame": 284400,
+      "reference_start_frame": 278400
+    },
+    {
+      "capture_start_frame": 357360,
+      "competing_ncc": 0.30898335492364776,
+      "confident": true,
+      "ncc": 0.9999842121064338,
+      "offset_frames": 77760,
+      "reference_end_frame": 285600,
+      "reference_start_frame": 279600
+    },
+    {
+      "capture_start_frame": 358560,
+      "competing_ncc": 0.44413611887070453,
+      "confident": true,
+      "ncc": 0.9999873227494422,
+      "offset_frames": 77760,
+      "reference_end_frame": 286800,
+      "reference_start_frame": 280800
+    },
+    {
+      "capture_start_frame": 359760,
+      "competing_ncc": 0.41288760817353387,
+      "confident": true,
+      "ncc": 0.9997216849114968,
+      "offset_frames": 77760,
+      "reference_end_frame": 288000,
+      "reference_start_frame": 282000
+    },
+    {
+      "capture_start_frame": 361510,
+      "competing_ncc": 0.5332895782671759,
+      "confident": true,
+      "ncc": 0.9905098770854461,
+      "offset_frames": 78310,
+      "reference_end_frame": 289200,
+      "reference_start_frame": 283200
+    },
+    {
+      "capture_start_frame": 362710,
+      "competing_ncc": 0.5210446462906709,
+      "confident": true,
+      "ncc": 0.9996064901917746,
+      "offset_frames": 78310,
+      "reference_end_frame": 290400,
+      "reference_start_frame": 284400
+    },
+    {
+      "capture_start_frame": 363910,
+      "competing_ncc": 0.639857075520868,
+      "confident": true,
+      "ncc": 0.9999769191957332,
+      "offset_frames": 78310,
+      "reference_end_frame": 291600,
+      "reference_start_frame": 285600
+    },
+    {
+      "capture_start_frame": 365110,
+      "competing_ncc": 0.590923168431724,
+      "confident": true,
+      "ncc": 0.999983198196406,
+      "offset_frames": 78310,
+      "reference_end_frame": 292800,
+      "reference_start_frame": 286800
+    },
+    {
+      "capture_start_frame": 366310,
+      "competing_ncc": 0.5081412148585638,
+      "confident": true,
+      "ncc": 0.9999917466599851,
+      "offset_frames": 78310,
+      "reference_end_frame": 294000,
+      "reference_start_frame": 288000
+    },
+    {
+      "capture_start_frame": 367510,
+      "competing_ncc": 0.50701890588147,
+      "confident": true,
+      "ncc": 0.9999401678569078,
+      "offset_frames": 78310,
+      "reference_end_frame": 295200,
+      "reference_start_frame": 289200
+    },
+    {
+      "capture_start_frame": 368710,
+      "competing_ncc": 0.5934842202491873,
+      "confident": true,
+      "ncc": 0.9999246172456695,
+      "offset_frames": 78310,
+      "reference_end_frame": 296400,
+      "reference_start_frame": 290400
+    },
+    {
+      "capture_start_frame": 369910,
+      "competing_ncc": 0.39498189083399654,
+      "confident": true,
+      "ncc": 0.9999196043389363,
+      "offset_frames": 78310,
+      "reference_end_frame": 297600,
+      "reference_start_frame": 291600
+    },
+    {
+      "capture_start_frame": 371110,
+      "competing_ncc": 0.5287845564815519,
+      "confident": true,
+      "ncc": 0.9999124175028292,
+      "offset_frames": 78310,
+      "reference_end_frame": 298800,
+      "reference_start_frame": 292800
+    },
+    {
+      "capture_start_frame": 372310,
+      "competing_ncc": 0.6557792542455262,
+      "confident": true,
+      "ncc": 0.9999232702363138,
+      "offset_frames": 78310,
+      "reference_end_frame": 300000,
+      "reference_start_frame": 294000
+    },
+    {
+      "capture_start_frame": 373510,
+      "competing_ncc": 0.6219310214636179,
+      "confident": true,
+      "ncc": 0.9999978730147598,
+      "offset_frames": 78310,
+      "reference_end_frame": 301200,
+      "reference_start_frame": 295200
+    },
+    {
+      "capture_start_frame": 374710,
+      "competing_ncc": 0.598292794590228,
+      "confident": true,
+      "ncc": 0.9999973321443738,
+      "offset_frames": 78310,
+      "reference_end_frame": 302400,
+      "reference_start_frame": 296400
+    },
+    {
+      "capture_start_frame": 375910,
+      "competing_ncc": 0.5920914237293741,
+      "confident": true,
+      "ncc": 0.9999741506607196,
+      "offset_frames": 78310,
+      "reference_end_frame": 303600,
+      "reference_start_frame": 297600
+    },
+    {
+      "capture_start_frame": 377110,
+      "competing_ncc": 0.4247234135732954,
+      "confident": true,
+      "ncc": 0.9999656993732484,
+      "offset_frames": 78310,
+      "reference_end_frame": 304800,
+      "reference_start_frame": 298800
+    },
+    {
+      "capture_start_frame": 378310,
+      "competing_ncc": 0.36157850427178745,
+      "confident": true,
+      "ncc": 0.9999606055711,
+      "offset_frames": 78310,
+      "reference_end_frame": 306000,
+      "reference_start_frame": 300000
+    },
+    {
+      "capture_start_frame": 379510,
+      "competing_ncc": 0.3252803121101271,
+      "confident": true,
+      "ncc": 0.9999613592365291,
+      "offset_frames": 78310,
+      "reference_end_frame": 307200,
+      "reference_start_frame": 301200
+    },
+    {
+      "capture_start_frame": 380710,
+      "competing_ncc": 0.4416599138976125,
+      "confident": true,
+      "ncc": 0.9999476547675342,
+      "offset_frames": 78310,
+      "reference_end_frame": 308400,
+      "reference_start_frame": 302400
+    },
+    {
+      "capture_start_frame": 381910,
+      "competing_ncc": 0.4042762411028609,
+      "confident": true,
+      "ncc": 0.9999990856837375,
+      "offset_frames": 78310,
+      "reference_end_frame": 309600,
+      "reference_start_frame": 303600
+    },
+    {
+      "capture_start_frame": 383110,
+      "competing_ncc": 0.4475718681357173,
+      "confident": true,
+      "ncc": 0.999999587505852,
+      "offset_frames": 78310,
+      "reference_end_frame": 310800,
+      "reference_start_frame": 304800
+    },
+    {
+      "capture_start_frame": 384310,
+      "competing_ncc": 0.43426396636980574,
+      "confident": true,
+      "ncc": 0.9999996911604394,
+      "offset_frames": 78310,
+      "reference_end_frame": 312000,
+      "reference_start_frame": 306000
+    },
+    {
+      "capture_start_frame": 385510,
+      "competing_ncc": 0.4651240300435266,
+      "confident": true,
+      "ncc": 0.9999997356312326,
+      "offset_frames": 78310,
+      "reference_end_frame": 313200,
+      "reference_start_frame": 307200
+    },
+    {
+      "capture_start_frame": 386710,
+      "competing_ncc": 0.33402430890597723,
+      "confident": true,
+      "ncc": 0.9999996674908288,
+      "offset_frames": 78310,
+      "reference_end_frame": 314400,
+      "reference_start_frame": 308400
+    },
+    {
+      "capture_start_frame": 387910,
+      "competing_ncc": 0.3399214309737266,
+      "confident": true,
+      "ncc": 0.9999995819080835,
+      "offset_frames": 78310,
+      "reference_end_frame": 315600,
+      "reference_start_frame": 309600
+    },
+    {
+      "capture_start_frame": 389110,
+      "competing_ncc": 0.3074408677691903,
+      "confident": true,
+      "ncc": 0.9999994875130896,
+      "offset_frames": 78310,
+      "reference_end_frame": 316800,
+      "reference_start_frame": 310800
+    },
+    {
+      "capture_start_frame": 630310,
+      "competing_ncc": 0.2494936460255506,
+      "confident": true,
+      "ncc": 0.9999582327253601,
+      "offset_frames": 78310,
+      "reference_end_frame": 558000,
+      "reference_start_frame": 552000
+    },
+    {
+      "capture_start_frame": 631510,
+      "competing_ncc": 0.4858959325029732,
+      "confident": true,
+      "ncc": 0.9999885447510097,
+      "offset_frames": 78310,
+      "reference_end_frame": 559200,
+      "reference_start_frame": 553200
+    },
+    {
+      "capture_start_frame": 632710,
+      "competing_ncc": 0.4142979870969897,
+      "confident": true,
+      "ncc": 0.9999879033710245,
+      "offset_frames": 78310,
+      "reference_end_frame": 560400,
+      "reference_start_frame": 554400
+    },
+    {
+      "capture_start_frame": 633910,
+      "competing_ncc": 0.4594191219430353,
+      "confident": true,
+      "ncc": 0.9999891575899382,
+      "offset_frames": 78310,
+      "reference_end_frame": 561600,
+      "reference_start_frame": 555600
+    },
+    {
+      "capture_start_frame": 635110,
+      "competing_ncc": 0.34774329431642514,
+      "confident": true,
+      "ncc": 0.999989550781997,
+      "offset_frames": 78310,
+      "reference_end_frame": 562800,
+      "reference_start_frame": 556800
+    },
+    {
+      "capture_start_frame": 636310,
+      "competing_ncc": 0.37322845677481814,
+      "confident": true,
+      "ncc": 0.9999914632545506,
+      "offset_frames": 78310,
+      "reference_end_frame": 564000,
+      "reference_start_frame": 558000
+    },
+    {
+      "capture_start_frame": 637510,
+      "competing_ncc": 0.5020671340721248,
+      "confident": true,
+      "ncc": 0.9999933486965337,
+      "offset_frames": 78310,
+      "reference_end_frame": 565200,
+      "reference_start_frame": 559200
+    },
+    {
+      "capture_start_frame": 638710,
+      "competing_ncc": 0.5131819272880199,
+      "confident": true,
+      "ncc": 0.9999952353978437,
+      "offset_frames": 78310,
+      "reference_end_frame": 566400,
+      "reference_start_frame": 560400
+    },
+    {
+      "capture_start_frame": 639910,
+      "competing_ncc": 0.4734435912223756,
+      "confident": true,
+      "ncc": 0.999994390519932,
+      "offset_frames": 78310,
+      "reference_end_frame": 567600,
+      "reference_start_frame": 561600
+    },
+    {
+      "capture_start_frame": 641110,
+      "competing_ncc": 0.43494452581563864,
+      "confident": true,
+      "ncc": 0.9999948868113931,
+      "offset_frames": 78310,
+      "reference_end_frame": 568800,
+      "reference_start_frame": 562800
+    },
+    {
+      "capture_start_frame": 642310,
+      "competing_ncc": 0.25505446546920807,
+      "confident": true,
+      "ncc": 0.9999937523666932,
+      "offset_frames": 78310,
+      "reference_end_frame": 570000,
+      "reference_start_frame": 564000
+    },
+    {
+      "capture_start_frame": 643510,
+      "competing_ncc": 0.2283561197336766,
+      "confident": true,
+      "ncc": 0.9999894241012247,
+      "offset_frames": 78310,
+      "reference_end_frame": 571200,
+      "reference_start_frame": 565200
+    },
+    {
+      "capture_start_frame": 644710,
+      "competing_ncc": 0.3079499876347124,
+      "confident": true,
+      "ncc": 0.9999805208524883,
+      "offset_frames": 78310,
+      "reference_end_frame": 572400,
+      "reference_start_frame": 566400
+    },
+    {
+      "capture_start_frame": 645910,
+      "competing_ncc": 0.40858110933345443,
+      "confident": true,
+      "ncc": 0.9999675021263427,
+      "offset_frames": 78310,
+      "reference_end_frame": 573600,
+      "reference_start_frame": 567600
+    },
+    {
+      "capture_start_frame": 647110,
+      "competing_ncc": 0.42262789028934056,
+      "confident": true,
+      "ncc": 0.9999163047925943,
+      "offset_frames": 78310,
+      "reference_end_frame": 574800,
+      "reference_start_frame": 568800
+    },
+    {
+      "capture_start_frame": 648310,
+      "competing_ncc": 0.34362838064411155,
+      "confident": false,
+      "ncc": 0.899103687065765,
+      "offset_frames": 78310,
+      "reference_end_frame": 576000,
+      "reference_start_frame": 570000
+    },
+    {
+      "capture_start_frame": 649722,
+      "competing_ncc": 0.6149893014656156,
+      "confident": true,
+      "ncc": 0.9965658008104509,
+      "offset_frames": 78522,
+      "reference_end_frame": 577200,
+      "reference_start_frame": 571200
+    },
+    {
+      "capture_start_frame": 650922,
+      "competing_ncc": 0.44386222939098285,
+      "confident": true,
+      "ncc": 0.9999726794454974,
+      "offset_frames": 78522,
+      "reference_end_frame": 578400,
+      "reference_start_frame": 572400
+    },
+    {
+      "capture_start_frame": 652122,
+      "competing_ncc": 0.4360752336200357,
+      "confident": true,
+      "ncc": 0.9999920798931364,
+      "offset_frames": 78522,
+      "reference_end_frame": 579600,
+      "reference_start_frame": 573600
+    },
+    {
+      "capture_start_frame": 653322,
+      "competing_ncc": 0.3699411116501391,
+      "confident": true,
+      "ncc": 0.9999915701789126,
+      "offset_frames": 78522,
+      "reference_end_frame": 580800,
+      "reference_start_frame": 574800
+    },
+    {
+      "capture_start_frame": 654522,
+      "competing_ncc": 0.3689070103572826,
+      "confident": true,
+      "ncc": 0.9999842975945143,
+      "offset_frames": 78522,
+      "reference_end_frame": 582000,
+      "reference_start_frame": 576000
+    },
+    {
+      "capture_start_frame": 655722,
+      "competing_ncc": 0.30315196961707175,
+      "confident": true,
+      "ncc": 0.999981513629679,
+      "offset_frames": 78522,
+      "reference_end_frame": 583200,
+      "reference_start_frame": 577200
+    },
+    {
+      "capture_start_frame": 656922,
+      "competing_ncc": 0.38857227152639606,
+      "confident": true,
+      "ncc": 0.9999739142471248,
+      "offset_frames": 78522,
+      "reference_end_frame": 584400,
+      "reference_start_frame": 578400
+    },
+    {
+      "capture_start_frame": 658122,
+      "competing_ncc": 0.3921019892453413,
+      "confident": true,
+      "ncc": 0.9999419228045723,
+      "offset_frames": 78522,
+      "reference_end_frame": 585600,
+      "reference_start_frame": 579600
+    },
+    {
+      "capture_start_frame": 659322,
+      "competing_ncc": 0.4294015502323663,
+      "confident": true,
+      "ncc": 0.9999488539271264,
+      "offset_frames": 78522,
+      "reference_end_frame": 586800,
+      "reference_start_frame": 580800
+    },
+    {
+      "capture_start_frame": 660522,
+      "competing_ncc": 0.44075203455934614,
+      "confident": true,
+      "ncc": 0.9999567149773912,
+      "offset_frames": 78522,
+      "reference_end_frame": 588000,
+      "reference_start_frame": 582000
+    },
+    {
+      "capture_start_frame": 661722,
+      "competing_ncc": 0.4270140676304864,
+      "confident": true,
+      "ncc": 0.9999420931513489,
+      "offset_frames": 78522,
+      "reference_end_frame": 589200,
+      "reference_start_frame": 583200
+    },
+    {
+      "capture_start_frame": 662922,
+      "competing_ncc": 0.24403328861822057,
+      "confident": true,
+      "ncc": 0.9999557835948689,
+      "offset_frames": 78522,
+      "reference_end_frame": 590400,
+      "reference_start_frame": 584400
+    },
+    {
+      "capture_start_frame": 664122,
+      "competing_ncc": 0.32842699813526616,
+      "confident": true,
+      "ncc": 0.9999914537889595,
+      "offset_frames": 78522,
+      "reference_end_frame": 591600,
+      "reference_start_frame": 585600
+    },
+    {
+      "capture_start_frame": 665322,
+      "competing_ncc": 0.48398168567915895,
+      "confident": true,
+      "ncc": 0.9999912635445009,
+      "offset_frames": 78522,
+      "reference_end_frame": 592800,
+      "reference_start_frame": 586800
+    },
+    {
+      "capture_start_frame": 666522,
+      "competing_ncc": 0.5228118857777924,
+      "confident": true,
+      "ncc": 0.9999944909647609,
+      "offset_frames": 78522,
+      "reference_end_frame": 594000,
+      "reference_start_frame": 588000
+    },
+    {
+      "capture_start_frame": 667722,
+      "competing_ncc": 0.5879199787042303,
+      "confident": true,
+      "ncc": 0.9999955350179893,
+      "offset_frames": 78522,
+      "reference_end_frame": 595200,
+      "reference_start_frame": 589200
+    },
+    {
+      "capture_start_frame": 668922,
+      "competing_ncc": 0.7153500444449469,
+      "confident": true,
+      "ncc": 0.9999959766296769,
+      "offset_frames": 78522,
+      "reference_end_frame": 596400,
+      "reference_start_frame": 590400
+    },
+    {
+      "capture_start_frame": 670122,
+      "competing_ncc": 0.7114086584673218,
+      "confident": true,
+      "ncc": 0.9999956500662542,
+      "offset_frames": 78522,
+      "reference_end_frame": 597600,
+      "reference_start_frame": 591600
+    },
+    {
+      "capture_start_frame": 671322,
+      "competing_ncc": 0.7549847264003553,
+      "confident": true,
+      "ncc": 0.9999955974117243,
+      "offset_frames": 78522,
+      "reference_end_frame": 598800,
+      "reference_start_frame": 592800
+    },
+    {
+      "capture_start_frame": 672522,
+      "competing_ncc": 0.3869589371883066,
+      "confident": true,
+      "ncc": 0.999988085237967,
+      "offset_frames": 78522,
+      "reference_end_frame": 600000,
+      "reference_start_frame": 594000
+    },
+    {
+      "capture_start_frame": 673722,
+      "competing_ncc": 0.3547649583899426,
+      "confident": true,
+      "ncc": 0.9999971024329731,
+      "offset_frames": 78522,
+      "reference_end_frame": 601200,
+      "reference_start_frame": 595200
+    },
+    {
+      "capture_start_frame": 674922,
+      "competing_ncc": 0.4339874049496655,
+      "confident": true,
+      "ncc": 0.9999973013500366,
+      "offset_frames": 78522,
+      "reference_end_frame": 602400,
+      "reference_start_frame": 596400
+    },
+    {
+      "capture_start_frame": 676122,
+      "competing_ncc": 0.21539477232911233,
+      "confident": true,
+      "ncc": 0.9999944127911911,
+      "offset_frames": 78522,
+      "reference_end_frame": 603600,
+      "reference_start_frame": 597600
+    },
+    {
+      "capture_start_frame": 677322,
+      "competing_ncc": 0.7155095905495774,
+      "confident": true,
+      "ncc": 0.9999968930224379,
+      "offset_frames": 78522,
+      "reference_end_frame": 604800,
+      "reference_start_frame": 598800
+    }
+  ],
+  "scope": "Short local anchors ONLY to locate observed offset changes; never used to warp, resample, or convert the failed whole-reference result to a pass",
+  "source_run_id": 45049366545,
+  "window_frames": 6000
+}

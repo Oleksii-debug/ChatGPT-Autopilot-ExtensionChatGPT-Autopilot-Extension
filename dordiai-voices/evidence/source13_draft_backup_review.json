@@ -1,0 +1,48 @@
+{
+  "format": "dordiai-dev13-draft-backup-review",
+  "format_version": 1,
+  "files": [
+    {
+      "path": "dordiai-voices/tools/draft_core13_backup.py",
+      "bytes": 20187,
+      "sha256": "bee60311b4e577ee80456c7d0e89a93d89a9cee0e739d070bd1eeb7a62812d54",
+      "git_sha": "04d881667d190c915b9adb04f3126d121f2df983"
+    },
+    {
+      "path": "dordiai-voices/tests/test_draft_core13_backup.py",
+      "bytes": 14266,
+      "sha256": "cf489698030bf074f1bd47c5b20caf3b80f57646fe1aefa0437835fe5bee48b2",
+      "git_sha": "282f40bd7c1ddd5e73b9c7b502215aef974266ec"
+    },
+    {
+      "path": ".github/workflows/dordiai-core13-backup.yml",
+      "bytes": 2256,
+      "sha256": "7a0ba0bee798ea22b701243729fb4bd1132ec138bf027722ead301983f08ce34",
+      "git_sha": "2ebeb36644a89fd27e9ac0c5feaaf88340371b33"
+    }
+  ],
+  "actual_build_pin": "9c4a464c4f7844ccb4d47da80e5a4b5d9405a9d2",
+  "source13_proof_index": "9d8f44e88cb2a2c126318dd4f2496b9340d19710",
+  "marker": "[backup-dev13]",
+  "tag": "dordiai-voices-dev13-engineering-backup",
+  "storage_anchor": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+  "binary_source": "2d70515a4c49413efcb23198491bbc675a55db0a",
+  "source_run": 45049806570,
+  "artifact_id": 14765535864,
+  "core_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+  "core_bytes": 1992990314,
+  "core_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+  "tests": {
+    "total": 17,
+    "passed": 17,
+    "actual_remote_run": false
+  },
+  "historical11_12_unchanged": true,
+  "reviewed_logic": "Exact audited12 ownership/no-overwrite/full-readback helper pattern; new13 identities/body/scope, artifact metadata now read from actual13 build pin and strict placeholder/workflow/artifact fields checked",
+  "scope": "Create or resume ONLY the exact owned unpublished13 DRAFT, core+receipt assets only, full SHA256 readback for both, no publication/ref updates/asset replacements/deletions. Distinct from all11/12 drafts.",
+  "remaining": "Parent review/launch; actual two-asset readback and draft state must pass before durable-backup success claim.",
+  "nvda_verified_by_source_workflow": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "product_ready": false
+}

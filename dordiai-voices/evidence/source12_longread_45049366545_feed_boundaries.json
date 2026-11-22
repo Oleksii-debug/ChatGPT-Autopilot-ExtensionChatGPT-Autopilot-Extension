@@ -1,0 +1,354 @@
+{
+  "acoustic_latency_verified": false,
+  "captured_frames": 2159520,
+  "format": "dordiai-diagnostic-feed-boundary-segment-comparison",
+  "format_version": 1,
+  "full_reference_gate_passed": false,
+  "full_reference_ncc": 0.5856072658391752,
+  "observed_added_intervals": [
+    {
+      "added_frames": 895,
+      "added_ms": 37.291666666666664,
+      "capture_first_frame": 93010,
+      "capture_gap_start_minus_previous_feed_return_ms": 244.256566666687,
+      "capture_last_exclusive": 93905,
+      "captured_piece_peak_lsb": 1.0,
+      "captured_piece_rms_lsb": 0.47742325131255886,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 69,
+      "feed_gap_before_next_call_ms": 242.3694,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649761457,
+          "packet": 385,
+          "qpc_position_100ns": 4649640858,
+          "retained_first_frame": 92400,
+          "retained_frames": 240,
+          "retained_offset_frames": 92400
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649861191,
+          "packet": 386,
+          "qpc_position_100ns": 4649740858,
+          "retained_first_frame": 92640,
+          "retained_frames": 240,
+          "retained_offset_frames": 92640
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649974851,
+          "packet": 387,
+          "qpc_position_100ns": 4649840858,
+          "retained_first_frame": 92880,
+          "retained_frames": 240,
+          "retained_offset_frames": 92880
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650058961,
+          "packet": 388,
+          "qpc_position_100ns": 4649940858,
+          "retained_first_frame": 93120,
+          "retained_frames": 240,
+          "retained_offset_frames": 93120
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650160577,
+          "packet": 389,
+          "qpc_position_100ns": 4650040858,
+          "retained_first_frame": 93360,
+          "retained_frames": 240,
+          "retained_offset_frames": 93360
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650260608,
+          "packet": 390,
+          "qpc_position_100ns": 4650140858,
+          "retained_first_frame": 93600,
+          "retained_frames": 240,
+          "retained_offset_frames": 93600
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650368555,
+          "packet": 391,
+          "qpc_position_100ns": 4650240858,
+          "retained_first_frame": 93840,
+          "retained_frames": 240,
+          "retained_offset_frames": 93840
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650471722,
+          "packet": 392,
+          "qpc_position_100ns": 4650340858,
+          "retained_first_frame": 94080,
+          "retained_frames": 240,
+          "retained_offset_frames": 94080
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650565737,
+          "packet": 393,
+          "qpc_position_100ns": 4650440858,
+          "retained_first_frame": 94320,
+          "retained_frames": 240,
+          "retained_offset_frames": 94320
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -39.17883333331299,
+      "reference_boundary_frame": 16145,
+      "reference_boundary_seconds": 0.6727083333333334
+    },
+    {
+      "added_frames": 550,
+      "added_ms": 22.916666666666664,
+      "capture_first_frame": 365755,
+      "capture_gap_start_minus_previous_feed_return_ms": 182.460966666687,
+      "capture_last_exclusive": 366305,
+      "captured_piece_peak_lsb": 5.0,
+      "captured_piece_rms_lsb": 0.5892985043869764,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 1229,
+      "feed_gap_before_next_call_ms": 167.1121,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763355781,
+          "packet": 1521,
+          "qpc_position_100ns": 4763240858,
+          "retained_first_frame": 365040,
+          "retained_frames": 240,
+          "retained_offset_frames": 365040
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763464471,
+          "packet": 1522,
+          "qpc_position_100ns": 4763340858,
+          "retained_first_frame": 365280,
+          "retained_frames": 240,
+          "retained_offset_frames": 365280
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763566749,
+          "packet": 1523,
+          "qpc_position_100ns": 4763440858,
+          "retained_first_frame": 365520,
+          "retained_frames": 240,
+          "retained_offset_frames": 365520
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763659072,
+          "packet": 1524,
+          "qpc_position_100ns": 4763540858,
+          "retained_first_frame": 365760,
+          "retained_frames": 240,
+          "retained_offset_frames": 365760
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763757012,
+          "packet": 1525,
+          "qpc_position_100ns": 4763640858,
+          "retained_first_frame": 366000,
+          "retained_frames": 240,
+          "retained_offset_frames": 366000
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763860164,
+          "packet": 1526,
+          "qpc_position_100ns": 4763740858,
+          "retained_first_frame": 366240,
+          "retained_frames": 240,
+          "retained_offset_frames": 366240
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763958669,
+          "packet": 1527,
+          "qpc_position_100ns": 4763840858,
+          "retained_first_frame": 366480,
+          "retained_frames": 240,
+          "retained_offset_frames": 366480
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4764055883,
+          "packet": 1528,
+          "qpc_position_100ns": 4763940858,
+          "retained_first_frame": 366720,
+          "retained_frames": 240,
+          "retained_offset_frames": 366720
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -38.26553333331299,
+      "reference_boundary_frame": 287995,
+      "reference_boundary_seconds": 11.999791666666667
+    },
+    {
+      "added_frames": 212,
+      "added_ms": 8.833333333333334,
+      "capture_first_frame": 653133,
+      "capture_gap_start_minus_previous_feed_return_ms": 243.6468,
+      "capture_last_exclusive": 653345,
+      "captured_piece_peak_lsb": 1.0,
+      "captured_piece_rms_lsb": 0.5,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 2449,
+      "feed_gap_before_next_call_ms": 205.2568,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883165064,
+          "packet": 2719,
+          "qpc_position_100ns": 4883040858,
+          "retained_first_frame": 652560,
+          "retained_frames": 240,
+          "retained_offset_frames": 652560
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883262654,
+          "packet": 2720,
+          "qpc_position_100ns": 4883140858,
+          "retained_first_frame": 652800,
+          "retained_frames": 240,
+          "retained_offset_frames": 652800
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883360767,
+          "packet": 2721,
+          "qpc_position_100ns": 4883240858,
+          "retained_first_frame": 653040,
+          "retained_frames": 240,
+          "retained_offset_frames": 653040
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883464074,
+          "packet": 2722,
+          "qpc_position_100ns": 4883340858,
+          "retained_first_frame": 653280,
+          "retained_frames": 240,
+          "retained_offset_frames": 653280
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883556218,
+          "packet": 2723,
+          "qpc_position_100ns": 4883440858,
+          "retained_first_frame": 653520,
+          "retained_frames": 240,
+          "retained_offset_frames": 653520
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883659243,
+          "packet": 2724,
+          "qpc_position_100ns": 4883540858,
+          "retained_first_frame": 653760,
+          "retained_frames": 240,
+          "retained_offset_frames": 653760
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -47.223333333312986,
+      "reference_boundary_frame": 574823,
+      "reference_boundary_seconds": 23.950958333333332
+    }
+  ],
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "reference_frames": 1405050,
+  "sample_rate": 24000,
+  "scope": "Diagnostic only: four complete adjacent reference segments at independently observed local offsets and ACTUAL feed-call boundaries; this does not repair or pass the failed single-offset full-reference gate",
+  "segments": [
+    {
+      "capture_offset_frames": 76865,
+      "frames": 16145,
+      "ncc": 0.9996625070063645,
+      "reference_first_frame": 0,
+      "reference_last_exclusive": 16145
+    },
+    {
+      "capture_offset_frames": 77760,
+      "frames": 271850,
+      "ncc": 0.9999436458920705,
+      "reference_first_frame": 16145,
+      "reference_last_exclusive": 287995
+    },
+    {
+      "capture_offset_frames": 78310,
+      "frames": 286828,
+      "ncc": 0.9999630716356399,
+      "reference_first_frame": 287995,
+      "reference_last_exclusive": 574823
+    },
+    {
+      "capture_offset_frames": 78522,
+      "frames": 830227,
+      "ncc": 0.9999541042108244,
+      "reference_first_frame": 574823,
+      "reference_last_exclusive": 1405050
+    }
+  ],
+  "source_run_id": 45049366545,
+  "sum_added_frames": 1657,
+  "sum_added_ms": 69.04166666666666,
+  "underrun_cause_not_established_from_this_comparison_alone": true,
+  "warped_waveform_created": false
+}

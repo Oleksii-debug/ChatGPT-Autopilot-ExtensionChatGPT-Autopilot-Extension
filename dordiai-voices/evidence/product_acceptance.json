@@ -676,6 +676,227 @@
       "archive_exists": false,
       "actual_nvda_verified": false,
       "product_ready": false
+    },
+    "source13_build_worker": {
+      "format": "dordiai-source13-actual-build-worker-proof",
+      "format_version": 1,
+      "run_id": 45049806570,
+      "job_id": 137292209768,
+      "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+      "run_status": "completed",
+      "run_conclusion": "success",
+      "source_workflow_path": ".github/workflows/dordiai-source13-integration.yml",
+      "version": "0.13.1-dev.13",
+      "archive": {
+        "filename": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+        "size_bytes": 1992990314,
+        "sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+        "payload_files": 10260,
+        "installed_bytes": 2408769533,
+        "group": "core"
+      },
+      "windows_unit_suite": {
+        "total": 1682,
+        "passed": 1627,
+        "skipped": 55,
+        "failed": 0,
+        "errors": 0,
+        "seconds": 21.54
+      },
+      "preservation": {
+        "existing_model_identity_files": 8510,
+        "existing_prepared_bank_files": 180,
+        "existing_private_files": 1596,
+        "allowed_profiles": 45,
+        "all_existing_bytes_preserved": true,
+        "native_membership_data_descriptor_notice_preserved": true,
+        "new_model_files": 1,
+        "output_model_identity_files": 8511,
+        "new_ar": {
+          "kx47Runtime/models/CharacterNames/ar.json": {
+            "sha256": "5966d74af4bcf9e3a7be2221e7d3a04b481b5598332c32a3cc70ec2097092bb8",
+            "size_bytes": 296127
+          }
+        }
+      },
+      "worker": {
+        "status": "actual-source13-worker225-and-resource-recovery-passed",
+        "shared_dependency_guard": true,
+        "actual_native_cancel": {
+          "status": "passed",
+          "cancel_delay_after_request_ms": 30,
+          "cancel_and_drop_ack_ms": 2.194999999915126,
+          "first_reply_was_already_buffered_audio": false,
+          "scope": "worker protocol only; not NVDA audible stop latency"
+        },
+        "post_cancel_recovery": {
+          "finite_nonzero": true,
+          "first_pcm_ms": 133.50679999996373,
+          "completed_ms": 305.3579999999556,
+          "real_time_factor": 0.4441301739287882,
+          "audio": {
+            "frames": 16501,
+            "duration_seconds": 0.6875416666666667,
+            "peak": 0.46820068359375,
+            "rms": 0.12829636810835315,
+            "nonzero_samples": 16347
+          },
+          "chunks": [
+            {
+              "time_ms": 133.50679999996373,
+              "bytes": 7610
+            },
+            {
+              "time_ms": 134.40060000004905,
+              "bytes": 10032
+            },
+            {
+              "time_ms": 238.1656000000021,
+              "bytes": 12000
+            },
+            {
+              "time_ms": 303.51919999998245,
+              "bytes": 3360
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:ve",
+              "profile": "adam",
+              "speaker": "adam"
+            }
+          ]
+        },
+        "same_worker_resource_removal_and_restore": {
+          "missing_source_rejected_before_pcm": true,
+          "restored_source_emitted_pcm": true,
+          "first_pcm_ms": 2219.0411999999924,
+          "completed_ms": 2725.6186999999272,
+          "real_time_factor": 1.140426234309593,
+          "audio": {
+            "frames": 57360,
+            "duration_seconds": 2.39,
+            "peak": 0.97998046875,
+            "rms": 0.3715057959574923,
+            "nonzero_samples": 42349
+          },
+          "chunks": [
+            {
+              "time_ms": 2219.0411999999924,
+              "bytes": 480
+            },
+            {
+              "time_ms": 2221.6582999999446,
+              "bytes": 32936
+            },
+            {
+              "time_ms": 2366.9982999999775,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 2496.963599999958,
+              "bytes": 31200
+            },
+            {
+              "time_ms": 2719.7764000000006,
+              "bytes": 15516
+            },
+            {
+              "time_ms": 2720.122999999944,
+              "bytes": 20
+            },
+            {
+              "time_ms": 2720.327999999995,
+              "bytes": 3360
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:ss",
+              "profile": "adam",
+              "speaker": "adam"
+            }
+          ]
+        },
+        "actual_selected_profile_cases": 225,
+        "worker_shutdown": {
+          "exit_code": 0,
+          "forced_termination": false
+        }
+      },
+      "all225_pcm_sha_distinct": true,
+      "all8_excluded_voice_checks_passed": true,
+      "default_uk_en_ru_passed": true,
+      "default_worker_exit0_not_forced": true,
+      "artifacts": [
+        {
+          "id": 14765535864,
+          "name": "dordiai-source13-development-core-45049806570",
+          "bytes": 1992992808,
+          "sha256": "cb63dadbab699a1c90309a39e3fe77a5adc9e1c2488ba10b30cefb13d83ad0a4",
+          "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a"
+        },
+        {
+          "id": 14765103202,
+          "name": "dordiai-source13-integration-evidence-45049806570",
+          "bytes": 10403940,
+          "sha256": "aa32c82613f1eef268874cf7f36137e043b8aafa783a1f5d2d3b9e29151cd321",
+          "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a"
+        }
+      ],
+      "receipts": [
+        {
+          "path": "dordiai-voices/evidence/source13-45049806570/build.json.gz",
+          "bytes": 1320,
+          "sha256": "8ee8eb75998ead755d8e60676667e8bb926cde1778d040f2d64f23d33ae34ac6",
+          "git_sha": "8ae567bd4bbef50c06153d5e58ccf766ce7a60f9",
+          "decoded_bytes": 2986,
+          "decoded_sha256": "62a2efb96788a16cf3af77eb0d42af8a4bb8ddde18f1e5c83eb9e791685429de"
+        },
+        {
+          "path": "dordiai-voices/evidence/source13-45049806570/default-engines/report.json.gz",
+          "bytes": 3453,
+          "sha256": "b94848451d0fd7ae7d0df3ae7cea39b21c84f6349955e21043659a815fb670c9",
+          "git_sha": "5b34b187dda956f0dd04cd1bf952408596aaf89a",
+          "decoded_bytes": 21505,
+          "decoded_sha256": "1805ce2733a574db4dbdc290415bb6ac6f37963d26ac957e300e6bd242dc0fa8"
+        },
+        {
+          "path": "dordiai-voices/evidence/source13-45049806570/network-policy.json.gz",
+          "bytes": 257,
+          "sha256": "1724bcc55251b3e075e07fd8fcac033d8af46771ff85f194d50bba980c847519",
+          "git_sha": "9ca8efb2898e541efa6f67de69ea20c87b21ba35",
+          "decoded_bytes": 337,
+          "decoded_sha256": "7fe6f2d931a44c6cc6e25cf8fd18091e85f6a4ea78b895f44508b9c0ee3a1ed0"
+        },
+        {
+          "path": "dordiai-voices/evidence/source13-45049806570/worker225.json.gz",
+          "bytes": 39688,
+          "sha256": "b36cf618df812d0a9448e2da16bdb5965eeb07cd8dac022ca136717397a5f93c",
+          "git_sha": "3fcb023b939299295e33650ac06253b8b188836f",
+          "decoded_bytes": 300158,
+          "decoded_sha256": "e95de3d91fd171e0bad80bc3137f887614f8555376e8bda0445fff42eabbb001"
+        }
+      ],
+      "nvda_verified": false,
+      "physical_audio_verified": false,
+      "pronunciation_verified": false,
+      "typing_verified": false,
+      "product_ready": false,
+      "scope": "Actual Windows immutable13 build and packaged worker at pipe boundary; upcoming NVDA/UI/audio-device gates remain separate",
+      "evidence": "evidence/source13-worker-45049806570.json"
+    },
+    "long_mixed_real_output": {
+      "status": "frozen12_control_complete_reference_failed; future14_bounded_prefetch_experiment_pending",
+      "evidence": "evidence/source12_longread_45049366545.json",
+      "original100_preserved": true,
+      "full_ncc": 0.5856072658391752,
+      "added_silence_ms": 69.0417,
+      "cancel_tail_accepted": false,
+      "physical_audio_verified": false,
+      "product_ready": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product.",
@@ -735,7 +956,7 @@
     "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
   },
   "current_environment_blocker": "Local executor available; actual12 owned virtual WavePlayer phrase capture verified. Physical speaker/microphone and acoustic latency validation unavailable in hosted CI.",
-  "working_source_target_version": "Source13 integration: reviewed V2 leaf/bounded path manager, profile-language policy, durable voice ownership, new Arabic29 data. Actual13 archive/build/NVDA verification pending; immutable actual12 remains available.",
+  "working_source_target_version": "Immutable13 built at2d70515a4c49413efcb23198491bbc675a55db0a; Windows1682total/1627pass/55skip, worker225/default3/recovery pass. Matching nine-mode actual NVDA and real-wx package pipeline now authorized with independently checked actual pin; no product-ready claim.",
   "host_namespace_failure": {
     "run": 45010564271,
     "known_nav_plain_path_chars": 266,
@@ -857,43 +1078,32 @@
     }
   },
   "latest_built_core": {
-    "version": "0.13.1-dev.12",
-    "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
-    "run": 45040668513,
-    "job": 137264162762,
-    "archive_name": "dordiai-voices-0.13.1-dev.12.nvda-addon",
-    "archive_bytes": 1992944744,
-    "archive_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
-    "core_artifact": 14761553443,
-    "evidence_artifact": 14761533502,
-    "windows_tests_total": 1330,
-    "windows_passed": 1280,
-    "windows_skipped": 50,
+    "version": "0.13.1-dev.13",
+    "source_commit": "2d70515a4c49413efcb23198491bbc675a55db0a",
+    "run": 45049806570,
+    "job": 137292209768,
+    "archive_name": "dordiai-voices-0.13.1-dev.13.nvda-addon",
+    "archive_bytes": 1992990314,
+    "archive_sha256": "4aed1ba48e8600dcd5f80bac9b85e5a3d7ce09b209c76a4a2873fe7b9960876d",
+    "installed_bytes": 2408769533,
+    "payload_files": 10260,
+    "core_artifact": 14765535864,
+    "evidence_artifact": 14765103202,
+    "windows_tests_total": 1682,
+    "windows_passed": 1627,
+    "windows_skipped": 55,
     "worker_native_profile_requests": 225,
-    "default3_passed": true,
     "banks_byte_identical": 180,
     "private_files_byte_identical": 1596,
-    "other_models_identity_files_byte_identical": 8508,
-    "reviewed_character_data_exceptions": 2,
+    "old_models_identity_byte_identical": 8510,
+    "new_ar_character_data_files": 1,
     "voice_ids_unchanged": 45,
-    "native_dictionary_descriptor_notice_unchanged": true,
-    "actual_nvda_pipeline_verified": true,
-    "typing_verified": true,
+    "actual_nvda_pipeline_verified": false,
+    "typing_verified": false,
     "physical_audio_verified": false,
     "native_pronunciation_verified": false,
     "product_ready": false,
-    "evidence": "evidence/source12_worker_45040668513.json",
-    "nvda_functional_run": 45041853551,
-    "nvda_evidence": "evidence/source12_nvda_five_mode_result.json",
-    "plain100_lexical_pieces": 102,
-    "plain100_route_mismatches": 0,
-    "actual_typing_cases": 9,
-    "typing_scenario": "standard",
-    "required_resource_recovery_verified": true,
-    "native_dictionary_recovery_verified": true,
-    "wave_player_verified": true,
-    "virtual_waveform_transport_verified": true,
-    "audio_evidence": "evidence/source12_phrase_transport_45042554326.json"
+    "evidence": "evidence/source13-worker-45049806570.json"
   },
   "current_frozen_core_historical10": {
     "version": "0.13.1-dev.10",

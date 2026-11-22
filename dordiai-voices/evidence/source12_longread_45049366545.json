@@ -1,0 +1,1063 @@
+{
+  "acoustic_latency_verified": false,
+  "actual_profile_values": [
+    "adam"
+  ],
+  "actual_rate": 80,
+  "actual_rate_multiplier": 1,
+  "all_actual_request_speed_values": [
+    1.515716566510398
+  ],
+  "all_original_reports_full_pcm_feed_timing_and_logs_preserved_in_zip": true,
+  "all_own_com_interfaces_released": [
+    true,
+    true
+  ],
+  "artifact_id": 14765246228,
+  "artifact_name": "dordiai-real-nvda-owned-longread-capture",
+  "boundary_manager_snapshots": [
+    {
+      "counters": {
+        "feed_entered": 0,
+        "feed_returned": 0,
+        "planner_requests": 0,
+        "public_read_dispatches": 0,
+        "public_read_returns": 0,
+        "wx_heartbeats": 0
+      },
+      "done_notification_seen": false,
+      "driver_closed": false,
+      "driver_default_tempo": 1.515716566510398,
+      "driver_error": "None",
+      "driver_generation": 1,
+      "driver_jobs_size_approximate": 0,
+      "driver_name": "kx47Preview",
+      "driver_paused": false,
+      "driver_rate": 80,
+      "driver_rate_multiplier": 1,
+      "driver_sequences": 0,
+      "driver_thread_alive": true,
+      "driver_type": "synthDrivers.kx47Preview.SynthDriver",
+      "feed_events": 0,
+      "high_level_inputs": 0,
+      "label": "read-boundary-before-public-mode-and-cancel",
+      "manager_current_priority_queue": {
+        "pending_sequence_count": 4,
+        "priority": 0
+      },
+      "manager_indexes_speaking": {
+        "count": 1,
+        "strict_int_items": [
+          1
+        ]
+      },
+      "manager_priority_queues": [
+        {
+          "pending_sequence_count": 4,
+          "priority": 0
+        }
+      ],
+      "manager_should_push_when_done": false,
+      "manager_type": "speech.manager.SpeechManager",
+      "phase": "ready",
+      "planned_routes": 0,
+      "reference_bytes": 0,
+      "selected_synth_is_owned_driver": true,
+      "speech_been_canceled": false,
+      "speech_is_paused": false,
+      "speech_is_speaking": false,
+      "speech_mode": "off",
+      "thread": "MainThread",
+      "when_ns": 461131677200
+    },
+    {
+      "counters": {
+        "feed_entered": 0,
+        "feed_returned": 0,
+        "planner_requests": 0,
+        "public_read_dispatches": 0,
+        "public_read_returns": 0,
+        "wx_heartbeats": 0
+      },
+      "done_notification_seen": false,
+      "driver_closed": false,
+      "driver_default_tempo": 1.515716566510398,
+      "driver_error": "None",
+      "driver_generation": 2,
+      "driver_jobs_size_approximate": 0,
+      "driver_name": "kx47Preview",
+      "driver_paused": false,
+      "driver_rate": 80,
+      "driver_rate_multiplier": 1,
+      "driver_sequences": 0,
+      "driver_thread_alive": true,
+      "driver_type": "synthDrivers.kx47Preview.SynthDriver",
+      "feed_events": 0,
+      "high_level_inputs": 0,
+      "label": "read-boundary-after-public-cancel",
+      "manager_current_priority_queue": null,
+      "manager_indexes_speaking": {
+        "count": 0,
+        "strict_int_items": []
+      },
+      "manager_priority_queues": [],
+      "manager_should_push_when_done": false,
+      "manager_type": "speech.manager.SpeechManager",
+      "phase": "ready",
+      "planned_routes": 0,
+      "reference_bytes": 0,
+      "selected_synth_is_owned_driver": true,
+      "speech_been_canceled": true,
+      "speech_is_paused": false,
+      "speech_is_speaking": false,
+      "speech_mode": "talk",
+      "thread": "MainThread",
+      "when_ns": 461132937700
+    },
+    {
+      "counters": {
+        "feed_entered": 0,
+        "feed_returned": 0,
+        "planner_requests": 0,
+        "public_read_dispatches": 1,
+        "public_read_returns": 1,
+        "wx_heartbeats": 0
+      },
+      "done_notification_seen": false,
+      "driver_closed": false,
+      "driver_default_tempo": 1.515716566510398,
+      "driver_error": "None",
+      "driver_generation": 2,
+      "driver_jobs_size_approximate": 1,
+      "driver_name": "kx47Preview",
+      "driver_paused": false,
+      "driver_rate": 80,
+      "driver_rate_multiplier": 1,
+      "driver_sequences": 1,
+      "driver_thread_alive": true,
+      "driver_type": "synthDrivers.kx47Preview.SynthDriver",
+      "feed_events": 0,
+      "high_level_inputs": 1,
+      "label": "after-public-speakTextInfo",
+      "manager_current_priority_queue": {
+        "pending_sequence_count": 2,
+        "priority": 0
+      },
+      "manager_indexes_speaking": {
+        "count": 1,
+        "strict_int_items": [
+          3
+        ]
+      },
+      "manager_priority_queues": [
+        {
+          "pending_sequence_count": 2,
+          "priority": 0
+        }
+      ],
+      "manager_should_push_when_done": false,
+      "manager_type": "speech.manager.SpeechManager",
+      "phase": "longread",
+      "planned_routes": 0,
+      "reference_bytes": 0,
+      "selected_synth_is_owned_driver": true,
+      "speech_been_canceled": false,
+      "speech_is_paused": false,
+      "speech_is_speaking": true,
+      "speech_mode": "talk",
+      "thread": "MainThread",
+      "when_ns": 461248044900
+    }
+  ],
+  "cancel_api_bracket_is_not_audio_stop_tail": true,
+  "cancel_api_qpc_bracket_ms": 0.5932999999999999,
+  "cancel_clock": {
+    "perf_after_cancel_ns": 552809060000,
+    "perf_before_cancel_ns": 552808462400,
+    "qpc_after_cancel": 5528090578,
+    "qpc_before_cancel": 5528084645,
+    "qpc_frequency": 10000000
+  },
+  "cancel_ownership": {
+    "controller_pid": 7664,
+    "held_controller_creation_filetime": 134398420248632918,
+    "held_target_creation_filetime": 134398420752579566,
+    "helper_parent_pid": 7664,
+    "helper_pid": 5732,
+    "image_sha256": "b3442f222cb677141138dab33a08f9baeae1b3b24b06e2cd9c1bf56083bd15a1",
+    "owned_config": "D:\\a\\_temp\\dordiai-vb46-nvda-longread-45049366545\\nvda-e88a4df936e24183a6687b5d772aa53c\\config",
+    "owned_run_root": "D:\\a\\_temp\\dordiai-vb46-nvda-longread-45049366545\\nvda-e88a4df936e24183a6687b5d772aa53c",
+    "plugin_ready_sha256": "628bb1b686201374e791de0470083606932cb8a6b6b890e3629ff71230d71eef",
+    "same_controller_parent_verified": true,
+    "scope": "Only held official NVDA sibling launched by this exact controller; no arbitrary or system PID",
+    "target_parent_pid": 7664,
+    "target_pid": 2128
+  },
+  "cancel_tail_gate_status": "open",
+  "cancel_tail_verified": false,
+  "captured_frames": 2159520,
+  "captured_pcm": {
+    "filename": "captured.pcm",
+    "sha256": "42b1bb9f82ddb7186c7980fa0389ec58384035aa2f1fab2320d64037044d1d94",
+    "size_bytes": 4319040
+  },
+  "core_input": {
+    "actual_bytes": 1992944744,
+    "actual_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "exists": true,
+    "expected_bytes": 1992944744,
+    "expected_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+    "expected_sha256_well_formed": true,
+    "is_symlink": false,
+    "path": "D:\\a\\_temp\\nvda-capture-core12\\dordiai-voices-0.13.1-dev.12.nvda-addon",
+    "regular_file": true,
+    "unchanged_during_read": true,
+    "verified": true
+  },
+  "device_position_values": [
+    0
+  ],
+  "diagnostic_added_frames_total": 1657,
+  "diagnostic_added_intervals": [
+    {
+      "added_frames": 895,
+      "added_ms": 37.291666666666664,
+      "capture_first_frame": 93010,
+      "capture_gap_start_minus_previous_feed_return_ms": 244.256566666687,
+      "capture_last_exclusive": 93905,
+      "captured_piece_peak_lsb": 1.0,
+      "captured_piece_rms_lsb": 0.47742325131255886,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 69,
+      "feed_gap_before_next_call_ms": 242.3694,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649761457,
+          "packet": 385,
+          "qpc_position_100ns": 4649640858,
+          "retained_first_frame": 92400,
+          "retained_frames": 240,
+          "retained_offset_frames": 92400
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649861191,
+          "packet": 386,
+          "qpc_position_100ns": 4649740858,
+          "retained_first_frame": 92640,
+          "retained_frames": 240,
+          "retained_offset_frames": 92640
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4649974851,
+          "packet": 387,
+          "qpc_position_100ns": 4649840858,
+          "retained_first_frame": 92880,
+          "retained_frames": 240,
+          "retained_offset_frames": 92880
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650058961,
+          "packet": 388,
+          "qpc_position_100ns": 4649940858,
+          "retained_first_frame": 93120,
+          "retained_frames": 240,
+          "retained_offset_frames": 93120
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650160577,
+          "packet": 389,
+          "qpc_position_100ns": 4650040858,
+          "retained_first_frame": 93360,
+          "retained_frames": 240,
+          "retained_offset_frames": 93360
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650260608,
+          "packet": 390,
+          "qpc_position_100ns": 4650140858,
+          "retained_first_frame": 93600,
+          "retained_frames": 240,
+          "retained_offset_frames": 93600
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650368555,
+          "packet": 391,
+          "qpc_position_100ns": 4650240858,
+          "retained_first_frame": 93840,
+          "retained_frames": 240,
+          "retained_offset_frames": 93840
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650471722,
+          "packet": 392,
+          "qpc_position_100ns": 4650340858,
+          "retained_first_frame": 94080,
+          "retained_frames": 240,
+          "retained_offset_frames": 94080
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4650565737,
+          "packet": 393,
+          "qpc_position_100ns": 4650440858,
+          "retained_first_frame": 94320,
+          "retained_frames": 240,
+          "retained_offset_frames": 94320
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -39.17883333331299,
+      "reference_boundary_frame": 16145,
+      "reference_boundary_seconds": 0.6727083333333334
+    },
+    {
+      "added_frames": 550,
+      "added_ms": 22.916666666666664,
+      "capture_first_frame": 365755,
+      "capture_gap_start_minus_previous_feed_return_ms": 182.460966666687,
+      "capture_last_exclusive": 366305,
+      "captured_piece_peak_lsb": 5.0,
+      "captured_piece_rms_lsb": 0.5892985043869764,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 1229,
+      "feed_gap_before_next_call_ms": 167.1121,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763355781,
+          "packet": 1521,
+          "qpc_position_100ns": 4763240858,
+          "retained_first_frame": 365040,
+          "retained_frames": 240,
+          "retained_offset_frames": 365040
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763464471,
+          "packet": 1522,
+          "qpc_position_100ns": 4763340858,
+          "retained_first_frame": 365280,
+          "retained_frames": 240,
+          "retained_offset_frames": 365280
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763566749,
+          "packet": 1523,
+          "qpc_position_100ns": 4763440858,
+          "retained_first_frame": 365520,
+          "retained_frames": 240,
+          "retained_offset_frames": 365520
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763659072,
+          "packet": 1524,
+          "qpc_position_100ns": 4763540858,
+          "retained_first_frame": 365760,
+          "retained_frames": 240,
+          "retained_offset_frames": 365760
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763757012,
+          "packet": 1525,
+          "qpc_position_100ns": 4763640858,
+          "retained_first_frame": 366000,
+          "retained_frames": 240,
+          "retained_offset_frames": 366000
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763860164,
+          "packet": 1526,
+          "qpc_position_100ns": 4763740858,
+          "retained_first_frame": 366240,
+          "retained_frames": 240,
+          "retained_offset_frames": 366240
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4763958669,
+          "packet": 1527,
+          "qpc_position_100ns": 4763840858,
+          "retained_first_frame": 366480,
+          "retained_frames": 240,
+          "retained_offset_frames": 366480
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4764055883,
+          "packet": 1528,
+          "qpc_position_100ns": 4763940858,
+          "retained_first_frame": 366720,
+          "retained_frames": 240,
+          "retained_offset_frames": 366720
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -38.26553333331299,
+      "reference_boundary_frame": 287995,
+      "reference_boundary_seconds": 11.999791666666667
+    },
+    {
+      "added_frames": 212,
+      "added_ms": 8.833333333333334,
+      "capture_first_frame": 653133,
+      "capture_gap_start_minus_previous_feed_return_ms": 243.6468,
+      "capture_last_exclusive": 653345,
+      "captured_piece_peak_lsb": 1.0,
+      "captured_piece_rms_lsb": 0.5,
+      "clock_scope": "Raw software capture packet QPC and Python perf_counter timeline; no physical queued-audio depth or acoustic latency claim",
+      "feed_event_index": 2449,
+      "feed_gap_before_next_call_ms": 205.2568,
+      "nearby_packets": [
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883165064,
+          "packet": 2719,
+          "qpc_position_100ns": 4883040858,
+          "retained_first_frame": 652560,
+          "retained_frames": 240,
+          "retained_offset_frames": 652560
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883262654,
+          "packet": 2720,
+          "qpc_position_100ns": 4883140858,
+          "retained_first_frame": 652800,
+          "retained_frames": 240,
+          "retained_offset_frames": 652800
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883360767,
+          "packet": 2721,
+          "qpc_position_100ns": 4883240858,
+          "retained_first_frame": 653040,
+          "retained_frames": 240,
+          "retained_offset_frames": 653040
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883464074,
+          "packet": 2722,
+          "qpc_position_100ns": 4883340858,
+          "retained_first_frame": 653280,
+          "retained_frames": 240,
+          "retained_offset_frames": 653280
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883556218,
+          "packet": 2723,
+          "qpc_position_100ns": 4883440858,
+          "retained_first_frame": 653520,
+          "retained_frames": 240,
+          "retained_offset_frames": 653520
+        },
+        {
+          "device_position_frames": 0,
+          "flags": 0,
+          "frames": 240,
+          "observed_qpc_ticks": 4883659243,
+          "packet": 2724,
+          "qpc_position_100ns": 4883540858,
+          "retained_first_frame": 653760,
+          "retained_frames": 240,
+          "retained_offset_frames": 653760
+        }
+      ],
+      "next_feed_call_minus_capture_gap_end_ms": -47.223333333312986,
+      "reference_boundary_frame": 574823,
+      "reference_boundary_seconds": 23.950958333333332
+    }
+  ],
+  "diagnostic_added_ms_total": 69.04166666666666,
+  "diagnostic_piecewise_comparison_does_not_convert_global_failure_to_pass": true,
+  "diagnostic_segments_only": [
+    {
+      "capture_offset_frames": 76865,
+      "frames": 16145,
+      "ncc": 0.9996625070063645,
+      "reference_first_frame": 0,
+      "reference_last_exclusive": 16145
+    },
+    {
+      "capture_offset_frames": 77760,
+      "frames": 271850,
+      "ncc": 0.9999436458920705,
+      "reference_first_frame": 16145,
+      "reference_last_exclusive": 287995
+    },
+    {
+      "capture_offset_frames": 78310,
+      "frames": 286828,
+      "ncc": 0.9999630716356399,
+      "reference_first_frame": 287995,
+      "reference_last_exclusive": 574823
+    },
+    {
+      "capture_offset_frames": 78522,
+      "frames": 830227,
+      "ncc": 0.9999541042108244,
+      "reference_first_frame": 574823,
+      "reference_last_exclusive": 1405050
+    }
+  ],
+  "effective_default_tempo": 1.515716566510398,
+  "feed_call_count": 5988,
+  "first_feed_scope": "Actual cold complete public read request to original real WavePlayer.feed entry; not acoustic latency",
+  "format": "dordiai-exact-source12-longread-transport-index",
+  "format_version": 1,
+  "full_reference_gate_passed": false,
+  "gap_cause_not_proven_from_timing_alone": true,
+  "immutable_core_version": "0.13.1-dev.12",
+  "independent_stdlib_math_fsum_complete_ncc": 0.5856072658391733,
+  "input_utf8_sha256": "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16",
+  "job_id": 137290850695,
+  "longread_ownership": {
+    "controller_pid": 7664,
+    "held_controller_creation_filetime": 134398420248632918,
+    "held_target_creation_filetime": 134398420752579566,
+    "helper_parent_pid": 7664,
+    "helper_pid": 8128,
+    "image_sha256": "b3442f222cb677141138dab33a08f9baeae1b3b24b06e2cd9c1bf56083bd15a1",
+    "owned_config": "D:\\a\\_temp\\dordiai-vb46-nvda-longread-45049366545\\nvda-e88a4df936e24183a6687b5d772aa53c\\config",
+    "owned_run_root": "D:\\a\\_temp\\dordiai-vb46-nvda-longread-45049366545\\nvda-e88a4df936e24183a6687b5d772aa53c",
+    "plugin_ready_sha256": "628bb1b686201374e791de0470083606932cb8a6b6b890e3629ff71230d71eef",
+    "same_controller_parent_verified": true,
+    "scope": "Only held official NVDA sibling launched by this exact controller; no arbitrary or system PID",
+    "target_parent_pid": 7664,
+    "target_pid": 2128
+  },
+  "native_helpers_compiled_and_selftests_passed": true,
+  "native_packet_flags_values": [
+    0
+  ],
+  "native_pronunciation_verified": false,
+  "ncc_threshold": 0.98,
+  "no_new_transport_gap_verified": false,
+  "no_waveform_warp_or_resample_used": true,
+  "original_artifact_git_blob": "52b26e24d47ba3e8ab78f525efeb7d89f7582447",
+  "original_artifact_zip_bytes": 5026547,
+  "original_artifact_zip_sha256": "0f59ccda5b47e129071af60eb2e3556fe8cc19329ec684882ba6b5e205614894",
+  "owned_helpers_reaped": true,
+  "owned_nvda_reaped": true,
+  "packet_qpc_delta_100ns_values": [
+    100000
+  ],
+  "physical_audio_verified": false,
+  "planned_request_count": 61,
+  "pnp_cleanup": {
+    "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence",
+    "absence_verified": true,
+    "attempted": true,
+    "driver_store_purge_attempted": false,
+    "removal_requested": true,
+    "removed": true,
+    "scope": "Only this call's exact owned device instance"
+  },
+  "product_ready": false,
+  "reference_frames": 1405050,
+  "reference_pcm": {
+    "filename": "longread-reference.pcm",
+    "sha256": "10d1ddd1653b32b2a77d952203a50ba27c6329ea32ed7a1872eb792696c687f4",
+    "size_bytes": 2810100
+  },
+  "request_to_first_feed_ms": 3135.3696,
+  "route_audit": {
+    "hyphenated_source_forms": [
+      "небесно-голубому",
+      "синевато-сером"
+    ],
+    "input_lexical_piece_count": 102,
+    "input_word_count": 100,
+    "input_words_preserved_in_order": true,
+    "lexical_content_preserved_in_order": true,
+    "mismatches": [],
+    "observed_lexical_piece_count": 102,
+    "observed_word_count": 102,
+    "observed_word_routes": [
+      {
+        "language": "uk",
+        "word": "ольсену"
+      },
+      {
+        "language": "ru",
+        "word": "присмирённая"
+      },
+      {
+        "language": "ru",
+        "word": "доктрину"
+      },
+      {
+        "language": "uk",
+        "word": "галапагосе"
+      },
+      {
+        "language": "ru",
+        "word": "аминбаевны"
+      },
+      {
+        "language": "ru",
+        "word": "курятинами"
+      },
+      {
+        "language": "uk",
+        "word": "витівкових"
+      },
+      {
+        "language": "ru",
+        "word": "прорубишься"
+      },
+      {
+        "language": "ru",
+        "word": "непальцем"
+      },
+      {
+        "language": "uk",
+        "word": "мегакрутими"
+      },
+      {
+        "language": "ru",
+        "word": "ковыляниями"
+      },
+      {
+        "language": "ru",
+        "word": "списались"
+      },
+      {
+        "language": "uk",
+        "word": "утеплювавсь"
+      },
+      {
+        "language": "ru",
+        "word": "припоминаньи"
+      },
+      {
+        "language": "ru",
+        "word": "переволочило"
+      },
+      {
+        "language": "uk",
+        "word": "рушникосушки"
+      },
+      {
+        "language": "ru",
+        "word": "оплёвывающуюся"
+      },
+      {
+        "language": "ru",
+        "word": "антитеатру"
+      },
+      {
+        "language": "uk",
+        "word": "яснесенькою"
+      },
+      {
+        "language": "ru",
+        "word": "ильменским"
+      },
+      {
+        "language": "ru",
+        "word": "небесно"
+      },
+      {
+        "language": "ru",
+        "word": "голубому"
+      },
+      {
+        "language": "uk",
+        "word": "вигибатимеш"
+      },
+      {
+        "language": "ru",
+        "word": "донецки"
+      },
+      {
+        "language": "ru",
+        "word": "нордах"
+      },
+      {
+        "language": "uk",
+        "word": "висловлень"
+      },
+      {
+        "language": "ru",
+        "word": "пожалевши"
+      },
+      {
+        "language": "ru",
+        "word": "затекли"
+      },
+      {
+        "language": "uk",
+        "word": "малопривабливій"
+      },
+      {
+        "language": "ru",
+        "word": "простерёгшего"
+      },
+      {
+        "language": "ru",
+        "word": "спохватитесь"
+      },
+      {
+        "language": "uk",
+        "word": "детектуй"
+      },
+      {
+        "language": "ru",
+        "word": "воспринимала"
+      },
+      {
+        "language": "ru",
+        "word": "кольчуги"
+      },
+      {
+        "language": "uk",
+        "word": "погамував"
+      },
+      {
+        "language": "ru",
+        "word": "зарумянивших"
+      },
+      {
+        "language": "ru",
+        "word": "скверна"
+      },
+      {
+        "language": "uk",
+        "word": "зализуватимусь"
+      },
+      {
+        "language": "ru",
+        "word": "лилиянн"
+      },
+      {
+        "language": "ru",
+        "word": "шапочками"
+      },
+      {
+        "language": "uk",
+        "word": "проголених"
+      },
+      {
+        "language": "ru",
+        "word": "картофелесортировальных"
+      },
+      {
+        "language": "ru",
+        "word": "питого"
+      },
+      {
+        "language": "uk",
+        "word": "попідливано"
+      },
+      {
+        "language": "ru",
+        "word": "низлагаемы"
+      },
+      {
+        "language": "ru",
+        "word": "зашушукайтесь"
+      },
+      {
+        "language": "uk",
+        "word": "найпискливіш"
+      },
+      {
+        "language": "ru",
+        "word": "питиримах"
+      },
+      {
+        "language": "ru",
+        "word": "камуфляже"
+      },
+      {
+        "language": "uk",
+        "word": "розплішіться"
+      },
+      {
+        "language": "ru",
+        "word": "безмельницыны"
+      },
+      {
+        "language": "ru",
+        "word": "уколупнули"
+      },
+      {
+        "language": "uk",
+        "word": "оберстдорфові"
+      },
+      {
+        "language": "ru",
+        "word": "иносказательно"
+      },
+      {
+        "language": "ru",
+        "word": "полонянка"
+      },
+      {
+        "language": "uk",
+        "word": "без'ядерності"
+      },
+      {
+        "language": "ru",
+        "word": "петрунелями"
+      },
+      {
+        "language": "ru",
+        "word": "тумаком"
+      },
+      {
+        "language": "uk",
+        "word": "озимій"
+      },
+      {
+        "language": "ru",
+        "word": "синевато"
+      },
+      {
+        "language": "ru",
+        "word": "сером"
+      },
+      {
+        "language": "ru",
+        "word": "контрпропагандою"
+      },
+      {
+        "language": "uk",
+        "word": "променітимем"
+      },
+      {
+        "language": "ru",
+        "word": "посахаренную"
+      },
+      {
+        "language": "ru",
+        "word": "маликам"
+      },
+      {
+        "language": "uk",
+        "word": "дідуню"
+      },
+      {
+        "language": "ru",
+        "word": "истолковываемое"
+      },
+      {
+        "language": "ru",
+        "word": "червоточиною"
+      },
+      {
+        "language": "uk",
+        "word": "плагіоклазі"
+      },
+      {
+        "language": "ru",
+        "word": "тяготимому"
+      },
+      {
+        "language": "ru",
+        "word": "тугрику"
+      },
+      {
+        "language": "uk",
+        "word": "бережечками"
+      },
+      {
+        "language": "ru",
+        "word": "отсасываемых"
+      },
+      {
+        "language": "ru",
+        "word": "дискомфортах"
+      },
+      {
+        "language": "uk",
+        "word": "драйвували"
+      },
+      {
+        "language": "ru",
+        "word": "саживаешь"
+      },
+      {
+        "language": "ru",
+        "word": "конденсорами"
+      },
+      {
+        "language": "uk",
+        "word": "кріогідратів"
+      },
+      {
+        "language": "ru",
+        "word": "поточенной"
+      },
+      {
+        "language": "ru",
+        "word": "секуляризуй"
+      },
+      {
+        "language": "uk",
+        "word": "діагенезом"
+      },
+      {
+        "language": "ru",
+        "word": "зашлифовывала"
+      },
+      {
+        "language": "ru",
+        "word": "поморочило"
+      },
+      {
+        "language": "uk",
+        "word": "одкочено"
+      },
+      {
+        "language": "ru",
+        "word": "кудесниками"
+      },
+      {
+        "language": "ru",
+        "word": "блефуй"
+      },
+      {
+        "language": "uk",
+        "word": "незім'яте"
+      },
+      {
+        "language": "ru",
+        "word": "взаимопроникающего"
+      },
+      {
+        "language": "ru",
+        "word": "скрипни"
+      },
+      {
+        "language": "ru",
+        "word": "плющена"
+      },
+      {
+        "language": "ru",
+        "word": "термосифонною"
+      },
+      {
+        "language": "ru",
+        "word": "обагритесь"
+      },
+      {
+        "language": "ru",
+        "word": "лонам"
+      },
+      {
+        "language": "ru",
+        "word": "черпав"
+      },
+      {
+        "language": "ru",
+        "word": "неоген"
+      },
+      {
+        "language": "ru",
+        "word": "перешитому"
+      },
+      {
+        "language": "ru",
+        "word": "фталазолом"
+      },
+      {
+        "language": "ru",
+        "word": "латникам"
+      },
+      {
+        "language": "uk",
+        "word": "ольсену"
+      },
+      {
+        "language": "ru",
+        "word": "присмирённая"
+      },
+      {
+        "language": "ru",
+        "word": "доктрину"
+      },
+      {
+        "language": "uk",
+        "word": "галапагосе"
+      }
+    ],
+    "raw_nonwhitespace_text_preserved": true,
+    "raw_punctuation_changes_may_originate_in_nvda_speech_processing": true,
+    "routing_passed": true,
+    "scope": "Every lexical piece of all original finite-source forms; actual segmentation is observed, not bypassed"
+  },
+  "run_id": 45049366545,
+  "sample_rate": 24000,
+  "source_probe_sha256": "7364484b5083d5abb66e3ee86d9a272de593d87357768378d3055457d618334f",
+  "status": "complete-original100-delivered-but-strict-transport-gate-failed",
+  "whole_complete_reference_ncc": 0.5856072658391752,
+  "windows_fixture_counts": [
+    40,
+    19,
+    14,
+    15,
+    18,
+    16
+  ],
+  "windows_fixture_total": 122,
+  "workflow_head": "e62f46371d0b78c4ada84226f6ccb2c8efab6bc0",
+  "workflow_source13_changes_do_not_change_tested_archive": true
+}

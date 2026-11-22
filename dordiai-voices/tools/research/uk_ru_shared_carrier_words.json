@@ -1,0 +1,116 @@
+{
+  "format": "dordiai-uk-ru-unprepared-word-carrier-fixture",
+  "format_version": 1,
+  "profile": "viktoriia",
+  "requested_speed": 1.515716566510398,
+  "source_tempo": 1.0,
+  "shared_steps": 8,
+  "unique_input_count": 20,
+  "cases": [
+    {
+      "id": 1,
+      "language": "uk",
+      "text": "українська"
+    },
+    {
+      "id": 2,
+      "language": "ru",
+      "text": "русский"
+    },
+    {
+      "id": 3,
+      "language": "uk",
+      "text": "ґанок"
+    },
+    {
+      "id": 4,
+      "language": "ru",
+      "text": "подъезд"
+    },
+    {
+      "id": 5,
+      "language": "uk",
+      "text": "їжак"
+    },
+    {
+      "id": 6,
+      "language": "ru",
+      "text": "съёмка"
+    },
+    {
+      "id": 7,
+      "language": "uk",
+      "text": "єдність"
+    },
+    {
+      "id": 8,
+      "language": "ru",
+      "text": "язык"
+    },
+    {
+      "id": 9,
+      "language": "uk",
+      "text": "іскра"
+    },
+    {
+      "id": 10,
+      "language": "ru",
+      "text": "экран"
+    },
+    {
+      "id": 11,
+      "language": "uk",
+      "text": "п'ять"
+    },
+    {
+      "id": 12,
+      "language": "ru",
+      "text": "щётка"
+    },
+    {
+      "id": 13,
+      "language": "uk",
+      "text": "майбутнє"
+    },
+    {
+      "id": 14,
+      "language": "ru",
+      "text": "мышь"
+    },
+    {
+      "id": 15,
+      "language": "uk",
+      "text": "зберегти"
+    },
+    {
+      "id": 16,
+      "language": "ru",
+      "text": "окно"
+    },
+    {
+      "id": 17,
+      "language": "uk",
+      "text": "кнопка"
+    },
+    {
+      "id": 18,
+      "language": "ru",
+      "text": "запись"
+    },
+    {
+      "id": 19,
+      "language": "uk",
+      "text": "читання"
+    },
+    {
+      "id": 20,
+      "language": "ru",
+      "text": "настройки"
+    }
+  ],
+  "scope": "Literal controlled20word performance fixture with explicit trainedUK/RU conditions, no language identification or pronunciation score",
+  "native_pronunciation_verified": false,
+  "production_registered": false,
+  "product_ready": false,
+  "configured_rate": 80
+}

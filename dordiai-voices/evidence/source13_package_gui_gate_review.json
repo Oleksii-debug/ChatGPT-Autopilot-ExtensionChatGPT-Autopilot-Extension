@@ -1,0 +1,53 @@
+{
+  "format": "dordiai-source13-package-gui-candidate",
+  "format_version": 1,
+  "launch_tag": "[source13-package-gui]",
+  "launch_ready": false,
+  "reason": "Actual source13 build pin is still absent; fail-closed existing shared pin must be filled from the successful owned build receipt.",
+  "files": {
+    ".github/workflows/dordiai-source13-package-gui.yml": "32d2df62683d4381c2117b5b34bcc416ff8ff404",
+    "dordiai-voices/tools/validate_source13_package_receipt.py": "aaf5a610e757f26d885707f99d34cbb9c82b0704",
+    "dordiai-voices/tests/test_source13_package_receipt.py": "92e45796e43b17b8ffbd46bd7b7314944c02eb39"
+  },
+  "unchanged_dependencies": {
+    "dordiai-voices/tools/windows_nvda_voice_packages_probe.py": "efec0a54f2ddf9d2a4a56fa283456feec285cc2e",
+    "dordiai-voices/tests/test_windows_nvda_voice_packages_probe.py": "02ede8be43a88c1fd7bbd9d3a90af8a2db32c313",
+    "dordiai-voices/tools/validate_source13_integration_receipt.py": "1d785fb951625b424e4d620426640b5bfab3a73e",
+    "dordiai-voices/tools/data/source13_build_pin.json": "efbe6da02a86e921dd767ce028fd17cc5b567b88"
+  },
+  "scope": {
+    "operations": 10,
+    "api_dispatched_real_wx": true,
+    "native_completion_boxes": true,
+    "full_keyboard_accessibility": false,
+    "native_file_chooser_interaction": false,
+    "restart_upgrade": false,
+    "physical_audio": false,
+    "optional_model_pronunciation": false,
+    "product_ready": false
+  },
+  "verification": {
+    "new_gate_tests": 10,
+    "passed": 10,
+    "unchanged_harness_scaffold_tests": 8,
+    "passed_scaffold": 8,
+    "inline_python_steps_compiled": 4,
+    "actual_source13_execution": false
+  },
+  "guards": [
+    "Shared exact-source13 pin rejects before API request/core download",
+    "Official successful owned source run/workflow/branch/source SHA and artifact ID/name/size/digest verified",
+    "Inner addon exact filename/size/SHA/version checked before NVDA",
+    "Unchanged efec harness Git blob pinned",
+    "Ten ordered real index outcomes, fresh driver/old closed thread/eSpeak/barrier release and unchanged core profile required",
+    "Inactive ownership requires schema2/native list label; active-only requires schema1",
+    "Real Windows modal/error-vs-success text and permitted managed profile SHA preserved",
+    "Exactly one passed native operation check per step with identical observations and final operations10 check"
+  ],
+  "owners": {
+    "workflow_and_gate": "preferences_ui",
+    "harness_and_actual_runtime_diagnosis": "release_12"
+  },
+  "production_files_changed": false,
+  "historical12_files_changed": false
+}
