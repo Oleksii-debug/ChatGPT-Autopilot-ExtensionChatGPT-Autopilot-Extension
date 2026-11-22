@@ -1,0 +1,63 @@
+name: Dordiai unpublished dev9 binary backup
+
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-core-backup.yml"
+      - "dordiai-voices/tools/draft_core_backup.py"
+      - "dordiai-voices/tests/test_draft_core_backup.py"
+      - "dordiai-voices/docs/ENGINEERING_BACKUP.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-voices-dev9-engineering-backup
+  cancel-in-progress: false
+
+jobs:
+  owned-draft-backup:
+    if: >-
+      github.repository == 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' &&
+      github.ref == 'refs/heads/dordiai-voices/audit-20261122' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[backup-dev9]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check ownership, corruption and no-overwrite regressions
+        run: python -m unittest discover -s dordiai-voices/tests -p test_draft_core_backup.py -v
+      - name: Download only the pinned existing engineering artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 14751826473
+          path: pinned-core
+          merge-multiple: true
+          repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          run-id: 45014461174
+          github-token: ${{ github.token }}
+      - name: Verify exact core and preserve it in an owned unpublished draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python dordiai-voices/tools/draft_core_backup.py
+          --core pinned-core/dordiai-voices-0.13.1-dev.9.nvda-addon
+          --receipt backup-evidence/dordiai-core-dev9-backup-receipt.json
+      - name: Retain the small receipt as a convenience copy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dordiai-core-dev9-draft-backup-receipt
+          path: backup-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 0
