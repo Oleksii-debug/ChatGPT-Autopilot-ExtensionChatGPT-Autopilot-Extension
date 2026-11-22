@@ -30,7 +30,7 @@ def _host_paths():
     module = sys.modules.get(name)
     if module is None:
         location = Path(__file__).absolute().parent.parent / "kx47Runtime" / "host_paths.py"
-        spelling = ntpath.normpath(str(location))
+        spelling = ntpath.normpath(str(location)) if os.name == "nt" else str(location)
         if os.name == "nt" and not spelling.startswith(("\\\\?\\", "\\\\.\\")):
             spelling = "\\\\?\\UNC\\" + spelling[2:] if spelling.startswith("\\\\") else "\\\\?\\" + spelling
         spec = importlib.util.spec_from_file_location(name, spelling)
