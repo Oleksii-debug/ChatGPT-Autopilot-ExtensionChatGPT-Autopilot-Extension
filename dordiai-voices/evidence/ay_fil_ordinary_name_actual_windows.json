@@ -1,0 +1,93 @@
+{
+  "format": "dordiai-ordinary-name-source-and-actual-pcm-receipt-v1",
+  "source_commit": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
+  "scope": "Two isolated, unregistered primary ordinary-name candidates; exact restored native MMS carriers and same-carrier source embeddings; unchanged core11 private Python/OpenVoice/Viktoriia. Source coverage and finite PCM are separate from pronunciation/typing/NVDA acceptance.",
+  "core": {
+    "version": "0.13.1-dev.11",
+    "bytes": 1992938157,
+    "sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
+    "python": "3.14.5",
+    "onnxruntime": "1.26.0",
+    "files_byte_identical_per_experiment": 10223
+  },
+  "languages": [
+    {
+      "code": "ay",
+      "iso_code": "ayr",
+      "source_count": 32,
+      "actual_native_wavs": 32,
+      "actual_viktoriia_wavs": 32,
+      "run_id": 45038768977,
+      "job_id": 137258304755,
+      "conclusion": "success",
+      "source_pdf_bytes": 5927811,
+      "source_pdf_sha256": "227ed343f0d68d460159bfb7f9a2a785085f82629a50fdd0d2498e3a2260b072",
+      "source_pdf_url": "https://cdn.www.gob.pe/uploads/document/file/4973488/item_55_vocabulario_aymara.pdf?v=1692022988",
+      "source_location": "Printed page12 / PDF page14, §1 Grafía/Nomenclatura",
+      "raw_report_git_blob": "d1303f4f9989943347d30615bf6e416f113f93c2",
+      "raw_report_sha256": "3eac360bcf22b9bd64a92d3c41547af3cf3db3147528790279242183ac94eb50",
+      "artifact": {
+        "id": 14760668030,
+        "name": "dordiai-ay32-ordinary-name-candidate-45038768977",
+        "bytes": 611576,
+        "sha256": "fbf6c0b4909ed76adf19cc31df7fa2cd4750416c534cec80edf8573210768e7e"
+      },
+      "totals": {
+        "native_seconds": 14.88,
+        "projection_seconds": 14.675011337868481,
+        "native_cpu_seconds": 7.053240599999867,
+        "projection_cpu_seconds": 7.726394100000107
+      },
+      "technical_contrasts": "q/qh/q' and a/ä, i/ï, u/ü produce distinct token sequences and native/projected WAV hashes; phonetic correctness remains unaccepted",
+      "production_character_resources_unchanged": true
+    },
+    {
+      "code": "fil",
+      "iso_code": "tgl",
+      "source_count": 28,
+      "actual_native_wavs": 28,
+      "actual_viktoriia_wavs": 28,
+      "run_id": 45038769182,
+      "job_id": 137258305370,
+      "conclusion": "success",
+      "source_pdf_bytes": 2042405,
+      "source_pdf_sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f",
+      "source_pdf_url": "https://kwfwikaatkultura.ph/wp-content/uploads/2024/03/Manwal-sa-Masinop-na-Pagsulat.pdf",
+      "source_location": "Printed page9 / PDF page19, §1.1 Titik; prose corroboration printed page5",
+      "raw_report_git_blob": "56d5ee58ff05b377d6480fe7d7492521a0f23532",
+      "raw_report_sha256": "1c678b14cb002e81f97307d8f1465f0180f6ce4a5acc57f68c2cf4bc130a4be5",
+      "artifact": {
+        "id": 14760269758,
+        "name": "dordiai-fil28-ordinary-name-candidate-45038769182",
+        "bytes": 892940,
+        "sha256": "92d1a399b39cca314b573713e5362dd8a71ffddc241d60152bfac8ecb2fff902"
+      },
+      "totals": {
+        "native_seconds": 19.152,
+        "projection_seconds": 18.959092970521542,
+        "native_cpu_seconds": 7.145871699999958,
+        "projection_cpu_seconds": 8.078758199999868
+      },
+      "technical_contrasts": "n/ñ/ng, g/j and e/i produce distinct token sequences and native/projected WAV hashes; phonetic correctness remains unaccepted",
+      "production_character_resources_unchanged": true
+    }
+  ],
+  "projected_wav_sample_rate": 22050,
+  "network_scope": "Owned ephemeral CI private Python outbound firewall plus audit deny; only local socket.gethostname allowed, socket creation/DNS/connect/send and HTTP denied before inference imports.",
+  "source_backed_ordinary_names": 60,
+  "native_wavs": 60,
+  "projected_wavs": 60,
+  "production_registered": false,
+  "letter_names_ready": false,
+  "native_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "prior_failure": {
+    "run_id": 45036190483,
+    "conclusion": "failure",
+    "stage": "before graph loading",
+    "reason": "Overbroad research audit rejected Windows platform.system local socket.gethostname query during ORT import. Exact source/model pins unchanged in successful retry."
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "format": "dordiai-owned-process-loopback-actual-summary",
+  "format_version": 1,
+  "run_id": 45036525050,
+  "job_id": 137251394799,
+  "source_commit": "e2f30c7b090fc0196e279f1a33643a432979557a",
+  "workflow_conclusion": "success",
+  "artifact": {
+    "id": 14760265415,
+    "size_bytes": 681639,
+    "sha256": "8431e6c9c67f2b08c1f5bdf2fe0ee9d257729f08dbea9e0adfebdb04253b8f18"
+  },
+  "fixture_tests": 63,
+  "trusted_existing_msvc_compilation_passed": true,
+  "native_abi_self_test_passed": true,
+  "capture_mode": "process-include-current-pid",
+  "current_target_and_parent_observed_child_pid": 3736,
+  "child_processes_created": false,
+  "native_format": {
+    "average_bytes_per_second": 384000,
+    "bits_per_sample": 32,
+    "block_align": 8,
+    "channels": 2,
+    "extra_bytes": 22,
+    "format_tag": 65534,
+    "native_encoding": "float32le",
+    "raw_format_hex": "feff020080bb000000dc05000800200016002000030000000300000000001000800000aa00389b71",
+    "sample_rate": 48000
+  },
+  "marker_frames": 48000,
+  "marker_all_submitted": true,
+  "captured_frames": 143520,
+  "reference_bytes": 384000,
+  "captured_bytes": 1148160,
+  "reference_sha256": "4e0acf5ef564f75ce5be75fb98ba24cb05126b76f2e2174c28c9bb0334c752e3",
+  "captured_sha256": "c549045d90c43b1ad6161acaaf734b6e38807347a316612037b0cf8aa4da949a",
+  "channel_ncc": [
+    0.9966245233350001,
+    0.996624523312202
+  ],
+  "independent_python_fsum_ncc_recheck": [
+    0.996624523335021,
+    0.9966245233122304
+  ],
+  "matched_capture_array_offset_frames": 1024,
+  "offset_scope": "Index in retained software PCM array, not calibrated time or acoustic latency",
+  "known_marker_correlated_verified": true,
+  "virtual_audio_verified": true,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "requested_phrase_waveform_match_verified": false,
+  "nvda_capture_verified": false,
+  "product_ready": false,
+  "all_own_com_interfaces_released": true,
+  "cleanup": {
+    "attempted": true,
+    "scope": "Only this call's exact owned device instance",
+    "driver_store_purge_attempted": false,
+    "removal_requested": true,
+    "removed": true,
+    "absence_verified": true,
+    "absence_query": "CM_Locate_DevNodeW PHANTOM; only CR_NO_SUCH_DEVNODE proves absence"
+  },
+  "settings_changed": {
+    "privacy": false,
+    "default_device": false,
+    "security": false,
+    "reboot": false
+  },
+  "helper_build": {
+    "format": "dordiai-owned-process-loopback-build",
+    "format_version": 1,
+    "run_id": "45036525050",
+    "compiler_authenticode_valid": true,
+    "compiler_signer_subject": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "compiler_signer_thumbprint": "AB172913A2960A224809EE8A0C371CD47A079B72",
+    "compiler_path": "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\VC\\Tools\\MSVC\\14.52.37025\\bin\\Hostx64\\x64\\cl.exe",
+    "compiler_sha256": "87b094e4fb3c646247b8eb515b5daa4fd73f991fe7cc42e98c0c9e3d3805d6fb",
+    "source_sha256": "eba7fd78469298b7c4c300fdd80c9da18ffb1d03323c8b72230d92ff59448012",
+    "executable_sha256": "81afe24416adef8a10ee7209ecdf6a55776a600bfd31a51cd5be4d10cecc981a",
+    "executable_size_bytes": 459776,
+    "product_runtime_modified": false,
+    "physical_audio_verified": false
+  },
+  "exact_reports": {
+    "path": "evidence/process_loopback_45036525050.json.gz",
+    "size_bytes": 18875,
+    "sha256": "33949ae61e2800501d77578d28eef9a91ee214db6964279e95b9d831a5570bbc",
+    "original_json_files": 5,
+    "git_blob": "de9173cf262eede0c14b5f3ffddff81ff41754b1"
+  },
+  "prior_endpoint_loopback_results_retained": "45034601082 and45035066605 captured all-zero; current positive is separate documented current-process-only API, not proof of endpoint-pin cause."
+}

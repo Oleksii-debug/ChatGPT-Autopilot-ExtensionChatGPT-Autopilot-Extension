@@ -1,0 +1,898 @@
+{
+  "format": "dordiai-fil28-ordinary-name-actual-pcm-v1",
+  "status": "passed-isolated-native-and-selected-profile-pcm",
+  "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+  "onnxruntime": "1.26.0",
+  "source_pdf_sha256": "5f20b7eb93ef53af129822bede538121b8967fbc0e7fd93c64bef646d740f66f",
+  "candidate_sha256": "c09796a1e0f5fe5dc85d4b51b029ecfbf1946ada9e92e703f93f0f2290b1c41a",
+  "input_hashes": {
+    "model": "f0594f259f7016a0ff00d5e72886f946e6ed6ae8edf1d9e78649f24d59c83ffb",
+    "tokens": "5f4883ec7ba2128b7467cda01aa875d02bee8d600dc5822843216d8a14224ab0",
+    "source": "4ae3b849f2a96d181f5994c03a9cae24e83be9ae26d80d99777d41e323e2f77f",
+    "flow": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+    "decoder": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36",
+    "target": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a"
+  },
+  "source_identity": {
+    "basis": "publisher-sample-from-same-pinned-checkpoint",
+    "reference_url": "https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/4f49fc254f11ddb0e35fbf25b6e48b04463a6779/tgl/sample.wav",
+    "reference_wav_sha256": "be305274de530418374875d7dcf6510f7b02f73b1380a972cec90fbf10ae6244",
+    "reference_sample_rate": 16000,
+    "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+    "source_sha256": "4ae3b849f2a96d181f5994c03a9cae24e83be9ae26d80d99777d41e323e2f77f",
+    "source_shape": [
+      1,
+      256,
+      1
+    ],
+    "source_norm": 12.48131275177002,
+    "source_dtype": "float32",
+    "unit_normalized": false,
+    "generated_calibration_noise_scale": 0.0,
+    "generated_calibration_noise_scale_w": 0.0
+  },
+  "ordinary_names_native_vocabulary_valid": true,
+  "scope": "candidate names explicitly provided as ordinary spoken text; native MMS + original OpenVoice to Viktoriia, not production glyph dispatch or NVDA typing proof",
+  "cases": [
+    {
+      "glyph": "a",
+      "ordinary_name": "ey",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        19,
+        0
+      ],
+      "native": {
+        "samples": 10240,
+        "sample_rate": 16000,
+        "audio_seconds": 0.64,
+        "peak": 0.25230810046195984,
+        "wav_sha256": "c0e8c6d1bf6e51ce5e475263851d26c0291d994a79b01739299cdaf6c3dba46f",
+        "file": "00-native.wav"
+      },
+      "native_render_seconds": 1.149164799999994,
+      "projection": {
+        "samples": 14080,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6385487528344671,
+        "peak": 0.1579935997724533,
+        "wav_sha256": "f8dafab2112056424e7883b9ccbaa0e1d50995e317064258fb863a3c0cb93003",
+        "file": "00-viktoriia.wav"
+      },
+      "projection_seconds": 0.29778059999998163
+    },
+    {
+      "glyph": "b",
+      "ordinary_name": "bi",
+      "native_input_ids": [
+        0,
+        30,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 9984,
+        "sample_rate": 16000,
+        "audio_seconds": 0.624,
+        "peak": 0.23318526148796082,
+        "wav_sha256": "9223ebd95c3152034322732c733e273a063059cde66e6d687480aa80ed0b1ff1",
+        "file": "01-native.wav"
+      },
+      "native_render_seconds": 0.1977942999999982,
+      "projection": {
+        "samples": 13568,
+        "sample_rate": 22050,
+        "audio_seconds": 0.615328798185941,
+        "peak": 0.19739899039268494,
+        "wav_sha256": "7cb3905a0e97e0d0ed62dc9e9bcede3118fbcbe9be69ed86dbf9a348bc3dac42",
+        "file": "01-viktoriia.wav"
+      },
+      "projection_seconds": 0.2858263999999906
+    },
+    {
+      "glyph": "c",
+      "ordinary_name": "si",
+      "native_input_ids": [
+        0,
+        7,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 11520,
+        "sample_rate": 16000,
+        "audio_seconds": 0.72,
+        "peak": 0.22021998465061188,
+        "wav_sha256": "36b72984aa2b1fd3d56cb7609702c0ae26d921ae4410dc1d2185073e473ff7bf",
+        "file": "02-native.wav"
+      },
+      "native_render_seconds": 0.2273454999999842,
+      "projection": {
+        "samples": 15872,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7198185941043084,
+        "peak": 0.1763625293970108,
+        "wav_sha256": "8c62dd96c9cf3bc5e4df86250a986a526d00cf1905a967f5ae90cb33cfd9fae3",
+        "file": "02-viktoriia.wav"
+      },
+      "projection_seconds": 0.3166712000000018
+    },
+    {
+      "glyph": "d",
+      "ordinary_name": "di",
+      "native_input_ids": [
+        0,
+        31,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 10240,
+        "sample_rate": 16000,
+        "audio_seconds": 0.64,
+        "peak": 0.2718408405780792,
+        "wav_sha256": "06a6610e4346f6be58316c67cbdac1e9ed43d91340eded866c40a39bce891b1a",
+        "file": "03-native.wav"
+      },
+      "native_render_seconds": 0.2044809000000214,
+      "projection": {
+        "samples": 14080,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6385487528344671,
+        "peak": 0.23232920467853546,
+        "wav_sha256": "271e6b4146aad49f81959b213abd85e984baac4bdbfc9aba25c6f4283487e859",
+        "file": "03-viktoriia.wav"
+      },
+      "projection_seconds": 0.27517230000000836
+    },
+    {
+      "glyph": "e",
+      "ordinary_name": "i",
+      "native_input_ids": [
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 7680,
+        "sample_rate": 16000,
+        "audio_seconds": 0.48,
+        "peak": 0.08996721357107162,
+        "wav_sha256": "aa657b94d98d00192a10c0e43cf3e399a23b41a014712c1cab3f2cffc8ad8d6c",
+        "file": "04-native.wav"
+      },
+      "native_render_seconds": 0.1510262000000182,
+      "projection": {
+        "samples": 10496,
+        "sample_rate": 22050,
+        "audio_seconds": 0.47600907029478456,
+        "peak": 0.07669603824615479,
+        "wav_sha256": "766f2e3919b40aaaa2ce62680c7a427ed6ca65d81ab63d061cb76e65c397d72d",
+        "file": "04-viktoriia.wav"
+      },
+      "projection_seconds": 0.20345040000000836
+    },
+    {
+      "glyph": "f",
+      "ordinary_name": "ef",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        21,
+        0
+      ],
+      "native": {
+        "samples": 11264,
+        "sample_rate": 16000,
+        "audio_seconds": 0.704,
+        "peak": 0.03436252847313881,
+        "wav_sha256": "d77a4a4da9e2d52656c6750b98d6808d949b619da5130b1ba39e46cd1bf5eba8",
+        "file": "05-native.wav"
+      },
+      "native_render_seconds": 0.23398969999999508,
+      "projection": {
+        "samples": 15360,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6965986394557823,
+        "peak": 0.012190090492367744,
+        "wav_sha256": "96a23a2e765025715134cc8f2659fc982a8e6ab399f7eb9819a43d062f94d2c2",
+        "file": "05-viktoriia.wav"
+      },
+      "projection_seconds": 0.2853313999999898
+    },
+    {
+      "glyph": "g",
+      "ordinary_name": "dyi",
+      "native_input_ids": [
+        0,
+        31,
+        0,
+        19,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 10752,
+        "sample_rate": 16000,
+        "audio_seconds": 0.672,
+        "peak": 0.34301918745040894,
+        "wav_sha256": "8fa17163530ffb2ba2d5b5d2a85e381903eb42d86322ffce30eb3805b93165bf",
+        "file": "06-native.wav"
+      },
+      "native_render_seconds": 0.22396329999997988,
+      "projection": {
+        "samples": 14592,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6617687074829932,
+        "peak": 0.24004611372947693,
+        "wav_sha256": "38ce8dffdc8186ea6a0f474e834282eadccc94f4b6dbefbe3feca6d6791d6f53",
+        "file": "06-viktoriia.wav"
+      },
+      "projection_seconds": 0.2740529999999808
+    },
+    {
+      "glyph": "h",
+      "ordinary_name": "eyts",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        19,
+        0,
+        28,
+        0,
+        7,
+        0
+      ],
+      "native": {
+        "samples": 13824,
+        "sample_rate": 16000,
+        "audio_seconds": 0.864,
+        "peak": 0.3324263393878937,
+        "wav_sha256": "99925c72318ba3cf990eea8716c5862a22aac577c3bfc8c436881ceded2c9844",
+        "file": "07-native.wav"
+      },
+      "native_render_seconds": 0.27878599999999665,
+      "projection": {
+        "samples": 18944,
+        "sample_rate": 22050,
+        "audio_seconds": 0.8591383219954648,
+        "peak": 0.20500899851322174,
+        "wav_sha256": "0ebd049603d5b334fe8f2e85cf841dacbce968ed59bcdde5254caa3c9e60a588",
+        "file": "07-viktoriia.wav"
+      },
+      "projection_seconds": 0.352381500000007
+    },
+    {
+      "glyph": "i",
+      "ordinary_name": "ay",
+      "native_input_ids": [
+        0,
+        0,
+        0,
+        19,
+        0
+      ],
+      "native": {
+        "samples": 9216,
+        "sample_rate": 16000,
+        "audio_seconds": 0.576,
+        "peak": 0.3072475492954254,
+        "wav_sha256": "ee6a070677363e1b3581ffd898834df5f095579f68ed68ee0afd13d2a4f0c094",
+        "file": "08-native.wav"
+      },
+      "native_render_seconds": 0.20702279999997586,
+      "projection": {
+        "samples": 12544,
+        "sample_rate": 22050,
+        "audio_seconds": 0.5688888888888889,
+        "peak": 0.24983273446559906,
+        "wav_sha256": "64a6acb5e097c9ae153f1d196f15d05fd39c275738bcc9281ef4b15eb4bf3ae0",
+        "file": "08-viktoriia.wav"
+      },
+      "projection_seconds": 0.23865630000000237
+    },
+    {
+      "glyph": "j",
+      "ordinary_name": "dyey",
+      "native_input_ids": [
+        0,
+        31,
+        0,
+        19,
+        0,
+        11,
+        0,
+        19,
+        0
+      ],
+      "native": {
+        "samples": 12800,
+        "sample_rate": 16000,
+        "audio_seconds": 0.8,
+        "peak": 0.3361136317253113,
+        "wav_sha256": "4f5d63b722865a3e345c513dfafbeef80a92375dd9ffb3eb35980cfa15dd7370",
+        "file": "09-native.wav"
+      },
+      "native_render_seconds": 0.2575928999999917,
+      "projection": {
+        "samples": 17408,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7894784580498866,
+        "peak": 0.2649995684623718,
+        "wav_sha256": "163aa294460e623c55b5ca18e30349cf73226b77c584d0e56c5b4b52d987e300",
+        "file": "09-viktoriia.wav"
+      },
+      "projection_seconds": 0.3196609999999964
+    },
+    {
+      "glyph": "k",
+      "ordinary_name": "key",
+      "native_input_ids": [
+        0,
+        41,
+        0,
+        11,
+        0,
+        19,
+        0
+      ],
+      "native": {
+        "samples": 10752,
+        "sample_rate": 16000,
+        "audio_seconds": 0.672,
+        "peak": 0.27729296684265137,
+        "wav_sha256": "1872fb98e4a0150d8debc64c3945dbab2fae222d5ced746d8f2e97d6597a7743",
+        "file": "10-native.wav"
+      },
+      "native_render_seconds": 0.2199826000000087,
+      "projection": {
+        "samples": 14592,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6617687074829932,
+        "peak": 0.2151769995689392,
+        "wav_sha256": "3f1e48e184a047c67910e6c53496700b755138f6a10437231abfeb1c0aedb6a1",
+        "file": "10-viktoriia.wav"
+      },
+      "projection_seconds": 0.27284109999999373
+    },
+    {
+      "glyph": "l",
+      "ordinary_name": "el",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        36,
+        0
+      ],
+      "native": {
+        "samples": 10752,
+        "sample_rate": 16000,
+        "audio_seconds": 0.672,
+        "peak": 0.24928273260593414,
+        "wav_sha256": "48b79b6287e42a5d14b15145afede1e7912c422fa73de68262c57744aff2b92a",
+        "file": "11-native.wav"
+      },
+      "native_render_seconds": 0.20786329999998543,
+      "projection": {
+        "samples": 14592,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6617687074829932,
+        "peak": 0.1710408329963684,
+        "wav_sha256": "e25bfa2a97485a2c65d578d340b4ee6c33b6d9c2cc3885a3acb9845204e64548",
+        "file": "11-viktoriia.wav"
+      },
+      "projection_seconds": 0.2934467999999981
+    },
+    {
+      "glyph": "m",
+      "ordinary_name": "em",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        6,
+        0
+      ],
+      "native": {
+        "samples": 11264,
+        "sample_rate": 16000,
+        "audio_seconds": 0.704,
+        "peak": 0.2487947642803192,
+        "wav_sha256": "1cfd188e8a24e5207d259a180a7cc7ee1323dd87b72129d5505a15fda25cd9ba",
+        "file": "12-native.wav"
+      },
+      "native_render_seconds": 0.24597230000000536,
+      "projection": {
+        "samples": 15360,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6965986394557823,
+        "peak": 0.18247990310192108,
+        "wav_sha256": "3bbc3b7c979934cbd21c7c987ad5f141a1cba92bcf2a2f3ca60f387da98962ec",
+        "file": "12-viktoriia.wav"
+      },
+      "projection_seconds": 0.30156350000001453
+    },
+    {
+      "glyph": "n",
+      "ordinary_name": "en",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        16,
+        0
+      ],
+      "native": {
+        "samples": 10496,
+        "sample_rate": 16000,
+        "audio_seconds": 0.656,
+        "peak": 0.11347228288650513,
+        "wav_sha256": "5c0639a0b0b515cb891d356c449f774d10b3df8c2daa270fb495c90efc03e827",
+        "file": "13-native.wav"
+      },
+      "native_render_seconds": 0.2069371999999987,
+      "projection": {
+        "samples": 14336,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6501587301587302,
+        "peak": 0.10940413922071457,
+        "wav_sha256": "2cafeb27c0964472a7f222e4d91cedc641d4777c80dccab161c3114a2e84ddad",
+        "file": "13-viktoriia.wav"
+      },
+      "projection_seconds": 0.2888925000000029
+    },
+    {
+      "glyph": "ñ",
+      "ordinary_name": "enye",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        16,
+        0,
+        19,
+        0,
+        11,
+        0
+      ],
+      "native": {
+        "samples": 11776,
+        "sample_rate": 16000,
+        "audio_seconds": 0.736,
+        "peak": 0.3474908769130707,
+        "wav_sha256": "82dc7737fb0c0a84f7016d4c2e7f8d50e434a6231625bef09f52b0ca2ee266d4",
+        "file": "14-native.wav"
+      },
+      "native_render_seconds": 0.22957980000001044,
+      "projection": {
+        "samples": 16128,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7314285714285714,
+        "peak": 0.28870269656181335,
+        "wav_sha256": "cc5be2d760194dde2652055a5177b6e7a83673dfbb49c37b699fd315fa5fb112",
+        "file": "14-viktoriia.wav"
+      },
+      "projection_seconds": 0.3169369999999958
+    },
+    {
+      "glyph": "ng",
+      "ordinary_name": "en dyi",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        16,
+        0,
+        25,
+        0,
+        31,
+        0,
+        19,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 12800,
+        "sample_rate": 16000,
+        "audio_seconds": 0.8,
+        "peak": 0.4136258065700531,
+        "wav_sha256": "994008c096e12c5a2f8f32a3629b57db02dae42ee6c991a1289fb87d7a815e75",
+        "file": "15-native.wav"
+      },
+      "native_render_seconds": 0.25108549999998786,
+      "projection": {
+        "samples": 17408,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7894784580498866,
+        "peak": 0.3274109363555908,
+        "wav_sha256": "bc0d9c6d7d26519c58dc6751c069e886bc756c4fb674b87013582d06b591cf34",
+        "file": "15-viktoriia.wav"
+      },
+      "projection_seconds": 0.3487879999999848
+    },
+    {
+      "glyph": "o",
+      "ordinary_name": "o",
+      "native_input_ids": [
+        0,
+        5,
+        0
+      ],
+      "native": {
+        "samples": 7424,
+        "sample_rate": 16000,
+        "audio_seconds": 0.464,
+        "peak": 0.034901831299066544,
+        "wav_sha256": "0d4d92ddc409e928e88e8eaf3d486e440f8c63096106a53a71690a2f849855e3",
+        "file": "16-native.wav"
+      },
+      "native_render_seconds": 0.1486960999999951,
+      "projection": {
+        "samples": 9984,
+        "sample_rate": 22050,
+        "audio_seconds": 0.4527891156462585,
+        "peak": 0.0050275083631277084,
+        "wav_sha256": "68098e8ba1686cf88c02abc26bc5f8edb9ad6e9865420164548b8c4a15ed2b46",
+        "file": "16-viktoriia.wav"
+      },
+      "projection_seconds": 0.2115253999999993
+    },
+    {
+      "glyph": "p",
+      "ordinary_name": "pi",
+      "native_input_ids": [
+        0,
+        23,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 10496,
+        "sample_rate": 16000,
+        "audio_seconds": 0.656,
+        "peak": 0.26784801483154297,
+        "wav_sha256": "4a9239dbff820954b3176bd5c83d7842e051adcdacbd953ff636078f4730b34e",
+        "file": "17-native.wav"
+      },
+      "native_render_seconds": 0.2008192000000122,
+      "projection": {
+        "samples": 14336,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6501587301587302,
+        "peak": 0.20982027053833008,
+        "wav_sha256": "ab95c34d1c23182a3e0c475374d4d99102cc40dd4f03e1b37b84c8c631ae53af",
+        "file": "17-viktoriia.wav"
+      },
+      "projection_seconds": 0.28147160000000326
+    },
+    {
+      "glyph": "q",
+      "ordinary_name": "kyu",
+      "native_input_ids": [
+        0,
+        41,
+        0,
+        19,
+        0,
+        9,
+        0
+      ],
+      "native": {
+        "samples": 12800,
+        "sample_rate": 16000,
+        "audio_seconds": 0.8,
+        "peak": 0.3286888897418976,
+        "wav_sha256": "bcd6a57dbba535f3250aac5d6fd5dcaa9912c82200f0cb04c6e3ad38aab41a74",
+        "file": "18-native.wav"
+      },
+      "native_render_seconds": 0.23773499999998648,
+      "projection": {
+        "samples": 17408,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7894784580498866,
+        "peak": 0.21135210990905762,
+        "wav_sha256": "e1826120efb849e3e33317a5606258ede60681ebc6659de9d5c0f7c4574daf2c",
+        "file": "18-viktoriia.wav"
+      },
+      "projection_seconds": 0.3349854000000221
+    },
+    {
+      "glyph": "r",
+      "ordinary_name": "ar",
+      "native_input_ids": [
+        0,
+        0,
+        0,
+        24,
+        0
+      ],
+      "native": {
+        "samples": 10496,
+        "sample_rate": 16000,
+        "audio_seconds": 0.656,
+        "peak": 0.23125912249088287,
+        "wav_sha256": "d5ddaae7163dd57a36ca5d2086b685020f73512631e8f49c0723e655fb03b42d",
+        "file": "19-native.wav"
+      },
+      "native_render_seconds": 0.1985499000000175,
+      "projection": {
+        "samples": 14336,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6501587301587302,
+        "peak": 0.1182778999209404,
+        "wav_sha256": "7f244c9cb18201bf293019572721bd943bc88c5e16373d2ec4fa2541145be513",
+        "file": "19-viktoriia.wav"
+      },
+      "projection_seconds": 0.26541550000001735
+    },
+    {
+      "glyph": "s",
+      "ordinary_name": "es",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        7,
+        0
+      ],
+      "native": {
+        "samples": 10752,
+        "sample_rate": 16000,
+        "audio_seconds": 0.672,
+        "peak": 0.057151541113853455,
+        "wav_sha256": "4df81a79458d5f6ca0daf496b9027159d82bbfbfbe3b175270b06bda1829df67",
+        "file": "20-native.wav"
+      },
+      "native_render_seconds": 0.22873160000000325,
+      "projection": {
+        "samples": 14592,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6617687074829932,
+        "peak": 0.047338299453258514,
+        "wav_sha256": "8f07b853901e1a3da087f540bcf34eadb09fd022dc3b45d31e6fd22f892cad96",
+        "file": "20-viktoriia.wav"
+      },
+      "projection_seconds": 0.27827930000000833
+    },
+    {
+      "glyph": "t",
+      "ordinary_name": "ti",
+      "native_input_ids": [
+        0,
+        28,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 10496,
+        "sample_rate": 16000,
+        "audio_seconds": 0.656,
+        "peak": 0.26008108258247375,
+        "wav_sha256": "86809f76d1d3f1b5d22c92c1338a6b564393b083c2e78441494b107f05578c94",
+        "file": "21-native.wav"
+      },
+      "native_render_seconds": 0.21830309999998576,
+      "projection": {
+        "samples": 14336,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6501587301587302,
+        "peak": 0.18283683061599731,
+        "wav_sha256": "341900f8799c62862a93607eb3750462e8bb91da6ee95b5578b919d62c47930d",
+        "file": "21-viktoriia.wav"
+      },
+      "projection_seconds": 0.2732641000000058
+    },
+    {
+      "glyph": "u",
+      "ordinary_name": "yu",
+      "native_input_ids": [
+        0,
+        19,
+        0,
+        9,
+        0
+      ],
+      "native": {
+        "samples": 9728,
+        "sample_rate": 16000,
+        "audio_seconds": 0.608,
+        "peak": 0.26534369587898254,
+        "wav_sha256": "4d84fc4204cc2d6e10c30f75d1b6d07920b4b8072bfc37623d767ed4128e17d5",
+        "file": "22-native.wav"
+      },
+      "native_render_seconds": 0.20520500000000652,
+      "projection": {
+        "samples": 13312,
+        "sample_rate": 22050,
+        "audio_seconds": 0.603718820861678,
+        "peak": 0.18803450465202332,
+        "wav_sha256": "56503fc0a9ee9e1e97e9ed854ca09f554fb34c183815220492af389f538e47bb",
+        "file": "22-viktoriia.wav"
+      },
+      "projection_seconds": 0.2653942000000029
+    },
+    {
+      "glyph": "v",
+      "ordinary_name": "vi",
+      "native_input_ids": [
+        0,
+        14,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 11520,
+        "sample_rate": 16000,
+        "audio_seconds": 0.72,
+        "peak": 0.2810323238372803,
+        "wav_sha256": "057378de5eba4aca5d7ce71e74eeefaa67f7fe29334bea17e0daf6bf621f7907",
+        "file": "23-native.wav"
+      },
+      "native_render_seconds": 0.23428989999999317,
+      "projection": {
+        "samples": 15872,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7198185941043084,
+        "peak": 0.22405613958835602,
+        "wav_sha256": "a2e363c6bce6af2bd088d69220b18b514163fc3eddbace4afa33196037b42c4b",
+        "file": "23-viktoriia.wav"
+      },
+      "projection_seconds": 0.29841590000000906
+    },
+    {
+      "glyph": "w",
+      "ordinary_name": "dobolyu",
+      "native_input_ids": [
+        0,
+        31,
+        0,
+        5,
+        0,
+        30,
+        0,
+        5,
+        0,
+        36,
+        0,
+        19,
+        0,
+        9,
+        0
+      ],
+      "native": {
+        "samples": 12800,
+        "sample_rate": 16000,
+        "audio_seconds": 0.8,
+        "peak": 0.3080032765865326,
+        "wav_sha256": "cfc411005530369b0b8835db05a62f5d1efc63a1cb09ea542ede24aaf2d1ebb7",
+        "file": "24-native.wav"
+      },
+      "native_render_seconds": 0.26062749999999824,
+      "projection": {
+        "samples": 17408,
+        "sample_rate": 22050,
+        "audio_seconds": 0.7894784580498866,
+        "peak": 0.2510144114494324,
+        "wav_sha256": "89ada7ee981d52b1d2ff752375099fd45083f5902019afb7b17fc5163af42eb9",
+        "file": "24-viktoriia.wav"
+      },
+      "projection_seconds": 0.3247685999999703
+    },
+    {
+      "glyph": "x",
+      "ordinary_name": "eks",
+      "native_input_ids": [
+        0,
+        11,
+        0,
+        41,
+        0,
+        7,
+        0
+      ],
+      "native": {
+        "samples": 10752,
+        "sample_rate": 16000,
+        "audio_seconds": 0.672,
+        "peak": 0.16183649003505707,
+        "wav_sha256": "e404114bba12e5fa8447d54c5019c3a1e36163cf7a720eaaa1990db6c50c4254",
+        "file": "25-native.wav"
+      },
+      "native_render_seconds": 0.22929640000000973,
+      "projection": {
+        "samples": 14592,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6617687074829932,
+        "peak": 0.13977444171905518,
+        "wav_sha256": "b98d0db31e15ae29d1cd03c844fa98e3a17b43b0283d9dc29561b0c242395f4b",
+        "file": "25-viktoriia.wav"
+      },
+      "projection_seconds": 0.2725236999999652
+    },
+    {
+      "glyph": "y",
+      "ordinary_name": "way",
+      "native_input_ids": [
+        0,
+        34,
+        0,
+        0,
+        0,
+        19,
+        0
+      ],
+      "native": {
+        "samples": 13312,
+        "sample_rate": 16000,
+        "audio_seconds": 0.832,
+        "peak": 0.2640853226184845,
+        "wav_sha256": "dcbc4d2d23dbcb6907acc0bd033b55fbeb98307dea021e1b5fa20d8297b5a31c",
+        "file": "26-native.wav"
+      },
+      "native_render_seconds": 0.26394239999996216,
+      "projection": {
+        "samples": 18176,
+        "sample_rate": 22050,
+        "audio_seconds": 0.8243083900226758,
+        "peak": 0.23440399765968323,
+        "wav_sha256": "491205236f127f2764ba7dfee4ec0c9c0cbe62217d21f36a1ad21c5548e43689",
+        "file": "26-viktoriia.wav"
+      },
+      "projection_seconds": 0.3355666999999585
+    },
+    {
+      "glyph": "z",
+      "ordinary_name": "zi",
+      "native_input_ids": [
+        0,
+        13,
+        0,
+        8,
+        0
+      ],
+      "native": {
+        "samples": 10496,
+        "sample_rate": 16000,
+        "audio_seconds": 0.656,
+        "peak": 0.2573298513889313,
+        "wav_sha256": "80706f47646c3a413e902857a77bf367339d2ef4502bea327d08c794c3d9aa1f",
+        "file": "27-native.wav"
+      },
+      "native_render_seconds": 0.22708850000003622,
+      "projection": {
+        "samples": 14336,
+        "sample_rate": 22050,
+        "audio_seconds": 0.6501587301587302,
+        "peak": 0.2375241369009018,
+        "wav_sha256": "d6844155ea9fa28d22eacbc25d52bca52c34e8ea3de0a1bbbf0f49d760013a3b",
+        "file": "27-viktoriia.wav"
+      },
+      "projection_seconds": 0.2656947999999488
+    }
+  ],
+  "letter_names_ready": false,
+  "native_pronunciation_verified": false,
+  "windows_nvda_verified": false,
+  "typing_verified": false,
+  "production_registered": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "actual_cases": 28,
+  "all_source_names_native_and_projected_finite_nonzero": true,
+  "existing_payloads_unchanged": 10223,
+  "projected_sample_rate": 22050,
+  "production_character_resources_unchanged": true
+}
