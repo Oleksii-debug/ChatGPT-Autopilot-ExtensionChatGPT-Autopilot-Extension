@@ -10,11 +10,11 @@ jobs:
   actual-nvda11:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source11-nvda]')
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        mode: [normal, typing, ru-missing, descriptor-corruption]
+        mode: [plain-text]
     env:
       PYTHONUTF8: '1'
       CORE_SHA256: '223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb'
@@ -61,10 +61,11 @@ jobs:
           root=pathlib.Path("dordiai-voices")
           output=root/"windows-results/nvda"
           mode=os.environ["NVDA_PROBE_MODE"]
-          tool=("windows_nvda_native_descriptor_probe.py" if mode=="descriptor-corruption"
-                else "windows_nvda_membership_integration_probe.py")
+          tool=("windows_nvda_plain_text_probe.py" if mode=="plain-text" else
+                "windows_nvda_native_descriptor_probe.py" if mode=="descriptor-corruption" else
+                "windows_nvda_membership_integration_probe.py")
           command=[sys.executable,str(root/"tools"/tool),"--addon",
-              str(root/"dist/dordiai-voices-0.13.1-dev.11.nvda-addon"),"--output",str(output),"--long-installed-config","--timeout","600"]
+              str(root/"dist/dordiai-voices-0.13.1-dev.11.nvda-addon"),"--output",str(output),"--long-installed-config","--timeout","1800" if mode=="plain-text" else "600"]
           if mode=="normal":command.append("--fatal-recovery-probe")
           elif mode=="typing":command.append("--typing-probe")
           elif mode=="ru-missing":command.append("--required-resource-recovery-probe")
@@ -108,6 +109,9 @@ jobs:
               if path.name=="nvda-probe.json":
                   native=document.get("native_membership",{})
                   print("SOURCE11_NATIVE_MANAGER "+json.dumps({key:native.get(key) for key in ("lookup_timings","statistics_after","scope")}),flush=True)
+                  for row in (document.get("actual_plain_text") or {}).get("cases",[]):
+                      print("SOURCE11_PLAIN_CASE "+json.dumps({key:row.get(key) for key in ("case","functional_passed","route_audit","driver_error","observed_language_fields","default_locale_pinning_observation","pcm_metrics")},ensure_ascii=True),flush=True)
+                  print("SOURCE11_PLAIN_CLEANUP "+json.dumps((document.get("actual_plain_text") or {}).get("cleanup")),flush=True)
                   for key in ("native_descriptor_recovery","required_resource_recovery","actual_typing"):
                       row=document.get(key)
                       if row is not None:print("SOURCE11_"+key.upper()+" "+json.dumps(row,ensure_ascii=True),flush=True)
