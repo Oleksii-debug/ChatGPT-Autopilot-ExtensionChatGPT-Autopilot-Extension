@@ -235,7 +235,12 @@ def inspect_zip_members(archive, max_bytes=MAX_PACKAGE_BYTES):
     if len(archive.infolist()) > MAX_MEMBERS:
         raise PackageError("Too many package members")
     for info in archive.infolist():
+        # On Windows ZipInfo rewrites raw backslashes while reading. Validate
+        # the original archive identity as well as the normalized destination.
+        validate_member_path(info.orig_filename)
         validate_member_path(info.filename)
+        if info.orig_filename != info.filename:
+            raise PackageError("Noncanonical package member: " + info.orig_filename)
         mode = info.external_attr >> 16
         kind = stat.S_IFMT(mode)
         if info.is_dir() or kind not in (0, stat.S_IFREG) or info.flag_bits & 1:

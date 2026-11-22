@@ -25,6 +25,8 @@ def verify_archive(path, max_core_bytes=3_000_000_000):
             raise ValueError("Archive exceeds verification limits")
         for info in infos:
             name = info.filename
+            if info.orig_filename != name or "\\" in info.orig_filename or "\x00" in info.orig_filename:
+                raise ValueError("Noncanonical raw archive member: " + info.orig_filename)
             relative = PurePosixPath(name)
             if (relative.is_absolute() or ".." in relative.parts or str(relative) != name
                     or "\\" in name or ":" in name or any(ord(c) < 32 for c in name)

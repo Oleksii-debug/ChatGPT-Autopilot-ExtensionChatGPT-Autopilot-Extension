@@ -225,6 +225,11 @@ def _read_manifest(archive):
     names = set()
     size = 0
     for info in infos:
+        # ZipInfo may normalize Windows backslashes or truncate a NUL suffix
+        # before exposing filename. Such raw identities are never accepted.
+        if (info.orig_filename != info.filename or "\\" in info.orig_filename
+                or "\x00" in info.orig_filename):
+            raise PackageError("Неканонічний шлях у пакеті: " + info.orig_filename)
         if info.is_dir():
             raise PackageError("Архів повинен містити лише перелічені файли.")
         key = info.filename.casefold()

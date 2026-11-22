@@ -622,11 +622,15 @@ def extract_addon(archive, destination):
         if "manifest.ini" not in source.namelist():
             raise ValueError("Add-on archive has no manifest.ini")
         for info in source.infolist():
-            path = PurePosixPath(info.filename)
-            key = info.filename.casefold()
-            if (path.is_absolute() or ".." in path.parts or "\\" in info.filename or ":" in info.filename
-                    or "\x00" in info.filename or key in names or stat.S_ISLNK(info.external_attr >> 16)):
-                raise ValueError("Unsafe add-on archive member: " + info.filename)
+            # ZipInfo normalizes backslashes on Windows while READING a ZIP.
+            # Its original name retains the bytes decoded from the archive;
+            # checking filename alone would accept a noncanonical raw path.
+            raw_name = info.orig_filename
+            path = PurePosixPath(raw_name)
+            key = raw_name.casefold()
+            if (raw_name != info.filename or path.is_absolute() or ".." in path.parts or "\\" in raw_name or ":" in raw_name
+                    or "\x00" in raw_name or key in names or stat.S_ISLNK(info.external_attr >> 16)):
+                raise ValueError("Unsafe add-on archive member: " + raw_name)
             names.add(key)
             target = destination.joinpath(*path.parts)
             if not target.resolve().is_relative_to(destination):

@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 import zipfile
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
@@ -83,6 +84,19 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
                 output.writestr("a.txt", "two")
             with self.assertRaises(ValueError):
                 probe.extract_addon(archive, root / "config")
+
+    def test_raw_backslash_rejected_even_when_zipinfo_normalized_filename(self):
+        # Reproduce the Windows ZipInfo reader on every host. The raw name
+        # must be checked before attempting to open or extract any member.
+        member = zipfile.ZipInfo("inside/escape")
+        member.orig_filename = "inside\\escape"
+        archive = SimpleNamespace(namelist=lambda: ["manifest.ini", member.filename],
+                                  infolist=lambda: [member])
+        context = patch.object(probe.zipfile, "ZipFile")
+        with tempfile.TemporaryDirectory() as temporary, context as factory:
+            factory.return_value.__enter__.return_value = archive
+            with self.assertRaisesRegex(ValueError, "Unsafe add-on archive member"):
+                probe.extract_addon("unused-fixture.zip", Path(temporary) / "isolated")
 
     @unittest.skipIf(probe.os.name == "nt", "Linux guard test only")
     def test_linux_is_reported_blocked_without_download_or_nvda_stubs(self):

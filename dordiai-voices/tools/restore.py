@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
@@ -24,7 +24,12 @@ def safe_members(archive, target):
     target = target.resolve()
     names = set()
     for member in archive.infolist():
-        name = member.filename
+        name = member.orig_filename
+        relative = PurePosixPath(name)
+        if (name != member.filename or "\\" in name or ":" in name
+                or any(ord(char) < 32 for char in name) or relative.is_absolute()
+                or ".." in relative.parts):
+            raise ValueError(f"Unsafe raw archive member: {name}")
         destination = (target / name).resolve()
         if ("\\" in name or not destination.is_relative_to(target)
                 or stat.S_ISLNK(member.external_attr >> 16)):
