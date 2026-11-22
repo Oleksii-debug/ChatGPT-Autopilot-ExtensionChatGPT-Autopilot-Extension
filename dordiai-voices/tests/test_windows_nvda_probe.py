@@ -334,5 +334,258 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
             downloader.assert_not_called()
 
 
+class RequiredResourceProbeScaffoldingTests(unittest.TestCase):
+    """Owned file/control-flow tests only; actual NVDA proof runs on Windows."""
+
+    def fixture(self, root):
+        owned = Path(root).resolve() / "owned-probe"
+        addon = owned / "config/addons/ownedDordiai"
+        target = addon / "kx47Runtime" / probe.REQUIRED_RESOURCE_RELATIVE
+        target.parent.mkdir(parents=True)
+        original = b"owned model fixture bytes, never an inference graph" * 100
+        target.write_bytes(original)
+        return owned, addon, target, original
+
+    def embedded(self, names):
+        tree = ast.parse(probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}"))
+        definitions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+        namespace = {}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), "required-resource-scaffolding", "exec"), namespace)
+        return namespace
+
+    def test_quarantine_is_atomic_owned_and_sha_identically_restored(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            quarantine = Path(record["quarantine_path"])
+            self.assertFalse(target.exists())
+            self.assertEqual(quarantine.read_bytes(), original)
+            self.assertTrue(record["asset_missing_before_nvda_launch"])
+            self.assertFalse(record["restored"])
+            result = probe.restore_required_resource(record)
+            self.assertTrue(result["sha256_identical"])
+            self.assertEqual(target.read_bytes(), original)
+            self.assertFalse(quarantine.exists())
+            self.assertTrue(record["restored"])
+            # Cleanup remains safe if an earlier successful path restored it.
+            self.assertEqual(probe.restore_required_resource(record), result)
+
+    def test_outside_owned_configuration_is_never_mutated(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            wrong_owned = Path(temporary) / "another-owned-probe"
+            wrong_owned.mkdir()
+            with self.assertRaises(ValueError):
+                probe.quarantine_required_resource(addon, wrong_owned, "a" * 32)
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_linked_asset_paths_are_refused_without_mutation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            real = target.with_name("actual-model")
+            target.rename(real)
+            try:
+                target.symlink_to(real)
+            except OSError as error:
+                self.skipTest("Host cannot create a symlink fixture: " + type(error).__name__)
+            with self.assertRaises(ValueError):
+                probe.quarantine_required_resource(addon, owned, "a" * 32)
+            self.assertEqual(real.read_bytes(), original)
+
+    def test_existing_quarantine_and_invalid_identifier_are_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            quarantine = target.with_name(target.name + "." + "a" * 32 + ".quarantine")
+            quarantine.write_bytes(b"existing sentinel")
+            with self.assertRaises(FileExistsError):
+                probe.quarantine_required_resource(addon, owned, "a" * 32)
+            with self.assertRaises(ValueError):
+                probe.quarantine_required_resource(addon, owned, "../escape")
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(quarantine.read_bytes(), b"existing sentinel")
+
+    def test_unexpected_replacement_is_not_overwritten_during_restore(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            target.write_bytes(b"unexpected replacement sentinel")
+            with self.assertRaises(FileExistsError):
+                probe.restore_required_resource(record)
+            self.assertEqual(target.read_bytes(), b"unexpected replacement sentinel")
+            self.assertEqual(Path(record["quarantine_path"]).read_bytes(), original)
+            target.unlink()
+            probe.restore_required_resource(record)
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_modified_quarantine_cannot_be_reported_sha_identical(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            Path(record["quarantine_path"]).write_bytes(b"changed bytes")
+            with self.assertRaises(RuntimeError):
+                probe.restore_required_resource(record)
+            self.assertFalse(target.exists())
+            self.assertFalse(record["restored"])
+            Path(record["quarantine_path"]).write_bytes(original)
+            probe.restore_required_resource(record)
+
+    def test_cleanup_restores_even_if_owned_process_shutdown_raises(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            with patch.object(probe, "stop_owned", side_effect=TimeoutError("owned process watchdog")):
+                result = probe.cleanup_required_resource_probe(object(), record)
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("owned_process_shutdown_error", result)
+            self.assertTrue(result["restoration"]["sha256_identical"])
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_cleanup_retains_explicit_restoration_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            with patch.object(probe, "stop_owned"), patch.object(probe, "restore_required_resource",
+                    side_effect=OSError("controlled restoration fixture failure")):
+                result = probe.cleanup_required_resource_probe(None, record)
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("restoration_error", result)
+            probe.restore_required_resource(record)
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_quarantine_postrename_failure_rolls_back_before_record_escapes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            real_hash = probe.sha256_file
+            calls = []
+            def checked_hash(path):
+                calls.append(Path(path))
+                if len(calls) == 2:
+                    raise OSError("controlled verification fixture failure")
+                return real_hash(path)
+            with patch.object(probe, "sha256_file", side_effect=checked_hash):
+                with self.assertRaises(OSError):
+                    probe.quarantine_required_resource(addon, owned, "a" * 32)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(list(target.parent.glob("*.quarantine")), [])
+
+    def test_modes_are_explicit_and_mutually_exclusive(self):
+        with tempfile.TemporaryDirectory() as temporary, patch("sys.stderr", new=io.StringIO()):
+            with self.assertRaises(SystemExit) as context:
+                probe.main(["--addon", "unused", "--output", temporary,
+                            "--fatal-recovery-probe", "--required-resource-recovery-probe"])
+        self.assertEqual(context.exception.code, 2)
+
+    def test_settings_close_branches_before_normal_speech_only_when_requested(self):
+        namespace = self.embedded({"close_settings"})
+        normal, resource = object(), object()
+        namespace.update(start_phrase=normal, start_required_resource_recovery_probe=resource)
+        for selected in (False, True):
+            callbacks = []
+            namespace["SETTINGS"] = {"required_resource_recovery_probe": selected}
+            namespace["later"] = lambda delay, callback: callbacks.append(callback)
+            namespace["close_settings"](None)
+            self.assertEqual(callbacks, [resource if selected else normal])
+
+    def test_real_missing_resource_probe_never_injects_an_exception_or_ipc_reply(self):
+        tree = ast.parse(probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", "{}"))
+        definition = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                          and node.name == "start_required_resource_recovery_probe")
+        methods = [node.func.attr for node in ast.walk(definition)
+                   if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)]
+        self.assertEqual(methods.count("speak"), 1)
+        self.assertNotIn("_dordiai_report_error", methods)
+        self.assertNotIn("_send", methods)
+        self.assertNotIn("_receive", methods)
+        self.assertNotIn("setSynth", methods)
+        calls = [node.func.id for node in ast.walk(definition)
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+        self.assertNotIn("ImportError", calls)
+        self.assertNotIn("RuntimeError", calls)
+        self.assertIn("validate_required_resource_probe_ownership", calls)
+        self.assertIn("SpeechMode.talk", ast.unparse(definition))
+
+    def test_controller_restoration_is_in_finally_and_quarantine_precedes_owned_launch(self):
+        tree = ast.parse(inspect.getsource(probe.main))
+        top_try = next(node for node in tree.body[0].body if isinstance(node, ast.Try))
+        final_calls = [node.func.id for statement in top_try.finalbody for node in ast.walk(statement)
+                       if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+        self.assertIn("cleanup_required_resource_probe", final_calls)
+        quarantine_call = next(node for node in ast.walk(top_try)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == "quarantine_required_resource")
+        launches = [node for node in ast.walk(top_try)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "Popen"]
+        self.assertTrue(any(launch.lineno > quarantine_call.lineno for launch in launches))
+
+    def accepted_row(self):
+        fixture = Path(__file__).resolve().parent / "fixtures/ruaccent_required_resource_worker.json"
+        diagnostics = json.loads(fixture.read_text(encoding="utf-8"))["diagnostics"]
+        return {"quarantine_verified_before_request": True, "asset_still_missing": True,
+                "diagnostics": {"type": "RuntimeError", "worker": diagnostics},
+                "active_synth": "espeak", "active_driver_module": "synthDrivers.espeak",
+                "configured_synth_preserved": True, "old_driver_closed": True, "old_driver_thread_stopped": True,
+                "recovery": {"reason": "required-resource-unavailable", "state": "builtin-espeak-selected",
+                             "espeak_selection_succeeded": True},
+                "notice_request_observed": True, "notice_request_synth": "espeak", "notice_pcm_nonzero_bytes": 10}
+
+
+    def test_plugin_requires_same_owned_driver_worker_and_quarantine_bytes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            owned, addon, target, original = self.fixture(temporary)
+            runtime = addon / "kx47Runtime"
+            executable = runtime / "python/python.exe"
+            executable.parent.mkdir()
+            executable.write_bytes(b"unit path fixture, never executed")
+            script = runtime / "nvda_worker.py"
+            script.write_text("# unit path fixture, never executed\n", encoding="utf-8")
+            record = probe.quarantine_required_resource(addon, owned, "a" * 32)
+            namespace = self.embedded({"validate_required_resource_probe_ownership"})
+            driver_class = type("OwnedPathFixture", (), {"__module__": "owned_path_fixture"})
+            driver = driver_class()
+            driver._engine = SimpleNamespace(_command=[
+                str(executable), "-I", "-B", "-u", str(script), str(runtime / "models")])
+            namespace.update(Path=Path, sys=sys, OUTPUT=owned, DRIVER=driver,
+                             SETTINGS={"run_id": "a" * 32, "required_resource_quarantine": record})
+            with patch.dict(sys.modules, {"owned_path_fixture": SimpleNamespace(RUNTIME=runtime)}):
+                self.assertEqual(namespace["validate_required_resource_probe_ownership"](), target)
+                driver._engine._command[4] = str(executable)
+                with self.assertRaises(ValueError):
+                    namespace["validate_required_resource_probe_ownership"]()
+            probe.restore_required_resource(record)
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_probe_acceptance_requires_all_recovery_evidence_not_only_selected_synth(self):
+        namespace = self.embedded({"required_resource_worker_diagnostic", "required_resource_recovery_passed"})
+        passed = namespace["required_resource_recovery_passed"]
+        self.assertTrue(passed(self.accepted_row()))
+        for field in ("quarantine_verified_before_request", "asset_still_missing", "configured_synth_preserved",
+                      "old_driver_closed", "old_driver_thread_stopped", "notice_request_observed"):
+            with self.subTest(field=field):
+                row = self.accepted_row()
+                row[field] = False
+                self.assertFalse(passed(row))
+        for field, value in (("notice_pcm_nonzero_bytes", 0), ("active_synth", "silence"),
+                             ("active_driver_module", "probe.stub"), ("notice_request_synth", "kx47Preview"),
+                             ("diagnostics", {}), ("recovery", {}), ("recovery", None)):
+            with self.subTest(field=field, value=value):
+                row = self.accepted_row()
+                row[field] = value
+                self.assertFalse(passed(row))
+
+    def test_probe_acceptance_requires_the_actual_typed_loader_error(self):
+        namespace = self.embedded({"required_resource_worker_diagnostic", "required_resource_recovery_passed"})
+        passed = namespace["required_resource_recovery_passed"]
+        for error_type in ("ImportError", "TimeoutError", "UnsupportedMMSInput", "FileNotFoundError"):
+            row = self.accepted_row()
+            row["diagnostics"]["worker"]["type"] = error_type
+            self.assertFalse(passed(row))
+        row = self.accepted_row()
+        row["diagnostics"]["worker"]["cause"]["type"] = "ConnectionError"
+        self.assertFalse(passed(row))
+        row = self.accepted_row()
+        row["diagnostics"]["worker"]["frames"][-1]["module"] = "foreign.download"
+        self.assertFalse(passed(row))
+
+
 if __name__ == "__main__":
     unittest.main()

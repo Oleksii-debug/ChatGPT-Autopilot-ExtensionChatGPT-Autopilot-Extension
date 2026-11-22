@@ -71,6 +71,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install regression dependencies
+        run: python -m pip install -r dordiai-voices/tests/requirements.txt
+      - name: Run Windows regression checks
+        run: python -m unittest discover -s dordiai-voices/tests -v
       - name: Reuse the immutable tested development core for isolated NVDA probes
         uses: actions/download-artifact@v4
         with:
@@ -96,13 +100,13 @@ jobs:
               manifest=json.loads(archive.read("dordiai-release.json"))
           if manifest.get("version")!="0.13.1-dev.8":
               raise RuntimeError("Diagnostic core version does not match pinned build run")
-      - name: Probe the actual NVDA child environment
+      - name: Prove actual missing-resource worker failure and genuine NVDA recovery
         shell: python
         run: |
           import json, pathlib, subprocess, sys
           root = pathlib.Path("dordiai-voices")
           subprocess.run([sys.executable, str(root / "tools/setup_audio_endpoint.py"), "--output", str(root / "windows-results/audio"), "--ephemeral-ci", "--start-existing-services"], check=False)
-          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--fatal-recovery-probe"]
+          command = [sys.executable, str(root / "tools/windows_nvda_probe.py"), "--addon", str(root / "dist/dordiai-voices-0.13.1-dev.8.nvda-addon"), "--output", str(root / "windows-results/nvda"), "--required-resource-recovery-probe", "--timeout", "240"]
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
@@ -126,7 +130,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dordiai-voices-nvda-loader-diagnostics
+          name: dordiai-voices-nvda-required-resource-diagnostics
           path: dordiai-voices/windows-evidence
           if-no-files-found: warn
           retention-days: 7

@@ -206,6 +206,7 @@ LATENCY_STOP = threading.Event()
 IMPORT_DIAGNOSTIC_DONE = threading.Event()
 RECOVERY_ORIGINAL_WAVE_FACTORY = None
 RECOVERY_OUTPUTS = []
+REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE = None
 DONE = threading.Event()
 SAMPLE_RATE = 24000
 SAMPLES = {}
@@ -514,7 +515,7 @@ def inspect_space(dialog, before_checked):
 def close_settings(dialog):
     if dialog is not None:
         dialog.onCancel(None)
-    later(500, start_phrase)
+    later(500, start_required_resource_recovery_probe if SETTINGS.get("required_resource_recovery_probe") else start_phrase)
 
 
 def start_phrase():
@@ -809,7 +810,11 @@ def latency_finished(summary):
 
 
 def restore_recovery_output_factory():
-    global RECOVERY_ORIGINAL_WAVE_FACTORY
+    global RECOVERY_ORIGINAL_WAVE_FACTORY, REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE
+    if globals().get("REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE") is not None:
+        import ui
+        ui.message = REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE
+        REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE = None
     if RECOVERY_ORIGINAL_WAVE_FACTORY is not None:
         import nvwave
         nvwave.WavePlayer = RECOVERY_ORIGINAL_WAVE_FACTORY
@@ -888,6 +893,193 @@ def finish_fatal_recovery_probe():
     if SETTINGS.get("headless_ui_probe"):
         passed = passed and row["recording_sink_nonzero_bytes"] > 0
     check("injected_fatal_notification_recovery", "passed" if passed else "failed", observations=row)
+    restore_recovery_output_factory()
+    finish()
+
+
+def validate_required_resource_probe_ownership():
+    """Verify controller ownership without changing or fabricating model errors."""
+    import hashlib
+    import re
+    record = SETTINGS.get("required_resource_quarantine")
+    if not isinstance(record, dict) or record.get("asset_missing_before_nvda_launch") is not True:
+        raise ValueError("No controller-attested pre-launch resource quarantine")
+    owned = OUTPUT.resolve(strict=True)
+    if Path(record["run_root"]).resolve(strict=True) != owned or record["run_id"] != SETTINGS["run_id"]:
+        raise ValueError("Required-resource quarantine belongs to a different probe")
+    addon = Path(record["addon_root"]).resolve(strict=True)
+    runtime = Path(record["runtime_root"]).resolve(strict=True)
+    if addon.parent != owned / "config" / "addons" or runtime != addon / "kx47Runtime":
+        raise ValueError("Required-resource quarantine is outside the owned add-on")
+    module = sys.modules.get(type(DRIVER).__module__)
+    if module is None or Path(module.RUNTIME).resolve(strict=True) != runtime:
+        raise ValueError("Selected driver does not use the controller's owned runtime")
+    relative = "models/PocketTTS/stress/ru_ruaccent/nn_omograph/model.onnx"
+    if record.get("asset_relative") != relative:
+        raise ValueError("Unexpected required-resource asset")
+    target = runtime / relative
+    quarantine = target.with_name(target.name + "." + SETTINGS["run_id"] + ".quarantine")
+    if Path(record["quarantine_path"]) != quarantine:
+        raise ValueError("Unexpected required-resource quarantine path")
+    current = addon
+    for component in target.relative_to(addon).parts:
+        current = current / component
+        if current.is_symlink() or (hasattr(current, "is_junction") and current.is_junction()):
+            raise ValueError("Linked required-resource asset path")
+    if target.exists() or not quarantine.is_file() or quarantine.is_symlink():
+        raise ValueError("Required resource was not quarantined before this request")
+    checksum = record.get("asset_sha256")
+    if not isinstance(checksum, str) or re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
+        raise ValueError("Missing required-resource checksum")
+    digest = hashlib.sha256()
+    with quarantine.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != checksum or quarantine.stat().st_size != record["asset_bytes"]:
+        raise ValueError("Required-resource quarantine bytes changed")
+    command = getattr(getattr(DRIVER, "_engine", None), "_command", [])
+    if (len(command) < 6 or Path(command[0]).resolve(strict=True) != runtime / "python/python.exe"
+            or Path(command[4]).resolve(strict=True) != runtime / "nvda_worker.py"
+            or Path(command[5]).resolve(strict=True) != runtime / "models"):
+        raise ValueError("Speech worker is not private to the owned packaged runtime")
+    return target
+
+
+def required_resource_worker_diagnostic(details):
+    if not isinstance(details, dict):
+        return False
+    worker = details.get("worker")
+    if not isinstance(worker, dict) or worker.get("type") != "ModelDownloadError":
+        return False
+    cause = worker.get("cause")
+    if not isinstance(cause, dict) or cause.get("type") != "FileNotFoundError" or cause.get("cause") is not None:
+        return False
+    def frames(node):
+        rows = node.get("frames")
+        if not isinstance(rows, list) or not 1 <= len(rows) <= 16 or any(not isinstance(row, dict) for row in rows):
+            return set()
+        return {(row.get("module"), row.get("function")) for row in rows
+                if isinstance(row.get("module"), str) and isinstance(row.get("function"), str)}
+    return ({("native_multilingual", "russian_text"),
+             ("stressonnx.backends.ruaccent", "_load"),
+             ("stressonnx.download", "_download_files")} <= frames(worker)
+            and ("stressonnx.download", "_download_files") in frames(cause))
+
+
+def required_resource_recovery_passed(row):
+    recovery = row.get("recovery", {})
+    if not isinstance(recovery, dict):
+        return False
+    return (row.get("quarantine_verified_before_request") is True
+            and row.get("asset_still_missing") is True
+            and required_resource_worker_diagnostic(row.get("diagnostics"))
+            and row.get("active_synth") == "espeak"
+            and row.get("active_driver_module") == "synthDrivers.espeak"
+            and row.get("configured_synth_preserved") is True
+            and row.get("old_driver_closed") is True
+            and row.get("old_driver_thread_stopped") is True
+            and recovery.get("reason") == "required-resource-unavailable"
+            and recovery.get("state") == "builtin-espeak-selected"
+            and recovery.get("espeak_selection_succeeded") is True
+            and row.get("notice_request_observed") is True
+            and row.get("notice_request_synth") == "espeak"
+            and row.get("notice_pcm_nonzero_bytes", 0) > 0)
+
+
+def start_required_resource_recovery_probe():
+    global STAGE, RECOVERY_ORIGINAL_WAVE_FACTORY, REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE
+    import config
+    import nvwave
+    import speech
+    import ui
+    from speech.commands import LangChangeCommand, IndexCommand
+    STAGE = "required_resource_notification_recovery"
+    RESULT["scope"] = "actual-isolated-required-resource-worker-and-fallback-proof"
+    RESULT["normal_performance_benchmark_skipped"] = True
+    if synthDriverHandler.getSynth() is not DRIVER:
+        check(STAGE, "blocked", reason="Original owned synthesizer is no longer active")
+        finish()
+        return
+    target = validate_required_resource_probe_ownership()
+    row = RESULT["required_resource_recovery"] = {
+        "scope": "Actual missing bundled RuAccent model; genuine worker error and NVDA fallback",
+        "synthetic_error_injected": False, "physical_audio_verified": False,
+        "acoustic_latency_verified": False, "pronunciation_verified": False,
+        "configured_synth_before": config.conf["speech"]["synth"],
+        "recording_pcm_sink_test_double": bool(SETTINGS.get("headless_ui_probe")),
+        "quarantine_verified_before_request": True,
+        "asset_missing_before_nvda_launch": True,
+        "asset_sha256": SETTINGS["required_resource_quarantine"]["asset_sha256"],
+        "restore_owner": "controller finally after stopping only its owned NVDA process",
+        "notice_request_observed": False,
+    }
+    RECOVERY_ORIGINAL_WAVE_FACTORY = nvwave.WavePlayer
+    def create_observed_output(*args, **kwargs):
+        player = (RecordingPCMSink(*args, **kwargs) if SETTINGS.get("headless_ui_probe")
+                  else RECOVERY_ORIGINAL_WAVE_FACTORY(*args, **kwargs))
+        counter = RecordingPCMSink(1, 24000, 16)
+        RECOVERY_OUTPUTS.append(counter)
+        original_feed = player.feed
+        def observed_notice_feed(data, size=None, onDone=None):
+            result = original_feed(data, size=size, onDone=onDone)
+            if row["notice_request_observed"]:
+                counter.feed(data, size=size)
+            return result
+        player.feed = observed_notice_feed
+        return player
+    nvwave.WavePlayer = create_observed_output
+    REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE = ui.message
+    def observed_notice(text, *args, **kwargs):
+        active = synthDriverHandler.getSynth()
+        if (isinstance(text, str) and text.startswith("Не вдалося завантажити потрібні ресурси dordiai-voices.")
+                and getattr(active, "name", None) == "espeak"):
+            row["notice_request_observed"] = True
+            row["notice_request_synth"] = active.name
+            row["notice_request_ns"] = time.perf_counter_ns()
+        return REQUIRED_RESOURCE_ORIGINAL_UI_MESSAGE(text, *args, **kwargs)
+    ui.message = observed_notice
+    speech.setSpeechMode(speech.SpeechMode.talk)
+    row["notice_speech_mode_enabled"] = True
+    DRIVER.cancel()
+    DRIVER.voice = "sara"
+    DRIVER._dordiai_last_error = None
+    DRIVER._dordiai_last_error_details = None
+    DONE.clear()
+    row["request_started_ns"] = time.perf_counter_ns()
+    # Fixed, deliberately uncached ordinary text through the public driver.
+    # No production hooks, synthetic exception, direct IPC or replayed error.
+    DRIVER.speak([LangChangeCommand("ru"),
+                  "Проверка восстановления отсутствующего ресурса модели ударений.",
+                  IndexCommand(889901)])
+    save()
+    later(100, lambda: observe_required_resource_recovery(target, time.monotonic() + 90.0))
+
+
+def observe_required_resource_recovery(target, deadline):
+    import config
+    row = RESULT["required_resource_recovery"]
+    active = synthDriverHandler.getSynth()
+    details = getattr(DRIVER, "_dordiai_last_error_details", None)
+    row.update(
+        diagnostics=details,
+        recovery=dict(details.get("recovery", {})) if isinstance(details, dict) else {},
+        active_synth=getattr(active, "name", None),
+        active_driver_module=type(active).__module__ if active is not None else None,
+        configured_synth_preserved=config.conf["speech"]["synth"] == row["configured_synth_before"],
+        old_driver_closed=bool(getattr(DRIVER, "_closed", False)),
+        old_driver_thread_stopped=not DRIVER._thread.is_alive(),
+        asset_still_missing=not target.exists(),
+        notice_pcm_bytes=sum(sink.submitted_bytes for sink in RECOVERY_OUTPUTS),
+        notice_pcm_nonzero_bytes=sum(sink.nonzero_bytes for sink in RECOVERY_OUTPUTS),
+        output_boundary="recording PCM sink TEST DOUBLE" if SETTINGS.get("headless_ui_probe") else "forwarded real WavePlayer",
+    )
+    passed = required_resource_recovery_passed(row)
+    if not passed and time.monotonic() < deadline:
+        save()
+        later(100, lambda: observe_required_resource_recovery(target, deadline))
+        return
+    row["elapsed_ms"] = (time.perf_counter_ns() - row["request_started_ns"]) / 1e6
+    check("required_resource_notification_recovery", "passed" if passed else "failed", observations=row)
     restore_recovery_output_factory()
     finish()
 
@@ -1043,6 +1235,106 @@ def wait_process(process, timeout, expected_file=None):
     raise TimeoutError("Owned NVDA process exceeded the probe watchdog")
 
 
+REQUIRED_RESOURCE_RELATIVE = Path("models/PocketTTS/stress/ru_ruaccent/nn_omograph/model.onnx")
+
+
+def required_resource_probe_paths(addon, owned_run, run_id):
+    """Resolve one fixed asset only within this controller's fresh configuration."""
+    if not isinstance(run_id, str) or re.fullmatch(r"[0-9a-f]{32}", run_id) is None:
+        raise ValueError("Invalid owned probe identifier")
+    owned_run = Path(owned_run).resolve(strict=True)
+    addon = Path(addon)
+    if addon.is_symlink() or (hasattr(addon, "is_junction") and addon.is_junction()):
+        raise ValueError("Required-resource probe refuses a linked add-on")
+    if addon.resolve(strict=True).parent != owned_run / "config" / "addons":
+        raise ValueError("Required-resource probe refuses an add-on outside its owned configuration")
+    addon = addon.resolve(strict=True)
+    runtime = addon / "kx47Runtime"
+    target = runtime / REQUIRED_RESOURCE_RELATIVE
+    quarantine = target.with_name(target.name + "." + run_id + ".quarantine")
+    # resolve() alone would silently follow links. Reject links/junctions in
+    # every controlled component, including a pre-existing target or backup.
+    current = addon
+    candidates = [addon]
+    for component in target.relative_to(addon).parts:
+        current = current / component
+        candidates.append(current)
+    candidates.append(quarantine)
+    for candidate in candidates:
+        if candidate.is_symlink() or (hasattr(candidate, "is_junction") and candidate.is_junction()):
+            raise ValueError("Required-resource probe refuses linked asset paths")
+    if runtime.resolve(strict=True) != runtime or target.resolve(strict=False) != target:
+        raise ValueError("Required-resource probe asset escaped its owned runtime")
+    return owned_run, addon, runtime, target, quarantine
+
+
+def quarantine_required_resource(addon, owned_run, run_id):
+    owned_run, addon, runtime, target, quarantine = required_resource_probe_paths(addon, owned_run, run_id)
+    if quarantine.exists():
+        raise FileExistsError("Required-resource quarantine already exists")
+    info = target.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_size <= 0 or info.st_nlink != 1:
+        raise ValueError("Required-resource probe requires one nonempty ordinary owned file")
+    checksum = sha256_file(target)
+    record = {"run_root": str(owned_run), "addon_root": str(addon), "runtime_root": str(runtime),
+              "run_id": run_id, "asset_relative": REQUIRED_RESOURCE_RELATIVE.as_posix(),
+              "quarantine_path": str(quarantine), "asset_sha256": checksum,
+              "asset_bytes": info.st_size, "restored": False,
+              "asset_missing_before_nvda_launch": False}
+    os.replace(target, quarantine)
+    try:
+        if target.exists() or sha256_file(quarantine) != checksum:
+            raise RuntimeError("Required-resource quarantine verification failed")
+        record["asset_missing_before_nvda_launch"] = True
+        return record
+    except BaseException:
+        # No caller owns a record until this returns. Roll back even an error
+        # encountered between the rename and the controller's finally block.
+        if quarantine.exists() and not target.exists():
+            os.replace(quarantine, target)
+        raise
+
+
+def restore_required_resource(record):
+    """Restore byte-identical data; never overwrite an unexpected replacement."""
+    owned_run, addon, runtime, target, quarantine = required_resource_probe_paths(
+        record["addon_root"], record["run_root"], record["run_id"])
+    if (record.get("runtime_root") != str(runtime)
+            or record.get("asset_relative") != REQUIRED_RESOURCE_RELATIVE.as_posix()
+            or record.get("quarantine_path") != str(quarantine)):
+        raise ValueError("Required-resource restoration metadata does not match its owned asset")
+    checksum = record.get("asset_sha256")
+    if not isinstance(checksum, str) or re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
+        raise ValueError("Invalid required-resource restoration checksum")
+    if quarantine.exists():
+        if target.exists():
+            raise FileExistsError("Refusing to overwrite a replacement required-resource asset")
+        if sha256_file(quarantine) != checksum:
+            raise RuntimeError("Quarantined required-resource checksum changed; original retained")
+        os.replace(quarantine, target)
+    if not target.is_file() or sha256_file(target) != checksum:
+        raise RuntimeError("Required-resource restoration checksum verification failed")
+    record["restored"] = True
+    record["restored_sha256"] = checksum
+    return {"restored": True, "sha256_identical": True, "bytes": target.stat().st_size}
+
+
+def cleanup_required_resource_probe(process, record):
+    """Always attempt restoration, even if stopping the owned process fails."""
+    result = {}
+    try:
+        stop_owned(process)
+    except Exception as error:
+        result["owned_process_shutdown_error"] = repr(error)
+    finally:
+        try:
+            result["restoration"] = restore_required_resource(record)
+        except Exception as error:
+            result["restoration_error"] = repr(error)
+    result["status"] = "failed" if "owned_process_shutdown_error" in result or "restoration_error" in result else "passed"
+    return result
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--addon", required=True, type=Path)
@@ -1051,8 +1343,11 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=600.0, help="Watchdog seconds for each NVDA process")
     parser.add_argument("--headless-ui-probe", action="store_true",
                         help="Explicit recording output TEST DOUBLE for real NVDA/driver/model/GUI checks; never certifies WavePlayer or acoustic output")
-    parser.add_argument("--fatal-recovery-probe", action="store_true",
+    recovery_modes = parser.add_mutually_exclusive_group()
+    recovery_modes.add_argument("--fatal-recovery-probe", action="store_true",
                         help="Optional injected fatal-notification recovery check after normal speech/latency; not a real model-import failure proof")
+    recovery_modes.add_argument("--required-resource-recovery-probe", action="store_true",
+                        help="Isolated real missing RuAccent file/worker/fallback proof; skips normal speech benchmarks and restores the owned asset in finally")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -1072,6 +1367,8 @@ def main(argv=None):
         result["limitations"].append("Explicit headless output double: no WavePlayer/device/acoustic acceptance")
     controller_path = output / "windows-nvda-probe.json"
     process = None
+    required_resource_quarantine = None
+    restoration_failed = False
     try:
         if os.name != "nt":
             result.update(status="blocked", reason="A real Windows desktop and audio environment are required; no emulation or stubs used")
@@ -1113,6 +1410,12 @@ def main(argv=None):
         result["checks"].append({"name": "portable_nvda_created", "status": "passed", "bootstrap_exit_code": exit_code})
         addon = extract_addon(args.addon, config / "addons" / addon_name(args.addon))
         result["extracted_addon"] = str(addon)
+        if args.required_resource_recovery_probe:
+            # Before launch: startup itself warms RuAccent in the real worker.
+            required_resource_quarantine = quarantine_required_resource(addon, run, run_id)
+            result["required_resource_quarantine"] = required_resource_quarantine
+            result["scope"] = "actual-isolated-required-resource-worker-and-fallback-proof"
+            result["normal_performance_benchmark_skipped"] = True
         probe_addon = config / "addons" / "dordiaiProbe"
         plugins = probe_addon / "globalPlugins"
         plugins.mkdir(parents=True)
@@ -1123,6 +1426,8 @@ def main(argv=None):
         (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__NATIVE_IMPORT_DIAGNOSTIC__", repr(NATIVE_IMPORT_DIAGNOSTIC)).replace("__PROBE_SETTINGS__", repr({
             "output": str(run), "run_id": run_id, "headless_ui_probe": args.headless_ui_probe,
             "fatal_recovery_probe": args.fatal_recovery_probe,
+            "required_resource_recovery_probe": args.required_resource_recovery_probe,
+            "required_resource_quarantine": required_resource_quarantine,
         })), encoding="utf-8")
         (config / "nvda.ini").write_text(
             '[general]\nshowWelcomeDialog = False\naskToExit = False\nsaveConfigurationOnExit = False\n'
@@ -1171,7 +1476,16 @@ def main(argv=None):
         result.update(status="failed", error=repr(error), traceback=traceback.format_exc())
         return 1
     finally:
-        stop_owned(process)
+        if required_resource_quarantine is not None:
+            cleanup = cleanup_required_resource_probe(process, required_resource_quarantine)
+            result["required_resource_cleanup"] = cleanup
+            result["checks"].append(dict(name="required_resource_sha_identical_restoration",
+                                         status=cleanup["status"], **cleanup.get("restoration", {})))
+            if cleanup["status"] != "passed":
+                restoration_failed = True
+                result["status"] = "failed"
+        else:
+            stop_owned(process)
         result["finished_at_ns"] = time.time_ns()
         write_json(controller_path, result)
         summary = {"status": result["status"], "result": str(controller_path), "run_directory": str(run)}
@@ -1182,6 +1496,8 @@ def main(argv=None):
             summary["nonpassing_checks"] = [{key: entry[key] for key in ("name", "status", "error", "reason") if key in entry}
                                              for entry in result["probe"].get("checks", []) if entry.get("status") != "passed"]
         print(json.dumps(summary), flush=True)
+        if restoration_failed:
+            return 1
 
 
 if __name__ == "__main__":
