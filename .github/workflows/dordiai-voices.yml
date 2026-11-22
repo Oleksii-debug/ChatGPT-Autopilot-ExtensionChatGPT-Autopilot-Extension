@@ -14,6 +14,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  artifact-diagnostics:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[diagnose-nvda]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Recover only small diagnostics from the previous Windows artifact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id 14741290102 --output dordiai-voices/diagnosed-windows-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-voices-recovered-windows-diagnostics
+          path: dordiai-voices/diagnosed-windows-evidence
+          if-no-files-found: warn
+          retention-days: 7
+
   unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -99,12 +123,15 @@ jobs:
           import pathlib, subprocess, sys
           addon = next(pathlib.Path("dordiai-voices/dist").glob("*.nvda-addon"))
           subprocess.run([sys.executable, "dordiai-voices/tools/windows_nvda_probe.py", "--addon", str(addon), "--output", "dordiai-voices/windows-results/nvda"], check=True)
+      - name: Print probe failures and collect bounded Windows diagnostics
+        if: always()
+        run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
       - uses: actions/upload-artifact@v4
         id: windows_evidence
         if: always()
         with:
           name: dordiai-voices-windows-evidence
-          path: dordiai-voices/windows-results
+          path: dordiai-voices/windows-evidence
           if-no-files-found: warn
           retention-days: 7
       - uses: actions/upload-artifact@v4

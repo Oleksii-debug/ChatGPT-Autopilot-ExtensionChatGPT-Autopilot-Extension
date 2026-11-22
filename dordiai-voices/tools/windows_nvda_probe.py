@@ -799,7 +799,14 @@ def main(argv=None):
         stop_owned(process)
         result["finished_at_ns"] = time.time_ns()
         write_json(controller_path, result)
-        print(json.dumps({"status": result["status"], "result": str(controller_path), "run_directory": str(run)}))
+        summary = {"status": result["status"], "result": str(controller_path), "run_directory": str(run)}
+        for key in ("error", "reason", "traceback"):
+            if key in result:
+                summary[key] = result[key]
+        if isinstance(result.get("probe"), dict):
+            summary["nonpassing_checks"] = [{key: entry[key] for key in ("name", "status", "error", "reason") if key in entry}
+                                             for entry in result["probe"].get("checks", []) if entry.get("status") != "passed"]
+        print(json.dumps(summary), flush=True)
 
 
 if __name__ == "__main__":

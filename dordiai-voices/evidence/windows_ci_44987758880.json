@@ -1,0 +1,55 @@
+{
+  "format": "dordiai-windows-ci-observation",
+  "format_version": 1,
+  "run_id": 44987758880,
+  "commit_sha": "87a91cc661da3ca3e799acd789b49a219517b6c1",
+  "workflow_url": "https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension/actions/runs/44987758880",
+  "source": "Connected GitHub jobs/steps API and finalized job logs",
+  "linux_unit_job": {
+    "id": 137101958463,
+    "status": "success"
+  },
+  "windows_job": {
+    "id": 137101958631,
+    "status": "failure",
+    "checks": {
+      "windows_unit_tests": "success",
+      "audited_baseline_restore": "success",
+      "modular_release_build": "success",
+      "release_archive_verification": "success",
+      "actual_core_engine_probe": "success",
+      "optional_resource_installation": "success",
+      "actual_additional_engine_probe": "success",
+      "actual_nvda_integration_probe": "failure"
+    }
+  },
+  "observed_console": [
+    "2026-11-22T05:10:22.7451551Z Windows engine probe: passed (engine/report.json)",
+    "2026-11-22T05:11:13.1676719Z Windows engine probe: passed (extra-engines/report.json)",
+    "2026-11-22T05:12:11.7207724Z NVDA controller status failed; old controller printed paths but no exception details",
+    "2026-11-22T05:12:12.7004900Z NVDA subprocess returned exit status 1"
+  ],
+  "limitations": [
+    "Successful worker smoke checks do not certify native-speaker pronunciation or NVDA audible latency.",
+    "No successful NVDA acceptance is claimed.",
+    "Detailed NVDA failure cause remains unobserved in this record; the old log omitted it."
+  ],
+  "evidence_artifact": {
+    "id": 14741290102,
+    "size_bytes": 1941758431,
+    "download_connector_limit_bytes": 536870912,
+    "status": "download refused by connected GitHub tool because artifact exceeded limit",
+    "cause": "The original evidence upload included the extracted NVDA/add-on/model directory tree (12072 files)."
+  },
+  "corrective_changes": [
+    "tools/collect_windows_evidence.py: retain only bounded JSON/log/WAV evidence, excluding portable/config/addons/models/executables, maximum50MiB including inventory",
+    ".github/workflows/dordiai-voices.yml: always print probe failure summaries and NVDA log tail; upload bounded windows-evidence directory",
+    "tools/windows_nvda_probe.py: final console summary includes error/reason/traceback/nonpassing checks"
+  ],
+  "collector_tests": {
+    "count": 6,
+    "result": "passed",
+    "platform": "Linux"
+  },
+  "rerun_with_small_diagnostics": "not_yet_observed"
+}
