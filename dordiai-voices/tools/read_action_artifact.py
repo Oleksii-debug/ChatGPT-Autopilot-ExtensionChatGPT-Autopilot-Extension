@@ -191,7 +191,7 @@ def selected_member(path):
         return False
     if path.name in REPORT_NAMES or path.name in LOG_NAMES:
         return True
-    return path.name in {"report.json", "worker-stderr.log"} and path.parts[0] in {"engine", "extra-engines"}
+    return path.name in {"report.json", "worker-stderr.log", "native-carrier-stderr.log"} and path.parts[0] in {"engine", "extra-engines", "characters", "mms-ha", "mms-ha-shared"}
 
 
 def brief_report(document):

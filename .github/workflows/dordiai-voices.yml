@@ -82,7 +82,20 @@ jobs:
       - name: Recover only small diagnostics from the previous Windows artifact
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id 14741290102 --output dordiai-voices/diagnosed-windows-evidence
+        run: python dordiai-voices/tools/read_action_artifact.py --repo "${{ github.repository }}" --artifact-id 14745169351 --output dordiai-voices/diagnosed-windows-evidence
+      - name: Print bounded fixed-input worker diagnostics
+        if: always()
+        shell: python
+        run: |
+          import json, pathlib
+          root = pathlib.Path("dordiai-voices/diagnosed-windows-evidence")
+          for path in sorted(root.rglob("*stderr.log")):
+              text = path.read_bytes()[-65536:].decode("utf-8", errors="replace")
+              print("FIXED ENGINE STDERR " + path.relative_to(root).as_posix(), flush=True)
+              print(text.encode("ascii", errors="backslashreplace").decode("ascii"), flush=True)
+          for path in root.rglob("nvda-probe.json"):
+              report = json.loads(path.read_text(encoding="utf-8"))
+              print("NVDA SUMMARY " + json.dumps({key: report.get(key) for key in ("status", "worker_bootstrap", "native_import_diagnostics", "initial_smoke_predevice_latency", "api_latency")}, ensure_ascii=True), flush=True)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
