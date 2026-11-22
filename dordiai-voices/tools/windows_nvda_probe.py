@@ -1424,7 +1424,11 @@ def main(argv=None):
                         help="Isolated real missing RuAccent file/worker/fallback proof; skips normal speech benchmarks and restores the owned asset in finally")
     recovery_modes.add_argument("--typing-probe", action="store_true",
                         help="Owned wx.TextCtrl real SendInput/NVDA typing echo and route checks; skips direct speech benchmarks")
+    parser.add_argument("--typing-scenario", choices=("standard", "characters-only", "navigation", "forced-uk", "disabled-ru"), default="standard",
+                        help="Optional isolated real-key coverage; standard preserves nine keys with native word echo ON")
     args = parser.parse_args(argv)
+    if args.typing_scenario != "standard" and not args.typing_probe:
+        parser.error("--typing-scenario requires --typing-probe")
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
     output = args.output.resolve()
@@ -1507,6 +1511,7 @@ def main(argv=None):
             "fatal_recovery_probe": args.fatal_recovery_probe,
             "required_resource_recovery_probe": args.required_resource_recovery_probe,
             "typing_probe": args.typing_probe,
+            "typing_scenario": args.typing_scenario,
             "required_resource_quarantine": required_resource_quarantine,
         }))
         if args.typing_probe:

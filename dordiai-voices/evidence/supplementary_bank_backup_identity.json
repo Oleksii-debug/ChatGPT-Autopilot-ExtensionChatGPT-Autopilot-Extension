@@ -1,0 +1,38 @@
+{
+  "format": "dordiai-data-backup-identity",
+  "format_version": 1,
+  "repository": "Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension",
+  "kind": "prepared-bank-overlay",
+  "version": "0.13.1-banks.1",
+  "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+  "binary_source_commit": "7b08ce448d5b888e6c75a503f72bf1d3dd8e8368",
+  "source_workflow": ".github/workflows/dordiai-supplementary-banks.yml",
+  "source_run_id": 45018169807,
+  "source_artifact": {
+    "id": 14752868030,
+    "name": "supplementary-bank-overlay-0.13.1-banks.1",
+    "wrapper_sha256": "3be4840f1c52c189e919386711745041ca64bccfba7a5dd895cbcd508ce1d74f"
+  },
+  "archive": {
+    "filename": "dordiai-supplementary-banks-0.13.1-banks.1.zip",
+    "sha256": "055d57d619ed0925b19199799ff08a24690ff8a34f1a3652674cb8c7b38e6ccb",
+    "size_bytes": 415348067
+  },
+  "manifest": {
+    "filename": "dordiai-prepared-bank-overlay.json",
+    "size_bytes": 9681415,
+    "sha256": "bed7d5018b23595c9ff2c0dfb3f84f4e54a981c57a9712f0cec935579503db14"
+  },
+  "source_core": {
+    "filename": "dordiai-voices-0.13.1-dev.8.nvda-addon",
+    "sha256": "568e49547f386b17fc82d1def13257749774eecaf999f4823d74100e47bf7ac6",
+    "size_bytes": 1767411258
+  },
+  "catalogue_sha256": "d60359f722b521b30faaac5cc1beff07861efbe1a1cd521d986bf002446fd4a6",
+  "product_ready": false,
+  "quality_validation": {
+    "nvda": "pending",
+    "physical_audio": "pending",
+    "pronunciation": "pending"
+  }
+}

@@ -206,6 +206,42 @@ class SixLayerOrtCarrier:
         return audio
 
 
+
+def read_reference_wav(path):
+    """Read the actual expected PCM16 native reference without a new audio DLL."""
+    import numpy as np
+    import wave
+    path = Path(path)
+    if path.stat().st_size > 8 * 1024 * 1024:
+        raise ValueError("Native reference WAV exceeds the bounded input budget")
+    with wave.open(str(path), "rb") as source:
+        facts = {"channels": source.getnchannels(), "sample_width": source.getsampwidth(),
+                 "sample_rate": source.getframerate(), "frames": source.getnframes(),
+                 "compression": source.getcomptype()}
+        if facts["sample_width"] != 2 or facts["channels"] not in (1, 2) or facts["compression"] != "NONE":
+            raise ValueError("Unsupported native reference WAV format: " + repr(facts))
+        raw = source.readframes(facts["frames"])
+    if len(raw) != facts["frames"] * facts["channels"] * 2:
+        raise ValueError("Truncated PCM16 native reference WAV")
+    audio = np.frombuffer(raw, "<i2").astype(np.float32) / 32768.
+    audio = audio.reshape(-1, facts["channels"]).mean(axis=1).astype(np.float32)
+    return audio, facts["sample_rate"], facts
+
+
+def write_pcm16_wav(path, audio, rate):
+    import numpy as np
+    import wave
+    if not np.isfinite(audio).all():
+        raise ValueError("Refusing nonfinite output PCM")
+    pcm = (np.clip(audio, -1., 1. - 1. / 32768.) * 32768.).astype("<i2")
+    with Path(path).open("xb") as stream:
+        with wave.open(stream, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(rate)
+            output.writeframes(pcm.tobytes())
+
+
 def peak_rss():
     if sys.platform == "win32":
         import ctypes
@@ -273,14 +309,13 @@ def probe(args):
         raise ValueError("Existing ORT1.26 compatibility must use the actual private core package")
     sys.path.insert(0, str(args.g2p_source.resolve() / "src"))
     import numpy as np
-    import soundfile as sf
     from africa_g2p import g2p
     started = perf_counter()
     carrier = SixLayerOrtCarrier(args.graphs, root / "tokenizer.json", expected_ort_version=args.expected_ort,
                                  package_python=package_python)
     report["runtime_imports"] = {name: {"file": str(getattr(sys.modules[name], "__file__", "")),
                                       "version": str(getattr(sys.modules[name], "__version__", "unreported"))}
-                                 for name in ("numpy", "onnxruntime", "tokenizers", "soundfile")}
+                                 for name in ("numpy", "onnxruntime", "tokenizers")}
     if package_python is not None and any(not Path(row["file"]).resolve().is_relative_to(package_python.resolve())
                                           for row in report["runtime_imports"].values()):
         raise ValueError("Native dependency escaped the unchanged private package")
@@ -294,10 +329,9 @@ def probe(args):
         ipa = g2p(row["text"], row["language"], output="ipa")
         if ipa != row["expected_training_ipa"]:
             raise ValueError("G2P not identical to primary training fixture")
-        ref, rate = sf.read(root / index["files"]["voice_" + row["language"]]["relative"],
-                            dtype="float32", always_2d=True)
+        ref, rate, reference_format = read_reference_wav(root / index["files"]["voice_" + row["language"]]["relative"])
         started = perf_counter()
-        audio = carrier.audio(ipa, ref.mean(axis=1), int(rate))
+        audio = carrier.audio(ipa, ref, int(rate))
         elapsed = perf_counter() - started
         if carrier.last_facts["generation_cap_reached"]:
             raise ValueError("Output reached generation cap; cannot claim completed utterance")
@@ -305,26 +339,26 @@ def probe(args):
         if rms < 1e-6 or peak < 1e-5:
             raise ValueError("Silent waveform")
         path = audio_folder / (row["language"] + "-" + str(number) + ".wav")
-        with path.open("xb") as output:
-            sf.write(output, audio, RATE, format="WAV", subtype="PCM_16")
+        write_pcm16_wav(path, audio, RATE)
         item = dict(row, status="passed", ipa=ipa, samples=len(audio), sample_rate=RATE,
                     seconds=len(audio) / RATE, inference_seconds=elapsed, real_time_factor=elapsed / (len(audio) / RATE),
                     peak=peak, rms=rms, clip_fraction=float(np.mean(np.abs(audio) >= 1.)),
                     wav_file=str(path), wav_sha256=common.digest(path), float32_sha256=sha256(audio.tobytes()).hexdigest(),
-                    host_facts=carrier.last_facts, process_peak_rss_bytes=peak_rss())
+                    host_facts=carrier.last_facts, reference_wav_format=reference_format, process_peak_rss_bytes=peak_rss())
         report["cases"].append(item)
         common.write_json(args.report, report)
         print(json.dumps({k: item[k] for k in ("language", "status", "seconds", "inference_seconds", "real_time_factor")}), flush=True)
     # A request after another language must begin from clean recurrent state.
     first = rows[0]
-    ref, rate = sf.read(root / index["files"]["voice_" + first["language"]]["relative"], dtype="float32", always_2d=True)
-    replay = carrier.audio(first["expected_training_ipa"], ref.mean(axis=1), int(rate))
+    ref, rate, _ = read_reference_wav(root / index["files"]["voice_" + first["language"]]["relative"])
+    replay = carrier.audio(first["expected_training_ipa"], ref, int(rate))
     if sha256(replay.tobytes()).hexdigest() != report["cases"][0]["float32_sha256"]:
         raise ValueError("Recurrent state or reference selection leaked across language requests")
     report.update(status="actual-six-layer-pythonort-cpu-unintegrated", all_six_cases_passed=True,
                   recurrent_state_reset_replay_passed=True, process_peak_rss_bytes=peak_rss(),
                   windows_verified=sys.platform == "win32", python_version=sys.version,
-                  ort_version=carrier.ort.__version__, provider="CPUExecutionProvider", executable=sys.executable)
+                  ort_version=carrier.ort.__version__, provider="CPUExecutionProvider", executable=sys.executable,
+                  wave_io="stdlib PCM16 WAV reader and writer; actual header retained; no soundfile")
     common.write_json(args.report, report)
     return report
 

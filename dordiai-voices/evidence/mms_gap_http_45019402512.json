@@ -1,0 +1,371 @@
+{
+  "cautions": [
+    "HTTP401/403 and transport errors are never reported as HTTP404.",
+    "An actual directory404 is relevant only when the positive directory pattern succeeds.",
+    "No neighbouring language, IPA prototype, metadata entry, or PCM output establishes accepted native pronunciation.",
+    "Comorian varieties are kept separate; none establishes all varieties."
+  ],
+  "checked_at": "2026-11-22T11:52:11.199110+00:00",
+  "checks": [
+    {
+      "consolidated_directory": {
+        "body_sha256": "b0e950faa94533028d59b759e21e79a2730d93dbf774ff30082d807e2fa3f675",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/aar does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/aar"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-aar"
+      },
+      "model_ready": false,
+      "native_iso639_3": "aar",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "aa"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "89615da9640b5131c29844d5b30167febac7113d82127fbb80f9502265780bdf",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/ton does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ton"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-ton"
+      },
+      "model_ready": false,
+      "native_iso639_3": "ton",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "to"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "5b75b1c7e1f6a16646ce7fda9f353151e1715cd53c63c7b0047dda41856e9c44",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/hmo does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hmo"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-hmo"
+      },
+      "model_ready": false,
+      "native_iso639_3": "hmo",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "ho"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "e2983a5cc0aae4818578bd82528bfeca0b1c4564c4535236a15a7a1d7dca7090",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/tet does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/tet"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-tet"
+      },
+      "model_ready": false,
+      "native_iso639_3": "tet",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "tet"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "945fe283f5f7e8e3c48ee4a57867b2f13e3740777692ba253c573e1442fbd096",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/nbl does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/nbl"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-nbl"
+      },
+      "model_ready": false,
+      "native_iso639_3": "nbl",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "nr"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "7c386749f6fb693b392ce257c8fc996fcb06a145ef10de9e90bbe2ece05cc8eb",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/ssw does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ssw"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-ssw"
+      },
+      "model_ready": false,
+      "native_iso639_3": "ssw",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "ss"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "f26e6ffe4b8357512a76ab57e8acfa013889bd77cc704ca46c0ee9eb504d9573",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/ven does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ven"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-ven"
+      },
+      "model_ready": false,
+      "native_iso639_3": "ven",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "ve"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "ba5339e6d90493d4d37677adcfc62f8fc5b09a3042843e24b92eee9e6ddf591d",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/cnr does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/cnr"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-cnr"
+      },
+      "model_ready": false,
+      "native_iso639_3": "cnr",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "cnr"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "e7cf1a2e85382965cca256406bf37d8984e34ef54106171170cae926ba2d3979",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/ito does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/ito"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-ito"
+      },
+      "model_ready": false,
+      "native_iso639_3": "ito",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "ito"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "72d84afb572e60ebf4aeec7283e364297e6c2e759638fae8bcd5499212ecb03d",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/zdj does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/zdj"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-zdj"
+      },
+      "model_ready": false,
+      "native_iso639_3": "zdj",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "comorian"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "57cf2cedfd30bcea07cc7b665a9697ddeb2382251fe36249726f3801823a7a67",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/wni does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/wni"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-wni"
+      },
+      "model_ready": false,
+      "native_iso639_3": "wni",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "comorian"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "c28b7cda80915bd1941057fcf30bb10941d9b0057cb5f93c47bace3881fb2604",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/wlc does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/wlc"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-wlc"
+      },
+      "model_ready": false,
+      "native_iso639_3": "wlc",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "comorian"
+    },
+    {
+      "consolidated_directory": {
+        "body_sha256": "9e237d46c635b12ff945ed9ffcd55132f22e42cd254d0cbaab1c392c05acb637",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"models/swb does not exist on \\\"44cc7fb408064ef9ea6e7c59130d88cac1274671\\\"\"}",
+        "http_status": 404,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/swb"
+      },
+      "consolidated_exact_paths": [],
+      "directory_pattern_verified_by_actual_hau": true,
+      "individual_lookup_result": "public-access-denied-or-hidden-not-proof-of-nonexistence",
+      "individual_repository": {
+        "body_sha256": "65842e3d84e6b7f62a470c85204e80b953bb8f944e9b69813130a9d7f3eaa1d8",
+        "classification": "actual-http-error",
+        "error_excerpt": "{\"error\":\"Invalid username or password.\"}",
+        "http_status": 401,
+        "url": "https://huggingface.co/api/models/facebook/mms-tts-swb"
+      },
+      "model_ready": false,
+      "native_iso639_3": "swb",
+      "native_listener_verified": false,
+      "repository_metadata": null,
+      "selected_code": "comorian"
+    }
+  ],
+  "consolidated": {
+    "body_sha256": "ea64d170594855214d1beeda2a11854c13edff9b7337660e8eb94ef8164b11e1",
+    "body_size_bytes": 344176,
+    "classification": "actual-http-response",
+    "file_count": 8003,
+    "final_url": "https://huggingface.co/api/models/facebook/mms-tts",
+    "http_status": 200,
+    "id": "facebook/mms-tts",
+    "revision": "44cc7fb408064ef9ea6e7c59130d88cac1274671",
+    "url": "https://huggingface.co/api/models/facebook/mms-tts"
+  },
+  "format": "dordiai-mms-gap-http-audit",
+  "format_version": 1,
+  "positive_control": {
+    "body_sha256": "8f10d3688f89e7a040fa92f1bf890d7637cf2d5b5adc54836d39460bd4bcc1c8",
+    "body_size_bytes": 4980,
+    "classification": "actual-http-response",
+    "consolidated_directory": {
+      "body_sha256": "245c5c1433fab847f66e3dc785751aca755ab4ca326c954759fbd64dd8ae49b5",
+      "body_size_bytes": 523,
+      "classification": "actual-http-response",
+      "final_url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hau",
+      "http_status": 200,
+      "url": "https://huggingface.co/api/models/facebook/mms-tts/tree/44cc7fb408064ef9ea6e7c59130d88cac1274671/models/hau"
+    },
+    "final_url": "https://huggingface.co/api/models/facebook/mms-tts-hau",
+    "http_status": 200,
+    "metadata": {
+      "card_language": null,
+      "file_names": [
+        ".gitattributes",
+        "README.md",
+        "config.json",
+        "model.safetensors",
+        "pytorch_model.bin",
+        "special_tokens_map.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "gated": false,
+      "id": "facebook/mms-tts-hau",
+      "pipeline_tag": "text-to-speech",
+      "private": false,
+      "revision": "f0eb02aa37f7259f35349da63cafe0556cf93e3d"
+    },
+    "url": "https://huggingface.co/api/models/facebook/mms-tts-hau"
+  },
+  "scope": "Exact official model endpoints and consolidated metadata only; no acoustic assets downloaded"
+}

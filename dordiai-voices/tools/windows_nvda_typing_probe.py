@@ -41,7 +41,7 @@ def _typing_sequence(sequence):
             result.append({"text": item[:120]})
         else:
             row = {"command": type(item).__name__}
-            for key in ("lang", "state"):
+            for key in ("lang", "state", "index"):
                 if hasattr(item, key):
                     row[key] = getattr(item, key)
             result.append(row)
@@ -69,7 +69,7 @@ def _typing_on_raw_key(vkCode, scanCode, extended, pressed, injected):
     row = state.get("active") if state and not state.get("cleaned") else None
     if row is not None and (vkCode == row.get("vk") or row.get("shift") and vkCode in (0x10, 0xa0)):
         row["raw_keys"].append({"vk": int(vkCode), "pressed": bool(pressed), "injected": bool(injected),
-                                "scan": int(scanCode), "time_ns": time.perf_counter_ns()})
+                                "scan": int(scanCode), "extended": bool(extended), "time_ns": time.perf_counter_ns()})
     return True
 
 
@@ -138,8 +138,9 @@ def _typing_bind_user32():
     return user
 
 
-def _typing_key_events(scan, shift=False):
-    events = ([(0x2a, 0x0008)] if shift else []) + [(scan, 0x0008), (scan, 0x000a)]
+def _typing_key_events(scan, shift=False, extended=False):
+    prefix = 0x0001 if extended else 0
+    events = ([(0x2a, 0x0008)] if shift else []) + [(scan, 0x0008 | prefix), (scan, 0x000a | prefix)]
     if shift:
         events.append((0x2a, 0x000a))
     values = (_TypingInput * len(events))()
@@ -149,14 +150,15 @@ def _typing_key_events(scan, shift=False):
     return values
 
 
-def _typing_key_pair(scan):
-    return _typing_key_events(scan)
+def _typing_key_pair(scan, extended=False):
+    return _typing_key_events(scan, extended=extended)
 
 
 def _typing_pending_keys(events, inserted):
     pressed = []
     for item in events[:max(0, min(len(events), inserted))]:
-        key = int(item.data.ki.wScan)
+        scan = int(item.data.ki.wScan)
+        key = (scan, True) if item.data.ki.dwFlags & 0x0001 else scan
         if item.data.ki.dwFlags & 0x0002:
             if key in pressed:
                 pressed.remove(key)
@@ -195,7 +197,7 @@ def start_actual_typing_probe():
     frame = wx.Frame(None, title="Dordiai isolated real typing probe")
     text = wx.TextCtrl(frame, value="", size=(500, 80))
     frame.SetClientSize((520, 100))
-    keys = {"speakTypedCharacters": 1, "speakTypedWords": 1,
+    keys = {"speakTypedCharacters": 1, "speakTypedWords": int(SETTINGS.get("typing_words", 1)),
             "handleInjectedKeys": True, "speechInterruptForCharacters": True, "speakCommandKeys": False}
     _TYPING = {"frame": frame, "text": text, "user": user, "index": 0, "active": None,
                "last_language": None, "expected": "", "loaded": [],
@@ -207,7 +209,7 @@ def start_actual_typing_probe():
                "cleaned": False, "in_typed_handler": False}
     RESULT["actual_typing"] = {"scope": "real SendInput to owned wx.TextCtrl through unchanged NVDA typing handlers",
         "input_injection": "scan-code SendInput, not WM_CHAR or direct speech calls",
-        "speech_mode": "talk", "speak_typed_characters": 1, "speak_typed_words": 1,
+        "speech_mode": "talk", "speak_typed_characters": 1, "speak_typed_words": int(SETTINGS.get("typing_words", 1)),
         "no_manual_language_commands": True, "physical_audio_verified": False,
         "recording_pcm_sink_test_double": bool(SETTINGS.get("headless_ui_probe")), "cases": []}
     for key, value in keys.items():
@@ -358,7 +360,7 @@ def _typing_wait_case(deadline):
     row["symbol_label_matches"] = symbol_ok
     row["letter_name_matches"] = letter_ok
     row["word_echo_matches"] = word_ok
-    row["routing_status"] = ("passed" if _typing_route_matches(row["language"], row["effective_languages"])
+    row["routing_status"] = ("passed" if _typing_route_matches(row.get("expected_language", row["language"]), row["effective_languages"])
                              and symbol_ok and letter_ok and word_ok else "mismatch")
     row["first_pcm_ms"] = (first_pcm - row["send_started_ns"]) / 1000000.0 if first_pcm else None
     state["expected"] = row["expected_control_value"]
@@ -397,7 +399,7 @@ def _typing_cleanup():
         except Exception as error:
             failures.append(type(error).__name__)
     for scan in reversed(state.get("pending_releases", ())):
-        pair = _typing_key_pair(scan)
+        pair = _typing_key_pair(scan[0], extended=scan[1]) if isinstance(scan, tuple) else _typing_key_pair(scan)
         try:
             if state["user"].SendInput(1, _typing_ct.byref(pair[1]), _typing_ct.sizeof(_TypingInput)) != 1:
                 failures.append("OwnedKeyReleaseFailed")
@@ -461,7 +463,12 @@ def finish():
 
 def extend_plugin(source):
     """Append probe observers after the base plugin class; compile before use."""
-    result = source + "\n" + PLUGIN_CODE
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+    scenario_spec = spec_from_file_location("_dordiai_typing_scenario_extension", Path(__file__).with_name("windows_nvda_typing_scenarios.py"))
+    scenario_module = module_from_spec(scenario_spec)
+    scenario_spec.loader.exec_module(scenario_module)
+    result = source + "\n" + PLUGIN_CODE + "\n" + scenario_module.PLUGIN_CODE
     compile(result, "isolated-real-typing-probe-plugin", "exec")
     return result
 

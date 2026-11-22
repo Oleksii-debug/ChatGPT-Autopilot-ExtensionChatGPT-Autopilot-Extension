@@ -1,0 +1,1274 @@
+{
+  "format": "dordiai-word-lid-remaining-source-investigation",
+  "format_version": 1,
+  "created_utc": "2026-11-22",
+  "status": "primary-metadata-candidates-not-acquired-not-trained",
+  "selection": {
+    "path": "dordiai-voices/selected_languages.json",
+    "entries": 135
+  },
+  "installed_model": {
+    "languages": [
+      "af",
+      "az",
+      "bg",
+      "ca",
+      "cs",
+      "da",
+      "de",
+      "en",
+      "es",
+      "et",
+      "fi",
+      "fr",
+      "ga",
+      "gn",
+      "ht",
+      "hu",
+      "id",
+      "is",
+      "it",
+      "ky",
+      "la",
+      "lb",
+      "lt",
+      "lv",
+      "mk",
+      "mn",
+      "ms",
+      "mt",
+      "nb",
+      "nl",
+      "pl",
+      "pt",
+      "qu",
+      "ro",
+      "ru",
+      "sk",
+      "sl",
+      "sq",
+      "sv",
+      "sw",
+      "tk",
+      "tr",
+      "uk",
+      "uz",
+      "vi"
+    ],
+    "language_count": 45,
+    "model_sha256": "19c9f7c9c3d63c20dc6f8f1f2cc12384aa29fb565710c886d84f4244eb159d64"
+  },
+  "v2_existing_candidate": {
+    "path": "tools/data/word_lid_sources_v2.json",
+    "languages": [
+      "el",
+      "hr",
+      "sr",
+      "hi",
+      "mr",
+      "ne",
+      "mai",
+      "doi",
+      "brx",
+      "bm",
+      "ha",
+      "ig",
+      "rw",
+      "mos",
+      "ny",
+      "sn",
+      "tn",
+      "wo",
+      "xh",
+      "yo",
+      "zu"
+    ],
+    "language_count": 21,
+    "files": 51,
+    "status": "Separate training candidate; not asserted installed"
+  },
+  "remaining_selected_labels": [
+    "bs",
+    "cnr",
+    "rm",
+    "ay",
+    "ito",
+    "cmn",
+    "ar",
+    "bn",
+    "ur",
+    "ja",
+    "pa",
+    "te",
+    "ta",
+    "ko",
+    "fa",
+    "th",
+    "gu",
+    "kn",
+    "my",
+    "ml",
+    "fil",
+    "or",
+    "ps",
+    "sd",
+    "ku",
+    "si",
+    "as",
+    "kk",
+    "km",
+    "tg",
+    "he",
+    "lo",
+    "sat",
+    "ks",
+    "hy",
+    "ka",
+    "kok",
+    "mni",
+    "dv",
+    "dz",
+    "tet",
+    "am",
+    "om",
+    "ff",
+    "mg",
+    "so",
+    "ln",
+    "rn",
+    "ak",
+    "dyu",
+    "ti",
+    "tamazight",
+    "st",
+    "nso",
+    "ts",
+    "ss",
+    "ve",
+    "nd",
+    "nr",
+    "aa",
+    "sg",
+    "comorian",
+    "tpi",
+    "sm",
+    "fj",
+    "to",
+    "mi",
+    "gil",
+    "ho"
+  ],
+  "global_rules": {
+    "minimum_distinct_native_training_words_after_normalization_script_and_name_filters": 100,
+    "publisher_holdout_priority": "test > validation > hash split; applies to every label/source for the same normalized spelling",
+    "unpartitioned_training_source": "NFC/case-normalized global word SHA25680/10/10; no same spelling in multiple partitions",
+    "homographs": "Retain plausible language label sets; shared spelling can be intrinsically unresolvable without hints. Never force one language from a shared dictionary entry.",
+    "evaluation": "FLORES dev may supply validation only; FLORES devtest reserved final independent evaluation. Neither is relabelled training.",
+    "weak_labels": "Wikipedia edition, web-country and corpus language labels are weak evidence, not proof every token is native; borrowed words/names/filtering and selective abstention remain necessary.",
+    "script_counts": "Record real script-family training counts separately; the historical OTHER label cannot certify specific native script coverage."
+  },
+  "immediate_additional_sources": [
+    {
+      "id": "aksharantar-v3-asm",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "as",
+      "source_language": "asm",
+      "expected_scripts": [
+        "BENGALI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/asm.zip",
+      "sha256": "5ecd0dbbffdfa4026c0624106bbf3f95df3d79bbcdbb653a76fc74a759b909de",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/asm.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 179000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-ben",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "bn",
+      "source_language": "ben",
+      "expected_scripts": [
+        "BENGALI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/ben.zip",
+      "sha256": "4ab6edcc6ab556040d8f43ee75eec73cc25af0cf72d09e4650dab26b196d5fe7",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/ben.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 1231000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-guj",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "gu",
+      "source_language": "guj",
+      "expected_scripts": [
+        "GUJARATI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/guj.zip",
+      "sha256": "2b83105a76c8d9b93007fc6fb6b5593b9ef45e0ae7d753036fe7a2c82a4b6208",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/guj.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 1143000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-kan",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "kn",
+      "source_language": "kan",
+      "expected_scripts": [
+        "KANNADA"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/kan.zip",
+      "sha256": "a0c18fa0a8bf06b34d413b09c3e7b9505b74ba3f7f1fa2ae724793fc3fc7d650",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/kan.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 2907000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-kas",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "ks",
+      "source_language": "kas",
+      "expected_scripts": [
+        "ARABIC"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/kas.zip",
+      "sha256": "e2488d3972b440bf75ce16db5b43333a83362c9b2c633c914e50dfb6e07d255b",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/kas.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 47000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-kok",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "kok",
+      "source_language": "kok",
+      "expected_scripts": [
+        "DEVANAGARI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/kok.zip",
+      "sha256": "c08a2896ef3b85f44937c6fcfa75fefdc0736ffb3deceaf0cf9cf64227cc85e9",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/kok.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 613000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-mal",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "ml",
+      "source_language": "mal",
+      "expected_scripts": [
+        "MALAYALAM"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/mal.zip",
+      "sha256": "182a7c4e30cb6144e35accdddb5669c6001bc18d68184dec2ec34cdc8a6cce09",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/mal.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 4101000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-mni",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "mni",
+      "source_language": "mni",
+      "expected_scripts": [
+        "MEETEI",
+        "BENGALI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/mni.zip",
+      "sha256": "55d59376fcf08b376dd3db87735869d7d6dd49c78b237582dfcad9f956ed31ad",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/mni.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 10000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false,
+      "mapping_note": "Inspect actual per-script counts; Meetei and Bengali orthographies remain explicit, neither proves coverage of the other."
+    },
+    {
+      "id": "aksharantar-v3-ori",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "or",
+      "source_language": "ori",
+      "expected_scripts": [
+        "ORIYA"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/ori.zip",
+      "sha256": "9095e8dc4221708ad02826e84c1bbb7e5033e1cbf4e4f7396272ded0947b7c0b",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/ori.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 346000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-pan",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "pa",
+      "source_language": "pan",
+      "expected_scripts": [
+        "GURMUKHI"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/pan.zip",
+      "sha256": "d4d13450866a02974fd887f124ec73bcd5afe71d3c2c859bb0e9faab2d95b48d",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/pan.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 515000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false,
+      "mapping_note": "Gurmukhi source does not prove Shahmukhi coverage."
+    },
+    {
+      "id": "aksharantar-v3-sid",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "sd",
+      "source_language": "sid",
+      "expected_scripts": [
+        "ARABIC"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/sid.zip",
+      "sha256": "865059fbbe102ca8198b8cd19054c0b1193a83e968ac682c52b36dd5e48665cd",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/sid.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 60000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false,
+      "mapping_note": "Publisher official download table maps sd-en to sid.zip; sid is not treated as the ISO code for Sindhi."
+    },
+    {
+      "id": "aksharantar-v3-tam",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "ta",
+      "source_language": "tam",
+      "expected_scripts": [
+        "TAMIL"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/tam.zip",
+      "sha256": "d019cffcdc2264870a96b8ffaea0b66a3b175c8c7d56c095d9f6dd4bbeb313a2",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/tam.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 3231000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-tel",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "te",
+      "source_language": "tel",
+      "expected_scripts": [
+        "TELUGU"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/tel.zip",
+      "sha256": "08f1c2841f4d02fcc2a56362f7760ec16fc52d8a199029c68d44024ab0d22c1a",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/tel.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 2430000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    },
+    {
+      "id": "aksharantar-v3-urd",
+      "kind": "aksharantar-jsonl-zip",
+      "language": "ur",
+      "source_language": "urd",
+      "expected_scripts": [
+        "ARABIC"
+      ],
+      "revision": "e418c1fc928d9f5393af33268472cf20c1891be8",
+      "url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/resolve/e418c1fc928d9f5393af33268472cf20c1891be8/urd.zip",
+      "sha256": "5d2b06eccefdfa457b27c03120aec2131e1316368d3439631396f7d3defb7e3a",
+      "max_bytes": 134217728,
+      "hash_observed_page": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/main/urd.zip",
+      "hash_status": "Publisher raw SHA256 observed on file page; compare downloaded exact-revision bytes before use",
+      "license": "Manual: CC-BY, publisher version unspecified; mined/existing packaging: CC0-1.0; underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/ai4bharat/Aksharantar/blob/e418c1fc928d9f5393af33268472cf20c1891be8/README.md",
+      "attribution": "AI4Bharat; Madhani et al. Aksharantar (2022)",
+      "exclude_sources": [
+        "AK-NEI",
+        "AK-NEF"
+      ],
+      "publisher_role": "archive-native-Train-Val-Test",
+      "publisher_approximate_train_pairs": 699000,
+      "distinct_valid_native_training_words": null,
+      "minimum_100_after_filters_verified": false
+    }
+  ],
+  "broad_primary_source": {
+    "id": "wikimedia-wikipedia-20231101",
+    "repository": "wikimedia/wikipedia",
+    "revision": "b04c8d1ceb2f5cd4588862100d08de323dccfbaa",
+    "license": "CC-BY-SA-3.0 / GFDL as publisher card; per-text terms retained",
+    "license_url": "https://huggingface.co/datasets/wikimedia/wikipedia/blob/b04c8d1ceb2f5cd4588862100d08de323dccfbaa/README.md",
+    "publisher_role": "train",
+    "format": "parquet text column",
+    "native_edition_candidates": [
+      {
+        "target_language": "bs",
+        "source_edition": "bs",
+        "config": "20231101.bs",
+        "files_glob": "20231101.bs/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "rm",
+        "source_edition": "rm",
+        "config": "20231101.rm",
+        "files_glob": "20231101.rm/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ay",
+        "source_edition": "ay",
+        "config": "20231101.ay",
+        "files_glob": "20231101.ay/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ar",
+        "source_edition": "ar",
+        "config": "20231101.ar",
+        "files_glob": "20231101.ar/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "bn",
+        "source_edition": "bn",
+        "config": "20231101.bn",
+        "files_glob": "20231101.bn/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ur",
+        "source_edition": "ur",
+        "config": "20231101.ur",
+        "files_glob": "20231101.ur/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ja",
+        "source_edition": "ja",
+        "config": "20231101.ja",
+        "files_glob": "20231101.ja/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "pa",
+        "source_edition": "pa",
+        "config": "20231101.pa",
+        "files_glob": "20231101.pa/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "te",
+        "source_edition": "te",
+        "config": "20231101.te",
+        "files_glob": "20231101.te/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ta",
+        "source_edition": "ta",
+        "config": "20231101.ta",
+        "files_glob": "20231101.ta/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ko",
+        "source_edition": "ko",
+        "config": "20231101.ko",
+        "files_glob": "20231101.ko/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "fa",
+        "source_edition": "fa",
+        "config": "20231101.fa",
+        "files_glob": "20231101.fa/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "th",
+        "source_edition": "th",
+        "config": "20231101.th",
+        "files_glob": "20231101.th/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "gu",
+        "source_edition": "gu",
+        "config": "20231101.gu",
+        "files_glob": "20231101.gu/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "kn",
+        "source_edition": "kn",
+        "config": "20231101.kn",
+        "files_glob": "20231101.kn/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "my",
+        "source_edition": "my",
+        "config": "20231101.my",
+        "files_glob": "20231101.my/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ml",
+        "source_edition": "ml",
+        "config": "20231101.ml",
+        "files_glob": "20231101.ml/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "or",
+        "source_edition": "or",
+        "config": "20231101.or",
+        "files_glob": "20231101.or/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ps",
+        "source_edition": "ps",
+        "config": "20231101.ps",
+        "files_glob": "20231101.ps/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "sd",
+        "source_edition": "sd",
+        "config": "20231101.sd",
+        "files_glob": "20231101.sd/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ku",
+        "source_edition": "ku",
+        "config": "20231101.ku",
+        "files_glob": "20231101.ku/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "si",
+        "source_edition": "si",
+        "config": "20231101.si",
+        "files_glob": "20231101.si/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "as",
+        "source_edition": "as",
+        "config": "20231101.as",
+        "files_glob": "20231101.as/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "kk",
+        "source_edition": "kk",
+        "config": "20231101.kk",
+        "files_glob": "20231101.kk/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "km",
+        "source_edition": "km",
+        "config": "20231101.km",
+        "files_glob": "20231101.km/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "tg",
+        "source_edition": "tg",
+        "config": "20231101.tg",
+        "files_glob": "20231101.tg/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "he",
+        "source_edition": "he",
+        "config": "20231101.he",
+        "files_glob": "20231101.he/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "lo",
+        "source_edition": "lo",
+        "config": "20231101.lo",
+        "files_glob": "20231101.lo/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "sat",
+        "source_edition": "sat",
+        "config": "20231101.sat",
+        "files_glob": "20231101.sat/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ks",
+        "source_edition": "ks",
+        "config": "20231101.ks",
+        "files_glob": "20231101.ks/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "hy",
+        "source_edition": "hy",
+        "config": "20231101.hy",
+        "files_glob": "20231101.hy/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ka",
+        "source_edition": "ka",
+        "config": "20231101.ka",
+        "files_glob": "20231101.ka/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "mni",
+        "source_edition": "mni",
+        "config": "20231101.mni",
+        "files_glob": "20231101.mni/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "dv",
+        "source_edition": "dv",
+        "config": "20231101.dv",
+        "files_glob": "20231101.dv/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "dz",
+        "source_edition": "dz",
+        "config": "20231101.dz",
+        "files_glob": "20231101.dz/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "tet",
+        "source_edition": "tet",
+        "config": "20231101.tet",
+        "files_glob": "20231101.tet/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "am",
+        "source_edition": "am",
+        "config": "20231101.am",
+        "files_glob": "20231101.am/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "om",
+        "source_edition": "om",
+        "config": "20231101.om",
+        "files_glob": "20231101.om/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ff",
+        "source_edition": "ff",
+        "config": "20231101.ff",
+        "files_glob": "20231101.ff/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "mg",
+        "source_edition": "mg",
+        "config": "20231101.mg",
+        "files_glob": "20231101.mg/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "so",
+        "source_edition": "so",
+        "config": "20231101.so",
+        "files_glob": "20231101.so/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ln",
+        "source_edition": "ln",
+        "config": "20231101.ln",
+        "files_glob": "20231101.ln/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "rn",
+        "source_edition": "rn",
+        "config": "20231101.rn",
+        "files_glob": "20231101.rn/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ti",
+        "source_edition": "ti",
+        "config": "20231101.ti",
+        "files_glob": "20231101.ti/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "st",
+        "source_edition": "st",
+        "config": "20231101.st",
+        "files_glob": "20231101.st/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "nso",
+        "source_edition": "nso",
+        "config": "20231101.nso",
+        "files_glob": "20231101.nso/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ts",
+        "source_edition": "ts",
+        "config": "20231101.ts",
+        "files_glob": "20231101.ts/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ss",
+        "source_edition": "ss",
+        "config": "20231101.ss",
+        "files_glob": "20231101.ss/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "ve",
+        "source_edition": "ve",
+        "config": "20231101.ve",
+        "files_glob": "20231101.ve/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "sg",
+        "source_edition": "sg",
+        "config": "20231101.sg",
+        "files_glob": "20231101.sg/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "tpi",
+        "source_edition": "tpi",
+        "config": "20231101.tpi",
+        "files_glob": "20231101.tpi/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "sm",
+        "source_edition": "sm",
+        "config": "20231101.sm",
+        "files_glob": "20231101.sm/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "fj",
+        "source_edition": "fj",
+        "config": "20231101.fj",
+        "files_glob": "20231101.fj/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "to",
+        "source_edition": "to",
+        "config": "20231101.to",
+        "files_glob": "20231101.to/train-*",
+        "distinct_native_training_words": null
+      },
+      {
+        "target_language": "mi",
+        "source_edition": "mi",
+        "config": "20231101.mi",
+        "files_glob": "20231101.mi/train-*",
+        "distinct_native_training_words": null
+      }
+    ],
+    "explicit_mappings": [
+      {
+        "target_language": "cmn",
+        "source_edition": "zh",
+        "config": "20231101.zh",
+        "scope": "Written standard Chinese proxy for declared Mandarin target; never Yue alias; segmented Chinese corpus preferred."
+      },
+      {
+        "target_language": "fil",
+        "source_edition": "tl",
+        "config": "20231101.tl",
+        "scope": "Explicit Tagalog-basis subset of selected Filipino standard, not automatic fil=tl identity claim."
+      }
+    ],
+    "acquisition_status": "Exact revision is pinned; per-Parquet raw SHA256/size lock and >=100 script-valid word receipts still required",
+    "publisher_observed_examples": {
+      "rm": {
+        "train_articles": 3822,
+        "download_size_bytes": 10483970
+      },
+      "rn": {
+        "train_articles": 819,
+        "download_size_bytes": 301252
+      },
+      "sat": {
+        "train_articles": 9767,
+        "download_size_bytes": 15428584
+      }
+    },
+    "constraints": [
+      "Do not download all71.8GB. Acquire bounded required shards or checked text-column projections, retaining exact raw-file/source receipts.",
+      "For Chinese/Japanese/Thai/Khmer/Lao/Burmese, do not call whitespace chunks words. Prefer segmented primary lexicons/treebanks or pinned native tokenization.",
+      "Small editions still require actual100-distinct-word after-filter checks; article counts are not word counts."
+    ]
+  },
+  "segmented_primary_alternatives": [
+    {
+      "repository": "UniversalDependencies/UD_Chinese-GSD",
+      "revision": "666317e1b3030c18ecc19871367f6a98eb77b137",
+      "license": "CC-BY-SA-4.0 annotations; underlying text terms in pinned README retained",
+      "target_language": "cmn",
+      "source_language": "zh",
+      "files": [
+        {
+          "path": "README.md",
+          "git_blob_sha1": "d19da34cf2cfa49f76f05e5a593b3cdd7d97e6a1",
+          "bytes": 3075,
+          "role": "provenance"
+        },
+        {
+          "path": "zh_gsd-ud-dev.conllu",
+          "git_blob_sha1": "d45ebb9e33847434b3586e7c9b217c4de06846aa",
+          "bytes": 1195022,
+          "role": "validation"
+        },
+        {
+          "path": "zh_gsd-ud-test.conllu",
+          "git_blob_sha1": "24a7bbef09e44233465973da3ad780b486cc8f73",
+          "bytes": 1136346,
+          "role": "test"
+        },
+        {
+          "path": "zh_gsd-ud-train.conllu",
+          "git_blob_sha1": "324375e21b76adfb4d62df473296bb2f9772fc5f",
+          "bytes": 9318344,
+          "role": "train"
+        }
+      ],
+      "distinct_native_training_words": null,
+      "note": "Explicit traditional written Chinese target-Mandarin corpus mapping; excludes Cantonese. Most Chinese words shorter than4 need lexicon/script paths, not claimed from classifier."
+    },
+    {
+      "repository": "UniversalDependencies/UD_Japanese-GSD",
+      "revision": "33e7310b58308e85fd2b33a2fc3ef3e434f821c7",
+      "license": "CC-BY-SA-4.0 annotations; underlying text terms in pinned README retained",
+      "target_language": "ja",
+      "source_language": "ja",
+      "files": [
+        {
+          "path": "README.md",
+          "git_blob_sha1": "19eba1740cef9bf200b2f54c3ed537b0cd183a65",
+          "bytes": 8905,
+          "role": "provenance"
+        },
+        {
+          "path": "ja_gsd-ud-dev.conllu",
+          "git_blob_sha1": "d8ff1ce5560511c24d78b5b9633507ed0b8f61b9",
+          "bytes": 2961591,
+          "role": "validation"
+        },
+        {
+          "path": "ja_gsd-ud-test.conllu",
+          "git_blob_sha1": "67a529689c473aeaa6232c8378c473e12489d225",
+          "bytes": 3111982,
+          "role": "test"
+        },
+        {
+          "path": "ja_gsd-ud-train.conllu",
+          "git_blob_sha1": "e975a4e306f618fa965fc528cc3376cc1f765cf7",
+          "bytes": 40583344,
+          "role": "train"
+        }
+      ],
+      "distinct_native_training_words": null,
+      "note": "Use segmented FORM entries; current single-script word classifier rejects ordinary Kanji+Kana mixtures. No Japanese-ready claim."
+    },
+    {
+      "repository": "UniversalDependencies/UD_Korean-Kaist",
+      "revision": "1fbabb639c195dc246cecf436fffc96c49f3ec90",
+      "license": "CC-BY-SA-4.0 annotations; underlying text terms in pinned README retained",
+      "target_language": "ko",
+      "source_language": "ko",
+      "files": [
+        {
+          "path": "README.md",
+          "git_blob_sha1": "219eee70f09189a91c931afa4ff65f320c81ec7a",
+          "bytes": 3642,
+          "role": "provenance"
+        },
+        {
+          "path": "ko_kaist-ud-dev.conllu",
+          "git_blob_sha1": "af6b81d772b5ef6c881c13cc668ba4c455fc7cfe",
+          "bytes": 3021769,
+          "role": "validation"
+        },
+        {
+          "path": "ko_kaist-ud-test.conllu",
+          "git_blob_sha1": "257896d9d5eca2b0d9a6ac2087a980a934662262",
+          "bytes": 3333342,
+          "role": "test"
+        },
+        {
+          "path": "ko_kaist-ud-train.conllu",
+          "git_blob_sha1": "0c8cc262675981160482e0f9c66623fe2f5378d2",
+          "bytes": 34652262,
+          "role": "train"
+        }
+      ],
+      "distinct_native_training_words": null,
+      "note": "Use native tokenized FORM; publisher train/dev/test fixed before global normalized-word holdouts."
+    }
+  ],
+  "additional_primary_sources": [
+    {
+      "id": "uct-mzansi-deduplicated",
+      "repository": "uctnlp/mzansi-text-deduplicated",
+      "revision": "601cc5af92a77bc442da7b3c0264b35cd4a125f5",
+      "license": "ODC-By-1.0; Common Crawl Terms of Use and underlying text terms retained",
+      "license_url": "https://huggingface.co/datasets/uctnlp/mzansi-text-deduplicated/blob/601cc5af92a77bc442da7b3c0264b35cd4a125f5/README.md",
+      "format": "Parquet text+lang columns",
+      "publisher_splits": [
+        "train",
+        "validation",
+        "test"
+      ],
+      "mappings": {
+        "nbl": "nr",
+        "nso": "nso",
+        "sot": "st",
+        "ssw": "ss",
+        "tso": "ts",
+        "ven": "ve"
+      },
+      "scope": "Genuine SouthernNdebele nbl, not Northern nde. Existing21labels are not duplicated here.",
+      "distinct_native_training_words": null,
+      "raw_file_hashes": null,
+      "notes": [
+        "All11 languages declared in every publisher split; global WORD holdouts remain required despite document deduplication.",
+        "Current Nov12 licence supersedes cached Apache2 cards. Source byte count around9.58GB entire dataset; text-only column projection can avoid audio (dataset has no audio).",
+        "Do not claim language-specific100words until actual filtered receipts."
+      ]
+    },
+    {
+      "id": "classla-web-cnr-2.0",
+      "publisher": "Jožef Stefan Institute / CLARIN.SI",
+      "version": "2.0",
+      "source_identifier": "http://hdl.handle.net/11356/2079",
+      "target_language": "cnr",
+      "license": "CC0-1.0 publisher release; original web content/takedown terms retained",
+      "publisher_role": "unpartitioned-training-corpus",
+      "file": "CLASSLA-web.cnr.2.0.jsonl.gz",
+      "publisher_md5": "fdcf171ea122710559840f75d841b923",
+      "approximate_compressed_size": "802.65MB",
+      "native_tokenized_alternative": "CLASSLA-web.cnr.2.0.anno.jsonl.gz",
+      "publisher_word_count": 294000000,
+      "distinct_native_training_words": null,
+      "note": "Own Montenegrin .me crawl labels, no Serbian alias; same-spelling bs/hr/sr/cnr retained ambiguous. Acquire versioned file and compute SHA256 before training.",
+      "url": "https://www.clarin.si/repository/xmlui/bitstream/handle/11356/2079/CLASSLA-web.cnr.2.0.jsonl.gz?isAllowed=y&sequence=5"
+    },
+    {
+      "id": "google-waxal-akan",
+      "repository": "google/WaxalNLP",
+      "revision": "5f4d8ca24f2b9d168b2ee545f1febaaff4b40580",
+      "revision_status": "Exact primary dataset commit observed; per-Parquet SHA256 lock pending",
+      "config": "aka_asr_v2",
+      "target_language": "ak",
+      "source_language": "aka",
+      "license": "CC-BY-4.0 (University of Ghana Akan ASR; exact per-provider card)",
+      "text_column": "transcription",
+      "publisher_role": "train with publisher holdouts separate",
+      "distinct_native_training_words": null,
+      "note": "Official Google actualAkan config; do not substitute Twi as fullAkan. Read selected transcription column only, no speech/audio needed.",
+      "paths_by_role": {
+        "train": "data/ASR/aka/aka-train-*",
+        "validation": "data/ASR/aka/aka-validation-*",
+        "test": "data/ASR/aka/aka-test-*"
+      },
+      "notes": [
+        "Akan v2 points to original already-speaker-disjoint files; exclude unlabeled. Global normalized-word holdouts still override every source/label.",
+        "Avoid downloading embedded audio columns; a safe checked Parquet text-only projection needs an exact raw-file lock and provenance before adoption."
+      ]
+    },
+    {
+      "id": "afrispeech-northern-ndebele",
+      "repository": "AfriSpeech/african-speech-public_v1",
+      "revision": null,
+      "revision_status": "Primary source and selector mapping established; exact HF revision/file hash lock pending",
+      "config": "ndebele_zimbabwe_nde",
+      "target_language": "nd",
+      "source_language": "nde",
+      "publisher_splits": {
+        "train": 2308,
+        "validation": 81,
+        "test": 163
+      },
+      "license": "Must read exact original corpus card/per-config terms; selector code license does not grant corpus text rights",
+      "distinct_native_training_words": null,
+      "note": "Native NorthernNdebele transcriptions; no Southern nbl/nr alias. Data-source metadata only, not acquired."
+    },
+    {
+      "id": "oldi-seed-train-only",
+      "repository": "openlanguagedata/oldi_seed",
+      "revision": "ba216439cfc272bbc940c5ab1cec5556937604a3",
+      "license": "CC-BY-SA-4.0",
+      "publisher_role": "train",
+      "candidate_variants": [
+        {
+          "language": "dz",
+          "file": "seed/dzo_Tibt.jsonl",
+          "scope": "Dzongkha native Tibetan script"
+        },
+        {
+          "language": "ks",
+          "file": "seed/kas_Arab.jsonl",
+          "scope": "Kashmiri Arabic script"
+        },
+        {
+          "language": "ks",
+          "file": "seed/kas_Deva.jsonl",
+          "scope": "Kashmiri Devanagari script"
+        },
+        {
+          "language": "mni",
+          "file": "seed/mni_Beng.jsonl",
+          "scope": "Meitei Bengali orthography only; no Meetei script claim"
+        },
+        {
+          "language": "mi",
+          "file": "seed/mri_Latn.jsonl",
+          "scope": "Maori native Latin orthography"
+        },
+        {
+          "selected_group": "tamazight",
+          "source_variant": "tzm_Tfng",
+          "file": "seed/tzm_Tfng.jsonl",
+          "scope": "Central Atlas Tamazight partial variant, no zgh/kab/fullgroup alias"
+        }
+      ],
+      "publisher_sentences_per_language": 6193,
+      "raw_file_hashes": null,
+      "distinct_native_training_words": null,
+      "note": "Primary dataset is explicitly intended for training, unlike FLORES dev/devtest. Exact per-file raw hash and valid normalized-word counts required."
+    }
+  ],
+  "unavailable_or_unresolved": [
+    {
+      "language": "ito",
+      "status": "no_sufficient_pinned_open_primary_native_training_corpus_found",
+      "reason": "No source with >=100 distinct native words established; never substitute Spanish."
+    },
+    {
+      "language": "dyu",
+      "status": "primary_train_corpus_found_but_gated_not_acquired",
+      "source": "https://huggingface.co/datasets/uvci/koumankan4dyula",
+      "version": "1.0.0",
+      "license": "CC-BY-SA-4.0",
+      "publisher_train_record_count": 8065,
+      "reason": "Primary files require accepting HF access conditions. No source hash/content receipt; do not alias Bambara or consume final-eval datasets as training."
+    },
+    {
+      "language": "tamazight",
+      "status": "selected_group_requires_explicit_standard_variant",
+      "reason": "Wikipedia20231101 lacks zgh dump despite metadata language list. Kabyle kab/ CentralAtlas tzm source is a partial variant, not generic selected-group full coverage."
+    },
+    {
+      "language": "aa",
+      "status": "no_sufficient_pinned_open_primary_native_training_corpus_established",
+      "reason": "A native speech-model checkpoint is not evidence of accessible word-LID training text."
+    },
+    {
+      "language": "comorian",
+      "status": "selected_group_and_source_unresolved",
+      "reason": "Do not replace Comorian varieties with Swahili; no pinned corpus with >=100 native training words established."
+    },
+    {
+      "language": "gil",
+      "status": "no_sufficient_pinned_open_primary_native_training_corpus_found",
+      "reason": "No Gilbertese corpus pin/count established; no English fallback labelled Gilbertese."
+    },
+    {
+      "language": "ho",
+      "status": "no_sufficient_pinned_open_primary_native_training_corpus_found",
+      "reason": "No Hiri Motu corpus pin/count established; no TokPisin alias."
+    }
+  ],
+  "rejected_shortcuts": [
+    {
+      "source": "UniversalDependencies/UD_Thai-PUD",
+      "revision": "4e0e10fd6d026750990d578c939507cfd2de13af",
+      "reason": "Only test.conllu in release; not imported as new training data."
+    },
+    {
+      "source": "FLORES-200 / NLLB-MD",
+      "reason": "Evaluation corpora not relabelled train."
+    },
+    {
+      "source": "Wikimedia20231101.zgh",
+      "reason": "Card explicitly says dump absent; language metadata list alone does not establish files."
+    },
+    {
+      "source": "Twi→ak, Serbian→cnr, NorthernNdebele→nr",
+      "reason": "No undocumented full-language aliases."
+    }
+  ],
+  "implementation_changes_made": false,
+  "model_training_performed": false,
+  "source_downloads_performed": false,
+  "corpus_payloads_downloaded": false,
+  "metadata_documents_read": true
+}
