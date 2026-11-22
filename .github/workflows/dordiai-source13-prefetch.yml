@@ -28,6 +28,8 @@ jobs:
       contents: read
       actions: read
     env:
+      PYTHONUTF8: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
       HF_HUB_OFFLINE: '1'
       TRANSFORMERS_OFFLINE: '1'
       DO_NOT_TRACK: '1'
@@ -252,13 +254,24 @@ jobs:
               if size>cap or total>240*1024*1024:raise ValueError("Owned evidence quota exceeded; no truncated proof accepted")
               relative=source.relative_to(root);target=stage/relative;target.parent.mkdir(exist_ok=True,parents=True);shutil.copyfile(source,target)
               index.append({"path":relative.as_posix(),"bytes":size,"sha256":hashlib.sha256(target.read_bytes()).hexdigest()})
-          build=pathlib.Path(os.environ["DORDIAI_PROCESS_HELPER_ROOT"])
-          for name in ("build.json","nvda-longread-build.json"):
-              source=build/name
-              if not source.is_file():continue
-              if source.is_symlink() or source.stat().st_size>65536:raise ValueError("Bounded regular own build receipt required")
-              shutil.copyfile(source,stage/name)
-          (stage/"evidence-index.json").write_text(json.dumps({"files":index,"total_bytes":total,"physical_audio_verified":False},sort_keys=True),encoding="utf-8")
+          helper_root=os.environ.get("DORDIAI_PROCESS_HELPER_ROOT")
+          if helper_root:
+              build=pathlib.Path(helper_root)
+              for name in ("build.json","nvda-longread-build.json"):
+                  source=build/name
+                  if not source.is_file():continue
+                  if source.is_symlink() or source.stat().st_size>65536:raise ValueError("Bounded regular own build receipt required")
+                  shutil.copyfile(source,stage/name)
+          (stage/"evidence-index.json").write_text(json.dumps({
+              "files":index,"total_bytes":total,"physical_audio_verified":False,"product_ready":False,
+              "controller_report_present":(root/"prefetch-trials.json").is_file(),
+              "helper_root_created":bool(helper_root),
+              "owned_trial_directories":len(list(root.glob("nvda-*"))),
+              "early_failure_without_trials":not (root/"prefetch-trials.json").is_file(),
+              "workflow_job_status":"${{ job.status }}",
+              "run_id":os.environ["GITHUB_RUN_ID"],
+              "source_commit":os.environ["GITHUB_SHA"],
+          },sort_keys=True),encoding="utf-8")
       - name: Preserve only own bounded PCM, logs and reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

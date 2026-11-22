@@ -212,6 +212,29 @@ class PrefetchTrialTests(unittest.TestCase):
         self.assertIn("windows_prefetch_trials.py",source)
         self.assertNotIn("--addon-sha256 908a9825",source)
         self.assertNotIn("pull_request_target:",source)
+        self.assertIn("PYTHONUTF8: '1'",source)
+
+    def test_workflow_stages_early_failure_without_helper_or_trial(self):
+        source=(ROOT.parent/".github/workflows/dordiai-source13-prefetch.yml").read_text("utf8")
+        lines=source.splitlines()
+        start=next(i for i,line in enumerate(lines) if "name: Stage only bounded exact owned longread evidence" in line)
+        run=next(i for i in range(start,len(lines)) if lines[i].strip()=="run: |")
+        block=[]
+        for line in lines[run+1:]:
+            if line and not line.startswith("          "):
+                break
+            block.append(line[10:] if line else "")
+        with tempfile.TemporaryDirectory() as d:
+            environment={"RUNNER_TEMP":d,"GITHUB_RUN_ID":"1234","GITHUB_SHA":"a"*40}
+            with patch.dict(os.environ,environment,clear=True):
+                exec(compile("\n".join(block),"<failed-prebuild-stage>","exec"),{})
+            path=Path(d)/"dordiai-source13-prefetch-evidence-1234/evidence-index.json"
+            receipt=json.loads(path.read_text("utf8"))
+            self.assertTrue(receipt["early_failure_without_trials"])
+            self.assertFalse(receipt["helper_root_created"])
+            self.assertFalse(receipt["controller_report_present"])
+            self.assertFalse(receipt["product_ready"])
+            self.assertEqual(receipt["owned_trial_directories"],0)
 
     def test_workflow_python_blocks_compile(self):
         source=(ROOT.parent/".github/workflows/dordiai-source13-prefetch.yml").read_text("utf8")
