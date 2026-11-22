@@ -234,6 +234,60 @@ class GlobalPublisherHoldoutTests(unittest.TestCase):
             receipt = prepare.prepare(manifest, cache, output)
         return output / "extra-corpus.jsonl.gz", receipt
 
+
+    def test_real_connection_is_closed_before_database_cleanup_on_success(self):
+        connections = []
+        original_connect = prepare.sqlite3.connect
+        def track_connection(*args, **kwargs):
+            connection = original_connect(*args, **kwargs)
+            connections.append(connection)  # Keep strong references: no GC rescue.
+            return connection
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(prepare.sqlite3, "connect", side_effect=track_connection):
+                path, receipt = self.fixture(temporary, [
+                    ("ha-train", "ha", "train", "nativeword NOUN\n")])
+            self.assertEqual(len(connections), 1)
+            with self.assertRaises(prepare.sqlite3.ProgrammingError):
+                connections[0].execute("SELECT 1")
+            self.assertEqual(list(path.parent.glob("word-source-index-*")), [])
+            self.assertEqual(sha256(path.read_bytes()).hexdigest(), receipt["corpus_sha256"])
+
+    def test_active_export_failure_closes_handles_and_keeps_original_error(self):
+        connections, export_cursors = [], []
+        original_connect = prepare.sqlite3.connect
+        original_write = prepare.gzip.GzipFile.write
+        class TrackedConnection(prepare.sqlite3.Connection):
+            def execute(self, query, *args, **kwargs):
+                cursor = super().execute(query, *args, **kwargs)
+                if "GROUP_CONCAT" in query:
+                    export_cursors.append(cursor)
+                return cursor
+        def track_connection(*args, **kwargs):
+            connection = original_connect(*args, factory=TrackedConnection, **kwargs)
+            connections.append(connection)
+            return connection
+        writes = []
+        def fail_payload(stream, data):
+            writes.append(len(data))
+            if len(writes) == 2:
+                raise OSError("controlled active export failure")
+            return original_write(stream, data)
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(prepare.sqlite3, "connect", side_effect=track_connection), \
+                    patch.object(prepare.gzip.GzipFile, "write", new=fail_payload):
+                with self.assertRaisesRegex(OSError, "controlled active export failure"):
+                    self.fixture(temporary, [("ha-train", "ha", "train", "nativeword NOUN\n")])
+            self.assertEqual(len(connections), 1)
+            self.assertEqual(len(export_cursors), 1)
+            with self.assertRaises(prepare.sqlite3.ProgrammingError):
+                connections[0].execute("SELECT 1")
+            with self.assertRaises(prepare.sqlite3.ProgrammingError):
+                export_cursors[0].fetchone()
+            output = Path(temporary) / "prepared"
+            self.assertEqual(list(output.glob("word-source-index-*")), [])
+            self.assertFalse((output / "extra-corpus.jsonl.gz").exists())
+            self.assertFalse((output / "extra-corpus.jsonl.tmp").exists())
+
     def test_all_language_labels_survive_and_test_wins_globally(self):
         with tempfile.TemporaryDirectory() as temporary:
             path, receipt = self.fixture(temporary, [

@@ -1,0 +1,60 @@
+{
+  "format": "dordiai-build-preflight-failure",
+  "format_version": 1,
+  "product_ready": false,
+  "version": "0.13.1-dev.10",
+  "workflow_run_id": 45020511872,
+  "job_id": 137202122819,
+  "source_commit": "b94c7db198551617a0900577ec694fa2d88a063a",
+  "platform": "Windows Server 2025 / Python3.12.10",
+  "conclusion": "failure",
+  "unit_tests": {
+    "ran": 810,
+    "errors": 4,
+    "skipped": 29,
+    "failed": 0
+  },
+  "errors": [
+    {
+      "module": "test_word_lid_sources.GlobalPublisherHoldoutTests",
+      "test": "test_all_language_labels_survive_and_test_wins_globally",
+      "type": "PermissionError",
+      "windows_error": 32,
+      "location": "tools/prepare_word_lid_sources.py:268",
+      "operation": "unlink temporary SQLite file while connection remains open"
+    },
+    {
+      "module": "test_word_lid_sources.GlobalPublisherHoldoutTests",
+      "test": "test_prepared_corpus_corruption_is_rejected_before_training",
+      "type": "PermissionError",
+      "windows_error": 32,
+      "location": "tools/prepare_word_lid_sources.py:268",
+      "operation": "unlink temporary SQLite file while connection remains open"
+    },
+    {
+      "module": "test_word_lid_sources.GlobalPublisherHoldoutTests",
+      "test": "test_publisher_test_spelling_cannot_train_through_a_baseline_label",
+      "type": "PermissionError",
+      "windows_error": 32,
+      "location": "tools/prepare_word_lid_sources.py:268",
+      "operation": "unlink temporary SQLite file while connection remains open"
+    },
+    {
+      "module": "test_word_lid_sources.GlobalPublisherHoldoutTests",
+      "test": "test_receipt_must_match_the_pinned_source_identity",
+      "type": "PermissionError",
+      "windows_error": 32,
+      "location": "tools/prepare_word_lid_sources.py:268",
+      "operation": "unlink temporary SQLite file while connection remains open"
+    }
+  ],
+  "diagnosis": "sqlite3.Connection context manager handles transactions but does not close the connection; explicit close is required before unlink on Windows.",
+  "build": {
+    "baseline_restore": "skipped",
+    "overlay_download": "skipped",
+    "core_built": false,
+    "bank_identity_checks": "not reached; not bypassed",
+    "audio_tests": "not reached"
+  },
+  "scope": "Preparation tool resource lifetime bug; no production/archive bytes were built by this failed run."
+}

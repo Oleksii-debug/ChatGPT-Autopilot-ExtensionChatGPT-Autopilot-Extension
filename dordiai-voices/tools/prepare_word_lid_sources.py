@@ -7,6 +7,7 @@ Sentence-language membership remains weak word-language evidence.
 """
 import argparse
 from collections import Counter
+from contextlib import closing
 import gzip
 import hashlib
 import importlib.util
@@ -209,8 +210,10 @@ def prepare(manifest, cache, output, languages=None):
     os.close(descriptor)
     database_path = Path(database_path)
     try:
-        with sqlite3.connect(database_path) as database:
-            database.execute("CREATE TABLE evidence(word TEXT, language TEXT, role TEXT, PRIMARY KEY(word, language, role)) WITHOUT ROWID")
+        # Connection.__exit__ only commits/rolls back; it never closes the
+        # handle. Close owned cursors and the connection before Windows unlink.
+        with closing(sqlite3.connect(database_path)) as database, database:
+            database.execute("CREATE TABLE evidence(word TEXT, language TEXT, role TEXT, PRIMARY KEY(word, language, role)) WITHOUT ROWID").close()
             for row in rows:
                 path, receipt = acquire(row, cache)
                 counts = Counter()
@@ -228,17 +231,18 @@ def prepare(manifest, cache, output, languages=None):
                     batch.append((word, row["language"], role))
                     counts["accepted_rows"] += 1
                     if len(batch) >= 2000:
-                        database.executemany("INSERT OR IGNORE INTO evidence VALUES(?,?,?)", batch)
+                        database.executemany("INSERT OR IGNORE INTO evidence VALUES(?,?,?)", batch).close()
                         batch.clear()
                 if batch:
-                    database.executemany("INSERT OR IGNORE INTO evidence VALUES(?,?,?)", batch)
+                    database.executemany("INSERT OR IGNORE INTO evidence VALUES(?,?,?)", batch).close()
                 database.commit()
                 receipt["parser_counts"] = dict(sorted(counts.items()))
                 if not counts["accepted_rows"]:
                     raise ValueError("Pinned native-word source produced no usable native words: " + row["id"])
                 receipts.append(receipt)
                 print(json.dumps({"source": row["id"], "accepted_rows": counts["accepted_rows"]}), flush=True)
-            word_count = database.execute("SELECT COUNT(DISTINCT word) FROM evidence").fetchone()[0]
+            with closing(database.execute("SELECT COUNT(DISTINCT word) FROM evidence")) as count_cursor:
+                word_count = count_cursor.fetchone()[0]
             header = {"format": FORMAT, "normalised_words": word_count, "sources": receipts,
                       "source_lock_sha256": hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
                       "label_quality": "Weak native-word or sentence-language membership; shared labels retained",
@@ -252,10 +256,11 @@ def prepare(manifest, cache, output, languages=None):
                         query = """SELECT word, GROUP_CONCAT(DISTINCT language),
                             MAX(CASE role WHEN 'test' THEN 2 WHEN 'validation' THEN 1 ELSE 0 END)
                             FROM evidence GROUP BY word ORDER BY word"""
-                        for word, labels, priority in database.execute(query):
-                            item = {"word": word, "labels": sorted(labels.split(",")),
-                                    "publisher_role": ("train", "validation", "test")[priority]}
-                            compressed.write((json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+                        with closing(database.execute(query)) as export_cursor:
+                            for word, labels, priority in export_cursor:
+                                item = {"word": word, "labels": sorted(labels.split(",")),
+                                        "publisher_role": ("train", "validation", "test")[priority]}
+                                compressed.write((json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
                 os.replace(temporary, target)
             finally:
                 temporary.unlink(missing_ok=True)
