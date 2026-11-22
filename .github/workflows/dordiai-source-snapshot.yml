@@ -1,0 +1,40 @@
+name: Dordiai exact tracked source snapshot
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-snapshot:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source-snapshot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Export only tracked project and workflow source with immutable provenance
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,subprocess,tarfile
+          output=pathlib.Path("source-snapshot");output.mkdir()
+          archive=output/"dordiai-tracked-source.tar.gz"
+          subprocess.run(["git","archive","--format=tar.gz","-o",str(archive),"HEAD","dordiai-voices",".github"],check=True)
+          if archive.stat().st_size>128*1024*1024:raise ValueError("Unexpected source snapshot size")
+          with tarfile.open(archive) as source:
+              total=0;members=source.getmembers()
+              for member in members:
+                  path=pathlib.PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts or path.parts[0] not in ("dordiai-voices",".github") or not(member.isfile() or member.isdir()):
+                      raise ValueError("Unexpected tracked source member")
+                  total+=member.size
+              if total>512*1024*1024 or len(members)>20000:raise ValueError("Unexpected expanded source snapshot")
+          report={"format":"dordiai-exact-tracked-source-snapshot","source_commit":os.environ["GITHUB_SHA"],"run_id":os.environ["GITHUB_RUN_ID"],"filename":archive.name,"sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),"bytes":archive.stat().st_size,"expanded_bytes":total,"members":len(members),"working_tree_untracked_files_included":False,"large_models_downloaded":False}
+          (output/"source-receipt.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
+          print("DORDIAI_SOURCE_SNAPSHOT "+json.dumps(report),flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-exact-tracked-source-${{ github.run_id }}
+          path: source-snapshot/*
+          retention-days: 30

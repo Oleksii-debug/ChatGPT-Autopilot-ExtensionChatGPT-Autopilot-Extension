@@ -971,7 +971,7 @@ def validate_required_resource_probe_ownership():
             raise ValueError("Linked required-resource add-on or runtime")
     addon = required_probe_canonical_directory(raw_addon)
     runtime = required_probe_canonical_directory(raw_runtime)
-    if addon.parent != owned / "config" / "addons" or runtime != addon / "kx47Runtime":
+    if addon.parent not in (owned / "config" / "addons", owned / "config-native-membership-long-path" / "addons") or runtime != addon / "kx47Runtime":
         raise ValueError("Required-resource quarantine is outside the owned add-on")
     module = sys.modules.get(type(DRIVER).__module__)
     if module is None or required_probe_canonical_directory(module.RUNTIME) != runtime:
@@ -1320,7 +1320,7 @@ def required_resource_probe_paths(addon, owned_run, run_id):
     addon = Path(addon)
     if addon.is_symlink() or (hasattr(addon, "is_junction") and addon.is_junction()):
         raise ValueError("Required-resource probe refuses a linked add-on")
-    if addon.resolve(strict=True).parent != owned_run / "config" / "addons":
+    if addon.resolve(strict=True).parent not in (owned_run / "config" / "addons", owned_run / "config-native-membership-long-path" / "addons"):
         raise ValueError("Required-resource probe refuses an add-on outside its owned configuration")
     addon = addon.resolve(strict=True)
     runtime = addon / "kx47Runtime"
@@ -1409,12 +1409,19 @@ def cleanup_required_resource_probe(process, record):
     return result
 
 
+def owned_config_directory(run, *, long_installed=False):
+    """Two fixed child names only; the portable NVDA directory is unchanged."""
+    return Path(run) / ("config-native-membership-long-path" if long_installed else "config")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--addon", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--installer-cache", type=Path, help="Optional cache file path for the pinned official EXE")
     parser.add_argument("--timeout", type=float, default=600.0, help="Watchdog seconds for each NVDA process")
+    parser.add_argument("--long-installed-config", action="store_true",
+                        help="Owned installed-addon MAX_PATH proof: lengthen only config by28characters; portable directory remains unchanged")
     parser.add_argument("--headless-ui-probe", action="store_true",
                         help="Explicit recording output TEST DOUBLE for real NVDA/driver/model/GUI checks; never certifies WavePlayer or acoustic output")
     recovery_modes = parser.add_mutually_exclusive_group()
@@ -1472,7 +1479,9 @@ def main(argv=None):
         installer = verified_installer(args.installer_cache.resolve() if args.installer_cache else output / ("nvda_" + NVDA_VERSION + ".exe"))
         result["checks"].append({"name": "official_installer_checksum", "status": "passed"})
         portable = run / "portable"
-        config = run / "config"
+        config = owned_config_directory(run, long_installed=args.long_installed_config)
+        result["long_installed_config_requested"] = args.long_installed_config
+        result["config_directory"] = str(config)
         config.mkdir()
         # No installed NVDA, registry, startup task or user configuration is changed.
         bootstrap_log = run / "portable-creation.log"

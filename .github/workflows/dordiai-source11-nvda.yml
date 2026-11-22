@@ -64,7 +64,7 @@ jobs:
           tool=("windows_nvda_native_descriptor_probe.py" if mode=="descriptor-corruption"
                 else "windows_nvda_membership_integration_probe.py")
           command=[sys.executable,str(root/"tools"/tool),"--addon",
-              str(root/"dist/dordiai-voices-0.13.1-dev.11.nvda-addon"),"--output",str(output),"--timeout","600"]
+              str(root/"dist/dordiai-voices-0.13.1-dev.11.nvda-addon"),"--output",str(output),"--long-installed-config","--timeout","600"]
           if mode=="normal":command.append("--fatal-recovery-probe")
           elif mode=="typing":command.append("--typing-probe")
           elif mode=="ru-missing":command.append("--required-resource-recovery-probe")
