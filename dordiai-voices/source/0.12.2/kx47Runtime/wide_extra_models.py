@@ -12,7 +12,7 @@ import re
 import unicodedata
 from threading import RLock
 
-AVAILABLE = {"sat", "st", "xh", "ig", "ln", "nd"}
+AVAILABLE = {"sat", "st", "xh", "ig", "ln", "nd", "ks"}
 _ENGINES = OrderedDict()
 _ENGINE_LOCK = RLock()
 
@@ -32,6 +32,8 @@ def available(models, require_source=True):
             required += ("runtime_config.json", "upstream-vocab.json", "upstream-tokenizer_config.json")
         if code in {"ig", "ln", "nd"}:
             required += ("runtime_config.json",)
+        if code == "ks":
+            required += ("runtime_config.json", "export_provenance.json")
         if all((root / name).is_file() for name in required):
             result.add(code)
     return result
@@ -115,6 +117,9 @@ class NativeSantali:
 
 
 def _make_engine(code, models, owner=None):
+    if code == "ks":
+        from wide_matcha import NativeMatcha
+        return NativeMatcha(folder(code, models), owner=owner)
     if code in {"st", "xh"}:
         from wide_simba import NativeSimba
         return NativeSimba(folder(code, models), owner=owner)

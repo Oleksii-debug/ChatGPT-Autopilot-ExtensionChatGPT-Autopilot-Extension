@@ -35,6 +35,21 @@
     "‽": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
     "‸": "ᱠᱮᱨᱮᱴ",
     "⁂": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
+    "😀": "ᱞᱟᱱᱫᱟ ᱪᱮᱦᱨᱟ",
+    "😁": "ᱤᱥᱤᱲ ᱢᱚᱪᱟ",
+    "👋": "ᱛᱤ ᱦᱩᱨᱞᱟᱹ",
+    "🤚": "ᱛᱤ ᱛᱩᱞ ᱨᱟᱠᱟᱵ",
+    "👍": "ᱮᱝᱜᱟ ᱠᱟᱹᱴᱩᱵ ᱫᱮᱠᱷᱟᱣ",
+    "0⃣": "ᱠᱤᱠᱮᱯ: 0",
+    "1⃣": "ᱠᱤᱠᱮᱯ: 1",
+    "2⃣": "ᱠᱤᱠᱮᱯ: 2",
+    "3⃣": "ᱠᱤᱠᱮᱯ: 3",
+    "4⃣": "ᱠᱤᱠᱮᱯ: 4",
+    "5⃣": "ᱠᱤᱠᱮᱯ: 5",
+    "6⃣": "ᱠᱤᱠᱮᱯ: 6",
+    "7⃣": "ᱠᱤᱠᱮᱯ: 7",
+    "8⃣": "ᱠᱤᱠᱮᱯ: 8",
+    "9⃣": "ᱠᱤᱠᱮᱯ: 9",
     "ᱸ": "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ",
     "ᱹ": "ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
     "ᱺ": "ᱢᱩᱸ ᱜᱟᱹᱦᱞᱟᱹ ᱴᱩᱰᱟᱹᱜ",
@@ -118,58 +133,6 @@
     {
       "kind": "letter",
       "language": "sat",
-      "lookup_text": "‾",
-      "aliases": [
-        "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ"
-      ],
-      "text": "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ",
-      "semantic_kind": "spoken_name",
-      "source_kind": "symbol_name",
-      "source_id": "cldr_annotations",
-      "acoustic_validation": "pending"
-    },
-    {
-      "kind": "letter",
-      "language": "sat",
-      "lookup_text": "‽",
-      "aliases": [
-        "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ"
-      ],
-      "text": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
-      "semantic_kind": "spoken_name",
-      "source_kind": "symbol_name",
-      "source_id": "cldr_annotations",
-      "acoustic_validation": "pending"
-    },
-    {
-      "kind": "letter",
-      "language": "sat",
-      "lookup_text": "‸",
-      "aliases": [
-        "ᱠᱮᱨᱮᱴ"
-      ],
-      "text": "ᱠᱮᱨᱮᱴ",
-      "semantic_kind": "spoken_name",
-      "source_kind": "symbol_name",
-      "source_id": "cldr_annotations",
-      "acoustic_validation": "pending"
-    },
-    {
-      "kind": "letter",
-      "language": "sat",
-      "lookup_text": "⁂",
-      "aliases": [
-        "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ"
-      ],
-      "text": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
-      "semantic_kind": "spoken_name",
-      "source_kind": "symbol_name",
-      "source_id": "cldr_annotations",
-      "acoustic_validation": "pending"
-    },
-    {
-      "kind": "letter",
-      "language": "sat",
       "lookup_text": "ᱸ",
       "aliases": [
         "ᱢᱩᱸ ᱴᱩᱰᱟᱹᱜ"
@@ -244,6 +207,253 @@
       "source_kind": "symbol_name",
       "source_id": "curated_primary_modifier_names",
       "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "👍",
+      "aliases": [
+        "ᱮᱝᱜᱟ ᱠᱟᱹᱴᱩᱵ ᱫᱮᱠᱷᱟᱣ"
+      ],
+      "text": "ᱮᱝᱜᱟ ᱠᱟᱹᱴᱩᱵ ᱫᱮᱠᱷᱟᱣ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "😀",
+      "aliases": [
+        "ᱞᱟᱱᱫᱟ ᱪᱮᱦᱨᱟ"
+      ],
+      "text": "ᱞᱟᱱᱫᱟ ᱪᱮᱦᱨᱟ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "😁",
+      "aliases": [
+        "ᱤᱥᱤᱲ ᱢᱚᱪᱟ"
+      ],
+      "text": "ᱤᱥᱤᱲ ᱢᱚᱪᱟ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‸",
+      "aliases": [
+        "ᱠᱮᱨᱮᱴ"
+      ],
+      "text": "ᱠᱮᱨᱮᱴ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‽",
+      "aliases": [
+        "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ"
+      ],
+      "text": "ᱤᱱᱴᱟᱨᱚᱵᱮᱝᱜᱽ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "‾",
+      "aliases": [
+        "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ"
+      ],
+      "text": "ᱚᱵᱷᱟᱨ ᱞᱟᱹᱭᱤᱱ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "⁂",
+      "aliases": [
+        "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ"
+      ],
+      "text": "ᱟᱥᱴᱟᱨᱤᱡᱽᱢ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "0⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 0"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 0",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "1⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 1"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 1",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "2⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 2"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 2",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "3⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 3"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 3",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "4⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 4"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 4",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "5⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 5"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 5",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "6⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 6"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 6",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "7⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 7"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 7",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "8⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 8"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 8",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "9⃣",
+      "aliases": [
+        "ᱠᱤᱠᱮᱯ: 9"
+      ],
+      "text": "ᱠᱤᱠᱮᱯ: 9",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "👋",
+      "aliases": [
+        "ᱛᱤ ᱦᱩᱨᱞᱟᱹ"
+      ],
+      "text": "ᱛᱤ ᱦᱩᱨᱞᱟᱹ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
+    },
+    {
+      "kind": "letter",
+      "language": "sat",
+      "lookup_text": "🤚",
+      "aliases": [
+        "ᱛᱤ ᱛᱩᱞ ᱨᱟᱠᱟᱵ"
+      ],
+      "text": "ᱛᱤ ᱛᱩᱞ ᱨᱟᱠᱟᱵ",
+      "semantic_kind": "spoken_name",
+      "source_kind": "symbol_name",
+      "source_id": "cldr_annotations",
+      "acoustic_validation": "pending"
     }
   ],
   "semantics": {
@@ -252,7 +462,9 @@
     "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
     "ordinary_letter_names_status": "not-established-by-these-sources",
     "runtime_enabled": false,
-    "native_pronunciation_verified": false
+    "native_pronunciation_verified": false,
+    "symbol_keys": "Pinned explicit CLDR/NVDA native names; supplementary symbols and bounded emoji sequences stay symbol_names, never ordinary alphabet names",
+    "bank_storage_kind": "The letters bank stores short navigation clips for both symbols and letters; source_kind distinguishes their linguistic semantics"
   },
   "curated_modifier_names": [
     "ᱸ",
@@ -265,5 +477,14 @@
   "unreviewed_symbol_candidates": {},
   "ordinary_alphabet_source_complete": false,
   "ordinary_alphabet_source_repertoire": [],
-  "letter_names_ready": false
+  "letter_names_ready": false,
+  "symbol_bank_preparation": {
+    "default_symbol_budget": 512,
+    "native_symbol_names_available": 25,
+    "symbol_jobs_scheduled": 25,
+    "symbol_jobs_pending_budget": 0,
+    "pending_symbol_keys": [],
+    "scope": "Full native symbol_names remain available at runtime. This is a bounded preparation plan, not existing PCM. The voice bank builder must also enforce its global index byte limit across selected languages.",
+    "conflicting_name_aliases_omitted": []
+  }
 }

@@ -1,0 +1,552 @@
+{
+  "format": "dordiai-matcha-checkpoint-sources-v1",
+  "code": "ks",
+  "iso_code": "kas",
+  "backend": "extra-onnx",
+  "repo_id": "GAASH-Lab/Matcha-TTS-Kashmiri",
+  "revision": "718203e01e0b4ddab3e925445619c69cddeb7231",
+  "source_repo": "gaash-lab/Bolbosh",
+  "source_revision": "7435b77029a691cc00a335356013ca6ee78f794a",
+  "normalizer_repo": "abdulmuizz0903/KashmiriNormalizer",
+  "normalizer_revision": "9bb966e76b88caf875bfb9facf3036bef706427e",
+  "license": "MIT",
+  "vocoder_license": "MIT",
+  "minimum_core_version": "0.13.1-dev.2",
+  "assets": {
+    "source/.pre-commit-config.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/.pre-commit-config.yaml",
+      "size_bytes": 1516,
+      "sha256": "f229eca455276c40d39d0943d6bc4f3268a06cd7c71bed671a5e03c3263becf4"
+    },
+    "source/LICENSE": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/LICENSE",
+      "size_bytes": 1069,
+      "sha256": "874d84104bdc7b301f369b2f2e66b31f07826a67495af909655f3699c857620d"
+    },
+    "source/README.md": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/README.md",
+      "size_bytes": 10984,
+      "sha256": "3cde600af8ce484e2e8a89a967a11124840edcc7c43c799e954c6fe60996a81d"
+    },
+    "source/configs/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/__init__.py",
+      "size_bytes": 81,
+      "sha256": "40afe33e9461a043b773aa939b3ec32715d0031bc64114839ffc1607af407fa8"
+    },
+    "source/configs/callbacks/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/callbacks/default.yaml",
+      "size_bytes": 97,
+      "sha256": "b11971f5f4262a384ec6fc69f84cd73413fb400f2a558b37c6fde338e50b26cd"
+    },
+    "source/configs/callbacks/model_checkpoint.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/callbacks/model_checkpoint.yaml",
+      "size_bytes": 1200,
+      "sha256": "f218bcf0faf758f58602dff4d5d7dac58632af9d1ae2a2d0c8c3f263658b7f5d"
+    },
+    "source/configs/callbacks/model_summary.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/callbacks/model_summary.yaml",
+      "size_bytes": 252,
+      "sha256": "8277b1268154f29eabfd976ea9783f86876de58def5c63c4789e7086359df11e"
+    },
+    "source/configs/callbacks/none.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/callbacks/none.yaml",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/configs/callbacks/rich_progress_bar.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/callbacks/rich_progress_bar.yaml",
+      "size_bytes": 172,
+      "sha256": "922ed36015c64efc9442be737a3eeec0f15589a82fa8d3953c4f800fcb5c6d83"
+    },
+    "source/configs/data/hi-fi_en-US_female.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/data/hi-fi_en-US_female.yaml",
+      "size_bytes": 436,
+      "sha256": "f84e1c28a2e5c367f53485b950cd413ef3885ab3892b37b8b7a7d24bb9962b7d"
+    },
+    "source/configs/data/kashmiri.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/data/kashmiri.yaml",
+      "size_bytes": 457,
+      "sha256": "926c4328abdc1dae7f539fe00412971093c2bbe37a4f413d2763d9f9c9504b5b"
+    },
+    "source/configs/data/ljspeech.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/data/ljspeech.yaml",
+      "size_bytes": 500,
+      "sha256": "9c3e55dafb0bd32e08021f46c7cb02ab2367aac100b955c26c9ab985cb2c7635"
+    },
+    "source/configs/data/rasa.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/data/rasa.yaml",
+      "size_bytes": 480,
+      "sha256": "5526f6d8eeec6c7e1a4b5c97fcff17734f9fba77a0f4fbef0d479f78609e86c3"
+    },
+    "source/configs/data/vctk.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/data/vctk.yaml",
+      "size_bytes": 385,
+      "sha256": "45e6f76a1fa7fa82f25b8e80ee52d596e54b258b34a5229b713bd43cafb2d01c"
+    },
+    "source/configs/debug/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/debug/default.yaml",
+      "size_bytes": 903,
+      "sha256": "bfa395cb18a7097ecbf8739ab51e9ad18222b3658f9224a4ce87ba9b65657968"
+    },
+    "source/configs/debug/fdr.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/debug/fdr.yaml",
+      "size_bytes": 120,
+      "sha256": "a05cf9a9593ca08ffab1b543685cacd463c354f31de60533e5dfd6f520c0cde6"
+    },
+    "source/configs/debug/limit.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/debug/limit.yaml",
+      "size_bytes": 218,
+      "sha256": "a703da399f7de4d1658b7c3cd353d733bd17bc6003c570c63eb15df189b667ea"
+    },
+    "source/configs/debug/overfit.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/debug/overfit.yaml",
+      "size_bytes": 204,
+      "sha256": "5f4028eb494a2b5da577643947e16792fac228fca41e0166e25fbfb35e1446d5"
+    },
+    "source/configs/debug/profiler.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/debug/profiler.yaml",
+      "size_bytes": 225,
+      "sha256": "eaefaec6ed360ae837ec52af6195dd6f43e03de962524191dd8fc8196d5d55ac"
+    },
+    "source/configs/experiment/hifi_dataset_piper_phonemizer.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/experiment/hifi_dataset_piper_phonemizer.yaml",
+      "size_bytes": 423,
+      "sha256": "54fe613ab27bf7f52de8c0e26ad9ae28f6fee18cf6e9e227025d9c6f0192b0da"
+    },
+    "source/configs/experiment/ljspeech.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/experiment/ljspeech.yaml",
+      "size_bytes": 332,
+      "sha256": "4b7b1cfa3b94ed4ed9fdeeb86147eab9bafd7937b831fc2e21985828fe7f14e7"
+    },
+    "source/configs/experiment/ljspeech_from_durations.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/experiment/ljspeech_from_durations.yaml",
+      "size_bytes": 380,
+      "sha256": "6fb4a8f17d7c476685f95ac062ca37ac307022fe3c503063263317df27c752c0"
+    },
+    "source/configs/experiment/ljspeech_min_memory.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/experiment/ljspeech_min_memory.yaml",
+      "size_bytes": 361,
+      "sha256": "2c8f8442a6d11317658e83b730fb8b3c798bf10c585b810746788e6305527267"
+    },
+    "source/configs/experiment/multispeaker.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/experiment/multispeaker.yaml",
+      "size_bytes": 336,
+      "sha256": "2ec4c25fb069fe4a250154e869df442af6487826f78f94df692fee1bc85f0e62"
+    },
+    "source/configs/extras/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/extras/default.yaml",
+      "size_bytes": 232,
+      "sha256": "7bb741898d2bfd2532f120bbf61e64d9edbf2becb4caaa5721a412398b13ab95"
+    },
+    "source/configs/hparams_search/mnist_optuna.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/hparams_search/mnist_optuna.yaml",
+      "size_bytes": 1818,
+      "sha256": "b9f286f9dc473eb71de22c0f295cb793e834e9a3ca910231f0eaad0029b8c451"
+    },
+    "source/configs/hydra/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/hydra/default.yaml",
+      "size_bytes": 608,
+      "sha256": "ba2fa4d16adec82f804096c22760b476ae62772d73713162384397a7b63bdef7"
+    },
+    "source/configs/logger/aim.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/aim.yaml",
+      "size_bytes": 1267,
+      "sha256": "75aea5c99390eb86eeb05c433ded8ef91a2a7a3e6985a62b9d235645613f1d70"
+    },
+    "source/configs/logger/comet.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/comet.yaml",
+      "size_bytes": 372,
+      "sha256": "4e46471685f47b238fcf3454a5a9b4bc735c75723d305e96cfcca2f4c0f75d17"
+    },
+    "source/configs/logger/csv.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/csv.yaml",
+      "size_bytes": 157,
+      "sha256": "5b1e2adffa494db168354d211ba0cb120738f7acc8d8d9b718727b98863be9d7"
+    },
+    "source/configs/logger/many_loggers.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/many_loggers.yaml",
+      "size_bytes": 118,
+      "sha256": "988ed420737b95b2464ecd03f213349796bc5f914a413249507f3a5425323399"
+    },
+    "source/configs/logger/mlflow.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/mlflow.yaml",
+      "size_bytes": 339,
+      "sha256": "d69cb36f98e92d4c5b71032ab45bb5c9b8ab9e7045f35b80a98ac345ef5f2f4b"
+    },
+    "source/configs/logger/neptune.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/neptune.yaml",
+      "size_bytes": 277,
+      "sha256": "59a9229d946b3dedb23bfa386ff780cc09f84fd9cc55b35dcda0eff539112dec"
+    },
+    "source/configs/logger/tensorboard.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/tensorboard.yaml",
+      "size_bytes": 258,
+      "sha256": "132b8babe6a3f25dc12a08c80448425094655b3f7e2e4e4cb4968902e8d5bd08"
+    },
+    "source/configs/logger/wandb.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/logger/wandb.yaml",
+      "size_bytes": 522,
+      "sha256": "6d03e94e5e44b76eede9db7ced9e3e449daa27830b3cb608dd340796ae70ce81"
+    },
+    "source/configs/model/cfm/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/model/cfm/default.yaml",
+      "size_bytes": 40,
+      "sha256": "3bb85ef5244eb4dc55d2823539656381b4f1206e2e09082707dffa8e5678233c"
+    },
+    "source/configs/model/decoder/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/model/decoder/default.yaml",
+      "size_bytes": 119,
+      "sha256": "7dbfe957a081b5c48a52bf2e51fa9fb7071527e2a713732b3d284562ed058f24"
+    },
+    "source/configs/model/encoder/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/model/encoder/default.yaml",
+      "size_bytes": 417,
+      "sha256": "8899b8407f53eda1d67202d07557340bb0d1f0516aa79f342fd0ad40ceb7acee"
+    },
+    "source/configs/model/matcha.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/model/matcha.yaml",
+      "size_bytes": 393,
+      "sha256": "025bc2eb0c9b8e4913076baa26c1f7b52936d903ddec484cbb9aed69181f6fef"
+    },
+    "source/configs/model/optimizer/adam.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/model/optimizer/adam.yaml",
+      "size_bytes": 70,
+      "sha256": "dd394aaeea8f8433a744e313dacc22fa5e87f547d1318a0b527e1f40eee211d4"
+    },
+    "source/configs/paths/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/paths/default.yaml",
+      "size_bytes": 632,
+      "sha256": "ab7fdffe2814b4901e2f7abb685348248806d5736e7833951e153dbb4ae7f5b3"
+    },
+    "source/configs/train.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/train.yaml",
+      "size_bytes": 1557,
+      "sha256": "c82fb2f963fe434106dfb66533bafd45033f512b80af2b67634f14cb25f827a1"
+    },
+    "source/configs/trainer/cpu.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/cpu.yaml",
+      "size_bytes": 51,
+      "sha256": "a950dc7be102e3b03b60b0078578c19e17459715d78dd5acb73b15cfa57e1fee"
+    },
+    "source/configs/trainer/ddp.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/ddp.yaml",
+      "size_bytes": 104,
+      "sha256": "8a7d901cdd3ea1c4c8b4264d866e8d4419c83913063d6c663fe25a0d88716e22"
+    },
+    "source/configs/trainer/ddp_sim.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/ddp_sim.yaml",
+      "size_bytes": 115,
+      "sha256": "23df9283e6381b2021ad1e5a607e1e30984f7b616a85b1fc8e950e327e5a5962"
+    },
+    "source/configs/trainer/default.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/default.yaml",
+      "size_bytes": 439,
+      "sha256": "13a971a18732f0104186693f704977ea6e3fdc1ff32d79ec986cddcf906edc2b"
+    },
+    "source/configs/trainer/gpu.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/gpu.yaml",
+      "size_bytes": 51,
+      "sha256": "e7c2d3192f59a1ad3da4e82e304b95a8cd9862850beb5c2be82c6c0ce688e30a"
+    },
+    "source/configs/trainer/mps.yaml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/configs/trainer/mps.yaml",
+      "size_bytes": 51,
+      "sha256": "0e844d85640842e70222a5fcc2c6ea52fc1d9ff0fbb6fa8d64b8c9bf9e730bea"
+    },
+    "source/denoise.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/denoise.py",
+      "size_bytes": 1556,
+      "sha256": "ffb3871f5bda925ca31ede802173fb5c8478a0a7dd945727f1a1e6e3d1ab1e25"
+    },
+    "source/denoise2.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/denoise2.py",
+      "size_bytes": 2645,
+      "sha256": "b8797951f0ff83cf0a7d94803f789608f1994aefb3e85a9ad5506a26a1d4f9c3"
+    },
+    "source/matcha/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/app.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/app.py",
+      "size_bytes": 13992,
+      "sha256": "6c1386d553392fc5fae1a17cac7e2275dbb8e5d8def659a4cabe6e6c0abfe3ee"
+    },
+    "source/matcha/cli.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/cli.py",
+      "size_bytes": 15674,
+      "sha256": "2a312f741abaf3b9d256b506b4a008e9384becf4abbe58e1435ddc2c76284724"
+    },
+    "source/matcha/data/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/data/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/data/components/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/data/components/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/data/text_mel_datamodule.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/data/text_mel_datamodule.py",
+      "size_bytes": 10299,
+      "sha256": "94bd70e50b55b8b37117eaab01fadf3e7db0cb189b7b94ea0d2e2ec7601522dc"
+    },
+    "source/matcha/hifigan/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/hifigan/config.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/config.py",
+      "size_bytes": 779,
+      "sha256": "7314bf6132bf5283b6ba66bf51ef10445b4d03a95d484b7510bdfabb6f8d8027"
+    },
+    "source/matcha/hifigan/denoiser.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/denoiser.py",
+      "size_bytes": 2691,
+      "sha256": "7215458d019fb0015679054e099f9e3bdfcf2396cd55b0ffbda604d189ac279a"
+    },
+    "source/matcha/hifigan/env.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/env.py",
+      "size_bytes": 429,
+      "sha256": "42d8439aa4d6580228dad488f9aad5b5e455c672949e6f669239505675db9837"
+    },
+    "source/matcha/hifigan/meldataset.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/meldataset.py",
+      "size_bytes": 6815,
+      "sha256": "80e715ef05f8eaa50ee2e4bdf0034fa5eb894ab95d337c7b868e7d47133e9ff8"
+    },
+    "source/matcha/hifigan/models.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/models.py",
+      "size_bytes": 11714,
+      "sha256": "784f0e1b84d27dab9f20cba788151c51a8fa08a6023bb8cc0ef6d96879f82998"
+    },
+    "source/matcha/hifigan/xutils.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/hifigan/xutils.py",
+      "size_bytes": 1396,
+      "sha256": "68db58bb54b241a1ad6cdfcd9d27cb1a14e2fabff2def60a3087fb11819a0ce0"
+    },
+    "source/matcha/models/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/models/baselightningmodule.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/baselightningmodule.py",
+      "size_bytes": 7049,
+      "sha256": "d0f2af00b2166892c65763e0ca5f66c005db4d5882f8cdc9d588fddf8989d6b5"
+    },
+    "source/matcha/models/components/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/components/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/models/components/decoder.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/components/decoder.py",
+      "size_bytes": 14505,
+      "sha256": "f9c07ec5b875793e19e67fb4a86039edd985e668a66c3416624846f148eb2422"
+    },
+    "source/matcha/models/components/flow_matching.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/components/flow_matching.py",
+      "size_bytes": 4657,
+      "sha256": "a6f2b2eeca2600749d575dda8624d864d904227e2a9f764a6cb2b89290445e6c"
+    },
+    "source/matcha/models/components/text_encoder.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/components/text_encoder.py",
+      "size_bytes": 14937,
+      "sha256": "dc6bf6053b3c93786fa84ddb6fe8c0490d3079319db5caaed075806dda4f6b2c"
+    },
+    "source/matcha/models/components/transformer.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/components/transformer.py",
+      "size_bytes": 13283,
+      "sha256": "72f16da121d0df5a6028330d22e5d7a3e38e096c91ef06e9c56a8ae504308af7"
+    },
+    "source/matcha/models/matcha_tts.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/models/matcha_tts.py",
+      "size_bytes": 10443,
+      "sha256": "8c36ebed04dd2a1b4e7508407b20dca007255690731333b0690187131bd3b516"
+    },
+    "source/matcha/onnx/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/onnx/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/onnx/export.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/onnx/export.py",
+      "size_bytes": 5386,
+      "sha256": "55402f8916f287d5a15dac4b3d08dd40bc1a54afd964d81a58f30503650a8787"
+    },
+    "source/matcha/onnx/infer.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/onnx/infer.py",
+      "size_bytes": 6293,
+      "sha256": "002823b5f31dbf3b94e1799a94d2eb79b9a4043d96f152dc2e2f1b9579e35265"
+    },
+    "source/matcha/text/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/text/__init__.py",
+      "size_bytes": 2100,
+      "sha256": "9a7dc432ab88c7e48cc1db3c6b9d8225396d0c87e5ce4e73a4e09404f2bee8d1"
+    },
+    "source/matcha/text/cleaners.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/text/cleaners.py",
+      "size_bytes": 4394,
+      "sha256": "745ee7a4dfcf99de44ff7cdd21d1f44f7129ff7795e4124c4fb1a68761a220f6"
+    },
+    "source/matcha/text/numbers.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/text/numbers.py",
+      "size_bytes": 2249,
+      "sha256": "370a7e1e6a9aaacb4010b56aaa532effb6e3e2a896433317166c39ea706ad61d"
+    },
+    "source/matcha/text/symbols.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/text/symbols.py",
+      "size_bytes": 1325,
+      "sha256": "285a18c0e94ea95ac3c4c8afb35c9d17dbf3deb183ccfe21f5e82a18bf4ba831"
+    },
+    "source/matcha/train.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/train.py",
+      "size_bytes": 7378,
+      "sha256": "055793e1034e13912a00b6fe850e7e15486e49f281452e82905e0ff5e7023ba0"
+    },
+    "source/matcha/utils/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/__init__.py",
+      "size_bytes": 326,
+      "sha256": "60db3dd6b8f37947154acdda663bfdb6199ae3623cd4992ccbd445de7aaebcea"
+    },
+    "source/matcha/utils/audio.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/audio.py",
+      "size_bytes": 2311,
+      "sha256": "b96b7f623942e93e74da8ea6d37e0ea56564f2f742b84962d1d0968bdada231b"
+    },
+    "source/matcha/utils/data/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/data/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "source/matcha/utils/data/hificaptain.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/data/hificaptain.py",
+      "size_bytes": 4557,
+      "sha256": "5d56e8a3cb7718cffb30ca1368b35697eaba78c1b32723c165a5c4a38fa91df0"
+    },
+    "source/matcha/utils/data/ljspeech.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/data/ljspeech.py",
+      "size_bytes": 2655,
+      "sha256": "e35d83d2b78c2e11f62c741ebca15ad8e89afb729bc75d2be4f71724ab1844cb"
+    },
+    "source/matcha/utils/data/utils.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/data/utils.py",
+      "size_bytes": 1721,
+      "sha256": "f507bf0e09db795a773e4c787a9e24e6d4ae9d5498e10f20828079bc27a30ed1"
+    },
+    "source/matcha/utils/get_durations_from_trained_model.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/get_durations_from_trained_model.py",
+      "size_bytes": 6473,
+      "sha256": "d5d203a4ffa80b77f44b18ce09a84db3514c89e2e4370160dd225b5affa3071f"
+    },
+    "source/matcha/utils/instantiators.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/instantiators.py",
+      "size_bytes": 1828,
+      "sha256": "431a8e9d155a6c249ebaba4f3835ea87725267e13b9bc8ca4acc72d56bd35fe2"
+    },
+    "source/matcha/utils/logging_utils.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/logging_utils.py",
+      "size_bytes": 1711,
+      "sha256": "825388fc91bcfd804a1d6c03e5144a2a409ecf737b0c9947dbb573e3cc8012d5"
+    },
+    "source/matcha/utils/model.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/model.py",
+      "size_bytes": 2935,
+      "sha256": "51588a1da57cf7f21e68a245c30d711d5fd14d7aafd18bdf416ab03ad9f343e2"
+    },
+    "source/matcha/utils/monotonic_align/__init__.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/monotonic_align/__init__.py",
+      "size_bytes": 646,
+      "sha256": "fecfc8355eef2ff37d9a162d6400c0935d42b1218ff24ca49f47c4cb233bdedb"
+    },
+    "source/matcha/utils/monotonic_align/core.pyx": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/monotonic_align/core.pyx",
+      "size_bytes": 1236,
+      "sha256": "b768c96a6b256831a41599d685d510d2ab384f88239ed30e01748f32d65aab4c"
+    },
+    "source/matcha/utils/monotonic_align/setup.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/monotonic_align/setup.py",
+      "size_bytes": 207,
+      "sha256": "6dfd1dd1cbc645a0020b6daaab4b2a819101061cf8ab30e532a0713b24ca0b68"
+    },
+    "source/matcha/utils/pylogger.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/pylogger.py",
+      "size_bytes": 720,
+      "sha256": "61b0bc626e4766b25c0c122c40eea34a7bb263908b650475dc4fe8012f526194"
+    },
+    "source/matcha/utils/rich_utils.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/rich_utils.py",
+      "size_bytes": 3315,
+      "sha256": "98c358c56ebf65f2c6cb3cfaf47aa0efdedf467d0a114cca42badc16a1cd6703"
+    },
+    "source/matcha/utils/utils.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/matcha/utils/utils.py",
+      "size_bytes": 8455,
+      "sha256": "e5337e3c84b3b2323f0a09d15f73d23c156c16144bf061d9c997709bcf4ee134"
+    },
+    "source/mcd_eval.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/mcd_eval.py",
+      "size_bytes": 8160,
+      "sha256": "bb467dbc26cc9dc6147ec0baf1e2070fbe57690e4d30235c7973bd43a738fea2"
+    },
+    "source/pyproject.toml": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/pyproject.toml",
+      "size_bytes": 982,
+      "sha256": "52ca8cbc1158784a2b2571bfcda26d0b9867f42efdfe1f6dbe75e57f1cf8e096"
+    },
+    "source/requirements.txt": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/requirements.txt",
+      "size_bytes": 1010,
+      "sha256": "e0d1cc491b5788f988697e7dc11865107234b36a4296c4cb5a9f2a7cee592f27"
+    },
+    "source/setup.py": {
+      "url": "https://raw.githubusercontent.com/gaash-lab/Bolbosh/7435b77029a691cc00a335356013ca6ee78f794a/setup.py",
+      "size_bytes": 1779,
+      "sha256": "16f60ed42858a12043ab7cef116be217aaf7a9471724d72e19ae68ccb7320e6c"
+    },
+    "normalizer/LICENSE": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/LICENSE",
+      "size_bytes": 1079,
+      "sha256": "624db188b894a3813c1d3f582f6b2b197162db2f04831d1cee2a9f2ea72ee1f3"
+    },
+    "normalizer/pyproject.toml": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/pyproject.toml",
+      "size_bytes": 632,
+      "sha256": "6111c21eecb1418238f3e20fb0e821d046599e82cfb6f016151fb7e73db30894"
+    },
+    "normalizer/README.md": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/README.md",
+      "size_bytes": 3480,
+      "sha256": "9d8e17ef5054d104edc290dd8b11c44b349657c788de466fa39a5f6409a238fb"
+    },
+    "normalizer/src/KashmiriNormalizer/__init__.py": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/src/KashmiriNormalizer/__init__.py",
+      "size_bytes": 156,
+      "sha256": "f956ed73040e7e52a62fa66f54e124783b4aacac2875318704b44b3964cbe9c9"
+    },
+    "normalizer/src/KashmiriNormalizer/constants.py": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/src/KashmiriNormalizer/constants.py",
+      "size_bytes": 7273,
+      "sha256": "b899d2a8546cc6f812f01996ac091c6585f5aaaae9e29a872cd5def24534ee1f"
+    },
+    "normalizer/src/KashmiriNormalizer/normalizer.py": {
+      "url": "https://raw.githubusercontent.com/abdulmuizz0903/KashmiriNormalizer/9bb966e76b88caf875bfb9facf3036bef706427e/src/KashmiriNormalizer/normalizer.py",
+      "size_bytes": 6050,
+      "sha256": "a3181423daf40825e004c319221d662d79a827bdb729a675ac4ed2d504e68fd6"
+    },
+    "model.ckpt": {
+      "url": "https://huggingface.co/GAASH-Lab/Matcha-TTS-Kashmiri/resolve/718203e01e0b4ddab3e925445619c69cddeb7231/model.ckpt",
+      "size_bytes": 251143678,
+      "sha256": "03a4defa68c188b4a61a0970ba83d4f487c1fc223eb1b77a58b05c6ea8a1b20e"
+    },
+    "g_02500000": {
+      "url": "https://github.com/shivammehta25/Matcha-TTS-checkpoints/releases/download/v1.0/g_02500000",
+      "size_bytes": 55788858,
+      "sha256": "771eaf4876485a35e25577563d390c262e23c2421e4a8c929eacfde34a5b7a60"
+    }
+  }
+}

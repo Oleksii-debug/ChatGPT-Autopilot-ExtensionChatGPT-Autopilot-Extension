@@ -79,10 +79,21 @@
     "exemplar_units": "Glyph repertoire only; never assumed to be spoken names",
     "ordinary_letter_names_status": "not-established-by-these-sources",
     "runtime_enabled": false,
-    "native_pronunciation_verified": false
+    "native_pronunciation_verified": false,
+    "symbol_keys": "Pinned explicit CLDR/NVDA native names; supplementary symbols and bounded emoji sequences stay symbol_names, never ordinary alphabet names",
+    "bank_storage_kind": "The letters bank stores short navigation clips for both symbols and letters; source_kind distinguishes their linguistic semantics"
   },
   "unreviewed_symbol_candidates": {},
   "ordinary_alphabet_source_complete": false,
   "ordinary_alphabet_source_repertoire": [],
-  "letter_names_ready": false
+  "letter_names_ready": false,
+  "symbol_bank_preparation": {
+    "default_symbol_budget": 512,
+    "native_symbol_names_available": 0,
+    "symbol_jobs_scheduled": 0,
+    "symbol_jobs_pending_budget": 0,
+    "pending_symbol_keys": [],
+    "scope": "Full native symbol_names remain available at runtime. This is a bounded preparation plan, not existing PCM. The voice bank builder must also enforce its global index byte limit across selected languages.",
+    "conflicting_name_aliases_omitted": []
+  }
 }

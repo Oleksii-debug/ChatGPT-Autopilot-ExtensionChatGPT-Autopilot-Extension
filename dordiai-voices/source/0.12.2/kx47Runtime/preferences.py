@@ -72,6 +72,86 @@ def remove_extra_package(entry, addon_root, *, references=None):
     return _package_component("package_manager").uninstall_pack(package_id, addon_root=addon_root)
 
 
+def begin_package_speech(synth):
+    """On NVDA's main thread, keep navigation on a genuine built-in synth.
+
+    NVDA's public setSynth(..., isFallback=True) terminates the old instance
+    while preserving the configured synthesizer. Files are not changed unless
+    the built-in eSpeak instance was successfully selected first.
+    """
+    import speech
+    import synthDriverHandler as handler
+    if handler.getSynth() is not synth:
+        raise RuntimeError("Вибрано інший синтезатор. Пакет не змінено.")
+    synth.saveSettings()
+    speech.cancelSpeech()
+    error = None
+    try:
+        selected = handler.setSynth("espeak", isFallback=True)
+    except Exception as exception:
+        selected, error = False, str(exception)
+    fallback = handler.getSynth()
+    if not selected or fallback is None or getattr(fallback, "name", None) != "espeak":
+        detail = "Не вдалося ввімкнути вбудований eSpeak для озвучення під час роботи з пакетом. Пакет не змінено."
+        if error:
+            detail += " " + error
+        raise RuntimeError(detail)
+    return {"synth_name": synth.name, "temporary_synth": fallback}
+
+
+def finish_package_speech(session):
+    """Restore a fresh driver after success OR rollback, without stealing a user switch.
+
+    API success establishes selection, not physical audio-device acceptance.
+    The returned detail must be surfaced alongside the package result.
+    """
+    import speech
+    import synthDriverHandler as handler
+    current = handler.getSynth()
+    errors = []
+    if current is not session["temporary_synth"] and getattr(current, "name", None) != session["synth_name"]:
+        return {"restored": False, "user_changed_synth": True, "synth": current,
+                "error": False, "detail": "Залишено синтезатор, вибраний вами під час роботи з пакетом."}
+    if current is not session["temporary_synth"]:
+        # Reselecting dordiai manually during installation must not leave a
+        # now-stale epoch alive. Preserve that same synth's latest profile, then
+        # reload it; only a different synthesizer is left untouched above.
+        try:
+            current.saveSettings()
+        except Exception as error:
+            errors.append("Не вдалося зберегти останні налаштування: " + str(error))
+    speech.cancelSpeech()
+    try:
+        selected = handler.setSynth(session["synth_name"], isFallback=True)
+    except Exception as error:
+        selected = False
+        errors.append(str(error))
+    current = handler.getSynth()
+    if selected and current is not None and getattr(current, "name", None) == session["synth_name"]:
+        detail = "Синтезатор автоматично перезавантажено. Нові мови можна ввімкнути в налаштуваннях."
+        if errors:
+            detail += " " + "; ".join(errors)
+        return {"restored": True, "user_changed_synth": False, "synth": current, "error": bool(errors),
+                "detail": detail}
+    detail = "Не вдалося перезавантажити dordiai-voices після роботи з пакетом."
+    if current is None or getattr(current, "name", None) != "espeak":
+        try:
+            fallback_selected = handler.setSynth("espeak", isFallback=True)
+        except Exception as error:
+            fallback_selected = False
+            errors.append(str(error))
+        current = handler.getSynth()
+        if not fallback_selected or current is None or getattr(current, "name", None) != "espeak":
+            detail += " Не вдалося також увімкнути резервний eSpeak. Потрібен перезапуск NVDA."
+        else:
+            detail += " Для навігації залишено вбудований eSpeak. Повторно виберіть dordiai-voices або перезапустіть NVDA."
+    else:
+        detail += " Для навігації залишено вбудований eSpeak. Повторно виберіть dordiai-voices або перезапустіть NVDA."
+    if errors:
+        detail += " Помилки відновлення: " + "; ".join(errors)
+    return {"restored": False, "user_changed_synth": False, "synth": current, "error": True, "detail": detail}
+
+
 def _codes(value):
     """Read only text lists from a profile; malformed values must not enable everything."""
     return set(value.split()) if isinstance(value, str) else set()
@@ -427,8 +507,9 @@ def open_dialog(synth):
             box.Add(self.remove_package, flag=wx.TOP, border=8)
             box.Add(self.rollback_package, flag=wx.TOP, border=8)
             self.package_status = wx.StaticText(panel, label=(
-                "Основний комплект не видаляється тут. Після зміни пакетів перезапустіть NVDA, "
-                "потім увімкніть потрібні встановлені мови на вкладці «Мови»."
+                "Основний комплект не видаляється тут. Під час роботи з пакетом навігацію озвучує "
+                "вбудований eSpeak. Потім dordiai-voices автоматично перезавантажиться, "
+                "і можна буде ввімкнути нові мови на вкладці «Мови»."
             ))
             self.package_status.Wrap(500)
             box.Add(self.package_status, flag=wx.TOP, border=8)
@@ -489,7 +570,7 @@ def open_dialog(synth):
                 gui.messageBox("У пакета немає коректного ідентифікатора.", self.title, wx.OK | wx.ICON_ERROR)
                 return
             result = gui.messageBox(
-                "Видалити пакет «%s» з диска? Після цього перезапустіть NVDA. "
+                "Видалити пакет «%s» з диска? Синтезатор автоматично перезавантажиться. "
                 "Мови, яким потрібні його ресурси, стануть недоступними." % entry.get("name", pack_id),
                 self.title, wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION,
             )
@@ -529,8 +610,24 @@ def open_dialog(synth):
         def _run_package_operation(self, status, operation):
             from threading import Thread
             from ui import message
-            self.synth.cancel()
+            # Save the current dialog's validated settings before terminating
+            # its synth. A fresh driver will read the same NVDA profile later.
+            if not self._save():
+                return
+            try:
+                self._package_speech = begin_package_speech(self.synth)
+            except Exception as error:
+                detail = str(error)
+                self.package_status.SetLabel(detail)
+                gui.messageBox(detail, self.title, wx.OK | wx.ICON_ERROR)
+                if getSynth() is not self.synth:
+                    # Even a failed NVDA switch can terminate the old instance.
+                    # Never leave an editable dialog bound to that object.
+                    super().onCancel(None)
+                return
             self._package_busy = True
+            for index in range(3):
+                self.tabs.GetPage(index).Enable(False)
             self.install_package.Enable(False)
             self.remove_package.Enable(False)
             self.rollback_package.Enable(False)
@@ -543,15 +640,27 @@ def open_dialog(synth):
                 except Exception as error:
                     wx.CallAfter(self._package_finished, False, str(error))
                 else:
-                    wx.CallAfter(self._package_finished, True, "Пакет змінено. Перезапустіть NVDA, щоб застосувати зміни.")
+                    wx.CallAfter(self._package_finished, True, "Пакет змінено й перевірено.")
             Thread(target=work, daemon=True, name="Dordiai package operation").start()
 
         def _package_finished(self, success, detail):
+            # A rolled-back transaction can replace the index too, so always
+            # restore a new driver after a transaction has run.
+            try:
+                restored = finish_package_speech(self._package_speech)
+            except Exception as error:
+                restored = {"restored": False, "error": True, "synth": getSynth(),
+                            "detail": "Помилка відновлення озвучення: " + str(error)}
+            detail += " " + restored["detail"]
             self._package_busy = False
-            self.install_package.Enable(True)
-            self._refresh_packages()
             self.package_status.SetLabel(detail)
-            gui.messageBox(detail, self.title, wx.OK | (wx.ICON_INFORMATION if success else wx.ICON_ERROR))
+            gui.messageBox(detail, self.title, wx.OK | (wx.ICON_INFORMATION if success and not restored["error"] else wx.ICON_ERROR))
+            # The old dialog holds a terminated driver and outdated model/voice
+            # choices. Close it and build a new dialog from the restored driver.
+            super().onCancel(None)
+            current = restored.get("synth")
+            if restored["restored"] and current is not None:
+                wx.CallAfter(current._dordiai_open_settings)
 
         def _on_close(self, event):
             if self._package_busy:

@@ -1,0 +1,50 @@
+{
+  "format": "dordiai-matcha-onnx-v1",
+  "backend": "extra-onnx",
+  "code": "ks",
+  "iso_code": "kas",
+  "sample_rate": 22050,
+  "speaker": 422,
+  "steps": 10,
+  "temperature": 0.667,
+  "repo_id": "GAASH-Lab/Matcha-TTS-Kashmiri",
+  "revision": "718203e01e0b4ddab3e925445619c69cddeb7231",
+  "license": "MIT",
+  "minimum_core_version": "0.13.1-dev.3",
+  "model_sha256": "6528b8ebf93e6a2812a8015f74dee7a6d71c7c5ca8bc0c4e92b834515eddaac2",
+  "config_sha256": "c5a62a632244d755d968c1a016037e8fb7ba9567fb1549b8d89c5a7061c4bf07",
+  "technical_onnx_inference_verified": true,
+  "native_pronunciation_verified": false,
+  "navigation_verified": false,
+  "windows_nvda_verified": false,
+  "unsupported_native_characters": [
+    "ٲ"
+  ],
+  "unsupported_policy": "reject-or-explicit-installed-same-language-alternative",
+  "source_identity": {
+    "basis": "actual-same-native-matcha-carrier-pcm16-waveform",
+    "source_sha256": "f9f85869ef39d1e65279e46e13d02f5a438b378bf51e1880e17930f0747c3643",
+    "reference_wav_sha256": "8c4b44f34346dfd2f78d4f1639be76d25c5ded87f316da00e6093bd0ff7e79b7",
+    "encoder_sha256": "3dd4918cab90e1acf7fa5c6f7539c27710e7a3cdfba550468c5ea49399178bf7",
+    "source_shape": [
+      1,
+      256,
+      1
+    ],
+    "source_dtype": "float32",
+    "source_norm": 11.418668746948242,
+    "unit_normalized": false
+  },
+  "status": "prepared-real-onnx-carrier",
+  "model_bytes": 141748312,
+  "probe": {
+    "text": "مےٛ چھُ آز سُلۍ وۄستادَس نِش گَژھُن، سُہ پرناوِ مےٛ آز بَدل کانٛہہ سبَق۔",
+    "kind": "publisher-native-sentence",
+    "samples": 105984,
+    "audio_seconds": 4.806530612244898,
+    "seconds_including_load": 10.523520148999523,
+    "finite": true,
+    "peak": 0.3394893705844879
+  },
+  "compatibility_metadata_update": "Minimum core raised after intermediate dev2 CI; model/frontend/source unchanged."
+}

@@ -1,0 +1,98 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "run_id": "f84dabe95df94a36b01976359fc05bc2",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "status": "failed",
+  "run_directory": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo",
+  "nvda_version": "2026.3.1",
+  "installer_url": "https://download.nvaccess.org/releases/2026.3.1/nvda_2026.3.1.exe",
+  "installer_sha256": "6f80a5b0ca720a7d0d314b5be212f37388bbe81a1107ac3298c1821a1cd3f052",
+  "checks": [
+    {
+      "name": "windows_audio_output_enumeration",
+      "status": "blocked",
+      "reason": "Windows waveOut reports zero output devices; physical audio cannot be verified"
+    },
+    {
+      "name": "official_installer_checksum",
+      "status": "passed"
+    },
+    {
+      "name": "portable_nvda_created",
+      "status": "passed",
+      "bootstrap_exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Not a full release acceptance or acoustic/linguistic assessment",
+    "Explicit headless output double: no WavePlayer/device/acoustic acceptance"
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "audio_environment": {
+    "wave_out_devices": 0
+  },
+  "addon_path": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\dist\\dordiai-voices-0.13.1-dev.1.nvda-addon",
+  "addon_sha256": "63e0843b58b8e7140aa19e1408a73da714843d96bc9e5f57f1974e1e8e11b14b",
+  "portable_creation_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda_2026.3.1.exe",
+    "--create-portable-silent",
+    "--portable-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\portable",
+    "--config-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config",
+    "--no-sr-flag",
+    "--minimal",
+    "--log-file=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\portable-creation.log"
+  ],
+  "extracted_addon": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config\\addons\\kx47Voices",
+  "nvda_log": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\nvda.log",
+  "probe_json": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\nvda-probe.json",
+  "nvda_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\portable\\nvda.exe",
+    "--config-path=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config",
+    "--log-file=D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\nvda.log",
+    "--debug-logging",
+    "--no-sr-flag",
+    "--minimal",
+    "--lang=en"
+  ],
+  "probe": {
+    "format_version": 1,
+    "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+    "status": "failed",
+    "run_id": "f84dabe95df94a36b01976359fc05bc2",
+    "platform": "Windows-2025Server-10.0.26100-SP0",
+    "nvda_version_expected": "2026.3.1",
+    "checks": [
+      {
+        "name": "physical_audio_output",
+        "status": "blocked",
+        "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+      },
+      {
+        "name": "driver_selection_exception",
+        "status": "failed",
+        "error": "TypeError(\"check() got multiple values for argument 'name'\")",
+        "traceback": "Traceback (most recent call last):\n  File \"D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 106, in guarded\n    callback()\n    ~~~~~~~~^^\n  File \"D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 206, in begin\n    check(\"select_dordiai\", \"passed\", name=DRIVER.name)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: check() got multiple values for argument 'name'\n"
+      }
+    ],
+    "limitations": [
+      "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+      "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+      "One keyboard smoke check is not a complete accessibility assessment.",
+      "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+    ],
+    "wave_player_verified": false,
+    "physical_audio_verified": false,
+    "acoustic_latency_verified": false,
+    "product_ready": false,
+    "recording_pcm_sink_test_double": true,
+    "nvda_version_actual": "2026.3.1",
+    "pcm_metrics": {},
+    "finished_at_ns": 1795326902163099400
+  },
+  "finished_at_ns": 1795326902882241900
+}

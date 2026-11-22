@@ -1,0 +1,1643 @@
+{
+  "format": "dordiai-core-size-audit",
+  "format_version": 1,
+  "archive": "dordiai-voices-0.13.1-dev.1.nvda-addon",
+  "download_bytes": 1766492602,
+  "installed_payload_bytes": 2125037335,
+  "installed_payload_excludes_release_manifest_and_filesystem_allocation": true,
+  "voice_profile_count": 45,
+  "ram_bytes": null,
+  "ram_not_inferred_from_disk_size": true,
+  "method": "Existing verified per-file SHA256 and ZIP compressed-size metadata; no acoustic weights loaded or modified.",
+  "categories": {
+    "code_dictionaries_documents_other": {
+      "installed_payload_bytes": 8538420,
+      "compressed_member_bytes": 7065954,
+      "files": 113
+    },
+    "shared_models_and_language_data": {
+      "installed_payload_bytes": 1259782055,
+      "compressed_member_bytes": 1077607050,
+      "files": 105
+    },
+    "voice_profiles_and_prepared_audio": {
+      "installed_payload_bytes": 687245667,
+      "compressed_member_bytes": 594124676,
+      "files": 8391
+    },
+    "embedded_python_and_native_libraries": {
+      "installed_payload_bytes": 169471193,
+      "compressed_member_bytes": 84703472,
+      "files": 1596
+    }
+  },
+  "branches": {
+    "kx47Runtime/models/PocketTTS/ru": {
+      "installed_payload_bytes": 463218916,
+      "compressed_member_bytes": 382634920,
+      "files": 8
+    },
+    "kx47Runtime/models/voices/native_profiles": {
+      "installed_payload_bytes": 217668478,
+      "compressed_member_bytes": 202794208,
+      "files": 91
+    },
+    "kx47Runtime/models/Holos/encoder.onnx": {
+      "installed_payload_bytes": 216030966,
+      "compressed_member_bytes": 200649849,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/native_letters": {
+      "installed_payload_bytes": 204076454,
+      "compressed_member_bytes": 177526987,
+      "files": 90
+    },
+    "kx47Runtime/python": {
+      "installed_payload_bytes": 169471193,
+      "compressed_member_bytes": 84703472,
+      "files": 1596
+    },
+    "kx47Runtime/models/voices/navigation": {
+      "installed_payload_bytes": 160222689,
+      "compressed_member_bytes": 130365182,
+      "files": 6256
+    },
+    "kx47Runtime/models/PocketTTS/stress": {
+      "installed_payload_bytes": 144302666,
+      "compressed_member_bytes": 96843911,
+      "files": 17
+    },
+    "kx47Runtime/models/Holos/decoder_window.onnx": {
+      "installed_payload_bytes": 79160919,
+      "compressed_member_bytes": 70824413,
+      "files": 1
+    },
+    "kx47Runtime/models/PocketTTS/en": {
+      "installed_payload_bytes": 72360292,
+      "compressed_member_bytes": 65611835,
+      "files": 11
+    },
+    "kx47Runtime/models/OpenVoiceV2/encoder-flow.onnx": {
+      "installed_payload_bytes": 70293317,
+      "compressed_member_bytes": 65688730,
+      "files": 1
+    },
+    "kx47Runtime/models/Piper/en_US-amy-low.onnx": {
+      "installed_payload_bytes": 63104526,
+      "compressed_member_bytes": 58464217,
+      "files": 1
+    },
+    "kx47Runtime/models/Piper/en_US-ryan-low.onnx": {
+      "installed_payload_bytes": 63104526,
+      "compressed_member_bytes": 58464961,
+      "files": 1
+    },
+    "kx47Runtime/models/OpenVoiceV2/decoder.onnx": {
+      "installed_payload_bytes": 57893174,
+      "compressed_member_bytes": 54160189,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/navigation_native": {
+      "installed_payload_bytes": 47269080,
+      "compressed_member_bytes": 35490359,
+      "files": 1170
+    },
+    "kx47Runtime/models/voices/native_commands": {
+      "installed_payload_bytes": 34251866,
+      "compressed_member_bytes": 28868981,
+      "files": 90
+    },
+    "kx47Runtime/models/Holos/prosody.onnx": {
+      "installed_payload_bytes": 22839251,
+      "compressed_member_bytes": 20834914,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/classmate_locales": {
+      "installed_payload_bytes": 14014975,
+      "compressed_member_bytes": 13159574,
+      "files": 307
+    },
+    "kx47Runtime/models/voices/navigation_profile": {
+      "installed_payload_bytes": 8278928,
+      "compressed_member_bytes": 4785670,
+      "files": 172
+    },
+    "kx47Runtime/cyrillic_words.bin": {
+      "installed_payload_bytes": 5788240,
+      "compressed_member_bytes": 5002276,
+      "files": 1
+    },
+    "kx47Runtime/models/Holos/source.onnx": {
+      "installed_payload_bytes": 2467976,
+      "compressed_member_bytes": 2239508,
+      "files": 1
+    },
+    "kx47Runtime/latin_dictionary.json.gz": {
+      "installed_payload_bytes": 1730689,
+      "compressed_member_bytes": 1731219,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/spelling": {
+      "installed_payload_bytes": 1095174,
+      "compressed_member_bytes": 860812,
+      "files": 60
+    },
+    "kx47Runtime/models/Holos/dordiai_kernels.dll": {
+      "installed_payload_bytes": 762880,
+      "compressed_member_bytes": 264860,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ru.json": {
+      "installed_payload_bytes": 421377,
+      "compressed_member_bytes": 30181,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/uk.json": {
+      "installed_payload_bytes": 380892,
+      "compressed_member_bytes": 29095,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/en.json": {
+      "installed_payload_bytes": 328620,
+      "compressed_member_bytes": 23361,
+      "files": 1
+    },
+    "kx47Runtime/models/WordLanguage/word-lid.json.gz": {
+      "installed_payload_bytes": 296117,
+      "compressed_member_bytes": 293015,
+      "files": 1
+    },
+    "kx47Runtime/models/WordLanguage/cyrillic-lexicon.json.gz": {
+      "installed_payload_bytes": 268689,
+      "compressed_member_bytes": 268774,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/km.json": {
+      "installed_payload_bytes": 255183,
+      "compressed_member_bytes": 20091,
+      "files": 1
+    },
+    "doc/third-party": {
+      "installed_payload_bytes": 250399,
+      "compressed_member_bytes": 84446,
+      "files": 26
+    },
+    "kx47Runtime/models/CharacterNames/lo.json": {
+      "installed_payload_bytes": 236035,
+      "compressed_member_bytes": 19363,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ha.json": {
+      "installed_payload_bytes": 214889,
+      "compressed_member_bytes": 17538,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/rm.json": {
+      "installed_payload_bytes": 207605,
+      "compressed_member_bytes": 17070,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/yo.json": {
+      "installed_payload_bytes": 207324,
+      "compressed_member_bytes": 18256,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ig.json": {
+      "installed_payload_bytes": 191029,
+      "compressed_member_bytes": 15893,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ak.json": {
+      "installed_payload_bytes": 187302,
+      "compressed_member_bytes": 15354,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/so.json": {
+      "installed_payload_bytes": 185484,
+      "compressed_member_bytes": 16588,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/fil.json": {
+      "installed_payload_bytes": 178994,
+      "compressed_member_bytes": 14644,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/zu.json": {
+      "installed_payload_bytes": 168834,
+      "compressed_member_bytes": 14891,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/core_spelling_2x": {
+      "installed_payload_bytes": 120970,
+      "compressed_member_bytes": 104366,
+      "files": 11
+    },
+    "kx47Runtime/models/voices/delivery_profiles.json": {
+      "installed_payload_bytes": 83492,
+      "compressed_member_bytes": 18802,
+      "files": 1
+    },
+    "synthDrivers/kx47Preview.py": {
+      "installed_payload_bytes": 73353,
+      "compressed_member_bytes": 20175,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/tg.json": {
+      "installed_payload_bytes": 67850,
+      "compressed_member_bytes": 6717,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/rw.json": {
+      "installed_payload_bytes": 62916,
+      "compressed_member_bytes": 6145,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/xh.json": {
+      "installed_payload_bytes": 62157,
+      "compressed_member_bytes": 5904,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/wo.json": {
+      "installed_payload_bytes": 60510,
+      "compressed_member_bytes": 5740,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/nso.json": {
+      "installed_payload_bytes": 60062,
+      "compressed_member_bytes": 5871,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/english": {
+      "installed_payload_bytes": 54428,
+      "compressed_member_bytes": 49446,
+      "files": 46
+    },
+    "kx47Runtime/models/CharacterNames/NVDA-GPL.txt": {
+      "installed_payload_bytes": 53408,
+      "compressed_member_bytes": 18933,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/holos": {
+      "installed_payload_bytes": 51840,
+      "compressed_member_bytes": 48904,
+      "files": 45
+    },
+    "kx47Runtime/rhvoice_stress.json": {
+      "installed_payload_bytes": 47294,
+      "compressed_member_bytes": 11124,
+      "files": 1
+    },
+    "kx47Runtime/cyrillic_ngrams.json": {
+      "installed_payload_bytes": 46872,
+      "compressed_member_bytes": 17507,
+      "files": 1
+    },
+    "kx47Runtime/preferences.py": {
+      "installed_payload_bytes": 36231,
+      "compressed_member_bytes": 9854,
+      "files": 1
+    },
+    "kx47Runtime/package_manager.py": {
+      "installed_payload_bytes": 27357,
+      "compressed_member_bytes": 8593,
+      "files": 1
+    },
+    "kx47Runtime/models/Holos/voices.npz": {
+      "installed_payload_bytes": 26289,
+      "compressed_member_bytes": 26291,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ay.json": {
+      "installed_payload_bytes": 25199,
+      "compressed_member_bytes": 2369,
+      "files": 1
+    },
+    "kx47Runtime/language_catalog.json": {
+      "installed_payload_bytes": 25019,
+      "compressed_member_bytes": 2872,
+      "files": 1
+    },
+    "kx47Runtime/wide_voice_index.json": {
+      "installed_payload_bytes": 24208,
+      "compressed_member_bytes": 4334,
+      "files": 1
+    },
+    "kx47Runtime/language_catalog.py": {
+      "installed_payload_bytes": 22779,
+      "compressed_member_bytes": 6894,
+      "files": 1
+    },
+    "kx47Runtime/voice_packages.py": {
+      "installed_payload_bytes": 22661,
+      "compressed_member_bytes": 6646,
+      "files": 1
+    },
+    "kx47Runtime/nvda_worker.py": {
+      "installed_payload_bytes": 20259,
+      "compressed_member_bytes": 5143,
+      "files": 1
+    },
+    "kx47Runtime/speech_text.py": {
+      "installed_payload_bytes": 18212,
+      "compressed_member_bytes": 6509,
+      "files": 1
+    },
+    "kx47Runtime/wide_languages.py": {
+      "installed_payload_bytes": 17925,
+      "compressed_member_bytes": 6006,
+      "files": 1
+    },
+    "kx47Runtime/wide_voice.py": {
+      "installed_payload_bytes": 17310,
+      "compressed_member_bytes": 5221,
+      "files": 1
+    },
+    "kx47Runtime/ukrainian_voices.py": {
+      "installed_payload_bytes": 16881,
+      "compressed_member_bytes": 5309,
+      "files": 1
+    },
+    "kx47Runtime/wide_common_helpers.py": {
+      "installed_payload_bytes": 15781,
+      "compressed_member_bytes": 4968,
+      "files": 1
+    },
+    "kx47Runtime/wide_hebrew_niqqud.py": {
+      "installed_payload_bytes": 15521,
+      "compressed_member_bytes": 5403,
+      "files": 1
+    },
+    "kx47Runtime/upgrade_packages.py": {
+      "installed_payload_bytes": 14879,
+      "compressed_member_bytes": 4548,
+      "files": 1
+    },
+    "kx47Runtime/wide_omnivoice_onnx.py": {
+      "installed_payload_bytes": 13633,
+      "compressed_member_bytes": 4702,
+      "files": 1
+    },
+    "kx47Runtime/native_multilingual.py": {
+      "installed_payload_bytes": 13162,
+      "compressed_member_bytes": 4280,
+      "files": 1
+    },
+    "kx47Runtime/wide_mms.py": {
+      "installed_payload_bytes": 12166,
+      "compressed_member_bytes": 4228,
+      "files": 1
+    },
+    "kx47Runtime/converted_voices.py": {
+      "installed_payload_bytes": 11812,
+      "compressed_member_bytes": 4115,
+      "files": 1
+    },
+    "kx47Runtime/omnivoice_duration.py": {
+      "installed_payload_bytes": 11641,
+      "compressed_member_bytes": 4206,
+      "files": 1
+    },
+    "kx47Runtime/voice_assets.py": {
+      "installed_payload_bytes": 11105,
+      "compressed_member_bytes": 3517,
+      "files": 1
+    },
+    "kx47Runtime/models/WordLanguage/MODEL_CARD_UK.md": {
+      "installed_payload_bytes": 9914,
+      "compressed_member_bytes": 3687,
+      "files": 1
+    },
+    "kx47Runtime/native_locale.py": {
+      "installed_payload_bytes": 9579,
+      "compressed_member_bytes": 3251,
+      "files": 1
+    },
+    "doc/uk": {
+      "installed_payload_bytes": 9516,
+      "compressed_member_bytes": 3841,
+      "files": 2
+    },
+    "kx47Runtime/pocket_english.py": {
+      "installed_payload_bytes": 9253,
+      "compressed_member_bytes": 3322,
+      "files": 1
+    },
+    "kx47Runtime/kx47.py": {
+      "installed_payload_bytes": 8813,
+      "compressed_member_bytes": 3329,
+      "files": 1
+    },
+    "kx47Runtime/ukrainian_stress.py": {
+      "installed_payload_bytes": 7989,
+      "compressed_member_bytes": 3220,
+      "files": 1
+    },
+    "kx47Runtime/voice_delivery.py": {
+      "installed_payload_bytes": 7398,
+      "compressed_member_bytes": 2703,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/mni.json": {
+      "installed_payload_bytes": 7336,
+      "compressed_member_bytes": 1878,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/sat.json": {
+      "installed_payload_bytes": 7235,
+      "compressed_member_bytes": 1726,
+      "files": 1
+    },
+    "kx47Runtime/wide_coqui_onnx.py": {
+      "installed_payload_bytes": 7195,
+      "compressed_member_bytes": 2523,
+      "files": 1
+    },
+    "kx47Runtime/models/WideLanguages/Hebrew": {
+      "installed_payload_bytes": 7048,
+      "compressed_member_bytes": 2533,
+      "files": 1
+    },
+    "kx47Runtime/wide_simba.py": {
+      "installed_payload_bytes": 6584,
+      "compressed_member_bytes": 2566,
+      "files": 1
+    },
+    "kx47Runtime/santali_phonemizer.py": {
+      "installed_payload_bytes": 6528,
+      "compressed_member_bytes": 2349,
+      "files": 1
+    },
+    "kx47Runtime/personal_voice.py": {
+      "installed_payload_bytes": 6526,
+      "compressed_member_bytes": 2387,
+      "files": 1
+    },
+    "kx47Runtime/wide_extra_models.py": {
+      "installed_payload_bytes": 6433,
+      "compressed_member_bytes": 2451,
+      "files": 1
+    },
+    "kx47Runtime/wide_extra.py": {
+      "installed_payload_bytes": 6427,
+      "compressed_member_bytes": 2768,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/doi.json": {
+      "installed_payload_bytes": 6371,
+      "compressed_member_bytes": 1392,
+      "files": 1
+    },
+    "kx47Runtime/latin_languages.py": {
+      "installed_payload_bytes": 6366,
+      "compressed_member_bytes": 2601,
+      "files": 1
+    },
+    "kx47Runtime/personal_catalog.py": {
+      "installed_payload_bytes": 5675,
+      "compressed_member_bytes": 2352,
+      "files": 1
+    },
+    "kx47Runtime/wide_number_words.json": {
+      "installed_payload_bytes": 5622,
+      "compressed_member_bytes": 1436,
+      "files": 1
+    },
+    "kx47Runtime/wide_profiles.py": {
+      "installed_payload_bytes": 5527,
+      "compressed_member_bytes": 2277,
+      "files": 1
+    },
+    "kx47Runtime/word_classifier.py": {
+      "installed_payload_bytes": 5413,
+      "compressed_member_bytes": 2153,
+      "files": 1
+    },
+    "synthDrivers/_dordiai_letter_bank.py": {
+      "installed_payload_bytes": 5110,
+      "compressed_member_bytes": 1773,
+      "files": 1
+    },
+    "kx47Runtime/wide_carrier.py": {
+      "installed_payload_bytes": 5054,
+      "compressed_member_bytes": 1757,
+      "files": 1
+    },
+    "kx47Runtime/wide_numbers.py": {
+      "installed_payload_bytes": 5030,
+      "compressed_member_bytes": 1861,
+      "files": 1
+    },
+    "kx47Runtime/native_lookahead.py": {
+      "installed_payload_bytes": 4962,
+      "compressed_member_bytes": 1575,
+      "files": 1
+    },
+    "kx47Runtime/language_routing.py": {
+      "installed_payload_bytes": 4785,
+      "compressed_member_bytes": 1832,
+      "files": 1
+    },
+    "kx47Runtime/wide_hebrew.py": {
+      "installed_payload_bytes": 4587,
+      "compressed_member_bytes": 1918,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/mai.json": {
+      "installed_payload_bytes": 4296,
+      "compressed_member_bytes": 1171,
+      "files": 1
+    },
+    "kx47Runtime/models/Piper/en_US-ryan-low.onnx.json": {
+      "installed_payload_bytes": 4165,
+      "compressed_member_bytes": 989,
+      "files": 1
+    },
+    "kx47Runtime/models/Piper/en_US-amy-low.onnx.json": {
+      "installed_payload_bytes": 4164,
+      "compressed_member_bytes": 989,
+      "files": 1
+    },
+    "kx47Runtime/spelling_audio.py": {
+      "installed_payload_bytes": 3832,
+      "compressed_member_bytes": 1569,
+      "files": 1
+    },
+    "kx47Runtime/rhvoice_carrier.py": {
+      "installed_payload_bytes": 3653,
+      "compressed_member_bytes": 1463,
+      "files": 1
+    },
+    "kx47Runtime/wide_warmup.py": {
+      "installed_payload_bytes": 3550,
+      "compressed_member_bytes": 1287,
+      "files": 1
+    },
+    "kx47Runtime/voice_controls.py": {
+      "installed_payload_bytes": 3468,
+      "compressed_member_bytes": 1251,
+      "files": 1
+    },
+    "kx47Runtime/character_names.py": {
+      "installed_payload_bytes": 3447,
+      "compressed_member_bytes": 1337,
+      "files": 1
+    },
+    "kx47Runtime/speech_tempo.py": {
+      "installed_payload_bytes": 3325,
+      "compressed_member_bytes": 1240,
+      "files": 1
+    },
+    "kx47Runtime/english_phonetics.py": {
+      "installed_payload_bytes": 3306,
+      "compressed_member_bytes": 1523,
+      "files": 1
+    },
+    "synthDrivers/_dordiai_audio.py": {
+      "installed_payload_bytes": 3204,
+      "compressed_member_bytes": 1210,
+      "files": 1
+    },
+    "kx47Runtime/wide_common_carrier.py": {
+      "installed_payload_bytes": 3092,
+      "compressed_member_bytes": 1324,
+      "files": 1
+    },
+    "kx47Runtime/wide_phonetics.py": {
+      "installed_payload_bytes": 2963,
+      "compressed_member_bytes": 1325,
+      "files": 1
+    },
+    "kx47Runtime/download_models.py": {
+      "installed_payload_bytes": 2829,
+      "compressed_member_bytes": 1456,
+      "files": 1
+    },
+    "kx47Runtime/navigation_cache.py": {
+      "installed_payload_bytes": 2765,
+      "compressed_member_bytes": 1228,
+      "files": 1
+    },
+    "kx47Runtime/models/Holos/holos_onnx.json": {
+      "installed_payload_bytes": 2725,
+      "compressed_member_bytes": 942,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/brx.json": {
+      "installed_payload_bytes": 2706,
+      "compressed_member_bytes": 880,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/dz.json": {
+      "installed_payload_bytes": 2610,
+      "compressed_member_bytes": 870,
+      "files": 1
+    },
+    "kx47Runtime/clean_voice_audio.py": {
+      "installed_payload_bytes": 2576,
+      "compressed_member_bytes": 1058,
+      "files": 1
+    },
+    "kx47Runtime/reference_voices.py": {
+      "installed_payload_bytes": 2556,
+      "compressed_member_bytes": 1074,
+      "files": 1
+    },
+    "kx47Runtime/wide_breton.py": {
+      "installed_payload_bytes": 2538,
+      "compressed_member_bytes": 1204,
+      "files": 1
+    },
+    "kx47Runtime/session_control.py": {
+      "installed_payload_bytes": 2515,
+      "compressed_member_bytes": 957,
+      "files": 1
+    },
+    "kx47Runtime/experiment_letters.py": {
+      "installed_payload_bytes": 2498,
+      "compressed_member_bytes": 1145,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/spelling_alignment.json": {
+      "installed_payload_bytes": 2411,
+      "compressed_member_bytes": 404,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ln.json": {
+      "installed_payload_bytes": 2392,
+      "compressed_member_bytes": 845,
+      "files": 1
+    },
+    "installTasks.py": {
+      "installed_payload_bytes": 2347,
+      "compressed_member_bytes": 920,
+      "files": 1
+    },
+    "kx47Runtime/voice_catalog.py": {
+      "installed_payload_bytes": 2331,
+      "compressed_member_bytes": 854,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/kab.json": {
+      "installed_payload_bytes": 2282,
+      "compressed_member_bytes": 855,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ks.json": {
+      "installed_payload_bytes": 2254,
+      "compressed_member_bytes": 828,
+      "files": 1
+    },
+    "worldVoiceBridge/DordiaiVoices": {
+      "installed_payload_bytes": 2218,
+      "compressed_member_bytes": 892,
+      "files": 2
+    },
+    "kx47Runtime/models/CharacterNames/ff.json": {
+      "installed_payload_bytes": 2131,
+      "compressed_member_bytes": 815,
+      "files": 1
+    },
+    "kx47Runtime/voice_policy.py": {
+      "installed_payload_bytes": 2049,
+      "compressed_member_bytes": 970,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/CLDR-Unicode-3.0.txt": {
+      "installed_payload_bytes": 2033,
+      "compressed_member_bytes": 1093,
+      "files": 1
+    },
+    "kx47Runtime/models/english_voice_profiles.json": {
+      "installed_payload_bytes": 2002,
+      "compressed_member_bytes": 513,
+      "files": 1
+    },
+    "kx47Runtime/language_codes.py": {
+      "installed_payload_bytes": 1981,
+      "compressed_member_bytes": 1046,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/sg.json": {
+      "installed_payload_bytes": 1968,
+      "compressed_member_bytes": 772,
+      "files": 1
+    },
+    "kx47Runtime/wide_loading.py": {
+      "installed_payload_bytes": 1958,
+      "compressed_member_bytes": 740,
+      "files": 1
+    },
+    "doc/en": {
+      "installed_payload_bytes": 1857,
+      "compressed_member_bytes": 933,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/mg.json": {
+      "installed_payload_bytes": 1834,
+      "compressed_member_bytes": 748,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/bm.json": {
+      "installed_payload_bytes": 1828,
+      "compressed_member_bytes": 739,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/rn.json": {
+      "installed_payload_bytes": 1802,
+      "compressed_member_bytes": 721,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/nd.json": {
+      "installed_payload_bytes": 1784,
+      "compressed_member_bytes": 722,
+      "files": 1
+    },
+    "kx47Runtime/streaming_resample.py": {
+      "installed_payload_bytes": 1770,
+      "compressed_member_bytes": 711,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/sn.json": {
+      "installed_payload_bytes": 1766,
+      "compressed_member_bytes": 715,
+      "files": 1
+    },
+    "kx47Runtime/wide_japanese.py": {
+      "installed_payload_bytes": 1758,
+      "compressed_member_bytes": 727,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/st.json": {
+      "installed_payload_bytes": 1730,
+      "compressed_member_bytes": 712,
+      "files": 1
+    },
+    "kx47Runtime/wide_nordic.py": {
+      "installed_payload_bytes": 1678,
+      "compressed_member_bytes": 881,
+      "files": 1
+    },
+    "globalPlugins/dordiaiMainPreferences.py": {
+      "installed_payload_bytes": 1604,
+      "compressed_member_bytes": 747,
+      "files": 1
+    },
+    "globalPlugins/dordiaiLanguages.py": {
+      "installed_payload_bytes": 1576,
+      "compressed_member_bytes": 748,
+      "files": 1
+    },
+    "kx47Runtime/piper_family_sessions.py": {
+      "installed_payload_bytes": 1565,
+      "compressed_member_bytes": 674,
+      "files": 1
+    },
+    "kx47Runtime/latin_phonetics.py": {
+      "installed_payload_bytes": 1453,
+      "compressed_member_bytes": 733,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/catalog.json": {
+      "installed_payload_bytes": 1331,
+      "compressed_member_bytes": 589,
+      "files": 1
+    },
+    "kx47Runtime/wide_common.py": {
+      "installed_payload_bytes": 1169,
+      "compressed_member_bytes": 593,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/adam.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/agnieszka.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/alex.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/alice_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1082,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/astra_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/bella.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1093,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/brian.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1093,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/brian_studio.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1084,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/brianna.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/callum_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1090,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/charlie_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/chris.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1086,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/claude_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1085,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/daniel.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/daniel_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1092,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/david.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1092,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/elis.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/en.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1094,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/en_male.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1085,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/gemini_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1093,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/george.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1085,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/george_unpacked.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1086,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/gpt_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1086,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/grok_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1084,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/harry.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/hazel.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1092,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/keeper.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1091,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/laura_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1096,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/laura_unpacked.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1086,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/lian.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/liza.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1094,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/liza_talk.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/mark.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/mykola.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/oksana.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/oleksii.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1091,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/oleksii_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1090,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/oleksii_day2.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1095,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/oleksii_unpacked.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/olena.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1088,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/sara.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/sara_archive.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1093,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/studio_day1.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1087,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/viktoriia.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1091,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/will.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1083,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/yevhen.npy": {
+      "installed_payload_bytes": 1152,
+      "compressed_member_bytes": 1089,
+      "files": 1
+    },
+    "kx47Runtime/models/OpenVoiceV2/LICENSE": {
+      "installed_payload_bytes": 1057,
+      "compressed_member_bytes": 623,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/dyu.json": {
+      "installed_payload_bytes": 1043,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/gil.json": {
+      "installed_payload_bytes": 1043,
+      "compressed_member_bytes": 465,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/mos.json": {
+      "installed_payload_bytes": 1043,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/tpi.json": {
+      "installed_payload_bytes": 1043,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/dv.json": {
+      "installed_payload_bytes": 1042,
+      "compressed_member_bytes": 463,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/fj.json": {
+      "installed_payload_bytes": 1042,
+      "compressed_member_bytes": 465,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ny.json": {
+      "installed_payload_bytes": 1042,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/sm.json": {
+      "installed_payload_bytes": 1042,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/ts.json": {
+      "installed_payload_bytes": 1042,
+      "compressed_member_bytes": 464,
+      "files": 1
+    },
+    "kx47Runtime/reference_prosody.py": {
+      "installed_payload_bytes": 1034,
+      "compressed_member_bytes": 485,
+      "files": 1
+    },
+    "kx47Runtime/personal_orthography.py": {
+      "installed_payload_bytes": 992,
+      "compressed_member_bytes": 531,
+      "files": 1
+    },
+    "kx47Runtime/russian_phonetics.py": {
+      "installed_payload_bytes": 728,
+      "compressed_member_bytes": 438,
+      "files": 1
+    },
+    "kx47Runtime/models/CharacterNames/SOURCE-NOTICE.txt": {
+      "installed_payload_bytes": 675,
+      "compressed_member_bytes": 406,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/reference_prosody.json": {
+      "installed_payload_bytes": 462,
+      "compressed_member_bytes": 224,
+      "files": 1
+    },
+    "manifest.ini": {
+      "installed_payload_bytes": 417,
+      "compressed_member_bytes": 283,
+      "files": 1
+    },
+    "kx47Runtime/models/Piper/MODEL_CARD": {
+      "installed_payload_bytes": 308,
+      "compressed_member_bytes": 235,
+      "files": 1
+    },
+    "kx47Runtime/models/Holos/offline-optimized": {
+      "installed_payload_bytes": 83,
+      "compressed_member_bytes": 83,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/ukrainian_articulation.json": {
+      "installed_payload_bytes": 71,
+      "compressed_member_bytes": 55,
+      "files": 1
+    },
+    "kx47Runtime/requirements.txt": {
+      "installed_payload_bytes": 57,
+      "compressed_member_bytes": 57,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/voice_aliases.json": {
+      "installed_payload_bytes": 23,
+      "compressed_member_bytes": 25,
+      "files": 1
+    },
+    "kx47Runtime/models/voices/delivery_equalizers.json": {
+      "installed_payload_bytes": 3,
+      "compressed_member_bytes": 5,
+      "files": 1
+    }
+  },
+  "per_voice_owned_paths": {
+    "adam": {
+      "installed_payload_bytes": 14806135,
+      "compressed_member_bytes": 12788783,
+      "files": 180
+    },
+    "agnieszka": {
+      "installed_payload_bytes": 14948775,
+      "compressed_member_bytes": 12960578,
+      "files": 178
+    },
+    "alex": {
+      "installed_payload_bytes": 14988026,
+      "compressed_member_bytes": 12987531,
+      "files": 179
+    },
+    "alice_day1": {
+      "installed_payload_bytes": 15016197,
+      "compressed_member_bytes": 13031766,
+      "files": 180
+    },
+    "astra_day2": {
+      "installed_payload_bytes": 15090141,
+      "compressed_member_bytes": 13015561,
+      "files": 179
+    },
+    "bella": {
+      "installed_payload_bytes": 14880199,
+      "compressed_member_bytes": 12826135,
+      "files": 179
+    },
+    "brian": {
+      "installed_payload_bytes": 14921404,
+      "compressed_member_bytes": 12932481,
+      "files": 179
+    },
+    "brian_studio": {
+      "installed_payload_bytes": 15128300,
+      "compressed_member_bytes": 13212163,
+      "files": 180
+    },
+    "brianna": {
+      "installed_payload_bytes": 15202493,
+      "compressed_member_bytes": 13392966,
+      "files": 179
+    },
+    "callum_day1": {
+      "installed_payload_bytes": 14967333,
+      "compressed_member_bytes": 13009361,
+      "files": 179
+    },
+    "charlie_day1": {
+      "installed_payload_bytes": 15314750,
+      "compressed_member_bytes": 13202048,
+      "files": 178
+    },
+    "chris": {
+      "installed_payload_bytes": 14724208,
+      "compressed_member_bytes": 12653453,
+      "files": 179
+    },
+    "claude_day2": {
+      "installed_payload_bytes": 15683223,
+      "compressed_member_bytes": 13203407,
+      "files": 178
+    },
+    "daniel": {
+      "installed_payload_bytes": 15316972,
+      "compressed_member_bytes": 13237751,
+      "files": 180
+    },
+    "daniel_day1": {
+      "installed_payload_bytes": 15044412,
+      "compressed_member_bytes": 13009931,
+      "files": 180
+    },
+    "david": {
+      "installed_payload_bytes": 14884020,
+      "compressed_member_bytes": 12918788,
+      "files": 180
+    },
+    "elis": {
+      "installed_payload_bytes": 14877239,
+      "compressed_member_bytes": 12916635,
+      "files": 179
+    },
+    "gemini_day2": {
+      "installed_payload_bytes": 13869828,
+      "compressed_member_bytes": 11533156,
+      "files": 179
+    },
+    "george": {
+      "installed_payload_bytes": 15543824,
+      "compressed_member_bytes": 13289497,
+      "files": 181
+    },
+    "george_unpacked": {
+      "installed_payload_bytes": 14900849,
+      "compressed_member_bytes": 12903641,
+      "files": 179
+    },
+    "gpt_day2": {
+      "installed_payload_bytes": 13759381,
+      "compressed_member_bytes": 11936484,
+      "files": 179
+    },
+    "grok_day2": {
+      "installed_payload_bytes": 13314592,
+      "compressed_member_bytes": 11449905,
+      "files": 179
+    },
+    "harry": {
+      "installed_payload_bytes": 14837237,
+      "compressed_member_bytes": 12838492,
+      "files": 179
+    },
+    "hazel": {
+      "installed_payload_bytes": 15184166,
+      "compressed_member_bytes": 13244012,
+      "files": 179
+    },
+    "keeper": {
+      "installed_payload_bytes": 16414680,
+      "compressed_member_bytes": 13752136,
+      "files": 179
+    },
+    "laura_day1": {
+      "installed_payload_bytes": 15505924,
+      "compressed_member_bytes": 13225784,
+      "files": 179
+    },
+    "laura_unpacked": {
+      "installed_payload_bytes": 15071261,
+      "compressed_member_bytes": 12973503,
+      "files": 179
+    },
+    "lian": {
+      "installed_payload_bytes": 14774871,
+      "compressed_member_bytes": 12758813,
+      "files": 179
+    },
+    "liza": {
+      "installed_payload_bytes": 15594611,
+      "compressed_member_bytes": 13505621,
+      "files": 179
+    },
+    "liza_talk": {
+      "installed_payload_bytes": 15261534,
+      "compressed_member_bytes": 13354084,
+      "files": 178
+    },
+    "mark": {
+      "installed_payload_bytes": 15076849,
+      "compressed_member_bytes": 13167355,
+      "files": 180
+    },
+    "mykola": {
+      "installed_payload_bytes": 13058985,
+      "compressed_member_bytes": 11186563,
+      "files": 180
+    },
+    "oksana": {
+      "installed_payload_bytes": 14896973,
+      "compressed_member_bytes": 12950231,
+      "files": 179
+    },
+    "oleksii": {
+      "installed_payload_bytes": 15401684,
+      "compressed_member_bytes": 13388480,
+      "files": 179
+    },
+    "oleksii_day1": {
+      "installed_payload_bytes": 14856988,
+      "compressed_member_bytes": 12946633,
+      "files": 180
+    },
+    "oleksii_day2": {
+      "installed_payload_bytes": 15188549,
+      "compressed_member_bytes": 12809912,
+      "files": 177
+    },
+    "oleksii_unpacked": {
+      "installed_payload_bytes": 15305549,
+      "compressed_member_bytes": 13286866,
+      "files": 180
+    },
+    "olena": {
+      "installed_payload_bytes": 13725098,
+      "compressed_member_bytes": 11911116,
+      "files": 179
+    },
+    "sara": {
+      "installed_payload_bytes": 15666045,
+      "compressed_member_bytes": 13201327,
+      "files": 179
+    },
+    "sara_archive": {
+      "installed_payload_bytes": 15071419,
+      "compressed_member_bytes": 13146143,
+      "files": 179
+    },
+    "studio_day1": {
+      "installed_payload_bytes": 15141954,
+      "compressed_member_bytes": 13108489,
+      "files": 179
+    },
+    "veren": {
+      "installed_payload_bytes": 14692801,
+      "compressed_member_bytes": 12721959,
+      "files": 176
+    },
+    "viktoriia": {
+      "installed_payload_bytes": 14337941,
+      "compressed_member_bytes": 12369132,
+      "files": 179
+    },
+    "will": {
+      "installed_payload_bytes": 14908671,
+      "compressed_member_bytes": 12959195,
+      "files": 179
+    },
+    "yevhen": {
+      "installed_payload_bytes": 14922642,
+      "compressed_member_bytes": 12909415,
+      "files": 179
+    }
+  },
+  "shared_voice_data_bytes": 15166934,
+  "exact_duplicate_groups": 515,
+  "redundant_payload_bytes": 17488453,
+  "redundant_payload_fraction": 0.008229715644031261,
+  "redundant_compressed_member_bytes": 13968725,
+  "largest_duplicate_groups": [
+    {
+      "sha256": "0d747c698ce27d9eb4f71704c650f50cd1ce8b22dc4d0ada3933c161928cc904",
+      "size_bytes": 78188,
+      "copies": 2,
+      "redundant_payload_bytes": 78188,
+      "redundant_compressed_member_bytes": 73143,
+      "paths": [
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/3ee576346604cb56301fb116.npy",
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/cf7d875eefe0d861a4421642.npy"
+      ]
+    },
+    {
+      "sha256": "597f0554efeb6bc2b99d14addd4ce71400331c3496e2a6b9f99a69ce50da9002",
+      "size_bytes": 77304,
+      "copies": 2,
+      "redundant_payload_bytes": 77304,
+      "redundant_compressed_member_bytes": 72170,
+      "paths": [
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/7f723661bc59bbba95cce363.npy",
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/d33467e1d81f13abc1398730.npy"
+      ]
+    },
+    {
+      "sha256": "5364b4c59b9d136c896e983ab26777d65e6fa39c95679920ea78009812c411bc",
+      "size_bytes": 76424,
+      "copies": 2,
+      "redundant_payload_bytes": 76424,
+      "redundant_compressed_member_bytes": 71426,
+      "paths": [
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/7e02eb55767e406bbec7b434.npy",
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/af68ad854b3b882af64a325a.npy"
+      ]
+    },
+    {
+      "sha256": "f6f1da4db84209b8bc22e97db73bff4f9d07373ebc9935bc3237825cc65b4d2e",
+      "size_bytes": 71132,
+      "copies": 2,
+      "redundant_payload_bytes": 71132,
+      "redundant_compressed_member_bytes": 66190,
+      "paths": [
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/701ff8141d9479b530a6e424.npy",
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/f9e6a45ec8a9fc8ac228e625.npy"
+      ]
+    },
+    {
+      "sha256": "022fda5684d620f2efeb64822115e800b27bfcbd12fcb8c8dad4030a298beb75",
+      "size_bytes": 69808,
+      "copies": 2,
+      "redundant_payload_bytes": 69808,
+      "redundant_compressed_member_bytes": 65200,
+      "paths": [
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/4cb5cd55dfb02f72874170ea.npy",
+        "kx47Runtime/models/voices/classmate_locales/letter_sources/6c6477da0b523c0771e96279.npy"
+      ]
+    },
+    {
+      "sha256": "17d68131ae35e245795c452aa89a3b942c79dd7e44def29792f32bf85d2e773b",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 34754,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/adam/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/adam/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "5b3897caa17735e71229c921d7f9e0c042008cb7f8d02b592777caaa7cb29360",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 34007,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/agnieszka/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/agnieszka/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "bc7763d6607e2efb6a0b5b7086108be3b5a156feedd8eec541cd8b392c3eecd0",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36109,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/alex/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/alex/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "85d96fe457be2cfe46c6712535d48bc1cd582758607dbc0ef4ff9ccec9c95fb4",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 35827,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/alice_day1/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/alice_day1/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "303ffab55199c4c1c1f984f1ba53d382c9f66cc7859ade475bfcfffacc19db98",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36201,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/astra_day2/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/astra_day2/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "753831264b861fc1a54b1a5fe86d01a58ad8c0493955163709bda27a343c5e28",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 34344,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/bella/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/bella/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "92c6f5dac4695becfa5fb4265b0d94ec204b6acd2fbdd26fe3cb226bf0db9c09",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36733,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/brian/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/brian/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "409e5c3955e09399d19bb3d71c4493fed6062466c3a846b69c7eef680abf677b",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 37173,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/brian_studio/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/brian_studio/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "8803377d1dea108a9daaf8a9b4ce91c130905b7dc2cd02d469e97ad46be4a786",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36996,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/brianna/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/brianna/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "d60be293767da5d9fd1b7a95470af99593f60600f1f4a4bf94be9b16b026c6ed",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36457,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/callum_day1/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/callum_day1/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "00edbfd4bc58e1698afd3ace91a00ecc80da8ffa55a1acc6f74c2266fa3ffdad",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36093,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/charlie_day1/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/charlie_day1/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "3ee5502b4905f9309ad0a7e23b4ba977baf9caaa82b03ef3d67e1e446f4f7f8f",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 34705,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/chris/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/chris/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "dc36c78af2e9809f6b79bad044cf49f341d56006e6d9d6143066eb3e9adc38a5",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36632,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/claude_day2/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/claude_day2/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "2f4197ca7c117a8642e03bdb170891065d9d30fc7cb3c37ae4ca537166d17a8d",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 36812,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/daniel/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/daniel/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    },
+    {
+      "sha256": "9a639ab8835efeddb4eacf0b49069b676ab248b1ab0f3b687f84bb82ffee426a",
+      "size_bytes": 44924,
+      "copies": 2,
+      "redundant_payload_bytes": 44924,
+      "redundant_compressed_member_bytes": 35788,
+      "paths": [
+        "kx47Runtime/models/voices/navigation/daniel_day1/772432a78577d9dc210f51cc.wav",
+        "kx47Runtime/models/voices/navigation/daniel_day1/98ca2b3cf7810e0134d3bdbf.wav"
+      ]
+    }
+  ],
+  "duplicate_detail_limit": 20,
+  "graph_format_alternatives": [
+    {
+      "onnx": "kx47Runtime/models/PocketTTS/en/flow_lm_flow.onnx",
+      "ort": "kx47Runtime/models/PocketTTS/en/flow_lm_flow.ort",
+      "onnx_payload_bytes": 3402841,
+      "onnx_compressed_member_bytes": 3148016,
+      "exact_byte_duplicates": false
+    },
+    {
+      "onnx": "kx47Runtime/models/PocketTTS/en/flow_lm_main_int8.onnx",
+      "ort": "kx47Runtime/models/PocketTTS/en/flow_lm_main_int8.ort",
+      "onnx_payload_bytes": 13321868,
+      "onnx_compressed_member_bytes": 12014758,
+      "exact_byte_duplicates": false
+    },
+    {
+      "onnx": "kx47Runtime/models/PocketTTS/en/mimi_decoder.onnx",
+      "ort": "kx47Runtime/models/PocketTTS/en/mimi_decoder.ort",
+      "onnx_payload_bytes": 10806594,
+      "onnx_compressed_member_bytes": 9832924,
+      "exact_byte_duplicates": false
+    },
+    {
+      "onnx": "kx47Runtime/models/PocketTTS/en/text_conditioner.onnx",
+      "ort": "kx47Runtime/models/PocketTTS/en/text_conditioner.ort",
+      "onnx_payload_bytes": 8194294,
+      "onnx_compressed_member_bytes": 7620303,
+      "exact_byte_duplicates": false
+    }
+  ],
+  "decisions": [
+    "No core or runtime file changed by audit.",
+    "Exact duplicates require preserving every referenced path or adding a tested content-addressed resolver; direct deletion is unsafe.",
+    "ONNX/ORT alternatives are not identical weights; current English loader tries ORT and falls back to ONNX, so dropping a format needs actual Windows compatibility proof.",
+    "Prepared voice banks trade disk space for fast keyboard/navigation playback; do not remove them to claim an unmeasured latency improvement.",
+    "Measure process working set and peak separately on Windows; ZIP or installed bytes do not establish RAM usage."
+  ]
+}

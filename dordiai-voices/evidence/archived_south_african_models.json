@@ -114,5 +114,14 @@
       "declared_license": "CC-BY-NC-ND-3.0-ZA"
     }
   ],
-  "conclusion": "Historical target voice filenames are verified, but this search recovered no model binaries or verified weight licenses. Do not mark Southern Ndebele, Swati or Venda supported from directory listings, engine source or corpora alone. Northern Ndebele is a distinct language and its separately exported Coqui model is covered by evidence/ndebele_export.json."
+  "conclusion": "Historical target voice filenames are verified, but this search recovered no model binaries or verified weight licenses. Do not mark Southern Ndebele, Swati or Venda supported from directory listings, engine source or corpora alone. Northern Ndebele is a distinct language and its separately exported Coqui model is covered by evidence/ndebele_export.json.",
+  "exact_cdx_without_status_filter": {
+    "filenames": [
+      "Voice.Lwazi.Nbl.1.2.zip",
+      "Voice.Lwazi.Ssw.1.2.zip",
+      "Voice.Lwazi.Ven.1.2.zip"
+    ],
+    "result_per_file": [],
+    "finding": "All three exact URL CDX queries returned empty arrays without a status filter; no HTTP302/206 capture found by those queries."
+  }
 }

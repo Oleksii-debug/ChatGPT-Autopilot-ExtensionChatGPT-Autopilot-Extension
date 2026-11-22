@@ -1,0 +1,35 @@
+{
+  "format": "dordiai-native-package-roundtrip",
+  "format_version": 1,
+  "pack": "dordiai-rasa-brx-1.0.0.zip",
+  "pack_sha256": "61c9420ff02df15f458dab56230926f951191eb10e43a0ac7ca910228f2adefa",
+  "minimum_core_version": "0.13.1-dev.3",
+  "rejected_core_versions": [
+    "0.13.1-dev.1",
+    "0.13.1-dev.2"
+  ],
+  "files_installed": 6,
+  "actual_pcm_from_installed_model": true,
+  "audio_path": "dist/runtime-probes/rasa-brx-installed.wav",
+  "audio_seconds": 2.9226666666666667,
+  "sample_rate": 24000,
+  "source_shape": [
+    1,
+    256,
+    1
+  ],
+  "source_dtype": "float32",
+  "source_norm": 10.7918701171875,
+  "onnxruntime": "1.27.0",
+  "documented_speaker": "BRX_F",
+  "documented_style": "ALEXA",
+  "clean_uninstall": true,
+  "native_pronunciation_verified": false,
+  "navigation_verified": false,
+  "windows_nvda_verified": false,
+  "complete_product": false,
+  "earlier_render_seconds_excluding_load": 1.197888991999207,
+  "render_seconds_including_load": 1.6710920359982993,
+  "load_seconds": 0.8542896229992039,
+  "render_seconds_excluding_load": 0.8168024129990954
+}

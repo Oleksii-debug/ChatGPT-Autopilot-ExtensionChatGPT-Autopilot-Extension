@@ -15,6 +15,7 @@ from threading import Thread
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from session_control import RequestCancellation, SynthesisCancelled
 from voice_policy import require_voice_allowed
+from error_diagnostics import safe_error
 
 
 OUTPUT_RATE = 24000
@@ -364,13 +365,14 @@ def main():
                 if not isinstance(error, SynthesisCancelled):
                     # Keep diagnostics out of the JSON audio pipe. The engine
                     # probe retains this stream for actionable model failures.
-                    traceback.print_exc(file=sys.stderr)
+                    print(json.dumps(safe_error(error)), file=sys.stderr)
                 try:
                     close_stream()
                 except Exception as cleanup_error:
                     print(f"Speech stream cleanup failed: {type(cleanup_error).__name__}", file=sys.stderr)
                 cancellations.release(cancellation)
-                response = {"finished": True} if isinstance(error, SynthesisCancelled) else {"error": type(error).__name__}
+                response = {"finished": True} if isinstance(error, SynthesisCancelled) else {
+                    "error": type(error).__name__, "diagnostics": safe_error(error)}
             replies.write(json.dumps(response) + "\n")
             replies.flush()
         close_stream()

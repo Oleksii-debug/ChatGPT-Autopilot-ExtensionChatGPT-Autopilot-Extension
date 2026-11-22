@@ -56,13 +56,52 @@ def save_group(root, group, packages, merge_packages=False, **details):
         merged = {row["id"]: row for row in result["groups"].get(group, {}).get("packages", [])}
         merged.update({row["id"]: row for row in packages})
         packages = list(merged.values())
-    result["groups"][group] = dict(details, minimum_core_version=MINIMUM_CORE_VERSION, packages=packages,
+    minimum = details.pop("minimum_core_version", MINIMUM_CORE_VERSION)
+    maximum_required = max((row.get("minimum_core_version", minimum) for row in packages),
+                           key=package_manager._version, default=minimum)
+    result["groups"][group] = dict(details, minimum_core_version=minimum, packages=packages,
+                                  required_core_version_for_all_packages=maximum_required,
                                   package_count=len(packages), download_bytes=sum(x["size_bytes"] for x in packages),
                                   installed_payload_bytes=sum(x["installed_bytes"] for x in packages))
     temporary = path.with_suffix(".json.part")
     temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
     return result["groups"][group]
+
+
+def write_catalogue(root=ROOT, output=None):
+    """Derive the optional catalogue from actual archive manifests, not guesses."""
+    root, output = Path(root), Path(output or Path(root) / "dist/language-packs")
+    summary = json.loads((root / "evidence/new_resource_pack_summary.json").read_text(encoding="utf-8"))
+    entries, inactive, seen = [], [], set()
+    fields = ("id", "version", "minimum_core_version", "languages", "engine_ids", "dependencies",
+              "dependency_versions", "license", "experimental", "quality_validation", "provenance")
+    for group in summary["groups"].values():
+        for record in group["packages"]:
+            archive = output / record["filename"]
+            manifest = package_manager.inspect_pack(archive)
+            if manifest["id"] != record["id"] or manifest["id"] in seen:
+                raise ValueError("Archive identity differs from summary or is duplicated: " + str(archive))
+            seen.add(manifest["id"])
+            if archive.stat().st_size != record["size_bytes"]:
+                raise ValueError("Archive size differs from summary: " + str(archive))
+            if digest(archive) != record["sha256"]:
+                raise ValueError("Archive checksum differs from summary: " + str(archive))
+            if record.get("distributable_catalogue_entry", True) is False:
+                inactive.append(record["filename"])
+                continue
+            entry = {key: manifest[key] for key in fields if key in manifest}
+            entry.update(name_uk=manifest["name"], filename=record["filename"],
+                         size_bytes=record["size_bytes"], sha256=record["sha256"], default_installation=False)
+            entries.append(entry)
+    result = {"format": "dordiai-opt-in-resource-catalogue", "format_version": 1,
+              "minimum_core_version": min((row["minimum_core_version"] for row in entries),
+                                          key=package_manager._version),
+              "entries": entries, "entry_count": len(entries), "inactive_research_archives": inactive,
+              "published": False, "full_pronunciation_or_nvda_acceptance": False}
+    path = root / "evidence/new_resource_catalog.json"
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return result
 
 
 def build_mms_packs(root=ROOT, output=None, workers=2):
@@ -134,9 +173,11 @@ def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh
             if proof["graph_sha256"] != model_hash or proof["source_identity_sha256"] != source_hash:
                 raise ValueError("Simba model changed after native preparation: " + code)
             license_name, provenance = "CC-BY-NC-4.0 MMS-derived; preserve included upstream notices", runtime["provenance"]
-        elif runtime.get("format") == "dordiai-coqui-onnx-v1":
+        elif runtime.get("format") in {"dordiai-coqui-onnx-v1", "dordiai-matcha-onnx-v1"}:
             if runtime["model_sha256"] != model_hash or runtime["source_identity"]["source_sha256"] != source_hash:
-                raise ValueError("Coqui model changed after native preparation: " + code)
+                raise ValueError("Native model changed after preparation: " + code)
+            if "config_sha256" in runtime and runtime["config_sha256"] != digest(directory / "config.json"):
+                raise ValueError("Native frontend changed after preparation: " + code)
             license_name = runtime["license"]
             provenance = {key: runtime[key] for key in ("repo_id", "revision", "iso_code")}
         elif code == "sat":
@@ -146,21 +187,31 @@ def build_extra_packs(root=ROOT, output=None, workers=2, codes=("sat", "st", "xh
             raise ValueError("Unrecognized prepared native model format: " + code)
         names = [p.name for p in directory.iterdir() if p.is_file() and p.suffix != ".wav"
                  and p.name not in {"native-probe.json", "runtime-probe.json"}]
+        if runtime.get("format") == "dordiai-matcha-onnx-v1":
+            names = ["model.onnx", "config.json", "runtime_config.json", "source.npy", "export_provenance.json",
+                     "NOTICE.txt", "LICENSE-BOLBOSH.txt", "LICENSE-NORMALIZER.txt", "UPSTREAM-README.md"]
         if not {"model.onnx", "config.json", "source.npy", "NOTICE.txt"} <= set(names):
             raise ValueError("Missing native extra runtime resource: " + code)
         identity = "extra-" + code
+        minimum_core = runtime.get("minimum_core_version", MINIMUM_CORE_VERSION)
         extra = {"license": license_name, "experimental": True,
                  "provenance": provenance, "model_sha256": model_hash, "source_sha256": source_hash,
                  "quality_validation": {"actual_native_cpu_onnx_verified": True,
                      "native_pronunciation_verified": False, "navigation_verified": False, "windows_nvda_verified": False}}
+        if runtime.get("format") == "dordiai-matcha-onnx-v1":
+            extra.update(unsupported_native_characters=runtime["unsupported_native_characters"],
+                         unsupported_policy=runtime["unsupported_policy"],
+                         text_synthesis_only=True,
+                         user_notice="Експериментальна кашмірська модель: непідтримані символи явно відхиляються або передаються встановленому кашмірському альтернативному рушію.")
         with selected_files(directory, names) as stage:
             record = create_resource_pack(stage, output / f"dordiai-{identity}-{PACK_VERSION}.zip",
                                           prefix="kx47Runtime/models/ExtraLanguages/" + code, identity=identity,
                                           name="Нейронний мовний пакет — " + labels.get(code, code),
-                                          version=PACK_VERSION, minimum_core_version=MINIMUM_CORE_VERSION,
+                                          version=PACK_VERSION, minimum_core_version=minimum_core,
                                           languages=[code], engine_ids=["extra-onnx"], metadata_extra=extra)
         record.update(id=identity, code=code, backend="extra-onnx", license=license_name,
                       model_sha256=model_hash, source_sha256=source_hash, experimental=True,
+                      minimum_core_version=minimum_core,
                       native_pronunciation_verified=False, windows_nvda_verified=False)
         print(f"Built {identity}: {record['size_bytes']:,} bytes", flush=True)
         return record
@@ -239,26 +290,72 @@ def build_omni_packs(root=ROOT, output=None, references_only=False):
                       preparation_encoder_excluded_bytes=(directory / "encoder.fp32.onnx").stat().st_size)
 
 
+def build_rasa_pack(root=ROOT, output=None):
+    root, output = Path(root), Path(output or Path(root) / "dist/language-packs")
+    directory = root / "model-packs/rasa/kx47Runtime/models/SharedRasaONNX"
+    configuration = json.loads((directory / "config.json").read_text(encoding="utf-8"))
+    if configuration.get("format") != "dordiai-rasa-onnx-v1":
+        raise ValueError("Unknown prepared Rasa format")
+    proof = configuration["source_identity"]["brx"]
+    source = configuration["provenance"]
+    expected = {"model.onnx": proof["model_sha256"], "tokens.txt": proof["tokens_sha256"],
+                "references/brx/source.npy": proof["source_sha256"]}
+    if not proof["finite"] or proof["samples"] <= 0 or proof["source_shape"] != [1, 256, 1]:
+        raise ValueError("Native Rasa preparation has not passed its real carrier check")
+    for name, checksum in expected.items():
+        if digest(directory / name) != checksum:
+            raise ValueError("Prepared Rasa resource changed: " + name)
+    minimum = configuration["minimum_core_version"]
+    extra = {"license": source["license"], "experimental": True,
+             "provenance": source, "model_sha256": expected["model.onnx"],
+             "source_sha256": expected["references/brx/source.npy"],
+             "quality_validation": {"actual_native_cpu_onnx_verified": True,
+                 "native_pronunciation_verified": False, "navigation_verified": False, "windows_nvda_verified": False},
+             "documented_speaker": "BRX_F", "documented_style": "ALEXA",
+             "user_notice": "Лише документована мова бодо, голос BRX_F та стиль ALEXA; інші голоси й емоції не підтверджені."}
+    with selected_files(directory, ["model.onnx", "tokens.txt", "config.json", "NOTICE.txt", "README.md",
+                                    "references/brx/source.npy"]) as stage:
+        record = create_resource_pack(stage, output / f"dordiai-rasa-brx-{PACK_VERSION}.zip",
+                                      prefix="kx47Runtime/models/SharedRasaONNX", identity="rasa-brx",
+                                      name="Rasa — Бодо (BRX_F)", version=PACK_VERSION,
+                                      minimum_core_version=minimum, languages=["brx"], engine_ids=["rasa-onnx"],
+                                      metadata_extra=extra)
+    record.update(id="rasa-brx", code="brx", backend="rasa-onnx", minimum_core_version=minimum,
+                  license=source["license"], model_sha256=expected["model.onnx"],
+                  source_sha256=expected["references/brx/source.npy"], experimental=True,
+                  native_pronunciation_verified=False, windows_nvda_verified=False)
+    print(f"Built rasa-brx: {record['size_bytes']:,} bytes", flush=True)
+    return save_group(root, "rasa", [record], backend="rasa-onnx", minimum_core_version=minimum)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--workers", type=int, default=2)
-    parser.add_argument("--group", action="append", choices=["mms", "extra", "omni"])
+    parser.add_argument("--group", action="append", choices=["mms", "extra", "omni", "rasa"])
     parser.add_argument("--extra-code", action="append")
     parser.add_argument("--references-only", action="store_true", help="Reuse the existing shared Omni model ZIP")
+    parser.add_argument("--catalogue-only", action="store_true", help="Refresh catalogue metadata without rebuilding weights")
     args = parser.parse_args()
     if not 1 <= args.workers <= 8:
         parser.error("workers must be between 1 and 8")
+    if args.catalogue_only:
+        result = write_catalogue(args.root, args.output)
+        print(json.dumps({"entry_count": result["entry_count"], "inactive_research_archives": result["inactive_research_archives"]}))
+        return
     for name in args.group or ["mms"]:
         if name == "mms":
             group = build_mms_packs(args.root, args.output, args.workers)
         elif name == "extra":
             group = build_extra_packs(args.root, args.output, args.workers,
                                       args.extra_code or ("sat", "st", "xh", "ig", "ln", "nd"))
+        elif name == "rasa":
+            group = build_rasa_pack(args.root, args.output)
         else:
             group = build_omni_packs(args.root, args.output, args.references_only)
         print(json.dumps({key: value for key, value in group.items() if key != "packages"}, ensure_ascii=False), flush=True)
+    write_catalogue(args.root, args.output)
 
 
 if __name__ == "__main__":

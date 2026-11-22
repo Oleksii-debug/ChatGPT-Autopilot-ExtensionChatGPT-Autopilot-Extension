@@ -274,5 +274,162 @@ class PreferencesTests(unittest.TestCase):
         self.assertEqual(selected, [["Автоматично", "Українська"]] * 3)
 
 
+class PackageSpeechTests(unittest.TestCase):
+    """Public NVDA selection contracts; these are not sound-device tests."""
+
+    def setUp(self):
+        self.original = types.SimpleNamespace(name="kx47Preview", saveSettings=MagicMock())
+        self.current = self.original
+        self.configured = "kx47Preview"
+        self.calls = []
+        self.speech = types.SimpleNamespace(cancelSpeech=MagicMock())
+        self.handler = types.SimpleNamespace(getSynth=lambda: self.current, setSynth=self.select)
+
+    def select(self, name, isFallback=False):
+        self.calls.append((name, isFallback))
+        self.current = types.SimpleNamespace(name=name, _dordiai_open_settings=MagicMock())
+        if not isFallback:
+            self.configured = name
+        return True
+
+    def modules(self):
+        return patch.dict(sys.modules, {"speech": self.speech, "synthDriverHandler": self.handler})
+
+    def test_maintenance_keeps_navigation_on_builtin_and_restores_fresh_driver(self):
+        with self.modules():
+            session = prefs.begin_package_speech(self.original)
+            self.assertEqual(self.current.name, "espeak")
+            self.assertIs(self.current, session["temporary_synth"])
+            self.assertEqual(self.configured, "kx47Preview")
+            result = prefs.finish_package_speech(session)
+        self.assertTrue(result["restored"])
+        self.assertIsNot(result["synth"], self.original)
+        self.assertEqual(result["synth"].name, "kx47Preview")
+        self.assertEqual(self.calls, [("espeak", True), ("kx47Preview", True)])
+        self.original.saveSettings.assert_called_once_with()
+        self.assertEqual(self.speech.cancelSpeech.call_count, 2)
+
+    def test_user_synth_change_during_package_operation_is_respected(self):
+        with self.modules():
+            session = prefs.begin_package_speech(self.original)
+            chosen = self.current = types.SimpleNamespace(name="oneCore")
+            self.configured = "oneCore"
+            result = prefs.finish_package_speech(session)
+        self.assertFalse(result["restored"])
+        self.assertTrue(result["user_changed_synth"])
+        self.assertIs(result["synth"], chosen)
+        self.assertEqual(self.calls, [("espeak", True)])
+        self.assertEqual(self.configured, "oneCore")
+
+    def test_manually_reselected_same_dordiai_gets_fresh_epoch_and_keeps_latest_settings(self):
+        with self.modules():
+            session = prefs.begin_package_speech(self.original)
+            reselected = self.current = types.SimpleNamespace(name="kx47Preview", saveSettings=MagicMock())
+            result = prefs.finish_package_speech(session)
+        self.assertTrue(result["restored"])
+        self.assertIsNot(result["synth"], reselected)
+        reselected.saveSettings.assert_called_once_with()
+        self.assertEqual(self.calls, [("espeak", True), ("kx47Preview", True)])
+
+    def test_failed_reload_reports_failure_and_keeps_nvda_automatic_espeak_fallback(self):
+        with self.modules():
+            session = prefs.begin_package_speech(self.original)
+            def fail_reload(name, isFallback=False):
+                self.calls.append((name, isFallback))
+                self.current = types.SimpleNamespace(name="espeak")
+                return False
+            self.handler.setSynth = fail_reload
+            result = prefs.finish_package_speech(session)
+        self.assertFalse(result["restored"])
+        self.assertTrue(result["error"])
+        self.assertEqual(result["synth"].name, "espeak")
+        self.assertIn("Не вдалося перезавантажити", result["detail"])
+        self.assertIn("залишено вбудований eSpeak", result["detail"])
+
+    def test_reload_exception_activates_explicit_fallback_and_exposes_error(self):
+        with self.modules():
+            session = prefs.begin_package_speech(self.original)
+            def fail_then_fallback(name, isFallback=False):
+                if name == "kx47Preview":
+                    self.current = None
+                    raise RuntimeError("broken package index")
+                return self.select(name, isFallback)
+            self.handler.setSynth = fail_then_fallback
+            result = prefs.finish_package_speech(session)
+        self.assertTrue(result["error"])
+        self.assertEqual(result["synth"].name, "espeak")
+        self.assertIn("broken package index", result["detail"])
+        self.assertEqual(self.configured, "kx47Preview")
+
+    def test_no_package_mutation_can_start_without_spoken_builtin_selection(self):
+        self.handler.setSynth = lambda name, isFallback=False: False
+        with self.modules(), self.assertRaisesRegex(RuntimeError, "Пакет не змінено"):
+            prefs.begin_package_speech(self.original)
+
+    def test_different_current_synth_is_not_terminated_when_maintenance_is_requested(self):
+        self.current = types.SimpleNamespace(name="oneCore")
+        with self.modules(), self.assertRaisesRegex(RuntimeError, "інший синтезатор"):
+            prefs.begin_package_speech(self.original)
+        self.assertEqual(self.calls, [])
+        self.original.saveSettings.assert_not_called()
+
+    def _run_dialog_operation(self, fail):
+        """Drive the actual dialog transaction methods, with queued UI callbacks."""
+        self.original.description = "Dordiai test"
+        queued, dialog_types, observed = [], [], []
+        wx = MagicMock()
+        wx.CallAfter = lambda callback, *args: queued.append((callback, args))
+        gui = types.ModuleType("gui")
+        gui.guiHelper = types.SimpleNamespace()
+        gui.mainFrame = types.SimpleNamespace(popupSettingsDialog=dialog_types.append)
+        gui.messageBox = MagicMock()
+        settings = types.ModuleType("gui.settingsDialogs")
+        class BaseDialog:
+            def onCancel(self, event):
+                self.closed = True
+        settings.SettingsDialog = BaseDialog
+        class ImmediateWorker:
+            def __init__(self, target, **kwargs):
+                self.target = target
+            def start(self):
+                self.target()
+        ui = types.SimpleNamespace(message=lambda text: observed.append(("notice", self.current.name)))
+        def operation():
+            observed.append(("operation", self.current.name))
+            if fail:
+                raise ValueError("transaction rolled back")
+        with self.modules(), patch.dict(sys.modules, {"wx": wx, "gui": gui,
+            "gui.settingsDialogs": settings, "ui": ui}), patch("threading.Thread", ImmediateWorker):
+            prefs.open_dialog(self.original)
+            dialog = dialog_types[0].__new__(dialog_types[0])
+            dialog.synth = self.original
+            dialog._save = MagicMock(return_value=True)
+            dialog.package_status = MagicMock()
+            dialog.tabs = MagicMock()
+            dialog.install_package = MagicMock()
+            dialog.remove_package = MagicMock()
+            dialog.rollback_package = MagicMock()
+            dialog._package_busy = False
+            dialog._run_package_operation("Робота з пакетом", operation)
+            self.assertTrue(dialog._package_busy)
+            self.assertEqual(observed, [("notice", "espeak"), ("operation", "espeak")])
+            callback, args = queued.pop(0)
+            callback(*args)
+        self.assertFalse(dialog._package_busy)
+        self.assertTrue(dialog.closed)
+        self.assertIsNot(self.current, self.original)
+        self.assertEqual(self.current.name, "kx47Preview")
+        self.assertEqual(queued[0][0], self.current._dordiai_open_settings)
+        detail = gui.messageBox.call_args.args[0]
+        self.assertIn("автоматично перезавантажено", detail)
+        self.assertEqual("transaction rolled back" in detail, fail)
+
+    def test_dialog_package_success_reloads_and_reopens_fresh_settings(self):
+        self._run_dialog_operation(False)
+
+    def test_dialog_package_rollback_still_reloads_and_exposes_transaction_error(self):
+        self._run_dialog_operation(True)
+
+
 if __name__ == "__main__":
     unittest.main()

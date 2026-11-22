@@ -85,6 +85,7 @@ def markdown(data):
              "espeak+voice-conversion": "eSpeak: синтез за правилами з нейронним перетворенням тембру",
              "hebrew-neural+voice-conversion": "Спеціалізована нейромодель з перетворенням тембру",
              "mms-neural+voice-conversion": "MMS: окремі нейромоделі з перетворенням тембру",
+             "rasa-native-neural+voice-conversion": "Rasa: нативна нейромодель з документованим мовним носієм і перетворенням тембру",
              "dedicated-neural+voice-conversion": "Додаткові спеціалізовані нейромоделі з перетворенням тембру",
              "shared-diffusion-neural+voice-conversion": "Спільна дифузійна нейромодель з перетворенням тембру; інтерактивні затримки NVDA не прийняті"}
     for backend, count in summary["backend_counts_resources_present"].items():

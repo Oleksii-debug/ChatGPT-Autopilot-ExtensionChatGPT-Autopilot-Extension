@@ -132,8 +132,19 @@ class NewModelIntegrationTests(unittest.TestCase):
             return np.full(2400, .15, np.float32), 24000
         self.omni.audio = omni_audio
         self.omni.source = lambda code, *, models: self.omni_source
+        self.rasa = ModuleType("wide_rasa")
+        self.rasa.available = lambda models: {"brx"}
+        self.rasa.calls = []
+        self.rasa.cleared_owners = []
+        self.rasa_source = np.full((1,256,1),.41,np.float32)
+        def rasa_audio(code,text,character=False,*,models,rate=1.,owner=None):
+            self.rasa.calls.append((code,text,character,models,rate,owner))
+            return np.full(2400,.17,np.float32),24000
+        self.rasa.audio=rasa_audio
+        self.rasa.source=lambda code,*,models:self.rasa_source
+        self.rasa.clear_engines=lambda owner=None:self.rasa.cleared_owners.append(owner)
         self.modules = patch.dict(sys.modules, {"wide_mms": self.mms, "wide_extra_models": self.extra,
-                                               "wide_omnivoice_onnx": self.omni})
+                                               "wide_omnivoice_onnx": self.omni,"wide_rasa":self.rasa})
         self.modules.start()
         self.addCleanup(self.modules.stop)
         self.addCleanup(self.voice.close)
@@ -170,6 +181,37 @@ class NewModelIntegrationTests(unittest.TestCase):
         self.assertEqual(self.extra.cleared_owners,[self.owner])
         self.voice.close()
         self.assertEqual(self.extra.cleared_owners,[self.owner])
+
+    def test_rasa_preferred_route_projects_its_own_source_and_cleans_owner(self):
+        self.voice.registry["brx"]={"backend":"rasa-onnx","source":"SharedRasaONNX/references/brx/source.npy"}
+        with patch("language_catalog.resolve_backend_info",side_effect=lambda models,code,info,**kw:info):
+            self.assertTrue(self.collect("brx").size)
+        self.assertEqual(self.rasa.calls[0][0],"brx")
+        self.assertIs(self.rasa.calls[0][-1],self.owner)
+        self.assertTrue(all(np.array_equal(feed["src_g"],self.rasa_source) for feed in self.converter.flow.feeds))
+        self.voice.close()
+        self.voice.close()
+        self.assertEqual(self.rasa.cleared_owners,[self.owner])
+
+    def test_text_selected_same_language_fallback_does_not_reuse_preferred_source(self):
+        self.voice.registry["ks"]={"backend":"extra-onnx","family":"matcha","source":"ExtraLanguages/ks/source.npy"}
+        self.extra.available=lambda models:{"ks"}
+        self.omni.available=lambda models:{"ks"}
+        preferred=dict(self.voice.registry["ks"])
+        fallback={"backend":"omni-onnx","language":"ks","source":"SharedOmniONNX/references/ks/source.npy"}
+        selections=[]
+        def resolve(models,code,info,*,text=None,character=False):
+            selections.append((code,text,character))
+            return fallback if text=="unsupported" else preferred
+        with patch("language_catalog.resolve_backend_info",side_effect=resolve):
+            for text,expected in (("native",self.extra_source),("unsupported",self.omni_source),("native",self.extra_source)):
+                start=len(self.converter.flow.feeds)
+                self.assertTrue(list(self.voice.blocks("viktoriia","ks",text)))
+                self.assertTrue(all(np.array_equal(feed["src_g"],expected) for feed in self.converter.flow.feeds[start:]))
+        self.assertEqual(selections,[("ks","native",False),("ks","unsupported",False),("ks","native",False)])
+        self.assertEqual(len(self.extra.calls),2)
+        self.assertEqual(len(self.omni.calls),1)
+        self.assertEqual(self.voice._selected_source.cache_info().currsize,2)
 
     def test_mms_cache_reuses_current_and_recent_carrier_and_closes_evicted_model(self):
         self.collect("ha")

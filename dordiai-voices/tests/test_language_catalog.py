@@ -50,6 +50,31 @@ class CatalogTest(unittest.TestCase):
             "iso_code": iso, "frontend": "characters", "is_uroman": False}).encode())
         self.identity("MMS/" + code + "/source.npy")
 
+    def rasa(self):
+        info = {"backend": "rasa-onnx", "source": "SharedRasaONNX/references/brx/source.npy"}
+        self.satisfy(catalog._wide_requirements("brx", info, self.models)[1])
+        self.identity("SharedRasaONNX/references/brx/source.npy")
+        configuration = {"format": "dordiai-rasa-onnx-v1", "frontend": "native-characters", "sample_rate": 24000,
+            "languages": {"brx": {"speaker_id": 4, "speaker_name": "BRX_F", "style_id": 0, "style_name": "ALEXA", "script": "Deva"}},
+            "provenance": {"files": {"model.onnx": {"sha256": "1" * 64}}},
+            "source_identity": {"brx": {"language": "brx", "speaker_id": 4, "style_id": 0, "sample_rate": 24000,
+                "model_sha256": "1" * 64, "tokens_sha256": catalog._small_hash(self.models, "SharedRasaONNX/tokens.txt"),
+                "source_sha256": catalog._small_hash(self.models, "SharedRasaONNX/references/brx/source.npy")}}}
+        self.put("SharedRasaONNX/config.json", json.dumps(configuration).encode())
+        return info
+
+    def omni_fallback(self, code):
+        prefix = "SharedOmniONNX/references/" + code + "/"
+        info = {"backend": "omni-onnx", "language": code, "source": prefix + "source.npy",
+                "model_repository": "test/fixture", "model_revision": "fixture-pinned-v1"}
+        self.satisfy(catalog._wide_requirements(code, info, self.models)[1])
+        self.identity(prefix + "source.npy")
+        self.npy(prefix + "codes.npy", "<i8", (8, 2), struct.pack("<16q", *range(16)))
+        self.put(prefix + "text.txt", b"Fixture native reference transcript")
+        self.put("SharedOmniONNX/source.json", b'{"repository": "test/fixture", "revision": "fixture-pinned-v1"}')
+        info["reference_hashes"] = {name: catalog._small_hash(self.models, prefix + name) for name in ("codes.npy", "text.txt", "source.npy")}
+        return info
+
     def test_selected_scope_matches_authoritative_file(self):
         selected = json.loads((ROOT / "selected_languages.json").read_text(encoding="utf-8"))["languages"]
         self.assertEqual(135, len(selected))
@@ -228,6 +253,58 @@ class CatalogTest(unittest.TestCase):
         config["lang_code"] = "ig"
         self.put("ExtraLanguages/ig/config.json", json.dumps(config).encode())
         self.assertIn("ig", catalog.installed_languages(self.models))
+
+    def test_existing_bodo_omni_pack_remains_explicit_same_language_fallback(self):
+        fallback = self.omni_fallback("brx")
+        info = {"backend": "rasa-onnx", "source": "SharedRasaONNX/references/brx/source.npy", "fallbacks": [fallback]}
+        self.index({"brx": info})
+        selected = catalog.resolve_backend_info(self.models, "brx", info)
+        self.assertEqual("omni-onnx", selected["backend"])
+        self.assertEqual("explicit-same-language-fallback", selected["_backend_selection"])
+        self.assertIn("резервний рушій цієї мови", catalog.installed_languages(self.models)["brx"])
+        self.assertFalse(catalog.language_status(self.models, "brx")["interactive_reading_ready"])
+
+    def test_native_bodo_pack_wins_and_requires_its_actual_calibration(self):
+        fallback = self.omni_fallback("brx")
+        info = dict(self.rasa(), fallbacks=[fallback])
+        self.index({"brx": info})
+        self.assertEqual("rasa-onnx", catalog.resolve_backend_info(self.models, "brx", info)["backend"])
+        self.identity("SharedRasaONNX/references/brx/source.npy", .75)
+        self.assertEqual("omni-onnx", catalog.resolve_backend_info(self.models, "brx", info)["backend"])
+        self.identity("SharedOmniONNX/references/brx/source.npy", .75)
+        self.assertNotIn("brx", catalog.installed_languages(self.models))
+
+    def test_a_different_language_or_omni_model_revision_is_never_a_fallback(self):
+        info = {"backend": "rasa-onnx", "fallbacks": [self.omni_fallback("ks")]}
+        self.assertEqual("rasa-onnx", catalog.resolve_backend_info(self.models, "brx", info)["backend"])
+        info["fallbacks"] = [self.omni_fallback("brx")]
+        self.put("SharedOmniONNX/source.json", b'{"repository": "test/fixture", "revision": "another-model"}')
+        self.assertEqual("preferred-unavailable", catalog.resolve_backend_info(self.models, "brx", info)["_backend_selection"])
+
+    def test_unsupported_kashmiri_letter_uses_only_explicit_installed_same_language_fallback(self):
+        info = {"backend": "extra-onnx", "family": "matcha", "source": "ExtraLanguages/ks/source.npy"}
+        self.satisfy(catalog._wide_requirements("ks", info, self.models)[1])
+        self.identity("ExtraLanguages/ks/source.npy")
+        symbols = ["_"] + [chr(0x600 + i) for i in range(271)]
+        config = {"format": "dordiai-matcha-native-frontend-v1", "code": "ks", "symbols": symbols,
+            "allowed_characters": [c for c in symbols if c != "ٲ"] + list("0123456789"),
+            "character_mapping": {}, "punctuation_mapping": {}, "digits_mapping": {"8": ["٨", "۸"]},
+            "word_to_digit_mapping": {"ٲٹھ": ["8"]}, "punctuations": []}
+        self.put("ExtraLanguages/ks/config.json", json.dumps(config).encode())
+        runtime = {"format": "dordiai-matcha-onnx-v1", "code": "ks", "iso_code": "kas", "sample_rate": 22050,
+            "speaker": 422, "steps": 10, "config_sha256": catalog._small_hash(self.models, "ExtraLanguages/ks/config.json"),
+            "source_identity": {"source_sha256": catalog._small_hash(self.models, "ExtraLanguages/ks/source.npy")}}
+        self.put("ExtraLanguages/ks/runtime_config.json", json.dumps(runtime).encode())
+        info["fallbacks"] = [self.omni_fallback("ks")]
+        self.assertEqual("extra-onnx", catalog.resolve_backend_info(self.models, "ks", info, text="آداب")["backend"])
+        selected = catalog.resolve_backend_info(self.models, "ks", info, text="ٲداب")
+        self.assertEqual("omni-onnx", selected["backend"])
+        self.assertEqual("unsupported-native-input", selected["_selection_reason"])
+        # Digit expansion itself introduces the missing letter: selecting on
+        # raw Unicode alone would incorrectly choose the preferred engine.
+        self.assertEqual("omni-onnx", catalog.resolve_backend_info(self.models, "ks", info, text="8")["backend"])
+        info["fallbacks"] = []
+        self.assertEqual("extra-onnx", catalog.resolve_backend_info(self.models, "ks", info, text="ٲداب")["backend"])
 
 
 if __name__ == "__main__":

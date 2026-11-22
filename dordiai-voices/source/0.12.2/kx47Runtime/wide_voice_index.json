@@ -596,13 +596,39 @@
     "interactive_nvda_latency_verified": false
   },
   "ks": {
-    "voice": "omni:ks",
+    "voice": "extra:ks",
     "name": "Кашмірська",
-    "backend": "omni-onnx",
-    "source": "SharedOmniONNX/references/ks/source.npy",
+    "backend": "extra-onnx",
+    "family": "matcha",
+    "source": "ExtraLanguages/ks/source.npy",
+    "iso_code": "kas",
+    "native_script": "Arab",
+    "source_speaker_id": 422,
+    "minimum_core_version": "0.13.1-dev.3",
     "native_pronunciation_verified": false,
     "navigation_verified": false,
-    "interactive_nvda_latency_verified": false
+    "unsupported_native_characters": [
+      "ٲ"
+    ],
+    "fallbacks": [
+      {
+        "voice": "omni:ks",
+        "name": "Кашмірська",
+        "backend": "omni-onnx",
+        "language": "ks",
+        "source": "SharedOmniONNX/references/ks/source.npy",
+        "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+        "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+        "reference_hashes": {
+          "codes.npy": "0bd533dd19501c8ccac325279fc468783d3367d003af7a96f96e8efdf521c738",
+          "text.txt": "4d6c87dcae78708084d0d927a2ba14d2d580ea5509228a8c5597590385247021",
+          "source.npy": "9e36ab7bf89e552b43125194d50555ada707ff34826582ffff00c5e73903ba17"
+        },
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "interactive_nvda_latency_verified": false
+      }
+    ]
   },
   "mni": {
     "voice": "omni:mni",
@@ -614,13 +640,37 @@
     "interactive_nvda_latency_verified": false
   },
   "brx": {
-    "voice": "omni:brx",
+    "voice": "rasa:brx",
     "name": "Бодо",
-    "backend": "omni-onnx",
-    "source": "SharedOmniONNX/references/brx/source.npy",
+    "backend": "rasa-onnx",
+    "source": "SharedRasaONNX/references/brx/source.npy",
+    "iso_code": "brx",
+    "native_script": "Deva",
+    "source_speaker_id": 4,
+    "source_style_id": 0,
+    "source_style_name": "ALEXA",
+    "minimum_core_version": "0.13.1-dev.3",
     "native_pronunciation_verified": false,
     "navigation_verified": false,
-    "interactive_nvda_latency_verified": false
+    "fallbacks": [
+      {
+        "voice": "omni:brx",
+        "name": "Бодо",
+        "backend": "omni-onnx",
+        "language": "brx",
+        "source": "SharedOmniONNX/references/brx/source.npy",
+        "model_repository": "gaber/OmniVoice-ONNX-CPU-INT8",
+        "model_revision": "efddec1c39169c79e57eb65f1a7b650d0906a182",
+        "reference_hashes": {
+          "codes.npy": "5b0272fee06f3af73c6b1ee774fdac3005bb32437ee36e063f5dc68cc0f2298e",
+          "text.txt": "4c2ac2d4ecb0a8a3b80fa2c62fe289357382b4c8dd5c166cad07b205f2a40835",
+          "source.npy": "d75b9199463a036a66b760ab37e1e5ea582428bc739b309349ae8e3be52fe52e"
+        },
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "interactive_nvda_latency_verified": false
+      }
+    ]
   },
   "ig": {
     "voice": "extra:ig",

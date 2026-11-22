@@ -1,0 +1,87 @@
+{
+  "format": "dordiai-rasa-model-sources-v1",
+  "repository": "MatiasLin/sherpa-onnx-vits-rasa-13",
+  "revision": "b5afd4e991e3bdd6195528de650e2ed219d47506",
+  "license": "CC-BY-4.0",
+  "files": {
+    "README.md": {
+      "size_bytes": 3389,
+      "git_blob": "a51554fe1c348bb5241c30d12bbdf67cf2d0f473"
+    },
+    "model.onnx": {
+      "size_bytes": 123338635,
+      "sha256": "4473f8d0b6f738196c1626bbf337cda99b34749b638bb7234c4cb8e1992bf804"
+    },
+    "tokens.txt": {
+      "size_bytes": 9556,
+      "git_blob": "65e07c04745cbaf726297fea4d52840c5fa3fac4"
+    }
+  },
+  "minimum_core_version": "0.13.1-dev.3",
+  "primary_model": {
+    "repository": "ai4bharat/vits_rasa_13",
+    "revision": "00b1590501b55708d5d66be51bae336b51bce1d2",
+    "url": "https://huggingface.co/ai4bharat/vits_rasa_13",
+    "original_files_gated_and_not_downloaded": true,
+    "documented_languages": [
+      "as",
+      "bn",
+      "brx",
+      "doi",
+      "kn",
+      "mai",
+      "ml",
+      "mr",
+      "ne",
+      "pa",
+      "sa",
+      "ta",
+      "te"
+    ],
+    "adopted_languages": {
+      "brx": {
+        "speaker_id": 4,
+        "speaker_name": "BRX_F",
+        "style_id": 0,
+        "style_name": "ALEXA",
+        "script": "Deva"
+      }
+    },
+    "exporter_mni_tag_rejected": "MNI absent from primary supported languages/speakers and no Meitei characters in exported table. No substitution with another Indic speaker.",
+    "capacity_not_trained_speakers": "1024 speaker/32 emotion rows are model capacity, not a demonstrated catalogue of trained identities."
+  },
+  "exporter_code": {
+    "repository": "matiaslin/sherpa-onnx-vits-rasa-13-exporter",
+    "revision": "2e218bed5757e5bfbcc00a7f6630f8a167b1961e",
+    "license": "MIT",
+    "url": "https://github.com/matiaslin/sherpa-onnx-vits-rasa-13-exporter"
+  },
+  "actual_graph_contract": {
+    "sample_rate": 24000,
+    "frontend": "characters",
+    "add_blank": true,
+    "blank_id": 0,
+    "literal_underscore_id": 95,
+    "required_inputs": [
+      "x",
+      "x_length",
+      "noise_scale",
+      "length_scale",
+      "noise_scale_w",
+      "sid",
+      "emotion_id"
+    ],
+    "noise_inputs_are_scalars": true
+  },
+  "acceptance": {
+    "native_pronunciation_verified": false,
+    "ordinary_alphabet_verified": false,
+    "windows_nvda_verified": false
+  },
+  "notes": [
+    "ExporterREADME says22050Hz; actual immutable graph metadata says24000Hz.",
+    "ALEXA style0 is documented, not an independently defined neutral-emotion label.",
+    "DirectORT uses one punctuation-preserving call and no Sherpa empty trailing sentence.",
+    "Exact original gated tokenizer parity is not established; use documented native-character export without uroman."
+  ]
+}

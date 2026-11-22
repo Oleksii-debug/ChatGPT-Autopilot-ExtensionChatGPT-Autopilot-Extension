@@ -1,0 +1,16 @@
+{
+  "run": 44990916427,
+  "head": "6fbf639879c886d7e53c613e4d09d84a01894350",
+  "linux_units": "passed",
+  "windows_units": {
+    "tests": 363,
+    "status": "failed",
+    "errors": 1,
+    "cause": "Test fixture reads pinned non-ASCII MMS provenance with platform-default cp1252",
+    "file": "tests/test_wide_mms.py",
+    "fix": "Explicit UTF-8 reading, including related optional fixture reads",
+    "fix_commit": "dab2a6f8156aa43cc1b82ee97c1a6905b47fd522"
+  },
+  "production_runtime_error": false,
+  "rerun": 44991026216
+}

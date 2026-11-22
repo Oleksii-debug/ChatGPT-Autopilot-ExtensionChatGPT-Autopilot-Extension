@@ -63,12 +63,18 @@ class NativeLetterBank:
                 assets.require_voice_allowed(profile)
             except ValueError:
                 return None
+            managed=assets._profile(self.references,profile)
+            if managed is None:
+                return self.folder/(profile+".json"),self.folder/(profile+".pcm"),False
             index = assets.asset_path(self.references, profile, self.folder_name + "_index")
             audio = assets.asset_path(self.references, profile, self.folder_name + "_audio")
             if (index is None) != (audio is None):
                 raise ValueError("Installed voice has an incomplete prepared audio bank")
             if index is not None:
                 return index, audio, True
+            # Optional banks may be absent in a replacement package. That is
+            # never permission to borrow an older built-in speaker's PCM.
+            return None
         return self.folder / (profile + ".json"), self.folder / (profile + ".pcm"), False
 
     @lru_cache(maxsize=32)

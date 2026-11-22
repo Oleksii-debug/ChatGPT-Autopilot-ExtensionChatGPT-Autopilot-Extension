@@ -1,0 +1,247 @@
+{
+  "format": "dordiai-fast-carrier-research-v1",
+  "checked_at": "2026-11-22",
+  "actual_additions": [
+    "ks via native Bolbosh/Matcha; experimental readiness"
+  ],
+  "romansh": {
+    "espeak_primary": "https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/docs/languages.md",
+    "espeak_list_checked": 136,
+    "espeak_roh_listed": false,
+    "rhvoice_primary": "https://raw.githubusercontent.com/RHVoice/RHVoice/master/.gitmodules",
+    "rhvoice_roh_package_present": false,
+    "slowsoft_primary": "https://www.slowsoft.ch/",
+    "slowsoft_current_statement": "ceased business operations March2026",
+    "university_primary": "https://www.cl.uzh.ch/en/research-groups/Language-Technology.html",
+    "university_release_status": "current TTS for Romansch project listed; no downloadable model link there",
+    "interpretation": "No verified faster native Romansh resource found in these sources; SwissGerman/Romanian/Aromanian/Romani are not aliases."
+  },
+  "toucan": {
+    "source_repo": "DigitalPhonetics/IMS-Toucan",
+    "source_revision": "3cc2094d9c7123336eda7e299ac0bc90319ca9ff",
+    "model_repo": "Flux9665/ToucanTTS",
+    "model_revision": "e0afe0ef703d2178dd7dc74ec298693ddb10e720",
+    "acoustic_bytes": 200782528,
+    "vocoder_bytes": 124772377,
+    "license": "Apache-2.0",
+    "target_supervision": {
+      "kas": true,
+      "mni": true,
+      "brx": true,
+      "wol": true,
+      "roh": false,
+      "cnr": false
+    },
+    "frontend_problem": "Acoustic supervised-language coverage does not establish G2P coverage. Actual Transphone chooses ten other languages for Wolof/Manipuri/Bodo; Meitei greeting collapsed to one vowel. Kashmiri native G2P available, but full phone-to-wave still0.87s+ perword before ONNX export. Not integrated as these native language replacements.",
+    "actual_probe": {
+      "source_revision": "3cc2094d9c7123336eda7e299ac0bc90319ca9ff",
+      "model_revision": "e0afe0ef703d2178dd7dc74ec298693ddb10e720",
+      "torch": "2.6.0+cpu",
+      "threads": 2,
+      "samples": [
+        {
+          "code": "wo",
+          "iso": "wol",
+          "text": "Salaam",
+          "phones": "~salam~#",
+          "phone_count": 8,
+          "g2p_seconds": 13.6348885110001,
+          "acoustic_vocoder_seconds": 1.2836725870001828,
+          "audio_seconds": 0.832,
+          "peak": 0.823599636554718,
+          "finite": true,
+          "g2p_target_languages": [
+            "ewe",
+            "kik",
+            "nya",
+            "swa",
+            "xho",
+            "yor",
+            "zul",
+            "aar",
+            "abk",
+            "acw"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/wo-0.wav"
+        },
+        {
+          "code": "wo",
+          "iso": "wol",
+          "text": "Salaam aleekum. Nanga def?",
+          "phones": "~salam aleːkum nanɡa def~#",
+          "phone_count": 25,
+          "g2p_seconds": 0.6772612949989707,
+          "acoustic_vocoder_seconds": 2.5456021499994677,
+          "audio_seconds": 1.68,
+          "peak": 0.7860648036003113,
+          "finite": true,
+          "g2p_target_languages": [
+            "ewe",
+            "kik",
+            "nya",
+            "swa",
+            "xho",
+            "yor",
+            "zul",
+            "aar",
+            "abk",
+            "acw"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/wo-1.wav"
+        },
+        {
+          "code": "ks",
+          "iso": "kas",
+          "text": "آداب۔",
+          "phones": "~aːd̪aːb~#",
+          "phone_count": 7,
+          "g2p_seconds": 0.02006018100109941,
+          "acoustic_vocoder_seconds": 1.2054508500004886,
+          "audio_seconds": 0.752,
+          "peak": 0.8003977537155151,
+          "finite": true,
+          "g2p_target_languages": [
+            "kas"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/ks-2.wav"
+        },
+        {
+          "code": "ks",
+          "iso": "kas",
+          "text": "آداب۔",
+          "phones": "~aːd̪aːb~#",
+          "phone_count": 7,
+          "g2p_seconds": 0.024795354998786934,
+          "acoustic_vocoder_seconds": 0.8746656069997698,
+          "audio_seconds": 0.752,
+          "peak": 0.8003977537155151,
+          "finite": true,
+          "g2p_target_languages": [
+            "kas"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/ks-3.wav"
+        },
+        {
+          "code": "mni",
+          "iso": "mni",
+          "text": "ꯈꯨꯔꯨꯝꯖꯔꯤ",
+          "phones": "~eː~#",
+          "phone_count": 4,
+          "g2p_seconds": 0.0856249789994763,
+          "acoustic_vocoder_seconds": 1.9368395620003866,
+          "audio_seconds": 1.04,
+          "peak": 0.7468174695968628,
+          "finite": true,
+          "g2p_target_languages": [
+            "cnk",
+            "zom",
+            "aot",
+            "bod",
+            "dng",
+            "dzo",
+            "lif",
+            "lsi",
+            "mya",
+            "nan"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/mni-4.wav"
+        },
+        {
+          "code": "mni",
+          "iso": "mni",
+          "text": "ꯈꯨꯔꯨꯝꯖꯔꯤ",
+          "phones": "~eː~#",
+          "phone_count": 4,
+          "g2p_seconds": 0.08125318899874401,
+          "acoustic_vocoder_seconds": 1.0463310340001044,
+          "audio_seconds": 1.04,
+          "peak": 0.7468174695968628,
+          "finite": true,
+          "g2p_target_languages": [
+            "cnk",
+            "zom",
+            "aot",
+            "bod",
+            "dng",
+            "dzo",
+            "lif",
+            "lsi",
+            "mya",
+            "nan"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/mni-5.wav"
+        },
+        {
+          "code": "brx",
+          "iso": "brx",
+          "text": "खुलुमबाय।",
+          "phones": "~kulumbaj~#",
+          "phone_count": 11,
+          "g2p_seconds": 0.49438636200102337,
+          "acoustic_vocoder_seconds": 1.9861868389998563,
+          "audio_seconds": 1.056,
+          "peak": 0.5054576992988586,
+          "finite": true,
+          "g2p_target_languages": [
+            "aot",
+            "bod",
+            "cnk",
+            "dng",
+            "dzo",
+            "lif",
+            "lsi",
+            "mya",
+            "nan",
+            "new"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/brx-6.wav"
+        },
+        {
+          "code": "brx",
+          "iso": "brx",
+          "text": "खुलुमबाय।",
+          "phones": "~kulumbaj~#",
+          "phone_count": 11,
+          "g2p_seconds": 0.5101888379995216,
+          "acoustic_vocoder_seconds": 1.1970436249994236,
+          "audio_seconds": 1.056,
+          "peak": 0.5054576992988586,
+          "finite": true,
+          "g2p_target_languages": [
+            "aot",
+            "bod",
+            "cnk",
+            "dng",
+            "dzo",
+            "lif",
+            "lsi",
+            "mya",
+            "nan",
+            "new"
+          ],
+          "wav": "/workspace/scratch/eb1194a9e557/toucan-probe/brx-7.wav"
+        }
+      ]
+    },
+    "phonepiece_inventory_preparation": "Additional primary phonepiece phonetic inventory was fetched during preparation; not shipped or invoked on client."
+  },
+  "rejected_wolof_proxy": {
+    "onnx_repo": "jaguaman09/mms-tts-wol-onnx",
+    "onnx_revision": "3dcd72ae874e75d6c85bff18f8de3b20cf122477",
+    "upstream_repo": "rnjema-unima/mms-tts-wol-baseline",
+    "upstream_revision": "d69aac958f673393fda5d0f956b684513db2e6c5",
+    "actual_weights_sha256": "ab724e06ef6c906211a6df91b71223348b0ec9f8840900b684100b8b3f86021c",
+    "actual_weights_bytes": 145229816,
+    "same_hash_as": "facebook/mms-tts-ful @3fad6a46405c074e35d0de5b246b5010cf116f7c",
+    "interpretation": "Bit-identical Fula donor is not evidence of learned Wolof; excluded despite target-language marketing tags."
+  },
+  "montenegrin": {
+    "primary_code": "https://github.com/Balkansmedia/tts-ai-",
+    "finding": "Repository explicitly trained on Croatian VoxPopuli; future Montenegrin data collection stated. No Montenegrin-only checkpoint verified.",
+    "commercial_primary": "https://www.alfanum.co.rs/en/an-sintetizator/",
+    "commercial_finding": "Actual Montenegrin product declared, including on-premise; no open downloadable redistributable checkpoint established.",
+    "actual_corpus_candidate": "https://huggingface.co/datasets/disco-eth/WorldSpeech",
+    "actual_corpus_language": "cnr_me",
+    "corpus_is_trained_runtime_model": false
+  }
+}

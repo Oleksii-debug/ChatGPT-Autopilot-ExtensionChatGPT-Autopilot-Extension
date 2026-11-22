@@ -19,10 +19,11 @@
       "shared-neural+voice-conversion": 21,
       "espeak+voice-conversion": 51,
       "rhvoice-statistical+voice-conversion": 1,
-      "shared-diffusion-neural+voice-conversion": 7,
+      "shared-diffusion-neural+voice-conversion": 5,
       "mms-neural+voice-conversion": 29,
       "hebrew-neural+voice-conversion": 1,
-      "dedicated-neural+voice-conversion": 6
+      "dedicated-neural+voice-conversion": 7,
+      "rasa-native-neural+voice-conversion": 1
     }
   },
   "regions": [
@@ -2160,18 +2161,27 @@
       "first_priority_region": "Азія",
       "runtime_code": "ks",
       "registered": true,
-      "backend": "shared-diffusion-neural+voice-conversion",
+      "backend": "dedicated-neural+voice-conversion",
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
-      "settings_label_uk": "Кашмірська (експериментально, повільне читання; лише текст)",
+      "settings_label_uk": "Кашмірська (експериментально; для окремих літер потрібен резервний пакет)",
       "character_names_ready": false,
       "number_normalization_ready": false,
-      "interactive_reading_ready": false,
+      "native_orthography_partial": true,
+      "keyboard_echo_verified": false,
+      "backend_selection": "preferred",
+      "selected_backend": "extra-onnx",
+      "preferred_backend": "extra-onnx",
+      "selection_reason": null,
+      "preferred_missing_resources": [],
+      "fallback_missing_resources": [],
       "capabilities": {
         "character_names": false,
         "number_normalization": false,
-        "interactive_nvda_latency_verified": false
+        "unsupported_native_characters": [
+          "U+0672"
+        ]
       },
       "windows_audio_verified": false
     },
@@ -2326,18 +2336,27 @@
       "first_priority_region": "Азія",
       "runtime_code": "brx",
       "registered": true,
-      "backend": "shared-diffusion-neural+voice-conversion",
+      "backend": "rasa-native-neural+voice-conversion",
       "resources_present": true,
       "status": "resources-present-unverified",
       "missing_resources": [],
-      "settings_label_uk": "Бодо (експериментально, повільне читання; лише текст)",
+      "settings_label_uk": "Бодо (експериментально; назви літер не перевірені)",
       "character_names_ready": false,
       "number_normalization_ready": false,
-      "interactive_reading_ready": false,
+      "keyboard_echo_verified": false,
+      "backend_selection": "preferred",
+      "selected_backend": "rasa-onnx",
+      "preferred_backend": "rasa-onnx",
+      "selection_reason": null,
+      "preferred_missing_resources": [],
+      "fallback_missing_resources": [],
       "capabilities": {
         "character_names": false,
         "number_normalization": false,
-        "interactive_nvda_latency_verified": false
+        "source_speaker": "BRX_F",
+        "source_speaker_id": 4,
+        "source_style": "ALEXA",
+        "source_style_id": 0
       },
       "windows_audio_verified": false
     },

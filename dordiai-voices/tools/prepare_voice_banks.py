@@ -24,7 +24,8 @@ from unicodedata import normalize
 MAX_CLIP_BYTES = 24000 * 2 * 8
 MAX_ENTRIES = 10000
 BANK_ROLES = frozenset({"native_letters_index", "native_letters_audio",
-                        "native_commands_index", "native_commands_audio"})
+                        "native_commands_index", "native_commands_audio","native_bank_preparation_report"})
+MAX_COMBINED_INDEX_BYTES=2*1024*1024
 CORE = ("uk", "en", "ru")
 
 
@@ -82,6 +83,10 @@ def validate_entries(entries):
                 if not isinstance(item[key],str) or not 0<len(item[key])<=2048:
                     raise ValueError("Invalid prepared bank source metadata")
                 row[key]=item[key]
+        if "acoustic_validation" in item:
+            if not isinstance(item["acoustic_validation"],str) or len(item["acoustic_validation"])>100:
+                raise ValueError("Invalid source acoustic validation metadata")
+            row["acoustic_validation"]=item["acoustic_validation"]
         identity = kind, entry_key(language, name)
         for alias in row["aliases"]:
             key=kind,entry_key(language,alias)
@@ -181,17 +186,32 @@ def _atomic_json(path, document):
     os.replace(temporary, path)
 
 
+class EpochGuardedRenderer:
+    """Do not combine a copied old profile with a concurrently activated voice."""
+    def __init__(self,worker,epoch,expected):
+        self.worker,self.epoch,self.expected=worker,epoch,expected
+
+    def render(self,request,timeout):
+        if self.epoch()!=self.expected:
+            raise ValueError("Installed resources changed during bank preparation; start a new source snapshot")
+        result=self.worker.render(request,timeout)
+        if self.epoch()!=self.expected:
+            raise ValueError("Installed resources changed during bank preparation; refusing mixed voice data")
+        return result
+
+
 def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, progress=None):
     """Pure orchestration, injectable for tests; production uses real PipeWorker."""
     entries = validate_entries(entries)
+    preview_bytes=0
     for kind in ("letter", "command"):
         selected = [row for row in entries if row["kind"] == kind]
+        if not selected:continue
         preview = {"entries": {entry_key(row["language"], name): [10**12, MAX_CLIP_BYTES]
-                               for row in selected for name in [row["lookup_text"],*row["aliases"]]},
-                   "entry_texts": {entry_key(row["language"], name):row for row in selected
-                                   for name in [row["lookup_text"],*row["aliases"]]}}
-        if len(json.dumps(preview, ensure_ascii=False, indent=2).encode("utf-8")) > 2 * 1024 * 1024 - 1024:
-            raise ValueError("The prepared bank index would be too large; prepare fewer languages per voice package")
+                               for row in selected for name in [row["lookup_text"],*row["aliases"]]}}
+        preview_bytes+=len(json.dumps(preview,ensure_ascii=False,indent=2).encode("utf-8"))+1024
+    if preview_bytes>MAX_COMBINED_INDEX_BYTES:
+        raise ValueError("The combined prepared indexes exceed 2 MiB; select fewer languages/symbol jobs per voice package")
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     banks, roles, runs = {}, {}, []
@@ -208,7 +228,9 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
                            "document": {"format": "dordiai-voice-bank", "format_version": 1,
                                         "voice_id": voice_id, "kind": plural,
                                         "sample_rate": 24000, "sample_width": 2, "channels": 1,
-                                        "complete": False, "entries": {}, "entry_texts": {}}}
+                                        "complete":False,"acoustic_validation":"pending",
+                                        "pronunciation_verified":False,"entries":{},
+                                        "preparation_report":"generation-progress.json"}}
             roles[index.name] = "native_" + plural + "_index"
             roles[audio.name] = "native_" + plural + "_audio"
         bank = banks[kind]
@@ -233,8 +255,9 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
         for lookup in [row["lookup_text"],*row["aliases"]]:
             key=entry_key(language,lookup)
             bank["document"]["entries"][key]=[offset,len(pcm)]
-            bank["document"]["entry_texts"][key]=row
         _atomic_json(bank["index_path"], bank["document"])
+        if sum(item["index_path"].stat().st_size for item in banks.values())>MAX_COMBINED_INDEX_BYTES:
+            raise ValueError("The emitted prepared indexes exceed the global 2 MiB limit")
         runs.append({**row, "audio": statistics, "worker": result})
         _atomic_json(directory / "generation-progress.json", {"voice_id": voice_id, "complete": False, "runs": runs})
         if progress is not None:
@@ -243,6 +266,7 @@ def generate_banks(worker, probe, voice_id, entries, directory, *, timeout=90, p
         bank["document"]["complete"] = True
         _atomic_json(bank["index_path"], bank["document"])
     _atomic_json(directory / "generation-progress.json", {"voice_id": voice_id, "complete": True, "runs": runs})
+    roles["generation-progress.json"]="native_bank_preparation_report"
     return roles, runs
 
 
@@ -269,13 +293,18 @@ def copy_profile_source(runtime, assets, profile, destination, *, version, licen
             raise ValueError("The requested voice is not installed")
         if not license_text:
             raise ValueError("Provide --license with the actual provenance terms for an exported built-in voice")
+        wide_target="classmate_locales/"+profile+".npy"
+        generic_target=profile+".npy"
+        english_target="english/"+profile+".npy"
+        target=wide_target if (references/wide_target).is_file() else generic_target
+        english=english_target if (references/english_target).is_file() else generic_target
         candidates = {
             "holos/" + profile + ".npy": "holos_profile",
-            profile + ".npy": "target_embedding",
-            "english/" + profile + ".npy": "english_embedding",
+            target:"target_embedding",
             "native_profiles/" + profile + ".npz": "pocket_english_state",
             "native_profiles/" + profile + ".safetensors": "pocket_russian_prompt",
         }
+        if english!=target:candidates[english]="english_embedding"
         for relative, role in candidates.items():
             source = references / relative
             if source.is_file():
@@ -333,6 +362,10 @@ def run(args):
               "pronunciation_verified": False, "nvda_verified": False,
               "created_utc": datetime.now(timezone.utc).isoformat()}
     try:
+        def source_epoch():
+            return (assets._signature(assets.package_root(runtime/"models/voices")/"voice-packages.json"),
+                    assets._signature(runtime/"installed_resource_packs.json"))
+        snapshot=source_epoch()
         recipe = copy_profile_source(runtime, assets, args.voice, stage, version=args.version, license_text=args.license)
         if args.entries_json:
             source_path=Path(args.entries_json)
@@ -347,7 +380,8 @@ def run(args):
         if any(row["language"].split("-")[0] not in allowed for row in entries):
             raise ValueError("The requested bank includes a language not declared by the installed voice")
         worker = probe.PipeWorker(runtime, stage / "worker-stderr.log")
-        roles, runs = generate_banks(worker, probe, args.voice, entries, stage / "banks", timeout=args.timeout,
+        guarded=EpochGuardedRenderer(worker,source_epoch,snapshot)
+        roles, runs = generate_banks(guarded, probe, args.voice, entries, stage / "banks", timeout=args.timeout,
             progress=lambda done, total, row: print(f"{done}/{total}: {row['language']} {row['name']}", flush=True))
         recipe["roles"].update({"banks/" + name: role for name, role in roles.items()})
         _atomic_json(stage / "recipe.json", recipe)

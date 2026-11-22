@@ -244,6 +244,13 @@ def begin():
         finish()
         return
     check("select_dordiai", "passed", driver_name=DRIVER.name)
+    try:
+        from synthDrivers import _sonic
+        _sonic.initialize()
+        check("host_sonic_import_and_dll", "passed", module=getattr(_sonic, "__name__", None))
+    except Exception as error:
+        check("host_sonic_import_and_dll", "failed", error_type=type(error).__name__,
+              import_name=getattr(error, "name", None))
     module = sys.modules.get(type(DRIVER).__module__)
     SAMPLE_RATE = getattr(module, "SAMPLE_RATE", SAMPLE_RATE)
     voices = list(DRIVER.availableVoices)
@@ -380,6 +387,7 @@ def start_phrase():
     DRIVER.cancel()
     DONE.clear()
     DRIVER._dordiai_last_error = None
+    DRIVER._dordiai_last_error_details = None
     RESULT["phrase_requested_ns"] = time.perf_counter_ns()
     DRIVER.speak([LangChangeCommand("uk"), "Кнопка перемикач натиснуто. ",
                   LangChangeCommand("en"), "Open the document. ", IndexCommand(880001)])
@@ -388,12 +396,20 @@ def start_phrase():
 
 def wait_for_stage(stage, deadline, continuation):
     stats = snapshot(stage)
+    details = getattr(DRIVER, "_dordiai_last_error_details", None)
+    if permanent_speech_failure(details):
+        check(stage + "_pcm_submission", "failed", reason="Permanent speech import failure; further requests stopped",
+              metrics=stats, diagnostics=details)
+        DRIVER.cancel()
+        finish()
+        return
     if DONE.is_set():
         error = getattr(DRIVER, "_dordiai_last_error", None)
         success = stats.get("pcm_bytes", 0) > 0 and stats.get("nonzero_bytes", 0) > 0 and not error
         if success and not SETTINGS.get("headless_ui_probe"):
             RESULT["wave_player_verified"] = True
         check(stage + "_pcm_submission", "passed" if success else "failed", metrics=stats, driver_error=error,
+              diagnostics=details,
               output_boundary="recording PCM sink TEST DOUBLE" if SETTINGS.get("headless_ui_probe") else "real WavePlayer")
         later(300, continuation)
     elif time.monotonic() >= deadline:
@@ -403,6 +419,14 @@ def wait_for_stage(stage, deadline, continuation):
         later(300, continuation)
     else:
         later(250, lambda: wait_for_stage(stage, deadline, continuation))
+
+
+def permanent_speech_failure(details):
+    if not isinstance(details, dict):
+        return False
+    return details.get("type") in {"ImportError", "ModuleNotFoundError"} or (
+        isinstance(details.get("worker"), dict) and
+        details["worker"].get("type") in {"ImportError", "ModuleNotFoundError"})
 
 
 def start_character():
@@ -514,6 +538,8 @@ def latency_worker():
         global ACTIVE_REQUEST
         if LATENCY_STOP.is_set() or time.monotonic() >= deadline:
             raise TimeoutError("Latency watchdog exhausted")
+        if permanent_speech_failure(getattr(DRIVER, "_dordiai_last_error_details", None)):
+            raise RuntimeError("Permanent speech import failure; latency requests stopped")
         DRIVER.cancel()
         DONE.clear()
         pending = {"event": threading.Event(), "started_ns": time.perf_counter_ns(), "first_feed_ns": None}

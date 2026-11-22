@@ -478,7 +478,8 @@
       ],
       "package_count": 29,
       "download_bytes": 3059894565,
-      "installed_payload_bytes": 3306666877
+      "installed_payload_bytes": 3306666877,
+      "required_core_version_for_all_packages": "0.13.1-dev.1"
     },
     "extra": {
       "backend": "extra-onnx",
@@ -579,11 +580,29 @@
           "experimental": true,
           "native_pronunciation_verified": false,
           "windows_nvda_verified": false
+        },
+        {
+          "filename": "dordiai-extra-ks-1.0.0.zip",
+          "size_bytes": 130369393,
+          "sha256": "44899a48976892dc8eaccf83028119f5ab7d1c6424e590d1b2552629197e4f20",
+          "payload_files": 9,
+          "installed_bytes": 141778515,
+          "id": "extra-ks",
+          "code": "ks",
+          "backend": "extra-onnx",
+          "license": "MIT",
+          "model_sha256": "6528b8ebf93e6a2812a8015f74dee7a6d71c7c5ca8bc0c4e92b834515eddaac2",
+          "source_sha256": "f9f85869ef39d1e65279e46e13d02f5a438b378bf51e1880e17930f0747c3643",
+          "experimental": true,
+          "minimum_core_version": "0.13.1-dev.3",
+          "native_pronunciation_verified": false,
+          "windows_nvda_verified": false
         }
       ],
-      "package_count": 6,
-      "download_bytes": 586668923,
-      "installed_payload_bytes": 634969230
+      "required_core_version_for_all_packages": "0.13.1-dev.3",
+      "package_count": 7,
+      "download_bytes": 717038316,
+      "installed_payload_bytes": 776747745
     },
     "omni": {
       "backend": "omni-onnx",
@@ -813,7 +832,35 @@
       ],
       "package_count": 11,
       "download_bytes": 927050149,
-      "installed_payload_bytes": 1091904856
+      "installed_payload_bytes": 1091904856,
+      "required_core_version_for_all_packages": "0.13.1-dev.1"
+    },
+    "rasa": {
+      "backend": "rasa-onnx",
+      "minimum_core_version": "0.13.1-dev.3",
+      "packages": [
+        {
+          "filename": "dordiai-rasa-brx-1.0.0.zip",
+          "size_bytes": 114167978,
+          "sha256": "61c9420ff02df15f458dab56230926f951191eb10e43a0ac7ca910228f2adefa",
+          "payload_files": 6,
+          "installed_bytes": 123358295,
+          "id": "rasa-brx",
+          "code": "brx",
+          "backend": "rasa-onnx",
+          "minimum_core_version": "0.13.1-dev.3",
+          "license": "CC-BY-4.0",
+          "model_sha256": "4473f8d0b6f738196c1626bbf337cda99b34749b638bb7234c4cb8e1992bf804",
+          "source_sha256": "ea1f17a659fbbb77e586679e4931ded2986607b256662dbcb1ef8d88ec1a8b31",
+          "experimental": true,
+          "native_pronunciation_verified": false,
+          "windows_nvda_verified": false
+        }
+      ],
+      "required_core_version_for_all_packages": "0.13.1-dev.3",
+      "package_count": 1,
+      "download_bytes": 114167978,
+      "installed_payload_bytes": 123358295
     }
   },
   "default_installation": false,

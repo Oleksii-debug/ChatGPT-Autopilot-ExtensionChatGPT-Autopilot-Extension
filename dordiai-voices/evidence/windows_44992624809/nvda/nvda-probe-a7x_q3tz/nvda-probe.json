@@ -1,0 +1,398 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "status": "failed",
+  "run_id": "511169af1a9746e388824ca6ca663e61",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "nvda_version_expected": "2026.3.1",
+  "checks": [
+    {
+      "name": "physical_audio_output",
+      "status": "blocked",
+      "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+    },
+    {
+      "name": "select_dordiai",
+      "status": "passed",
+      "driver_name": "kx47Preview"
+    },
+    {
+      "name": "allowed_voice_catalog",
+      "status": "passed",
+      "count": 45,
+      "voices": [
+        "adam",
+        "agnieszka",
+        "alex",
+        "alice_day1",
+        "astra_day2",
+        "bella",
+        "brian",
+        "brian_studio",
+        "brianna",
+        "callum_day1",
+        "charlie_day1",
+        "chris",
+        "claude_day2",
+        "daniel",
+        "daniel_day1",
+        "david",
+        "elis",
+        "gemini_day2",
+        "george",
+        "george_unpacked",
+        "gpt_day2",
+        "grok_day2",
+        "harry",
+        "hazel",
+        "keeper",
+        "laura_day1",
+        "laura_unpacked",
+        "lian",
+        "liza",
+        "liza_talk",
+        "mark",
+        "mykola",
+        "oksana",
+        "oleksii",
+        "oleksii_day1",
+        "oleksii_day2",
+        "oleksii_unpacked",
+        "olena",
+        "sara",
+        "sara_archive",
+        "studio_day1",
+        "veren",
+        "viktoriia",
+        "will",
+        "yevhen"
+      ],
+      "excluded_present": []
+    },
+    {
+      "name": "fresh_default_languages",
+      "status": "passed",
+      "enabled": [
+        "en",
+        "ru",
+        "uk"
+      ]
+    },
+    {
+      "name": "settings_dialog",
+      "status": "passed",
+      "title": "dordiai-voices — налаштування",
+      "visible": true,
+      "pages": [
+        "Мовлення",
+        "Голоси",
+        "Мови",
+        "Пакети"
+      ],
+      "labels": [
+        "dordiai-voices — налаштування",
+        "panel",
+        "Основний голос",
+        "Визначення мови",
+        "Швидкість, відсотків",
+        "Множник швидкості",
+        "Гучність, відсотків",
+        "Висота, відсотків",
+        "Тембр, відсотків",
+        "Мова чисел",
+        "Мова кириличних літер",
+        "panel",
+        "Доступні голоси",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "panel",
+        "Мови для перемикання",
+        "Увімкнути всі",
+        "Вимкнути всі",
+        "Основна мова",
+        "Мова для призначення голосу",
+        "Голос для цієї мови",
+        "Показано встановлені мови. Галочка вмикає мову, але не видаляє її файли. Нові мови\nпотрібно вмикати окремо. Текст вимкненою мовою читається основною мовою.\nВиберіть мову й сумісний голос. У примусовому режимі весь текст читається основною\nмовою.",
+        "panel",
+        "Установлені додаткові пакети",
+        "Установити пакет із ZIP-файла…",
+        "Видалити вибраний пакет…",
+        "Вибрати попередню версію голосу…",
+        "Основний комплект не видаляється тут. Після зміни пакетів перезапустіть NVDA, потім\nувімкніть потрібні встановлені мови на вкладці «Мови».",
+        "OK",
+        "Cancel",
+        "&Apply"
+      ],
+      "checked_languages": [
+        "en",
+        "ru",
+        "uk"
+      ],
+      "voice_rows": 45,
+      "missing_controls": []
+    },
+    {
+      "name": "settings_hotkey_binding",
+      "status": "passed",
+      "scripts": [
+        "script_preferences"
+      ]
+    },
+    {
+      "name": "keyboard_tab",
+      "status": "passed",
+      "events_emitted": true,
+      "changed_focus": true,
+      "focused_type": "WxCtrlWithEnableEvnt",
+      "reason": null
+    },
+    {
+      "name": "keyboard_checkbox_space",
+      "status": "passed",
+      "changed": true,
+      "reason": null
+    },
+    {
+      "name": "phrase_pcm_submission",
+      "status": "failed",
+      "metrics": {},
+      "driver_error": "ImportError",
+      "output_boundary": "recording PCM sink TEST DOUBLE"
+    },
+    {
+      "name": "character_pcm_submission",
+      "status": "failed",
+      "metrics": {},
+      "driver_error": "ImportError",
+      "output_boundary": "recording PCM sink TEST DOUBLE"
+    },
+    {
+      "name": "cancel_api",
+      "status": "passed",
+      "call_duration_ms": 0.0177,
+      "generation_before": 3,
+      "generation_after": 4,
+      "note": "One API observation, not acoustic stop latency or P95/P99 acceptance"
+    },
+    {
+      "name": "api_latency_measurement",
+      "status": "failed",
+      "letters": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "cancel": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "switch": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "note": "Measurement completion only; API/pre-device values do not certify physical latency acceptance"
+    },
+    {
+      "name": "warm_letter_predevice_target",
+      "status": "blocked",
+      "measurements": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "reason": "Recording sink double: internal queue measurements cannot satisfy WavePlayer/device or acoustic acceptance"
+    },
+    {
+      "name": "cancel_api_target",
+      "status": "blocked",
+      "measurements": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "reason": "Recording sink double: internal queue measurements cannot satisfy WavePlayer/device or acoustic acceptance"
+    }
+  ],
+  "limitations": [
+    "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+    "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+    "One keyboard smoke check is not a complete accessibility assessment.",
+    "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "nvda_version_actual": "2026.3.1",
+  "phrase_requested_ns": 683849390000,
+  "character_requested_ns": 689597565600,
+  "latency_scope": {
+    "boundary": "driver.speak to recording PCM sink TEST DOUBLE",
+    "cancel_boundary": "elapsed real driver.cancel API call",
+    "physical_audible_latency": "not measured; no loopback capture",
+    "switch_boundary": "alternating individual language requests, not a continuous audible gap measurement",
+    "warmup": "one isolated letter request per language before repeated samples",
+    "cold_start": "Initial phrase and character timings are recorded separately after driver startup; background preloading and packaged caches mean they are not guaranteed fully cold runs.",
+    "sample_count_target": 100,
+    "hardware": {
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "machine": "AMD64",
+      "processor": "AMD64 Family 25 Model 1 Stepping 1, AuthenticAMD",
+      "python": "3.13.17 (tags/v3.13.17:64e080d, Oct 21 2026, 14:08:53) [MSC v.1944 64 bit (AMD64)]",
+      "sample_rate": 24000,
+      "logical_cpu_count": 4,
+      "wave_out_devices": 0,
+      "configured_audio_device": "default"
+    }
+  },
+  "api_latency": {
+    "warm_letters": {
+      "count": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null
+    },
+    "cancel_api": {
+      "count": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null
+    },
+    "warm_switch_requests": {
+      "count": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null
+    },
+    "languages": [
+      "uk",
+      "en",
+      "ru"
+    ],
+    "samples": {
+      "first_after_prior_smoke_ms": {
+        "uk": null,
+        "en": null,
+        "ru": null
+      },
+      "warm_letters_ms": [],
+      "cancel_api_ms": [],
+      "warm_switch_requests_ms": [],
+      "timeouts": [
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "en",
+          "error": "ImportError"
+        },
+        {
+          "language": "ru",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        },
+        {
+          "language": "uk",
+          "error": "ImportError"
+        }
+      ],
+      "errors": [
+        "TimeoutError('Latency watchdog exhausted')"
+      ]
+    }
+  },
+  "initial_smoke_predevice_latency": {
+    "phrase_first_request_to_pcm_ms": null,
+    "character_first_request_to_pcm_ms": null
+  },
+  "pcm_metrics": {},
+  "finished_at_ns": 1795328553801407800
+}

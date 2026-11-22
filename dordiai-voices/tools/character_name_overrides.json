@@ -182,6 +182,457 @@
       "exclusions": {
         "qh": "ILCA table currently says qa for both q and qh; do not silently correct an ambiguous source"
       }
+    },
+    "es": {
+      "source": {
+        "url": "https://www.rae.es/sites/default/files/Principales_novedades_de_la_Ortografia_de_la_lengua_espanola.pdf",
+        "sha256": "bf631982e947e95b13d3ce1a6c381ab32fd5b493e297725933b6445aa8fa0509",
+        "sha256_scope": "original retrieved PDF bytes",
+        "title": "Principales novedades de la última edición de la Ortografía de la lengua española (2010)",
+        "author": "Real Academia Española / Asociación de Academias de la Lengua Española",
+        "location": "§2; PDF page2 name table",
+        "role": "Explicit ordinary letter names in a primary language reference. Recommended common names; ch/ll remain digraphs and are not silently counted as alphabet letters.",
+        "short_quote": "El nombre común recomendado",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "b": "be",
+        "c": "ce",
+        "d": "de",
+        "e": "e",
+        "f": "efe",
+        "g": "ge",
+        "h": "hache",
+        "i": "i",
+        "j": "jota",
+        "k": "ka",
+        "l": "ele",
+        "m": "eme",
+        "n": "ene",
+        "ñ": "eñe",
+        "o": "o",
+        "p": "pe",
+        "q": "cu",
+        "r": "erre",
+        "s": "ese",
+        "t": "te",
+        "u": "u",
+        "v": "uve",
+        "w": "uve doble",
+        "x": "equis",
+        "y": "ye",
+        "z": "zeta"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "v": [
+          "ve"
+        ],
+        "w": [
+          "ve doble",
+          "doble uve",
+          "doble ve",
+          "doble u"
+        ],
+        "y": [
+          "i griega"
+        ]
+      }
+    },
+    "pt": {
+      "source": {
+        "url": "https://files.diariodarepublica.pt/1s/1991/08/193a00/43704388.pdf",
+        "sha256": "c158913d9075ebba7ca6661317fe6e777fb9a7588e13ed46044115e05aede1f5",
+        "sha256_scope": "original retrieved PDF bytes",
+        "title": "Acordo Ortográfico da Língua Portuguesa (1990), Diário da República I série-A 193, 23 August1991",
+        "author": "República Portuguesa; agreed Portuguese-language orthography",
+        "location": "AnexoI, BaseI, printedp4371 / PDFp2; visually checked original table",
+        "role": "Explicit ordinary letter names in a primary language reference. First listed alternatives selected; alphabet26 plus separately documentedç/seven digraph name entries. Source permits other regional names.",
+        "short_quote": "Os nomes das letras acima sugeridos",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "á",
+        "b": "bê",
+        "c": "cê",
+        "d": "dê",
+        "e": "é",
+        "f": "efe",
+        "g": "gê",
+        "h": "agá",
+        "i": "i",
+        "j": "jota",
+        "k": "capa",
+        "l": "ele",
+        "m": "eme",
+        "n": "ene",
+        "o": "ó",
+        "p": "pê",
+        "q": "quê",
+        "r": "erre",
+        "s": "esse",
+        "t": "tê",
+        "u": "u",
+        "v": "vê",
+        "w": "dáblio",
+        "x": "xis",
+        "y": "ípsilon",
+        "z": "zê",
+        "ç": "cê cedilhado",
+        "rr": "erre duplo",
+        "ss": "esse duplo",
+        "ch": "cê-agá",
+        "lh": "ele-agá",
+        "nh": "ene-agá",
+        "gu": "guê-u",
+        "qu": "quê-u"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "g": [
+          "guê"
+        ],
+        "k": [
+          "cá"
+        ]
+      }
+    },
+    "it": {
+      "source": {
+        "url": "https://www.treccani.it/enciclopedia/nomi-delle-prontuario-lettere_%28Enciclopedia-dell%27Italiano%29/",
+        "sha256": "9c54b8c54f7eea4d15af44e3053ee35e9a5555f6ec1437738f319db134c6a0b1",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "lettere, nomi delle [prontuario], Enciclopedia dell’Italiano (2011)",
+        "author": "Istituto della Enciclopedia Italiana fondata da Giovanni Treccani",
+        "location": "Ordinary consonant/vowel names and Lettere importate subsections",
+        "role": "Explicit ordinary letter names in a primary language reference. Traditional Italian spelling names selected, including loanletters; IPA explanations excluded from text values.",
+        "short_quote": "Le vocali",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "b": "bi",
+        "c": "ci",
+        "d": "di",
+        "e": "e",
+        "f": "effe",
+        "g": "gi",
+        "h": "acca",
+        "i": "i",
+        "j": "i lunga",
+        "k": "kappa",
+        "l": "elle",
+        "m": "emme",
+        "n": "enne",
+        "o": "o",
+        "p": "pi",
+        "q": "qu",
+        "r": "erre",
+        "s": "esse",
+        "t": "ti",
+        "u": "u",
+        "v": "vu",
+        "w": "doppia vu",
+        "x": "ics",
+        "y": "ipsilon",
+        "z": "zeta"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "v": [
+          "vi"
+        ],
+        "j": [],
+        "k": [
+          "cappa"
+        ],
+        "w": [
+          "vu doppia"
+        ],
+        "y": [
+          "i greca"
+        ]
+      }
+    },
+    "hr": {
+      "source": {
+        "url": "https://pravopis.hr/slova/",
+        "sha256": "9ab93c8856daa0d9686e9f69d6851f226f24bd38dc33b32965f1a7dfb71b78f1",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "Hrvatski pravopis, Slova",
+        "author": "Institut za hrvatski jezik i jezikoslovlje",
+        "location": "Slova; Nazivi su slova hrvatske latinice paragraph",
+        "role": "Explicit ordinary letter names in a primary language reference. All30 explicit names inclthree digraphs. Source notes some names are uncommon but gives them systematically; no foreignQ/W/X/Y names inferred.",
+        "short_quote": "Nazivi su slova hrvatske latinice",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "b": "be",
+        "c": "ce",
+        "č": "če",
+        "ć": "će",
+        "d": "de",
+        "dž": "dže",
+        "đ": "đe",
+        "e": "e",
+        "f": "ef",
+        "g": "ge",
+        "h": "ha",
+        "i": "i",
+        "j": "je",
+        "k": "ka",
+        "l": "el",
+        "lj": "elj",
+        "m": "em",
+        "n": "en",
+        "nj": "enj",
+        "o": "o",
+        "p": "pe",
+        "r": "er",
+        "s": "es",
+        "š": "eš",
+        "t": "te",
+        "u": "u",
+        "v": "ve",
+        "z": "ze",
+        "ž": "že"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name"
+    },
+    "fi": {
+      "source": {
+        "url": "https://kielitoimistonohjepankki.fi/ohje/aakkoset/",
+        "sha256": "41849ba8c9d04fbacc3e9284e73bc38a6e79edaf8ea7b1e9d93e33ea80b57bfa",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "Aakkoset — Kirjainten nimitykset",
+        "author": "Kotimaisten kielten keskus, Kielitoimiston ohjepankki",
+        "location": "Kirjainten nimitykset table",
+        "role": "Explicit ordinary letter names in a primary language reference. First listed standard forms selected; ordinary29 letters plus officially includedš/ž.",
+        "short_quote": "Kirjainten nimitykset",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "aa",
+        "b": "bee",
+        "c": "see",
+        "d": "dee",
+        "e": "ee",
+        "f": "äf",
+        "g": "gee",
+        "h": "hoo",
+        "i": "ii",
+        "j": "jii",
+        "k": "koo",
+        "l": "äl",
+        "m": "äm",
+        "n": "än",
+        "o": "oo",
+        "p": "pee",
+        "q": "kuu",
+        "r": "är",
+        "s": "äs",
+        "t": "tee",
+        "u": "uu",
+        "v": "vee",
+        "w": "kaksoisvee",
+        "x": "äks",
+        "y": "yy",
+        "z": "tset",
+        "å": "ruotsalainen oo",
+        "ä": "ää",
+        "ö": "öö",
+        "š": "hattu-äs",
+        "ž": "hattu-tset"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name",
+      "alternatives": {
+        "f": [
+          "äffä"
+        ],
+        "l": [
+          "ällä"
+        ],
+        "m": [
+          "ämmä"
+        ],
+        "n": [
+          "ännä"
+        ],
+        "r": [
+          "ärrä"
+        ],
+        "s": [
+          "ässä"
+        ],
+        "š": [
+          "hattu-ässä"
+        ],
+        "x": [
+          "äksä"
+        ],
+        "z": [
+          "tseta"
+        ],
+        "ž": [
+          "hattu-tseta"
+        ]
+      }
+    },
+    "el": {
+      "source": {
+        "url": "https://ebooks.edu.gr/ebooks/v/html/8547/2334/Grammatiki-Neas-Ellinikis-Glossas_A-B-G-Gymnasiou_html-apli/index_B_03.html",
+        "sha256": "614e7d18b5aea420407181f5a7d524547ac74c2e5b7ca433ef5793d4798fdb85",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "Γραμματική Νέας Ελληνικής Γλώσσας Α΄, Β΄, Γ΄ Γυμνασίου, 3. Γραφή",
+        "author": "Greek Ministry of Education / Ινστιτούτο Εκπαιδευτικής Πολιτικής / Διόφαντος",
+        "location": "3. Γραφή, table with Ονομασία column",
+        "role": "Explicit ordinary letter-name table in a primary language/educational reference. 24-letter modernGreek alphabet with separately shownfinalσ/ς form; Greek native names, notforeigntransliterations.",
+        "short_quote": "Ονομασία",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "α": "άλφα",
+        "β": "βήτα",
+        "γ": "γάμα",
+        "δ": "δέλτα",
+        "ε": "έψιλον",
+        "ζ": "ζήτα",
+        "η": "ήτα",
+        "θ": "θήτα",
+        "ι": "γιώτα",
+        "κ": "κάπα",
+        "λ": "λάμδα",
+        "μ": "μι",
+        "ν": "νι",
+        "ξ": "ξι",
+        "ο": "όμικρον",
+        "π": "πι",
+        "ρ": "ρο",
+        "σ": "σίγμα",
+        "τ": "ταυ",
+        "υ": "ύψιλον",
+        "φ": "φι",
+        "χ": "χι",
+        "ψ": "ψι",
+        "ω": "ωμέγα",
+        "ς": "σίγμα"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name"
+    },
+    "pl": {
+      "source": {
+        "url": "https://sszpitalne.edu.pl/wp-content/uploads/2020/03/kolejno%C5%9B%C4%87-alfabetyczna-%C4%87wiczenia.pdf",
+        "sha256": "0f2ce97cfaf20f8611902219f0dcdebb5ec9dc5f42db32bb461e31c83ef0bedf",
+        "sha256_scope": "original retrieved PDF bytes",
+        "title": "Kolejność alfabetyczna — ćwiczenia, Alfabet",
+        "author": "Zespół Szkół Szpitalnych, primary school teaching material",
+        "location": "PDF page1, fourrows ofletter-name pairs; originalpage visuallychecked",
+        "role": "Explicit ordinary letter-name table in a primary language/educational reference. 32-letter schoolalphabet. Legacy PDFfont extractsż asŜ; actualpage visuallyconfirmsż andżet, explicitlytranscribedwithoutfont-byte substitution rules.",
+        "short_quote": "Zapamiętaj kolejność i nazwy liter w alfabecie",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "ą": "ą",
+        "b": "be",
+        "c": "ce",
+        "ć": "cie",
+        "d": "de",
+        "e": "e",
+        "ę": "ę",
+        "f": "ef",
+        "g": "gie",
+        "h": "ha",
+        "i": "i",
+        "j": "jot",
+        "k": "ka",
+        "l": "el",
+        "ł": "eł",
+        "m": "em",
+        "n": "en",
+        "ń": "eń",
+        "o": "o",
+        "ó": "ó",
+        "p": "pe",
+        "r": "er",
+        "s": "es",
+        "ś": "eś",
+        "t": "te",
+        "u": "u",
+        "w": "wu",
+        "y": "y",
+        "z": "zet",
+        "ź": "ziet",
+        "ż": "żet"
+      },
+      "ordinary_alphabet_complete": true,
+      "semantic_role": "ordinary_letter_name"
+    },
+    "ro": {
+      "source": {
+        "url": "https://doom.lingv.ro/studiu_introductiv/semne_grafice",
+        "sha256": "0c95348416ee17ca6c80571d570f16787ca018f026b16d01fbf0a53d64640e62",
+        "sha256_scope": "original retrieved HTML bytes",
+        "title": "DOOM³ — Studiu introductiv, 1.1.1. Alfabetul limbii române",
+        "author": "Institutul de Lingvistică Iorgu Iordan — Alexandru Rosetti, Academia Română",
+        "location": "Tab.1, Denumirea/citirea literei column",
+        "role": "Explicit ordinary letter-name table in a primary language/educational reference. Only explicit native-script name variants selected: c=kî,g=ghe. Name notation withče/ğe/kü not mechanicallytransformed into inventedorthography.",
+        "short_quote": "Denumirea/citirea literei",
+        "license_note": "Individual factual letter-name mappings transcribed with attribution; source document, prose, images and fonts are not redistributed; no license of whole source asserted",
+        "native_pronunciation_verified": false
+      },
+      "letter_names": {
+        "a": "a",
+        "ă": "ă",
+        "â": "î din a",
+        "b": "be",
+        "c": "kî",
+        "d": "de",
+        "e": "e",
+        "f": "ef",
+        "g": "ghe",
+        "h": "haș",
+        "i": "i",
+        "î": "î din i",
+        "j": "je",
+        "k": "ka",
+        "l": "el",
+        "m": "em",
+        "n": "en",
+        "o": "o",
+        "p": "pe",
+        "r": "er",
+        "s": "es",
+        "ș": "șe",
+        "t": "te",
+        "ț": "țe",
+        "u": "u",
+        "v": "ve",
+        "w": "dublu ve",
+        "x": "iks",
+        "y": "i grec",
+        "z": "ze"
+      },
+      "ordinary_alphabet_complete": false,
+      "semantic_role": "ordinary_letter_name",
+      "exclusions": {
+        "q": "Onlysourcevariantkü usesnon-Romanian/phonetic notation; no ordinarywrittenname inferred"
+      }
     }
   }
 }

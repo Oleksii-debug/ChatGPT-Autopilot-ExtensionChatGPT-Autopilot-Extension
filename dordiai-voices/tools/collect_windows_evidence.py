@@ -44,14 +44,14 @@ def _tail(path, maximum):
 def _summary(document):
     result = {key: document[key] for key in ("status", "scope", "error", "reason", "traceback")
               if key in document}
-    for field in ("checks", "tests"):
+    for field in ("checks", "tests", "cases"):
         entries = document.get(field)
         if isinstance(entries, list):
             result[field + "_count"] = len(entries)
             result[field + "_nonpassing"] = [
                 {key: value for key, value in entry.items()
                  if key in {"name", "kind", "language", "voice", "status", "error", "reason", "traceback", "driver_error"}}
-                for entry in entries if isinstance(entry, dict) and entry.get("status") not in {"passed", "success"}
+                for entry in entries if isinstance(entry, dict) and entry.get("status") not in {"passed", "success", "passed-structure-only"}
             ]
     if isinstance(document.get("probe"), dict):
         result["probe"] = _summary(document["probe"])

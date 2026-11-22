@@ -1,0 +1,2013 @@
+{
+  "format": "dordiai-windows-engine-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T06:05:33.372490+00:00",
+  "platform": "win32",
+  "host_python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "system": "Windows-2025Server-10.0.26100-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 207 Stepping 2, GenuineIntel",
+  "logical_cpu_count": 4,
+  "package_root": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package",
+  "status": "passed",
+  "tests": [
+    {
+      "kind": "language-engine",
+      "language": "en",
+      "runs": [
+        {
+          "first_pcm_ms": 1906.820400000015,
+          "completed_ms": 2629.513999999972,
+          "real_time_factor": 0.6281248917598046,
+          "audio": {
+            "frames": 100471,
+            "duration_seconds": 4.1862916666666665,
+            "peak": 0.531585693359375,
+            "rms": 0.07427333702473547,
+            "nonzero_samples": 97523
+          },
+          "chunks": [
+            {
+              "time_ms": 1906.820400000015,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 1938.0290000000286,
+              "bytes": 6840
+            },
+            {
+              "time_ms": 1989.881999999966,
+              "bytes": 17642
+            },
+            {
+              "time_ms": 2040.7301999999845,
+              "bytes": 11040
+            },
+            {
+              "time_ms": 2089.2864999999574,
+              "bytes": 5760
+            },
+            {
+              "time_ms": 2246.5234999999666,
+              "bytes": 52924
+            },
+            {
+              "time_ms": 2298.533099999986,
+              "bytes": 15518
+            },
+            {
+              "time_ms": 2351.3569000000416,
+              "bytes": 15644
+            },
+            {
+              "time_ms": 2410.1402999999664,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 2461.6932000000133,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 2512.9318000000467,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 2562.707199999977,
+              "bytes": 15614
+            },
+            {
+              "time_ms": 2613.2379000000583,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 2614.274900000055,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "en-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Speech engine check. The selected voice is reading an English sentence.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 1906.820400000015,
+        "median_ms": 1906.820400000015,
+        "maximum_ms": 1906.820400000015
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "ru",
+      "runs": [
+        {
+          "first_pcm_ms": 1474.8288000000684,
+          "completed_ms": 3175.6497999999738,
+          "real_time_factor": 0.8909103100013954,
+          "audio": {
+            "frames": 85548,
+            "duration_seconds": 3.5645,
+            "peak": 0.423065185546875,
+            "rms": 0.08953544046863596,
+            "nonzero_samples": 83982
+          },
+          "chunks": [
+            {
+              "time_ms": 1474.8288000000684,
+              "bytes": 9834
+            },
+            {
+              "time_ms": 1660.1663000000144,
+              "bytes": 15382
+            },
+            {
+              "time_ms": 1815.032100000053,
+              "bytes": 13978
+            },
+            {
+              "time_ms": 1964.0185000000656,
+              "bytes": 13746
+            },
+            {
+              "time_ms": 2105.4082000000562,
+              "bytes": 480
+            },
+            {
+              "time_ms": 2256.0057000000597,
+              "bytes": 27698
+            },
+            {
+              "time_ms": 2409.6365000000333,
+              "bytes": 13924
+            },
+            {
+              "time_ms": 2558.647199999996,
+              "bytes": 14020
+            },
+            {
+              "time_ms": 2706.3877000000502,
+              "bytes": 13772
+            },
+            {
+              "time_ms": 2867.5005000000056,
+              "bytes": 13600
+            },
+            {
+              "time_ms": 2995.4927,
+              "bytes": 14502
+            },
+            {
+              "time_ms": 3086.709400000018,
+              "bytes": 12480
+            },
+            {
+              "time_ms": 3162.57470000005,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "ru-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Проверка синтезатора. Выбранный голос читает русский текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 1474.8288000000684,
+        "median_ms": 1474.8288000000684,
+        "maximum_ms": 1474.8288000000684
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "de",
+      "runs": [
+        {
+          "first_pcm_ms": 2586.875700000064,
+          "completed_ms": 3102.424600000063,
+          "real_time_factor": 1.4978513458057032,
+          "audio": {
+            "frames": 49710,
+            "duration_seconds": 2.07125,
+            "peak": 0.3768310546875,
+            "rms": 0.07189933794033686,
+            "nonzero_samples": 49444
+          },
+          "chunks": [
+            {
+              "time_ms": 2586.875700000064,
+              "bytes": 40380
+            },
+            {
+              "time_ms": 2980.392199999983,
+              "bytes": 51360
+            },
+            {
+              "time_ms": 3094.5927999999867,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:de",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "de-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Dies ist ein Test der Sprachausgabe.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 2586.875700000064,
+        "median_ms": 2586.875700000064,
+        "maximum_ms": 2586.875700000064
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "fr",
+      "runs": [
+        {
+          "first_pcm_ms": 554.132700000082,
+          "completed_ms": 1087.2180000000071,
+          "real_time_factor": 0.4853471225028863,
+          "audio": {
+            "frames": 53762,
+            "duration_seconds": 2.240083333333333,
+            "peak": 0.474151611328125,
+            "rms": 0.07949422312405065,
+            "nonzero_samples": 53550
+          },
+          "chunks": [
+            {
+              "time_ms": 554.132700000082,
+              "bytes": 42300
+            },
+            {
+              "time_ms": 943.0815000000621,
+              "bytes": 53498
+            },
+            {
+              "time_ms": 1077.8673000000936,
+              "bytes": 4800
+            },
+            {
+              "time_ms": 1078.493000000094,
+              "bytes": 6926
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:fr",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "fr-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Ceci est un test de synthèse vocale.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 554.132700000082,
+        "median_ms": 554.132700000082,
+        "maximum_ms": 554.132700000082
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "it",
+      "runs": [
+        {
+          "first_pcm_ms": 534.3388000000004,
+          "completed_ms": 871.8482000000449,
+          "real_time_factor": 0.45856578566734774,
+          "audio": {
+            "frames": 45630,
+            "duration_seconds": 1.90125,
+            "peak": 0.45849609375,
+            "rms": 0.083348589967645,
+            "nonzero_samples": 45330
+          },
+          "chunks": [
+            {
+              "time_ms": 534.3388000000004,
+              "bytes": 45180
+            },
+            {
+              "time_ms": 860.8864999999923,
+              "bytes": 38400
+            },
+            {
+              "time_ms": 861.7876000000706,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:it",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "it-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Questa è una prova di sintesi vocale.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 534.3388000000004,
+        "median_ms": 534.3388000000004,
+        "maximum_ms": 534.3388000000004
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "es",
+      "runs": [
+        {
+          "first_pcm_ms": 563.7076999998953,
+          "completed_ms": 1123.8887999999179,
+          "real_time_factor": 0.5374244112372589,
+          "audio": {
+            "frames": 50190,
+            "duration_seconds": 2.09125,
+            "peak": 0.36602783203125,
+            "rms": 0.07485411628016728,
+            "nonzero_samples": 48785
+          },
+          "chunks": [
+            {
+              "time_ms": 563.7076999998953,
+              "bytes": 40380
+            },
+            {
+              "time_ms": 937.4289999999519,
+              "bytes": 52320
+            },
+            {
+              "time_ms": 1115.7882999999629,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:es",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "es-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Esta es una prueba de síntesis de voz.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 563.7076999998953,
+        "median_ms": 563.7076999998953,
+        "maximum_ms": 563.7076999998953
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "pl",
+      "runs": [
+        {
+          "first_pcm_ms": 2262.1462999999267,
+          "completed_ms": 2585.6363999999985,
+          "real_time_factor": 1.3023689053055734,
+          "audio": {
+            "frames": 47648,
+            "duration_seconds": 1.9853333333333334,
+            "peak": 0.38092041015625,
+            "rms": 0.07224521961285826,
+            "nonzero_samples": 46976
+          },
+          "chunks": [
+            {
+              "time_ms": 2262.1462999999267,
+              "bytes": 49020
+            },
+            {
+              "time_ms": 2577.4255999999696,
+              "bytes": 39840
+            },
+            {
+              "time_ms": 2578.1965999999557,
+              "bytes": 6436
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:pl",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "pl-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "To jest próba syntezatora mowy.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 2262.1462999999267,
+        "median_ms": 2262.1462999999267,
+        "maximum_ms": 2262.1462999999267
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "uk",
+      "runs": [
+        {
+          "first_pcm_ms": 1102.2477999999865,
+          "completed_ms": 2489.3632000000707,
+          "real_time_factor": 0.4180290848026987,
+          "audio": {
+            "frames": 142920,
+            "duration_seconds": 5.955,
+            "peak": 0.375396728515625,
+            "rms": 0.08780135683214507,
+            "nonzero_samples": 139242
+          },
+          "chunks": [
+            {
+              "time_ms": 1102.2477999999865,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 1264.4053000000213,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 1377.263800000037,
+              "bytes": 32400
+            },
+            {
+              "time_ms": 1550.828200000069,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 1706.091000000015,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 1861.0491000000593,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 1924.4112000000086,
+              "bytes": 3600
+            },
+            {
+              "time_ms": 2101.409800000056,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 2259.1805000000704,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 2407.5412000000824,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 2467.255000000023,
+              "bytes": 1200
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "baseline",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "uk-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Перевірка синтезатора. Кнопка перемикач натиснуто. Голос читає український текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 1102.2477999999865,
+        "median_ms": 1102.2477999999865,
+        "maximum_ms": 1102.2477999999865
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "ro",
+      "runs": [
+        {
+          "first_pcm_ms": 2117.1335999999883,
+          "completed_ms": 3170.9687999999687,
+          "real_time_factor": 1.2900168017086358,
+          "audio": {
+            "frames": 58994,
+            "duration_seconds": 2.458083333333333,
+            "peak": 0.979949951171875,
+            "rms": 0.2441939279369564,
+            "nonzero_samples": 58891
+          },
+          "chunks": [
+            {
+              "time_ms": 2117.1335999999883,
+              "bytes": 11886
+            },
+            {
+              "time_ms": 2352.062300000057,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 2608.3296000000473,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 2845.1880000000074,
+              "bytes": 31206
+            },
+            {
+              "time_ms": 3075.088199999982,
+              "bytes": 4800
+            },
+            {
+              "time_ms": 3161.1549000000423,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [
+            {
+              "stage": "language-source",
+              "time_ms": 18.02280000003975
+            }
+          ],
+          "renderers": [
+            {
+              "engine": "wide:ro",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "ro-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Acesta este un test de sinteză vocală.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 2117.1335999999883,
+        "median_ms": 2117.1335999999883,
+        "maximum_ms": 2117.1335999999883
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "nl",
+      "runs": [
+        {
+          "first_pcm_ms": 764.5612999999685,
+          "completed_ms": 1638.3393999999498,
+          "real_time_factor": 0.7809208476494767,
+          "audio": {
+            "frames": 50351,
+            "duration_seconds": 2.097958333333333,
+            "peak": 0.978515625,
+            "rms": 0.22855418904213545,
+            "nonzero_samples": 50250
+          },
+          "chunks": [
+            {
+              "time_ms": 764.5612999999685,
+              "bytes": 10446
+            },
+            {
+              "time_ms": 1019.705799999997,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1254.5635000000175,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1491.0242999999355,
+              "bytes": 20160
+            },
+            {
+              "time_ms": 1630.0494999999273,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:nl",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "nl-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Dit is een test van spraaksynthese.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 764.5612999999685,
+        "median_ms": 764.5612999999685,
+        "maximum_ms": 764.5612999999685
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "pt",
+      "runs": [
+        {
+          "first_pcm_ms": 767.8239000000531,
+          "completed_ms": 1681.8238000000747,
+          "real_time_factor": 0.7582756514061693,
+          "audio": {
+            "frames": 53231,
+            "duration_seconds": 2.2179583333333333,
+            "peak": 0.963592529296875,
+            "rms": 0.19610090769586955,
+            "nonzero_samples": 53119
+          },
+          "chunks": [
+            {
+              "time_ms": 767.8239000000531,
+              "bytes": 7566
+            },
+            {
+              "time_ms": 1022.0656999999846,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1256.859899999995,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1495.0812000000724,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 1672.9363000000603,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:pt",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "pt-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Este é um teste de síntese de voz.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 767.8239000000531,
+        "median_ms": 767.8239000000531,
+        "maximum_ms": 767.8239000000531
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "el",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "cs",
+      "runs": [
+        {
+          "first_pcm_ms": 781.4442000000099,
+          "completed_ms": 1710.5556000000206,
+          "real_time_factor": 0.7443805987198872,
+          "audio": {
+            "frames": 55151,
+            "duration_seconds": 2.2979583333333333,
+            "peak": 0.91766357421875,
+            "rms": 0.18229767332469518,
+            "nonzero_samples": 55077
+          },
+          "chunks": [
+            {
+              "time_ms": 781.4442000000099,
+              "bytes": 11886
+            },
+            {
+              "time_ms": 1035.1709999999912,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1267.6930000000084,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1524.2997999999943,
+              "bytes": 28320
+            },
+            {
+              "time_ms": 1701.5233999999282,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:cs",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "cs-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Toto je zkouška syntézy řeči.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 781.4442000000099,
+        "median_ms": 781.4442000000099,
+        "maximum_ms": 781.4442000000099
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "hu",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "sv",
+      "runs": [
+        {
+          "first_pcm_ms": 768.4885999999551,
+          "completed_ms": 1698.7091999999393,
+          "real_time_factor": 0.7590441585522247,
+          "audio": {
+            "frames": 53711,
+            "duration_seconds": 2.2379583333333333,
+            "peak": 0.976470947265625,
+            "rms": 0.20111692041441287,
+            "nonzero_samples": 53589
+          },
+          "chunks": [
+            {
+              "time_ms": 768.4885999999551,
+              "bytes": 10926
+            },
+            {
+              "time_ms": 1024.809600000026,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1264.376900000002,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1521.7840999999908,
+              "bytes": 26400
+            },
+            {
+              "time_ms": 1689.8411999999325,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:sv",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "sv-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Detta är ett test av talsyntes.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 768.4885999999551,
+        "median_ms": 768.4885999999551,
+        "maximum_ms": 768.4885999999551
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "sr",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "bg",
+      "runs": [
+        {
+          "first_pcm_ms": 738.4991000000127,
+          "completed_ms": 1507.6493000000255,
+          "real_time_factor": 0.8114548496333478,
+          "audio": {
+            "frames": 44591,
+            "duration_seconds": 1.8579583333333334,
+            "peak": 0.96551513671875,
+            "rms": 0.2184752108185596,
+            "nonzero_samples": 44482
+          },
+          "chunks": [
+            {
+              "time_ms": 738.4991000000127,
+              "bytes": 13806
+            },
+            {
+              "time_ms": 980.3765999999996,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1215.885700000058,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1498.4404000000495,
+              "bytes": 5280
+            },
+            {
+              "time_ms": 1499.5439000000488,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:bg",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "bg-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Това е тест на синтеза на реч.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 738.4991000000127,
+        "median_ms": 738.4991000000127,
+        "maximum_ms": 738.4991000000127
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "sq",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "hr",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ca",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "da",
+      "runs": [
+        {
+          "first_pcm_ms": 538.9654000000519,
+          "completed_ms": 880.5534000000534,
+          "real_time_factor": 0.43588156092734265,
+          "audio": {
+            "frames": 48484,
+            "duration_seconds": 2.020166666666667,
+            "peak": 0.28863525390625,
+            "rms": 0.06893738979541165,
+            "nonzero_samples": 48149
+          },
+          "chunks": [
+            {
+              "time_ms": 538.9654000000519,
+              "bytes": 49020
+            },
+            {
+              "time_ms": 867.6252000000204,
+              "bytes": 41760
+            },
+            {
+              "time_ms": 868.592900000067,
+              "bytes": 6188
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:da",
+              "profile": "sara",
+              "carrier": "Piper",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "da-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Dette er en test af talesyntese.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 538.9654000000519,
+        "median_ms": 538.9654000000519,
+        "maximum_ms": 538.9654000000519
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "fi",
+      "runs": [
+        {
+          "first_pcm_ms": 740.7455999999684,
+          "completed_ms": 1458.5283999999774,
+          "real_time_factor": 0.8296717688606446,
+          "audio": {
+            "frames": 42191,
+            "duration_seconds": 1.7579583333333333,
+            "peak": 0.975311279296875,
+            "rms": 0.26966482212566467,
+            "nonzero_samples": 42123
+          },
+          "chunks": [
+            {
+              "time_ms": 740.7455999999684,
+              "bytes": 12366
+            },
+            {
+              "time_ms": 975.3442999999606,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1230.3683999999748,
+              "bytes": 31200
+            },
+            {
+              "time_ms": 1450.9170999999697,
+              "bytes": 1928
+            },
+            {
+              "time_ms": 1451.6748999999436,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:fi",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "fi-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Tämä on puhesynteesin testi.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 740.7455999999684,
+        "median_ms": 740.7455999999684,
+        "maximum_ms": 740.7455999999684
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "sk",
+      "runs": [
+        {
+          "first_pcm_ms": 1122.191300000054,
+          "completed_ms": 1649.921000000063,
+          "real_time_factor": 0.8465112659797664,
+          "audio": {
+            "frames": 46778,
+            "duration_seconds": 1.9490833333333333,
+            "peak": 0.41009521484375,
+            "rms": 0.08214401055131859,
+            "nonzero_samples": 44487
+          },
+          "chunks": [
+            {
+              "time_ms": 1122.191300000054,
+              "bytes": 39800
+            },
+            {
+              "time_ms": 1517.2976000000062,
+              "bytes": 44030
+            },
+            {
+              "time_ms": 1641.8670000000475,
+              "bytes": 2400
+            },
+            {
+              "time_ms": 1642.6118000000542,
+              "bytes": 7326
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "native-locale:sk",
+              "profile": "sara",
+              "carrier": "Jasietka",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "sk-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Toto je skúška syntézy reči.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 1122.191300000054,
+        "median_ms": 1122.191300000054,
+        "maximum_ms": 1122.191300000054
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "nb",
+      "runs": [
+        {
+          "first_pcm_ms": 303.87789999997494,
+          "completed_ms": 748.0602000000545,
+          "real_time_factor": 0.41380732955334226,
+          "audio": {
+            "frames": 43386,
+            "duration_seconds": 1.80775,
+            "peak": 0.425537109375,
+            "rms": 0.10164362503188437,
+            "nonzero_samples": 43217
+          },
+          "chunks": [
+            {
+              "time_ms": 303.87789999997494,
+              "bytes": 10010
+            },
+            {
+              "time_ms": 308.85860000000775,
+              "bytes": 23406
+            },
+            {
+              "time_ms": 542.687600000022,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 740.1777999999695,
+              "bytes": 22126
+            },
+            {
+              "time_ms": 740.8740000000762,
+              "bytes": 22
+            }
+          ],
+          "loading_stages": [
+            {
+              "stage": "language-source",
+              "time_ms": 0.4650000000765431
+            }
+          ],
+          "renderers": [
+            {
+              "engine": "wide:nb",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "nb-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "Dette er en test av talesyntese.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 303.87789999997494,
+        "median_ms": 303.87789999997494,
+        "maximum_ms": 303.87789999997494
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "lt",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "bs",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "sl",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "mk",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "lv",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "et",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ga",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "lb",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "mt",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "is",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "la",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ht",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "qu",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "gn",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "cmn",
+      "runs": [
+        {
+          "first_pcm_ms": 283.6386000000175,
+          "completed_ms": 804.4421000000739,
+          "real_time_factor": 0.38214263885043687,
+          "audio": {
+            "frames": 50522,
+            "duration_seconds": 2.1050833333333334,
+            "peak": 0.427734375,
+            "rms": 0.11492405628171577,
+            "nonzero_samples": 50499
+          },
+          "chunks": [
+            {
+              "time_ms": 283.6386000000175,
+              "bytes": 10010
+            },
+            {
+              "time_ms": 288.42680000002474,
+              "bytes": 23406
+            },
+            {
+              "time_ms": 545.7835000000841,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 795.2386000000615,
+              "bytes": 36400
+            },
+            {
+              "time_ms": 796.045700000036,
+              "bytes": 20
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:cmn",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "cmn-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "这是语音合成测试。",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 283.6386000000175,
+        "median_ms": 283.6386000000175,
+        "maximum_ms": 283.6386000000175
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "hi",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ar",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "bn",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ur",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "id",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ja",
+      "runs": [
+        {
+          "first_pcm_ms": 797.9979000000412,
+          "completed_ms": 1694.284400000015,
+          "real_time_factor": 0.7215990062288222,
+          "audio": {
+            "frames": 56351,
+            "duration_seconds": 2.347958333333333,
+            "peak": 0.8880615234375,
+            "rms": 0.18144195267814606,
+            "nonzero_samples": 56291
+          },
+          "chunks": [
+            {
+              "time_ms": 797.9979000000412,
+              "bytes": 19566
+            },
+            {
+              "time_ms": 1035.646300000053,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1293.5683000000608,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1529.5650000000478,
+              "bytes": 27360
+            },
+            {
+              "time_ms": 1685.1513000000296,
+              "bytes": 3360
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:ja",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "ja-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "これは音声合成のテストです。",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 797.9979000000412,
+        "median_ms": 797.9979000000412,
+        "maximum_ms": 797.9979000000412
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "pa",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "mr",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "te",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "tr",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ta",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "vi",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ko",
+      "runs": [
+        {
+          "first_pcm_ms": 757.540400000039,
+          "completed_ms": 1509.5261000000164,
+          "real_time_factor": 0.6626662471877302,
+          "audio": {
+            "frames": 54671,
+            "duration_seconds": 2.2779583333333333,
+            "peak": 0.97955322265625,
+            "rms": 0.24286753174191386,
+            "nonzero_samples": 54535
+          },
+          "chunks": [
+            {
+              "time_ms": 757.540400000039,
+              "bytes": 22446
+            },
+            {
+              "time_ms": 991.587000000095,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1252.0916000000852,
+              "bytes": 31208
+            },
+            {
+              "time_ms": 1499.7512000001052,
+              "bytes": 16800
+            },
+            {
+              "time_ms": 1500.5796000000373,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "wide:ko",
+              "profile": "sara",
+              "speaker": "sara"
+            }
+          ],
+          "wave_file": "ko-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        }
+      ],
+      "voice": "sara",
+      "text": "이것은 음성 합성 테스트입니다.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 1,
+        "minimum_ms": 757.540400000039,
+        "median_ms": 757.540400000039,
+        "maximum_ms": 757.540400000039
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "fa",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "th",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "gu",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "kn",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ms",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "my",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ml",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "or",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ps",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "uz",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "sd",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ne",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ku",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "si",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "as",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "az",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "kk",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "he",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "hy",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "tk",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ky",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ka",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "mn",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "kok",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "sw",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "am",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "om",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "af",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "ti",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "tn",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "kind": "language-engine",
+      "language": "mi",
+      "runs": [],
+      "status": "skipped",
+      "reason": "No engineering sample provided; supply --samples-json"
+    },
+    {
+      "voice": "kostia",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "inna",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "dina",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "vira",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "innesa",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika_classmate",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "anatolii",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "kind": "cancel-and-recover",
+      "language": "uk",
+      "voice": "sara",
+      "status": "passed",
+      "cancel_delay_after_request_ms": 20,
+      "cancel_and_drop_ack_ms": 1.6906000000744825,
+      "first_reply_was_already_buffered_audio": false,
+      "scope": "worker protocol only; not NVDA audible stop latency",
+      "recovery": {
+        "first_pcm_ms": 182.77250000005552,
+        "completed_ms": 922.4149000000352,
+        "real_time_factor": 0.25306307270234163,
+        "audio": {
+          "frames": 87480,
+          "duration_seconds": 3.645,
+          "peak": 0.35296630859375,
+          "rms": 0.09128730264938019,
+          "nonzero_samples": 85031
+        },
+        "chunks": [
+          {
+            "time_ms": 182.77250000005552,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 331.57249999999294,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 463.35069999997813,
+            "bytes": 42000
+          },
+          {
+            "time_ms": 645.629299999996,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 796.6126000000031,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 908.4543999999823,
+            "bytes": 31200
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "sara"
+          }
+        ],
+        "wave_file": "cancel-recovery.wav"
+      }
+    }
+  ],
+  "scope": "actual packaged worker/model smoke; no NVDA audio device",
+  "nvda_verified": false,
+  "pronunciation_verified": false,
+  "all_selected_languages_verified": false,
+  "prepared_letter_latency_verified": false,
+  "warnings": [
+    "First-PCM time is a pipe measurement, not audible onset.",
+    "Generated WAV files require pronunciation and listening review."
+  ],
+  "runtime_root": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime",
+  "requested_languages": [
+    "en",
+    "ru",
+    "de",
+    "fr",
+    "it",
+    "es",
+    "pl",
+    "uk",
+    "ro",
+    "nl",
+    "pt",
+    "el",
+    "cs",
+    "hu",
+    "sv",
+    "sr",
+    "bg",
+    "sq",
+    "hr",
+    "ca",
+    "da",
+    "fi",
+    "sk",
+    "nb",
+    "lt",
+    "bs",
+    "sl",
+    "mk",
+    "lv",
+    "et",
+    "ga",
+    "lb",
+    "mt",
+    "is",
+    "la",
+    "ht",
+    "qu",
+    "gn",
+    "cmn",
+    "hi",
+    "ar",
+    "bn",
+    "ur",
+    "id",
+    "ja",
+    "pa",
+    "mr",
+    "te",
+    "tr",
+    "ta",
+    "vi",
+    "ko",
+    "fa",
+    "th",
+    "gu",
+    "kn",
+    "ms",
+    "my",
+    "ml",
+    "or",
+    "ps",
+    "uz",
+    "sd",
+    "ne",
+    "ku",
+    "si",
+    "as",
+    "az",
+    "kk",
+    "he",
+    "hy",
+    "tk",
+    "ky",
+    "ka",
+    "mn",
+    "kok",
+    "sw",
+    "am",
+    "om",
+    "af",
+    "ti",
+    "tn",
+    "mi"
+  ],
+  "installed_language_count": 83,
+  "voice_count": 45,
+  "worker_script_sha256": "ba63de2c4091e5fc4fe7f54a0b54047cd900ec92931d6541db38afee6502a5d1",
+  "embedded_python_sha256": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+  "package_version": "0.13.1-dev.1",
+  "worker_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\python\\python.exe",
+    "-I",
+    "-B",
+    "-u",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\nvda_worker.py",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models",
+    "--reference-model",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models\\Holos",
+    "--references",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models\\voices",
+    "--reference-engine",
+    "holos",
+    "--preload-language",
+    "mixed"
+  ],
+  "failed_or_blocked_checks": 0,
+  "worker_shutdown": {
+    "exit_code": 0,
+    "forced_termination": false
+  },
+  "completed_utc": "2026-11-22T06:06:12.824693+00:00"
+}

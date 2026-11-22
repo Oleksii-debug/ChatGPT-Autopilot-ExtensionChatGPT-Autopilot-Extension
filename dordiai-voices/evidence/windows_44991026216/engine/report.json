@@ -1,0 +1,678 @@
+{
+  "format": "dordiai-windows-engine-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T05:52:59.098490+00:00",
+  "platform": "win32",
+  "host_python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "system": "Windows-2025Server-10.0.26100-SP0",
+  "machine": "AMD64",
+  "processor": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+  "logical_cpu_count": 4,
+  "package_root": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package",
+  "status": "passed",
+  "tests": [
+    {
+      "kind": "language-engine",
+      "language": "uk",
+      "runs": [
+        {
+          "first_pcm_ms": 1662.8117000000202,
+          "completed_ms": 3156.461200000024,
+          "real_time_factor": 0.5300522586062173,
+          "audio": {
+            "frames": 142920,
+            "duration_seconds": 5.955,
+            "peak": 0.375396728515625,
+            "rms": 0.08780135683214507,
+            "nonzero_samples": 139242
+          },
+          "chunks": [
+            {
+              "time_ms": 1662.8117000000202,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 1835.4464000000235,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 1961.3271000000054,
+              "bytes": 32400
+            },
+            {
+              "time_ms": 2138.022200000023,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 2326.4341999999942,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 2490.045500000008,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 2557.6068000000305,
+              "bytes": 3600
+            },
+            {
+              "time_ms": 2739.033300000017,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 2910.4606999999874,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 3072.3302000000103,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 3134.7514000000274,
+              "bytes": 1200
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "baseline",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "uk-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        },
+        {
+          "first_pcm_ms": 169.1505999999663,
+          "completed_ms": 1641.3417999999638,
+          "real_time_factor": 0.2756241477749729,
+          "audio": {
+            "frames": 142920,
+            "duration_seconds": 5.955,
+            "peak": 0.375396728515625,
+            "rms": 0.08780135683214507,
+            "nonzero_samples": 139242
+          },
+          "chunks": [
+            {
+              "time_ms": 169.1505999999663,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 337.60999999998376,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 462.5906999999643,
+              "bytes": 32400
+            },
+            {
+              "time_ms": 636.8772999999806,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 816.4054000000078,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 979.3248999999946,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 1045.8914000000163,
+              "bytes": 3600
+            },
+            {
+              "time_ms": 1227.6868999999806,
+              "bytes": 22080
+            },
+            {
+              "time_ms": 1399.1550999999731,
+              "bytes": 28800
+            },
+            {
+              "time_ms": 1557.5920999999653,
+              "bytes": 48000
+            },
+            {
+              "time_ms": 1619.4992999999727,
+              "bytes": 1200
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "baseline",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "uk-sara-2.wav",
+          "repeat_index": 1,
+          "warm_repeat": true
+        }
+      ],
+      "voice": "sara",
+      "text": "Перевірка синтезатора. Кнопка перемикач натиснуто. Голос читає український текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 2,
+        "minimum_ms": 169.1505999999663,
+        "median_ms": 915.9811499999932,
+        "maximum_ms": 1662.8117000000202
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "en",
+      "runs": [
+        {
+          "first_pcm_ms": 943.7945000000241,
+          "completed_ms": 1517.150700000002,
+          "real_time_factor": 0.3624092205711106,
+          "audio": {
+            "frames": 100471,
+            "duration_seconds": 4.1862916666666665,
+            "peak": 0.531585693359375,
+            "rms": 0.07427333702473547,
+            "nonzero_samples": 97523
+          },
+          "chunks": [
+            {
+              "time_ms": 943.7945000000241,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 967.5969000000464,
+              "bytes": 6840
+            },
+            {
+              "time_ms": 1009.259400000019,
+              "bytes": 17642
+            },
+            {
+              "time_ms": 1048.35410000004,
+              "bytes": 11040
+            },
+            {
+              "time_ms": 1086.604100000045,
+              "bytes": 5760
+            },
+            {
+              "time_ms": 1203.1913000000145,
+              "bytes": 52924
+            },
+            {
+              "time_ms": 1254.724500000009,
+              "bytes": 15518
+            },
+            {
+              "time_ms": 1298.7314000000083,
+              "bytes": 15644
+            },
+            {
+              "time_ms": 1340.1588000000402,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 1380.634500000042,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 1421.312300000011,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 1461.6604999999936,
+              "bytes": 15614
+            },
+            {
+              "time_ms": 1501.8105000000332,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 1502.3249000000192,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "en-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        },
+        {
+          "first_pcm_ms": 20.442199999990862,
+          "completed_ms": 571.7505000000074,
+          "real_time_factor": 0.1365768430691461,
+          "audio": {
+            "frames": 100471,
+            "duration_seconds": 4.1862916666666665,
+            "peak": 0.531585693359375,
+            "rms": 0.07427333702473547,
+            "nonzero_samples": 97523
+          },
+          "chunks": [
+            {
+              "time_ms": 20.442199999990862,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 41.46320000000969,
+              "bytes": 6840
+            },
+            {
+              "time_ms": 79.40259999998034,
+              "bytes": 17642
+            },
+            {
+              "time_ms": 116.53710000001638,
+              "bytes": 11040
+            },
+            {
+              "time_ms": 153.96249999997735,
+              "bytes": 5760
+            },
+            {
+              "time_ms": 267.9769999999735,
+              "bytes": 52924
+            },
+            {
+              "time_ms": 311.6410000000087,
+              "bytes": 15518
+            },
+            {
+              "time_ms": 353.01800000002004,
+              "bytes": 15644
+            },
+            {
+              "time_ms": 393.32619999998997,
+              "bytes": 15360
+            },
+            {
+              "time_ms": 433.48450000002003,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 474.3791999999871,
+              "bytes": 15580
+            },
+            {
+              "time_ms": 515.5277999999726,
+              "bytes": 15614
+            },
+            {
+              "time_ms": 556.4666999999872,
+              "bytes": 2880
+            },
+            {
+              "time_ms": 556.9037999999864,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "en-sara-2.wav",
+          "repeat_index": 1,
+          "warm_repeat": true
+        }
+      ],
+      "voice": "sara",
+      "text": "Speech engine check. The selected voice is reading an English sentence.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 2,
+        "minimum_ms": 20.442199999990862,
+        "median_ms": 482.11835000000747,
+        "maximum_ms": 943.7945000000241
+      }
+    },
+    {
+      "kind": "language-engine",
+      "language": "ru",
+      "runs": [
+        {
+          "first_pcm_ms": 1046.5523000000303,
+          "completed_ms": 2178.2244000000333,
+          "real_time_factor": 0.6114528650128168,
+          "audio": {
+            "frames": 85497,
+            "duration_seconds": 3.562375,
+            "peak": 0.423065185546875,
+            "rms": 0.0895621404319728,
+            "nonzero_samples": 83931
+          },
+          "chunks": [
+            {
+              "time_ms": 1046.5523000000303,
+              "bytes": 6718
+            },
+            {
+              "time_ms": 1159.8349999999868,
+              "bytes": 14436
+            },
+            {
+              "time_ms": 1253.0901000000085,
+              "bytes": 14544
+            },
+            {
+              "time_ms": 1355.4493999999977,
+              "bytes": 14000
+            },
+            {
+              "time_ms": 1455.838099999994,
+              "bytes": 3840
+            },
+            {
+              "time_ms": 1550.7314000000179,
+              "bytes": 22856
+            },
+            {
+              "time_ms": 1653.3612000000062,
+              "bytes": 15180
+            },
+            {
+              "time_ms": 1754.6831000000225,
+              "bytes": 13420
+            },
+            {
+              "time_ms": 1847.462900000039,
+              "bytes": 12960
+            },
+            {
+              "time_ms": 1953.0672999999865,
+              "bytes": 15440
+            },
+            {
+              "time_ms": 2051.123700000005,
+              "bytes": 12480
+            },
+            {
+              "time_ms": 2109.124500000007,
+              "bytes": 13400
+            },
+            {
+              "time_ms": 2162.4709000000166,
+              "bytes": 4040
+            },
+            {
+              "time_ms": 2165.46390000002,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "ru-sara-1.wav",
+          "repeat_index": 0,
+          "warm_repeat": false
+        },
+        {
+          "first_pcm_ms": 203.97120000001223,
+          "completed_ms": 1351.677900000027,
+          "real_time_factor": 0.3794316712867194,
+          "audio": {
+            "frames": 85497,
+            "duration_seconds": 3.562375,
+            "peak": 0.423065185546875,
+            "rms": 0.0895621404319728,
+            "nonzero_samples": 83931
+          },
+          "chunks": [
+            {
+              "time_ms": 203.97120000001223,
+              "bytes": 6718
+            },
+            {
+              "time_ms": 310.7118000000355,
+              "bytes": 14436
+            },
+            {
+              "time_ms": 437.36890000002404,
+              "bytes": 14544
+            },
+            {
+              "time_ms": 531.8359999999984,
+              "bytes": 14000
+            },
+            {
+              "time_ms": 632.1811000000253,
+              "bytes": 3840
+            },
+            {
+              "time_ms": 729.1835999999989,
+              "bytes": 22856
+            },
+            {
+              "time_ms": 830.2544000000012,
+              "bytes": 15180
+            },
+            {
+              "time_ms": 935.0517999999965,
+              "bytes": 13420
+            },
+            {
+              "time_ms": 1032.534300000009,
+              "bytes": 12960
+            },
+            {
+              "time_ms": 1136.268800000039,
+              "bytes": 15440
+            },
+            {
+              "time_ms": 1232.2101000000316,
+              "bytes": 12480
+            },
+            {
+              "time_ms": 1284.5634000000246,
+              "bytes": 13400
+            },
+            {
+              "time_ms": 1335.7297000000017,
+              "bytes": 4040
+            },
+            {
+              "time_ms": 1338.9620000000377,
+              "bytes": 7680
+            }
+          ],
+          "loading_stages": [],
+          "renderers": [
+            {
+              "engine": "profile",
+              "profile": "sara"
+            }
+          ],
+          "wave_file": "ru-sara-2.wav",
+          "repeat_index": 1,
+          "warm_repeat": true
+        }
+      ],
+      "voice": "sara",
+      "text": "Проверка синтезатора. Выбранный голос читает русский текст.",
+      "status": "passed",
+      "first_pcm": {
+        "count": 2,
+        "minimum_ms": 203.97120000001223,
+        "median_ms": 625.2617500000213,
+        "maximum_ms": 1046.5523000000303
+      }
+    },
+    {
+      "voice": "kostia",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "inna",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "dina",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "vira",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "innesa",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika_classmate",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "anatolii",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "voice": "veronika",
+      "status": "passed",
+      "reply": {
+        "error": "ValueError"
+      },
+      "kind": "excluded-voice"
+    },
+    {
+      "kind": "cancel-and-recover",
+      "language": "uk",
+      "voice": "sara",
+      "status": "passed",
+      "cancel_delay_after_request_ms": 20,
+      "cancel_and_drop_ack_ms": 1.320000000021082,
+      "first_reply_was_already_buffered_audio": false,
+      "scope": "worker protocol only; not NVDA audible stop latency",
+      "recovery": {
+        "first_pcm_ms": 177.7742000000444,
+        "completed_ms": 983.2193000000302,
+        "real_time_factor": 0.26974466392319074,
+        "audio": {
+          "frames": 87480,
+          "duration_seconds": 3.645,
+          "peak": 0.35296630859375,
+          "rms": 0.09128730264938019,
+          "nonzero_samples": 85031
+        },
+        "chunks": [
+          {
+            "time_ms": 177.7742000000444,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 343.24660000004314,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 490.13620000005176,
+            "bytes": 42000
+          },
+          {
+            "time_ms": 672.3057000000381,
+            "bytes": 22080
+          },
+          {
+            "time_ms": 845.3474000000369,
+            "bytes": 28800
+          },
+          {
+            "time_ms": 969.6677000000022,
+            "bytes": 31200
+          }
+        ],
+        "loading_stages": [],
+        "renderers": [
+          {
+            "engine": "baseline",
+            "profile": "sara"
+          }
+        ],
+        "wave_file": "cancel-recovery.wav"
+      }
+    }
+  ],
+  "scope": "actual packaged worker/model smoke; no NVDA audio device",
+  "nvda_verified": false,
+  "pronunciation_verified": false,
+  "all_selected_languages_verified": false,
+  "prepared_letter_latency_verified": false,
+  "warnings": [
+    "First-PCM time is a pipe measurement, not audible onset.",
+    "Generated WAV files require pronunciation and listening review."
+  ],
+  "runtime_root": "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime",
+  "requested_languages": [
+    "uk",
+    "en",
+    "ru"
+  ],
+  "installed_language_count": 3,
+  "voice_count": 45,
+  "worker_script_sha256": "d85255da11a01c1c404a087c1576e5a3931068f413b41c177f6f53a5b1a6ee07",
+  "embedded_python_sha256": "3adbbf2af609e206e3ca18cd55fc7c4b52f5c8bb8218dd99fd5a9e50d7a193cd",
+  "package_version": "0.13.1-dev.1",
+  "worker_command": [
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\python\\python.exe",
+    "-I",
+    "-B",
+    "-u",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\nvda_worker.py",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models",
+    "--reference-model",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models\\Holos",
+    "--references",
+    "D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\probe-package\\kx47Runtime\\models\\voices",
+    "--reference-engine",
+    "holos",
+    "--preload-language",
+    "mixed"
+  ],
+  "failed_or_blocked_checks": 0,
+  "worker_shutdown": {
+    "exit_code": 0,
+    "forced_termination": false
+  },
+  "completed_utc": "2026-11-22T05:53:11.238622+00:00"
+}

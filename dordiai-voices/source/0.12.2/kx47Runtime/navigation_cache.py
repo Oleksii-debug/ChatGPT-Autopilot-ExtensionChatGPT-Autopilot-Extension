@@ -6,6 +6,7 @@ from threading import RLock
 import wave
 import numpy as np
 from speech_tempo import change_tempo
+from voice_assets import _profile
 
 
 OUTPUT_RATE = 24000
@@ -63,6 +64,10 @@ def read_clip(path):
 
 
 def load_clip(references, profile, language, text, speed):
+    if references is None or _profile(references,profile) is not None:
+        # Managed replacements can share an identifier with a built-in voice,
+        # but immutable legacy WAVs still contain the older acoustic identity.
+        return None
     language = (language or "uk").lower().replace("_", "-")
     if language in {"en", "en-us"}:
         language = "en-us"
@@ -76,4 +81,5 @@ def load_clip(references, profile, language, text, speed):
         # A missing or damaged optimization must use the same configured
         # speaker's normal synthesis, never suppress a word or switch voices.
         return None
-    return change_tempo(clip, OUTPUT_RATE, speed)
+    result=change_tempo(clip,OUTPUT_RATE,speed)
+    return None if _profile(references,profile) is not None else result

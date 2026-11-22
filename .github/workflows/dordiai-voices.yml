@@ -110,6 +110,9 @@ jobs:
               package_manager.install_pack(archive, addon_root=package)
       - name: Actual additional-language engine probe
         run: python dordiai-voices/tools/windows_engine_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/extra-engines --all-installed --repetitions 1
+      - name: Actual letter and symbol worker audio structure
+        if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/nvda_worker.py') != ''
+        run: python dordiai-voices/tools/windows_character_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/characters
       - name: Actual pinned new MMS representative on the embedded Windows runtime
         if: always() && hashFiles('dordiai-voices/probe-package/kx47Runtime/nvda_worker.py') != ''
         run: python dordiai-voices/tools/windows_mms_probe.py --package-root dordiai-voices/probe-package --output dordiai-voices/windows-results/mms-ha --timeout 120

@@ -1,0 +1,68 @@
+{
+  "product": "dordiai-voices",
+  "target_version": "0.13.1-dev.3",
+  "product_ready": false,
+  "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
+  "authorized_automatic_decisions": true,
+  "gates": {
+    "excluded_voices": {
+      "status": "automated_checks_passed",
+      "excluded_profiles": 8,
+      "retained_profiles": 45
+    },
+    "core_size": {
+      "status": "local_build_passed",
+      "bytes": 1767222592,
+      "maximum_bytes": 3000000000,
+      "evidence": "evidence/release_build_0.13.1-dev.3.json",
+      "built_version": "0.13.1-dev.3",
+      "installed_bytes": 2129353911
+    },
+    "selected_language_resources": {
+      "status": "incomplete",
+      "catalogue_entries": 135,
+      "complete_resource_entries": 124,
+      "partial_resource_entries": 1,
+      "missing_entries": 10,
+      "evidence": "evidence/language_coverage_dev2.json",
+      "caveat": "Resource presence is not pronunciation, typing or latency acceptance."
+    },
+    "new_character_names": {
+      "status": "incomplete",
+      "evidence": "evidence/ordinary_alphabet_sources.json"
+    },
+    "interactive_speed": {
+      "status": "not_accepted",
+      "evidence": "evidence/omnivoice_cpu_word_benchmark.json",
+      "slow_model_language_count": 7,
+      "caveat": "Prepared clip timings do not certify uncached words or physical output."
+    },
+    "windows_models": {
+      "status": "current_dev1_source_passed",
+      "current_run": 44991026216,
+      "previous_passed_run": 44987758880,
+      "selected_language_count": 21,
+      "evidence": "evidence/windows_44992624809/mms-ha/report.json",
+      "new_mms_ha_representative": "passed"
+    },
+    "actual_nvda": {
+      "status": "physical_output_blocked",
+      "reason": "Windows CI has no audio endpoint; explicit recording-sink probe is separate.",
+      "wave_player_verified": false,
+      "physical_acoustic_latency_verified": false,
+      "driver_selection_with_recording_sink": true,
+      "probe_helper_fix_commit": "ff7899fc695546458ac7a236aa57104d46dea6cc",
+      "settings_window_smoke": true,
+      "hotkey_binding_smoke": true,
+      "keyboard_tab_and_space_smoke": true,
+      "audio_submission": "failed_worker_ImportError_on_intermediate_dev2",
+      "diagnostics_and_trusted_cwd_fix": "pending_real_Windows_run",
+      "evidence": "evidence/windows_44992624809/nvda/windows-nvda-probe.json"
+    },
+    "native_pronunciation": {
+      "status": "not_accepted",
+      "reason": "Native-listener assessment of language-specific pronunciation and long fast mixed reading remains open."
+    }
+  },
+  "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product."
+}

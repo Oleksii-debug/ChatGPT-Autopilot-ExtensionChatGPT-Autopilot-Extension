@@ -1,0 +1,51 @@
+{
+  "format": "dordiai-release-verification-summary",
+  "format_version": 1,
+  "version": "0.13.1-dev.1",
+  "baseline": "0.12.2",
+  "source_snapshot": "evidence/source_snapshot_0.13.1-dev.1.json.gz",
+  "source_snapshot_sha256": "c97e4becb82ff8b0db383dab20ea072a7e8b888c270583321b1fc2ef0aa14f26",
+  "source_tree_sha256": "14753a071d05e0ce10036e8ba0d301cf91c90450418e3ceabe6332ebe4933f68",
+  "source_files": 161,
+  "source_syntax": {
+    "python_modules": 73,
+    "json_documents": 53
+  },
+  "normalization": {
+    "converted_voices.py": "LF to match Git bytes",
+    "wide_voice_index.json": "LF to match Git bytes"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "zlib_compile": "1.3.2",
+    "zlib_runtime": "1.3.2"
+  },
+  "voice_count": 45,
+  "excluded_voice_count": 8,
+  "excluded_resource_files": 1424,
+  "core_under_2GB": true,
+  "core_under_3GB": true,
+  "new_heavy_model_weights_in_core": false,
+  "artifacts": [
+    {
+      "filename": "dordiai-voices-0.13.1-dev.1.nvda-addon",
+      "group": "core",
+      "installed_bytes": 2125037335,
+      "payload_files": 10205,
+      "sha256": "ad571190fccdb7ddd8f158ed9d6c8a60174c6d167d7247d9f34199fd04dd272c",
+      "size_bytes": 1766492602
+    }
+  ],
+  "archive_sha256": "ad571190fccdb7ddd8f158ed9d6c8a60174c6d167d7247d9f34199fd04dd272c",
+  "verification": {
+    "filename": "dordiai-voices-0.13.1-dev.1.nvda-addon",
+    "verified_files": 10205,
+    "installed_bytes": 2125037335,
+    "download_bytes": 1766492602,
+    "voice_count": 45,
+    "windows_nvda_validation": "not_performed_by_packaging_verifier"
+  },
+  "windows_nvda_validation": "pending separate actual Windows/NVDA protocol",
+  "complete_product": false
+}

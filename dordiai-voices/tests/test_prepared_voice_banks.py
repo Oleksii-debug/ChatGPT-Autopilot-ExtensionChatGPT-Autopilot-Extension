@@ -7,6 +7,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -246,6 +247,50 @@ class PreparedVoiceBanksTests(unittest.TestCase):
         for override in ({"format":"unknown"},{"format_version":True},{"format_version":2},{"language":"ha"}):
             with self.subTest(override=override),self.assertRaises(ValueError):
                 banks.load_entries_document({**document,**override})
+
+    def test_bank_indexes_share_global_byte_quota_before_any_model_runs(self):
+        jobs=[{"kind":"letter","language":"uk","text":"бе","semantic_kind":"spoken_name"},
+              {"kind":"command","language":"uk","text":"Зберегти"}]
+        worker=FakeWorker()
+        with patch.object(banks,"MAX_COMBINED_INDEX_BYTES",1800):
+            with self.assertRaisesRegex(ValueError,"combined prepared indexes"):
+                banks.generate_banks(worker,probe,"fresh_voice",jobs,self.base/"over-quota")
+        self.assertEqual(worker.requests,[])
+        self.assertFalse((self.base/"over-quota").exists())
+
+    def test_fast_index_keeps_offsets_and_full_provenance_in_separate_report(self):
+        index=json.loads((self.prepared/"banks/letters.json").read_text(encoding="utf-8"))
+        self.assertNotIn("entry_texts",index)
+        self.assertEqual(index["acoustic_validation"],"pending")
+        report=json.loads((self.prepared/"banks/generation-progress.json").read_text(encoding="utf-8"))
+        self.assertEqual(report["runs"][0]["lookup_text"],"бе")
+        self.assertEqual(self.recipe["roles"]["banks/generation-progress.json"],"native_bank_preparation_report")
+
+    def test_builtin_export_preserves_wide_and_english_calibration_as_distinct_roles(self):
+        runtime=self.base/"export-runtime"
+        references=runtime/"models/voices"
+        for folder in [references/"holos",references/"classmate_locales",references/"english"]:folder.mkdir(parents=True,exist_ok=True)
+        (references/"catalog.json").write_text('{"fresh_voice":"Fresh voice"}',encoding="utf-8")
+        np.save(references/"holos/fresh_voice.npy",np.full((1,256),.2,np.float32))
+        np.save(references/"fresh_voice.npy",np.full((1,256,1),.3,np.float32))
+        np.save(references/"classmate_locales/fresh_voice.npy",np.full((1,256,1),.7,np.float32))
+        np.save(references/"english/fresh_voice.npy",np.full((1,256,1),.9,np.float32))
+        output=self.base/"exported-profile";output.mkdir()
+        recipe=banks.copy_profile_source(runtime,voice_assets,"fresh_voice",output,version="1.0.0",license_text="Test fixture")
+        roles={role:output/name for name,role in recipe["roles"].items()}
+        self.assertTrue(np.all(np.load(roles["target_embedding"])==.7))
+        self.assertTrue(np.all(np.load(roles["english_embedding"])==.9))
+
+    def test_resource_change_during_preparation_cannot_mix_profile_versions(self):
+        epoch=[0]
+        class ChangingWorker(FakeWorker):
+            def render(self,request,timeout):
+                result=super().render(request,timeout)
+                epoch[0]+=1
+                return result
+        guarded=banks.EpochGuardedRenderer(ChangingWorker(),lambda:epoch[0],0)
+        with self.assertRaisesRegex(ValueError,"refusing mixed voice data"):
+            banks.generate_banks(guarded,probe,"fresh_voice",self.entries,self.base/"changed-source")
 
 
 if __name__ == "__main__":

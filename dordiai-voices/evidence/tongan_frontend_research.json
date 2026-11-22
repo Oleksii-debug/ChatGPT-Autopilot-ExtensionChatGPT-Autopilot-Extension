@@ -1,0 +1,41 @@
+{
+  "status": "research-checkpoint-not-a-runtime-language",
+  "registered": false,
+  "priority_paused_for": "real native Bodo/Manipuri Rasa ONNX investigation",
+  "primary_document": {
+    "title": "Faufaua! An Introduction to Tongan",
+    "publisher": "NZ Ministry of Education / CWA New Media",
+    "year": 2010,
+    "isbn": "9780478341249",
+    "pdf_bytes": 7488611,
+    "pdf_sha256": "f26b5eb0fb7109d1518441b770683952b801dc5ba7873db76188b4f49de82e61",
+    "blob_path": "https://mapaoch00pr.blob.core.windows.net/mapaoch00pr/artefacts/pdf/5a7c980b-4849-4690-ad8d-4a9cda5201d9/Faufaua%21-an-introduction-to-Tongan.pdf",
+    "download_query_not_retained": true,
+    "relevant_pdf_pages": [
+      20,
+      21
+    ],
+    "copyright": "Crown2010 all rights reserved; fullPDF remains private research cache, not redistributed"
+  },
+  "additional_primary_sources": [
+    "https://nzcurriculum.tki.org.nz/content/download/466/3659/file/tonga.pdf",
+    "https://www.tepapa.govt.nz/assets/76067/1692747224-final_final_version-tongan_resource_2016.pdf",
+    "https://www.cambridge.org/core/journals/journal-of-the-international-phonetic-association/article/tongan/FEE50E3523F8844E0617DB290EA0516A",
+    "https://www.homepages.ucl.ac.uk/~ucjtcwh/index_files/GarellekWhite2015.pdf"
+  ],
+  "mandatory_distinctions": [
+    "17-letter native alphabet; ng is one velar-nasal unit, fakaua is a real glottal consonant.",
+    "Macron length must remain distinct from written double vowels.",
+    "Explicit acute mark on final vowel or followingword overrides default stress.",
+    "Default lexical stress is penultimate mora, not blindly penultimate written syllable.",
+    "Faufaua distinguishes definitive accent from enclitic stress, same written acute mark.",
+    "Single-mora clitics can shift the stress domain into adjacent words; grammar cannot be inferred from an isolated alphabet map."
+  ],
+  "uncertainties": [
+    "PDFtext extraction represents macrons as grave-accented vowels: inspect actual rendered glyphs before treating that extraction artifact as normal written Tongan.",
+    "Diphthong/hiatus grouping and long-vowel splitting must be grounded in primary phonetic evidence.",
+    "Do not autoapply finalstress to every word after e/he: Faufaua contrasts explicit marked/unmarked forms.",
+    "No ordinary alphabet names may be replaced by phonetic examples. TePapa2016 page6 provides actual17letter names for future reviewed metadata.",
+    "No universalcarrier or source calibration yet; no ready-language claim."
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "scope": "Linux original-weight Piper vocabulary/PCM checks only; no human pronunciation, selected-target identity or Windows/NVDA acceptance",
+  "onnxruntime": "1.27.0",
+  "piper_version": "1.8.0",
+  "languages": {
+    "es": {
+      "model": "es_ES-davefx-medium.onnx",
+      "all_source_names_frontend_missing_phones": {},
+      "clips": [
+        {
+          "glyph": "b",
+          "name": "be",
+          "samples": 14336,
+          "sample_rate": 22050,
+          "render_seconds": 0.03658734199962055,
+          "peak": 0.7734212875366211,
+          "sha256": "bec3895d3b305e0be86bc0500b5972a0d8ace3c7b9d295dc7a4a2899ed5fc5fa",
+          "path": "evidence/european_character_probes/es-0.wav"
+        },
+        {
+          "glyph": "ñ",
+          "name": "eñe",
+          "samples": 15360,
+          "sample_rate": 22050,
+          "render_seconds": 0.034831097998903715,
+          "peak": 0.8697354197502136,
+          "sha256": "f9a278d5ece636d8951e69f3967a26ad50bbcdbf74982305936bbcfb917a0143",
+          "path": "evidence/european_character_probes/es-1.wav"
+        },
+        {
+          "glyph": "w",
+          "name": "uve doble",
+          "samples": 22272,
+          "sample_rate": 22050,
+          "render_seconds": 0.04576713300048141,
+          "peak": 0.8867957592010498,
+          "sha256": "5781e560d6b04a51088ede3d7e0800b4249464d9a987055ccbf9770cdaff6eeb",
+          "path": "evidence/european_character_probes/es-2.wav"
+        }
+      ],
+      "native_pronunciation_accepted": false
+    },
+    "it": {
+      "model": "it_IT-paola-medium.onnx",
+      "all_source_names_frontend_missing_phones": {},
+      "clips": [
+        {
+          "glyph": "c",
+          "name": "ci",
+          "samples": 9216,
+          "sample_rate": 22050,
+          "render_seconds": 0.025438669001232483,
+          "peak": 0.3609730005264282,
+          "sha256": "cbb1114fa77ebaf0ce3fc2f6727fb077a4a94e476ec707894f4a0bf8bb9ab49a",
+          "path": "evidence/european_character_probes/it-0.wav"
+        },
+        {
+          "glyph": "h",
+          "name": "acca",
+          "samples": 10240,
+          "sample_rate": 22050,
+          "render_seconds": 0.026068451001265203,
+          "peak": 0.4219515919685364,
+          "sha256": "608e321016cf6d3876276d3f2ed71de09dc93e574715ad22d00d74e971f155a4",
+          "path": "evidence/european_character_probes/it-1.wav"
+        },
+        {
+          "glyph": "w",
+          "name": "doppia vu",
+          "samples": 14592,
+          "sample_rate": 22050,
+          "render_seconds": 0.031777422000232036,
+          "peak": 0.49818986654281616,
+          "sha256": "97f301d8a573567b9970155e28e7c887217283097aa614a61fcdc307d0913ab4",
+          "path": "evidence/european_character_probes/it-2.wav"
+        }
+      ],
+      "native_pronunciation_accepted": false
+    },
+    "pl": {
+      "model": "pl_PL-gosia-medium.onnx",
+      "all_source_names_frontend_missing_phones": {},
+      "clips": [
+        {
+          "glyph": "b",
+          "name": "be",
+          "samples": 3840,
+          "sample_rate": 22050,
+          "render_seconds": 0.01476994599943282,
+          "peak": 0.1838885247707367,
+          "sha256": "3a9c0bfa4d4ff84195997160471956ee0578c6afe8fe3ec6abe71b4d3b21a5a7",
+          "path": "evidence/european_character_probes/pl-0.wav"
+        },
+        {
+          "glyph": "ł",
+          "name": "eł",
+          "samples": 8192,
+          "sample_rate": 22050,
+          "render_seconds": 0.04454338300092786,
+          "peak": 0.2348225861787796,
+          "sha256": "4f98b0babe1ddf709413efd97a8d5626ef9abaea1f3e3d61e11bbcc0fc13e82c",
+          "path": "evidence/european_character_probes/pl-1.wav"
+        },
+        {
+          "glyph": "ź",
+          "name": "ziet",
+          "samples": 7680,
+          "sample_rate": 22050,
+          "render_seconds": 0.034476823999284534,
+          "peak": 0.264773964881897,
+          "sha256": "65ed292d3b30d2492ed90c64ac2ff6f5485b53e76bf77a94909cea07227ca42f",
+          "path": "evidence/european_character_probes/pl-2.wav"
+        }
+      ],
+      "native_pronunciation_accepted": false
+    }
+  }
+}

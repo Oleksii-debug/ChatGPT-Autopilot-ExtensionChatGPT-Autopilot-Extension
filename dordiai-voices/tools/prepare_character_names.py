@@ -23,6 +23,9 @@ CLDR_REVISION = "7d2b9cb11cec08f4d333ad73209deb3df0711c3b"
 ALIASES_NVDA = {"nb": "nb_NO", "no": "nb_NO", "pt": "pt_PT", "zh": "zh_CN", "cmn": "zh_CN"}
 ALIASES_CLDR = {"nb": "nb", "fil": "fil", "kab": "kab"}
 ESCAPES = {"0": "\0", "t": "\t", "n": "\n", "r": "\r", "f": "\f", "v": "\v", "#": "#", "\\": "\\"}
+MAX_SYMBOL_SEQUENCE = 16
+DEFAULT_SYMBOL_BANK_BUDGET = 512
+COMMON_EMOJI = frozenset("😀 😃 😄 😁 😆 😅 😂 🤣 🙂 🙃 😉 😊 😍 🥰 😎 🤔 😢 😭 😡 😠 😴 😷 👍 👎 👏 🙏 ❤ ❤️ 💔 ✅ ❌ ⚠ ⚠️ ℹ ℹ️ ☑ ☑️".split())
 
 
 def fetch(url, destination):
@@ -96,11 +99,33 @@ def nvda_symbols(text):
     return output
 
 
+def is_symbol_key(key):
+    """Accept source-listed symbols/emoji, never alphabet/digit name guesses.
+
+    The sequence bound covers ordinary ZWJ families and subdivision flags.
+    Format controls other than emoji joiners/tags and presentation selectors
+    are excluded, even if a malformed upstream record supplies a label.
+    """
+    if not isinstance(key, str) or not 1 <= len(key) <= MAX_SYMBOL_SEQUENCE:
+        return False
+    if re.fullmatch(r"[0-9#*]\ufe0f?\u20e3", key):
+        return True
+    has_symbol = False
+    for char in key:
+        if unicodedata.category(char).startswith(("P", "S")):
+            has_symbol = True
+        elif char in {"\u200d", "\ufe0e", "\ufe0f"} or 0xE0020 <= ord(char) <= 0xE007F:
+            continue
+        else:
+            return False
+    return has_symbol and not key.startswith("\u200d") and not key.endswith("\u200d")
+
+
 def cldr_symbols(document):
     output = {}
     values = document.get("annotations", {}).get("annotations", {})
     for key, entry in values.items():
-        if len(key) != 1 or ord(key) > 0x2FFF or not unicodedata.category(key).startswith(("P", "S")):
+        if not is_symbol_key(key):
             continue
         candidates = entry.get("tts", [])
         if isinstance(candidates, str):
@@ -108,6 +133,54 @@ def cldr_symbols(document):
         if candidates and candidates[0] not in {key, "↑↑↑", "∅∅∅", "", "-"}:
             output[key] = candidates[0]
     return output
+
+
+def symbol_bank_keys(mapping, origins, curated=(), budget=DEFAULT_SYMBOL_BANK_BUDGET):
+    """Bound default precomputation, retaining full runtime name lookup.
+
+    This per-language budget does not replace the bank builder's global index
+    byte limit. Large installations must select a language subset or explicitly
+    plan several separate compatible banks; omitted jobs remain pending.
+    """
+    curated = set(curated)
+    def priority(key):
+        if key in curated:
+            return 0, key
+        if key in COMMON_EMOJI:
+            return 1, key
+        if origins.get(key) == "nvda_symbols":
+            return 2, key
+        if len(key) == 1 and ord(key) <= 0x2FFF:
+            return 3, key
+        return 4, key
+    return sorted(mapping, key=priority)[:max(0, int(budget))]
+
+
+def disambiguate_bank_aliases(entries):
+    """Keep glyph keys authoritative when names collide after bank hashing.
+
+    Two source labels may differ only in capitalisation/spacing. Both glyph
+    entries keep their own exact spoken text; a conflicting convenience name
+    alias is reported and omitted rather than overwriting another recording.
+    """
+    def key(text):
+        return unicodedata.normalize("NFC", text).strip().casefold()
+    primary = {key(row["lookup_text"]): row for row in entries}
+    claimed = dict(primary)
+    conflicts = []
+    for row in entries:
+        accepted = []
+        for alias in row["aliases"]:
+            previous = claimed.get(key(alias))
+            if previous is not None and previous["text"] != row["text"]:
+                conflicts.append({"lookup_text": row["lookup_text"], "alias": alias,
+                                  "conflicts_with_lookup": previous["lookup_text"],
+                                  "reason": "Same casefolded/trimmed name key for different exact source labels; glyph keys retained"})
+                continue
+            claimed[key(alias)] = row
+            accepted.append(alias)
+        row["aliases"] = accepted
+    return conflicts
 
 
 def exemplar_units(pattern):
@@ -265,6 +338,10 @@ def prepare(codes, output, cache):
                 record["letter_names"][variant] = name
         record["ordinary_alphabet_source_complete"] = override.get("ordinary_alphabet_complete") is True
         record["ordinary_alphabet_source_repertoire"] = list(override.get("letter_names", {}))
+        if override.get("alternatives"):
+            # Documented regional/lexical alternatives are provenance only.
+            # One chosen native name remains the ordinary runtime spelling.
+            record["ordinary_letter_name_alternatives"] = override["alternatives"]
         if override.get("exclusions"):
             record["curation_exclusions"] = override["exclusions"]
         if code in core:
@@ -284,8 +361,18 @@ def prepare(codes, output, cache):
         record["missing_ordinary_letter_names"] = [glyph for glyph in record["exemplar_units"]
                                                     if glyph not in record["letter_names"] and glyph not in record["symbol_names"]]
         origins = {entry["lookup_text"]: entry["source_id"] for entry in record["bank_entries"]}
+        selected_symbols = symbol_bank_keys(record["symbol_names"], origins, override.get("symbol_names", {}))
+        selected_symbol_names = {glyph: record["symbol_names"][glyph] for glyph in selected_symbols}
+        record["symbol_bank_preparation"] = {
+            "default_symbol_budget": DEFAULT_SYMBOL_BANK_BUDGET,
+            "native_symbol_names_available": len(record["symbol_names"]),
+            "symbol_jobs_scheduled": len(selected_symbols),
+            "symbol_jobs_pending_budget": len(record["symbol_names"]) - len(selected_symbols),
+            "pending_symbol_keys": sorted(set(record["symbol_names"]) - set(selected_symbols)),
+            "scope": "Full native symbol_names remain available at runtime. This is a bounded preparation plan, not existing PCM. The voice bank builder must also enforce its global index byte limit across selected languages.",
+        }
         record["bank_entries"] = []
-        for kind, mapping in (("letter_name", record["letter_names"]), ("symbol_name", record["symbol_names"])):
+        for kind, mapping in (("letter_name", record["letter_names"]), ("symbol_name", selected_symbol_names)):
             for glyph, text in mapping.items():
                 if not text.strip() or len(text) > 160 or "<|" in text:
                     continue
@@ -297,11 +384,15 @@ def prepare(codes, output, cache):
                                                "aliases": aliases, "text": text, "semantic_kind": "spoken_name",
                                                "source_kind": kind, "source_id": ("project_core_alphabet" if code in core else "curated_primary_alphabet_names") if kind == "letter_name" else source_id if glyph in override.get("symbol_names", {}) else origins.get(glyph, "native_symbol_source"),
                                                "acoustic_validation": "pending"})
+        record["symbol_bank_preparation"]["conflicting_name_aliases_omitted"] = disambiguate_bank_aliases(record["bank_entries"])
         record["semantics"]["ordinary_letter_names_status"] = "existing-core-alphabet" if code in core else "source-complete-acoustic-acceptance-pending" if record["ordinary_alphabet_source_complete"] else "source-partial-acoustic-acceptance-pending" if record["letter_names"] else "not-established-by-these-sources"
+        record["semantics"]["symbol_keys"] = "Pinned explicit CLDR/NVDA native names; supplementary symbols and bounded emoji sequences stay symbol_names, never ordinary alphabet names"
+        record["semantics"]["bank_storage_kind"] = "The letters bank stores short navigation clips for both symbols and letters; source_kind distinguishes their linguistic semantics"
         path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         summary.update(symbol_names=len(record["symbol_names"]), ordinary_letter_names=len(record["letter_names"]),
                        letter_names_ready=record["letter_names_ready"],
                        english_identical_candidates_excluded=len(candidates),
+                       symbol_jobs_pending_budget=record["symbol_bank_preparation"]["symbol_jobs_pending_budget"],
                        bank_entries_pending_acoustic_validation=len(record["bank_entries"]))
     licenses = {
         "NVDA-GPL.txt": f"https://raw.githubusercontent.com/nvaccess/nvda/{NVDA_REVISION}/copying.txt",
@@ -322,7 +413,7 @@ def prepare(codes, output, cache):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--languages", help="Comma-separated exact languages; default new model languages plus three existing core languages")
+    parser.add_argument("--languages", help="Comma-separated exact languages; default new model languages, source-curated alphabets and three existing core languages")
     parser.add_argument("--output", type=Path, default=ROOT / "source/0.12.2/kx47Runtime/models/CharacterNames")
     parser.add_argument("--cache", type=Path, default=ROOT.parent.parent / "character-source-cache")
     parser.add_argument("--evidence", type=Path, default=ROOT / "evidence/character_name_sources.json")
@@ -332,6 +423,11 @@ def main(argv=None):
     else:
         registry = json.loads((ROOT / "source/0.12.2/kx47Runtime/wide_voice_index.json").read_text(encoding="utf-8"))
         codes = sorted({"uk", "en", "ru"} | {code for code, value in registry.items() if value.get("backend") in {"mms-onnx", "extra-onnx", "omni-onnx"}})
+        # Source-backed tables for existing European/American engines are useful
+        # too. Adding metadata never registers a model or marks its audio ready.
+        curated = json.loads(Path(__file__).with_name("character_name_overrides.json").read_text(encoding="utf-8"))
+        existing = {path.stem for path in args.output.glob("*.json") if re.fullmatch(r"[a-z][a-z0-9]{1,11}", path.stem)}
+        codes = sorted(set(codes) | set(curated.get("languages", {})) | existing)
     # The English reference is used only to flag untranslated candidate labels.
     # It does not enable a language or provide a fallback for another locale.
     codes = sorted(set(codes) | {"en"})

@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "scope": "real-nvda-driver-models-gui-with-recording-sink-test-double",
+  "status": "failed",
+  "run_id": "f84dabe95df94a36b01976359fc05bc2",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "nvda_version_expected": "2026.3.1",
+  "checks": [
+    {
+      "name": "physical_audio_output",
+      "status": "blocked",
+      "reason": "Explicit recording PCM sink test double; no WavePlayer/device acceptance"
+    },
+    {
+      "name": "driver_selection_exception",
+      "status": "failed",
+      "error": "TypeError(\"check() got multiple values for argument 'name'\")",
+      "traceback": "Traceback (most recent call last):\n  File \"D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 106, in guarded\n    callback()\n    ~~~~~~~~^^\n  File \"D:\\a\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension\\dordiai-voices\\windows-results\\nvda\\nvda-probe-tb9crcwo\\config\\addons\\dordiaiProbe\\globalPlugins\\dordiaiProbe.py\", line 206, in begin\n    check(\"select_dordiai\", \"passed\", name=DRIVER.name)\n    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: check() got multiple values for argument 'name'\n"
+    }
+  ],
+  "limitations": [
+    "PCM recorded before the physical output device is not a WASAPI loopback recording.",
+    "This smoke probe does not certify pronunciation, perceived voice identity or acoustic latency percentiles.",
+    "One keyboard smoke check is not a complete accessibility assessment.",
+    "Explicit headless UI probe: WavePlayer is replaced only during this isolated test by a recording PCM sink. Device and acoustic acceptance remain blocked."
+  ],
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "product_ready": false,
+  "recording_pcm_sink_test_double": true,
+  "nvda_version_actual": "2026.3.1",
+  "pcm_metrics": {},
+  "finished_at_ns": 1795326902163099400
+}

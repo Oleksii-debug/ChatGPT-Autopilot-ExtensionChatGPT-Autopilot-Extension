@@ -4,6 +4,22 @@
   "cldr_revision": "7d2b9cb11cec08f4d333ad73209deb3df0711c3b",
   "scope": "Pinned-source character metadata, not generated or accepted audio banks",
   "languages": {
+    "brx": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 62,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions",
+        "cldr_annotations"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
     "ay": {
       "status": "metadata-prepared",
       "symbol_names": 0,
@@ -18,35 +34,8 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "ak": {
-      "status": "metadata-prepared",
-      "symbol_names": 489,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 22,
-      "bank_entries_pending_acoustic_validation": 489,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 23
-    },
-    "doi": {
-      "status": "metadata-prepared",
-      "symbol_names": 8,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 73,
-      "bank_entries_pending_acoustic_validation": 8,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "bm": {
       "status": "metadata-prepared",
@@ -61,7 +50,23 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "doi": {
+      "status": "metadata-prepared",
+      "symbol_names": 8,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 73,
+      "bank_entries_pending_acoustic_validation": 8,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "dv": {
       "status": "metadata-prepared",
@@ -77,22 +82,8 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "brx": {
-      "status": "metadata-prepared",
-      "symbol_names": 0,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 62,
-      "bank_entries_pending_acoustic_validation": 0,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions",
-        "cldr_annotations"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "dyu": {
       "status": "metadata-prepared",
@@ -108,7 +99,8 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "dz": {
       "status": "metadata-prepared",
@@ -123,7 +115,8 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "ff": {
       "status": "metadata-prepared",
@@ -137,23 +130,59 @@
         "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
-    "fj": {
+    "fi": {
       "status": "metadata-prepared",
-      "symbol_names": 0,
+      "symbol_names": 2263,
+      "phonetic_descriptions": 29,
+      "ordinary_letter_names": 62,
+      "exemplar_units": 31,
+      "bank_entries_pending_acoustic_validation": 574,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 44,
+      "symbol_jobs_pending_budget": 1751
+    },
+    "en": {
+      "status": "metadata-prepared",
+      "symbol_names": 2296,
+      "phonetic_descriptions": 26,
+      "ordinary_letter_names": 52,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 564,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 1784
+    },
+    "el": {
+      "status": "metadata-prepared",
+      "symbol_names": 1958,
+      "phonetic_descriptions": 61,
+      "ordinary_letter_names": 49,
+      "exemplar_units": 36,
+      "bank_entries_pending_acoustic_validation": 561,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 4,
+      "symbol_jobs_pending_budget": 1446
+    },
+    "ak": {
+      "status": "metadata-prepared",
+      "symbol_names": 1885,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
-      "exemplar_units": 0,
-      "bank_entries_pending_acoustic_validation": 0,
+      "exemplar_units": 22,
+      "bank_entries_pending_acoustic_validation": 512,
       "missing_sources": [
         "nvda_symbols",
-        "nvda_descriptions",
-        "cldr_annotations",
-        "cldr_characters"
+        "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 62,
+      "symbol_jobs_pending_budget": 1373
     },
     "gil": {
       "status": "metadata-prepared",
@@ -169,60 +198,109 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
-    "fil": {
+    "es": {
       "status": "metadata-prepared",
-      "symbol_names": 429,
+      "symbol_names": 1983,
+      "phonetic_descriptions": 27,
+      "ordinary_letter_names": 54,
+      "exemplar_units": 33,
+      "bank_entries_pending_acoustic_validation": 566,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 312,
+      "symbol_jobs_pending_budget": 1471
+    },
+    "fj": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
-      "exemplar_units": 28,
-      "bank_entries_pending_acoustic_validation": 429,
+      "exemplar_units": 0,
+      "bank_entries_pending_acoustic_validation": 0,
       "missing_sources": [
         "nvda_symbols",
-        "nvda_descriptions"
+        "nvda_descriptions",
+        "cldr_annotations",
+        "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 83
-    },
-    "ha": {
-      "status": "metadata-prepared",
-      "symbol_names": 509,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 58,
-      "exemplar_units": 29,
-      "bank_entries_pending_acoustic_validation": 567,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 3
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "ig": {
       "status": "metadata-prepared",
-      "symbol_names": 483,
+      "symbol_names": 1878,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
       "exemplar_units": 36,
-      "bank_entries_pending_acoustic_validation": 483,
+      "bank_entries_pending_acoustic_validation": 512,
       "missing_sources": [
         "nvda_symbols",
         "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 29
+      "english_identical_candidates_excluded": 69,
+      "symbol_jobs_pending_budget": 1366
     },
-    "en": {
+    "hr": {
       "status": "metadata-prepared",
-      "symbol_names": 862,
-      "phonetic_descriptions": 26,
-      "ordinary_letter_names": 52,
-      "exemplar_units": 26,
-      "bank_entries_pending_acoustic_validation": 914,
+      "symbol_names": 2239,
+      "phonetic_descriptions": 37,
+      "ordinary_letter_names": 63,
+      "exemplar_units": 30,
+      "bank_entries_pending_acoustic_validation": 575,
       "missing_sources": [],
-      "letter_names_ready": true,
-      "english_identical_candidates_excluded": 0
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 57,
+      "symbol_jobs_pending_budget": 1727
+    },
+    "fil": {
+      "status": "metadata-prepared",
+      "symbol_names": 1531,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 28,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 416,
+      "symbol_jobs_pending_budget": 1019
+    },
+    "ha": {
+      "status": "metadata-prepared",
+      "symbol_names": 1938,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 58,
+      "exemplar_units": 29,
+      "bank_entries_pending_acoustic_validation": 570,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 7,
+      "symbol_jobs_pending_budget": 1426
+    },
+    "kab": {
+      "status": "metadata-prepared",
+      "symbol_names": 0,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 34,
+      "bank_entries_pending_acoustic_validation": 0,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "ks": {
       "status": "metadata-prepared",
@@ -237,21 +315,8 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "kab": {
-      "status": "metadata-prepared",
-      "symbol_names": 0,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 34,
-      "bank_entries_pending_acoustic_validation": 0,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "ln": {
       "status": "metadata-prepared",
@@ -266,7 +331,38 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "km": {
+      "status": "metadata-prepared",
+      "symbol_names": 1943,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 74,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 4,
+      "symbol_jobs_pending_budget": 1431
+    },
+    "lo": {
+      "status": "metadata-prepared",
+      "symbol_names": 1947,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 55,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 1435
     },
     "mai": {
       "status": "metadata-prepared",
@@ -280,35 +376,50 @@
         "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
-    "km": {
+    "it": {
       "status": "metadata-prepared",
-      "symbol_names": 511,
-      "phonetic_descriptions": 0,
+      "symbol_names": 1958,
+      "phonetic_descriptions": 51,
+      "ordinary_letter_names": 52,
+      "exemplar_units": 32,
+      "bank_entries_pending_acoustic_validation": 564,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 337,
+      "symbol_jobs_pending_budget": 1446
+    },
+    "mni": {
+      "status": "metadata-prepared",
+      "symbol_names": 7,
+      "phonetic_descriptions": 42,
       "ordinary_letter_names": 0,
-      "exemplar_units": 74,
-      "bank_entries_pending_acoustic_validation": 511,
+      "exemplar_units": 62,
+      "bank_entries_pending_acoustic_validation": 7,
       "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
+        "nvda_symbols"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 1
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
-    "lo": {
+    "nd": {
       "status": "metadata-prepared",
-      "symbol_names": 512,
+      "symbol_names": 0,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
-      "exemplar_units": 55,
-      "bank_entries_pending_acoustic_validation": 512,
+      "exemplar_units": 25,
+      "bank_entries_pending_acoustic_validation": 0,
       "missing_sources": [
         "nvda_symbols",
-        "nvda_descriptions"
+        "nvda_descriptions",
+        "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "mg": {
       "status": "metadata-prepared",
@@ -323,7 +434,8 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "mos": {
       "status": "metadata-prepared",
@@ -339,34 +451,23 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "nso": {
       "status": "metadata-prepared",
-      "symbol_names": 149,
+      "symbol_names": 1231,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
       "exemplar_units": 25,
-      "bank_entries_pending_acoustic_validation": 149,
+      "bank_entries_pending_acoustic_validation": 512,
       "missing_sources": [
         "nvda_symbols",
         "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 13
-    },
-    "mni": {
-      "status": "metadata-prepared",
-      "symbol_names": 6,
-      "phonetic_descriptions": 42,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 62,
-      "bank_entries_pending_acoustic_validation": 6,
-      "missing_sources": [
-        "nvda_symbols"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 30,
+      "symbol_jobs_pending_budget": 719
     },
     "ny": {
       "status": "metadata-prepared",
@@ -382,35 +483,47 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "pt": {
+      "status": "metadata-prepared",
+      "symbol_names": 1971,
+      "phonetic_descriptions": 26,
+      "ordinary_letter_names": 75,
+      "exemplar_units": 38,
+      "bank_entries_pending_acoustic_validation": 587,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 63,
+      "symbol_jobs_pending_budget": 1459
     },
     "rm": {
       "status": "metadata-prepared",
-      "symbol_names": 487,
+      "symbol_names": 1779,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 52,
       "exemplar_units": 32,
-      "bank_entries_pending_acoustic_validation": 539,
+      "bank_entries_pending_acoustic_validation": 564,
       "missing_sources": [
         "nvda_symbols",
         "nvda_descriptions"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 25
+      "english_identical_candidates_excluded": 102,
+      "symbol_jobs_pending_budget": 1267
     },
-    "sat": {
+    "pl": {
       "status": "metadata-prepared",
-      "symbol_names": 10,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 36,
-      "bank_entries_pending_acoustic_validation": 10,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
+      "symbol_names": 2226,
+      "phonetic_descriptions": 32,
+      "ordinary_letter_names": 64,
+      "exemplar_units": 32,
+      "bank_entries_pending_acoustic_validation": 576,
+      "missing_sources": [],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 70,
+      "symbol_jobs_pending_budget": 1714
     },
     "rn": {
       "status": "metadata-prepared",
@@ -425,32 +538,8 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "rw": {
-      "status": "metadata-prepared",
-      "symbol_names": 162,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 26,
-      "bank_entries_pending_acoustic_validation": 162,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "ru": {
-      "status": "metadata-prepared",
-      "symbol_names": 879,
-      "phonetic_descriptions": 39,
-      "ordinary_letter_names": 66,
-      "exemplar_units": 33,
-      "bank_entries_pending_acoustic_validation": 945,
-      "missing_sources": [],
-      "letter_names_ready": true,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "sm": {
       "status": "metadata-prepared",
@@ -466,7 +555,23 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "sat": {
+      "status": "metadata-prepared",
+      "symbol_names": 25,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 36,
+      "bank_entries_pending_acoustic_validation": 25,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "sg": {
       "status": "metadata-prepared",
@@ -481,7 +586,23 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "rw": {
+      "status": "metadata-prepared",
+      "symbol_names": 1258,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 4,
+      "symbol_jobs_pending_budget": 746
     },
     "sn": {
       "status": "metadata-prepared",
@@ -496,7 +617,35 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "ro": {
+      "status": "metadata-prepared",
+      "symbol_names": 1971,
+      "phonetic_descriptions": 33,
+      "ordinary_letter_names": 60,
+      "exemplar_units": 31,
+      "bank_entries_pending_acoustic_validation": 572,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 338,
+      "symbol_jobs_pending_budget": 1459
+    },
+    "tg": {
+      "status": "metadata-prepared",
+      "symbol_names": 1263,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 35,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 3,
+      "symbol_jobs_pending_budget": 751
     },
     "st": {
       "status": "metadata-prepared",
@@ -511,76 +660,8 @@
         "cldr_annotations"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "so": {
-      "status": "metadata-prepared",
-      "symbol_names": 413,
-      "phonetic_descriptions": 21,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 18,
-      "bank_entries_pending_acoustic_validation": 413,
-      "missing_sources": [],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 122
-    },
-    "tg": {
-      "status": "metadata-prepared",
-      "symbol_names": 164,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 35,
-      "bank_entries_pending_acoustic_validation": 164,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 2
-    },
-    "tpi": {
-      "status": "metadata-prepared",
-      "symbol_names": 0,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 0,
-      "bank_entries_pending_acoustic_validation": 0,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions",
-        "cldr_annotations",
-        "cldr_characters"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
-    },
-    "wo": {
-      "status": "metadata-prepared",
-      "symbol_names": 161,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 29,
-      "bank_entries_pending_acoustic_validation": 161,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 5
-    },
-    "xh": {
-      "status": "metadata-prepared",
-      "symbol_names": 162,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 26,
-      "bank_entries_pending_acoustic_validation": 162,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
     "ts": {
       "status": "metadata-prepared",
@@ -596,62 +677,122 @@
         "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
     },
-    "uk": {
-      "status": "metadata-prepared",
-      "symbol_names": 866,
-      "phonetic_descriptions": 32,
-      "ordinary_letter_names": 66,
-      "exemplar_units": 34,
-      "bank_entries_pending_acoustic_validation": 932,
-      "missing_sources": [],
-      "letter_names_ready": true,
-      "english_identical_candidates_excluded": 0
-    },
-    "zu": {
-      "status": "metadata-prepared",
-      "symbol_names": 376,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 60,
-      "bank_entries_pending_acoustic_validation": 376,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 136
-    },
-    "yo": {
-      "status": "metadata-prepared",
-      "symbol_names": 494,
-      "phonetic_descriptions": 0,
-      "ordinary_letter_names": 0,
-      "exemplar_units": 45,
-      "bank_entries_pending_acoustic_validation": 494,
-      "missing_sources": [
-        "nvda_symbols",
-        "nvda_descriptions"
-      ],
-      "letter_names_ready": false,
-      "english_identical_candidates_excluded": 18
-    },
-    "nd": {
+    "tpi": {
       "status": "metadata-prepared",
       "symbol_names": 0,
       "phonetic_descriptions": 0,
       "ordinary_letter_names": 0,
-      "exemplar_units": 25,
+      "exemplar_units": 0,
       "bank_entries_pending_acoustic_validation": 0,
       "missing_sources": [
         "nvda_symbols",
         "nvda_descriptions",
-        "cldr_annotations"
+        "cldr_annotations",
+        "cldr_characters"
       ],
       "letter_names_ready": false,
-      "english_identical_candidates_excluded": 0
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 0
+    },
+    "so": {
+      "status": "metadata-prepared",
+      "symbol_names": 1837,
+      "phonetic_descriptions": 21,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 18,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 133,
+      "symbol_jobs_pending_budget": 1325
+    },
+    "xh": {
+      "status": "metadata-prepared",
+      "symbol_names": 1262,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 26,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 750
+    },
+    "wo": {
+      "status": "metadata-prepared",
+      "symbol_names": 1274,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 29,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 34,
+      "symbol_jobs_pending_budget": 762
+    },
+    "ru": {
+      "status": "metadata-prepared",
+      "symbol_names": 2313,
+      "phonetic_descriptions": 39,
+      "ordinary_letter_names": 66,
+      "exemplar_units": 33,
+      "bank_entries_pending_acoustic_validation": 578,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 1801
+    },
+    "uk": {
+      "status": "metadata-prepared",
+      "symbol_names": 2300,
+      "phonetic_descriptions": 32,
+      "ordinary_letter_names": 66,
+      "exemplar_units": 34,
+      "bank_entries_pending_acoustic_validation": 578,
+      "missing_sources": [],
+      "letter_names_ready": true,
+      "english_identical_candidates_excluded": 0,
+      "symbol_jobs_pending_budget": 1788
+    },
+    "yo": {
+      "status": "metadata-prepared",
+      "symbol_names": 1918,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 45,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 29,
+      "symbol_jobs_pending_budget": 1406
+    },
+    "zu": {
+      "status": "metadata-prepared",
+      "symbol_names": 1706,
+      "phonetic_descriptions": 0,
+      "ordinary_letter_names": 0,
+      "exemplar_units": 60,
+      "bank_entries_pending_acoustic_validation": 512,
+      "missing_sources": [
+        "nvda_symbols",
+        "nvda_descriptions"
+      ],
+      "letter_names_ready": false,
+      "english_identical_candidates_excluded": 241,
+      "symbol_jobs_pending_budget": 1194
     }
   },
-  "blocked_english_identical_symbol_candidates": 460
+  "blocked_english_identical_symbol_candidates": 2359
 }

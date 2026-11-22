@@ -5,12 +5,8 @@
   "entries": [
     {
       "id": "mms-ay",
-      "name_uk": "MMS — Аймара",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ay-1.0.0.zip",
-      "size_bytes": 105498985,
-      "sha256": "c9dbff6efa8c4d6efbe6712fcb287b1b80ac4a5e4f72e79ac422a26c14cfe57e",
       "languages": [
         "ay"
       ],
@@ -18,10 +14,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -36,16 +30,17 @@
         "source_sha256": "fed930102519a94edc6bcdbf8921b86412b22adc7d094ccb17768c14f1de7f61",
         "standard": "Central Aymara (ayr)",
         "tokens_sha256": "de3335300658158d6aea823953b8748a8d86382ed9dc480c08138bd0c070502d"
-      }
+      },
+      "name_uk": "MMS — Аймара",
+      "filename": "dordiai-mms-ay-1.0.0.zip",
+      "size_bytes": 105498985,
+      "sha256": "c9dbff6efa8c4d6efbe6712fcb287b1b80ac4a5e4f72e79ac422a26c14cfe57e",
+      "default_installation": false
     },
     {
       "id": "mms-fil",
-      "name_uk": "MMS — Філіппінська — стандарт на тагальській основі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-fil-1.0.0.zip",
-      "size_bytes": 105530850,
-      "sha256": "53ea51d6a7d557046d8628ea4abcd39d0e43d430136b48d76aecf2da8cdced8f",
       "languages": [
         "fil"
       ],
@@ -53,10 +48,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -71,16 +64,17 @@
         "source_sha256": "a735b5e15dc29875bc4bb94c1e4789c6aaf03ba737266ab7b1984278e8339647",
         "standard": "Tagalog (tgl), basis of Filipino standard",
         "tokens_sha256": "5f4883ec7ba2128b7467cda01aa875d02bee8d600dc5822843216d8a14224ab0"
-      }
+      },
+      "name_uk": "MMS — Філіппінська — стандарт на тагальській основі",
+      "filename": "dordiai-mms-fil-1.0.0.zip",
+      "size_bytes": 105530850,
+      "sha256": "53ea51d6a7d557046d8628ea4abcd39d0e43d430136b48d76aecf2da8cdced8f",
+      "default_installation": false
     },
     {
       "id": "mms-km",
-      "name_uk": "MMS — Кхмерська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-km-1.0.0.zip",
-      "size_bytes": 105532644,
-      "sha256": "ffa0c602fc82b8e1a72d982f24684c4b9d11630d3a8ddfc014027fc9b5f13081",
       "languages": [
         "km"
       ],
@@ -88,10 +82,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -106,16 +98,17 @@
         "source_sha256": "b1b7c454a3836884a200602e2c1277e3f1ba6f5dfc204fff3f09a80ab862604c",
         "standard": "khm",
         "tokens_sha256": "b15954d9cc8eb2aad3eb564dce826c1361152ef4b83ac5e784f5ee86929ec317"
-      }
+      },
+      "name_uk": "MMS — Кхмерська",
+      "filename": "dordiai-mms-km-1.0.0.zip",
+      "size_bytes": 105532644,
+      "sha256": "ffa0c602fc82b8e1a72d982f24684c4b9d11630d3a8ddfc014027fc9b5f13081",
+      "default_installation": false
     },
     {
       "id": "mms-tg",
-      "name_uk": "MMS — Таджицька",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-tg-1.0.0.zip",
-      "size_bytes": 105523486,
-      "sha256": "e1286d11910974eb36761e981655c1e74a1b296a757b074d4978f7e02a338c72",
       "languages": [
         "tg"
       ],
@@ -123,10 +116,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -141,16 +132,17 @@
         "source_sha256": "43cb01c431b3ba38c7068ee8ae3c097f272583bdbc6549ae1b9b409d29ce2cb7",
         "standard": "tgk",
         "tokens_sha256": "16f3918b85b7ba3c9346dd0934acc415697ed22dcc9d7793dc80034b2f8abf0d"
-      }
+      },
+      "name_uk": "MMS — Таджицька",
+      "filename": "dordiai-mms-tg-1.0.0.zip",
+      "size_bytes": 105523486,
+      "sha256": "e1286d11910974eb36761e981655c1e74a1b296a757b074d4978f7e02a338c72",
+      "default_installation": false
     },
     {
       "id": "mms-lo",
-      "name_uk": "MMS — Лаоська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-lo-1.0.0.zip",
-      "size_bytes": 105525068,
-      "sha256": "52017f2a2067244425156205e1baef6517c297b0dad712e9d692fc4bcbcc60a6",
       "languages": [
         "lo"
       ],
@@ -158,10 +150,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -176,16 +166,17 @@
         "source_sha256": "e0ed9f8a7b5d756a76800773d941f706b4599d23a86a6e8064fed8b1aaae44f8",
         "standard": "lao",
         "tokens_sha256": "2efa143e564d865e23290e645adccecd3fc68cf880441f7276c34083da74891b"
-      }
+      },
+      "name_uk": "MMS — Лаоська",
+      "filename": "dordiai-mms-lo-1.0.0.zip",
+      "size_bytes": 105525068,
+      "sha256": "52017f2a2067244425156205e1baef6517c297b0dad712e9d692fc4bcbcc60a6",
+      "default_installation": false
     },
     {
       "id": "mms-mai",
-      "name_uk": "MMS — Майтілі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-mai-1.0.0.zip",
-      "size_bytes": 105514630,
-      "sha256": "f1f128ab97d87bf82d206989649535534637552e41ca11486c9cf797938f2fb6",
       "languages": [
         "mai"
       ],
@@ -193,10 +184,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -211,16 +200,17 @@
         "source_sha256": "996b6f611adde7d1237f83eb9f026f12fce3b7ff8e255a20e90073bcebbee16a",
         "standard": "mai",
         "tokens_sha256": "1a2a8966d9c889496118dce0b1f80f83eee2c1533fc027a9d16cddba43cdb6fa"
-      }
+      },
+      "name_uk": "MMS — Майтілі",
+      "filename": "dordiai-mms-mai-1.0.0.zip",
+      "size_bytes": 105514630,
+      "sha256": "f1f128ab97d87bf82d206989649535534637552e41ca11486c9cf797938f2fb6",
+      "default_installation": false
     },
     {
       "id": "mms-doi",
-      "name_uk": "MMS — Догрі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-doi-1.0.0.zip",
-      "size_bytes": 105545305,
-      "sha256": "591755e81a7b9cb65133976396a8c286cb94b5ba1ce611352ad9095df8248716",
       "languages": [
         "doi"
       ],
@@ -228,10 +218,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -246,16 +234,17 @@
         "source_sha256": "0f8f0012dece79080c48ee7aef837a821a4f5a515a77c556e4769a20c9a04653",
         "standard": "Dogri (dgo)",
         "tokens_sha256": "0b86dc24d5e14c22472296c91c9f92a8dcc2cf15fad43d3b71142ad5186981e9"
-      }
+      },
+      "name_uk": "MMS — Догрі",
+      "filename": "dordiai-mms-doi-1.0.0.zip",
+      "size_bytes": 105545305,
+      "sha256": "591755e81a7b9cb65133976396a8c286cb94b5ba1ce611352ad9095df8248716",
+      "default_installation": false
     },
     {
       "id": "mms-dv",
-      "name_uk": "MMS — Дівехі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-dv-1.0.0.zip",
-      "size_bytes": 105467562,
-      "sha256": "bef2b0c516bc3a3535d5bcf1daff381822e83a70985e596c2f47883cc07cfcb3",
       "languages": [
         "dv"
       ],
@@ -263,10 +252,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -281,16 +268,17 @@
         "source_sha256": "c39af4bdf730950a0d55ac030d997a6efcc664f192ba7ff01cb9262377d8ed2a",
         "standard": "div",
         "tokens_sha256": "1b034159a9076e69438ff296984bd56746f9f8f6eb628964940ea171683a5ad1"
-      }
+      },
+      "name_uk": "MMS — Дівехі",
+      "filename": "dordiai-mms-dv-1.0.0.zip",
+      "size_bytes": 105467562,
+      "sha256": "bef2b0c516bc3a3535d5bcf1daff381822e83a70985e596c2f47883cc07cfcb3",
+      "default_installation": false
     },
     {
       "id": "mms-dz",
-      "name_uk": "MMS — Дзонг-кха",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-dz-1.0.0.zip",
-      "size_bytes": 105512188,
-      "sha256": "79ca81b7695ce20828dcf5cf72d72b72721f947bc178b236dabf37bbf9a002ba",
       "languages": [
         "dz"
       ],
@@ -298,10 +286,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -316,16 +302,17 @@
         "source_sha256": "cd037c60b2010159eb78241d6834d2db62e25e9a0303841321f27fffe5310bf5",
         "standard": "dzo",
         "tokens_sha256": "8a7654094293bb4d6e96e86a31671323349d54308788b90ad664cf0c29f7e195"
-      }
+      },
+      "name_uk": "MMS — Дзонг-кха",
+      "filename": "dordiai-mms-dz-1.0.0.zip",
+      "size_bytes": 105512188,
+      "sha256": "79ca81b7695ce20828dcf5cf72d72b72721f947bc178b236dabf37bbf9a002ba",
+      "default_installation": false
     },
     {
       "id": "mms-ha",
-      "name_uk": "MMS — Хауса",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ha-1.0.0.zip",
-      "size_bytes": 105521099,
-      "sha256": "3ce3cdf680fd51835daf2c9402b4c9319cc3408e838137721b8b9576581dd596",
       "languages": [
         "ha"
       ],
@@ -333,10 +320,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -351,16 +336,17 @@
         "source_sha256": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
         "standard": "hau",
         "tokens_sha256": "78b39313ddfc60be59cc12a957f11bf0f5dd4d1cdd3d5c16fe0bf3fae165d0c9"
-      }
+      },
+      "name_uk": "MMS — Хауса",
+      "filename": "dordiai-mms-ha-1.0.0.zip",
+      "size_bytes": 105521099,
+      "sha256": "3ce3cdf680fd51835daf2c9402b4c9319cc3408e838137721b8b9576581dd596",
+      "default_installation": false
     },
     {
       "id": "mms-yo",
-      "name_uk": "MMS — Йоруба",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-yo-1.0.0.zip",
-      "size_bytes": 105539911,
-      "sha256": "34995b59809b9e7e6dfbe3c8bf5c9bcaa9838619cde3e28a50ec80615e46efd4",
       "languages": [
         "yo"
       ],
@@ -368,10 +354,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -386,16 +370,17 @@
         "source_sha256": "a800558c7113fea46b9e15fcd202c9fb7127cea338a2ecc8e011025f6724cc21",
         "standard": "yor",
         "tokens_sha256": "3fca3219266d24915a05e358f16fc57e7f748150cf25d1ffe5b8b6e530f915f0"
-      }
+      },
+      "name_uk": "MMS — Йоруба",
+      "filename": "dordiai-mms-yo-1.0.0.zip",
+      "size_bytes": 105539911,
+      "sha256": "34995b59809b9e7e6dfbe3c8bf5c9bcaa9838619cde3e28a50ec80615e46efd4",
+      "default_installation": false
     },
     {
       "id": "mms-ff",
-      "name_uk": "MMS — Фула, або фульфульде",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ff-1.0.0.zip",
-      "size_bytes": 105532623,
-      "sha256": "8c47161ef261ba055407fa1447b6e70a554a01212aa462eb3fad172ea97cfff2",
       "languages": [
         "ff"
       ],
@@ -403,10 +388,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -421,16 +404,17 @@
         "source_sha256": "03e714c525b35bbfa57fb3090a9246829712807d12716af96c78fd2c45ca7ecd",
         "standard": "Fula/Fulfulde (ful), exact checkpoint variety requires listening",
         "tokens_sha256": "b34fca4aa77eee1b64b709eed4b83252dc25ea9132fea1b1d6e938d6bf1d753e"
-      }
+      },
+      "name_uk": "MMS — Фула, або фульфульде",
+      "filename": "dordiai-mms-ff-1.0.0.zip",
+      "size_bytes": 105532623,
+      "sha256": "8c47161ef261ba055407fa1447b6e70a554a01212aa462eb3fad172ea97cfff2",
+      "default_installation": false
     },
     {
       "id": "mms-mg",
-      "name_uk": "MMS — Малагасійська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-mg-1.0.0.zip",
-      "size_bytes": 105548481,
-      "sha256": "dc3969ae9675108481c240ecb1239ee010ddbde4ce99ed4772b8752394706b92",
       "languages": [
         "mg"
       ],
@@ -438,10 +422,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -456,16 +438,17 @@
         "source_sha256": "58161c072f3c7ae869abbc5f58fcf0f7be9f5cc1eee21e5c807759d2facd8fca",
         "standard": "Malagasy (mlg), checkpoint standard",
         "tokens_sha256": "3820c57711dd3efd606524206de79451726b39e7c643179960e13d926c873321"
-      }
+      },
+      "name_uk": "MMS — Малагасійська",
+      "filename": "dordiai-mms-mg-1.0.0.zip",
+      "size_bytes": 105548481,
+      "sha256": "dc3969ae9675108481c240ecb1239ee010ddbde4ce99ed4772b8752394706b92",
+      "default_installation": false
     },
     {
       "id": "mms-so",
-      "name_uk": "MMS — Сомалійська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-so-1.0.0.zip",
-      "size_bytes": 105496665,
-      "sha256": "db0e3d65d8aa750dc9d9e0e02d2ba1d44a5ce8729706b08b4db0789f978720cc",
       "languages": [
         "so"
       ],
@@ -473,10 +456,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -491,16 +472,17 @@
         "source_sha256": "fd1f6005a2abea5a101ded57951464c903d9cc7a73d43efa2c3aac105d86e0b2",
         "standard": "som",
         "tokens_sha256": "7735b35bace882ce0116589b5243f4072d7ff26f76903353bf879e3501c9b088"
-      }
+      },
+      "name_uk": "MMS — Сомалійська",
+      "filename": "dordiai-mms-so-1.0.0.zip",
+      "size_bytes": 105496665,
+      "sha256": "db0e3d65d8aa750dc9d9e0e02d2ba1d44a5ce8729706b08b4db0789f978720cc",
+      "default_installation": false
     },
     {
       "id": "mms-sn",
-      "name_uk": "MMS — Шона",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-sn-1.0.0.zip",
-      "size_bytes": 105508786,
-      "sha256": "467234db159422ec016889546acb458ae247ca3530e25df828448beb24910882",
       "languages": [
         "sn"
       ],
@@ -508,10 +490,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -526,16 +506,17 @@
         "source_sha256": "fb30ffbcb0171ae56884c60fee3ec6bcde2533701d719b73a7856dc6f0b089a2",
         "standard": "sna",
         "tokens_sha256": "98391f18dc3ba8db4876b75abe253a0053d49c02b85c4295f1db8c6af646f443"
-      }
+      },
+      "name_uk": "MMS — Шона",
+      "filename": "dordiai-mms-sn-1.0.0.zip",
+      "size_bytes": 105508786,
+      "sha256": "467234db159422ec016889546acb458ae247ca3530e25df828448beb24910882",
+      "default_installation": false
     },
     {
       "id": "mms-rw",
-      "name_uk": "MMS — Кіньяруанда",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-rw-1.0.0.zip",
-      "size_bytes": 105497484,
-      "sha256": "42779573ed834b490681067b687cc755d264608f1ef26179294b158bbfb16e67",
       "languages": [
         "rw"
       ],
@@ -543,10 +524,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -561,16 +540,17 @@
         "source_sha256": "b1a76f74e94af0288bad8cfbfae2d3ff83a4d60ac32ffe01f78fe5ff8fb3b7be",
         "standard": "kin",
         "tokens_sha256": "2ab58191eec47a2cf944503c11ce307a05b13bc9e908a3c29c1e06d2881b4ee4"
-      }
+      },
+      "name_uk": "MMS — Кіньяруанда",
+      "filename": "dordiai-mms-rw-1.0.0.zip",
+      "size_bytes": 105497484,
+      "sha256": "42779573ed834b490681067b687cc755d264608f1ef26179294b158bbfb16e67",
+      "default_installation": false
     },
     {
       "id": "mms-rn",
-      "name_uk": "MMS — Кірунді",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-rn-1.0.0.zip",
-      "size_bytes": 105490634,
-      "sha256": "4e812b1720184d16d95255a2395d41722c37d1912c1c4968763c53c50bcdbb32",
       "languages": [
         "rn"
       ],
@@ -578,10 +558,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -596,16 +574,17 @@
         "source_sha256": "46ddd9cb077dcf0a7d76d9c0f6e07826a148b8824f29f45420558223f2107c1c",
         "standard": "run",
         "tokens_sha256": "f8aef360a3fcd3b367721d8a1ad571ada76818d075dda2015302ac06609ae4ba"
-      }
+      },
+      "name_uk": "MMS — Кірунді",
+      "filename": "dordiai-mms-rn-1.0.0.zip",
+      "size_bytes": 105490634,
+      "sha256": "4e812b1720184d16d95255a2395d41722c37d1912c1c4968763c53c50bcdbb32",
+      "default_installation": false
     },
     {
       "id": "mms-ny",
-      "name_uk": "MMS — Чичева, або чева",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ny-1.0.0.zip",
-      "size_bytes": 105512558,
-      "sha256": "9f3f58f6718620d04b6a8f41a235a7dc8d655ac5f31b49e1c2812c358c164bd3",
       "languages": [
         "ny"
       ],
@@ -613,10 +592,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -631,16 +608,17 @@
         "source_sha256": "907a147adc68b735906deffbf411de0c840ea65b9919c1eaf0114988071c6e11",
         "standard": "nya",
         "tokens_sha256": "e6868455fdd5ee56329d9a51512f7a0902911cc36ecdcd6cf5c05498563b7e2c"
-      }
+      },
+      "name_uk": "MMS — Чичева, або чева",
+      "filename": "dordiai-mms-ny-1.0.0.zip",
+      "size_bytes": 105512558,
+      "sha256": "9f3f58f6718620d04b6a8f41a235a7dc8d655ac5f31b49e1c2812c358c164bd3",
+      "default_installation": false
     },
     {
       "id": "mms-ak",
-      "name_uk": "MMS — Акан",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ak-1.0.0.zip",
-      "size_bytes": 105521571,
-      "sha256": "0d30d424848fa22533f5367826e14599b92973ad9841a0d10d2481b858dc0933",
       "languages": [
         "ak"
       ],
@@ -648,10 +626,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -666,16 +642,17 @@
         "source_sha256": "e0fc83d9c4905fc321dca4e5deae99f86358674cf8039ccab07519d8fb57204d",
         "standard": "Akan (aka), checkpoint standard",
         "tokens_sha256": "e45ba292dd337d7dd2a83bd81aed813c706412d6e6887c91329d943e02abd300"
-      }
+      },
+      "name_uk": "MMS — Акан",
+      "filename": "dordiai-mms-ak-1.0.0.zip",
+      "size_bytes": 105521571,
+      "sha256": "0d30d424848fa22533f5367826e14599b92973ad9841a0d10d2481b858dc0933",
+      "default_installation": false
     },
     {
       "id": "mms-bm",
-      "name_uk": "MMS — Бамбара",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-bm-1.0.0.zip",
-      "size_bytes": 105505927,
-      "sha256": "acf375a4d1f4b8ee02812f9823543ea7f318559bab4551f77066f45c030fa2a3",
       "languages": [
         "bm"
       ],
@@ -683,10 +660,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -701,16 +676,17 @@
         "source_sha256": "b0a0b4c29c8382e61d28b7a41de79b867ff5fd676a4a7ad6a4a52a43f2e55c15",
         "standard": "bam",
         "tokens_sha256": "1aac384d1a5f612b7c123066cb736bf661ae4a304a62667ca24af005cd36e962"
-      }
+      },
+      "name_uk": "MMS — Бамбара",
+      "filename": "dordiai-mms-bm-1.0.0.zip",
+      "size_bytes": 105505927,
+      "sha256": "acf375a4d1f4b8ee02812f9823543ea7f318559bab4551f77066f45c030fa2a3",
+      "default_installation": false
     },
     {
       "id": "mms-dyu",
-      "name_uk": "MMS — Діула",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-dyu-1.0.0.zip",
-      "size_bytes": 105521625,
-      "sha256": "1ef6563d94ffca98b1e66b9984eb6ee01589ffc506857a71b23b38ea6476e736",
       "languages": [
         "dyu"
       ],
@@ -718,10 +694,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -736,16 +710,17 @@
         "source_sha256": "3096f843218ea9e8e6f1099d1542e4b2c9530d68545f0efc4cd0df067b474970",
         "standard": "dyu",
         "tokens_sha256": "071d7d538666142ebadf44b45829c719b135a2fe16cb5d939abd5fd320c29a37"
-      }
+      },
+      "name_uk": "MMS — Діула",
+      "filename": "dordiai-mms-dyu-1.0.0.zip",
+      "size_bytes": 105521625,
+      "sha256": "1ef6563d94ffca98b1e66b9984eb6ee01589ffc506857a71b23b38ea6476e736",
+      "default_installation": false
     },
     {
       "id": "mms-mos",
-      "name_uk": "MMS — Мооре, або моссі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-mos-1.0.0.zip",
-      "size_bytes": 105505675,
-      "sha256": "cb9f11c526dd52fb21341d9902b4e7336bdcbdf2744dc9286a303f96994c24a2",
       "languages": [
         "mos"
       ],
@@ -753,10 +728,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -771,16 +744,17 @@
         "source_sha256": "bef6a620bc076485fe377e52fcf207679bed177b8c78a255a6f49d0240ff6bb7",
         "standard": "mos",
         "tokens_sha256": "785218808f07e80b9007543b261c207d49ba0875bb1f95abd3c6d99f638eaf0e"
-      }
+      },
+      "name_uk": "MMS — Мооре, або моссі",
+      "filename": "dordiai-mms-mos-1.0.0.zip",
+      "size_bytes": 105505675,
+      "sha256": "cb9f11c526dd52fb21341d9902b4e7336bdcbdf2744dc9286a303f96994c24a2",
+      "default_installation": false
     },
     {
       "id": "mms-kab",
-      "name_uk": "MMS — Кабільська (частина групи Тамазигхт)",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-kab-1.0.0.zip",
-      "size_bytes": 105481504,
-      "sha256": "d71e820a6223668b1bccc968b232628c97d009b2440d430185258eed13b0418a",
       "languages": [
         "kab"
       ],
@@ -788,10 +762,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -806,16 +778,17 @@
         "source_sha256": "2963dac42a14d3490ce4f36d3a8efa8607ae276bff4bc22f562ed45e266e4177",
         "standard": "Kabyle (kab), Algeria; NOT Standard Moroccan Tamazight",
         "tokens_sha256": "865a6bafa6a7261d8c548142ac79c5a0e8ab7deacbdb3757680d53ce6e664758"
-      }
+      },
+      "name_uk": "MMS — Кабільська (частина групи Тамазигхт)",
+      "filename": "dordiai-mms-kab-1.0.0.zip",
+      "size_bytes": 105481504,
+      "sha256": "d71e820a6223668b1bccc968b232628c97d009b2440d430185258eed13b0418a",
+      "default_installation": false
     },
     {
       "id": "mms-ts",
-      "name_uk": "MMS — Тсонга",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-ts-1.0.0.zip",
-      "size_bytes": 105531561,
-      "sha256": "d70e51ed37bf3e13b612db3bfb7bd90ff3a43daa4c8bda7d5cb9498002934ebf",
       "languages": [
         "ts"
       ],
@@ -823,10 +796,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -841,16 +812,17 @@
         "source_sha256": "d2330ab8148a7e84954207c0cc2b824ffaf3ecc20782d1ccf2b9ffcc97ee8ed7",
         "standard": "tso",
         "tokens_sha256": "4143f8eb55eb417e38b8aff7c9efd2c874b6beefff0357957649e72694c7bb73"
-      }
+      },
+      "name_uk": "MMS — Тсонга",
+      "filename": "dordiai-mms-ts-1.0.0.zip",
+      "size_bytes": 105531561,
+      "sha256": "d70e51ed37bf3e13b612db3bfb7bd90ff3a43daa4c8bda7d5cb9498002934ebf",
+      "default_installation": false
     },
     {
       "id": "mms-sg",
-      "name_uk": "MMS — Санго",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-sg-1.0.0.zip",
-      "size_bytes": 105505717,
-      "sha256": "f731fb0d12a3811ef24414e60cc8cb1046daae896b76d8e317de5d9a800b00f2",
       "languages": [
         "sg"
       ],
@@ -858,10 +830,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -876,16 +846,17 @@
         "source_sha256": "f6e1265a532769a6401ff07708902c1ae1b52f305ce7df5efa3432eb3949ecc0",
         "standard": "sag",
         "tokens_sha256": "79a6e4e39028178cfb281d4ef846ef56ee63902fae46f27d4acd6538e437eab4"
-      }
+      },
+      "name_uk": "MMS — Санго",
+      "filename": "dordiai-mms-sg-1.0.0.zip",
+      "size_bytes": 105505717,
+      "sha256": "f731fb0d12a3811ef24414e60cc8cb1046daae896b76d8e317de5d9a800b00f2",
+      "default_installation": false
     },
     {
       "id": "mms-tpi",
-      "name_uk": "MMS — Ток-пісін",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-tpi-1.0.0.zip",
-      "size_bytes": 105501353,
-      "sha256": "1e3cb5f466cb108a8ffa251517e148557fc1c98aaa18f39eec014c3f0809b256",
       "languages": [
         "tpi"
       ],
@@ -893,10 +864,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -911,16 +880,17 @@
         "source_sha256": "ce2fe70ad1ae652881f8130968ac60e076b91c7bdd9ad41b5ee7cd1175c4bfc3",
         "standard": "tpi",
         "tokens_sha256": "b8b5e19bcd0ecb08559454283b5fad293666b92620698b0c001f3e8cf888e56f"
-      }
+      },
+      "name_uk": "MMS — Ток-пісін",
+      "filename": "dordiai-mms-tpi-1.0.0.zip",
+      "size_bytes": 105501353,
+      "sha256": "1e3cb5f466cb108a8ffa251517e148557fc1c98aaa18f39eec014c3f0809b256",
+      "default_installation": false
     },
     {
       "id": "mms-sm",
-      "name_uk": "MMS — Самоанська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-sm-1.0.0.zip",
-      "size_bytes": 105522821,
-      "sha256": "88ddd6e4315ef6c6b7f4a0fbac3eae3e0a98e4f0be1539e7e96eb395394fbdbc",
       "languages": [
         "sm"
       ],
@@ -928,10 +898,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -946,16 +914,17 @@
         "source_sha256": "50306dc64c489e8df6ddfbf00e5ff638f1271a11aca8f2f4fbed8a78687f3ad6",
         "standard": "smo",
         "tokens_sha256": "d20e8db7cfac406165243b0c90e405d1b6db57d8454240d9a9a51bd01212b0a1"
-      }
+      },
+      "name_uk": "MMS — Самоанська",
+      "filename": "dordiai-mms-sm-1.0.0.zip",
+      "size_bytes": 105522821,
+      "sha256": "88ddd6e4315ef6c6b7f4a0fbac3eae3e0a98e4f0be1539e7e96eb395394fbdbc",
+      "default_installation": false
     },
     {
       "id": "mms-fj",
-      "name_uk": "MMS — Фіджійська",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-fj-1.0.0.zip",
-      "size_bytes": 105491031,
-      "sha256": "c4952d948374d0bd7d31657e587ef268eb3c1ccc8c930aab7dd814cc5f1907fb",
       "languages": [
         "fj"
       ],
@@ -963,10 +932,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -981,16 +948,17 @@
         "source_sha256": "a11bbdb436f12dde8771ca64d1220a64aca0fc955e7f5f358fb85605e26ce518",
         "standard": "fij",
         "tokens_sha256": "3a14414d6370fa58cf9c57cc595d4863aee5b07a7e9b7213c778cbc7bcf0e2bb"
-      }
+      },
+      "name_uk": "MMS — Фіджійська",
+      "filename": "dordiai-mms-fj-1.0.0.zip",
+      "size_bytes": 105491031,
+      "sha256": "c4952d948374d0bd7d31657e587ef268eb3c1ccc8c930aab7dd814cc5f1907fb",
+      "default_installation": false
     },
     {
       "id": "mms-gil",
-      "name_uk": "MMS — Гілбертська, або кірибаті",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-mms-gil-1.0.0.zip",
-      "size_bytes": 105506821,
-      "sha256": "da87c561177723f6ababb8ec71a657fa44ba1ed68b28508c71ea843ee5f5c010",
       "languages": [
         "gil"
       ],
@@ -998,10 +966,8 @@
         "mms-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_carrier_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1016,16 +982,17 @@
         "source_sha256": "f4fd87d20da143c436a2fa85c295c5289d13bfb7a2e73ba047b11e28c393ef73",
         "standard": "gil",
         "tokens_sha256": "32f991d3813a25090b431b1a076f296adbfeb69a2af802abe25481a2dc029931"
-      }
+      },
+      "name_uk": "MMS — Гілбертська, або кірибаті",
+      "filename": "dordiai-mms-gil-1.0.0.zip",
+      "size_bytes": 105506821,
+      "sha256": "da87c561177723f6ababb8ec71a657fa44ba1ed68b28508c71ea843ee5f5c010",
+      "default_installation": false
     },
     {
       "id": "extra-sat",
-      "name_uk": "Нейронний мовний пакет — Санталі",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-sat-1.0.0.zip",
-      "size_bytes": 58452969,
-      "sha256": "dc54751588c4655b7a993896271f19523a17111cbf73866950ff41ee69280177",
       "languages": [
         "sat"
       ],
@@ -1033,10 +1000,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "Apache-2.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1081,16 +1046,17 @@
         "repository": "kaushalkrishnax/santali-piper-vits",
         "revision": "50da29423065a25393d58d48d83de21ad85c4d4d",
         "windows_verified": false
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Санталі",
+      "filename": "dordiai-extra-sat-1.0.0.zip",
+      "size_bytes": 58452969,
+      "sha256": "dc54751588c4655b7a993896271f19523a17111cbf73866950ff41ee69280177",
+      "default_installation": false
     },
     {
       "id": "extra-st",
-      "name_uk": "Нейронний мовний пакет — Сесото",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-st-1.0.0.zip",
-      "size_bytes": 105531556,
-      "sha256": "70bfd50eefe8dea6df0385e0a50a5ec4c95743eb44ca03d9cd33351cd360271b",
       "languages": [
         "st"
       ],
@@ -1098,10 +1064,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0 MMS-derived; preserve included upstream notices",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1179,16 +1143,17 @@
           "repository": "UBC-NLP/Simba-TTS-sot",
           "revision": "4cf607a7d28f3125272d80643d2769af7bf33772"
         }
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Сесото",
+      "filename": "dordiai-extra-st-1.0.0.zip",
+      "size_bytes": 105531556,
+      "sha256": "70bfd50eefe8dea6df0385e0a50a5ec4c95743eb44ca03d9cd33351cd360271b",
+      "default_installation": false
     },
     {
       "id": "extra-xh",
-      "name_uk": "Нейронний мовний пакет — Коса",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-xh-1.0.0.zip",
-      "size_bytes": 105535845,
-      "sha256": "d2d4d86cba49a940e4bd37280a30d864ce787ce5cce123803b079772ab4a6717",
       "languages": [
         "xh"
       ],
@@ -1196,10 +1161,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC-4.0 MMS-derived; preserve included upstream notices",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1277,16 +1240,17 @@
           "repository": "UBC-NLP/Simba-TTS-xho",
           "revision": "1bd104d6fe7a687bbc1e9b36031ab51d605e151c"
         }
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Коса",
+      "filename": "dordiai-extra-xh-1.0.0.zip",
+      "size_bytes": 105535845,
+      "sha256": "d2d4d86cba49a940e4bd37280a30d864ce787ce5cce123803b079772ab4a6717",
+      "default_installation": false
     },
     {
       "id": "extra-ig",
-      "name_uk": "Нейронний мовний пакет — Ігбо",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-ig-1.0.0.zip",
-      "size_bytes": 105732425,
-      "sha256": "bbf7b61b2acdcd2dc0025e6f0cc42ec3deab8686bb8fa3bf96a9936183127f92",
       "languages": [
         "ig"
       ],
@@ -1294,10 +1258,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "cc-by-sa-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1308,16 +1270,17 @@
         "iso_code": "ibo",
         "repo_id": "Phoonnx/vits-ig-openbible-graphemes",
         "revision": "eeb9ba146287c20f46bcd76c31e28c1f534c0ce0"
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Ігбо",
+      "filename": "dordiai-extra-ig-1.0.0.zip",
+      "size_bytes": 105732425,
+      "sha256": "bbf7b61b2acdcd2dc0025e6f0cc42ec3deab8686bb8fa3bf96a9936183127f92",
+      "default_installation": false
     },
     {
       "id": "extra-ln",
-      "name_uk": "Нейронний мовний пакет — Лінгала",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-ln-1.0.0.zip",
-      "size_bytes": 105719439,
-      "sha256": "2daac1638ec4baa1ef5cec169effa8dc9ebc0c74118f2c493164cf5c815b112d",
       "languages": [
         "ln"
       ],
@@ -1325,10 +1288,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "cc-by-sa-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1339,16 +1300,17 @@
         "iso_code": "lin",
         "repo_id": "Phoonnx/vits-ln-openbible-graphemes",
         "revision": "46d471ee11714d0a36990cb0bba93fa609ec1e35"
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Лінгала",
+      "filename": "dordiai-extra-ln-1.0.0.zip",
+      "size_bytes": 105719439,
+      "sha256": "2daac1638ec4baa1ef5cec169effa8dc9ebc0c74118f2c493164cf5c815b112d",
+      "default_installation": false
     },
     {
       "id": "extra-nd",
-      "name_uk": "Нейронний мовний пакет — Північна ндебеле",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-extra-nd-1.0.0.zip",
-      "size_bytes": 105696689,
-      "sha256": "869d2384232f970a847b8599629882e901c56c85d1ff77cc1bce23c5a93c1f82",
       "languages": [
         "nd"
       ],
@@ -1356,10 +1318,8 @@
         "extra-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "cc-by-sa-4.0",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "actual_native_cpu_onnx_verified": true,
         "native_pronunciation_verified": false,
@@ -1370,25 +1330,54 @@
         "iso_code": "nde",
         "repo_id": "multilingual-tts/VITS-OpenBible-Ndebele",
         "revision": "b9177e02bcca72b90dee5f331755275a95af946a"
-      }
+      },
+      "name_uk": "Нейронний мовний пакет — Північна ндебеле",
+      "filename": "dordiai-extra-nd-1.0.0.zip",
+      "size_bytes": 105696689,
+      "sha256": "869d2384232f970a847b8599629882e901c56c85d1ff77cc1bce23c5a93c1f82",
+      "default_installation": false
+    },
+    {
+      "id": "extra-ks",
+      "version": "1.0.0",
+      "minimum_core_version": "0.13.1-dev.3",
+      "languages": [
+        "ks"
+      ],
+      "engine_ids": [
+        "extra-onnx"
+      ],
+      "dependencies": [],
+      "license": "MIT",
+      "experimental": true,
+      "quality_validation": {
+        "actual_native_cpu_onnx_verified": true,
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "windows_nvda_verified": false
+      },
+      "provenance": {
+        "iso_code": "kas",
+        "repo_id": "GAASH-Lab/Matcha-TTS-Kashmiri",
+        "revision": "718203e01e0b4ddab3e925445619c69cddeb7231"
+      },
+      "name_uk": "Нейронний мовний пакет — Кашмірська",
+      "filename": "dordiai-extra-ks-1.0.0.zip",
+      "size_bytes": 130369393,
+      "sha256": "44899a48976892dc8eaccf83028119f5ab7d1c6424e590d1b2552629197e4f20",
+      "default_installation": false
     },
     {
       "id": "shared-omni-onnx",
-      "name_uk": "Omni ONNX — спільна експериментальна модель (повільна)",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-shared-omni-onnx-1.0.0.zip",
-      "size_bytes": 927013557,
-      "sha256": "1e625da6c84291a4b5f30e92e465e8338c5ea86847f9734d0bb0dcbc0fddd291",
       "languages": [],
       "engine_ids": [
         "omni-onnx"
       ],
       "dependencies": [],
-      "dependency_versions": {},
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1397,16 +1386,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni ONNX — спільна експериментальна модель (повільна)",
+      "filename": "dordiai-shared-omni-onnx-1.0.0.zip",
+      "size_bytes": 927013557,
+      "sha256": "1e625da6c84291a4b5f30e92e465e8338c5ea86847f9734d0bb0dcbc0fddd291",
+      "default_installation": false
     },
     {
       "id": "omni-brx",
-      "name_uk": "Omni — експериментальний мовний профіль brx",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-brx-1.0.0.zip",
-      "size_bytes": 3251,
-      "sha256": "8deeda76beed0124e7bd4a695b23a3b025b6a35968eef5a91da6ad76d24cf3f2",
       "languages": [
         "brx"
       ],
@@ -1421,7 +1411,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1430,16 +1419,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль brx",
+      "filename": "dordiai-omni-brx-1.0.0.zip",
+      "size_bytes": 3251,
+      "sha256": "8deeda76beed0124e7bd4a695b23a3b025b6a35968eef5a91da6ad76d24cf3f2",
+      "default_installation": false
     },
     {
       "id": "omni-ks",
-      "name_uk": "Omni — експериментальний мовний профіль ks",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-ks-1.0.0.zip",
-      "size_bytes": 3172,
-      "sha256": "fec64a7bf67e41db6ca03ba0147448ddb001dc13815f3d8ecb77e636ddf62939",
       "languages": [
         "ks"
       ],
@@ -1454,7 +1444,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1463,16 +1452,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль ks",
+      "filename": "dordiai-omni-ks-1.0.0.zip",
+      "size_bytes": 3172,
+      "sha256": "fec64a7bf67e41db6ca03ba0147448ddb001dc13815f3d8ecb77e636ddf62939",
+      "default_installation": false
     },
     {
       "id": "omni-mni",
-      "name_uk": "Omni — експериментальний мовний профіль mni",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-mni-1.0.0.zip",
-      "size_bytes": 3329,
-      "sha256": "12474418c0501e9a4f309c06af7c47b2beecc49212517d4ec103be1b6fe11db6",
       "languages": [
         "mni"
       ],
@@ -1487,7 +1477,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1496,16 +1485,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль mni",
+      "filename": "dordiai-omni-mni-1.0.0.zip",
+      "size_bytes": 3329,
+      "sha256": "12474418c0501e9a4f309c06af7c47b2beecc49212517d4ec103be1b6fe11db6",
+      "default_installation": false
     },
     {
       "id": "omni-nso",
-      "name_uk": "Omni — експериментальний мовний профіль nso",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-nso-1.0.0.zip",
-      "size_bytes": 4040,
-      "sha256": "d9e6028ed57dfc9930c7bb5d8dc1796b0aea1e9ae464be317966355d7b8f5ea1",
       "languages": [
         "nso"
       ],
@@ -1520,7 +1510,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1529,16 +1518,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль nso",
+      "filename": "dordiai-omni-nso-1.0.0.zip",
+      "size_bytes": 4040,
+      "sha256": "d9e6028ed57dfc9930c7bb5d8dc1796b0aea1e9ae464be317966355d7b8f5ea1",
+      "default_installation": false
     },
     {
       "id": "omni-rm",
-      "name_uk": "Omni — експериментальний мовний профіль rm",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-rm-1.0.0.zip",
-      "size_bytes": 3782,
-      "sha256": "4f594a54a8dfad43f7f71bb7984284eacff1a6be9dd97c915749cb6f557de468",
       "languages": [
         "rm"
       ],
@@ -1553,7 +1543,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1562,16 +1551,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль rm",
+      "filename": "dordiai-omni-rm-1.0.0.zip",
+      "size_bytes": 3782,
+      "sha256": "4f594a54a8dfad43f7f71bb7984284eacff1a6be9dd97c915749cb6f557de468",
+      "default_installation": false
     },
     {
       "id": "omni-wo",
-      "name_uk": "Omni — експериментальний мовний профіль wo",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-wo-1.0.0.zip",
-      "size_bytes": 3767,
-      "sha256": "78fcbdf98cdadbd569b2e08f46324797900b5ff793ceb9ce43546011f9747cbe",
       "languages": [
         "wo"
       ],
@@ -1586,7 +1576,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1595,16 +1584,17 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль wo",
+      "filename": "dordiai-omni-wo-1.0.0.zip",
+      "size_bytes": 3767,
+      "sha256": "78fcbdf98cdadbd569b2e08f46324797900b5ff793ceb9ce43546011f9747cbe",
+      "default_installation": false
     },
     {
       "id": "omni-zu",
-      "name_uk": "Omni — експериментальний мовний профіль zu",
       "version": "1.0.0",
       "minimum_core_version": "0.13.1-dev.1",
-      "filename": "dordiai-omni-zu-1.0.0.zip",
-      "size_bytes": 3687,
-      "sha256": "27188f4f02d8c1eb07bff02e21a1e47136de7bf8ca8649c22f16856a324620c8",
       "languages": [
         "zu"
       ],
@@ -1619,7 +1609,6 @@
       },
       "license": "CC-BY-NC upstream OmniVoice weights; Higgs Audio 2 license separately",
       "experimental": true,
-      "default_installation": false,
       "quality_validation": {
         "interactive_nvda_latency_verified": false,
         "native_pronunciation_verified": false,
@@ -1628,23 +1617,131 @@
       "provenance": {
         "repository": "gaber/OmniVoice-ONNX-CPU-INT8",
         "revision": "efddec1c39169c79e57eb65f1a7b650d0906a182"
-      }
+      },
+      "name_uk": "Omni — експериментальний мовний профіль zu",
+      "filename": "dordiai-omni-zu-1.0.0.zip",
+      "size_bytes": 3687,
+      "sha256": "27188f4f02d8c1eb07bff02e21a1e47136de7bf8ca8649c22f16856a324620c8",
+      "default_installation": false
+    },
+    {
+      "id": "rasa-brx",
+      "version": "1.0.0",
+      "minimum_core_version": "0.13.1-dev.3",
+      "languages": [
+        "brx"
+      ],
+      "engine_ids": [
+        "rasa-onnx"
+      ],
+      "dependencies": [],
+      "license": "CC-BY-4.0",
+      "experimental": true,
+      "quality_validation": {
+        "actual_native_cpu_onnx_verified": true,
+        "native_pronunciation_verified": false,
+        "navigation_verified": false,
+        "windows_nvda_verified": false
+      },
+      "provenance": {
+        "acceptance": {
+          "native_pronunciation_verified": false,
+          "ordinary_alphabet_verified": false,
+          "windows_nvda_verified": false
+        },
+        "actual_graph_contract": {
+          "add_blank": true,
+          "blank_id": 0,
+          "frontend": "characters",
+          "literal_underscore_id": 95,
+          "noise_inputs_are_scalars": true,
+          "required_inputs": [
+            "x",
+            "x_length",
+            "noise_scale",
+            "length_scale",
+            "noise_scale_w",
+            "sid",
+            "emotion_id"
+          ],
+          "sample_rate": 24000
+        },
+        "exporter_code": {
+          "license": "MIT",
+          "repository": "matiaslin/sherpa-onnx-vits-rasa-13-exporter",
+          "revision": "2e218bed5757e5bfbcc00a7f6630f8a167b1961e",
+          "url": "https://github.com/matiaslin/sherpa-onnx-vits-rasa-13-exporter"
+        },
+        "files": {
+          "README.md": {
+            "git_blob": "a51554fe1c348bb5241c30d12bbdf67cf2d0f473",
+            "size_bytes": 3389
+          },
+          "model.onnx": {
+            "sha256": "4473f8d0b6f738196c1626bbf337cda99b34749b638bb7234c4cb8e1992bf804",
+            "size_bytes": 123338635
+          },
+          "tokens.txt": {
+            "git_blob": "65e07c04745cbaf726297fea4d52840c5fa3fac4",
+            "size_bytes": 9556
+          }
+        },
+        "format": "dordiai-rasa-model-sources-v1",
+        "license": "CC-BY-4.0",
+        "minimum_core_version": "0.13.1-dev.3",
+        "notes": [
+          "ExporterREADME says22050Hz; actual immutable graph metadata says24000Hz.",
+          "ALEXA style0 is documented, not an independently defined neutral-emotion label.",
+          "DirectORT uses one punctuation-preserving call and no Sherpa empty trailing sentence.",
+          "Exact original gated tokenizer parity is not established; use documented native-character export without uroman."
+        ],
+        "primary_model": {
+          "adopted_languages": {
+            "brx": {
+              "script": "Deva",
+              "speaker_id": 4,
+              "speaker_name": "BRX_F",
+              "style_id": 0,
+              "style_name": "ALEXA"
+            }
+          },
+          "capacity_not_trained_speakers": "1024 speaker/32 emotion rows are model capacity, not a demonstrated catalogue of trained identities.",
+          "documented_languages": [
+            "as",
+            "bn",
+            "brx",
+            "doi",
+            "kn",
+            "mai",
+            "ml",
+            "mr",
+            "ne",
+            "pa",
+            "sa",
+            "ta",
+            "te"
+          ],
+          "exporter_mni_tag_rejected": "MNI absent from primary supported languages/speakers and no Meitei characters in exported table. No substitution with another Indic speaker.",
+          "original_files_gated_and_not_downloaded": true,
+          "repository": "ai4bharat/vits_rasa_13",
+          "revision": "00b1590501b55708d5d66be51bae336b51bce1d2",
+          "url": "https://huggingface.co/ai4bharat/vits_rasa_13"
+        },
+        "repository": "MatiasLin/sherpa-onnx-vits-rasa-13",
+        "revision": "b5afd4e991e3bdd6195528de650e2ed219d47506"
+      },
+      "name_uk": "Rasa — Бодо (BRX_F)",
+      "filename": "dordiai-rasa-brx-1.0.0.zip",
+      "size_bytes": 114167978,
+      "sha256": "61c9420ff02df15f458dab56230926f951191eb10e43a0ac7ca910228f2adefa",
+      "default_installation": false
     }
   ],
-  "entry_count": 43,
+  "entry_count": 45,
   "inactive_research_archives": [
-    {
-      "id": "omni-ig",
-      "reason": "inactive research alternate; current registry uses dedicated native Extra backend"
-    },
-    {
-      "id": "omni-ln",
-      "reason": "inactive research alternate; current registry uses dedicated native Extra backend"
-    },
-    {
-      "id": "omni-xh",
-      "reason": "inactive research alternate; current registry uses dedicated native Extra backend"
-    }
+    "dordiai-omni-ig-1.0.0.zip",
+    "dordiai-omni-ln-1.0.0.zip",
+    "dordiai-omni-xh-1.0.0.zip"
   ],
   "published": false,
   "full_pronunciation_or_nvda_acceptance": false

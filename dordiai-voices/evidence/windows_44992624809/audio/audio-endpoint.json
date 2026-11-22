@@ -1,0 +1,50 @@
+{
+  "format": "dordiai-audio-endpoint-setup",
+  "format_version": 1,
+  "created_utc": "2026-11-22T06:17:23.119361+00:00",
+  "status": "blocked",
+  "scope": "ephemeral CI audio infrastructure; no product or physical-latency acceptance",
+  "wave_player_verified": false,
+  "physical_audio_verified": false,
+  "driver_installed": false,
+  "vendor_sources": [
+    "https://vb-audio.com/Cable/",
+    "https://vb-audio.com/Cable/VBCABLE_ReferenceManual.pdf",
+    "https://vb-audio.com/Services/licensing.htm"
+  ],
+  "vendor_driver_policy": "Not installed: reviewed vendor package explicitly requires a reboot. No reboot, boot/security/trust-store changes or user-PC changes are performed.",
+  "wave_out_devices_before": 0,
+  "services": [
+    {
+      "service": "AudioEndpointBuilder",
+      "before": {
+        "state": 4,
+        "process_id": 2828,
+        "win32_exit_code": 0
+      },
+      "start_requested": false,
+      "after": {
+        "state": 4,
+        "process_id": 2828,
+        "win32_exit_code": 0
+      }
+    },
+    {
+      "service": "Audiosrv",
+      "before": {
+        "state": 4,
+        "process_id": 2088,
+        "win32_exit_code": 0
+      },
+      "start_requested": false,
+      "after": {
+        "state": 4,
+        "process_id": 2088,
+        "win32_exit_code": 0
+      }
+    }
+  ],
+  "wave_out_devices_after": 0,
+  "reason": "No Windows audio output endpoint is present. The reviewed virtual driver requires reboot; unattended driver installation was not attempted.",
+  "completed_utc": "2026-11-22T06:17:23.200432+00:00"
+}

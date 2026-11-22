@@ -103,6 +103,31 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
     def test_actual_embedded_helper_calls_bind_their_signatures(self):
         self.assertEqual(helper_binding_errors(probe.PROBE_PLUGIN), [])
 
+    def test_permanent_worker_or_host_import_failures_stop_requests(self):
+        definition = next(node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef)
+                          and node.name == "permanent_speech_failure")
+        namespace = {}
+        exec(compile(ast.Module(body=[definition], type_ignores=[]), "permanent-error-check", "exec"), namespace)
+        permanent = namespace["permanent_speech_failure"]
+        self.assertTrue(permanent({"type": "ImportError", "import_name": "native"}))
+        self.assertTrue(permanent({"type": "RuntimeError", "worker": {"type": "ModuleNotFoundError"}}))
+        self.assertFalse(permanent({"type": "RuntimeError"}))
+        self.assertFalse(permanent(None))
+
+    def test_permanent_stage_failure_finishes_without_scheduling_retries(self):
+        names = {"wait_for_stage", "permanent_speech_failure"}
+        definitions = [node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name in names]
+        events = []
+        details = {"type": "RuntimeError", "worker": {"type": "ImportError", "import_name": "native"}}
+        namespace = {"snapshot": lambda stage: {"pcm_bytes": 0},
+                     "DRIVER": SimpleNamespace(_dordiai_last_error_details=details, cancel=lambda: events.append("cancel")),
+                     "check": lambda *args, **kw: events.append((args, kw)), "finish": lambda: events.append("finish"),
+                     "later": lambda *args: self.fail("permanent error must not schedule more requests")}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), "permanent-stage-check", "exec"), namespace)
+        namespace["wait_for_stage"]("phrase", time.monotonic() + 150, lambda: self.fail("must finish"))
+        self.assertEqual(events[-2:], ["cancel", "finish"])
+        self.assertEqual(events[0][1]["diagnostics"], details)
+
     def test_signature_check_detects_original_driver_selection_failure(self):
         # Reproduce the exact error observed after real NVDA selected the
         # driver: positional check name collided with the name= detail.

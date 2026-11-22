@@ -43,6 +43,7 @@ class WideVoices:
         self._native_timings=deque(maxlen=64)
         self._omni_used=False
         self._extra_used=False
+        self._rasa_used=False
         if mms_cache_budget_bytes is None:
             available=_headroom()
             # Unknown headroom retains the conservative original two-model
@@ -71,9 +72,21 @@ class WideVoices:
         if self._engine is None:self._engine=WideCarrier(self.folder)
         return self._engine
 
-    @lru_cache(maxsize=144)
-    def source(self,code):
-        backend=self.registry[code].get("backend")
+    def _backend_info(self,code,text=None,character=False):
+        from language_catalog import resolve_backend_info
+        return resolve_backend_info(self.models,code,self.registry[code],text=text,character=character)
+
+    def source(self,code,info=None):
+        # A single language can use two explicitly calibrated backends depending
+        # on input support. Never reuse its preferred embedding for the fallback.
+        selected=self._backend_info(code) if info is None else info
+        identity=json.dumps(selected,sort_keys=True,separators=(",",":"))
+        return self._selected_source(code,identity)
+
+    @lru_cache(maxsize=288)
+    def _selected_source(self,code,identity):
+        info=json.loads(identity)
+        backend=info.get("backend")
         if backend in {"mms-onnx", "mms-vits"}:
             from wide_mms import source
             return source(code,self.models)
@@ -83,7 +96,10 @@ class WideVoices:
         if backend=="omni-onnx":
             from wide_omnivoice_onnx import source
             return source(code,models=self.models)
-        file=self.folder/self.registry[code]["source"]
+        if backend=="rasa-onnx":
+            from wide_rasa import source
+            return source(code,models=self.models)
+        file=self.folder/info["source"]
         source=np.load(file,allow_pickle=False)
         if source.shape!=(1,256,1) or not np.isfinite(source).all():raise ValueError("Invalid source for "+code)
         return source
@@ -209,13 +225,15 @@ class WideVoices:
         if info is None:
             from personal_catalog import discover
             info=discover()[code]
+        else:
+            info=self._backend_info(code,text,character)
         self.owner.check_cancelled()
         event=getattr(self.owner,"cancel_event",None)
         native_factor=1. if character else min(1.85,max(.8,float(speed)))
         backend=info.get("backend")
-        new_native=backend in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx"}
+        new_native=backend in {"mms-onnx", "mms-vits", "extra-onnx", "omni-onnx", "rasa-onnx"}
         shared=info.get("natural")=="shared" and not character and not new_native
-        source_family='common' if shared else code if info.get('backend') else 'espeak'
+        source_family='common' if shared else (code,backend,info.get('source')) if backend else 'espeak'
         if self.progress and source_family not in self._opened_sources:
             self.progress('language-source')
         private=backend=='mms-graphemes'
@@ -228,7 +246,7 @@ class WideVoices:
             produced,sample_rate,native_factor=carrier.audio(text,character,native_factor)
             audio=resample(produced,sample_rate,22050)
         else:
-            source=self.source(code)
+            source=self.source(code,info=info)
         if backend in {"mms-onnx", "mms-vits"}:
             if self.progress and source_family not in self._opened_sources:self.progress('language-phonetics')
             reused=code in self._mms_carriers
@@ -242,6 +260,14 @@ class WideVoices:
             finally:
                 self._native_timings.append({"code":code,"backend":backend,"carrier_reused":reused,
                     "session_previously_loaded":loaded,"status":status,"generation_ms":(perf_counter()-started)*1000})
+            audio=resample(produced,sample_rate,22050)
+        elif backend=="rasa-onnx":
+            from wide_rasa import audio as rasa_audio,available
+            if code not in available(self.models):
+                raise ValueError("Required native Rasa resources are not installed: "+code)
+            if self.progress and source_family not in self._opened_sources:self.progress('language-phonetics')
+            self._rasa_used=True
+            produced,sample_rate=rasa_audio(code,text,character,models=self.models,rate=native_factor,owner=self.owner)
             audio=resample(produced,sample_rate,22050)
         elif backend=="extra-onnx":
             from wide_extra_models import audio as extra_audio,available
@@ -327,7 +353,7 @@ class WideVoices:
     def close(self):
         self._personal_carrier.cache_clear()
         self._personal_source.cache_clear()
-        self.source.cache_clear()
+        self._selected_source.cache_clear()
         for carrier in self._mms_carriers.values():
             close=getattr(carrier,"close",None)
             if close is not None:close()
@@ -337,4 +363,8 @@ class WideVoices:
             from wide_extra_models import clear_engines
             clear_engines(owner=self.owner)
             self._extra_used=False
+        if self._rasa_used:
+            from wide_rasa import clear_engines
+            clear_engines(owner=self.owner)
+            self._rasa_used=False
         if self._engine is not None:self._engine.close()

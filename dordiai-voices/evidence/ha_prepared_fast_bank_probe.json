@@ -1,0 +1,286 @@
+{
+  "format": "dordiai-real-prepared-fast-bank-probe",
+  "format_version": 1,
+  "created_utc": "2026-11-22T06:21:38.856808+00:00",
+  "status": "passed",
+  "scope": "real native audio -> package create/install -> actual driver planning/fast_clip, with NVDA import stubs only",
+  "voice": "viktoriia",
+  "language": "ha",
+  "version": "0.13.1-probe.2",
+  "source_document": "source/0.12.2/kx47Runtime/models/CharacterNames/ha.json",
+  "source_document_sha256": "0aad80199308a79a30e91c51def3a8a755ba4843205383d678204cd1408907d8",
+  "name_source": {
+    "url": "https://jblmflc.com/Hausa/Hausa%20PDF/Introduction%20to%20Hausa.pdf",
+    "sha256": "5393aae9fa003fc8de5ae8acc389dd24286061af69f47a1ecbd168970783a976",
+    "sha256_scope": "original PDF bytes",
+    "title": "Hausa Familiarization Course — Introduction",
+    "author": "Joint Base Lewis-McChord Foreign Language Center (hosting course publisher)",
+    "location": "Alphabet table, printed pages 11–12 / PDF pages 11–12",
+    "role": "Explicit Name of Letter in Hausa column; ordinary Boko letters and documented sh/ts digraphs",
+    "short_quote": "Name of Letter in Hausa",
+    "license_note": "Individual factual names transcribed with attribution; course PDF and teaching prose not redistributed; no license of whole source asserted",
+    "native_pronunciation_verified": false
+  },
+  "generation": [
+    {
+      "kind": "letter",
+      "language": "ha",
+      "name": "b",
+      "lookup_text": "b",
+      "text": "ba",
+      "semantic_kind": "spoken_name",
+      "aliases": [
+        "ba"
+      ],
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending",
+      "audio": {
+        "frames": 10056,
+        "duration_seconds": 0.419,
+        "peak": 0.5003662109375,
+        "rms": 0.08368050910280231,
+        "nonzero_samples": 9993
+      },
+      "worker": {
+        "first_pcm_ms": 2343.0377170006977,
+        "completed_ms": 2550.7716339998296,
+        "renderers": [
+          {
+            "profile": "viktoriia",
+            "speaker": "viktoriia",
+            "engine": "real-native-plus-openvoice",
+            "code": "ha"
+          }
+        ],
+        "scope": "real Linux direct model adapter, not Windows worker pipe or NVDA output"
+      }
+    },
+    {
+      "kind": "letter",
+      "language": "ha",
+      "name": "d",
+      "lookup_text": "d",
+      "text": "da",
+      "semantic_kind": "spoken_name",
+      "aliases": [
+        "da"
+      ],
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending",
+      "audio": {
+        "frames": 9336,
+        "duration_seconds": 0.389,
+        "peak": 0.441375732421875,
+        "rms": 0.0961580995193677,
+        "nonzero_samples": 9284
+      },
+      "worker": {
+        "first_pcm_ms": 375.7256729986693,
+        "completed_ms": 533.0854700005148,
+        "renderers": [
+          {
+            "profile": "viktoriia",
+            "speaker": "viktoriia",
+            "engine": "real-native-plus-openvoice",
+            "code": "ha"
+          }
+        ],
+        "scope": "real Linux direct model adapter, not Windows worker pipe or NVDA output"
+      }
+    },
+    {
+      "kind": "letter",
+      "language": "ha",
+      "name": "k",
+      "lookup_text": "k",
+      "text": "ka",
+      "semantic_kind": "spoken_name",
+      "aliases": [
+        "ka"
+      ],
+      "source_kind": "letter_name",
+      "source_id": "curated_primary_alphabet_names",
+      "acoustic_validation": "pending",
+      "audio": {
+        "frames": 7680,
+        "duration_seconds": 0.32,
+        "peak": 0.563201904296875,
+        "rms": 0.10496158082187616,
+        "nonzero_samples": 7553
+      },
+      "worker": {
+        "first_pcm_ms": 536.3235830009216,
+        "completed_ms": 536.5524750013719,
+        "renderers": [
+          {
+            "profile": "viktoriia",
+            "speaker": "viktoriia",
+            "engine": "real-native-plus-openvoice",
+            "code": "ha"
+          }
+        ],
+        "scope": "real Linux direct model adapter, not Windows worker pipe or NVDA output"
+      }
+    }
+  ],
+  "package_file": "viktoriia-0.13.1-probe.2.dordiai-voice",
+  "package_bytes": 4316443,
+  "package_sha256": "37ff35c0cd966ab908113b67cba0db44acc6f2d86d259fca3e7fc6a8320066de",
+  "install_result": {
+    "kind": "voice",
+    "directory": "probe-output/installed-voices/packages/viktoriia/0.13.1-probe.2"
+  },
+  "nvda_verified": false,
+  "physical_audio_verified": false,
+  "pronunciation_verified": false,
+  "only_representative_names": true,
+  "all_letters_or_languages_verified": false,
+  "lookups": [
+    {
+      "lookup_text": "b",
+      "spoken_name": "ba",
+      "planned_request": {
+        "profile": "viktoriia",
+        "mode": "reference",
+        "speed": 1.0,
+        "language": "ha",
+        "text": "b",
+        "controls": {
+          "pitch": 50,
+          "timbre": 50,
+          "volume": 100
+        },
+        "character": true,
+        "numberLanguage": "auto",
+        "nativeEnglish": false,
+        "nativeProfile": false,
+        "wideLocale": true
+      },
+      "first_lookup_ms": 4.825798,
+      "warm_lookup": {
+        "count": 200,
+        "minimum_ms": 0.534619,
+        "median_ms": 0.577396,
+        "p95_ms": 0.723206,
+        "p99_ms": 0.787967,
+        "maximum_ms": 0.845115
+      },
+      "pcm_sha256": "ab2bfc208b151aaeb1bfe81aba7fdcdf05afea94ef0aeff7b789fd8975555927",
+      "wave_file": "ha-b-viktoriia.wav",
+      "wave_bytes": 20156,
+      "wave_sha256": "c5686cab9fae477a19e6fde76cb3d53404bfb862906bccee6cf3e735238ea010",
+      "audio": {
+        "frames": 10056,
+        "duration_seconds": 0.419,
+        "peak": 0.5003662109375,
+        "rms": 0.08368050910280231,
+        "nonzero_samples": 9993
+      }
+    },
+    {
+      "lookup_text": "d",
+      "spoken_name": "da",
+      "planned_request": {
+        "profile": "viktoriia",
+        "mode": "reference",
+        "speed": 1.0,
+        "language": "ha",
+        "text": "d",
+        "controls": {
+          "pitch": 50,
+          "timbre": 50,
+          "volume": 100
+        },
+        "character": true,
+        "numberLanguage": "auto",
+        "nativeEnglish": false,
+        "nativeProfile": false,
+        "wideLocale": true
+      },
+      "first_lookup_ms": 0.672464,
+      "warm_lookup": {
+        "count": 200,
+        "minimum_ms": 0.53754,
+        "median_ms": 0.5823320000000001,
+        "p95_ms": 0.713195,
+        "p99_ms": 0.849046,
+        "maximum_ms": 1.040664
+      },
+      "pcm_sha256": "be2fe97f18f32cfac767a7a14014e987448ecf827e8fb5794d042b9eb916f2a1",
+      "wave_file": "ha-d-viktoriia.wav",
+      "wave_bytes": 18716,
+      "wave_sha256": "9e3dfebda26c83a91d45a04f6ef21b586446879634edd6866e53fa5845a5bb24",
+      "audio": {
+        "frames": 9336,
+        "duration_seconds": 0.389,
+        "peak": 0.441375732421875,
+        "rms": 0.0961580995193677,
+        "nonzero_samples": 9284
+      }
+    },
+    {
+      "lookup_text": "k",
+      "spoken_name": "ka",
+      "planned_request": {
+        "profile": "viktoriia",
+        "mode": "reference",
+        "speed": 1.0,
+        "language": "ha",
+        "text": "k",
+        "controls": {
+          "pitch": 50,
+          "timbre": 50,
+          "volume": 100
+        },
+        "character": true,
+        "numberLanguage": "auto",
+        "nativeEnglish": false,
+        "nativeProfile": false,
+        "wideLocale": true
+      },
+      "first_lookup_ms": 0.722881,
+      "warm_lookup": {
+        "count": 200,
+        "minimum_ms": 0.539961,
+        "median_ms": 0.5828855,
+        "p95_ms": 0.708374,
+        "p99_ms": 0.782345,
+        "maximum_ms": 0.799599
+      },
+      "pcm_sha256": "6049de3b8279370424c594288a6d03cc72bf799d42e05400734195432decd437",
+      "wave_file": "ha-k-viktoriia.wav",
+      "wave_bytes": 15404,
+      "wave_sha256": "537fa8b5e991cf65b96527f4f47294115e2132bf5ff35bf7c4320d30182cf4e3",
+      "audio": {
+        "frames": 7680,
+        "duration_seconds": 0.32,
+        "peak": 0.563201904296875,
+        "rms": 0.10496158082187616,
+        "nonzero_samples": 7553
+      }
+    }
+  ],
+  "model_worker_started_for_lookup": false,
+  "new_model_sessions_for_lookup": 0,
+  "meets_20ms_software_lookup_p95": true,
+  "timing_limit": "Function return of prepared PCM only; no physical/audible/NVDA latency claim",
+  "model_files_sha256": {
+    "MMS/ha/model.onnx": "5ce225af7c0177e7387ad549a41bf29a9134fc9f12b9220025b31e91a7b28f32",
+    "MMS/ha/source.npy": "c10d010faf3e2e92484b272be201a5cae92ade7ba0b94265499121ac5aa441f2",
+    "OpenVoiceV2/encoder-flow.onnx": "831fe762c0b47137e20753b9023b3901fc229bbc05bd6644ddce7073d7015404",
+    "OpenVoiceV2/decoder.onnx": "9d57879aff5d3d50ae810b4e4791170b3fd1d27004be71fc2ae3f90afd588d36"
+  },
+  "prepared_target_sha256": "e880e4ff3c582760073493c9651983a46dfab5a48d1b4ea1e773ef7f31a66f9a",
+  "index_sizes_bytes": {
+    "banks/letters.json": 720
+  },
+  "source_checkpoint_sha256": {
+    "tools/prepare_voice_banks.py": "a52004b33f9cb7d13c53efabd8e68f9486f9589e0aa8d2e0cd677d20d78ed1e8",
+    "tools/probe_prepared_fast_bank.py": "cb2feafc3f8541890050915ec9b4a2ac79805a915b8a0f3c7ef678cf1ef314cf",
+    "source/0.12.2/synthDrivers/_dordiai_letter_bank.py": "bd44ca9f9e47c91886fbbe10e56591b4112355a2aede8b6a1493a0f1ef54eddb",
+    "source/0.12.2/kx47Runtime/voice_assets.py": "27e8da00fbe4bc55314ff93e8362a9add21be0701d506f46fe2340e15ec6d153"
+  },
+  "source_checkpoint_note": "Source hashes recorded after the actual probe; probe script subsequently gained these explicit metadata fields without changing synthesis or lookup behavior."
+}

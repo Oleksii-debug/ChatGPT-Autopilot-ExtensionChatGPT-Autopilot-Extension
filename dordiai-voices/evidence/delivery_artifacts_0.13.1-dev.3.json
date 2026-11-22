@@ -1,0 +1,32 @@
+{
+  "format": "dordiai-development-delivery-artifacts",
+  "format_version": 1,
+  "version": "0.13.1-dev.3",
+  "artifacts": [
+    {
+      "path": "dist/dordiai-voices-0.13.1-dev.3.nvda-addon",
+      "size_bytes": 1767222592,
+      "sha256": "315fa139b3715034e43a7e35c1e50818f0703bb1f536f1fdebfaa43a1e372401"
+    },
+    {
+      "path": "dist/language-packs/dordiai-extra-ks-1.0.0.zip",
+      "size_bytes": 130369393,
+      "sha256": "44899a48976892dc8eaccf83028119f5ab7d1c6424e590d1b2552629197e4f20"
+    },
+    {
+      "path": "dist/language-packs/dordiai-rasa-brx-1.0.0.zip",
+      "size_bytes": 114167978,
+      "sha256": "61c9420ff02df15f458dab56230926f951191eb10e43a0ac7ca910228f2adefa"
+    },
+    {
+      "path": "evidence/source_snapshot_0.13.1-dev.3.json.gz",
+      "size_bytes": 2296917,
+      "sha256": "dc44f252d1a1343360093841a7bc0ccf5002f4342e9be33d7ce1c406d2f160d4"
+    }
+  ],
+  "resource_catalogue": "evidence/new_resource_catalog.json",
+  "core_verification": "evidence/release_build_0.13.1-dev.3.json",
+  "source_tree_sha256": "4e2e4106d2990429b55c4d7e4640e4779856ea1fa3f4138b31bf2d61cd4518f4",
+  "published": false,
+  "full_product_acceptance": false
+}

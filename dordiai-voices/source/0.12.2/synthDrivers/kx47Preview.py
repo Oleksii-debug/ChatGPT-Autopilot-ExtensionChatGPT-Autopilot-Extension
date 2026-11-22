@@ -45,6 +45,7 @@ def _runtime_module(name):
 
 
 _voice_policy = _runtime_module("voice_policy")
+_error_diagnostics = _runtime_module("error_diagnostics")
 _pref_spec = importlib.util.spec_from_file_location("_dordiai_main_preferences", RUNTIME / "preferences.py")
 _prefs = importlib.util.module_from_spec(_pref_spec)
 _pref_spec.loader.exec_module(_prefs)
@@ -140,8 +141,40 @@ def character_parts(text, language, english, spelling_language="auto", explicit=
                 yield "character", (code, cluster)
 
 
+def core_character_units(text, language):
+    """Keep reviewed symbol/emoji sequences intact and use native names."""
+    text = normalize("NFC", text)
+    symbols = None
+    position = 0
+    while position < len(text):
+        char = text[position]
+        keycap = char.isdecimal() and position + 1 < len(text) and text[position + 1] in "\ufe0f\u20e3"
+        if char.isalpha() or char.isspace() or char.isdecimal() and not keycap:
+            yield char, None
+            position += 1
+            continue
+        if symbols is None:
+            try:
+                symbols = _runtime_module("character_names").data(language).get("symbol_names", {})
+            except LookupError:
+                symbols = {}
+        for end in range(min(position + 32, len(text)), position, -1):
+            glyph = text[position:end]
+            name = symbols.get(glyph)
+            if isinstance(name, str) and name.strip() and name != glyph:
+                yield glyph, name
+                position = end
+                break
+        else:
+            yield char, None
+            position += 1
+
+
 def core_character_parts(text, language, english, spelling_language="auto"):
-    for char in normalize('NFC', text):
+    for char, symbol_name in core_character_units(text, language):
+        if symbol_name is not None:
+            yield "character", (language, symbol_name)
+            continue
         lower = char.lower()
         cyrillic = language if spelling_language == "auto" else spelling_language
         if lower in RU_LETTERS and (lower not in UK_LETTERS or cyrillic == "ru"):
@@ -427,6 +460,23 @@ def buffered_items(produce, cancelled, *, pending_count=12, short_reserve=False,
             cancelling_threads.append(producer)
 
 
+def _package_file_signature(path):
+    try:
+        info=Path(path).stat()
+        return info.st_mtime_ns,info.st_ctime_ns,info.st_size,info.st_ino
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        # Changing from readable to unreadable must also invalidate a session.
+        return ("unreadable",error.errno)
+
+
+def _resource_epoch(references):
+    voice_index=Path(references)/"packages/voice-packages.json" if references is not None else None
+    return (_package_file_signature(voice_index) if voice_index is not None else None,
+            _package_file_signature(RUNTIME/"installed_resource_packs.json"))
+
+
 class SpeechWorker:
     def __init__(self, python, script, models, reference_config=None, preload_language="mixed"):
         self._command = [str(python), "-I", "-B", "-u", str(script), str(models)]
@@ -442,6 +492,7 @@ class SpeechWorker:
         self._ready_modes = set()
         self._navigation = OrderedDict()
         self._references = Path(reference_config[1]) if reference_config else None
+        self._resource_epoch=_resource_epoch(self._references)
         from synthDrivers._dordiai_letter_bank import NativeLetterBank
         self._letterBank = NativeLetterBank(self._references)
         self._commandBank = NativeLetterBank(self._references, "native_commands")
@@ -450,6 +501,9 @@ class SpeechWorker:
     def fast_clip(self, request):
         """Read prepared speech without waiting for any neural model or worker."""
         _voice_policy.require_voice_allowed(request["profile"])
+        self._assert_resource_epoch()
+        managed=(self._references is not None and
+                 _runtime_module("voice_assets")._profile(self._references,request["profile"]) is not None)
         if self._references is not None and not request.get("segments"):
             language = (request.get("language") or "uk").lower().replace("_", "-")
             if request.get("character"):
@@ -465,15 +519,20 @@ class SpeechWorker:
                     if pcm is None and language == "en-gb" and name != "zed":
                         pcm = self._letterBank.read(request["profile"], "en-us", name)
                     if pcm is not None:
-                        return self._control_prepared_clip(request, pcm, native=True)
+                        return self._checked_prepared_clip(request,pcm,native=True)
             elif len(request["text"]) <= 160:
                 pcm = self._commandBank.read(request["profile"], language, request["text"])
                 if pcm is not None:
-                    return self._control_prepared_clip(request, pcm, native=True)
+                    return self._checked_prepared_clip(request,pcm,native=True)
+        if managed:
+            # Only verified package banks and this exact resource epoch's live
+            # synthesis cache belong to the replacement identity. Every legacy
+            # navigation/command/WAV cache below belongs to the older speaker.
+            return self._cached_clip(request)
         if request.get("danishCommands") and not request.get("character") and not request.get("segments"):
             pcm = self._commandBank.read(request["profile"], "da", request["text"])
             if pcm is not None:
-                return self._control_prepared_clip(request, pcm, native=True)
+                return self._checked_prepared_clip(request,pcm,native=True)
         if request.get("wideLocale") and not request.get("segments") and len(request["text"])<=160:
             code = _wide.registered(request["language"])
             if code and self._references is not None:
@@ -486,7 +545,7 @@ class SpeechWorker:
                     kind = "-char" if request.get("character") else "-text"
                     pcm = bank.read(request["profile"], code + kind, normalize("NFC",request["text"]))
                     if pcm is not None:
-                        return self._control_prepared_clip(request, pcm, native=True)
+                        return self._checked_prepared_clip(request,pcm,native=True)
         cached=self._cached_clip(request)
         if cached is not None:return cached
         if request.get("wideLocale"):
@@ -544,7 +603,16 @@ class SpeechWorker:
         self._navigation.move_to_end(key)
         if core_at_cap:
             request = dict(request, speed=1.0)
-        return self._control_prepared_clip(request, pcm, native_letter or core_at_cap)
+        return self._checked_prepared_clip(request,pcm,native_letter or core_at_cap)
+
+    def _assert_resource_epoch(self):
+        if self._resource_epoch!=_resource_epoch(self._references):
+            raise RuntimeError("Пакети dordiai-voices змінилися. Повторно виберіть синтезатор або перезапустіть NVDA.")
+
+    def _checked_prepared_clip(self,request,pcm,native):
+        result=self._control_prepared_clip(request,pcm,native)
+        self._assert_resource_epoch()
+        return result
 
     @staticmethod
     def _control_prepared_clip(request, pcm, native):
@@ -594,6 +662,7 @@ class SpeechWorker:
         if self._process is None:
             self._process = subprocess.Popen(
                 self._command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                cwd=str(Path(self._command[4]).resolve().parent),
                                 stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
             )
@@ -640,7 +709,9 @@ class SpeechWorker:
             self.close()
             raise
         if "error" in result:
-            raise RuntimeError(result["error"])
+            error = RuntimeError(result["error"])
+            error.dordiai_worker_error = result.get("diagnostics", {})
+            raise error
         return result
 
     def discard_forecast(self, token):
@@ -653,6 +724,7 @@ class SpeechWorker:
 
     def preload(self, *, runtime_only=False):
         with self._io:
+            self._assert_resource_epoch()
             if (runtime_only in self._ready_modes and self._process is not None
                     and self._process.poll() is None):return
             self._send({"mode": "preload", "runtimeOnly": runtime_only})
@@ -673,14 +745,21 @@ class SpeechWorker:
         return json.dumps({key:value for key,value in request.items() if key not in {'stream','nextNative'}},
                           sort_keys=True,ensure_ascii=True)
 
-    def _cached_clip(self,request):
+    def _epoch_clip_key(self,request):
+        self._assert_resource_epoch()
         key=self._clip_key(request)
+        return (self._resource_epoch,key) if key is not None else None
+
+    def _cached_clip(self,request):
+        key=self._epoch_clip_key(request)
         with self._cache_lock:
             cached=self._clips.get(key) if key is not None else None
             if cached is not None:self._clips.move_to_end(key)
-            return cached
+        self._assert_resource_epoch()
+        return cached
 
     def _remember_clip(self,key,data):
+        self._assert_resource_epoch()
         with self._cache_lock:
             self._clips[key]=data
             self._clips.move_to_end(key)
@@ -698,9 +777,11 @@ class SpeechWorker:
                 return
 
     def _stream(self, request, cancelled):
-        clip_key = self._clip_key(request)
+        self._assert_resource_epoch()
+        clip_key = self._epoch_clip_key(request)
         cached=self._cached_clip(request)
         if cached is not None:
+            self._assert_resource_epoch()
             yield cached
             return
 
@@ -721,6 +802,7 @@ class SpeechWorker:
                 if result.get("finished"):
                     break
                 pcm = self._decode(result["pcm" if complete else "chunk"])
+                self._assert_resource_epoch()
                 if clip_key is not None:
                     retained_size+=len(pcm)
                     if retained_size>SAMPLE_RATE*40:
@@ -778,7 +860,8 @@ _shared_entry=None
 def acquire_shared_worker(python,script,models,reference_config,language):
     """Reuse one inactive main worker; concurrent bridge instances stay private."""
     global _shared_entry
-    key=(str(python),str(script),str(models),tuple(map(str,reference_config or ())),language)
+    references=reference_config[1] if reference_config is not None else None
+    key=(str(python),str(script),str(models),tuple(map(str,reference_config or ())),language,_resource_epoch(references))
     with _shared_lock:
         if _shared_entry is not None and _shared_entry['lease'] is not None:
             return SpeechWorker(python,script,models,reference_config,language),None
@@ -872,6 +955,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         self._language_catalog = _runtime_module("language_catalog")
         self._voice_assets = _runtime_module("voice_assets")
         self._managedVoices = {}
+        self._voice_catalog_epoch=_resource_epoch(None)
         self._compatibleVoiceCache = {}
         self._installedLanguageCache = None
         self._voices = {} if info.get("referencesOnly") else dict(VOICES)
@@ -882,6 +966,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             if model.is_absolute() and samples.is_absolute() and model.is_dir() and samples.is_dir():
                 reference_config = model, samples, info.get("referenceEngine", "omnivoice")
                 self._voiceReferences = samples
+                self._voice_catalog_epoch=_resource_epoch(samples)
                 self._referenceEngine = info.get("referenceEngine", "omnivoice")
                 if (samples / "catalog.json").is_file():
                     names = json.loads((samples / "catalog.json").read_text(encoding="utf-8"))
@@ -951,6 +1036,8 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         """
         self._player=None
         try:
+            if self._voice_catalog_epoch!=_resource_epoch(getattr(self,"_voiceReferences",None)):
+                raise RuntimeError("Пакети dordiai-voices змінилися під час запуску. Повторно виберіть синтезатор.")
             from synthDrivers import _sonic
             _sonic.initialize()
             self._player=nvwave.WavePlayer(1,SAMPLE_RATE,16,outputDevice=config.conf["audio"]["outputDevice"])
@@ -1364,7 +1451,8 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                         close()
             except Exception as error:
                 if not cancelled():
-                    log.error("dordiai-voices: speech synthesis failed (%s).", error)
+                    details = _error_diagnostics.safe_error(error)
+                    log.error("dordiai-voices: speech synthesis failed: %s", json.dumps(details))
                     # Continuing after a failed word silently loses text.
                     # Propagate to the output loop, which stops this utterance.
                     raise
@@ -1433,7 +1521,8 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                                 self._play(value, generation)
                 except Exception as error:
                     if generation == self._generation:
-                        log.error("dordiai-voices: speech output failed (%s).", error)
+                        self._dordiai_last_error_details = _error_diagnostics.safe_error(error)
+                        log.error("dordiai-voices: speech output failed: %s", json.dumps(self._dordiai_last_error_details))
                         report = getattr(self, "_dordiai_report_error", None)
                         if report is not None:
                             report(error)

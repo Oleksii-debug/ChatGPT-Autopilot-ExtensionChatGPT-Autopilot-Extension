@@ -174,8 +174,8 @@ def voice_versions(references, voice):
 def _active_ids(root, signature):
     try:
         return frozenset(_packages._load_index(Path(root))["active"])
-    except (OSError, ValueError, TypeError):
-        return frozenset()
+    except (OSError, ValueError, TypeError) as error:
+        raise PackageError("The installed voice index cannot be read; refusing an older voice fallback") from error
 
 
 def _profile(references, profile):

@@ -89,6 +89,27 @@ class DriverPlanningTests(unittest.TestCase):
         self.assertEqual(values[0][1]["text"], "бэ")
         self.assertEqual(values[0][1]["profile"], "alice")
 
+    def test_core_symbol_and_emoji_names_keep_current_language_and_voice(self):
+        d = self.module
+        for language, glyph in (("uk", "😀"), ("en", "👩\u200d💻"), ("uk", "!")):
+            with self.subTest(language=language, glyph=glyph):
+                expected = d._runtime_module("character_names").spoken_name(language, glyph)
+                values = self.planned(self.synth(), [d.LangChangeCommand(language),
+                    d.CharacterModeCommand(True), glyph])
+                self.assertEqual(len(values), 1)
+                request = values[0][1]
+                self.assertTrue(request["character"])
+                self.assertEqual(request["text"], expected)
+                self.assertEqual(request["language"].split("-")[0], language)
+                self.assertEqual(request["profile"], "alice" if language == "en" else "viktoriia")
+
+    def test_emoji_sequence_does_not_consume_the_next_typed_letter(self):
+        d = self.module
+        values = list(d.core_character_parts("👩\u200d💻b", "en-US", "en-US"))
+        self.assertEqual(len(values), 2)
+        self.assertEqual(values[0][1][1], d._runtime_module("character_names").spoken_name("en", "👩\u200d💻"))
+        self.assertEqual(values[1], ("character", ("en-US", "bee")))
+
     def test_ukrainian_label_no_foreign_language_when_only_defaults_enabled(self):
         values = self.planned(self.synth(), ["Кнопка перемикач натиснуто"])
         self.assertTrue(values)

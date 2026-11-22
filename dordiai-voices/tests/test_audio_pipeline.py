@@ -26,6 +26,7 @@ if str(RUNTIME) not in sys.path:
 from session_control import GuardedSession, RequestCancellation, SynthesisCancelled, cancel_running
 from native_lookahead import NativeLookahead, CarrierContext
 import navigation_cache
+import error_diagnostics
 
 
 def standalone_driver_parts():
@@ -40,6 +41,7 @@ def standalone_driver_parts():
     module = ast.fix_missing_locations(ast.Module(body=functions + [stub], type_ignores=[]))
     namespace = dict(Queue=Queue, Empty=Empty, Full=Full, Thread=Thread, closing=closing,
                      monotonic=monotonic, SAMPLE_RATE=24000,
+                     _error_diagnostics=error_diagnostics, json=json,
                      release_shared_worker=lambda token: None,
                      log=types.SimpleNamespace(error=lambda *a: None))
     exec(compile(module, str(DRIVERS / "kx47Preview.py"), "exec"), namespace)
@@ -184,6 +186,8 @@ class Voice:
     cancel_event = None
     def __init__(self, *a, **kw): pass
     def chunks(self, profile, language, text, speed, **kw):
+        if text == "PRIVATE-MISSING-IMPORT-TEXT":
+            raise ModuleNotFoundError(text, name="missing_native_dependency")
         if text == "WAIT":
             print("ENTERED", file=sys.stderr, flush=True)
             deadline = time.monotonic() + 3
@@ -256,11 +260,21 @@ runpy.run_path(worker, run_name="__main__")
         self.send({"mode": "next"})
         self.assertEqual(self.reply(), {"finished": True})
         self.send(self.reference(profile="veronika"))
-        self.assertEqual(self.reply(), {"error": "ValueError"})
+        failure = self.reply()
+        self.assertEqual(failure["error"], "ValueError")
+        self.assertEqual(failure["diagnostics"]["type"], "ValueError")
         self.send(self.reference("new"))
         self.assertIn("chunk", self.reply())
         self.send({"mode": "drop"})
         self.assertEqual(self.reply(), {"finished": True})
+
+    def test_worker_import_failure_is_actionable_without_spoken_text(self):
+        self.send(self.reference("PRIVATE-MISSING-IMPORT-TEXT"))
+        reply = self.reply()
+        self.assertEqual(reply["error"], "ModuleNotFoundError")
+        self.assertEqual(reply["diagnostics"]["import_name"], "missing_native_dependency")
+        self.assertTrue(reply["diagnostics"]["frames"])
+        self.assertNotIn("PRIVATE-MISSING-IMPORT-TEXT", json.dumps(reply))
 
     def test_cancel_catches_active_and_queued_request_and_worker_recovers(self):
         self.send(self.reference("WAIT"))
