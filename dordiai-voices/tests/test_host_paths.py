@@ -25,6 +25,10 @@ import host_paths
 import voice_assets
 import voice_packages
 
+_cli_spec = importlib.util.spec_from_file_location("_host_path_test_voice_cli", ROOT / "tools/voice_packages.py")
+voice_cli = importlib.util.module_from_spec(_cli_spec)
+_cli_spec.loader.exec_module(voice_cli)
+
 
 def load_bank():
     spec = importlib.util.spec_from_file_location("_host_path_test_letter_bank",
@@ -116,7 +120,7 @@ class LongWindowsVoiceIdentityTests(unittest.TestCase):
             (source / "letters.json").write_text(json.dumps(document), encoding="utf-8")
             (source / "letters.pcm").write_bytes(self.new_pcm)
             roles.update({"letters.json": "native_letters_index", "letters.pcm": "native_letters_audio"})
-        manifest = voice_packages.prepare_manifest(source, voice_id="viktoriia", name="Synthetic replacement",
+        manifest = voice_cli.prepare_manifest(source, voice_id="viktoriia", name="Synthetic replacement",
             version=version, engine={"id": "holos", "compatibility_version": 1}, languages=["uk"],
             provenance={"source": "Explicit synthetic namespace/identity fixture", "license": "CC0-1.0"}, roles=roles)
         archive = self.base / (version + ".dordiai-voice")

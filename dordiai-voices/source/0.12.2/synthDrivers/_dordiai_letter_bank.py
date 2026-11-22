@@ -3,6 +3,7 @@ from functools import lru_cache
 from hashlib import sha256
 import importlib.util
 import json
+import ntpath
 import os
 from pathlib import Path
 import sys
@@ -29,7 +30,7 @@ def _host_paths():
     module = sys.modules.get(name)
     if module is None:
         location = Path(__file__).absolute().parent.parent / "kx47Runtime" / "host_paths.py"
-        spelling = str(location)
+        spelling = ntpath.normpath(str(location))
         if os.name == "nt" and not spelling.startswith(("\\\\?\\", "\\\\.\\")):
             spelling = "\\\\?\\UNC\\" + spelling[2:] if spelling.startswith("\\\\") else "\\\\?\\" + spelling
         spec = importlib.util.spec_from_file_location(name, spelling)
