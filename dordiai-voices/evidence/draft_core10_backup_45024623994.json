@@ -1,0 +1,40 @@
+{
+  "format": "dordiai-core10-draft-backup-observation",
+  "format_version": 1,
+  "product_ready": false,
+  "workflow_run_id": 45024623994,
+  "job_id": 137214828728,
+  "source_commit": "46dd8b5a61a348b6354807245559b6dd19070a2f",
+  "conclusion": "success",
+  "backup": {
+    "release_id": 454447004,
+    "tag": "dordiai-voices-dev10-engineering-backup",
+    "draft": true,
+    "published_at": null,
+    "storage_anchor_commit": "096a5e8b0a3f97aa3199106ff88c3009e7fc7bc4",
+    "binary_source_commit": "2bdababb86378f3cc6e58b934265175da589d703",
+    "assets": [
+      {
+        "id": 779070729,
+        "name": "dordiai-core-dev10-backup-receipt.json",
+        "size_bytes": 1673,
+        "state": "uploaded",
+        "sha256": "70f76c5c996c311f08371f79cd5255b07e9750e49bff65d4d69850ba4f36706a"
+      },
+      {
+        "id": 779067481,
+        "name": "dordiai-voices-0.13.1-dev.10.nvda-addon",
+        "size_bytes": 1974796411,
+        "state": "uploaded",
+        "sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8"
+      }
+    ]
+  },
+  "readback": "Successful pinned helper streamed upload and downloaded/hashed both stored assets; no overwrite/delete/publication.",
+  "older_core9_backup_preserved": {
+    "release_id": 454406176,
+    "core_asset_id": 778871291
+  },
+  "physical_audio_verified": false,
+  "prepared_bank_overlay_merged": true
+}
