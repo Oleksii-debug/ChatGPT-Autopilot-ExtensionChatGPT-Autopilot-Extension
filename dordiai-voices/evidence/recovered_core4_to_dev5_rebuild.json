@@ -1,0 +1,61 @@
+{
+  "format": "dordiai-core-only-resume-proof",
+  "format_version": 1,
+  "from_version": "0.13.1-dev.4",
+  "to_version": "0.13.1-dev.5",
+  "recovered_source_archive_sha256": "b80f0f2a428ba097b37437ccfd028ce41630b73fd92c5cfa9539da1b08a1b90e",
+  "source_snapshot": "evidence/source_snapshot_0.13.1-dev.5.json.gz",
+  "source_tree_sha256": "4354acb50d5d56cc166f849b4bbd8a9574d830d906a8895f82018d866dc7a038",
+  "recovered_baseline": {
+    "format": "dordiai-recovered-core-baseline",
+    "format_version": 1,
+    "baseline": "/workspace/scratch/eb1194a9e557/dordiai-core4-resume-proof/baseline",
+    "core_version": "0.13.1-dev.4",
+    "source_archive_sha256": "b80f0f2a428ba097b37437ccfd028ce41630b73fd92c5cfa9539da1b08a1b90e",
+    "payload_files": 10219,
+    "payload_bytes": 2129356176,
+    "voice_count": 45,
+    "generated_release_manifest_excluded": true,
+    "all_payload_hashes_verified_before_extraction": true,
+    "archived_code_executed": false,
+    "scope": "Core resources only; omitted optional Piper/Wide/Slovak bundles require their own saved ZIPs."
+  },
+  "primary_archive": {
+    "filename": "dordiai-voices-0.13.1-dev.5.nvda-addon",
+    "group": "core",
+    "installed_bytes": 2129363570,
+    "payload_files": 10219,
+    "sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+    "size_bytes": 1767225930
+  },
+  "core_only_rebuilt_archive": {
+    "filename": "dordiai-voices-0.13.1-dev.5.nvda-addon",
+    "group": "core",
+    "installed_bytes": 2129363570,
+    "payload_files": 10219,
+    "sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+    "size_bytes": 1767225930
+  },
+  "independent_rebuilt_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+  "exact_outer_zip_match": true,
+  "original_drive_archive_read_for_resume": false,
+  "original_full_baseline_read_for_resume": false,
+  "optional_language_bundles_recreated": false,
+  "resume_build_command": [
+    "python",
+    "dordiai-voices/tools/build_release.py",
+    "--baseline",
+    "/workspace/scratch/eb1194a9e557/dordiai-core4-resume-proof/baseline",
+    "--source",
+    "/workspace/scratch/eb1194a9e557/dordiai-source-0131-dev5-frozen",
+    "--version",
+    "0.13.1-dev.5",
+    "--only",
+    "core",
+    "--output",
+    "/workspace/scratch/eb1194a9e557/dordiai-core4-resume-proof/rebuilt"
+  ],
+  "redundant_rebuilt_zip_removed_after_verification": true,
+  "remaining_rebuild_report": "/workspace/scratch/eb1194a9e557/dordiai-core4-resume-proof/rebuilt/release-build.json",
+  "complete_product": false
+}

@@ -22,10 +22,25 @@ def reset_inherited_dll_directory():
     set_directory = kernel.SetDllDirectoryW
     set_directory.argtypes = [wintypes.LPCWSTR]
     set_directory.restype = wintypes.BOOL
-    before = get_directory(0, None)
+    def directory_present():
+        # Size queries may return 1 for an empty string, including its NUL.
+        # Read the actual string; a nonzero capacity is not a directory.
+        required = get_directory(0, None)
+        if required > 32768:
+            raise OSError("Private worker DLL directory exceeds the Windows path limit")
+        buffer = ctypes.create_unicode_buffer(max(1, required))
+        ctypes.set_last_error(0)
+        written = get_directory(len(buffer), buffer)
+        if not written and ctypes.get_last_error():
+            raise ctypes.WinError(ctypes.get_last_error())
+        if written >= len(buffer):
+            raise OSError("Private worker DLL directory changed during verification")
+        return bool(buffer.value)
+
+    before = directory_present()
     if not set_directory(None):
         raise ctypes.WinError(ctypes.get_last_error())
-    after = get_directory(0, None)
+    after = directory_present()
     if after:
         raise OSError("Private worker DLL directory was not reset")
     return {"status": "reset", "reset_to_default": True,

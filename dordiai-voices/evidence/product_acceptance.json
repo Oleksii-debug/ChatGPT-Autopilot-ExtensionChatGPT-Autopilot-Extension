@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.3",
+  "target_version": "0.13.1-dev.5",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -12,11 +12,11 @@
     },
     "core_size": {
       "status": "local_build_passed",
-      "bytes": 1767222592,
+      "bytes": 1767225930,
       "maximum_bytes": 3000000000,
-      "evidence": "evidence/release_build_0.13.1-dev.3.json",
-      "built_version": "0.13.1-dev.3",
-      "installed_bytes": 2129353911
+      "evidence": "evidence/release_build_0.13.1-dev.5.json",
+      "built_version": "0.13.1-dev.5",
+      "installed_bytes": 2129363570
     },
     "selected_language_resources": {
       "status": "incomplete",
@@ -57,11 +57,21 @@
       "keyboard_tab_and_space_smoke": true,
       "audio_submission": "failed_worker_ImportError_on_intermediate_dev2",
       "diagnostics_and_trusted_cwd_fix": "pending_real_Windows_run",
-      "evidence": "evidence/windows_44992624809/nvda/windows-nvda-probe.json"
+      "evidence": "evidence/windows_44992624809/nvda/windows-nvda-probe.json",
+      "confirmed_import_module": "marisa_trie",
+      "diagnostics_and_child_dll_isolation": "awaiting_dev5_Windows_confirmation",
+      "fatal_import_accessibility_recovery": "implemented; actual NVDA optional injection probe pending"
     },
     "native_pronunciation": {
       "status": "not_accepted",
       "reason": "Native-listener assessment of language-specific pronunciation and long fast mixed reading remains open."
+    },
+    "core_resource_resume": {
+      "status": "exact_rebuild_passed",
+      "source_core_version": "0.13.1-dev.4",
+      "rebuilt_version": "0.13.1-dev.5",
+      "evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
+      "optional_resources_recovered": false
     }
   },
   "completion_rule": "All requirements must have matching source/build evidence; no partial gate is promoted to finished product."

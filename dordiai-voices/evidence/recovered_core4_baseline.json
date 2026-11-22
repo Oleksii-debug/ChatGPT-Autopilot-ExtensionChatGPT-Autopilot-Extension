@@ -1,0 +1,14 @@
+{
+  "format": "dordiai-recovered-core-baseline",
+  "format_version": 1,
+  "baseline": "/workspace/scratch/eb1194a9e557/dordiai-core4-resume-proof/baseline",
+  "core_version": "0.13.1-dev.4",
+  "source_archive_sha256": "b80f0f2a428ba097b37437ccfd028ce41630b73fd92c5cfa9539da1b08a1b90e",
+  "payload_files": 10219,
+  "payload_bytes": 2129356176,
+  "voice_count": 45,
+  "generated_release_manifest_excluded": true,
+  "all_payload_hashes_verified_before_extraction": true,
+  "archived_code_executed": false,
+  "scope": "Core resources only; omitted optional Piper/Wide/Slovak bundles require their own saved ZIPs."
+}

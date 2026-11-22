@@ -431,5 +431,137 @@ class PackageSpeechTests(unittest.TestCase):
         self._run_dialog_operation(True)
 
 
+class FatalImportRecoveryTests(unittest.TestCase):
+    """Queue/real NVDA API lifecycle contracts, without emulating audio output."""
+
+    def setUp(self):
+        self.driver = Driver()
+        self.driver.name = "kx47Preview"
+        self.driver.saveSettings = MagicMock()
+        self.current = self.driver
+        self.configured = "kx47Preview"
+        self.calls, self.queued, self.notices, self.braille_messages, self.logs = [], [], [], [], []
+        self.event_queue = object()
+        self.handler = types.SimpleNamespace(getSynth=lambda: self.current, setSynth=self.select)
+        self.speech = types.SimpleNamespace(cancelSpeech=MagicMock())
+        self.ui = types.SimpleNamespace(message=self.announce)
+        self.braille = types.SimpleNamespace(handler=types.SimpleNamespace(message=self.braille_messages.append))
+        self.queue = types.SimpleNamespace(eventQueue=self.event_queue, queueFunction=lambda *args: self.queued.append(args))
+
+    def select(self, name, isFallback=False):
+        self.calls.append((name, isFallback))
+        self.current = types.SimpleNamespace(name=name) if name is not None else None
+        if name is not None and not isFallback:
+            self.configured = name
+        return True
+
+    def announce(self, text):
+        self.notices.append((getattr(self.current, "name", None), text))
+
+    def modules(self):
+        return patch.dict(sys.modules, {"queueHandler": self.queue, "synthDriverHandler": self.handler,
+            "speech": self.speech, "ui": self.ui, "braille": self.braille,
+            "logHandler": types.SimpleNamespace(log=types.SimpleNamespace(error=lambda *args: self.logs.append(args)))})
+
+    def run_next(self):
+        event_queue, callback, *args = self.queued.pop(0)
+        self.assertIs(event_queue, self.event_queue)
+        callback(*args)
+
+    def test_host_import_error_recovers_on_event_thread_before_announcing(self):
+        with self.modules():
+            self.driver._dordiai_report_error(ModuleNotFoundError("missing runtime", name="marisa_trie"))
+            self.assertIs(self.current, self.driver)
+            self.assertEqual(self.calls, [])
+            self.assertEqual(self.notices, [])
+            self.run_next()
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.configured, "kx47Preview")
+        self.driver.saveSettings.assert_called_once_with()
+        self.speech.cancelSpeech.assert_called_once_with()
+        self.assertEqual(self.notices[0][0], "espeak")
+        self.assertIn("Не вдалося завантажити", self.notices[0][1])
+        self.assertIn("marisa_trie", self.notices[0][1])
+        self.assertEqual(self.driver._dordiai_last_error_details["recovery"]["state"], "builtin-espeak-selected")
+
+    def test_typed_worker_import_failure_is_fatal_but_message_substrings_are_not(self):
+        error = RuntimeError("worker failed")
+        error.dordiai_worker_error = {"type": "ImportError", "import_name": "marisa_trie", "frames": []}
+        self.assertTrue(prefs.is_fatal_import_failure(error))
+        self.assertFalse(prefs.is_fatal_import_failure(RuntimeError("No module named marisa_trie")))
+        cancelled = type("SynthesisCancelled", (Exception,), {})("cancelled")
+        cancelled.dordiai_worker_error = error.dordiai_worker_error
+        self.assertFalse(prefs.is_fatal_import_failure(cancelled))
+        self.driver._dordiai_last_error_details = {"type": "ImportError"}
+        with self.modules():
+            self.driver._dordiai_report_error(error)
+            self.run_next()
+        self.assertEqual(self.current.name, "espeak")
+        self.assertEqual(self.driver._dordiai_last_error_details["worker"]["import_name"], "marisa_trie")
+
+    def test_fatal_bypasses_nonfatal_rate_limit_and_duplicate_recovery_does_not_loop(self):
+        with self.modules(), patch("time.monotonic", return_value=10.0):
+            self.driver._dordiai_report_error(ValueError("unsupported glyph"))
+            self.driver._dordiai_report_error(ImportError("runtime unavailable"))
+            self.driver._dordiai_report_error(ImportError("repeat runtime unavailable"))
+            self.assertEqual(len(self.queued), 2)
+            self.run_next()
+            self.run_next()
+            self.driver._dordiai_report_error(ImportError("repeat after failed notice"))
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.queued, [])
+        self.assertIn("recovery", self.driver._dordiai_last_error_details)
+        self.assertGreaterEqual(self.driver._dordiai_last_error_details["repeat_count"], 2)
+
+    def test_user_selected_other_synth_before_callback_is_never_overridden(self):
+        with self.modules():
+            self.driver._dordiai_report_error(ImportError("bad component"))
+            chosen = self.current = types.SimpleNamespace(name="oneCore")
+            self.run_next()
+        self.assertIs(self.current, chosen)
+        self.assertEqual(self.calls, [])
+        self.driver.saveSettings.assert_not_called()
+        self.assertEqual(self.notices[0][0], "oneCore")
+        self.assertEqual(self.driver._dordiai_last_error_details["recovery"]["state"], "user-synth-preserved")
+
+    def test_no_spoken_fallback_retains_braille_and_details_without_reselecting_broken_driver(self):
+        def fail_espeak(name, isFallback=False):
+            self.calls.append((name, isFallback))
+            self.current = types.SimpleNamespace(name="silence") if name else None
+            return name is None
+        self.handler.setSynth = fail_espeak
+        with self.modules():
+            self.driver._dordiai_report_error(ImportError("bad component"))
+            self.run_next()
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.notices, [])
+        self.assertIn("Резервний синтезатор також недоступний", self.braille_messages[0])
+        self.assertEqual(self.driver._dordiai_last_error_details["recovery"]["notice_delivery"], "braille-only")
+        self.assertEqual(self.configured, "kx47Preview")
+
+    def test_notification_device_error_uses_independent_braille_path(self):
+        self.ui.message = MagicMock(side_effect=OSError(5, "private requested text"))
+        with self.modules():
+            self.driver._dordiai_report_error(ImportError("bad component"))
+            self.run_next()
+        recovery = self.driver._dordiai_last_error_details["recovery"]
+        self.assertEqual(recovery["notice_delivery"], "braille-only")
+        self.assertEqual(recovery["notice_error"]["errno"], 5)
+        self.assertTrue(self.braille_messages)
+        self.assertNotIn("private requested text", json.dumps(self.driver._dordiai_last_error_details))
+
+    def test_braille_failure_keeps_actionable_notice_and_safe_error_metadata(self):
+        self.ui.message = MagicMock(side_effect=OSError("no output device"))
+        self.braille.handler.message = MagicMock(side_effect=RuntimeError("no braille display"))
+        with self.modules():
+            self.driver._dordiai_report_error(ImportError("bad component"))
+            self.run_next()
+        recovery = self.driver._dordiai_last_error_details["recovery"]
+        self.assertEqual(recovery["notice_delivery"], "retained-error-details-only")
+        self.assertEqual(recovery["braille_error"]["type"], "RuntimeError")
+        self.assertIn("Не вдалося завантажити", self.driver._dordiai_last_error_notice)
+        self.assertTrue(self.logs)
+
+
 if __name__ == "__main__":
     unittest.main()

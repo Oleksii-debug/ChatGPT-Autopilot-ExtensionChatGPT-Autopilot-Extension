@@ -115,6 +115,9 @@ class CoreBackupCreateTests(unittest.TestCase):
         self.assertEqual(restored.read_bytes(), self.raw)
         self.assertEqual(self.source.read_bytes(), self.raw)
         self.assertTrue((output / evidence["helper_bundle"]["filename"]).is_file())
+        with zipfile.ZipFile(output / evidence["helper_bundle"]["filename"]) as helper:
+            self.assertIn("recover_core_baseline.py", helper.namelist())
+            self.assertEqual(hashlib.sha256(helper.read("recover_core_baseline.py")).hexdigest(), evidence["baseline_recovery_tool_sha256"])
 
     def test_wrong_expected_source_hash_does_not_publish_partial_backup(self):
         output = self.root / "backup"

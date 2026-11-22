@@ -1,5 +1,6 @@
 """Probe scaffolding tests; these explicitly do not run or simulate NVDA."""
 import ast
+import ctypes
 import importlib.util
 import inspect
 import io
@@ -77,11 +78,28 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         with self.assertRaises(OSError):
             sink.feed(b"\x01\x00")
 
+    def test_recording_double_accepts_actual_espeak_native_feed_signature(self):
+        definition = next(node for node in self.probe_tree().body if isinstance(node, ast.ClassDef) and node.name == "RecordingPCMSink")
+        namespace = {}
+        exec(compile(ast.Module(body=[definition], type_ignores=[]), "native-recording-double", "exec"), namespace)
+        sink = namespace["RecordingPCMSink"](1, 22050, 16)
+        buffer = (ctypes.c_short * 2)(100, -100)
+        callbacks = []
+        sink.feed(ctypes.cast(buffer, ctypes.c_void_p), size=ctypes.sizeof(buffer), onDone=lambda: callbacks.append(True))
+        self.assertEqual(sink.submitted_bytes, 4)
+        self.assertGreater(sink.nonzero_bytes, 0)
+        self.assertEqual(callbacks, [True])
+        with self.assertRaises(ValueError):
+            sink.feed(ctypes.c_void_p(), size=4)
+        with self.assertRaises(ValueError):
+            sink.feed(ctypes.cast(buffer, ctypes.c_void_p), size=3 * 1024 * 1024)
+
     def test_headless_probe_cannot_finish_as_passed_even_if_api_checks_pass(self):
         definition = next(node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name == "finish")
         result = {"checks": [{"status": "passed"}], "wave_player_verified": False, "physical_audio_verified": False,
                   "acoustic_latency_verified": False, "product_ready": False}
         namespace = {"FINISHED": False, "SETTINGS": {"headless_ui_probe": True}, "LATENCY_STOP": threading.Event(),
+                     "restore_recovery_output_factory": lambda: None,
                      "DRIVER": None, "RESULT": result, "LOCK": threading.Lock(), "METRICS": {}, "SAMPLES": {},
                      "save": lambda: None, "time": time, "on_done": lambda: None,
                      "synthDriverHandler": SimpleNamespace(synthDoneSpeaking=SimpleNamespace(unregister=lambda callback: None)),
@@ -93,6 +111,61 @@ class WindowsProbeScaffoldingTests(unittest.TestCase):
         self.assertFalse(result["physical_audio_verified"])
         self.assertFalse(result["acoustic_latency_verified"])
         self.assertFalse(result["product_ready"])
+
+    def test_fault_injection_runs_only_when_opted_in_after_complete_measurements(self):
+        definition = next(node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name == "latency_finished")
+        complete = {"count": 100, "p95_ms": 1, "p99_ms": 2}
+        summary = {"warm_letters": complete, "cancel_api": complete, "warm_switch_requests": complete,
+                   "languages": ["uk", "en"], "samples": {"errors": [], "timeouts": []}}
+        for enabled in (False, True):
+            events = []
+            namespace = {"RESULT": {"checks": [{"name": phase + "_pcm_submission", "status": "passed"}
+                                                for phase in ("phrase", "character")]},
+                         "SETTINGS": {"headless_ui_probe": True, "fatal_recovery_probe": enabled},
+                         "snapshot": lambda stage: {}, "check": lambda *a, **kw: None,
+                         "later": lambda delay, callback: events.append(callback),
+                         "finish": lambda: events.append("finish"), "start_fatal_recovery_probe": object()}
+            exec(compile(ast.Module(body=[definition], type_ignores=[]), "optional-recovery-gate", "exec"), namespace)
+            namespace["latency_finished"](summary)
+            self.assertEqual(events, [namespace["start_fatal_recovery_probe"]] if enabled else ["finish"])
+
+    def test_fatal_recovery_restores_output_factory_after_notification_boundary(self):
+        names = {"restore_recovery_output_factory", "start_fatal_recovery_probe", "observe_fatal_recovery", "finish_fatal_recovery_probe"}
+        definitions = [node for node in self.probe_tree().body if isinstance(node, ast.FunctionDef) and node.name in names]
+        config = SimpleNamespace(conf={"speech": {"synth": "kx47Preview"}})
+        factory = object()
+        nvwave = SimpleNamespace(WavePlayer=factory)
+        events, scheduled = [], []
+        driver = SimpleNamespace(_closed=True, _thread=SimpleNamespace(is_alive=lambda: False))
+        def report(error):
+            self.assertIsInstance(error, ImportError)
+            driver._dordiai_fatal_recovery_scheduled = True
+        driver._dordiai_report_error = report
+        active = [driver]
+        namespace = {"SETTINGS": {"headless_ui_probe": True}, "RESULT": {}, "DRIVER": driver,
+                     "RECOVERY_OUTPUTS": [], "RECOVERY_ORIGINAL_WAVE_FACTORY": None,
+                     "synthDriverHandler": SimpleNamespace(getSynth=lambda: active[0]),
+                     "RecordingPCMSink": object, "time": time,
+                     "later": lambda delay, callback: scheduled.append(callback),
+                     "finish": lambda: events.append("finish"),
+                     "check": lambda name, status, **kw: events.append((name, status, kw))}
+        exec(compile(ast.Module(body=definitions, type_ignores=[]), "injected-recovery-scaffolding", "exec"), namespace)
+        with patch.dict("sys.modules", {"config": config, "nvwave": nvwave}):
+            namespace["start_fatal_recovery_probe"]()
+            self.assertTrue(namespace["RESULT"]["injected_fatal_recovery"]["queued_before_switch"])
+            self.assertIsNot(nvwave.WavePlayer, factory)
+            driver._dordiai_last_error_details = {"recovery": {"state": "builtin-espeak-selected", "espeak_selection_succeeded": True}}
+            espeak_class = type("SynthDriver", (), {"__module__": "synthDrivers.espeak", "name": "espeak"})
+            active[0] = espeak_class()
+            namespace["RECOVERY_OUTPUTS"].append(SimpleNamespace(submitted_bytes=4, nonzero_bytes=2))
+            namespace["observe_fatal_recovery"](time.monotonic() + 15)
+            namespace["finish_fatal_recovery_probe"]()
+        self.assertIs(nvwave.WavePlayer, factory)
+        self.assertEqual(events[-1], "finish")
+        self.assertEqual(events[-2][1], "passed")
+        observations = events[-2][2]["observations"]
+        self.assertFalse(observations["model_import_error_verified"])
+        self.assertFalse(observations["physical_audio_verified"])
 
     def test_embedded_plugin_is_valid_python_without_executing_nvda(self):
         code = probe.PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({"output": "C:/isolated/test", "run_id": "abc"}))

@@ -1,0 +1,16 @@
+{
+  "format": "dordiai-core-source-resume-bundle-verification",
+  "format_version": 1,
+  "version": "0.13.1-dev.5",
+  "path": "dist/dordiai-core-resume-0.13.1-dev.5.zip",
+  "size_bytes": 2315348,
+  "sha256": "08e912609815993e7f6462dc37f6fbce0243f7b4e231422206380aaa84788c63",
+  "files_verified": 9,
+  "source_snapshot_sha256": "a62ae343c439b64bb692cd002aa8b6c34d4060bbf0b960ec8b068f57620ead70",
+  "required_core4_sha256": "b80f0f2a428ba097b37437ccfd028ce41630b73fd92c5cfa9539da1b08a1b90e",
+  "expected_core5_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
+  "expected_release_manifest_sha256": "6b7a0110bc70843a0779af1086dcf2a5c274e7834bdea56bc8bb8d056cbb8282",
+  "actual_core4_to_core5_reproduction_proof": "evidence/recovered_core4_to_dev5_rebuild.json",
+  "full_weights_included": false,
+  "not_an_installer": true
+}

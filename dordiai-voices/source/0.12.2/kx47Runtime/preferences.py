@@ -152,6 +152,121 @@ def finish_package_speech(session):
     return {"restored": False, "user_changed_synth": False, "synth": current, "error": True, "detail": detail}
 
 
+def _safe_error_details(error):
+    try:
+        return _package_component("error_diagnostics").safe_error(error)
+    except Exception:
+        return {"type": type(error).__name__}
+
+
+def _worker_import_failure(details, depth=0):
+    """Classify typed worker diagnostics, never exception-message substrings."""
+    if not isinstance(details, dict) or depth > 3:
+        return False
+    if details.get("type") in {"SynthesisCancelled", "CancelledError"}:
+        return False
+    if details.get("type") in {"ImportError", "ModuleNotFoundError"}:
+        return True
+    return _worker_import_failure(details.get("cause"), depth + 1)
+
+
+def is_fatal_import_failure(error):
+    # An unsupported-text wrapper with a host ImportError as incidental context
+    # is not automatically a fatal bootstrap error. Worker diagnostics are an
+    # explicit typed IPC field, distinct from arbitrary text or stale notices.
+    if type(error).__name__ in {"SynthesisCancelled", "CancelledError"}:
+        return False
+    return isinstance(error, ImportError) or _worker_import_failure(getattr(error, "dordiai_worker_error", None))
+
+
+def _import_component(details, depth=0):
+    if not isinstance(details, dict) or depth > 4:
+        return None
+    value = details.get("import_name")
+    if details.get("type") in {"ImportError", "ModuleNotFoundError"} and isinstance(value, str):
+        import re
+        if re.fullmatch(r"[A-Za-z0-9_.<>-]{1,160}", value):
+            return value
+    return _import_component(details.get("worker"), depth + 1) or _import_component(details.get("cause"), depth + 1)
+
+
+def _publish_bootstrap_notice(driver, text, details, *, allow_speech):
+    """Retain a braille/error path even when speech cannot initialize."""
+    driver._dordiai_last_error_notice = text
+    recovery = details["recovery"]
+    if allow_speech:
+        try:
+            from ui import message
+            message(text)
+            recovery["notice_delivery"] = "nvda-speech-and-braille-requested"
+            return
+        except Exception as error:
+            recovery["notice_error"] = _safe_error_details(error)
+    try:
+        import braille
+        braille.handler.message(text)
+        recovery["notice_delivery"] = "braille-only"
+    except Exception as error:
+        recovery["braille_error"] = _safe_error_details(error)
+        recovery["notice_delivery"] = "retained-error-details-only"
+    # Never log the exception's message, requested speech text or local paths.
+    try:
+        from logHandler import log
+        log.error("dordiai-voices: bootstrap recovery notice: %s", json.dumps(details, ensure_ascii=True))
+    except Exception:
+        pass
+
+
+def recover_bootstrap_speech(driver, details):
+    """Run only through NVDA's event queue; never reload a broken synthesizer."""
+    import speech
+    import synthDriverHandler as handler
+    recovery = details["recovery"] = {"state": "queued", "physical_audio_verified": False}
+    driver._dordiai_last_error_details = details
+    base = "Не вдалося завантажити компоненти dordiai-voices."
+    component = _import_component(details)
+    if component:
+        base += " Компонент: " + component + "."
+    if handler.getSynth() is not driver:
+        recovery["state"] = "user-synth-preserved"
+        _publish_bootstrap_notice(driver, base + " Залишено вибраний вами синтезатор.", details, allow_speech=True)
+        return
+    try:
+        driver.saveSettings()
+    except Exception as error:
+        recovery["save_error"] = _safe_error_details(error)
+        base += " Останні налаштування не вдалося зберегти."
+    try:
+        speech.cancelSpeech()
+    except Exception as error:
+        recovery["cancel_error"] = _safe_error_details(error)
+    try:
+        # NVDA normally retries the previous synth if selecting a new one fails.
+        # Publicly deselect first so eSpeak failure cannot reselect this broken
+        # add-on. isFallback keeps the user's configured synth/profile intact.
+        cleared = handler.setSynth(None, isFallback=True)
+        if not cleared or handler.getSynth() is not None:
+            raise RuntimeError("Could not deselect failing synthesizer")
+        recovery["espeak_selection_succeeded"] = bool(handler.setSynth("espeak", isFallback=True))
+    except Exception as error:
+        recovery["fallback_error"] = _safe_error_details(error)
+    current = handler.getSynth()
+    name = getattr(current, "name", None)
+    if current is not driver and name == "espeak":
+        recovery["state"] = "builtin-espeak-selected"
+        text = base + " Для навігації ввімкнено вбудований eSpeak. Виправте помилку перед повторним вибором dordiai-voices."
+        allow_speech = True
+    elif current is not driver and name == "oneCore":
+        recovery["state"] = "builtin-windows-fallback-selected"
+        text = base + " eSpeak недоступний. Для навігації ввімкнено вбудований синтезатор Windows."
+        allow_speech = True
+    else:
+        recovery["state"] = "spoken-fallback-unavailable"
+        text = base + " Резервний синтезатор також недоступний. Виберіть інший синтезатор або перезапустіть NVDA. Подробиці помилки збережено."
+        allow_speech = False
+    _publish_bootstrap_notice(driver, text, details, allow_speech=allow_speech)
+
+
 def _codes(value):
     """Read only text lists from a profile; malformed values must not enable everything."""
     return set(value.split()) if isinstance(value, str) else set()
@@ -370,6 +485,24 @@ class PreferencesMixin:
         """
         from time import monotonic
         self._dordiai_last_error = str(error)
+        details = _safe_error_details(error)
+        self._dordiai_last_error_details = details
+        if is_fatal_import_failure(error):
+            # A fatal import must bypass the ordinary five-second notice limit.
+            # One queued recovery per driver prevents a failed notice looping
+            # through the same broken synth. Runtime/model work never switches
+            # synthesizers directly from the producer thread.
+            if getattr(self, "_dordiai_fatal_recovery_scheduled", False):
+                previous = getattr(self, "_dordiai_fatal_error_details", None)
+                if isinstance(previous, dict):
+                    previous["repeat_count"] = int(previous.get("repeat_count", 0)) + 1
+                    self._dordiai_last_error_details = previous
+                return
+            self._dordiai_fatal_recovery_scheduled = True
+            self._dordiai_fatal_error_details = details
+            import queueHandler
+            queueHandler.queueFunction(queueHandler.eventQueue, recover_bootstrap_speech, self, details)
+            return
         now = monotonic()
         if now - getattr(self, "_dordiai_last_error_time", float("-inf")) < 5.0:
             return

@@ -84,6 +84,8 @@ ORIGINAL_FEED = None
 ACTIVE_REQUEST = None
 LATENCY_THREAD = None
 LATENCY_STOP = threading.Event()
+RECOVERY_ORIGINAL_WAVE_FACTORY = None
+RECOVERY_OUTPUTS = []
 DONE = threading.Event()
 SAMPLE_RATE = 24000
 SAMPLES = {}
@@ -99,12 +101,26 @@ class RecordingPCMSink:
         self.bitsPerSample = bitsPerSample
         self.closed = False
         self.paused = False
+        self.submitted_bytes = self.nonzero_bytes = 0
 
-    def feed(self, data, onDone=None):
+    def feed(self, data, size=None, onDone=None):
         if self.closed:
             raise OSError("Recording sink is closed")
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            # Official eSpeak delivers its real native PCM as c_void_p/size.
+            # This remains an explicit output double, never a sound device.
+            import ctypes
+            if not isinstance(size, int) or not 0 <= size <= 2 * 1024 * 1024 or (size and not data):
+                raise ValueError("Recording sink requires a bounded native PCM buffer")
+            data = ctypes.string_at(data, size) if size else b""
+        elif size is not None:
+            if not isinstance(size, int) or not 0 <= size <= len(data):
+                raise ValueError("Recording sink byte count exceeds its buffer")
+            data = data[:size]
         if not isinstance(data, (bytes, bytearray, memoryview)) or len(data) % 2:
             raise ValueError("Recording sink requires aligned 16-bit PCM")
+        self.submitted_bytes += len(data)
+        self.nonzero_bytes += sum(byte != 0 for byte in data)
         if onDone is not None:
             onDone()
 
@@ -184,6 +200,7 @@ def finish():
     if FINISHED:
         return
     FINISHED = True
+    restore_recovery_output_factory()
     LATENCY_STOP.set()
     try:
         if DRIVER is not None:
@@ -619,6 +636,90 @@ def latency_finished(summary):
         check(name, "passed" if passed else "failed", measurements=measurements,
               p95_target_ms=20.0, p99_target_ms=50.0,
               physical_audible_acceptance="not measured")
+    smoke_complete = all(any(entry["name"] == phase + "_pcm_submission" and entry["status"] == "passed"
+                             for entry in RESULT["checks"]) for phase in ("phrase", "character"))
+    if SETTINGS.get("fatal_recovery_probe") and smoke_complete and target_complete and switch_complete and not errors:
+        later(250, start_fatal_recovery_probe)
+    else:
+        finish()
+
+
+def restore_recovery_output_factory():
+    global RECOVERY_ORIGINAL_WAVE_FACTORY
+    if RECOVERY_ORIGINAL_WAVE_FACTORY is not None:
+        import nvwave
+        nvwave.WavePlayer = RECOVERY_ORIGINAL_WAVE_FACTORY
+        RECOVERY_ORIGINAL_WAVE_FACTORY = None
+
+
+def start_fatal_recovery_probe():
+    global STAGE, RECOVERY_ORIGINAL_WAVE_FACTORY
+    import config
+    import nvwave
+    STAGE = "injected_fatal_notification_recovery"
+    if synthDriverHandler.getSynth() is not DRIVER:
+        check(STAGE, "blocked", reason="Original synthesizer is no longer active")
+        finish()
+        return
+    RESULT["injected_fatal_recovery"] = {
+        "scope": "Injected notification-boundary ImportError; not a real model failure or acoustic test",
+        "injected": True, "model_import_error_verified": False, "physical_audio_verified": False,
+        "configured_synth_before": config.conf["speech"]["synth"],
+        "recording_pcm_sink_test_double": bool(SETTINGS.get("headless_ui_probe")),
+    }
+    if SETTINGS.get("headless_ui_probe"):
+        RECOVERY_ORIGINAL_WAVE_FACTORY = nvwave.WavePlayer
+        def create_recording_output(*args, **kwargs):
+            sink = RecordingPCMSink(*args, **kwargs)
+            RECOVERY_OUTPUTS.append(sink)
+            return sink
+        nvwave.WavePlayer = create_recording_output
+    DRIVER._dordiai_report_error(ImportError("Injected probe notification boundary", name="dordiai_probe_optional_component"))
+    RESULT["injected_fatal_recovery"]["queued_before_switch"] = (
+        bool(getattr(DRIVER, "_dordiai_fatal_recovery_scheduled", False)) and
+        synthDriverHandler.getSynth() is DRIVER)
+    later(100, lambda: observe_fatal_recovery(time.monotonic() + 15.0))
+
+
+def observe_fatal_recovery(deadline):
+    import config
+    row = RESULT["injected_fatal_recovery"]
+    active = synthDriverHandler.getSynth()
+    details = getattr(DRIVER, "_dordiai_last_error_details", {})
+    recovery = details.get("recovery", {})
+    if (active is DRIVER or recovery.get("state") == "queued") and time.monotonic() < deadline:
+        later(100, lambda: observe_fatal_recovery(deadline))
+        return
+    row.update(active_synth=getattr(active, "name", None),
+               active_driver_module=type(active).__module__ if active is not None else None,
+               configured_synth_after=config.conf["speech"]["synth"], recovery=dict(recovery),
+               old_driver_closed=bool(getattr(DRIVER, "_closed", False)))
+    # A repeated report on the retired driver must not queue/reselect it.
+    DRIVER._dordiai_report_error(ImportError("Repeated injected probe boundary", name="dordiai_probe_optional_component"))
+    later(2000, finish_fatal_recovery_probe)
+
+
+def finish_fatal_recovery_probe():
+    import config
+    row = RESULT["injected_fatal_recovery"]
+    active = synthDriverHandler.getSynth()
+    details = getattr(DRIVER, "_dordiai_last_error_details", {})
+    row.update(recovery=dict(details.get("recovery", {})),
+               active_synth_after_settlement=getattr(active, "name", None),
+               configured_synth_preserved=config.conf["speech"]["synth"] == row["configured_synth_before"],
+               old_driver_thread_stopped=not DRIVER._thread.is_alive(),
+               recording_sink_pcm_bytes=sum(sink.submitted_bytes for sink in RECOVERY_OUTPUTS),
+               recording_sink_nonzero_bytes=sum(sink.nonzero_bytes for sink in RECOVERY_OUTPUTS))
+    passed = (row["queued_before_switch"] and row["active_synth"] == "espeak" and
+              row["active_driver_module"] == "synthDrivers.espeak" and
+              row["active_synth_after_settlement"] == "espeak" and row["configured_synth_preserved"] and
+              row["old_driver_closed"] and row["old_driver_thread_stopped"] and
+              row["recovery"].get("state") == "builtin-espeak-selected" and
+              row["recovery"].get("espeak_selection_succeeded") is True)
+    if SETTINGS.get("headless_ui_probe"):
+        passed = passed and row["recording_sink_nonzero_bytes"] > 0
+    check("injected_fatal_notification_recovery", "passed" if passed else "failed", observations=row)
+    restore_recovery_output_factory()
     finish()
 
 
@@ -781,6 +882,8 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=600.0, help="Watchdog seconds for each NVDA process")
     parser.add_argument("--headless-ui-probe", action="store_true",
                         help="Explicit recording output TEST DOUBLE for real NVDA/driver/model/GUI checks; never certifies WavePlayer or acoustic output")
+    parser.add_argument("--fatal-recovery-probe", action="store_true",
+                        help="Optional injected fatal-notification recovery check after normal speech/latency; not a real model-import failure proof")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -850,6 +953,7 @@ def main(argv=None):
             'minimumNVDAVersion = "2026.1"\nlastTestedNVDAVersion = "2026.3.1"\n', encoding="utf-8")
         (plugins / "dordiaiProbe.py").write_text(PROBE_PLUGIN.replace("__PROBE_SETTINGS__", repr({
             "output": str(run), "run_id": run_id, "headless_ui_probe": args.headless_ui_probe,
+            "fatal_recovery_probe": args.fatal_recovery_probe,
         })), encoding="utf-8")
         (config / "nvda.ini").write_text(
             '[general]\nshowWelcomeDialog = False\naskToExit = False\nsaveConfigurationOnExit = False\n'

@@ -70,12 +70,15 @@ def create_backup(source, output, *, version, expected_sha256):
                 raise ValueError("Source addon differs from the expected release SHA256")
         tool = stage / "restore_core_backup.py"
         shutil.copyfile(Path(restorer.__file__), tool)
+        recovery_tool = stage / "recover_core_baseline.py"
+        shutil.copyfile(Path(__file__).with_name(recovery_tool.name), recovery_tool)
         manifest_name = f"dordiai-core-{version}-backup-manifest.json"
         manifest_path = stage / manifest_name
         manifest = {"format": restorer.FORMAT, "format_version": 1, "version": version,
             "source_filename": source.name, "source_size_bytes": total, "source_sha256": expected_sha256,
             "chunks": records, "backup_parts_are_not_standalone_installers": True,
             "restore_tool": {"filename": tool.name, "sha256": restorer.file_sha256(tool)},
+            "baseline_recovery_tool": {"filename": recovery_tool.name, "sha256": restorer.file_sha256(recovery_tool)},
             "restore_command": f"python restore_core_backup.py --manifest {manifest_name}",
             "verify_without_duplicate_output_command": f"python restore_core_backup.py --manifest {manifest_name} --verify-only"}
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -90,13 +93,16 @@ def create_backup(source, output, *, version, expected_sha256):
             "Засіб перевіряє порядок, контрольні суми ZIP, внутрішніх блоків та остаточного файла. "
             "Наявний інший файл не перезаписується. Перевірений результат публікується атомарно: "
             "у Windows перейменуванням без перезапису, у Linux/macOS жорстким посиланням "
-            "на тій самій файловій системі.\n\nОчікувана остаточна SHA-256:\n" + expected_sha256 + "\n",
+            "на тій самій файловій системі.\n\nМінімальна база для продовження розробки без початкового Drive:\n"
+            f"python recover_core_baseline.py --archive {source.name} --output recovered-core-baseline --expected-sha256 {expected_sha256}\n"
+            "Це відновлює лише ресурси ядра; відсутні додаткові мовні пакети потребують власних ZIP.\n\n"
+            "Очікувана остаточна SHA-256:\n" + expected_sha256 + "\n",
             encoding="utf-8")
         verification = restorer.restore(manifest_path, verify_only=True)
         helper_name = f"dordiai-core-{version}-backup-tools.zip"
         helper = stage / helper_name
         with zipfile.ZipFile(helper, "w", compression=zipfile.ZIP_STORED) as archive:
-            for path in (manifest_path, tool, stage / "README_UK.txt"):
+            for path in (manifest_path, tool, recovery_tool, stage / "README_UK.txt"):
                 archive.writestr(_zip_info(path.name), path.read_bytes())
         evidence = {"format": "dordiai-core-backup-verification", "format_version": 1, "version": version,
             "source_filename": source.name, "source_size_bytes": total, "source_sha256": expected_sha256,
@@ -105,6 +111,7 @@ def create_backup(source, output, *, version, expected_sha256):
             "verification_output_file_created": False, "original_core_modified": False,
             "manifest_filename": manifest_name, "manifest_sha256": restorer.file_sha256(manifest_path),
             "restore_tool_sha256": restorer.file_sha256(tool),
+            "baseline_recovery_tool_sha256": restorer.file_sha256(recovery_tool),
             "helper_bundle": {"filename": helper_name, "size_bytes": helper.stat().st_size,
                               "sha256": restorer.file_sha256(helper)},
             "backup_parts_are_not_standalone_installers": True}
