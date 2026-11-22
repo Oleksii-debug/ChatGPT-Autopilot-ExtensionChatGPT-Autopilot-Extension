@@ -1328,7 +1328,24 @@
       "cleanup_verified": true,
       "evidence": "evidence/longread_failed_45045436146.json",
       "note": "Do not infer renderer underruns from absent reference; retry observes public queue/mode/driver/producer counters."
-    }
+    },
+    "source13_build_attempts": [
+      {
+        "source_commit": "e62f46371d0b78c4ada84226f6ccb2c8efab6bc0",
+        "run": 45049366558,
+        "job": 137290851051,
+        "status": "failed_before_resource_download",
+        "windows_tests_total": 1680,
+        "failures": 2,
+        "skipped": 55,
+        "archive_built": false,
+        "diagnoses": [
+          "Promotion fault injection compared unresolved vs Windows resolved alias; fixture canonicalization corrected with exact injection count.",
+          "Research NBL ZIP auditor now validates raw orig_filename identity and tests actual unsafe Windows-normalized members."
+        ],
+        "production_runtime_changed_for_retry": false
+      }
+    ]
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",

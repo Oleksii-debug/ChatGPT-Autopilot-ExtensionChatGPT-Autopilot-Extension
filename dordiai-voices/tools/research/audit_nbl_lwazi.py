@@ -61,6 +61,11 @@ def checked_members(z):
     members = {}
     total = 0
     for item in z.infolist():
+        # On Windows ZipInfo normalizes raw backslashes in filename; embedded
+        # NUL also truncates filename. Never audit only that normalized alias.
+        raw_name = item.orig_filename
+        if raw_name != item.filename or '\\' in raw_name or '\x00' in raw_name:
+            raise ValueError('Raw archive member name was normalized or unsafe')
         p = PurePosixPath(item.filename)
         if (not item.filename or p.is_absolute() or '\\' in item.filename
                 or any(x in {'', '.', '..'} for x in item.filename.rstrip('/').split('/'))

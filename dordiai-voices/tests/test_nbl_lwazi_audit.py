@@ -75,11 +75,27 @@ class AuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):m.tiers(grid().replace(b'name = "word"', b'name = "other"'))
 
     def test_unsafe_archive_member_rejected(self):
-        for name in ['../escape', '/escape', 'C:/escape', 'a\\escape']:
+        for name in ['../escape', '/escape', 'C:/escape', 'a\\escape', 'a\x00escape']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as d:
                 p = Path(d) / 'bad.zip'
-                with zipfile.ZipFile(p, 'w') as z:z.writestr(name, b'x')
-                with zipfile.ZipFile(p) as z,self.assertRaises(ValueError):m.checked_members(z)
+                # Passing a string to writestr lets Windows ZipInfo normalize
+                # backslashes before writing. Mutate after construction so the
+                # fixture really contains the unsafe raw central/local name.
+                info=zipfile.ZipInfo('placeholder')
+                info.filename=name;info.orig_filename=name
+                with zipfile.ZipFile(p, 'w') as z:z.writestr(info, b'x')
+                with zipfile.ZipFile(p) as z:
+                    self.assertEqual(z.infolist()[0].orig_filename,name)
+                    with self.assertRaises(ValueError):m.checked_members(z)
+
+    def test_windows_normalized_raw_alias_is_rejected(self):
+        # Exercise the Windows reader state even when tests run on Linux.
+        info=zipfile.ZipInfo('a/escape')
+        info.orig_filename='a\\escape'
+        class Reader:
+            def infolist(self):return [info]
+        with self.assertRaisesRegex(ValueError,'Raw archive member'):
+            m.checked_members(Reader())
 
     def test_paired_audio_and_alignment_checked(self):
         with tempfile.TemporaryDirectory() as d:

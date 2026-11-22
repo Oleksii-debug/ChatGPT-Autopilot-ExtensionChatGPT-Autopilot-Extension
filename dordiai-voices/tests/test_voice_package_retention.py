@@ -346,20 +346,39 @@ class FreshInstallOwnershipTests(unittest.TestCase):
         self.assertEqual(packages.list_installed_packages(self.case.root), [])
 
     def test_promotion_failure_retains_owned_unavailable_row_and_allows_install_retry(self):
+        self.assert_promotion_failure_and_retry()
+
+    def assert_promotion_failure_and_retry(self):
         replace = packages.os.replace
+        canonical_final = self.final.resolve()
+        blocked = []
         def fail_promotion(source, destination):
-            if Path(destination) == self.final:
+            if Path(destination).resolve() == canonical_final:
+                self.assertTrue(Path(source).name.startswith(".voice-install-"))
+                blocked.append((str(source), str(destination)))
                 raise PermissionError("promotion blocked")
             return replace(source, destination)
         with patch.object(packages.os, "replace", side_effect=fail_promotion):
             with self.assertRaisesRegex(PermissionError, "promotion blocked"):
                 packages.install_package(self.case.package, self.case.root)
+        self.assertEqual(len(blocked), 1, "The actual owned promotion must receive the injected fault")
         self.assertFalse(self.final.exists())
         self.assertFalse(list(self.case.root.glob(".voice-install-*")))
         self.assert_inactive_owned("unavailable")
         packages.install_package(self.case.package, self.case.root)
         self.assertEqual(packages.discover_packages(self.case.root)["example_voice"]["version"], "1.0.0")
         self.assertNotIn("inactive", packages._load_index(self.case.root))
+
+    def test_promotion_fault_matches_the_owned_destination_through_a_root_alias(self):
+        self.case.root.mkdir()
+        alias = self.case.base / "installed-alias"
+        try:
+            alias.symlink_to(self.case.root, target_is_directory=True)
+        except OSError:
+            self.skipTest("directory aliases unavailable")
+        self.case.root = alias
+        self.final = alias / "example_voice/1.0.0"
+        self.assert_promotion_failure_and_retry()
 
     def test_final_activation_commit_failure_keeps_promoted_files_listed_for_retry(self):
         self.original_write = packages._write_index
