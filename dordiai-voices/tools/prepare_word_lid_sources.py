@@ -180,7 +180,8 @@ def zip_rows(path, row, counts):
                     if not isinstance(provenance, str):
                         raise ValueError("Native-word row lacks its original source field")
                     counts["publisher_source:" + provenance] += 1
-                    if provenance in row.get("exclude_sources", ()):
+                    if provenance.strip().casefold() in {value.strip().casefold()
+                            for value in row.get("exclude_sources", ())}:
                         counts["excluded_named_entities"] += 1
                         continue
                     yield item["native word"], role

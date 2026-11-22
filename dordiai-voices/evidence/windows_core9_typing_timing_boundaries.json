@@ -1,0 +1,233 @@
+{
+  "format": "dordiai-real-typing-timing-boundaries",
+  "format_version": 1,
+  "source_run": 45016446860,
+  "typing_artifact_id": 14752316501,
+  "diagnostic_run": 45017874241,
+  "diagnostic_job": 137194007843,
+  "core_archive_sha256": "9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
+  "scope": "Retrospective differences of recorded monotonic probe timestamps; genuine SendInput/NVDA/driver/models, explicit recording-output test double; no device/acoustic latency acceptance.",
+  "all_nine_functional_and_routing_checks_passed": true,
+  "cleanup": {
+    "attempted": true,
+    "errors": [],
+    "keyboard_config_restored": true,
+    "keyboard_layout_restored": true,
+    "speech_mode_restored": true
+  },
+  "rows": [
+    {
+      "language": "uk",
+      "glyph": "а",
+      "total_ms": 24.6396,
+      "send_to_raw_ms": 0.3053,
+      "raw_to_typed_event_ms": 15.9196,
+      "typed_event_to_pre_synth_speak_ms": 2.2369,
+      "pre_synth_speak_to_first_pcm_ms": 6.1778,
+      "emitted_languages": [
+        "uk_UA",
+        "uk_UA"
+      ],
+      "effective_languages": [
+        "uk"
+      ],
+      "first_driver_text": "а",
+      "planned_texts": [
+        "а"
+      ]
+    },
+    {
+      "language": "uk",
+      "glyph": "ї",
+      "total_ms": 31.5636,
+      "send_to_raw_ms": 0.2151,
+      "raw_to_typed_event_ms": 27.0474,
+      "typed_event_to_pre_synth_speak_ms": 0.7921,
+      "pre_synth_speak_to_first_pcm_ms": 3.509,
+      "emitted_languages": [
+        "uk_UA",
+        "uk_UA"
+      ],
+      "effective_languages": [
+        "uk"
+      ],
+      "first_driver_text": "ї",
+      "planned_texts": [
+        "ї"
+      ]
+    },
+    {
+      "language": "en",
+      "glyph": "a",
+      "total_ms": 38.1854,
+      "send_to_raw_ms": 0.2259,
+      "raw_to_typed_event_ms": 32.3465,
+      "typed_event_to_pre_synth_speak_ms": 1.9391,
+      "pre_synth_speak_to_first_pcm_ms": 3.6739,
+      "emitted_languages": [
+        "en_US",
+        "en_US"
+      ],
+      "effective_languages": [
+        "en-us"
+      ],
+      "first_driver_text": "a",
+      "planned_texts": [
+        "ay"
+      ]
+    },
+    {
+      "language": "en",
+      "glyph": "b",
+      "total_ms": 36.8467,
+      "send_to_raw_ms": 0.2026,
+      "raw_to_typed_event_ms": 32.2375,
+      "typed_event_to_pre_synth_speak_ms": 0.8297,
+      "pre_synth_speak_to_first_pcm_ms": 3.5769,
+      "emitted_languages": [
+        "en_US",
+        "en_US"
+      ],
+      "effective_languages": [
+        "en-us"
+      ],
+      "first_driver_text": "b",
+      "planned_texts": [
+        "bee"
+      ]
+    },
+    {
+      "language": "en",
+      "glyph": "!",
+      "total_ms": 73.8373,
+      "send_to_raw_ms": 0.808,
+      "raw_to_typed_event_ms": 16.5274,
+      "typed_event_to_pre_synth_speak_ms": 1.3745,
+      "pre_synth_speak_to_first_pcm_ms": 55.1274,
+      "emitted_languages": [
+        "en_US",
+        "en_US"
+      ],
+      "effective_languages": [
+        "en-us"
+      ],
+      "first_driver_text": "ab  ",
+      "planned_texts": [
+        "ab",
+        "bang"
+      ]
+    },
+    {
+      "language": "ru",
+      "glyph": "а",
+      "total_ms": 75.349,
+      "send_to_raw_ms": 0.2149,
+      "raw_to_typed_event_ms": 16.2179,
+      "typed_event_to_pre_synth_speak_ms": 54.5959,
+      "pre_synth_speak_to_first_pcm_ms": 4.3203,
+      "emitted_languages": [
+        "ru_RU",
+        "ru_RU"
+      ],
+      "effective_languages": [
+        "ru"
+      ],
+      "first_driver_text": "а",
+      "planned_texts": [
+        "а"
+      ]
+    },
+    {
+      "language": "ru",
+      "glyph": "б",
+      "total_ms": 35.834,
+      "send_to_raw_ms": 0.2646,
+      "raw_to_typed_event_ms": 31.24,
+      "typed_event_to_pre_synth_speak_ms": 0.9095,
+      "pre_synth_speak_to_first_pcm_ms": 3.4199,
+      "emitted_languages": [
+        "ru_RU",
+        "ru_RU"
+      ],
+      "effective_languages": [
+        "ru"
+      ],
+      "first_driver_text": "б",
+      "planned_texts": [
+        "бэ"
+      ]
+    },
+    {
+      "language": "ru",
+      "glyph": "ы",
+      "total_ms": 29.7204,
+      "send_to_raw_ms": 0.2007,
+      "raw_to_typed_event_ms": 24.6335,
+      "typed_event_to_pre_synth_speak_ms": 0.8563,
+      "pre_synth_speak_to_first_pcm_ms": 4.0299,
+      "emitted_languages": [
+        "ru_RU",
+        "ru_RU"
+      ],
+      "effective_languages": [
+        "ru"
+      ],
+      "first_driver_text": "ы",
+      "planned_texts": [
+        "ы"
+      ]
+    },
+    {
+      "language": "ru",
+      "glyph": " ",
+      "total_ms": 169.0708,
+      "send_to_raw_ms": 0.2111,
+      "raw_to_typed_event_ms": 26.6154,
+      "typed_event_to_pre_synth_speak_ms": 1.2069,
+      "pre_synth_speak_to_first_pcm_ms": 141.0374,
+      "emitted_languages": [
+        "ru_RU",
+        "ru_RU"
+      ],
+      "effective_languages": [
+        "ru"
+      ],
+      "first_driver_text": "абы  ",
+      "planned_texts": [
+        "абы",
+        "пробел"
+      ]
+    }
+  ],
+  "interpretation": [
+    "raw-to-typedEvent includes native Windows/NVDA helper and event dispatch, scheduling and the probe callbacks; it is not isolated model time.",
+    "pre_synthSpeak observer fires immediately before actual getSynth().speak in official SpeechManager._pushNextSpeech; recorded interval also includes later hook callbacks and own planner/feed observers. Probe overhead is not calibrated or subtracted.",
+    "First RU shared letter delay is predominantly typed-event-to-pre-synthSpeak (54.5959ms), while subsequent driver-to-first-PCM is4.3203ms. Existing timestamps cannot isolate character-data lazy load from speech processing/queue scheduling.",
+    "Delimiter rows have native typed-word echo enabled. English ! sends word ab before bang; Russian space sends word абы before пробел. The first PCM belongs to the word sequence; these169/74ms totals do not isolate symbol rendering.",
+    "Nine single observations do not establish a distribution or P95. Direct89-letter first-use maximum3.73ms is a separate driver-level test, not interchangeable with actual keyboard timing."
+  ],
+  "primary_source_references": [
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/release-2026.3.1/source/eventHandler.py#L48",
+      "finding": "queueEvent schedules only gainFocus immediate; typedCharacter uses ordinary eventQueue."
+    },
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/release-2026.3.1/source/queueHandler.py#L43",
+      "finding": "queueFunction requests pump, default immediateFalse."
+    },
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/release-2026.3.1/source/core.py#L56",
+      "finding": "PUMP_MAX_DELAY=10; CorePump requests delayed wx.Timer; not a promise that total OS/native dispatch is10ms."
+    },
+    {
+      "url": "https://github.com/nvaccess/nvda/blob/release-2026.3.1/source/speech/manager.py#L435",
+      "finding": "pre_synthSpeak.notify immediately precedes getSynth().speak(seq)."
+    }
+  ],
+  "recommendations": [
+    "Repeat owned real-key character-only native echo with speakTypedWordsOFF and a separate normal ON run; preserve/restore native config, layout and protected-input checks.",
+    "Timestamp native pre_speechQueued and each pre_synthSpeak request separately, recording emitted IndexCommand.index without modifying commands; retain bounded planner/feed events so word-first and symbol-second portions can be distinguished honestly.",
+    "Repeat enough cases for latency distribution after prepared banks; keep cold locale first-use separate from resident cases. Do not change NVDA global timer/queue policy to improve a benchmark.",
+    "Add actual Backspace and LeftArrow outside typed-context with RU keyboard over UK document text, plus forced-language and disabled-RU UI cases; expected native settings/precedence and character deletion/navigation remain authoritative."
+  ]
+}

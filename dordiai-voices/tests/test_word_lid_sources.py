@@ -181,6 +181,25 @@ class SourceAcquisitionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 list(prepare.zip_rows(path, row, prepare.Counter()))
 
+
+    def test_publisher_named_entity_exclusion_handles_observed_case_variants(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "source.zip"
+            row = source_row("fixture", "brx", kind="aksharantar-jsonl-zip")
+            row.update(source_language="brx", exclude_sources=["AK-NEI", "AK-NEF"])
+            with zipfile.ZipFile(path, "w") as archive:
+                for role in ("train", "test"):
+                    items = [{"unique_identifier": "brx1", "native word": "बरफोर",
+                              "english word": "unit fixture", "source": tag}
+                             for tag in ("AK-Freq", "Ak-Freq", "Ak-NEI", "ak-nef", " AK-NEI ")]
+                    archive.writestr("brx_" + role + ".json", "\n".join(json.dumps(item) for item in items) + "\n")
+            counts = prepare.Counter()
+            rows = list(prepare.zip_rows(path, row, counts))
+            self.assertEqual(len(rows), 4)
+            self.assertEqual(counts["excluded_named_entities"], 6)
+            self.assertEqual(counts["publisher_source:Ak-NEI"], 2)
+            self.assertEqual(counts["publisher_source:Ak-Freq"], 2)
+
     def test_native_zip_never_extracts_unsafe_members(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "source.zip"
