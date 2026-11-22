@@ -449,6 +449,16 @@ class PackageSpeechTests(unittest.TestCase):
         self._run_dialog_operation(False, quiesce_fails=True)
 
 
+def required_resource_error():
+    """Replay the safe metadata captured from the real packaged Windows worker."""
+    fixture = Path(__file__).resolve().parent / "fixtures" / "ruaccent_required_resource_worker.json"
+    document = json.loads(fixture.read_text(encoding="utf-8"))
+    # SpeechWorker._receive uses this same host wrapper/explicit metadata field.
+    error = RuntimeError("ModelDownloadError")
+    error.dordiai_worker_error = json.loads(json.dumps(document["diagnostics"]))
+    return error
+
+
 class FatalImportRecoveryTests(unittest.TestCase):
     """Queue/real NVDA API lifecycle contracts, without emulating audio output."""
 
@@ -579,6 +589,205 @@ class FatalImportRecoveryTests(unittest.TestCase):
         self.assertEqual(recovery["braille_error"]["type"], "RuntimeError")
         self.assertIn("Не вдалося завантажити", self.driver._dordiai_last_error_notice)
         self.assertTrue(self.logs)
+
+
+    def test_real_required_resource_diagnostics_recover_on_event_thread(self):
+        error = required_resource_error()
+        with self.modules():
+            self.driver._dordiai_report_error(error)
+            self.assertIs(self.current, self.driver)
+            self.assertEqual(self.calls, [])
+            self.assertEqual(self.notices, [])
+            self.run_next()
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.configured, "kx47Preview")
+        self.driver.saveSettings.assert_called_once_with()
+        self.speech.cancelSpeech.assert_called_once_with()
+        self.assertEqual(self.notices[0][0], "espeak")
+        self.assertIn("потрібні ресурси", self.notices[0][1])
+        details = self.driver._dordiai_last_error_details
+        self.assertEqual(details["worker"], error.dordiai_worker_error)
+        self.assertEqual(details["recovery"]["reason"], "required-resource-unavailable")
+        self.assertFalse(details["recovery"]["physical_audio_verified"])
+
+    def test_required_resource_failure_bypasses_rate_limit_and_recovers_once(self):
+        with self.modules(), patch("time.monotonic", return_value=10.0):
+            self.driver._dordiai_report_error(ValueError("unsupported glyph"))
+            self.driver._dordiai_report_error(required_resource_error())
+            self.driver._dordiai_report_error(required_resource_error())
+            self.assertEqual(len(self.queued), 2)
+            self.run_next()
+            self.run_next()
+            self.driver._dordiai_report_error(required_resource_error())
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.queued, [])
+        details = self.driver._dordiai_last_error_details
+        self.assertEqual(details["recovery"]["reason"], "required-resource-unavailable")
+        self.assertGreaterEqual(details["repeat_count"], 2)
+
+    def test_required_resource_recovery_preserves_newly_selected_synth(self):
+        with self.modules():
+            self.driver._dordiai_report_error(required_resource_error())
+            chosen = self.current = types.SimpleNamespace(name="oneCore")
+            self.run_next()
+        self.assertIs(self.current, chosen)
+        self.assertEqual(self.calls, [])
+        self.driver.saveSettings.assert_not_called()
+        self.assertEqual(self.notices[0][0], "oneCore")
+        self.assertEqual(self.driver._dordiai_last_error_details["recovery"]["state"], "user-synth-preserved")
+
+    def test_required_resource_recovery_without_speech_retains_braille(self):
+        def fail_espeak(name, isFallback=False):
+            self.calls.append((name, isFallback))
+            self.current = types.SimpleNamespace(name="silence") if name else None
+            return name is None
+        self.handler.setSynth = fail_espeak
+        with self.modules():
+            self.driver._dordiai_report_error(required_resource_error())
+            self.run_next()
+        self.assertEqual(self.calls, [(None, True), ("espeak", True)])
+        self.assertEqual(self.notices, [])
+        self.assertTrue(self.braille_messages)
+        self.assertEqual(self.configured, "kx47Preview")
+        self.assertEqual(self.driver._dordiai_last_error_details["recovery"]["notice_delivery"], "braille-only")
+
+    def test_stale_required_resource_details_do_not_classify_unrelated_error(self):
+        self.driver._dordiai_last_error_details = {"worker": required_resource_error().dordiai_worker_error}
+        with self.modules():
+            self.driver._dordiai_report_error(ValueError("unsupported glyph"))
+            self.assertEqual(len(self.queued), 1)
+            self.run_next()
+        self.assertEqual(self.calls, [])
+        self.assertIs(self.current, self.driver)
+        self.assertNotIn("recovery", self.driver._dordiai_last_error_details)
+
+
+class RequiredResourceClassifierTests(unittest.TestCase):
+    def assert_nonfatal(self, error):
+        self.assertFalse(prefs.is_fatal_required_resource_failure(error))
+        self.assertFalse(prefs.is_fatal_speech_failure(error))
+
+    def test_actual_windows_worker_fixture_is_accepted_after_json_transport(self):
+        error = required_resource_error()
+        self.assertTrue(prefs.is_fatal_required_resource_failure(error))
+        self.assertTrue(prefs.is_fatal_speech_failure(error))
+        self.assertFalse(prefs.is_fatal_import_failure(error))
+
+    def test_error_messages_and_traceback_line_numbers_are_irrelevant(self):
+        error = required_resource_error()
+        error.args = ("a completely unrelated message",)
+        for node in (error.dordiai_worker_error, error.dordiai_worker_error["cause"]):
+            for frame in node["frames"]:
+                frame["line"] = 999999
+        self.assertTrue(prefs.is_fatal_required_resource_failure(error))
+
+    def test_both_exception_types_must_match_exactly(self):
+        for field, names in (("type", ("RuntimeError", "ValueError", "UnsupportedMMSInput",
+                            "SynthesisCancelled", "CancelledError", "MemoryError", "ModelLoadError")),
+                            ("cause", ("TimeoutError", "ConnectionError", "PermissionError",
+                             "MemoryError", "HTTPError", "ImportError", "UnsupportedMMSInput"))):
+            for name in names:
+                with self.subTest(field=field, name=name):
+                    error = required_resource_error()
+                    node = error.dordiai_worker_error if field == "type" else error.dordiai_worker_error["cause"]
+                    node["type"] = name
+                    if name == "ImportError":
+                        # Existing import recovery is intentionally a separate policy.
+                        self.assertFalse(prefs.is_fatal_required_resource_failure(error))
+                    else:
+                        self.assert_nonfatal(error)
+
+    def test_every_known_loader_provenance_frame_is_required(self):
+        for target, module, function in (
+                ("root", "native_multilingual", "russian_text"),
+                ("root", "stressonnx.backends.ruaccent", "_load"),
+                ("root", "stressonnx.download", "_download_files"),
+                ("cause", "stressonnx.download", "_download_files")):
+            with self.subTest(target=target, module=module):
+                error = required_resource_error()
+                node = error.dordiai_worker_error if target == "root" else error.dordiai_worker_error["cause"]
+                node["frames"] = [frame for frame in node["frames"]
+                                  if (frame["module"], frame["function"]) != (module, function)]
+                self.assert_nonfatal(error)
+
+    def test_similar_foreign_modules_or_functions_are_not_provenance(self):
+        for field, value in (("module", "other.stressonnx.download"),
+                             ("module", "stressonnx.download_extra"),
+                             ("function", "_download_files_extra")):
+            with self.subTest(field=field, value=value):
+                error = required_resource_error()
+                error.dordiai_worker_error["frames"][-1][field] = value
+                self.assert_nonfatal(error)
+
+    def test_malformed_or_unbounded_frames_fail_closed(self):
+        for malformed in (None, {}, "stressonnx.download", [], [None], ["_download_files"]):
+            for target in ("root", "cause"):
+                with self.subTest(target=target, malformed=malformed):
+                    error = required_resource_error()
+                    node = error.dordiai_worker_error if target == "root" else error.dordiai_worker_error["cause"]
+                    node["frames"] = malformed
+                    self.assert_nonfatal(error)
+        error = required_resource_error()
+        error.dordiai_worker_error["frames"].append({"module": "extra", "function": "extra"})
+        self.assert_nonfatal(error)
+
+    def test_missing_malformed_nested_and_cyclic_causes_fail_closed(self):
+        for malformed in (None, {}, [], "FileNotFoundError"):
+            with self.subTest(malformed=malformed):
+                error = required_resource_error()
+                error.dordiai_worker_error["cause"] = malformed
+                self.assert_nonfatal(error)
+        for extra in ({"type": "SynthesisCancelled"}, {"type": "TimeoutError"}):
+            error = required_resource_error()
+            error.dordiai_worker_error["cause"]["cause"] = extra
+            self.assert_nonfatal(error)
+        error = required_resource_error()
+        error.dordiai_worker_error["cause"]["cause"] = error.dordiai_worker_error
+        self.assert_nonfatal(error)
+
+    def test_arbitrary_host_file_and_download_errors_are_not_fatal(self):
+        errors = [FileNotFoundError("required model.onnx"), RuntimeError("ModelDownloadError"),
+                  ValueError("Required native MMS resources are not installed"),
+                  type("ModelDownloadError", (Exception,), {})("missing")]
+        for error in errors:
+            with self.subTest(type=type(error).__name__):
+                self.assert_nonfatal(error)
+
+    def test_malformed_worker_metadata_does_not_use_host_message_or_old_state(self):
+        for malformed in (None, [], "ModelDownloadError", {}, {"type": "FileNotFoundError"}):
+            with self.subTest(malformed=malformed):
+                error = RuntimeError("ModelDownloadError FileNotFoundError stressonnx.download")
+                error.dordiai_worker_error = malformed
+                self.assert_nonfatal(error)
+
+    def test_unsupported_or_transient_wrappers_are_not_walked_for_resource_causes(self):
+        for outer_type in ("UnsupportedMMSInput", "ValueError", "RuntimeError",
+                           "TimeoutError", "SynthesisCancelled", "CancelledError"):
+            error = required_resource_error()
+            error.dordiai_worker_error = {"type": outer_type, "cause": error.dordiai_worker_error}
+            self.assert_nonfatal(error)
+        error = required_resource_error()
+        node = error.dordiai_worker_error
+        for unused in range(100):
+            node = {"type": "RuntimeError", "cause": node}
+        error.dordiai_worker_error = node
+        self.assert_nonfatal(error)
+
+    def test_malformed_worker_type_is_nonfatal_without_classifier_exceptions(self):
+        for malformed in (None, [], {}, 0, True):
+            with self.subTest(malformed=malformed):
+                error = required_resource_error()
+                error.dordiai_worker_error["type"] = malformed
+                self.assert_nonfatal(error)
+        error = required_resource_error()
+        error.dordiai_worker_error = {"type": [], "cause": {"type": "ImportError"}}
+        self.assert_nonfatal(error)
+
+    def test_cancelled_host_never_activates_resource_recovery(self):
+        for name in ("SynthesisCancelled", "CancelledError"):
+            error = type(name, (Exception,), {})("cancelled")
+            error.dordiai_worker_error = required_resource_error().dordiai_worker_error
+            self.assert_nonfatal(error)
 
 
 if __name__ == "__main__":

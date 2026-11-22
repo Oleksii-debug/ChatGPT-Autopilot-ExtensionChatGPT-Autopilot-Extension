@@ -38,8 +38,17 @@ class WideCarrier:
         }
         for name,(argtypes,result) in signatures.items():
             proc=getattr(self.lib,name);proc.argtypes=argtypes;proc.restype=result
-        self.rate=self.lib.espeak_Initialize(2,35,str(self.folder.resolve()).encode("utf8"),0x8000)
-        if self.rate<=0: raise RuntimeError("Could not open the bundled eSpeak NG language data")
+        from legacy_data_path import prepare_legacy_data_path
+        self._data_location = prepare_legacy_data_path(self.folder)
+        self.rate=self.lib.espeak_Initialize(2,35,self._data_location.encoded,0x8000)
+        try:
+            self._data_location.verify()
+        except Exception:
+            self.lib.espeak_Terminate()
+            raise
+        if self.rate<=0:
+            self.lib.espeak_Terminate()
+            raise RuntimeError("Could not open the bundled eSpeak NG language data")
         self._lock=Lock()
         self._packets=[]
         self._cancelled=None

@@ -88,6 +88,8 @@ jobs:
           # Artifact origin is pinned to the completed dev7 build run above.
           # Record outer SHA and verify every payload checksum before execution.
           import json,subprocess,sys,zipfile
+          if actual != "14481b1cc0f9d01ae30845647f8ef2c31a8d5bbbfcc97bc6e10e345fb20e473b":
+              raise RuntimeError("Pinned core7 archive checksum mismatch")
           print(json.dumps({"verified_run":45002685422,"core_archive_sha256":actual,"core_archive_bytes":path.stat().st_size}),flush=True)
           subprocess.run([sys.executable,"dordiai-voices/tools/verify_release.py",str(path)],check=True)
           with zipfile.ZipFile(path) as archive:
@@ -104,7 +106,20 @@ jobs:
           audio = root / "windows-results/audio/audio-endpoint.json"
           if audio.is_file() and json.loads(audio.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               command.append("--headless-ui-probe")
-          subprocess.run(command, check=True)
+          completed = subprocess.run(command, check=False)
+          if completed.returncode == 2 and "--headless-ui-probe" in command:
+              report = json.loads(pathlib.Path("dordiai-voices/windows-results/nvda/windows-nvda-probe.json").read_text(encoding="utf-8"))
+              allowed = {"windows_audio_output_enumeration", "physical_audio_output", "warm_letter_predevice_target", "cancel_api_target"}
+              unexpected = [row for doc in (report, report.get("probe", {})) for row in doc.get("checks", [])
+                            if row.get("status") != "passed" and not (row.get("status") == "blocked" and row.get("name") in allowed)]
+              if (report.get("status") != "partial" or unexpected
+                      or report.get("recording_pcm_sink_test_double") is not True
+                      or report.get("physical_audio_verified") is not False
+                      or report.get("product_ready") is not False):
+                  raise RuntimeError("Headless probe has unaccepted failures or inconsistent acceptance flags")
+              print("Functional NVDA checks completed; physical/device and full-product acceptance remain BLOCKED.", flush=True)
+          elif completed.returncode != 0:
+              raise subprocess.CalledProcessError(completed.returncode, command)
       - name: Collect bounded diagnostic evidence
         if: always()
         run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence
@@ -268,7 +283,20 @@ jobs:
           if audio_report.is_file() and json.loads(audio_report.read_text(encoding="utf-8")).get("wave_out_devices_after") == 0:
               print("No actual audio endpoint: explicitly opting into recording PCM sink TEST DOUBLE for NVDA/GUI checks. WavePlayer and acoustic acceptance remain blocked.", flush=True)
               command.append("--headless-ui-probe")
-          subprocess.run(command, check=True)
+          completed = subprocess.run(command, check=False)
+          if completed.returncode == 2 and "--headless-ui-probe" in command:
+              report = json.loads(pathlib.Path("dordiai-voices/windows-results/nvda/windows-nvda-probe.json").read_text(encoding="utf-8"))
+              allowed = {"windows_audio_output_enumeration", "physical_audio_output", "warm_letter_predevice_target", "cancel_api_target"}
+              unexpected = [row for doc in (report, report.get("probe", {})) for row in doc.get("checks", [])
+                            if row.get("status") != "passed" and not (row.get("status") == "blocked" and row.get("name") in allowed)]
+              if (report.get("status") != "partial" or unexpected
+                      or report.get("recording_pcm_sink_test_double") is not True
+                      or report.get("physical_audio_verified") is not False
+                      or report.get("product_ready") is not False):
+                  raise RuntimeError("Headless probe has unaccepted failures or inconsistent acceptance flags")
+              print("Functional NVDA checks completed; physical/device and full-product acceptance remain BLOCKED.", flush=True)
+          elif completed.returncode != 0:
+              raise subprocess.CalledProcessError(completed.returncode, command)
       - name: Print probe failures and collect bounded Windows diagnostics
         if: always()
         run: python dordiai-voices/tools/collect_windows_evidence.py --source dordiai-voices/windows-results --output dordiai-voices/windows-evidence

@@ -43,15 +43,27 @@ class ResourceAndTrustTests(unittest.TestCase):
         self.assertEqual(len(index["weights"]), 460)
         self.assertEqual(len({row["sha256"] for row in index["models"].values()}), 29)
 
-    def test_opt_out_and_explicit_opt_in(self):
-        with patch.dict(os.environ, {family.ENVIRONMENT_OPTION: "0"}):
-            self.assertFalse(family.enabled())
-            self.assertIsNone(family.for_language("unused", "ha", lambda _: self.fail("Opt-out must not open a graph")))
-        with patch.dict(os.environ, {family.ENVIRONMENT_OPTION: "1"}):
+    def test_verified_default_explicit_opt_out_and_opt_in(self):
+        with patch.dict(os.environ):
+            os.environ.pop(family.ENVIRONMENT_OPTION, None)
+            self.assertTrue(family.DEFAULT_ENABLED)
             self.assertTrue(family.enabled())
+            for value in ("", "   ", "unrecognized"):
+                with self.subTest(default_value=value):
+                    os.environ[family.ENVIRONMENT_OPTION] = value
+                    self.assertTrue(family.enabled())
+        for value in ("0", "false", "off", "no", " OFF "):
+            with self.subTest(opt_out=value), patch.dict(os.environ, {family.ENVIRONMENT_OPTION: value}):
+                self.assertFalse(family.enabled())
+                self.assertIsNone(family.for_language("unused", "ha", lambda _: self.fail("Opt-out must not open a graph")))
+        for value in ("1", "true", "on", "yes", " ON "):
+            with self.subTest(opt_in=value), patch.dict(os.environ, {family.ENVIRONMENT_OPTION: value}):
+                self.assertTrue(family.enabled())
 
     def test_missing_and_tampered_shared_metadata_fall_back_before_open(self):
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {family.ENVIRONMENT_OPTION: "1"}):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ):
+            os.environ.pop(family.ENVIRONMENT_OPTION, None)
+            self.assertTrue(family.enabled())
             root = Path(temporary)
             folder = fixture(root / "models/MMS/ha")
             assets = root / "assets"

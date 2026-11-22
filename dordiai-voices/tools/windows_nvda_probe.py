@@ -698,14 +698,17 @@ def latency_worker():
     global ACTIVE_REQUEST
     from speech.commands import CharacterModeCommand, LangChangeCommand
     output = {"first_after_prior_smoke_ms": {}, "warm_letters_ms": [], "cancel_api_ms": [],
-              "warm_switch_requests_ms": [], "timeouts": [], "errors": []}
+              "warm_switch_requests_ms": [], "alphabet_first_pass_ms": [], "timeouts": [], "errors": []}
     deadline = time.monotonic() + 240.0
     installed = set(DRIVER._dordiai_all_languages())
     enabled = set(DRIVER._dordiai_enabled_languages)
     languages = [code for code in ("uk", "en", "ru") if code in installed and code in enabled]
     letters = {"uk": "а", "en": "a", "ru": "а"}
+    alphabets = {"uk": "абвгґдеєжзиіїйклмнопрстуфхцчшщьюя",
+                 "en": "abcdefghijklmnopqrstuvwxyz",
+                 "ru": "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"}
 
-    def request_letter(language, wait_done=True):
+    def request_letter(language, wait_done=True, glyph=None):
         global ACTIVE_REQUEST
         if LATENCY_STOP.is_set() or time.monotonic() >= deadline:
             raise TimeoutError("Latency watchdog exhausted")
@@ -716,7 +719,7 @@ def latency_worker():
         pending = {"event": threading.Event(), "started_ns": time.perf_counter_ns(), "first_feed_ns": None}
         with LOCK:
             ACTIVE_REQUEST = pending
-        DRIVER.speak([LangChangeCommand(language), CharacterModeCommand(True), letters[language], CharacterModeCommand(False)])
+        DRIVER.speak([LangChangeCommand(language), CharacterModeCommand(True), letters[language] if glyph is None else glyph, CharacterModeCommand(False)])
         if not pending["event"].wait(min(10.0, max(0.0, deadline - time.monotonic()))):
             output["timeouts"].append({"language": language, "error": getattr(DRIVER, "_dordiai_last_error", None)})
             DRIVER.cancel()
@@ -733,6 +736,13 @@ def latency_worker():
             raise RuntimeError("No installed/enabled probe language")
         for language in languages:
             output["first_after_prior_smoke_ms"][language] = request_letter(language)
+        # Separate fresh alphabet/digit lookups from the repeated warm "a"
+        # benchmark: exact-repeat caches cannot hide missing/slow other units.
+        for language in languages:
+            for glyph in alphabets[language] + "0123456789 .,;:!?+-=()[]{}@#":
+                value = request_letter(language, glyph=glyph)
+                output["alphabet_first_pass_ms"].append({"language": language, "glyph": glyph,
+                    "latency_ms": value, "primed_during_initial_warmup": glyph == letters[language]})
         primary = languages[0]
         for _ in range(100):
             value = request_letter(primary)
@@ -757,7 +767,8 @@ def latency_worker():
         DRIVER.cancel()
         with LOCK:
             ACTIVE_REQUEST = None
-    summary = {"warm_letters": percentiles(output["warm_letters_ms"]),
+    summary = {"alphabet_first_pass": percentiles([row["latency_ms"] for row in output["alphabet_first_pass_ms"] if row["latency_ms"] is not None]),
+               "warm_letters": percentiles(output["warm_letters_ms"]),
                "cancel_api": percentiles(output["cancel_api_ms"]),
                "warm_switch_requests": percentiles(output["warm_switch_requests_ms"]),
                "languages": languages, "samples": output}

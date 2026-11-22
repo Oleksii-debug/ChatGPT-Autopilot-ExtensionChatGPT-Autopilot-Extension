@@ -1,0 +1,105 @@
+{
+  "provenance": {
+    "kind": "actual-packaged-Windows-worker-safe-error",
+    "workflow_run": 45001728036,
+    "job": 137144528264,
+    "artifact_path": "engine/worker-stderr.log",
+    "logged_at_utc": "2026-11-22T08:13:00.1104131Z",
+    "note": "nvda_worker.py prints safe_error(error) and serializes fresh safe_error(error) into response diagnostics; IPC additionally attaches workerBootstrap. No requested text, paths or messages retained."
+  },
+  "diagnostics": {
+    "type": "ModelDownloadError",
+    "frames": [
+      {
+        "module": "voice_controls",
+        "function": "apply_stream_controls",
+        "line": 37
+      },
+      {
+        "module": "voice_delivery",
+        "function": "clean_onset",
+        "line": 140
+      },
+      {
+        "module": "voice_delivery",
+        "function": "equalize_voice",
+        "line": 130
+      },
+      {
+        "module": "native_multilingual",
+        "function": "preferred_speech",
+        "line": 311
+      },
+      {
+        "module": "native_multilingual",
+        "function": "phrase",
+        "line": 251
+      },
+      {
+        "module": "native_multilingual",
+        "function": "stream",
+        "line": 304
+      },
+      {
+        "module": "voice_delivery",
+        "function": "compact_padding",
+        "line": 95
+      },
+      {
+        "module": "speech_tempo",
+        "function": "stream_tempo",
+        "line": 63
+      },
+      {
+        "module": "voice_delivery",
+        "function": "condition_shared",
+        "line": 81
+      },
+      {
+        "module": "native_multilingual",
+        "function": "checked",
+        "line": 295
+      },
+      {
+        "module": "native_multilingual",
+        "function": "russian_chunks",
+        "line": 282
+      },
+      {
+        "module": "native_multilingual",
+        "function": "russian_text",
+        "line": 177
+      },
+      {
+        "module": "stressonnx.backends.ruaccent",
+        "function": "__call__",
+        "line": 451
+      },
+      {
+        "module": "stressonnx.backends.ruaccent",
+        "function": "_ensure_loaded",
+        "line": 202
+      },
+      {
+        "module": "stressonnx.backends.ruaccent",
+        "function": "_load",
+        "line": 211
+      },
+      {
+        "module": "stressonnx.download",
+        "function": "_download_files",
+        "line": 61
+      }
+    ],
+    "cause": {
+      "type": "FileNotFoundError",
+      "frames": [
+        {
+          "module": "stressonnx.download",
+          "function": "_download_files",
+          "line": 59
+        }
+      ]
+    }
+  }
+}

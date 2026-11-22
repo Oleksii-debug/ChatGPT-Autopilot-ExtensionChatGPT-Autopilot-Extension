@@ -183,9 +183,12 @@ def _worker_import_failure(details, depth=0):
     """Classify typed worker diagnostics, never exception-message substrings."""
     if not isinstance(details, dict) or depth > 3:
         return False
-    if details.get("type") in {"SynthesisCancelled", "CancelledError"}:
+    kind = details.get("type")
+    if not isinstance(kind, str):
         return False
-    if details.get("type") in {"ImportError", "ModuleNotFoundError"}:
+    if kind in {"SynthesisCancelled", "CancelledError"}:
+        return False
+    if kind in {"ImportError", "ModuleNotFoundError"}:
         return True
     return _worker_import_failure(details.get("cause"), depth + 1)
 
@@ -197,6 +200,46 @@ def is_fatal_import_failure(error):
     if type(error).__name__ in {"SynthesisCancelled", "CancelledError"}:
         return False
     return isinstance(error, ImportError) or _worker_import_failure(getattr(error, "dordiai_worker_error", None))
+
+
+def _diagnostic_has_frame(details, module, function):
+    """Match bounded safe IPC provenance; never inspect messages or paths."""
+    frames = details.get("frames") if isinstance(details, dict) else None
+    if not isinstance(frames, list) or not frames or len(frames) > 16:
+        return False
+    if any(not isinstance(frame, dict) for frame in frames):
+        return False
+    return any(frame.get("module") == module and frame.get("function") == function
+               for frame in frames)
+
+
+def _required_resource_failure_details(details):
+    """Recognize only the attested bundled offline RuAccent loader failure."""
+    if not isinstance(details, dict) or details.get("type") != "ModelDownloadError":
+        return False
+    cause = details.get("cause")
+    if (not isinstance(cause, dict) or cause.get("type") != "FileNotFoundError"
+            or cause.get("cause") is not None):
+        return False
+    # Class names alone are insufficient: unrelated downloads, user files and
+    # unsupported-input wrappers must not replace the user's synthesizer.
+    return (
+        _diagnostic_has_frame(details, "native_multilingual", "russian_text")
+        and _diagnostic_has_frame(details, "stressonnx.backends.ruaccent", "_load")
+        and _diagnostic_has_frame(details, "stressonnx.download", "_download_files")
+        and _diagnostic_has_frame(cause, "stressonnx.download", "_download_files")
+    )
+
+
+def is_fatal_required_resource_failure(error):
+    """Only fresh worker metadata can attest this permanent route failure."""
+    if type(error).__name__ in {"SynthesisCancelled", "CancelledError"}:
+        return False
+    return _required_resource_failure_details(getattr(error, "dordiai_worker_error", None))
+
+
+def is_fatal_speech_failure(error):
+    return is_fatal_import_failure(error) or is_fatal_required_resource_failure(error)
 
 
 def _import_component(details, depth=0):
@@ -243,7 +286,10 @@ def recover_bootstrap_speech(driver, details):
     import synthDriverHandler as handler
     recovery = details["recovery"] = {"state": "queued", "physical_audio_verified": False}
     driver._dordiai_last_error_details = details
-    base = "Не вдалося завантажити компоненти dordiai-voices."
+    required_resource = _required_resource_failure_details(details.get("worker"))
+    recovery["reason"] = "required-resource-unavailable" if required_resource else "import-bootstrap-failure"
+    base = ("Не вдалося завантажити потрібні ресурси dordiai-voices." if required_resource
+            else "Не вдалося завантажити компоненти dordiai-voices.")
     component = _import_component(details)
     if component:
         base += " Компонент: " + component + "."
@@ -507,8 +553,8 @@ class PreferencesMixin:
         self._dordiai_last_error = str(error)
         details = _safe_error_details(error)
         self._dordiai_last_error_details = details
-        if is_fatal_import_failure(error):
-            # A fatal import must bypass the ordinary five-second notice limit.
+        if is_fatal_speech_failure(error):
+            # A fatal loader failure must bypass the ordinary five-second notice limit.
             # One queued recovery per driver prevents a failed notice looping
             # through the same broken synth. Runtime/model work never switches
             # synthesizers directly from the producer thread.

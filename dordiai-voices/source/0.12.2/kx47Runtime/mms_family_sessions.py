@@ -18,7 +18,7 @@ import sys
 from threading import RLock
 import weakref
 
-DEFAULT_ENABLED = False  # Enabled only after managed Windows replacement proof.
+DEFAULT_ENABLED = True  # Exact-weight parity and managed Windows replacement verified.
 ENVIRONMENT_OPTION = "DORDIAI_MMS_SHARED_GRAPH"
 ASSETS = Path(__file__).with_name("models") / "MMSShared"
 INDEX_SIZE = 144600

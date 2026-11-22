@@ -191,11 +191,17 @@
     "linux_ci_cases": 531,
     "linux_ci_skipped": 26,
     "windows_ci_cases": 531,
-    "windows_ci_skipped": 27
+    "windows_ci_skipped": 27,
+    "dev8_changes": {
+      "legacy_c_data_path": "Independently reviewed exact native-data layout, measured path bounds and same-object aliases; Windows pending",
+      "required_resource_recovery": "Narrow exact RuAccent worker provenance; 17 new cases; actual missing-model end-to-end pending",
+      "mms_shared_default_enabled": true,
+      "distinct_glyph_probe": "176 alphabet/digit/common-symbol requests added before warm-repeat benchmark; Windows pending"
+    }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Validate reviewed legacy eSpeak nested data-parent path fix, default-on guarded MMS and narrow required-resource recovery under dev8 CI. Expand actual NVDA glyph sampling beyond repeated warmed 'a'. Local executor unavailable; continue via GitHub.",
+  "next_work": "Run full dev8 Windows validation, including actual legacy eSpeak nb/cmn, default-on shared MMS, distinct glyphs and genuine builtin recovery; investigate any real failures without relaxing physical/pronunciation gates.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,
