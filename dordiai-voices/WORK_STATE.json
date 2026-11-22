@@ -3,7 +3,7 @@
   "authorization": "User said старт on 2026-11-22",
   "status": "implementation_in_progress",
   "base_version": "0.12.2",
-  "target_version": "0.13.1-dev.5",
+  "target_version": "0.13.1-dev.6",
   "selected_catalogue_entries": 135,
   "allowed_voice_profiles": 45,
   "acceptance": "FINAL_PRODUCT_SPEC_UK.md",
@@ -30,10 +30,11 @@
   "environment": {
     "os": "Linux",
     "windows_nvda_available": false,
-    "windows_verification_route": "Active GitHub Actions Windows runner; zero audio endpoints require explicit isolated recording-sink NVDA UI probe"
+    "windows_verification_route": "GitHub Actions remains available independently; current run45000863624",
+    "local_executor_status": "unavailable; exec-server transport disconnected during task, no local file access"
   },
   "verification": {
-    "local_unit_tests": 485,
+    "local_unit_tests": 518,
     "local_unit_tests_passed": true,
     "resource_catalog_entries_present": 83,
     "missing_selected_resource_entries": 52,
@@ -43,8 +44,8 @@
     "first_remote_ci": "Initial missing NumPy and test fixture UTF-8 issues fixed; both host test suites now pass",
     "linux_remote_unit_tests_passed": true,
     "windows_remote_unit_tests_passed": true,
-    "current_windows_run": 44997655739,
-    "current_windows_stage": "Dev5 main suites pass on host and Windows; standalone core/extended/MMS PCM passes; actual NVDA UI passes but phrase PCM fails marisa_trie ImportError.",
+    "current_windows_run": 45000863624,
+    "current_windows_stage": "Host unit suites passed after fixture-only floating clock tolerance fix. Actual core engine/character/shared-MMS probes failed; actual NVDA probe still running. Exact failures pending complete logs.",
     "dev2_staged_resource_entries": 125,
     "dev2_staged_full_entries": 124,
     "dev2_staged_partial_entries": 1,
@@ -62,13 +63,13 @@
     "windows_new_mms_representative_passed": true,
     "nvda_settings_smoke_passed": true,
     "nvda_keyboard_tab_space_smoke_passed": true,
-    "final_source_snapshot": "evidence/source_snapshot_0.13.1-dev.5.json.gz",
+    "final_source_snapshot": "evidence/source_snapshot_0.13.1-dev.6.json.gz",
     "worker_import_diagnostics": "Structured child traceback confirms marisa_trie ImportError after bootstrap status reset; inherited and post-reset DLL directories absent. SetDllDirectory reset has not resolved the actual NVDA failure.",
-    "final_source_tree_sha256": "4354acb50d5d56cc166f849b4bbd8a9574d830d906a8895f82018d866dc7a038",
-    "core_archive_bytes": 1767225930,
-    "core_installed_bytes": 2129363570,
-    "core_archive_sha256": "7ffbb27a17a57cc5de377df095436985a7920fd4c22a73332e875823d200fb5d",
-    "core_built_version": "0.13.1-dev.5",
+    "final_source_tree_sha256": "8e8fe6056698395a885030bcf7df4f957e8c62283af9c8558d54dce081210d8f",
+    "core_archive_bytes": 1767406268,
+    "core_installed_bytes": 2130470392,
+    "core_archive_sha256": "ee60a000b3ea4387c2baf2afbbb252fd886b603d4e532220e62f29bf9dc465c8",
+    "core_built_version": "0.13.1-dev.6",
     "drive_independent_core_resume_verified": true,
     "drive_independent_core_resume_evidence": "evidence/recovered_core4_to_dev5_rebuild.json",
     "verified_main_suite_tests_per_platform": 485,
@@ -118,11 +119,28 @@
       "cause": "Windows native loader rejects 264-character marisa_trie PYD path; identical SHA-256 module imports at84characters in both fixed import-only children spawned by actual NVDA.",
       "extended_namespace_fix": "under actual Windows validation; no speech acceptance yet",
       "diagnostic_limitation": "TemporaryDirectory removal of loaded short-copy PYD raised recorded WinError5, so dictionary postcheck was not reached in this diagnostic; production install was not changed."
+    },
+    "local_optional_model_tests_skipped": 14,
+    "core_installed_language_entries": 3,
+    "windows_mapped_file_replacement_verified": true,
+    "mms_shared_default_enabled": false,
+    "current_dev6_core_engine_passed": false,
+    "current_dev6_shared_mms_passed": false,
+    "current_dev6_nvda_passed": false,
+    "all29_parity_reported_checkpoint": {
+      "source": "Completed subagent actual-model run before executor outage; full generated report remains in unavailable scratch, not yet committed",
+      "native_float_and_pcm_bit_identical": 29,
+      "converted_float_and_pcm_bit_identical": 29,
+      "probe_kind": "existing native-grapheme smoke sequences; not pronunciation acceptance",
+      "runtime_module_sha256": "89dfdc921c7420fb5e0b7e14f69fc56c0a4d9973f10c48d3395578960baecc3b"
+    },
+    "drive_independent_dev6_rebuild": {
+      "status": "rebuilt archive produced matching inventory and byte size, final outer SHA comparison not executed before outage; do not claim exact SHA proof"
     }
   },
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
-  "next_work": "Resolve proven NVDA child import failure and verify actual phrase/typing/cancellation; keep ongoing MMS graph-sharing integration separate from immutable dev5 acceptance.",
+  "next_work": "Obtain completed run45000863624 logs and diagnose actual dev6 regressions via GitHub route. Preserve immutable builds/source snapshots. Do not ask user for technical setup or claim full product ready.",
   "new_model_status": {
     "mms_models_downloaded_and_native_run": 29,
     "omni_fixed_reference_sets": 10,

@@ -1,6 +1,6 @@
 {
   "product": "dordiai-voices",
-  "target_version": "0.13.1-dev.5",
+  "target_version": "0.13.1-dev.6",
   "product_ready": false,
   "authoritative_requirements": "FINAL_PRODUCT_SPEC_UK.md",
   "authorized_automatic_decisions": true,
@@ -190,5 +190,16 @@
     "evidence": "evidence/windows_dev5_loader_44999586051.json.gz",
     "proven_cause": "Native module absolute path264characters fails with filename-too-long; identicalbytes at84characters import successfully.",
     "production_fix_accepted": false
-  }
+  },
+  "current_frozen_core": {
+    "version": "0.13.1-dev.6",
+    "archive_bytes": 1767406268,
+    "archive_sha256": "ee60a000b3ea4387c2baf2afbbb252fd886b603d4e532220e62f29bf9dc465c8",
+    "source_tree_sha256": "8e8fe6056698395a885030bcf7df4f957e8c62283af9c8558d54dce081210d8f",
+    "windows_run_in_progress": 45000863624,
+    "production_speech_verified": false,
+    "shared_mms_default_enabled": false,
+    "actual_windows_mapped_file_replacement_passed": true
+  },
+  "current_environment_blocker": "Local exec-server unavailable; frozen source6 and binary source snapshot6 already committed. GitHub Windows verification continues."
 }
