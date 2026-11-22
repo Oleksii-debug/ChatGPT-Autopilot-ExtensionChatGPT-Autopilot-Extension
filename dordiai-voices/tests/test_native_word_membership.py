@@ -153,7 +153,7 @@ class NativeMembershipTests(unittest.TestCase):
 
     def test_duplicate_codes_and_boolean_counts_are_rejected(self):
         for changes in ({"codes":["uk","uk"]},{"word_count":True}):
-            path,digest=self.malformed(runtime.WORD_ITEM.pack(0,1,1)+b"a",metadata_changes=changes)
+            path,digest=self.malformed(self.record(0,1,1)+b"a",metadata_changes=changes)
             with self.assertRaises(runtime.LexiconError):
                 runtime.MembershipLexicon(path,digest)
             path.unlink()
