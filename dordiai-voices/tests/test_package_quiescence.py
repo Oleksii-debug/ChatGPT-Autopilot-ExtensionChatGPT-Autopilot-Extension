@@ -170,7 +170,10 @@ class PackageQuiescenceTests(unittest.TestCase):
         process.stdin.close.assert_not_called()
         process.stdout.close.assert_not_called()
         process.wait.assert_called_once()
-        self.assertLessEqual(process.wait.call_args.kwargs['timeout'], .05)
+        # Deadline subtraction can round a fraction of a microsecond upward
+        # with Windows' monotonic clock. Keep a strict bounded wait without
+        # treating floating-point representation as a lifecycle failure.
+        self.assertLessEqual(process.wait.call_args.kwargs['timeout'], .050001)
         worker._process = None  # This fixture owns no real process.
 
     def test_aborted_reservation_restores_only_original_active_pool_entry(self):
