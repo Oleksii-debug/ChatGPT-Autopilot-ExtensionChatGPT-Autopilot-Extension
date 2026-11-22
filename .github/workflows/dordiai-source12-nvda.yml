@@ -7,7 +7,7 @@ permissions:
   contents: read
   actions: read
 jobs:
-  actual-nvda11:
+  actual-nvda12:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[source12-nvda]')
     runs-on: windows-latest
     timeout-minutes: 40

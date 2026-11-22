@@ -1,5 +1,7 @@
 """Pure observer/accounting checks, never a substitute for real NVDA execution."""
 import ast
+from hashlib import sha256
+import json
 import importlib.util
 from pathlib import Path
 import re
@@ -341,6 +343,13 @@ class ExplicitMarkerAndIsolatedReportingTests(unittest.TestCase):
             "auto_unmarked_100","forced_uk_unmarked_12","disabled_ru_unmarked_12",
             "native_rich_metadata_6","forced_uk_native_metadata_6","disabled_ru_native_metadata_6"])
         self.assertEqual(len(cases[0]["words"]),100)
+        # Exact first-six-case receipt from the previously executed source11
+        # probe blob1c247, not merely equal counts or hand-picked word samples.
+        raw=json.dumps(cases[:6],ensure_ascii=False,sort_keys=True,separators=(",",":")).encode("utf-8")
+        self.assertEqual(sha256(raw).hexdigest(),
+            "3872e688f14f98021e043c09ab3f996d4f3586baf66650bc9fda976767fe8d9b")
+        self.assertEqual(sha256(cases[0]["text"].encode("utf-8")).hexdigest(),
+            "c7cfa1ba024ee6f59bfa0152a4016318c9f8542fbec79f6b7accb07645acbe16")
         self.assertEqual(cases[6]["name"],"auto_native_known_compound_1")
         self.assertEqual(cases[6]["text"],"пресс-центр")
         self.assertEqual(cases[6]["words"][0]["expected_language"],"ru")

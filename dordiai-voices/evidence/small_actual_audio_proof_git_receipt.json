@@ -1,0 +1,1760 @@
+{
+  "format": "dordiai-small-actual-audio-proof-git-archive-receipt",
+  "format_version": 1,
+  "scope": "Exact original GitHub Actions artifact ZIP bytes imported as unattached binary Git blobs for parent-owned commit; artifact retention is no longer the sole copy once parent links these exact blobs",
+  "archives": [
+    {
+      "code": "ay",
+      "artifact_id": 14760668030,
+      "run_id": 45038768977,
+      "bytes": 611576,
+      "sha256": "fbf6c0b4909ed76adf19cc31df7fa2cd4750416c534cec80edf8573210768e7e",
+      "zip_members": 66,
+      "wavs": 64,
+      "expanded_bytes": 1156262,
+      "safe_member_types": [
+        "own mono PCM16 WAV",
+        "bounded JSON evidence",
+        "generated NPY carrier identity"
+      ],
+      "members": [
+        {
+          "path": "network-policy.json",
+          "bytes": 196,
+          "sha256": "80c05fb723f060d286de7004ba58da5dd0462222891aedaa515017e4c1343cb0"
+        },
+        {
+          "path": "pcm/00-native.wav",
+          "bytes": 7212,
+          "sha256": "ed7edcb1f644598e455530aa8a8d7c7b35cc2907c61d0582f7031775f5adab3e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 3584
+        },
+        {
+          "path": "pcm/00-viktoriia.wav",
+          "bytes": 9772,
+          "sha256": "28b001af92909070a9066459c1c9b754caa3f8dbcb125ad026330fdd22492e73",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 4864
+        },
+        {
+          "path": "pcm/01-native.wav",
+          "bytes": 13868,
+          "sha256": "a3f42ec41e56048ebf5fa4d4d82959f3c68995126b95f5398f3239845ca008ea",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6912
+        },
+        {
+          "path": "pcm/01-viktoriia.wav",
+          "bytes": 18988,
+          "sha256": "a69851c1d0c8300fb1f2686c647fcd2f20b84311f445ea96e7ec56855e9cdb2a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9472
+        },
+        {
+          "path": "pcm/02-native.wav",
+          "bytes": 16940,
+          "sha256": "b3ac78116c196716d83ea5ec798aca1b7fe6c9d05ee2d602ee9c802015a76084",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8448
+        },
+        {
+          "path": "pcm/02-viktoriia.wav",
+          "bytes": 23084,
+          "sha256": "45c10de663e0efe16bf4387dd496479057ab5eb552b9eae66b8bd0640cf63bb1",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/03-native.wav",
+          "bytes": 16428,
+          "sha256": "c18b4c29b2caffc47eec45edffd9f8e26d4213495b57a6cc1d2a7eb063624211",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8192
+        },
+        {
+          "path": "pcm/03-viktoriia.wav",
+          "bytes": 22572,
+          "sha256": "5fd6c1f12cf1ee9c3b3a0147fafff5cef411cfbd66a558cb2feae2c9718241cc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/04-native.wav",
+          "bytes": 18988,
+          "sha256": "2a1192dadc2ef8928bb61ec29724f202c56478be7a079f8ec905f47b1dfb392e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9472
+        },
+        {
+          "path": "pcm/04-viktoriia.wav",
+          "bytes": 25644,
+          "sha256": "cc189fec6b50f73c390277f5fc17da1707ecac66a67eccc2a1b8f943d771150c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/05-native.wav",
+          "bytes": 5164,
+          "sha256": "fb2524d4e897e086839e4294ee65c5f90d62987c130f6aad000bb1ee585d425e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 2560
+        },
+        {
+          "path": "pcm/05-viktoriia.wav",
+          "bytes": 6700,
+          "sha256": "c6b346217ceac4e9d05c3006586ef3d21d210ecd030c32fa256d6d5f93d2db00",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3328
+        },
+        {
+          "path": "pcm/06-native.wav",
+          "bytes": 15916,
+          "sha256": "5009d715ac00b20fb42aa6d857dc72881cb2419bd7734c79f6f56a18f67ae1fe",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7936
+        },
+        {
+          "path": "pcm/06-viktoriia.wav",
+          "bytes": 21548,
+          "sha256": "7286ac8601b356c29023320f14937c5b55f5297ec123c7b48f1240cca30d60c5",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/07-native.wav",
+          "bytes": 14892,
+          "sha256": "91b53151e8beb8d57b22b16f3815a1ebe408af9a1d22c8da36aca8f24c1c7a7f",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7424
+        },
+        {
+          "path": "pcm/07-viktoriia.wav",
+          "bytes": 20012,
+          "sha256": "832fe977b14eb7df8d0aeaca461743346fe2755cfa4425e4ddb76698b88e2301",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9984
+        },
+        {
+          "path": "pcm/08-native.wav",
+          "bytes": 18476,
+          "sha256": "7ba575923c6b364e912a4694c24e34e6b9723e52bbb7e4f3bdf68b0dd145dc9c",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9216
+        },
+        {
+          "path": "pcm/08-viktoriia.wav",
+          "bytes": 25132,
+          "sha256": "3f6abeafbb547ca8f7323428b68e968e9812eb71298a010f06e47152eee8cfbc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 12544
+        },
+        {
+          "path": "pcm/09-native.wav",
+          "bytes": 13356,
+          "sha256": "d2e87bcbe4317c0e8838eaf8a1687cb8954ad4f130066784575a755712ec434e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6656
+        },
+        {
+          "path": "pcm/09-viktoriia.wav",
+          "bytes": 17964,
+          "sha256": "b030ecfbe9dd021467317a9802dd348b2700033522168fac89270228dbe6d03c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8960
+        },
+        {
+          "path": "pcm/10-native.wav",
+          "bytes": 16940,
+          "sha256": "6ba0e12ac0aad807ede67e5ece58298bf1ca73cc56fc5c2acaa69142fee55352",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8448
+        },
+        {
+          "path": "pcm/10-viktoriia.wav",
+          "bytes": 23084,
+          "sha256": "0986bd3c31a2f6a8cd65cbbd288b1a11ca425a91c3f8af0da1370b3c5ece2fac",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/11-native.wav",
+          "bytes": 12844,
+          "sha256": "716c916e2b9fa6c21824e3126e29f079d267af93435c1465d5473f6761637785",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6400
+        },
+        {
+          "path": "pcm/11-viktoriia.wav",
+          "bytes": 17452,
+          "sha256": "6d3412e37443a90260eb7bf81e1a44630b8f89120bad5cd47386e9fbd10b5a41",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8704
+        },
+        {
+          "path": "pcm/12-native.wav",
+          "bytes": 23084,
+          "sha256": "3895d6e76153d952ffda6b84024f61b3d3a9f5866153770d944141028b4fa4be",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/12-viktoriia.wav",
+          "bytes": 31788,
+          "sha256": "8a1a12e06699d30e5d1ac4c0ac4c5f12f5848afd76abc36d8b598f104793e0e7",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 15872
+        },
+        {
+          "path": "pcm/13-native.wav",
+          "bytes": 16940,
+          "sha256": "4e00a98f904cea2239621de21c72f105ebcbcd0ef38f441c3c07c7ba1845e4cd",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8448
+        },
+        {
+          "path": "pcm/13-viktoriia.wav",
+          "bytes": 23084,
+          "sha256": "1a143100fd6bbef595bb2450c33c36c21a16ad87e9368ade4c5e94cdb133592b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/14-native.wav",
+          "bytes": 16940,
+          "sha256": "c9f8f8f3936e982a1671429779d85c2eacbfc336d5f5b7c33cac125e53fc3647",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8448
+        },
+        {
+          "path": "pcm/14-viktoriia.wav",
+          "bytes": 23084,
+          "sha256": "aba83ec2f18ef07bbc449d5034d8aeb9b3e9199a0755bfedc1855d5c3f27da91",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/15-native.wav",
+          "bytes": 18476,
+          "sha256": "4cf69960b862093115bef4f06c20c235d7abcbff063e9db7992e4bff045baac2",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9216
+        },
+        {
+          "path": "pcm/15-viktoriia.wav",
+          "bytes": 25132,
+          "sha256": "d6dce0d8dd5cc002f571711f14dbd75d89173bca70b150604c6ce15b59cea506",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 12544
+        },
+        {
+          "path": "pcm/16-native.wav",
+          "bytes": 14380,
+          "sha256": "fa4e242112570de9b3dc1533feb9f1454953beae694816e8d5a995c05a7d4e1b",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7168
+        },
+        {
+          "path": "pcm/16-viktoriia.wav",
+          "bytes": 19500,
+          "sha256": "086f0877d5206a53dbbb69df048ae5f587916a9bed5670e1db39448d5de9d9c6",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9728
+        },
+        {
+          "path": "pcm/17-native.wav",
+          "bytes": 15916,
+          "sha256": "cee40581db8c8bd6fde3fad98374912899a953071f11cf5f55b11cedaed1d40e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7936
+        },
+        {
+          "path": "pcm/17-viktoriia.wav",
+          "bytes": 21548,
+          "sha256": "28a0c0032aa6ee1ca4cebbe56d2ef34fb5f56093f8042447cfac1d08e23dab40",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/18-native.wav",
+          "bytes": 18988,
+          "sha256": "1a98f224a74d430aa91ce92023b2e1307f90d55d639b49f72bd37ca8b10d6b42",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9472
+        },
+        {
+          "path": "pcm/18-viktoriia.wav",
+          "bytes": 25644,
+          "sha256": "03570cb4764caeb6511fcf93bc4edc4bca09325b3c0a0e562a0d7327468a71cc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/19-native.wav",
+          "bytes": 11820,
+          "sha256": "a4f7f724a097fe17de53a89efa90f74852f430f0916ae7a68f06b9c4b5f6ae06",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 5888
+        },
+        {
+          "path": "pcm/19-viktoriia.wav",
+          "bytes": 15916,
+          "sha256": "23349cb5963caf8d0f5dcf5e2871d77865389187946b749e89cfd2aef95c9a72",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7936
+        },
+        {
+          "path": "pcm/20-native.wav",
+          "bytes": 16428,
+          "sha256": "6285ecf98ecf4879ff98a2612257c78289a475afef0abee3daefced3edeebf91",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8192
+        },
+        {
+          "path": "pcm/20-viktoriia.wav",
+          "bytes": 22572,
+          "sha256": "be63648afb14b806cb21ac2f8db28bda817691f8b5a73e9b520e5a3f529b88b8",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/21-native.wav",
+          "bytes": 10796,
+          "sha256": "96631acc9a725410c1c3da9c487904e761b6da0f72b390e299bc6767ebabfa44",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 5376
+        },
+        {
+          "path": "pcm/21-viktoriia.wav",
+          "bytes": 14380,
+          "sha256": "2183609f9bc9cedfdd59e26e96a3295580c2dd05321a02cdc293bf36514fe390",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7168
+        },
+        {
+          "path": "pcm/22-native.wav",
+          "bytes": 16428,
+          "sha256": "fb618cb91f99a1bd636df002a776db1744f13c57dce1222c761f99cb48c0d5d8",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8192
+        },
+        {
+          "path": "pcm/22-viktoriia.wav",
+          "bytes": 22572,
+          "sha256": "cbf5f486d6cb1ca9eccda31f799e8fb2a6cfcbab94fbabd3bfc45bdf235433cc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/23-native.wav",
+          "bytes": 13356,
+          "sha256": "b4b459d25dde3795ddce1637c4cf5d35c25e2f8571402fb32870fdeae5e3a49f",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6656
+        },
+        {
+          "path": "pcm/23-viktoriia.wav",
+          "bytes": 17964,
+          "sha256": "7d64972f8dd546058d4b60c8870cad3b6b23780aeaca2efbc630735711068f82",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8960
+        },
+        {
+          "path": "pcm/24-native.wav",
+          "bytes": 13356,
+          "sha256": "52655ccf3aaebc3bafc4b174842eb5d5506ba303019eb6f8dba0b9b2dc0ce646",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6656
+        },
+        {
+          "path": "pcm/24-viktoriia.wav",
+          "bytes": 17964,
+          "sha256": "b3cc4dd7dc1b53b27c91833f2ef5fc0d8728ce2c81ce6cfaebadbc1519467949",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8960
+        },
+        {
+          "path": "pcm/25-native.wav",
+          "bytes": 16940,
+          "sha256": "7a5bbedf2f52058bd4c806f23d54f0c24a8697b6d80d500ac5dc8150caf6c257",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8448
+        },
+        {
+          "path": "pcm/25-viktoriia.wav",
+          "bytes": 23084,
+          "sha256": "0254416b4721224c750c5409f5fcdfb5070bec2671e6f6903625ddf05c8bc23b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/26-native.wav",
+          "bytes": 7724,
+          "sha256": "e1b7c1c55ed51e50783166ded21cff0f84f0cdb2a05c2cdd717b85f2a49f88a9",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 3840
+        },
+        {
+          "path": "pcm/26-viktoriia.wav",
+          "bytes": 10284,
+          "sha256": "7211932a92b6dc1a0ea9b25411b972236bcd381cefbe0e0d28094ded52669692",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5120
+        },
+        {
+          "path": "pcm/27-native.wav",
+          "bytes": 14380,
+          "sha256": "59d92aa30badf3ce45a141f6b779e6e2453870e110207dc41d015f21c347f8d9",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7168
+        },
+        {
+          "path": "pcm/27-viktoriia.wav",
+          "bytes": 19500,
+          "sha256": "bb4960a3c85795b8827d4bca0cc2cb38fc27e89a799e44a415b2d0d9e42a2aa3",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9728
+        },
+        {
+          "path": "pcm/28-native.wav",
+          "bytes": 13868,
+          "sha256": "44c11bcac3e6d4dc1cc86b5ae7393509f31277a5a4529c7c1fe2a4a11ea0b746",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 6912
+        },
+        {
+          "path": "pcm/28-viktoriia.wav",
+          "bytes": 18988,
+          "sha256": "abb4c4ae5ed3ed50eded28076565151971143044a7395a4505ec79175e89ecb1",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9472
+        },
+        {
+          "path": "pcm/29-native.wav",
+          "bytes": 14892,
+          "sha256": "a4d4e90479888d009202856f71e617e767466942ef8eb50bd8ed5b18f3ff7de2",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7424
+        },
+        {
+          "path": "pcm/29-viktoriia.wav",
+          "bytes": 20012,
+          "sha256": "0e2d64aaea179ce50f0dec75adf75ae4bea28d4fc7ef21116b1f4140738ffa11",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9984
+        },
+        {
+          "path": "pcm/30-native.wav",
+          "bytes": 15404,
+          "sha256": "e6623fe371387de376a059811e06246785d54ee04c59a06bc52e0138df3a6507",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7680
+        },
+        {
+          "path": "pcm/30-viktoriia.wav",
+          "bytes": 21036,
+          "sha256": "e11c6987ad0de7d03dd99fa2a0d9e58a1ebc7cbf7a1749b1555d4213e77b3748",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/31-native.wav",
+          "bytes": 16428,
+          "sha256": "7b30a947e39d6a23d0286bb93a1532862d427e92ae471c2b4e6150bc041a9088",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 8192
+        },
+        {
+          "path": "pcm/31-viktoriia.wav",
+          "bytes": 22572,
+          "sha256": "9860faac3acc14beca9041d865a152452456c49d5f5fd5c71d0bcd445c8cc0a9",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/report.json",
+          "bytes": 29922,
+          "sha256": "3eac360bcf22b9bd64a92d3c41547af3cf3db3147528790279242183ac94eb50"
+        }
+      ],
+      "git_blob_sha": "78caa55b32902e786c206e6cfb6e242ef846ea4a",
+      "repository_path": "dordiai-voices/evidence/audio/ay32-ordinary-names-45038768977.zip",
+      "scope": "Actual isolated source-backed ordinary-name native MMS and original-Viktoriia PCM, not native-listener/NVDA/typing acceptance",
+      "signed_download_urls_persisted": false,
+      "raw_primary_documents_included": false
+    },
+    {
+      "code": "fil",
+      "artifact_id": 14760269758,
+      "run_id": 45038769182,
+      "bytes": 892940,
+      "sha256": "92d1a399b39cca314b573713e5362dd8a71ffddc241d60152bfac8ecb2fff902",
+      "zip_members": 58,
+      "wavs": 56,
+      "expanded_bytes": 1478331,
+      "safe_member_types": [
+        "own mono PCM16 WAV",
+        "bounded JSON evidence",
+        "generated NPY carrier identity"
+      ],
+      "members": [
+        {
+          "path": "network-policy.json",
+          "bytes": 196,
+          "sha256": "80c05fb723f060d286de7004ba58da5dd0462222891aedaa515017e4c1343cb0"
+        },
+        {
+          "path": "pcm/00-native.wav",
+          "bytes": 20524,
+          "sha256": "c0e8c6d1bf6e51ce5e475263851d26c0291d994a79b01739299cdaf6c3dba46f",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10240
+        },
+        {
+          "path": "pcm/00-viktoriia.wav",
+          "bytes": 28204,
+          "sha256": "f8dafab2112056424e7883b9ccbaa0e1d50995e317064258fb863a3c0cb93003",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14080
+        },
+        {
+          "path": "pcm/01-native.wav",
+          "bytes": 20012,
+          "sha256": "9223ebd95c3152034322732c733e273a063059cde66e6d687480aa80ed0b1ff1",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9984
+        },
+        {
+          "path": "pcm/01-viktoriia.wav",
+          "bytes": 27180,
+          "sha256": "7cb3905a0e97e0d0ed62dc9e9bcede3118fbcbe9be69ed86dbf9a348bc3dac42",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 13568
+        },
+        {
+          "path": "pcm/02-native.wav",
+          "bytes": 23084,
+          "sha256": "36b72984aa2b1fd3d56cb7609702c0ae26d921ae4410dc1d2185073e473ff7bf",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/02-viktoriia.wav",
+          "bytes": 31788,
+          "sha256": "8c62dd96c9cf3bc5e4df86250a986a526d00cf1905a967f5ae90cb33cfd9fae3",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 15872
+        },
+        {
+          "path": "pcm/03-native.wav",
+          "bytes": 20524,
+          "sha256": "06a6610e4346f6be58316c67cbdac1e9ed43d91340eded866c40a39bce891b1a",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10240
+        },
+        {
+          "path": "pcm/03-viktoriia.wav",
+          "bytes": 28204,
+          "sha256": "271e6b4146aad49f81959b213abd85e984baac4bdbfc9aba25c6f4283487e859",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14080
+        },
+        {
+          "path": "pcm/04-native.wav",
+          "bytes": 15404,
+          "sha256": "aa657b94d98d00192a10c0e43cf3e399a23b41a014712c1cab3f2cffc8ad8d6c",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7680
+        },
+        {
+          "path": "pcm/04-viktoriia.wav",
+          "bytes": 21036,
+          "sha256": "766f2e3919b40aaaa2ce62680c7a427ed6ca65d81ab63d061cb76e65c397d72d",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/05-native.wav",
+          "bytes": 22572,
+          "sha256": "d77a4a4da9e2d52656c6750b98d6808d949b619da5130b1ba39e46cd1bf5eba8",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/05-viktoriia.wav",
+          "bytes": 30764,
+          "sha256": "96a23a2e765025715134cc8f2659fc982a8e6ab399f7eb9819a43d062f94d2c2",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 15360
+        },
+        {
+          "path": "pcm/06-native.wav",
+          "bytes": 21548,
+          "sha256": "8fa17163530ffb2ba2d5b5d2a85e381903eb42d86322ffce30eb3805b93165bf",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/06-viktoriia.wav",
+          "bytes": 29228,
+          "sha256": "38ce8dffdc8186ea6a0f474e834282eadccc94f4b6dbefbe3feca6d6791d6f53",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14592
+        },
+        {
+          "path": "pcm/07-native.wav",
+          "bytes": 27692,
+          "sha256": "99925c72318ba3cf990eea8716c5862a22aac577c3bfc8c436881ceded2c9844",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 13824
+        },
+        {
+          "path": "pcm/07-viktoriia.wav",
+          "bytes": 37932,
+          "sha256": "0ebd049603d5b334fe8f2e85cf841dacbce968ed59bcdde5254caa3c9e60a588",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 18944
+        },
+        {
+          "path": "pcm/08-native.wav",
+          "bytes": 18476,
+          "sha256": "ee6a070677363e1b3581ffd898834df5f095579f68ed68ee0afd13d2a4f0c094",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9216
+        },
+        {
+          "path": "pcm/08-viktoriia.wav",
+          "bytes": 25132,
+          "sha256": "64a6acb5e097c9ae153f1d196f15d05fd39c275738bcc9281ef4b15eb4bf3ae0",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 12544
+        },
+        {
+          "path": "pcm/09-native.wav",
+          "bytes": 25644,
+          "sha256": "4f5d63b722865a3e345c513dfafbeef80a92375dd9ffb3eb35980cfa15dd7370",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/09-viktoriia.wav",
+          "bytes": 34860,
+          "sha256": "163aa294460e623c55b5ca18e30349cf73226b77c584d0e56c5b4b52d987e300",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 17408
+        },
+        {
+          "path": "pcm/10-native.wav",
+          "bytes": 21548,
+          "sha256": "1872fb98e4a0150d8debc64c3945dbab2fae222d5ced746d8f2e97d6597a7743",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/10-viktoriia.wav",
+          "bytes": 29228,
+          "sha256": "3f1e48e184a047c67910e6c53496700b755138f6a10437231abfeb1c0aedb6a1",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14592
+        },
+        {
+          "path": "pcm/11-native.wav",
+          "bytes": 21548,
+          "sha256": "48b79b6287e42a5d14b15145afede1e7912c422fa73de68262c57744aff2b92a",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/11-viktoriia.wav",
+          "bytes": 29228,
+          "sha256": "e25bfa2a97485a2c65d578d340b4ee6c33b6d9c2cc3885a3acb9845204e64548",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14592
+        },
+        {
+          "path": "pcm/12-native.wav",
+          "bytes": 22572,
+          "sha256": "1cfd188e8a24e5207d259a180a7cc7ee1323dd87b72129d5505a15fda25cd9ba",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11264
+        },
+        {
+          "path": "pcm/12-viktoriia.wav",
+          "bytes": 30764,
+          "sha256": "3bbc3b7c979934cbd21c7c987ad5f141a1cba92bcf2a2f3ca60f387da98962ec",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 15360
+        },
+        {
+          "path": "pcm/13-native.wav",
+          "bytes": 21036,
+          "sha256": "5c0639a0b0b515cb891d356c449f774d10b3df8c2daa270fb495c90efc03e827",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/13-viktoriia.wav",
+          "bytes": 28716,
+          "sha256": "2cafeb27c0964472a7f222e4d91cedc641d4777c80dccab161c3114a2e84ddad",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14336
+        },
+        {
+          "path": "pcm/14-native.wav",
+          "bytes": 23596,
+          "sha256": "82dc7737fb0c0a84f7016d4c2e7f8d50e434a6231625bef09f52b0ca2ee266d4",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11776
+        },
+        {
+          "path": "pcm/14-viktoriia.wav",
+          "bytes": 32300,
+          "sha256": "cc5be2d760194dde2652055a5177b6e7a83673dfbb49c37b699fd315fa5fb112",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 16128
+        },
+        {
+          "path": "pcm/15-viktoriia.wav",
+          "bytes": 34860,
+          "sha256": "bc0d9c6d7d26519c58dc6751c069e886bc756c4fb674b87013582d06b591cf34",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 17408
+        },
+        {
+          "path": "pcm/15-native.wav",
+          "bytes": 25644,
+          "sha256": "994008c096e12c5a2f8f32a3629b57db02dae42ee6c991a1289fb87d7a815e75",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/16-native.wav",
+          "bytes": 14892,
+          "sha256": "0d4d92ddc409e928e88e8eaf3d486e440f8c63096106a53a71690a2f849855e3",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 7424
+        },
+        {
+          "path": "pcm/16-viktoriia.wav",
+          "bytes": 20012,
+          "sha256": "68098e8ba1686cf88c02abc26bc5f8edb9ad6e9865420164548b8c4a15ed2b46",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9984
+        },
+        {
+          "path": "pcm/17-native.wav",
+          "bytes": 21036,
+          "sha256": "4a9239dbff820954b3176bd5c83d7842e051adcdacbd953ff636078f4730b34e",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/17-viktoriia.wav",
+          "bytes": 28716,
+          "sha256": "ab95c34d1c23182a3e0c475374d4d99102cc40dd4f03e1b37b84c8c631ae53af",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14336
+        },
+        {
+          "path": "pcm/18-native.wav",
+          "bytes": 25644,
+          "sha256": "bcd6a57dbba535f3250aac5d6fd5dcaa9912c82200f0cb04c6e3ad38aab41a74",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/18-viktoriia.wav",
+          "bytes": 34860,
+          "sha256": "e1826120efb849e3e33317a5606258ede60681ebc6659de9d5c0f7c4574daf2c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 17408
+        },
+        {
+          "path": "pcm/19-native.wav",
+          "bytes": 21036,
+          "sha256": "d5ddaae7163dd57a36ca5d2086b685020f73512631e8f49c0723e655fb03b42d",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/19-viktoriia.wav",
+          "bytes": 28716,
+          "sha256": "7f244c9cb18201bf293019572721bd943bc88c5e16373d2ec4fa2541145be513",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14336
+        },
+        {
+          "path": "pcm/20-native.wav",
+          "bytes": 21548,
+          "sha256": "4df81a79458d5f6ca0daf496b9027159d82bbfbfbe3b175270b06bda1829df67",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/20-viktoriia.wav",
+          "bytes": 29228,
+          "sha256": "8f07b853901e1a3da087f540bcf34eadb09fd022dc3b45d31e6fd22f892cad96",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14592
+        },
+        {
+          "path": "pcm/21-native.wav",
+          "bytes": 21036,
+          "sha256": "86809f76d1d3f1b5d22c92c1338a6b564393b083c2e78441494b107f05578c94",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/21-viktoriia.wav",
+          "bytes": 28716,
+          "sha256": "341900f8799c62862a93607eb3750462e8bb91da6ee95b5578b919d62c47930d",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14336
+        },
+        {
+          "path": "pcm/22-native.wav",
+          "bytes": 19500,
+          "sha256": "4d84fc4204cc2d6e10c30f75d1b6d07920b4b8072bfc37623d767ed4128e17d5",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 9728
+        },
+        {
+          "path": "pcm/22-viktoriia.wav",
+          "bytes": 26668,
+          "sha256": "56503fc0a9ee9e1e97e9ed854ca09f554fb34c183815220492af389f538e47bb",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 13312
+        },
+        {
+          "path": "pcm/23-native.wav",
+          "bytes": 23084,
+          "sha256": "057378de5eba4aca5d7ce71e74eeefaa67f7fe29334bea17e0daf6bf621f7907",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 11520
+        },
+        {
+          "path": "pcm/23-viktoriia.wav",
+          "bytes": 31788,
+          "sha256": "a2e363c6bce6af2bd088d69220b18b514163fc3eddbace4afa33196037b42c4b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 15872
+        },
+        {
+          "path": "pcm/24-native.wav",
+          "bytes": 25644,
+          "sha256": "cfc411005530369b0b8835db05a62f5d1efc63a1cb09ea542ede24aaf2d1ebb7",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 12800
+        },
+        {
+          "path": "pcm/24-viktoriia.wav",
+          "bytes": 34860,
+          "sha256": "89ada7ee981d52b1d2ff752375099fd45083f5902019afb7b17fc5163af42eb9",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 17408
+        },
+        {
+          "path": "pcm/25-native.wav",
+          "bytes": 21548,
+          "sha256": "e404114bba12e5fa8447d54c5019c3a1e36163cf7a720eaaa1990db6c50c4254",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10752
+        },
+        {
+          "path": "pcm/25-viktoriia.wav",
+          "bytes": 29228,
+          "sha256": "b98d0db31e15ae29d1cd03c844fa98e3a17b43b0283d9dc29561b0c242395f4b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14592
+        },
+        {
+          "path": "pcm/26-native.wav",
+          "bytes": 26668,
+          "sha256": "dcbc4d2d23dbcb6907acc0bd033b55fbeb98307dea021e1b5fa20d8297b5a31c",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 13312
+        },
+        {
+          "path": "pcm/26-viktoriia.wav",
+          "bytes": 36396,
+          "sha256": "491205236f127f2764ba7dfee4ec0c9c0cbe62217d21f36a1ad21c5548e43689",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 18176
+        },
+        {
+          "path": "pcm/27-native.wav",
+          "bytes": 21036,
+          "sha256": "80706f47646c3a413e902857a77bf367339d2ef4502bea327d08c794c3d9aa1f",
+          "channels": 1,
+          "sample_rate": 16000,
+          "frames": 10496
+        },
+        {
+          "path": "pcm/27-viktoriia.wav",
+          "bytes": 28716,
+          "sha256": "d6844155ea9fa28d22eacbc25d52bca52c34e8ea3de0a1bbbf0f49d760013a3b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 14336
+        },
+        {
+          "path": "pcm/report.json",
+          "bytes": 26711,
+          "sha256": "1c678b14cb002e81f97307d8f1465f0180f6ce4a5acc57f68c2cf4bc130a4be5"
+        }
+      ],
+      "git_blob_sha": "e52d0c356032cfd61631f442a9cce3b808334098",
+      "repository_path": "dordiai-voices/evidence/audio/fil28-ordinary-names-45038769182.zip",
+      "scope": "Actual isolated source-backed ordinary-name native MMS and original-Viktoriia PCM, not native-listener/NVDA/typing acceptance",
+      "signed_download_urls_persisted": false,
+      "raw_primary_documents_included": false
+    },
+    {
+      "code": "to",
+      "artifact_id": 14759865910,
+      "run_id": 45035136469,
+      "bytes": 1173502,
+      "sha256": "34b53f3835b5b5c6503ff9fbab3b1462e93193e2ff163a782dd064a81bff8263",
+      "zip_members": 89,
+      "wavs": 81,
+      "expanded_bytes": 1729757,
+      "safe_member_types": [
+        "own mono PCM16 WAV",
+        "bounded JSON evidence",
+        "generated NPY carrier identity"
+      ],
+      "members": [
+        {
+          "path": "carrier-inventory.json",
+          "bytes": 39946,
+          "sha256": "f78a400a703fa5fe2c313874d70a4663556c3324104f9b6b4040483b51395c23"
+        },
+        {
+          "path": "network-policy.json",
+          "bytes": 275,
+          "sha256": "86f4e6528396c3110911f1cc22a43172e59465bb141148ff7ce0fcec53708333"
+        },
+        {
+          "path": "input-integrity.json",
+          "bytes": 167,
+          "sha256": "272018ba35e6119594fe9fa4fff18aa827eea38f86842ce4b32abe13841727af"
+        },
+        {
+          "path": "primary-source-acquisition.json",
+          "bytes": 5586,
+          "sha256": "08dd0b66499a7796e59992bdab68f288790bf73fd55e42eee573a396a094a644"
+        },
+        {
+          "path": "private-core-inventory.json",
+          "bytes": 245729,
+          "sha256": "3fb974f71ce35f62a813dc29da8b61551648d4cd8fddeb0b072b7f48dc812363"
+        },
+        {
+          "path": "projection/00-native.wav",
+          "bytes": 12066,
+          "sha256": "4db4e374b4680d9c2bb82358ce158b47e4058c2c573050d4f9a454b4cb535329",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6011
+        },
+        {
+          "path": "projection/00-viktoriia.wav",
+          "bytes": 11820,
+          "sha256": "1c0936663a78389cb77eea6dbad66710d993c2fb8868628bd740ea14c433fb37",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5888
+        },
+        {
+          "path": "projection/01-native.wav",
+          "bytes": 14496,
+          "sha256": "b341cda2a9c51bda002d39926e83afa4b79e0fda8dccc56d5e544290614efe5d",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7226
+        },
+        {
+          "path": "projection/01-viktoriia.wav",
+          "bytes": 14380,
+          "sha256": "5907ee16efdc7ab637d3dccad692639dd5af87f865f6948a5d1b2fc304e9e61a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7168
+        },
+        {
+          "path": "projection/02-native.wav",
+          "bytes": 17620,
+          "sha256": "e44f8893032734d8d402a72cb4264a629707392aca7b17e64f004a9cc53a4b11",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8788
+        },
+        {
+          "path": "projection/02-viktoriia.wav",
+          "bytes": 17452,
+          "sha256": "674a439810e75467258ca39503b16fde3a7e06b90fa2beec1720e32b9664cd96",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8704
+        },
+        {
+          "path": "projection/03-native.wav",
+          "bytes": 20254,
+          "sha256": "be3fc8aa63d5afdd881ab07916113d97517abc5f2ce4472761a1869a66304345",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10105
+        },
+        {
+          "path": "projection/03-viktoriia.wav",
+          "bytes": 20012,
+          "sha256": "4b8965b15965874ee3d0daa97c186f7c88e94b92a7034c0bf1abfc7dc819d314",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9984
+        },
+        {
+          "path": "projection/04-native.wav",
+          "bytes": 21160,
+          "sha256": "d08cf7d8bd904d3db20b5559e4ebafa8595b74bd473f7433e13ef80fb1e2d80d",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10558
+        },
+        {
+          "path": "projection/04-viktoriia.wav",
+          "bytes": 21036,
+          "sha256": "6565ab021a7f6b77782c6c783dd88b6bcfd77e034b334866d304326353319680",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10496
+        },
+        {
+          "path": "projection/05-native.wav",
+          "bytes": 20818,
+          "sha256": "63ba561ea3131d9f6d73c8b04d942936dd7528893706fcc8935734b882728641",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10387
+        },
+        {
+          "path": "projection/05-viktoriia.wav",
+          "bytes": 20524,
+          "sha256": "82041b29175e7fd816b7adf66a5fe35cd4264ab3ecf182d0019a85507df9959a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 10240
+        },
+        {
+          "path": "projection/06-native.wav",
+          "bytes": 23922,
+          "sha256": "581697ff624b5ab869f4fd3d5ba3c52550cc88ba1953d3409d69e3310fc8d069",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11939
+        },
+        {
+          "path": "projection/06-viktoriia.wav",
+          "bytes": 23596,
+          "sha256": "e6ad0b92264f15647805d3bbda74d719244818cda0cd699cfaec547e3c90d854",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 11776
+        },
+        {
+          "path": "projection/07-native.wav",
+          "bytes": 19414,
+          "sha256": "39c7c70b8de243557b3bfa21ba4e41a69458a51f45e9b8c4bb89190c65d0f184",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9685
+        },
+        {
+          "path": "projection/07-viktoriia.wav",
+          "bytes": 18988,
+          "sha256": "e4b7759c6305973070483a8ec2cd56c330566401d23518e9fb35397dcb7b5994",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9472
+        },
+        {
+          "path": "projection/08-native.wav",
+          "bytes": 34180,
+          "sha256": "05e6b623f37f744cac50be4579208c1b00e230c77f37ff0b8ce7a1aab4616aed",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 17068
+        },
+        {
+          "path": "projection/08-viktoriia.wav",
+          "bytes": 33836,
+          "sha256": "8891e314a5a23a9920ebdba983e594b399de8e8c8b640928c11dcf5c49594f87",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 16896
+        },
+        {
+          "path": "projection/09-native.wav",
+          "bytes": 52274,
+          "sha256": "34b6f2e713ae1100e54877f1581f26669b36336b62a0f3b2eb53635a0a10b939",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 26115
+        },
+        {
+          "path": "projection/09-viktoriia.wav",
+          "bytes": 52268,
+          "sha256": "a04d4d0770d46db4338dbb2afb1d26bc44925529c24a8a684e02583ac002382e",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 26112
+        },
+        {
+          "path": "projection/10-native.wav",
+          "bytes": 7838,
+          "sha256": "9e883c5d48725e806b355c5a8830a8809c76431c3a0b140112999a61516cf37c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3897
+        },
+        {
+          "path": "projection/10-viktoriia.wav",
+          "bytes": 7724,
+          "sha256": "b8ab6829b8b76ab0842c6602e087ec67da4683b072a09d6758c6a2a033f8a578",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3840
+        },
+        {
+          "path": "projection/11-native.wav",
+          "bytes": 7266,
+          "sha256": "31ab729c7ebb8c4df6f1bb110b3e1936fff686a4026f310b07fd87d8de73ef80",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3611
+        },
+        {
+          "path": "projection/11-viktoriia.wav",
+          "bytes": 7212,
+          "sha256": "b7f1d657400d11f38da43e4ebfbe8143b29937c147146488f3b43ad4af0d93cf",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3584
+        },
+        {
+          "path": "projection/12-native.wav",
+          "bytes": 7832,
+          "sha256": "b699767465656c05f703c45629fd5323f30e47ac970d42c0931901bb12b2106f",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3894
+        },
+        {
+          "path": "projection/12-viktoriia.wav",
+          "bytes": 7724,
+          "sha256": "f553f2e6a3f1a609b96e793bd359b0e123f90ee00d3b0f6dc6b589638e96cc5a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3840
+        },
+        {
+          "path": "projection/13-native.wav",
+          "bytes": 7830,
+          "sha256": "4f61f37bf11cfe0e5bc0354519ed41fc487c747426ed0d28e13286775ae3beb7",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3893
+        },
+        {
+          "path": "projection/13-viktoriia.wav",
+          "bytes": 7724,
+          "sha256": "8277a2444c8f84ddd7b105c87a2127b94b98f0418f4f7c2f18ae7db642ae40a3",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3840
+        },
+        {
+          "path": "projection/14-native.wav",
+          "bytes": 7802,
+          "sha256": "0b71c113f249fda0f92db87a99007d96f0304c8058bc63bce8128b732897c784",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3879
+        },
+        {
+          "path": "projection/14-viktoriia.wav",
+          "bytes": 7724,
+          "sha256": "c1c4cf1a79d2e9dcbd8a82cac2a4bfe130674c4349d8aebc2d34f0742fc8f1ed",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 3840
+        },
+        {
+          "path": "projection/15-native.wav",
+          "bytes": 11538,
+          "sha256": "d3cc89ede32b6bb7307cb2f556753604acb52aed21b5772ca4556aad3e177628",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5747
+        },
+        {
+          "path": "projection/15-viktoriia.wav",
+          "bytes": 11308,
+          "sha256": "6a9cf91b63e3cea3b07078f271273a00f23c982683f714bde4338b75ed2b582e",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5632
+        },
+        {
+          "path": "projection/16-native.wav",
+          "bytes": 10948,
+          "sha256": "4e5225e3d98bcbb35af9f27750cbba27e8599e81dcab8b75127c0f09d7e22f6a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5452
+        },
+        {
+          "path": "projection/16-viktoriia.wav",
+          "bytes": 10796,
+          "sha256": "1bbfe10f3749ca0b79e47336bcb953e04e3e0b58eaa25576de5793179d7214d8",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5376
+        },
+        {
+          "path": "projection/17-native.wav",
+          "bytes": 11340,
+          "sha256": "91b39a65d910565602d5795feeef820fda368f763e5e301cd4a7a91667515a8c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5648
+        },
+        {
+          "path": "projection/17-viktoriia.wav",
+          "bytes": 11308,
+          "sha256": "36a697e193e599cb98798c854ffc1bc2e8e01ff2460858f6b50f2041fa762d60",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5632
+        },
+        {
+          "path": "projection/18-native.wav",
+          "bytes": 10300,
+          "sha256": "291d46c612680d751f44da2b297eba19c5d31aa71eb99fca2c74fe5f8444743a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5128
+        },
+        {
+          "path": "projection/18-viktoriia.wav",
+          "bytes": 10284,
+          "sha256": "60f9da9d79dfada30d551e5a798347188ba91f9d4a491516c3afe11daacf949b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5120
+        },
+        {
+          "path": "projection/19-native.wav",
+          "bytes": 10212,
+          "sha256": "47dc198a5342ae54a11f827e57b8d71a0ea0105f2c1d48b327e13993dc1fd493",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5084
+        },
+        {
+          "path": "projection/19-viktoriia.wav",
+          "bytes": 9772,
+          "sha256": "ce71559a63705122857440a4792d0dee397924a97bd43850dbfc0b46f9ff9a76",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 4864
+        },
+        {
+          "path": "projection/20-native.wav",
+          "bytes": 10692,
+          "sha256": "fb189c8ca9aee3073e3365aea1e4744d0dd71f7c9455fdc1495aa421b65ad18b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5324
+        },
+        {
+          "path": "projection/20-viktoriia.wav",
+          "bytes": 10284,
+          "sha256": "c86fa101269ead5fc6c7a74292a4ea92e65e764cb4d1996db6938830d3ab8e70",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5120
+        },
+        {
+          "path": "projection/21-native.wav",
+          "bytes": 11532,
+          "sha256": "405c3067bf2156e23390a8f85610cd981531855ea11fab4c14d5a62df2c85563",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5744
+        },
+        {
+          "path": "projection/21-viktoriia.wav",
+          "bytes": 11308,
+          "sha256": "7934bc607465328d0fc445c5b83c437825de271ed17e9fd70995fc5e118795dd",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5632
+        },
+        {
+          "path": "projection/22-native.wav",
+          "bytes": 10658,
+          "sha256": "36b9ee56b3e63b7192ba3ea3880eb7ebdbffe067b231afcd8228de7ca6316920",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5307
+        },
+        {
+          "path": "projection/22-viktoriia.wav",
+          "bytes": 10284,
+          "sha256": "35cb040a9f2bf9d2f4c742e17ab9d1c470870be46961e7f27df0a11e9022e829",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5120
+        },
+        {
+          "path": "projection/23-native.wav",
+          "bytes": 11426,
+          "sha256": "6613538b76449fe6465aca0c8d8c55dfc19978b8ac1c7123ffec23fa080b5573",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5691
+        },
+        {
+          "path": "projection/23-viktoriia.wav",
+          "bytes": 11308,
+          "sha256": "bfcba028405fe143b78c9827ce312e2dd1109b14276c4fb96ddf58e967a9b58b",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5632
+        },
+        {
+          "path": "projection/24-native.wav",
+          "bytes": 10316,
+          "sha256": "6d0429af34a10a719e4e12019b117e2cb7eea9bab269bfc5e96f85abbbb4145d",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5136
+        },
+        {
+          "path": "projection/24-viktoriia.wav",
+          "bytes": 10284,
+          "sha256": "ed521c21018933e5afbfcfc4126aae41cbcefa44d5acd5b23aeac4d6ec92ec25",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5120
+        },
+        {
+          "path": "projection/25-native.wav",
+          "bytes": 11884,
+          "sha256": "baef3e6278f4355411e07eedca6efcbf4e84d95265af43ade4201d0df9a73d51",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5920
+        },
+        {
+          "path": "projection/25-viktoriia.wav",
+          "bytes": 11820,
+          "sha256": "278afb3d069e2e489e3bf151660f43ff3ee34cad89ce3700e1d86905086876aa",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 5888
+        },
+        {
+          "path": "projection/26-native.wav",
+          "bytes": 26254,
+          "sha256": "6a1eb383c6fd7b2d09d01d7de032169e1968f65c6fb54d621eb7deed1eff158e",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 13105
+        },
+        {
+          "path": "projection/26-viktoriia.wav",
+          "bytes": 26156,
+          "sha256": "df111bd4efb8c62ac5759126238ec3d910fd0868607a4d734a9ec87c79131fe1",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 13056
+        },
+        {
+          "path": "projection/27-native.wav",
+          "bytes": 14084,
+          "sha256": "15169e66ec10148a24d47839c46e818a8fff4e7874642933137c2427f1c0b0c6",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7020
+        },
+        {
+          "path": "projection/27-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "64e4e76b7241c60bb27ecd703d21645e4ef5ad9994291601ea2e0fc92d2fcd8c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/28-native.wav",
+          "bytes": 18390,
+          "sha256": "90cacc1c3c0a59dc2a5af286d98b56c0d73dd8bbb1f278f32f1e75db3e6fb4dc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 9173
+        },
+        {
+          "path": "projection/28-viktoriia.wav",
+          "bytes": 17964,
+          "sha256": "76a184d60afce4db1b309b9afb0fe8cec6690dadea8d8588fd25ab28e1c9d4e8",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8960
+        },
+        {
+          "path": "projection/29-native.wav",
+          "bytes": 17324,
+          "sha256": "f289f364b6ed0087632623de37350ecb8bfd8b8cfd7e76e7a8d8506a41de192f",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8640
+        },
+        {
+          "path": "projection/29-viktoriia.wav",
+          "bytes": 16940,
+          "sha256": "10b76c1ad0da35b90c3ae0e86c8de99093c22d5adec0987c7d31537abf3307c4",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 8448
+        },
+        {
+          "path": "projection/30-native.wav",
+          "bytes": 13842,
+          "sha256": "3113e9282a78362b4006933e79fcd415116c9934dd115afd4f279303ba44e320",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6899
+        },
+        {
+          "path": "projection/30-viktoriia.wav",
+          "bytes": 13356,
+          "sha256": "ce248ec611a9e199372c81b00be9392447127880581d35be9240233f911778ea",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6656
+        },
+        {
+          "path": "projection/31-native.wav",
+          "bytes": 13994,
+          "sha256": "705cd4709a40fc663f05e0f1530889fd536fefa19312e72db5a669dd341b3ac5",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6975
+        },
+        {
+          "path": "projection/31-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "165253d38a17e6fd88921d330a2e0f5e2f69425447b64d9e66287b747531c648",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/32-native.wav",
+          "bytes": 13838,
+          "sha256": "e786ac3d9956484902f30369fe4c90ca50817fa36c11e58014cd091dd89cba30",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6897
+        },
+        {
+          "path": "projection/32-viktoriia.wav",
+          "bytes": 13356,
+          "sha256": "a25a074cf0a93f4f6dce039b8fbc113b0cd515873a7fda8a5254b59a205f2bdc",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6656
+        },
+        {
+          "path": "projection/33-native.wav",
+          "bytes": 13988,
+          "sha256": "1526bd74cc8a9167e5cbaddd2fbc9d95ededbd841595d6f99991367308bc327a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6972
+        },
+        {
+          "path": "projection/33-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "37bb1c6b8dcf0ee07dcfbdfe9473411bb15af013c2c527fac77bc46f6bde6014",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/34-native.wav",
+          "bytes": 14202,
+          "sha256": "eeb8fe030a1468d1fa6cf04498bbbab143d3038a98fc07971bb7e0cb8c06f82a",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7079
+        },
+        {
+          "path": "projection/34-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "cb2c9dce7e1c6e4f18b733602019b6053e3ddd24b817c2cc9321ab3da531fa44",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/35-native.wav",
+          "bytes": 13908,
+          "sha256": "e911984379091657d882ea84f5f657a60f686cdb4d8eae1a19222ef16a5e314e",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6932
+        },
+        {
+          "path": "projection/35-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "87a1a10b2610df4eb0b89df3bc6669e0faf404ad5738062a8fefe12bb1a24525",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/36-native.wav",
+          "bytes": 13790,
+          "sha256": "10316a11d7f89882399ab9ecf9eca06b5c23bbe503814c859c29926adb9783e6",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6873
+        },
+        {
+          "path": "projection/36-viktoriia.wav",
+          "bytes": 13356,
+          "sha256": "aa42c31643da8106bc8ffbfefad437276462201ec486adf478ed3ac145e47b1c",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6656
+        },
+        {
+          "path": "projection/37-native.wav",
+          "bytes": 13990,
+          "sha256": "2e5239d8c6fef4fa7c72747a00cf30bfc230c351e3752a0f7ef48605c6c7624f",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6973
+        },
+        {
+          "path": "projection/37-viktoriia.wav",
+          "bytes": 13868,
+          "sha256": "d603afca0cb0394844d665640e883516d505b8dbe2eec35b6426f9cc1208c867",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6912
+        },
+        {
+          "path": "projection/38-native.wav",
+          "bytes": 13758,
+          "sha256": "11c1e0e32e8166aa16b0607af642ac235f8afa833142c0e4eef06b2526e436f0",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6857
+        },
+        {
+          "path": "projection/38-viktoriia.wav",
+          "bytes": 13356,
+          "sha256": "0df5ee3a6a79b8df1a1b7d8c7598e5da25595ec009d1fddd2e236ebd54f4bbb1",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 6656
+        },
+        {
+          "path": "projection/39-native.wav",
+          "bytes": 14502,
+          "sha256": "ec7d6bbaf24451206a3ad58b7894d844b7d072c1150bf3f74bc04b699382b4a6",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7229
+        },
+        {
+          "path": "projection/39-viktoriia.wav",
+          "bytes": 14380,
+          "sha256": "d9674922d2ec1b34b1368238ce6cde957b6f5708a8643a53ca161e079c867bac",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 7168
+        },
+        {
+          "path": "projection/calibration.wav",
+          "bytes": 109156,
+          "sha256": "74e5d55eb185965f469466acff2dae4e58915809fc4a5f9f9fe31634dc38c894",
+          "channels": 1,
+          "sample_rate": 22050,
+          "frames": 54556
+        },
+        {
+          "path": "projection/proof.json",
+          "bytes": 113005,
+          "sha256": "77e4b82dc8b08f671220d4eaa0476a897bdf45683f65c8c10dd2c0df54f04a74"
+        },
+        {
+          "path": "projection/source.npy",
+          "bytes": 1152,
+          "sha256": "08afab51e5fc1c802c3508d13cd5c4689f71e97fcc0de95277dd9538cb764990"
+        },
+        {
+          "path": "reference-encoder-acquisition.json",
+          "bytes": 411,
+          "sha256": "979fc8ed8cfe609109a5dd983f070f0331250cf6f145bbcaf58fc0144c5bcc05"
+        }
+      ],
+      "git_blob_sha": "50f3791a1e45de512c1762d9de209746955106df",
+      "repository_path": "dordiai-voices/evidence/audio/tongan40-phonemic-prototype-45035136469.zip",
+      "scope": "Unregistered Tongan phonemic prototype using disclosed foreign acoustic primitives, with actual same-carrier calibration and original-Viktoriia projection; not a native Tongan neural model or accepted pronunciation",
+      "signed_download_urls_persisted": false,
+      "raw_primary_documents_included": false
+    }
+  ],
+  "total_zip_bytes": 2678018,
+  "total_owned_generated_wavs": 201,
+  "safe_zip_checks": {
+    "outer_sizes_and_sha256_matched": true,
+    "regular_nonlinked_unencrypted_members_only": true,
+    "absolute_parent_drive_backslash_nul_duplicate_casefold_paths_rejected": true,
+    "only_wav_json_npy_members": true,
+    "mono_pcm16_wav_frames_and_lengths_checked": true,
+    "all_json_parsed": true,
+    "per_member_sha256_recorded": true,
+    "raw_primary_docs_models_dlls_source_code_absent": true,
+    "credential_and_signed_url_scan_clean": true
+  },
+  "native_pronunciation_verified": false,
+  "nvda_verified": false,
+  "typing_verified": false,
+  "physical_audio_verified": false,
+  "product_ready": false,
+  "refs_modified": false
+}

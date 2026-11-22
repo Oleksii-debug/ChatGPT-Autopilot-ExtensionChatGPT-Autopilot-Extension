@@ -729,40 +729,32 @@
       }
     },
     "latest_built_core": {
-      "version": "0.13.1-dev.11",
-      "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
-      "run": 45029834209,
-      "job": 137230752726,
-      "archive_bytes": 1992938157,
-      "archive_sha256": "223e5ea7b29d0f9d16f3ca653711e8ced281c0fc7d5bd2fb891018a73926eceb",
-      "installed_bytes": 2408429678,
-      "files": 10257,
-      "core_artifact": 14757229220,
-      "evidence_artifact": 14757224120,
-      "windows_tests": 1058,
-      "windows_skipped": 36,
-      "old_bank_files_byte_identical": 180,
-      "old_private_python_files_byte_identical": 1596,
-      "actual_packaged_native_profile_requests": 225,
-      "default_three_engine_regression_passed": true,
-      "same_worker_source_removal_restoration_passed": true,
-      "eight_excluded_voices_rejected": true,
-      "worker_clean_exit": true,
-      "nvda_verified": "limited_functional_with_explicit_recording_sink; plain_file_word_routing_pending",
-      "typing_verified": true,
+      "version": "0.13.1-dev.12",
+      "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+      "run": 45040668513,
+      "job": 137264162762,
+      "archive_name": "dordiai-voices-0.13.1-dev.12.nvda-addon",
+      "archive_bytes": 1992944744,
+      "archive_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+      "core_artifact": 14761553443,
+      "evidence_artifact": 14761533502,
+      "windows_tests_total": 1330,
+      "windows_passed": 1280,
+      "windows_skipped": 50,
+      "worker_native_profile_requests": 225,
+      "default3_passed": true,
+      "banks_byte_identical": 180,
+      "private_files_byte_identical": 1596,
+      "other_models_identity_files_byte_identical": 8508,
+      "reviewed_character_data_exceptions": 2,
+      "voice_ids_unchanged": 45,
+      "native_dictionary_descriptor_notice_unchanged": true,
+      "actual_nvda_pipeline_verified": false,
+      "typing_verified": false,
       "physical_audio_verified": false,
       "native_pronunciation_verified": false,
       "product_ready": false,
-      "evidence": "evidence/source11_worker_45029834209.json",
-      "windows_tests_total": 1058,
-      "windows_passed": 1022,
-      "nvda_functional_checks_verified": true,
-      "nvda_functional_run": 45033534150,
-      "actual_typing_cases": 9,
-      "required_resource_recovery_verified": true,
-      "native_dictionary_recovery_verified": true,
-      "installed_dictionary_manager_verified": true,
-      "nvda_evidence": "evidence/source11_nvda_45033534150.json"
+      "evidence": "evidence/source12_worker_45040668513.json"
     },
     "current_working_source_suite": {
       "source_commit": "84ca83e36e729fece88fc56af078a0de826d9db3",
@@ -905,7 +897,7 @@
       "evidence": "evidence/source11_plain_text_provenance_failure.md"
     },
     "source12_candidate": {
-      "status": "reviewed_awaiting_actual_build",
+      "status": "actual_windows_build_worker_passed_matching_nvda_pending",
       "local_suite": {
         "base_snapshot": "09f4ec8453344b500dd15ecf7bd279339910c5fe",
         "tests_total": 1304,
@@ -920,7 +912,7 @@
       "word_cache_controls": 9,
       "prepared_banks_regenerated": false,
       "private_runtime_changes": false,
-      "actual_source12_archive_exists": false
+      "actual_source12_archive_exists": true
     },
     "character_names_ay_fil": {
       "actual_windows_runs": [
@@ -966,7 +958,7 @@
   "pending_decisions": [],
   "resource_authorization": "User explicitly authorized automatic decisions and noncommercial model integration on 2026-11-22; no further confirmation requested",
   "next_work": [
-    "Build reviewed source12 from exact immutable11 resources, then real matchingNVDA mixed100/TextInfo authoredmetadata/forced/disabled/typing/recovery and actualsoftwarePCM.",
+    "Run pinned actual12 NVDA five modes with original100 unmarkedwords/real authoredmetadata/typing/forced/disabled/compound and genuine faults. Preserve12 immutable; fixes need13.",
     "Calibrate own exact render-loopback PCM without microphone/privacy/default changes, then measure matching-core real output.",
     "Complete genuine missing-language frontends/resources and ordinary character names; retain truthful missing/partial counts.",
     "Measure downstream voice conversion/streaming and full typing, optimize only with unchanged quality and bounded lifecycle evidence."
@@ -1117,5 +1109,5 @@
       "source_snapshot_note": "Immutable production source9 and build recipe are in Git at source_commit; separate compressed source archive remains dev6."
     }
   },
-  "working_source_target_version": "Production12 candidate reviewed and staged: locale provenance/typed-context bridge, bounded exact-word cache, exact whole-compound membership and source-backed AY/FIL ordinary-name data. Local1304total/1252pass/52skip. ActualWindowsbuild and fullmatchingNVDA12 pending; immutable11 retained."
+  "working_source_target_version": "Immutable12 built atbe7f4e2468dc18bd155d2c205f89bf61c8e235a2; Windows1330total/1280pass/50skip and225packaged requests passed. Matching5modeactualNVDA12 pending; productionchanges next require13."
 }

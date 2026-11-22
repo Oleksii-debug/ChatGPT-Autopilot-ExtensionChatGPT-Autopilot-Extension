@@ -1,0 +1,10 @@
+{
+  "format": "dordiai-source12-build-pin",
+  "version": "0.13.1-dev.12",
+  "source_run_id": 45040668513,
+  "source_commit": "be7f4e2468dc18bd155d2c205f89bf61c8e235a2",
+  "archive_name": "dordiai-voices-0.13.1-dev.12.nvda-addon",
+  "archive_bytes": 1992944744,
+  "archive_sha256": "908a9825a8f3e1574d9d0a370ac0e35e1e1683eb04b998a937c312f0ce3ec573",
+  "product_ready": false
+}
