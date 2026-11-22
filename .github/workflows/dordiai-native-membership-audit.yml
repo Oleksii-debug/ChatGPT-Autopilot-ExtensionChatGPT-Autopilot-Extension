@@ -1,0 +1,58 @@
+name: Audit complete native dictionary source equality
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  full-source-equality:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[membership-audit]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify independent full-source hash audit
+        run: |
+          python -m py_compile dordiai-voices/tools/audit_native_membership.py
+          python -m unittest discover -s dordiai-voices/tests -p "test_native_membership_source_audit.py" -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: dordiai-compact-native-word-membership
+          run-id: 45027190211
+          github-token: ${{ github.token }}
+          path: dordiai-voices/native-membership-build
+      - name: Reconstruct every per-language source stream from unchanged compiled binary
+        run: >-
+          python dordiai-voices/tools/audit_native_membership.py
+          --lexicon dordiai-voices/native-membership-build/native-word-membership.bin
+          --sha256 21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689
+          --acquisition-report dordiai-voices/native-membership-build/acquisition-report.json
+          --expected-report-sha256 d7c8157a3cfc44d3e6cce9daf45099fb34c4f5f1e80edfed70a50e6cde2d6199
+          --output dordiai-voices/native-membership-source-equality.json
+      - name: Preserve exact full-source audit JSON evidence
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          path=pathlib.Path("dordiai-voices/native-membership-source-equality.json")
+          if not path.is_file():print("Complete native source equality UNVERIFIED: no report.",flush=True);raise SystemExit(0)
+          raw=path.read_bytes()
+          doc={"format":"dordiai-exact-complete-native-source-equality-json","format_version":1,
+              "run_id":os.environ["GITHUB_RUN_ID"],"commit":os.environ["GITHUB_SHA"],
+              "file":{"sha256":hashlib.sha256(raw).hexdigest(),"size_bytes":len(raw),"source_base64":base64.b64encode(raw).decode("ascii")}}
+          encoded=json.dumps(doc,sort_keys=True,separators=(",",":")).encode()
+          payload=base64.b64encode(gzip.compress(encoded,mtime=0)).decode("ascii")
+          print("DORDIAI_NATIVE_SOURCE_EQUALITY_JSON_SHA256 "+hashlib.sha256(encoded).hexdigest(),flush=True)
+          for i in range(0,len(payload),24000):print("DORDIAI_NATIVE_SOURCE_EQUALITY_GZIP_B64_%03d "%(i//24000)+payload[i:i+24000],flush=True)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dordiai-native-full-source-equality
+          path: dordiai-voices/native-membership-source-equality.json
+          if-no-files-found: warn
+          retention-days: 30
