@@ -39,7 +39,7 @@
     "Native-listener pronunciation, long fast mixed reading, physical output and acoustic latency acceptance on matching final source.",
     "All135 language word identification and homograph abstention need broader quality evaluation; current installed classifier has45 trained labels.",
     "Exact final release reconstruction must retain newly generated bank bytes and matching source/package evidence.",
-    "Complete five extended genuine keyboard scenarios on immutable core10; real-word echo still takes longer than cached glyphs and physical output remains unverified."
+    "Repeat extended keyboard policy/navigation checks and dictionary reads on matching final source11 archive; immutable core10's five scenarios passed."
   ],
   "environment": {
     "windows_verification_route": "GitHub Actions isolated Windows runners",
@@ -381,7 +381,20 @@
       "resource_size_and_runtime_benchmark_pending": false,
       "compact_build_retry_source": "e877c90bf892e6f4c73ab32742f33fe40102e1a6",
       "compact_build_and_two_hosts_successful_run": 45027190211,
-      "exact_metrics_recovery_pending": true
+      "exact_metrics_recovery_pending": true,
+      "compact": {
+        "run": 45027190211,
+        "artifact": 14756187576,
+        "bytes": 18661227,
+        "sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+        "full_semantic_scan_words": 6642550,
+        "blocks": 25948,
+        "windows_p95_lookup_ms": 2.0989,
+        "windows_p99_lookup_ms": 2.7906,
+        "windows_working_set_increase_bytes": 10158080,
+        "linux_p95_lookup_ms": 2.066,
+        "nvda_verified": false
+      }
     },
     "extended_keyboard_scenarios": {
       "immutable_core_version": "0.13.1-dev.10",
@@ -400,7 +413,10 @@
       "retry_source": "e86dc354a171ca123668b1a07d26273acb938289",
       "scope": "Actual real-key NVDA with explicit recording sink; no device-acoustic acceptance.",
       "latest_successful_retry_run": 45027257765,
-      "exact_evidence_preservation_pending": true
+      "exact_evidence_preservation_pending": false,
+      "evidence": "evidence/core10_keyboard_scenarios.json",
+      "actual_rows": 24,
+      "configuration_and_layout_restored": true
     },
     "word_classifier_v4": {
       "run": 45024624278,
@@ -438,20 +454,30 @@
       "universally_faster": false
     },
     "mni_checkpoint": {
-      "run": 45024624005,
-      "status": "five_actual_files_acquired_and_audited; safe tensor load not yet run",
-      "checkpoint_loaded": false,
+      "run": 45027582144,
+      "job": 137223868249,
+      "status": "actual_all_three_safe_state_loads_passed_not_inferred",
+      "checkpoint_loaded": true,
+      "safe_weights_only": true,
+      "torch": "2.6.0+cpu",
+      "kernel_network_denied_before_torch": true,
+      "fastpitch_model_tensor_bytes": 223835016,
+      "hifigan_generator_tensor_bytes": 55744520,
+      "inference_weight_tensor_bytes": 279579536,
       "inference_verified": false,
-      "publisher_weights_license": "Not present in acquired archive; recorded, user resource authorization applies."
+      "onnx_exported": false,
+      "evidence": "evidence/mni_checkpoint_state_45027582144.json",
+      "publisher_weights_license": "Not asserted; exact archive contains no checkpoint license document; source conditions recorded separately."
     },
     "virtual_audio": {
       "acquisition_run": 45024624054,
       "acquired_package_sha256": "bc44e8974191a5a2427d6c979e2dab08dbb09925f3f435dfa2f0ba3e45b6eb90",
-      "trial_status": "candidate under independent review",
+      "trial_status": "actual trial launched; no outcome yet",
       "driver_installed": false,
       "virtual_audio_verified": false,
       "physical_audio_verified": false,
-      "evidence": "evidence/virtual_audio_vendor_45024624054.json"
+      "evidence": "evidence/virtual_audio_vendor_45024624054.json",
+      "trial_source": "c4d7e9d09573612d0b5e540c4dd632fb3979c276"
     }
   },
   "pending_decisions": [],

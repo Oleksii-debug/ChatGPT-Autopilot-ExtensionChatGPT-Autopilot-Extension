@@ -1,0 +1,1175 @@
+{
+  "format": "dordiai-core10-actual-keyboard-scenarios",
+  "format_version": 1,
+  "core": {
+    "run_id": 45021069771,
+    "filename": "dordiai-voices-0.13.1-dev.10.nvda-addon",
+    "sha256": "437bb9394df5b44cb1a99edee21312f6255b8cc74622c0bcc15b3513e6c328d8",
+    "size_bytes": 1974796411
+  },
+  "scope": "Real isolated NVDA2026.3.1 GUI/SendInput/default handlers/product driver/models with explicit recording PCM output TEST DOUBLE. Functional metadata, policy, text/caret and PCM submission proof, never acoustic/device/pronunciation acceptance.",
+  "all_five_scenarios_functional_passed": true,
+  "physical_audio_verified": false,
+  "acoustic_latency_verified": false,
+  "pronunciation_verified": false,
+  "latency_distribution_verified": false,
+  "scenarios": [
+    {
+      "name": "standard",
+      "source_run": 45025594554,
+      "source_job": 137217808058,
+      "result": {
+        "scenario": "standard",
+        "cleanup": {
+          "attempted": true,
+          "errors": [],
+          "keyboard_config_restored": true,
+          "keyboard_layout_restored": true,
+          "speech_mode_restored": true
+        },
+        "preference_application": null,
+        "preference_restoration": null
+      },
+      "rows": [
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 22.4052,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 4.4125,
+              "notified_ns": 242697760600,
+              "first_pcm_submission_ns": 242702173100,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 242700793900
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "ї",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 18.5392,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "аї",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ї",
+              "driver_to_first_pcm_submission_ms": 2.0819,
+              "notified_ns": 243026022200,
+              "first_pcm_submission_ns": 243028104100,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ї",
+                  "planned_ns": 243026582700
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "a",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US",
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 21.8747,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "a",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "a",
+              "driver_to_first_pcm_submission_ms": 2.0113,
+              "notified_ns": 243764826900,
+              "first_pcm_submission_ns": 243766838200,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ay",
+                  "planned_ns": 243765403500
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "b",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US",
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 13.2095,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "ab",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "b",
+              "driver_to_first_pcm_submission_ms": 2.1105,
+              "notified_ns": 244087483500,
+              "first_pcm_submission_ns": 244089594000,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "bee",
+                  "planned_ns": 244088026500
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "!",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US",
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 158.456,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "ab!",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ab  ",
+              "driver_to_first_pcm_submission_ms": 121.0929,
+              "notified_ns": 244438093100,
+              "first_pcm_submission_ns": 244559186000,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "ab",
+                  "planned_ns": 244438842200
+                }
+              ]
+            },
+            {
+              "text": "bang  ",
+              "driver_to_first_pcm_submission_ms": 1.7441,
+              "notified_ns": 244640680700,
+              "first_pcm_submission_ns": 244642424800,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "bang",
+                  "planned_ns": 244641172500
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 62.9377,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 2.4583,
+              "notified_ns": 245426550900,
+              "first_pcm_submission_ns": 245429009200,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 245427226700
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "б",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 14.7981,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "аб",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "б",
+              "driver_to_first_pcm_submission_ms": 2.0484,
+              "notified_ns": 245808505300,
+              "first_pcm_submission_ns": 245810553700,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "бэ",
+                  "planned_ns": 245809027000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "ы",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 34.7618,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "абы",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ы",
+              "driver_to_first_pcm_submission_ms": 2.0923,
+              "notified_ns": 246147977700,
+              "first_pcm_submission_ns": 246150070000,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ы",
+                  "planned_ns": 246148486300
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": " ",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 121.8852,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "абы ",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "абы  ",
+              "driver_to_first_pcm_submission_ms": 105.0364,
+              "notified_ns": 246477256900,
+              "first_pcm_submission_ns": 246582293300,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "абы",
+                  "planned_ns": 246478076800
+                }
+              ]
+            },
+            {
+              "text": "пробел  ",
+              "driver_to_first_pcm_submission_ms": 1.8688,
+              "notified_ns": 246745151100,
+              "first_pcm_submission_ns": 246747019900,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "пробел",
+                  "planned_ns": 246745702100
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exact_json_gzip_receipt": {
+        "scenario": "standard",
+        "source_run": 45025594554,
+        "source_job": 137217808058,
+        "gzip_blob_sha": "e1a588c0f2718da7907a7c634237671b91c104ac",
+        "metadata": {
+          "encoding": "gzip+base64",
+          "chunks": 2,
+          "json_sha256": "92dca4f629f2f74a3d9b04af97c50f5abb78b3f5e41028b32b991580721ca6be",
+          "gzip_sha256": "8f0d0c6f5286918798a4752fbae11932e28bf386a854e42fc6aef197fa80f462",
+          "json_size_bytes": 202901
+        }
+      }
+    },
+    {
+      "name": "characters-only",
+      "source_run": 45025594554,
+      "source_job": 137217807859,
+      "result": {
+        "scenario": "characters-only",
+        "cleanup": {
+          "attempted": true,
+          "errors": [],
+          "keyboard_config_restored": true,
+          "keyboard_layout_restored": true,
+          "speech_mode_restored": true
+        },
+        "preference_application": null,
+        "preference_restoration": null
+      },
+      "rows": [
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 25.0004,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 5.9758,
+              "notified_ns": 224469040200,
+              "first_pcm_submission_ns": 224475016000,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 224472639400
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "ї",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 20.3192,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "аї",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ї",
+              "driver_to_first_pcm_submission_ms": 3.4706,
+              "notified_ns": 224799131300,
+              "first_pcm_submission_ns": 224802601900,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ї",
+                  "planned_ns": 224799841000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "a",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US",
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 28.2365,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "a",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "a",
+              "driver_to_first_pcm_submission_ms": 3.5366,
+              "notified_ns": 225530118500,
+              "first_pcm_submission_ns": 225533655100,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ay",
+                  "planned_ns": 225530768200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "b",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US",
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 14.7067,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "ab",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "b",
+              "driver_to_first_pcm_submission_ms": 3.4461,
+              "notified_ns": 225855332800,
+              "first_pcm_submission_ns": 225858778900,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "bee",
+                  "planned_ns": 225856088600
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "en",
+          "input_language": null,
+          "glyph": "!",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "en_US"
+          ],
+          "effective_languages": [
+            "en-us"
+          ],
+          "first_pcm_ms": 36.3157,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "ab!",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "bang  ",
+              "driver_to_first_pcm_submission_ms": 3.0094,
+              "notified_ns": 226209450500,
+              "first_pcm_submission_ns": 226212459900,
+              "planned_parts": [
+                {
+                  "language": "en-us",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "bang",
+                  "planned_ns": 226210114700
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 74.0836,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 3.7983,
+              "notified_ns": 226974370900,
+              "first_pcm_submission_ns": 226978169200,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 226975151100
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "б",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 37.2094,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "аб",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "б",
+              "driver_to_first_pcm_submission_ms": 3.4056,
+              "notified_ns": 227348732400,
+              "first_pcm_submission_ns": 227352138000,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "бэ",
+                  "planned_ns": 227349324600
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "ы",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU",
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 21.1172,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "абы",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ы",
+              "driver_to_first_pcm_submission_ms": 3.3851,
+              "notified_ns": 227649568500,
+              "first_pcm_submission_ns": 227652953600,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ы",
+                  "planned_ns": 227650192400
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": " ",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "ru_RU"
+          ],
+          "effective_languages": [
+            "ru"
+          ],
+          "first_pcm_ms": 19.9927,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "абы ",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "пробел  ",
+              "driver_to_first_pcm_submission_ms": 2.9524,
+              "notified_ns": 227982029300,
+              "first_pcm_submission_ns": 227984981700,
+              "planned_parts": [
+                {
+                  "language": "ru",
+                  "profile": "adam",
+                  "character": false,
+                  "text": "пробел",
+                  "planned_ns": 227982546500
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exact_json_gzip_receipt": {
+        "scenario": "characters-only",
+        "source_run": 45025594554,
+        "source_job": 137217807859,
+        "gzip_blob_sha": "12dddc5db6ac9a2abb1ff92b87d17d2669fb1e0b",
+        "metadata": {
+          "encoding": "gzip+base64",
+          "chunks": 2,
+          "json_sha256": "186dc7ccfbe230a852b337216f835fbb8f64899ac1437e3f8d15cd65609e78f8",
+          "gzip_sha256": "cc590e50f1332a1afec57af603edd3417e18296d19c9b44b7cc797b04460ddef",
+          "json_size_bytes": 190848
+        }
+      }
+    },
+    {
+      "name": "navigation",
+      "source_run": 45027257765,
+      "source_job": 137222869484,
+      "result": {
+        "scenario": "navigation",
+        "cleanup": {
+          "attempted": true,
+          "errors": [],
+          "keyboard_config_restored": true,
+          "keyboard_layout_restored": true,
+          "speech_mode_restored": true
+        },
+        "preference_application": null,
+        "preference_restoration": null
+      },
+      "rows": [
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "б",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 40.6624,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "б",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "б",
+              "driver_to_first_pcm_submission_ms": 5.8866,
+              "notified_ns": 314252158900,
+              "first_pcm_submission_ns": 314258045500,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "бе",
+                  "planned_ns": 314255960600
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "input_language": null,
+          "glyph": "ї",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": null,
+          "expected_label": null,
+          "emitted_languages": [
+            "uk_UA",
+            "uk_UA"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 36.1738,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "бї",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "ї",
+              "driver_to_first_pcm_submission_ms": 3.3341,
+              "notified_ns": 314584111200,
+              "first_pcm_submission_ns": 314587445300,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ї",
+                  "planned_ns": 314584786200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "input_language": "ru",
+          "glyph": "<Backspace>",
+          "action": "Backspace",
+          "status": "passed",
+          "routing_status": null,
+          "expected_language": null,
+          "expected_label": "ї",
+          "emitted_languages": [
+            "uk",
+            "uk"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 8.9813,
+          "word_echo_matches": null,
+          "symbol_label_matches": null,
+          "actual_control_value": "б",
+          "actual_insertion_point": 1,
+          "utterances": [
+            {
+              "text": "ї",
+              "driver_to_first_pcm_submission_ms": 2.8409,
+              "notified_ns": 315422404900,
+              "first_pcm_submission_ns": 315425245800,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "ї",
+                  "planned_ns": 315423073200
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "language": "uk",
+          "input_language": "ru",
+          "glyph": "<LeftArrow>",
+          "action": "LeftArrow",
+          "status": "passed",
+          "routing_status": null,
+          "expected_language": null,
+          "expected_label": "бе",
+          "emitted_languages": [
+            "uk",
+            "uk"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 10.3787,
+          "word_echo_matches": null,
+          "symbol_label_matches": null,
+          "actual_control_value": "б",
+          "actual_insertion_point": 0,
+          "utterances": [
+            {
+              "text": "б",
+              "driver_to_first_pcm_submission_ms": 3.2644,
+              "notified_ns": 315672020100,
+              "first_pcm_submission_ns": 315675284500,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "бе",
+                  "planned_ns": 315672775800
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exact_json_gzip_receipt": {
+        "scenario": "navigation",
+        "source_run": 45027257765,
+        "source_job": 137222869484,
+        "gzip_blob_sha": "82ac47d05d0bf0fd4ad9f99c7b33c6935376316d",
+        "metadata": {
+          "encoding": "gzip+base64",
+          "chunks": 2,
+          "json_sha256": "ba4b8c3850bdf75f0c46b613fbdd841c28c096d8544eaaf24713ad7a56fbc2ec",
+          "gzip_sha256": "7d9840f869d68cdf2acb12fb7689c41b9a20a4a9533e2fa335069beb012c5524",
+          "json_size_bytes": 110903
+        }
+      }
+    },
+    {
+      "name": "forced-uk",
+      "source_run": 45027257765,
+      "source_job": 137222869543,
+      "result": {
+        "scenario": "forced-uk",
+        "cleanup": {
+          "attempted": true,
+          "errors": [],
+          "keyboard_config_restored": true,
+          "keyboard_layout_restored": true,
+          "speech_mode_restored": true
+        },
+        "preference_application": {
+          "api": "actual PreferencesMixin._dordiai_apply (same settings-dialog API)",
+          "mode": "forced",
+          "enabled_languages": [
+            "en",
+            "ru",
+            "uk"
+          ],
+          "default_language": "uk",
+          "expected_route": "uk"
+        },
+        "preference_restoration": {
+          "restored": true,
+          "configuration_scope": "effective isolated AggregatedSection values; owned process discarded afterward"
+        }
+      },
+      "rows": [
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": "uk",
+          "expected_label": null,
+          "emitted_languages": [
+            "uk",
+            "uk"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 39.4146,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 6.3445,
+              "notified_ns": 359406895600,
+              "first_pcm_submission_ns": 359413240100,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 359410728900
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exact_json_gzip_receipt": {
+        "scenario": "forced-uk",
+        "source_run": 45027257765,
+        "source_job": 137222869543,
+        "gzip_blob_sha": "81c620d5d366ec9b48cde30042ea6e079d847b3a",
+        "metadata": {
+          "encoding": "gzip+base64",
+          "chunks": 1,
+          "json_sha256": "14310512ffcba6e4448049d962567b917dea5eecef94a20eeab2bf62d3f70969",
+          "gzip_sha256": "88770b62a5523b9dc5427408762118c080f9716a7dff915a3490a9aba5e8eca0",
+          "json_size_bytes": 53690
+        }
+      }
+    },
+    {
+      "name": "disabled-ru",
+      "source_run": 45027257765,
+      "source_job": 137222869227,
+      "result": {
+        "scenario": "disabled-ru",
+        "cleanup": {
+          "attempted": true,
+          "errors": [],
+          "keyboard_config_restored": true,
+          "keyboard_layout_restored": true,
+          "speech_mode_restored": true
+        },
+        "preference_application": {
+          "api": "actual PreferencesMixin._dordiai_apply (same settings-dialog API)",
+          "mode": "auto",
+          "enabled_languages": [
+            "en",
+            "uk"
+          ],
+          "default_language": "uk",
+          "expected_route": "uk"
+        },
+        "preference_restoration": {
+          "restored": true,
+          "configuration_scope": "effective isolated AggregatedSection values; owned process discarded afterward"
+        }
+      },
+      "rows": [
+        {
+          "language": "ru",
+          "input_language": null,
+          "glyph": "а",
+          "action": null,
+          "status": "passed",
+          "routing_status": "passed",
+          "expected_language": "uk",
+          "expected_label": null,
+          "emitted_languages": [
+            "uk",
+            "uk"
+          ],
+          "effective_languages": [
+            "uk"
+          ],
+          "first_pcm_ms": 28.7123,
+          "word_echo_matches": true,
+          "symbol_label_matches": true,
+          "actual_control_value": "а",
+          "actual_insertion_point": null,
+          "utterances": [
+            {
+              "text": "а",
+              "driver_to_first_pcm_submission_ms": 6.2039,
+              "notified_ns": 268702621200,
+              "first_pcm_submission_ns": 268708825100,
+              "planned_parts": [
+                {
+                  "language": "uk",
+                  "profile": "adam",
+                  "character": true,
+                  "text": "а",
+                  "planned_ns": 268706390300
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exact_json_gzip_receipt": {
+        "scenario": "disabled-ru",
+        "source_run": 45027257765,
+        "source_job": 137222869227,
+        "gzip_blob_sha": "37822ffe7b539a33f7c1c41f2026b0f117d0ed60",
+        "metadata": {
+          "encoding": "gzip+base64",
+          "chunks": 1,
+          "json_sha256": "98a7dd4d2951d60ca7976edc186ba94a08065e5ff523f89ffb7bd7e3d95c1227",
+          "gzip_sha256": "74fe8addaae2b778efd98a2383c14316078ca6d0518af2087ea5893f7a23b31a",
+          "json_size_bytes": 53644
+        }
+      }
+    }
+  ],
+  "interpretation": [
+    "English ! and Russian space with native word echo ON enqueue the preceding word before the symbol name. First PCM totals therefore include the word speech path; prepared-symbol dispatch alone is not that total.",
+    "Words OFF: English bang dispatch-to-PCM3.0094ms /whole-key36.3157ms; Russian пробел2.9524ms /whole-key19.9927ms. Words ON: preceding ab121.0929ms before bang1.7441ms; preceding абы105.0364ms before пробел1.8688ms.",
+    "First RU shared а has62.9377ms ON /74.0836ms OFF total, while queue-to-driver≈0.0664/0.0972ms and driver-to-PCM2.4583/3.7983ms. Dominant time precedes native queue submission; specific frontend cause not isolated.",
+    "Backspace and genuine E0 LeftArrow on actual UK-seeded text with RU keyboard retained Ukrainian emitted/effective language and expected ї/бе names, actual text/caret state. No manually invoked editing script or added locale command.",
+    "Forced UK and disabled RU used real PreferencesMixin._dordiai_apply, shared RU-layout а stayedUK, then effective isolated preferences and keyboard config/layout/speech mode restored.",
+    "Each key/action is a single observation in separate fresh owned jobs; noP95 or physical latency inference. Exact original JSON bytes are preserved in the linked gzip Git blobs."
+  ]
+}
