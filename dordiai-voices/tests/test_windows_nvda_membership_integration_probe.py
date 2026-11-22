@@ -73,10 +73,12 @@ class InstalledMembershipProbeTests(unittest.TestCase):
             "require":inspect.Signature([inspect.Parameter("name",inspect.Parameter.POSITIONAL_OR_KEYWORD),
                 inspect.Parameter("condition",inspect.Parameter.POSITIONAL_OR_KEYWORD),
                 inspect.Parameter("details",inspect.Parameter.VAR_KEYWORD)])}
+        # Dynamic **details has no statically knowable keyword name. Validate
+        # every explicit argument; duplicate explicit name/position still fails.
         for node in ast.walk(tree):
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id in signatures:
                 signatures[node.func.id].bind(*[object() for _ in node.args],
-                    **{kw.arg:object() for kw in node.keywords})
+                    **{kw.arg:object() for kw in node.keywords if kw.arg is not None})
 
 
 if __name__=="__main__":

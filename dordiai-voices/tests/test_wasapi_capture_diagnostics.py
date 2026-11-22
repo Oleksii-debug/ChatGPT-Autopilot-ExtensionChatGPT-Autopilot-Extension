@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location("wasapi_tested",Path(__file__).resolve().parents[1]/"tools/wasapi_capture_diagnostics.py")
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
@@ -41,6 +42,26 @@ class Contracts(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,"six"):m.guard(args,env,"nt")
             args.all_six_mme_opens_failed=True;env["RUNNER_ENVIRONMENT"]="self-hosted"
             with self.assertRaises(RuntimeError):m.guard(args,env,"nt")
+
+
+    def test_run_id_check_uses_canonical_relative_path_after_windows_alias_resolution(self):
+        # Deterministic simulation of an8.3alias path resolving to the long
+        # owned root. This is a namespace-unit contract, not a launch proof.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"Long Owned Root";root.mkdir()
+            alias=Path(tmp)/"SHORT~1"/"diag-123"/"wasapi.json"
+            canonical=root/"diag-123"/"wasapi.json"
+            args=SimpleNamespace(owned_instance_id="ROOT\\DORDIAI_VBCABLE_"+32*"A"+"\\0000",
+                all_six_mme_opens_failed=True,capture_name="CABLE Output (VB-Audio Virtual Cable)",output=alias)
+            env={"GITHUB_ACTIONS":"true","RUNNER_ENVIRONMENT":"github-hosted","GITHUB_REPOSITORY":m.REPOSITORY,
+                 "RUNNER_ARCH":"X64","GITHUB_RUN_ID":"123","RUNNER_TEMP":str(root)}
+            resolve=Path.resolve
+            def canonicalize(path,*a,**kw):
+                if path==alias:return canonical
+                return resolve(path,*a,**kw)
+            with patch.object(Path,"resolve",new=canonicalize):
+                m.guard(args,env,"nt")
+
 
 class FakeWasapi(m.Wasapi):
     def __init__(self,initialize=-2147024891):

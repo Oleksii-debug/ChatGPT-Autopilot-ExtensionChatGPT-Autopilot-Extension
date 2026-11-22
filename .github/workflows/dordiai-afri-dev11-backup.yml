@@ -1,0 +1,65 @@
+name: Dordiai unpublished AfriSix dev11 data backup
+
+on:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-afri-dev11-backup.yml"
+      - "dordiai-voices/tools/draft_afri_dev11_backup.py"
+      - "dordiai-voices/tests/test_draft_afri_dev11_backup.py"
+      - "dordiai-voices/docs/ENGINEERING_BACKUP_AFRI_DEV11.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dordiai-voices-afri-six-dev11-data-backup
+  cancel-in-progress: false
+
+jobs:
+  owned-draft-backup:
+    if: >-
+      github.repository == 'Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension' &&
+      github.ref == 'refs/heads/dordiai-voices/audit-20261122' &&
+      (github.event_name == 'workflow_dispatch' ||
+       contains(github.event.head_commit.message, '[backup-afri-dev11]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Check ownership, corruption and no-overwrite regressions
+        run: python -m unittest discover -s dordiai-voices/tests -p test_draft_afri_dev11_backup.py -v
+      - name: Download only the pinned existing engineering artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: 14754908871
+          path: pinned-afri-packs
+          merge-multiple: true
+          repository: Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+          run-id: 45024624013
+          github-token: ${{ github.token }}
+      - name: Verify all six exact packs before writes and preserve an owned unpublished data draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python dordiai-voices/tools/draft_afri_dev11_backup.py
+          --input-directory pinned-afri-packs
+          --receipt backup-evidence/dordiai-afri-six-dev11-backup-receipt.json
+      - name: Retain the small receipt as a convenience copy
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dordiai-afri-six-dev11-draft-backup-receipt
+          path: backup-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 0

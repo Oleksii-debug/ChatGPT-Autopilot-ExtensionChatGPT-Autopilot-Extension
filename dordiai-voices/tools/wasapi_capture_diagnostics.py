@@ -65,7 +65,7 @@ def guard(args,environ=os.environ,platform_name=os.name):
     output=args.output.absolute()
     if output.exists() or output.is_symlink() or not output.resolve().is_relative_to(root):
         raise RuntimeError("Fresh owned RUNNER_TEMP report required")
-    if environ["GITHUB_RUN_ID"] not in str(output.relative_to(root)):
+    if environ["GITHUB_RUN_ID"] not in str(output.resolve().relative_to(root)):
         raise RuntimeError("Output must bind current CI run")
     for parent in output.parents:
         if parent.is_symlink() or getattr(parent,"is_junction",lambda:False)():
