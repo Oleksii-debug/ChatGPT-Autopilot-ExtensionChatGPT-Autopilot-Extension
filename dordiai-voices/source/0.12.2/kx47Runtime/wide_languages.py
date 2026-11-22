@@ -164,8 +164,62 @@ def _word_spans(text,script,preferred,enabled_languages=None,mode="context",prio
         yield from _phrase_spans(text[start:],script,preferred,enabled_languages,mode,priorities)
 
 
+def _native_word_spans(text,script,preferred,enabled,mode,priorities,scope):
+    start=0
+    for stop in _SENTENCE_END.finditer(text):
+        end=stop.end()
+        yield from _phrase_spans(text[start:end],script,preferred,enabled,mode,priorities,scope)
+        start=end
+    if start<len(text):
+        yield from _phrase_spans(text[start:],script,preferred,enabled,mode,priorities,scope)
+
+
+_LEGACY_WORD_PATTERN = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)*")
+_NATIVE_WORD_FAMILIES = frozenset(("arabic", "bengali", "devanagari"))
+
+
+def _word_ranges(text):
+    """Keep complete native spellings and exact offsets, including bad marks."""
+    if text.isascii():
+        yield from ((match.start(), match.end()) for match in _LEGACY_WORD_PATTERN.finditer(text))
+        return
+    def base(char):
+        # Equivalent to the former regex's Unicode word base, excluding Nd/_.
+        return char.isalnum() and not char.isdecimal() and char not in "'’‘ʼ"
+    def component(char):
+        return base(char) or unicodedata.category(char).startswith("M") or char in "\u200c\u200d"
+    index = 0
+    while index < len(text):
+        if not component(text[index]):
+            index += 1
+            continue
+        start, has_base = index, False
+        while index < len(text):
+            char = text[index]
+            if component(char):
+                has_base = has_base or base(char)
+                index += 1
+            elif char in "'’‘ʼ" and has_base and index + 1 < len(text) and base(text[index + 1]):
+                index += 1
+            else:
+                break
+        if has_base:
+            yield start, index
+
+
+def _native_word_classifier_scope(policy, script, enabled):
+    if script not in _NATIVE_WORD_FAMILIES:
+        return frozenset()
+    capability = getattr(policy, "classifier_family_languages", None)
+    if capability is None:
+        return frozenset()
+    selected = capability(script)
+    allowed = frozenset(code for code in selected if code in FAMILIES[script] and code in CODES | CORE)
+    return allowed if enabled is None or allowed & enabled else frozenset()
+
+
 @lru_cache(maxsize=8192)
-def _lexical_candidates(word,script):
+def _legacy_lexical_candidates(word,script,skip_native_core=False):
     """Merge extended and core lexical evidence; never overwrite a homograph."""
     candidates=set()
     entry=_words().get(word)
@@ -176,33 +230,66 @@ def _lexical_candidates(word,script):
     if script=="latin":
         candidates.update(_auxiliary("latin_languages").word_candidates(word))
     elif script=="cyrillic":
-        candidates.update(_auxiliary("speech_text").cyrillic_word_candidates(word))
+        if not skip_native_core:
+            speech = _auxiliary("speech_text")
+            legacy = getattr(speech, "legacy_cyrillic_word_candidates", speech.cyrillic_word_candidates)
+            candidates.update(legacy(word))
         candidates.intersection_update(FAMILIES["cyrillic"])
+    if script in FAMILIES:
+        candidates.intersection_update(FAMILIES[script])
     return frozenset(code for code in candidates if code in CODES|CORE)
 
 
-def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",priorities=()):
+def _lexical_candidates(word,script):
+    primary = frozenset()
+    if script == "cyrillic":
+        speech = _auxiliary("speech_text")
+        lookup = getattr(speech, "native_cyrillic_word_candidates", None)
+        if lookup is not None:
+            primary = lookup(word)  # Verified before either legacy cache is read.
+    old = _legacy_lexical_candidates(word, script, bool(primary))
+    if primary:
+        # Replace weak UA/RU evidence, retaining independent other-Cyrillic labels.
+        return frozenset((old - {"uk", "ru"}) | primary)
+    return old
+
+
+_lexical_candidates.cache_clear = _legacy_lexical_candidates.cache_clear
+_lexical_candidates.cache_info = _legacy_lexical_candidates.cache_info
+
+
+def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",priorities=(),classifier_scope=None):
     policy=_auxiliary("language_routing")
     enabled=policy.enabled_keys(enabled_languages)
     preferred=policy.fallback_language(preferred,enabled,priorities)
     if PERSONAL:
         local=_personal_catalog.detect_phrase(text,script,PERSONAL)
         if local and (enabled is None or local in enabled):return [(local,text)]
+    if classifier_scope is not None and preferred not in FAMILIES[script]:
+        # Preserve the established whole-script fallback when the primary user
+        # language uses a different alphabet; an ML abstention is not a switch
+        # to an unrelated acoustic alphabet.
+        family_priority=next((policy.language_key(code) for code in priorities
+            if policy.language_key(code) in FAMILIES[script]
+            and policy.language_key(code) in CODES|CORE
+            and (enabled is None or policy.language_key(code) in enabled)),None)
+        preferred=family_priority or _tag(script,text,preferred,enabled) or preferred
     context=_tag(script,text,preferred,enabled) if mode=="context" else None
     if enabled is not None and context not in enabled:context=None
-    matches=list(re.finditer(r"[^\W\d_]+(?:['’][^\W\d_]+)*",text))
+    matches=list(_word_ranges(text))
     if not matches:return [(context,text)]
     sentence_tag,sentence_score=_phrase_language(text,script) if len(matches)>1 and mode=="context" else (None,0.)
     if sentence_tag not in CODES|CORE or (enabled is not None and sentence_tag not in enabled):
         sentence_tag=None
+    if script in FAMILIES and sentence_tag not in FAMILIES[script]:sentence_tag=None
     strong=len(matches)>=3 and sentence_tag is not None and sentence_score>=.85
     labels=[]
     current=preferred
-    for m in matches:
-        word=policy.normalize_word(m.group())
-        if len(word)<=1:
+    for start,end in matches:
+        word=policy.normalize_word(text[start:end])
+        if sum(char.isalpha() for char in word)<=1:
             # Shared letters are keyboard/spelling context, not language samples.
-            guess=current if current in CODES else None
+            guess=current if current in CODES|CORE else None
             labels.append(guess)
             continue
         candidates=_lexical_candidates(word,script)
@@ -215,9 +302,10 @@ def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",pr
             guess=None
             if len(word)>=4:
                 candidate,confidence=policy.classify_word(word,enabled)
-                if candidate:
+                if (candidate and (classifier_scope is None or candidate in classifier_scope)
+                        and (enabled is None or candidate in enabled)):
                     guess=candidate
-                else:
+                elif classifier_scope is None:
                     learned=policy.classifier_languages()
                     outside=(enabled if enabled is not None else CODES|CORE)-learned
                     if not learned or mode=="context" or outside:
@@ -232,27 +320,30 @@ def _phrase_spans(text,script,preferred,enabled_languages=None,mode="context",pr
                         elif len(word)>=8 and candidate and confidence>=.82 and _profiles().predict(word,script)[0]==candidate:
                             guess=candidate
             if guess not in CODES|CORE or (enabled is not None and guess not in enabled):guess=None
-            if script=="cyrillic" and guess not in FAMILIES["cyrillic"]:guess=None
+            if script in FAMILIES and guess not in FAMILIES[script]:guess=None
             if guess is None:
-                guess=(sentence_tag if strong else context) if mode=="context" else preferred
+                guess=(sentence_tag if strong else context) if mode=="context" else (
+                    current if classifier_scope is not None else preferred)
         if enabled is not None and guess not in enabled:guess=None
         labels.append(guess)
         if guess is not None:current=guess
     offset=0;current=labels[0];spans=[]
-    for m,tag in zip(matches[1:],labels[1:]):
+    for (start,end),tag in zip(matches[1:],labels[1:]):
         if tag!=current:
-            spans.append((current,text[offset:m.start()]))
-            offset=m.start();current=tag
+            spans.append((current,text[offset:start]))
+            offset=start;current=tag
     spans.append((current,text[offset:]))
     return spans
 
 
 def _script(char):
+    if char in "'’‘ʼ":return None
     n=ord(char)
     if char.isascii():return "latin" if char.isalpha() else None
     if not unicodedata.category(char).startswith("L"):return None
     if 0x0590<=n<=0x05ff or 0xfb1d<=n<=0xfb4f:return "he"
     if 0x0780<=n<=0x07bf:return "dv"
+    if 0xabc0<=n<=0xabff:return "mni"
     if 0x0600<=n<=0x06ff or 0x0750<=n<=0x077f or 0x08a0<=n<=0x08ff or 0xfb50<=n<=0xfdff or 0xfe70<=n<=0xfeff:return "arabic"
     if 0x0400<=n<=0x052f:return "cyrillic"
     if 0x0370<=n<=0x03ff or 0x1f00<=n<=0x1fff:return "el"
@@ -282,8 +373,8 @@ def _script(char):
     return "unknown"
 
 
-FAMILIES={"arabic":("ar","fa","ur","ps","ug","sd"),"devanagari":("hi","mr","ne","kok","mai","doi"),
-          "bengali":("bn","as","bpy"),"ethiopic":("am","ti"),"burmese":("my","shn"),
+FAMILIES={"arabic":("ar","fa","ur","ps","ug","sd","ks"),"devanagari":("hi","mr","ne","kok","mai","doi","brx"),
+          "bengali":("bn","as","bpy","mni"),"ethiopic":("am","ti"),"burmese":("my","shn"),
           "han":("cmn","yue","ja","hak"),"tibetan":("dz","bo"),
           "cyrillic":("uk","ru","bg","be","mk","sr","kk","tt","ba","cv","ky","mn","tg","uz","az","nog","kaa","ab")}
 
@@ -349,7 +440,8 @@ def split_extended(text,preferred="uk",explicit=False,*,enabled_languages=None,m
     requested=registered(preferred)
     if explicit:
         return [(requested,text)]
-    if sum(char.isalpha() for char in text)<=1:
+    if (sum(char.isalpha() for char in text)<=1
+            and not any(unicodedata.category(char).startswith("M") for char in text)):
         return [(requested,text)]
     pinned=(requested or preferred).lower().replace("_","-").split("-")[0]
     def label(script,span):
@@ -372,6 +464,13 @@ def split_extended(text,preferred="uk",explicit=False,*,enabled_languages=None,m
     def finish(script,value):
         if not explicit and script in {"latin","cyrillic"}:
             for code,part in _word_spans(value,script,requested or preferred,enabled,mode,priorities):add(code,part)
+        elif not explicit and script in _NATIVE_WORD_FAMILIES:
+            scope=_native_word_classifier_scope(policy,script,enabled)
+            if scope:
+                # Only explicit reviewed model capabilities activate this path.
+                # Raw label count/native-mark support alone is insufficient.
+                for code,part in _native_word_spans(value,script,requested or preferred,enabled,mode,priorities,scope):add(code,part)
+            else:add(label(script,value),value)
         elif not explicit and script=="he" and "yi" in CODES:
             start=0
             for cut in _SENTENCE_END.finditer(value):

@@ -974,6 +974,10 @@ def begin_package_maintenance(owner):
             workers.add(_shared_entry["worker"])
         session = {"token": object(), "owner": owner, "workers": tuple(workers), "drivers": drivers,
                    "detached_entry": _shared_entry, "quiesce_started": False, "quiesced": False}
+        native = _runtime_module("native_membership_runtime")
+        native.begin_maintenance(session["token"], (
+            getattr(driver, "_native_membership_token", None) for driver in (*drivers, owner)))
+        session["native_membership"] = native
         _package_maintenance = session
         # No future acquire may lease an old worker after this reservation.
         _shared_entry = None
@@ -1006,6 +1010,11 @@ def quiesce_package_maintenance(session, timeout=8.0):
             pending.join(timeout=max(0.0, deadline-monotonic()))
             if pending.is_alive():
                 raise TimeoutError("Попередній потік озвучення ще працює. Пакет не змінено.")
+    native = session.get("native_membership")
+    if native is not None:
+        native.quiesce(session["token"])
+    if monotonic() > deadline:
+        raise TimeoutError("Мовний словник не завершився вчасно. Пакет не змінено.")
     session["quiesced"] = True
 
 
@@ -1023,6 +1032,9 @@ def end_package_maintenance(session):
             _package_maintenance = None
         else:
             return False
+    native = session.get("native_membership")
+    if native is not None:
+        native.end_maintenance(session["token"])
     if pending:
         def cleanup():
             for worker in pending:
@@ -1180,7 +1192,10 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
         separate = info.get("referenceEngine") == "holos" and not self._canJoin
         self._worker_lease=None
         self._engine = self._english_engine = None
+        self._native_membership_token = None
         try:
+            self._native_membership_runtime = _runtime_module("native_membership_runtime")
+            self._native_membership_token = self._native_membership_runtime.acquire(models, RUNTIME.parent)
             if self.name=='kx47Preview' and not separate:
                 self._engine,self._worker_lease=acquire_shared_worker(python,RUNTIME/'nvda_worker.py',models,reference_config,'mixed')
             else:
@@ -1198,10 +1213,21 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 except BaseException:
                     log.warning("dordiai-voices: failed constructor worker cleanup did not complete.")
             self._engine = self._english_engine = self._worker_lease = None
+            try:
+                self._release_native_membership()
+            except BaseException:
+                log.warning("dordiai-voices: failed constructor lexical cleanup did not complete.")
             raise
         self._initialize_audio_output()
         self._thread = Thread(target=self._run, daemon=True, name="Diordiai speech")
         self._thread.start()
+
+    def _release_native_membership(self):
+        token = getattr(self, "_native_membership_token", None)
+        self._native_membership_token = None
+        runtime = getattr(self, "_native_membership_runtime", None)
+        if token is not None and runtime is not None:
+            runtime.release(token)
 
     def _initialize_audio_output(self):
         """Audio failure must not leave an unstarted driver owning a worker.
@@ -1230,6 +1256,7 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
             elif engine is not None:
                 cleanup.append(engine.close)
             if english is not None and english is not engine:cleanup.append(english.close)
+            cleanup.append(self._release_native_membership)
             for release in cleanup:
                 try:
                     release()
@@ -1756,9 +1783,18 @@ class SynthDriver(_prefs.PreferencesMixin, BaseDriver):
                 def release_when_quiet():
                     for thread in outstanding:
                         thread.join()
-                    release_shared_worker(self._worker_lease)
+                    try:
+                        release_shared_worker(self._worker_lease)
+                    finally:
+                        self._release_native_membership()
                 Thread(target=release_when_quiet, daemon=True,
                        name="dordiai retired worker cleanup").start()
+                self._player.close()
             else:
-                release_shared_worker(self._worker_lease)
-            self._player.close()
+                try:
+                    release_shared_worker(self._worker_lease)
+                finally:
+                    try:
+                        self._release_native_membership()
+                    finally:
+                        self._player.close()

@@ -6,10 +6,11 @@ import gzip
 import json
 from pathlib import Path
 import re
+import sys
 from zlib import crc32
 
 WORDS = re.compile(
-    r"[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+(?:['’][A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+)*|[А-Яа-яІіЇїЄєҐґЁё\u0301]+(?:['’][А-Яа-яІіЇїЄєҐґЁё\u0301]+)*|"
+    r"[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+(?:['’‘ʼ][A-Za-zÀ-ÖØ-öø-ÿĀ-ž]+)*|[А-Яа-яІіЇїЄєҐґЁё\u0301]+(?:['’‘ʼ][А-Яа-яІіЇїЄєҐґЁё\u0301]+)*|"
     r"\d+(?:[.,:/-]\d+)*(?:[\u00a0\u202f]\d{3})*"
 )
 NUMBER = {
@@ -113,8 +114,23 @@ def supplemental_cyrillic_index():
         return {}
 
 
-@lru_cache(maxsize=4096)
+def native_cyrillic_word_candidates(word):
+    """Consult the one owned reader BEFORE any legacy decision cache."""
+    manager = sys.modules.get("_dordiai_main_native_membership_runtime")
+    return manager.candidates(word) if manager is not None else frozenset()
+
+
 def cyrillic_word_candidates(word):
+    # Pass the original spelling: the primary source also normalizes U+2018 and
+    # U+02BC apostrophes, while the frozen classifier's normalization stays fixed.
+    primary = native_cyrillic_word_candidates(word)
+    if primary:
+        return primary
+    return legacy_cyrillic_word_candidates(word)
+
+
+@lru_cache(maxsize=4096)
+def legacy_cyrillic_word_candidates(word):
     """Return all lexical UA/RU candidates, preserving shared spellings."""
     word = routing_policy().normalize_word(word)
     ukrainian = any(letter in word for letter in "іїєґ")
@@ -146,6 +162,13 @@ def cyrillic_word_candidates(word):
         if contains_hash(ru_words, key):
             candidates.add("ru")
     return frozenset(candidates)
+
+
+# Preserve public cache inspection/clearing used by existing diagnostic tools.
+# The public wrapper itself is never cached, so a new dataset cannot return an
+# old same-word primary decision from this LRU.
+cyrillic_word_candidates.cache_clear = legacy_cyrillic_word_candidates.cache_clear
+cyrillic_word_candidates.cache_info = legacy_cyrillic_word_candidates.cache_info
 
 
 @lru_cache(maxsize=4096)

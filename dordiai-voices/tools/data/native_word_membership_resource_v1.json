@@ -1,0 +1,18 @@
+{
+  "format": "dordiai-native-word-membership-resource",
+  "format_version": 1,
+  "filename": "native-word-membership.bin",
+  "sha256": "21208748a50ebf3f5dd3e2feb94f0f3caf3490c2be784aaca2209462380e6689",
+  "bytes": 18661227,
+  "codes": [
+    "uk",
+    "ru"
+  ],
+  "normalization": "nfc-casefold-cyrillic-acute-apostrophes-v1",
+  "word_count": 6642550,
+  "dataset_version": "1.0.0+ci.45027190211.1",
+  "binary_format": "DMLX0001",
+  "build_run_id": 45027190211,
+  "acquisition_run_id": 45022418783,
+  "notice_filename": "native-word-membership.NOTICE.json"
+}

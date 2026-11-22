@@ -231,11 +231,19 @@ def _required_resource_failure_details(details):
     )
 
 
+def _native_membership_resource_failure(error):
+    import sys
+    native = sys.modules.get("_dordiai_main_native_membership_runtime")
+    checker = getattr(native, "is_resource_failure", None)
+    return bool(checker(error)) if checker is not None else False
+
+
 def is_fatal_required_resource_failure(error):
-    """Only fresh worker metadata can attest this permanent route failure."""
+    """Fresh worker proof or the registered host resource class attests failure."""
     if type(error).__name__ in {"SynthesisCancelled", "CancelledError"}:
         return False
-    return _required_resource_failure_details(getattr(error, "dordiai_worker_error", None))
+    return (_native_membership_resource_failure(error)
+            or _required_resource_failure_details(getattr(error, "dordiai_worker_error", None)))
 
 
 def is_fatal_speech_failure(error):
@@ -286,10 +294,14 @@ def recover_bootstrap_speech(driver, details):
     import synthDriverHandler as handler
     recovery = details["recovery"] = {"state": "queued", "physical_audio_verified": False}
     driver._dordiai_last_error_details = details
-    required_resource = _required_resource_failure_details(details.get("worker"))
-    recovery["reason"] = "required-resource-unavailable" if required_resource else "import-bootstrap-failure"
+    native_resource = details.get("required_resource_kind") == "native-word-membership"
+    required_resource = native_resource or _required_resource_failure_details(details.get("worker"))
+    recovery["reason"] = ("native-word-membership-unavailable" if native_resource else
+                          "required-resource-unavailable" if required_resource else "import-bootstrap-failure")
     base = ("Не вдалося завантажити потрібні ресурси dordiai-voices." if required_resource
             else "Не вдалося завантажити компоненти dordiai-voices.")
+    if native_resource:
+        base = "Не вдалося прочитати словник української та російської мов dordiai-voices."
     component = _import_component(details)
     if component:
         base += " Компонент: " + component + "."
@@ -554,6 +566,10 @@ class PreferencesMixin:
         details = _safe_error_details(error)
         self._dordiai_last_error_details = details
         if is_fatal_speech_failure(error):
+            if _native_membership_resource_failure(error):
+                # Attested from the actual registered error class, before queuing;
+                # arbitrary message text or a lookalike class cannot set this reason.
+                details["required_resource_kind"] = "native-word-membership"
             # A fatal loader failure must bypass the ordinary five-second notice limit.
             # One queued recovery per driver prevents a failed notice looping
             # through the same broken synth. Runtime/model work never switches
