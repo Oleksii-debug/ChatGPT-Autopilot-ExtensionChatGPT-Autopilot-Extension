@@ -1,0 +1,223 @@
+name: Dordiai isolated five-native causal streaming experiment
+on:
+  workflow_dispatch:
+  push:
+    branches: [dordiai-voices/audit-20261122]
+    paths:
+      - ".github/workflows/dordiai-afri-native-stream.yml"
+      - "dordiai-voices/tools/research/afri_native_stream_probe.py"
+      - "dordiai-voices/tests/test_afri_native_stream_probe.py"
+      - "dordiai-voices/tools/research/requirements-afri-six-ort.txt"
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dordiai-afri-native-stream-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  windows-unchanged-private-ort:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[afri-native-stream]')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      RESEARCH_ASSETS: ${{ github.workspace }}/ci-stream-small-assets
+      DERIVED_GRAPHS: ${{ github.workspace }}/ci-stream-graphs
+      RESEARCH_REPORTS: ${{ github.workspace }}/dordiai-voices/afri-native-stream-results
+      G2P_SOURCE: ${{ github.workspace }}/ci-six-native-g2p
+      PYTHONUNBUFFERED: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      DO_NOT_TRACK: "1"
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: AfriSpeech/africa-g2p
+          ref: 76b53a8fa2a688812e369837d179d4710c111a7a
+          path: ci-six-native-g2p
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Compile and test exact native fixture orchestration
+        working-directory: dordiai-voices
+        run: |
+          python -m py_compile tools/research/afri_native_stream_probe.py
+          python -m unittest discover -s tests -p test_afri_native_stream_probe.py
+      - name: Prepare only host report directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "$env:RESEARCH_REPORTS" -Force | Out-Null
+          "PRIVATE_CORE=$env:RUNNER_TEMP/dordiai-afri-three-private-core/kx47Runtime" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Download exact existing immutable core9 artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: "14751826473"
+          run-id: 45014461174
+          github-token: ${{ github.token }}
+          path: ci-existing-core9
+      - name: Verify entire original core SHA and extract only its unchanged private interpreter
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib,shutil,zipfile
+          def sha(path):
+              value=hashlib.sha256()
+              with path.open("rb") as source:
+                  for block in iter(lambda:source.read(1024*1024),b""):
+                      value.update(block)
+              return value.hexdigest()
+          archives=list(pathlib.Path("ci-existing-core9").rglob("*.nvda-addon"))
+          assert len(archives)==1, "Expected one original core addon"
+          addon=archives[0]
+          assert addon.stat().st_size==1767414839
+          assert sha(addon)=="9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a"
+          runtime=pathlib.Path(os.environ["PRIVATE_CORE"])
+          destination=runtime.parent
+          assert not runtime.exists()
+          records={}
+          with zipfile.ZipFile(addon) as archive:
+              for info in archive.infolist():
+                  if info.is_dir() or not (info.filename.startswith("kx47Runtime/python/") or info.filename=="kx47Runtime/windows_runtime.py"):
+                      continue
+                  name=pathlib.PurePosixPath(info.filename)
+                  assert not name.is_absolute() and ".." not in name.parts
+                  target=destination.joinpath(*name.parts)
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  with archive.open(info) as source,target.open("xb") as output:
+                      shutil.copyfileobj(source,output,1024*1024)
+                  records[info.filename]=sha(target)
+          assert (runtime/"python/python.exe").is_file()
+          assert (runtime/"windows_runtime.py").is_file()
+          proof={"scope":"Exact existing private interpreter only; no pip installation or DLL replacement",
+                 "source_core9_run":45014461174,"source_artifact":14751826473,
+                 "addon_sha256":"9e59fb90b3ac8ed5ee322ce111234f9fbdf24a3d25a5f96c1097fc7cc25c9e8a",
+                 "addon_bytes":1767414839,"files":records,"native_models_from_core_extracted":False,
+                 "package_files_modified":False,"product_integrated":False}
+          (pathlib.Path(os.environ["RESEARCH_REPORTS"])/"private-core-inventory.json").write_text(json.dumps(proof,indent=2),encoding="utf-8")
+      - name: Download only exact own six-layer graph artifact and verify complete ZIP SHA
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $handler = [System.Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect = $false
+          $client = [System.Net.Http.HttpClient]::new($handler)
+          $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, "https://api.github.com/repos/$env:REPOSITORY/actions/artifacts/14752457496/zip")
+          $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $env:GH_TOKEN)
+          $request.Headers.UserAgent.ParseAdd("dordiai-own-research-ci")
+          $response = $client.SendAsync($request).GetAwaiter().GetResult()
+          if ([int]$response.StatusCode -ne 302 -or $response.Headers.Location.Scheme -ne "https") { throw "Unexpected GitHub artifact redirect" }
+          # Never forward the repository credential to the signed object-storage URL.
+          $anonymous = [System.Net.Http.HttpClient]::new()
+          $stream = $anonymous.GetStreamAsync($response.Headers.Location).GetAwaiter().GetResult()
+          $zip = Join-Path $env:RUNNER_TEMP "afri-exact-six-graphs.zip"
+          $destination = [System.IO.File]::Create($zip)
+          try { $stream.CopyTo($destination) } finally { $destination.Dispose(); $stream.Dispose(); $anonymous.Dispose(); $response.Dispose(); $request.Dispose(); $client.Dispose(); $handler.Dispose() }
+          if ((Get-Item $zip).Length -ne 367643455) { throw "Artifact ZIP byte count mismatch" }
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "1b7053f683714e6e5e734dac23e3c3e3dd1991b9f5eab52c12520e5e67e4fba3") { throw "Artifact ZIP SHA mismatch" }
+          Expand-Archive -LiteralPath $zip -DestinationPath "$env:DERIVED_GRAPHS"
+          @{ artifact_id=14752457496; original_run=45017187461; zip_bytes=367643455; zip_sha256=$hash; graph_checkpoint="b4cdf2cb62674145fe83ba661041d8180faa543ff9ae1906ae3bb59c9a03171c" } | ConvertTo-Json | Set-Content -Encoding utf8 "$env:RESEARCH_REPORTS/artifact-acquisition.json"
+      - name: Acquire only tiny exact tokenizer native references and golden IPA
+        shell: pwsh
+        run: |
+          python dordiai-voices/tools/research/afri_native_stream_probe.py acquire --assets "$env:RESEARCH_ASSETS" --report "$env:RESEARCH_REPORTS/small-acquisition.json"
+          if ($LASTEXITCODE -ne 0) { throw "Pinned frontend acquisition failed" }
+      - name: Run real NumPy state isolation tests in unchanged private interpreter
+        shell: pwsh
+        env:
+          STREAM_PRIVATE_RUNTIME: ${{ env.PRIVATE_CORE }}
+        run: |
+          $python = (Resolve-Path (Join-Path $env:PRIVATE_CORE "python/python.exe")).Path
+          & $python -I -B dordiai-voices/tests/test_afri_native_stream_probe.py
+          if ($LASTEXITCODE -ne 0) { throw "Private streaming state tests failed" }
+      - name: Compare actual causal chunks against unchanged full-wave output across five languages
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $python = (Resolve-Path (Join-Path $env:PRIVATE_CORE "python/python.exe")).Path
+          $programs = @(& $python -c "import json,sys; print(json.dumps(sorted(set((sys.executable,sys._base_executable)))) )" | ConvertFrom-Json)
+          $profiles = @(Get-NetFirewallProfile)
+          if ($profiles.Count -lt 1 -or @($profiles | Where-Object { -not $_.Enabled }).Count -gt 0) { throw "Effective firewall profiles must already be enabled; no global profile changes permitted" }
+          $rules = @()
+          $exitCode = 1
+          try {
+            $i = 0
+            foreach ($program in $programs) {
+              $name = "DordiaiStreamingResearch-$env:GITHUB_RUN_ID-$i"
+              $rules += $name
+              New-NetFirewallRule -Name $name -DisplayName $name -Direction Outbound -Action Block -Program $program -Enabled True -Profile Any | Out-Null
+              $rule = Get-NetFirewallRule -Name $name
+              if ($rule.Action -ne "Block" -or $rule.Direction -ne "Outbound" -or $rule.Enabled -ne "True") { throw "Scoped deny rule did not become effective" }
+              $i++
+            }
+            @{ action="Block"; direction="Outbound"; enabled=$true; programs=$programs; all_firewall_profiles_enabled=$true; names=$rules; scope="own-ephemeral-CI-VM-python-processes-only" } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 "$env:RESEARCH_REPORTS/network-policy.json"
+            & $python -I -B dordiai-voices/tools/research/afri_native_stream_probe.py probe --assets "$env:RESEARCH_ASSETS" --graphs "$env:DERIVED_GRAPHS" --g2p-source "$env:G2P_SOURCE" --network-policy "$env:RESEARCH_REPORTS/network-policy.json" --packaged-runtime "$env:PRIVATE_CORE" --report "$env:RESEARCH_REPORTS/native-windows.json"
+            $exitCode = $LASTEXITCODE
+          } finally {
+            foreach ($name in $rules) { Remove-NetFirewallRule -Name $name -ErrorAction Continue }
+          }
+          if ($exitCode -ne 0) { throw "Native isolated direct-ORT probe failed with exit $exitCode" }
+      - name: Verify every extracted core executable and package byte stayed unchanged
+        if: always()
+        shell: python
+        run: |
+          import hashlib,json,os,pathlib
+          folder=pathlib.Path(os.environ["RESEARCH_REPORTS"])
+          source=folder/"private-core-inventory.json"
+          if not source.is_file():
+              raise RuntimeError("No verified original core inventory")
+          manifest=json.loads(source.read_text(encoding="utf-8"))
+          root=pathlib.Path(os.environ["PRIVATE_CORE"]).parent
+          changed=[]
+          for name,expected in manifest["files"].items():
+              path=root.joinpath(*pathlib.PurePosixPath(name).parts)
+              value=hashlib.sha256()
+              if path.is_file():
+                  with path.open("rb") as stream:
+                      for block in iter(lambda:stream.read(1024*1024),b""):
+                          value.update(block)
+              if not path.is_file() or value.hexdigest()!=expected:
+                  changed.append(name)
+          proof={"all_original_private_files_unchanged":not changed,"changed_files":changed,
+                 "checked_files":len(manifest["files"]),"pip_or_dll_upgrade_performed":False,
+                 "product_integrated":False}
+          (folder/"private-core-integrity.json").write_text(json.dumps(proof,indent=2),encoding="utf-8")
+          assert not changed
+      - name: Preserve exact proof without hardware or NVDA acceptance claims
+        if: always()
+        shell: python
+        run: |
+          import base64,gzip,hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["RESEARCH_REPORTS"])
+          for name in ("private-core-integrity.json","artifact-acquisition.json","small-acquisition.json","network-policy.json","native-windows.json"):
+              path=root/name
+              if not path.is_file():
+                  continue
+              raw=path.read_bytes()
+              value=json.loads(raw.decode("utf-8-sig"))
+              summary={k:value.get(k) for k in ("status","all_eighty_streamed_cases_within_numerical_gate","all_eighty_streamed_cases_float_and_pcm_bit_identical","all_chunk1_first_yields_before_ar_completion","all_five_cancel_close_and_fresh_request_replays_passed","windows_verified","nvda_verified","physical_audio_verified","downstream_converter_streaming_verified","model_load_seconds","process_peak_rss_bytes","all_original_input_bytes_unchanged","ort_version","python_version","product_integrated")}
+              summary["word_timings"]=[{"language":row["language"],"original_full":row["original_full_wave"]["wall_seconds"],"cached_full":row["cached_full_wave"]["wall_seconds"],"chunks":[{"frames":item["chunk_frames"],"first_nonzero_pcm_seconds":item["first_nonzero_pcm_seconds"],"completed_wave_seconds":item["wall_seconds"],"first_yield_before_ar_completion":item["first_yield_before_ar_completion"],"max_pcm16_lsb_error":item["parity"]["max_pcm16_lsb_error"],"float_bit_identical":item["parity"]["float32_bit_identical"]} for item in row["streamed"]]} for row in value.get("word_benchmarks",[])]
+              print("AFRI_WINDOWS_SUMMARY "+name+" "+json.dumps(summary),flush=True)
+              packed=gzip.compress(raw,mtime=0)
+              if len(packed)>524288:
+                  raise RuntimeError("Unexpectedly large proof")
+              text=base64.b64encode(packed).decode()
+              chunks=[text[i:i+12000] for i in range(0,len(text),12000)]
+              print("AFRI_WINDOWS_GZIP_SHA256 "+name+" "+hashlib.sha256(packed).hexdigest(),flush=True)
+              for i,chunk in enumerate(chunks,1):
+                  print("AFRI_WINDOWS_GZIP_B64 "+name+" "+str(i)+"/"+str(len(chunks))+" "+chunk,flush=True)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dordiai-afri-native-stream-ort-${{ github.run_id }}
+          path: ${{ env.RESEARCH_REPORTS }}
+          if-no-files-found: warn
+          retention-days: 14
